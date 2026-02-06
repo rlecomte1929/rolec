@@ -1,57 +1,14 @@
 # Python
+.venv/
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
+*.pyc
+relopass.db
 
 # Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-dist/
-.cache/
+frontend/node_modules/
+frontend/dist/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
+# OS / editor
 .DS_Store
 Thumbs.db
-
-# Env
-.env
-.env.local
-.env.production
-
-# Build
-frontend/dist/
-frontend/build/
+.vscode/

@@ -15,9 +15,18 @@ class RecommendationEngine:
     def get_housing_recommendations(self, profile: Dict[str, Any]) -> List[HousingRecommendation]:
         """Return filtered and ranked housing options."""
         housing_prefs = profile.get("movePlan", {}).get("housing", {})
-        
+
         budget_range = housing_prefs.get("budgetMonthlySGD")
-        bedrooms = housing_prefs.get("bedroomsMin", 3)
+
+        # bedroomsMin may come through as a string from the questionnaire,
+        # but our seed data stores bedrooms as integers. Normalise to int
+        # with a sensible default to avoid type errors when comparing.
+        bedrooms_raw = housing_prefs.get("bedroomsMin", 3)
+        try:
+            bedrooms = int(bedrooms_raw) if bedrooms_raw is not None else 3
+        except (TypeError, ValueError):
+            bedrooms = 3
+
         preferred_areas = housing_prefs.get("preferredAreas", [])
         must_haves = housing_prefs.get("mustHave", [])
         
@@ -28,7 +37,14 @@ class RecommendationEngine:
         filtered = []
         for house in all_housing:
             # Filter by bedrooms
-            if house["bedrooms"] < bedrooms:
+            house_bedrooms_raw = house.get("bedrooms")
+            try:
+                house_bedrooms = int(house_bedrooms_raw) if house_bedrooms_raw is not None else bedrooms
+            except (TypeError, ValueError):
+                # If we can't interpret the seed value, don't exclude it purely on bedrooms
+                house_bedrooms = bedrooms
+
+            if house_bedrooms < bedrooms:
                 continue
             
             # Filter by budget if specified
