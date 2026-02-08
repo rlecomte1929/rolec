@@ -12,10 +12,10 @@ export const Alert: React.FC<AlertProps> = ({
   title,
 }) => {
   const variants = {
-    info: 'bg-blue-50 border-blue-200 text-blue-800',
-    success: 'bg-green-50 border-green-200 text-green-800',
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
+    info: 'bg-[#eef4f8] border-[#c7d8e6] text-[#0b2b43]',
+    success: 'bg-[#eef7f6] border-[#c6e2df] text-[#1f8e8b]',
+    warning: 'bg-[#f6f2e9] border-[#e2d6bf] text-[#7a5e2a]',
+    error: 'bg-[#f7eeee] border-[#e6c9c9] text-[#7a2a2a]',
   };
   
   return (

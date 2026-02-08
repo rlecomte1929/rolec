@@ -26,8 +26,8 @@ QUESTION_BANK: List[Question] = [
     # 1. Target arrival date
     Question(
         id="q_target_arrival_date",
-        title="When do you plan to arrive in Singapore?",
-        whyThisMatters="This helps us plan your housing, school enrollment, and moving timeline.",
+        title="When do you plan to arrive at your destination?",
+        whyThisMatters="This helps us plan housing, school enrollment, and your moving timeline.",
         type="date",
         required=True,
         mapsTo="movePlan.targetArrivalDate",
@@ -37,8 +37,8 @@ QUESTION_BANK: List[Question] = [
     # 2. Assignment start date
     Question(
         id="q_assignment_start_date",
-        title="When does your Singapore assignment start?",
-        whyThisMatters="Your work permit application timing depends on this date.",
+        title="When does your assignment start?",
+        whyThisMatters="Your work authorization timing depends on this date.",
         type="date",
         required=True,
         mapsTo="primaryApplicant.assignment.startDate",
@@ -48,7 +48,7 @@ QUESTION_BANK: List[Question] = [
     # 3. Assignment duration
     Question(
         id="q_assignment_duration",
-        title="How long is your Singapore assignment expected to last?",
+        title="How long is your assignment expected to last?",
         whyThisMatters="This affects housing lease terms and school enrollment decisions.",
         type="single_select",
         required=True,
@@ -109,8 +109,8 @@ QUESTION_BANK: List[Question] = [
     # 8. Role title
     Question(
         id="q_role_title",
-        title="What is your role title at Norwegian Investment?",
-        whyThisMatters="This helps determine your work permit category and housing budget guidance.",
+        title="What is your role title at your employer?",
+        whyThisMatters="This helps determine your work authorization category and housing budget guidance.",
         type="text",
         required=True,
         mapsTo="primaryApplicant.employer.roleTitle",
@@ -120,16 +120,16 @@ QUESTION_BANK: List[Question] = [
     # 9. Salary band
     Question(
         id="q_salary_band",
-        title="What is your salary range in SGD per year?",
-        whyThisMatters="This affects work permit eligibility and helps us recommend suitable housing.",
+        title="What is your salary range per year?",
+        whyThisMatters="This affects work authorization eligibility and helps us recommend suitable housing.",
         type="single_select",
         required=True,
         mapsTo="primaryApplicant.employer.salaryBand",
         options=[
-            QuestionOption(value="60000-100000", label="SGD 60k - 100k"),
-            QuestionOption(value="100000-150000", label="SGD 100k - 150k"),
-            QuestionOption(value="150000-200000", label="SGD 150k - 200k"),
-            QuestionOption(value="200000+", label="SGD 200k+"),
+            QuestionOption(value="60000-100000", label="60k - 100k"),
+            QuestionOption(value="100000-150000", label="100k - 150k"),
+            QuestionOption(value="150000-200000", label="150k - 200k"),
+            QuestionOption(value="200000+", label="200k+"),
         ],
         allowUnknown=True
     ),
@@ -137,7 +137,7 @@ QUESTION_BANK: List[Question] = [
     # 10. Relocation package
     Question(
         id="q_relocation_package",
-        title="Does Norwegian Investment provide a relocation package?",
+        title="Does your employer provide a relocation package?",
         whyThisMatters="This helps us understand what support you already have for moving and housing.",
         type="boolean",
         required=True,
@@ -148,7 +148,7 @@ QUESTION_BANK: List[Question] = [
     # 11. Spouse name
     Question(
         id="q_spouse_name",
-        title="What is your wife's full name?",
+        title="What is your spouse's full name?",
         whyThisMatters="Required for dependent pass application.",
         type="text",
         required=True,
@@ -159,7 +159,7 @@ QUESTION_BANK: List[Question] = [
     # 12. Spouse nationality
     Question(
         id="q_spouse_nationality",
-        title="What is your wife's nationality?",
+        title="What is your spouse's nationality?",
         whyThisMatters="Affects dependent pass eligibility and work authorization.",
         type="text",
         required=True,
@@ -170,8 +170,8 @@ QUESTION_BANK: List[Question] = [
     # 13. Spouse occupation
     Question(
         id="q_spouse_occupation",
-        title="What is your wife's current occupation?",
-        whyThisMatters="This helps us guide her job search and work permit options in Singapore.",
+        title="What is your spouse's current occupation?",
+        whyThisMatters="This helps us guide job search and work authorization options.",
         type="text",
         required=False,
         mapsTo="spouse.occupation",
@@ -248,16 +248,16 @@ QUESTION_BANK: List[Question] = [
     
     Question(
         id="q_housing_budget",
-        title="What is your monthly housing budget in SGD?",
-        whyThisMatters="Singapore housing varies widely; this helps us show realistic options.",
+        title="What is your monthly housing budget?",
+        whyThisMatters="Housing varies widely; this helps us show realistic options.",
         type="single_select",
         required=True,
         mapsTo="movePlan.housing.budgetMonthlySGD",
         options=[
-            QuestionOption(value="3000-5000", label="SGD 3,000 - 5,000"),
-            QuestionOption(value="5000-7000", label="SGD 5,000 - 7,000"),
-            QuestionOption(value="7000-10000", label="SGD 7,000 - 10,000"),
-            QuestionOption(value="10000+", label="SGD 10,000+"),
+            QuestionOption(value="3000-5000", label="3,000 - 5,000"),
+            QuestionOption(value="5000-7000", label="5,000 - 7,000"),
+            QuestionOption(value="7000-10000", label="7,000 - 10,000"),
+            QuestionOption(value="10000+", label="10,000+"),
         ],
         allowUnknown=True
     ),
@@ -321,7 +321,7 @@ QUESTION_BANK: List[Question] = [
             QuestionOption(value="IB", label="International Baccalaureate (IB)"),
             QuestionOption(value="UK", label="British (IGCSE/A-Levels)"),
             QuestionOption(value="US", label="American"),
-            QuestionOption(value="Local", label="Singapore Local"),
+            QuestionOption(value="Local", label="Local curriculum"),
             QuestionOption(value="No preference", label="No preference"),
         ],
         allowUnknown=True
@@ -329,16 +329,16 @@ QUESTION_BANK: List[Question] = [
     
     Question(
         id="q_school_budget",
-        title="What is your annual school budget per child (SGD)?",
-        whyThisMatters="International schools range from SGD 20k to 45k+ per year.",
+        title="What is your annual school budget per child?",
+        whyThisMatters="International schools range widely by location.",
         type="single_select",
         required=True,
         mapsTo="movePlan.schooling.budgetAnnualSGD",
         options=[
-            QuestionOption(value="15000-25000", label="SGD 15k - 25k"),
-            QuestionOption(value="25000-35000", label="SGD 25k - 35k"),
-            QuestionOption(value="35000-45000", label="SGD 35k - 45k"),
-            QuestionOption(value="45000+", label="SGD 45k+"),
+            QuestionOption(value="15000-25000", label="15k - 25k"),
+            QuestionOption(value="25000-35000", label="25k - 35k"),
+            QuestionOption(value="35000-45000", label="35k - 45k"),
+            QuestionOption(value="45000+", label="45k+"),
         ],
         allowUnknown=True
     ),
@@ -383,7 +383,7 @@ QUESTION_BANK: List[Question] = [
     
     Question(
         id="q_storage_needed",
-        title="Will you need storage in Singapore?",
+        title="Will you need storage during the move?",
         whyThisMatters="Some movers offer storage for items that won't fit in temporary housing.",
         type="boolean",
         required=True,
@@ -434,8 +434,8 @@ QUESTION_BANK: List[Question] = [
     
     Question(
         id="q_has_employment_letter",
-        title="Do you have an employment letter from Norwegian Investment?",
-        whyThisMatters="Required for work permit application; should state role, salary, and start date.",
+        title="Do you have an employment letter from your employer?",
+        whyThisMatters="Required for work authorization; should state role, salary, and start date.",
         type="boolean",
         required=True,
         mapsTo="complianceDocs.hasEmploymentLetter",
@@ -452,6 +452,8 @@ def get_question_by_id(question_id: str) -> Question:
     return None
 
 
-def get_all_questions() -> List[Question]:
-    """Get all questions."""
-    return QUESTION_BANK
+def get_all_questions(skip_ids: set | None = None) -> List[Question]:
+    """Get all questions, optionally skipping IDs for scenario logic."""
+    if not skip_ids:
+        return QUESTION_BANK
+    return [question for question in QUESTION_BANK if question.id not in skip_ids]

@@ -30,14 +30,32 @@ export interface NextQuestionResponse {
 }
 
 export interface LoginRequest {
-  email: string;
-  provider?: string;
+  identifier: string;
+  password: string;
 }
 
 export interface LoginResponse {
   token: string;
-  userId: string;
-  email: string;
+  user: User;
+}
+
+export interface RegisterRequest {
+  username?: string;
+  email?: string;
+  password: string;
+  role: UserRole;
+  name?: string;
+}
+
+export type UserRole = 'HR' | 'EMPLOYEE';
+
+export interface User {
+  id: string;
+  username?: string;
+  email?: string;
+  role: UserRole;
+  name?: string;
+  company?: string;
 }
 
 export interface AnswerRequest {
@@ -70,6 +88,7 @@ export interface Passport {
 export interface Employer {
   name: string;
   roleTitle?: string;
+  jobLevel?: string;
   contractType?: string;
   salaryBand?: string;
 }
@@ -85,6 +104,7 @@ export interface PrimaryApplicant {
   fullName?: string;
   nationality?: string;
   dateOfBirth?: string;
+  photoUrl?: string;
   passport: Passport;
   employer: Employer;
   assignment: Assignment;
@@ -130,6 +150,226 @@ export interface ComplianceDocs {
   hasEmploymentLetter?: boolean;
   hasBankStatements?: boolean;
   notes?: string;
+}
+
+export type PolicyExceptionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface PolicyException {
+  id: string;
+  assignment_id: string;
+  category: string;
+  status: PolicyExceptionStatus;
+  reason?: string;
+  requested_amount?: number;
+  requested_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PolicyCap {
+  amount: number;
+  currency: string;
+  durationMonths?: number;
+}
+
+export interface PolicyConfig {
+  policyVersion: string;
+  effectiveDate: string;
+  jurisdictionNotes: string;
+  caps: Record<string, PolicyCap>;
+  approvalRules: Record<string, string>;
+  exceptionWorkflow: {
+    states: string[];
+    requiredFields: string[];
+  };
+  requiredEvidence: Record<string, string[]>;
+  leadTimeRules: { minDays: number };
+  riskThresholds: { low: number; moderate: number };
+  documentRequirements: Record<string, string[]>;
+}
+
+export type PolicySpendStatus = 'ON_TRACK' | 'NEAR_LIMIT' | 'OVER_LIMIT';
+
+export interface PolicySpendItem {
+  title: string;
+  used: number;
+  cap: number;
+  remaining: number;
+  currency: string;
+  status: PolicySpendStatus;
+}
+
+export interface PolicyResponse {
+  policy: PolicyConfig;
+  spend: Record<string, PolicySpendItem>;
+  exceptions: PolicyException[];
+  gating: {
+    requiresAcknowledgement: boolean;
+    requiresHRApproval: boolean;
+  };
+}
+
+export type ComplianceStatus = 'PASS' | 'WARN' | 'FAIL';
+export type ComplianceSeverity = 'LOW' | 'MED' | 'HIGH' | 'CRITICAL';
+export type ComplianceConfidence = 'LOW' | 'MED' | 'HIGH';
+export type ComplianceOwner = 'HR' | 'Employee' | 'Partner';
+
+export interface ComplianceCheckItem {
+  checkId: string;
+  title: string;
+  pillar: string;
+  status: ComplianceStatus;
+  severity: ComplianceSeverity;
+  confidence: ComplianceConfidence;
+  owner: ComplianceOwner;
+  whyItMatters: string;
+  evidenceNeeded: string[];
+  fixActions: string[];
+  blocking: boolean;
+}
+
+export interface ComplianceSummary {
+  riskScore: number;
+  label: 'Low' | 'Moderate' | 'High';
+  criticalCount: number;
+  lastVerified: string;
+}
+
+export interface ComplianceMeta {
+  visaPath: string;
+  destination: string;
+  stage: string;
+}
+
+export interface ComplianceConflict {
+  id: string;
+  title: string;
+  details: Record<string, string>;
+}
+
+export interface ComplianceCaseReport {
+  summary: ComplianceSummary;
+  meta: ComplianceMeta;
+  checks: ComplianceCheckItem[];
+  consistencyConflicts: ComplianceConflict[];
+  recentChecks: ComplianceCheckItem[];
+}
+
+export interface RelocationBasicsDTO {
+  originCountry?: string;
+  originCity?: string;
+  destCountry?: string;
+  destCity?: string;
+  purpose?: string;
+  targetMoveDate?: string;
+  durationMonths?: number;
+  hasDependents?: boolean;
+}
+
+export interface EmployeeProfileDTO {
+  fullName?: string;
+  nationality?: string;
+  passportCountry?: string;
+  passportExpiry?: string;
+  residenceCountry?: string;
+  email?: string;
+  ocr?: Record<string, any>;
+}
+
+export interface FamilyMemberDTO {
+  fullName?: string;
+  dateOfBirth?: string;
+  relationship?: string;
+  nationality?: string;
+  wantsToWork?: boolean;
+}
+
+export interface FamilyMembersDTO {
+  maritalStatus?: string;
+  spouse?: FamilyMemberDTO;
+  children?: FamilyMemberDTO[];
+}
+
+export interface AssignmentContextDTO {
+  employerName?: string;
+  employerCountry?: string;
+  workLocation?: string;
+  contractStartDate?: string;
+  contractType?: string;
+  salaryBand?: string;
+  jobTitle?: string;
+  seniorityBand?: string;
+}
+
+export interface CaseDraftDTO {
+  relocationBasics: RelocationBasicsDTO;
+  employeeProfile: EmployeeProfileDTO;
+  familyMembers: FamilyMembersDTO;
+  assignmentContext: AssignmentContextDTO;
+}
+
+export interface CaseDTO {
+  id: string;
+  status: string;
+  draft: CaseDraftDTO;
+  createdAt: string;
+  updatedAt: string;
+  originCountry?: string;
+  originCity?: string;
+  destCountry?: string;
+  destCity?: string;
+  purpose?: string;
+  targetMoveDate?: string;
+  flags?: Record<string, any>;
+  requirementsSnapshotId?: string;
+}
+
+export interface SourceRecordDTO {
+  id: string;
+  url: string;
+  title: string;
+  publisherDomain: string;
+  retrievedAt: string;
+  snippet?: string;
+}
+
+export interface RequirementItemDTO {
+  id: string;
+  pillar: string;
+  title: string;
+  description: string;
+  severity: string;
+  owner: string;
+  requiredFields: string[];
+  statusForCase: 'PROVIDED' | 'MISSING' | 'NEEDS_REVIEW';
+  citations: SourceRecordDTO[];
+}
+
+export interface CountryProfileDTO {
+  countryCode: string;
+  lastUpdatedAt?: string;
+  confidenceScore?: number;
+  sources: SourceRecordDTO[];
+  requirementGroups: { pillar: string; items: RequirementItemDTO[] }[];
+}
+
+export interface CountryListDTO {
+  countries: {
+    countryCode: string;
+    lastUpdatedAt?: string;
+    requirementsCount: number;
+    confidenceScore?: number;
+    topDomains: string[];
+  }[];
+}
+
+export interface CaseRequirementsDTO {
+  caseId: string;
+  destCountry: string;
+  purpose: string;
+  computedAt: string;
+  requirements: RequirementItemDTO[];
+  sources: SourceRecordDTO[];
 }
 
 export interface RelocationProfile {
@@ -212,3 +452,77 @@ export interface DashboardResponse {
   };
   overallStatus: 'On track' | 'At risk';
 }
+
+export type AssignmentStatus =
+  | 'IN_PROGRESS'
+  | 'DRAFT'
+  | 'EMPLOYEE_SUBMITTED'
+  | 'HR_REVIEW'
+  | 'HR_APPROVED'
+  | 'CHANGES_REQUESTED';
+
+export interface AssignmentSummary {
+  id: string;
+  caseId: string;
+  employeeIdentifier: string;
+  status: AssignmentStatus;
+  submittedAt?: string;
+  complianceStatus?: string | null;
+}
+
+export interface AssignmentDetail {
+  id: string;
+  caseId: string;
+  employeeIdentifier: string;
+  status: AssignmentStatus;
+  submittedAt?: string;
+  hrNotes?: string | null;
+  profile?: RelocationProfile | null;
+  completeness?: number | null;
+  complianceReport?: ComplianceReport | null;
+}
+
+export interface ComplianceReport {
+  overallStatus: 'COMPLIANT' | 'NON_COMPLIANT' | 'NEEDS_REVIEW';
+  checks: ComplianceCheck[];
+  actions: string[];
+}
+
+export interface ComplianceCheck {
+  id: string;
+  name: string;
+  status: 'COMPLIANT' | 'NON_COMPLIANT' | 'NEEDS_REVIEW';
+  severity: 'low' | 'medium' | 'high';
+  rationale: string;
+  affectedFields: string[];
+}
+
+export interface AssignCaseResponse {
+  assignmentId: string;
+  inviteToken?: string | null;
+}
+
+export interface EmployeeAssignmentResponse {
+  assignment: {
+    id: string;
+    case_id: string;
+    employee_identifier: string;
+    status: AssignmentStatus;
+  } | null;
+}
+
+export interface EmployeeJourneyResponse {
+  question: Question | null;
+  isComplete: boolean;
+  progress: {
+    answeredCount: number;
+    totalQuestions: number;
+    percentComplete: number;
+  };
+  completeness: number;
+  missingItems: string[];
+  assignmentStatus?: AssignmentStatus;
+  hrNotes?: string | null;
+  profile?: RelocationProfile | null;
+}
+

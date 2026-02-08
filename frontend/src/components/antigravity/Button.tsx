@@ -22,10 +22,10 @@ export const Button: React.FC<ButtonProps> = ({
   const baseStyles = 'font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
   
   const variants = {
-    primary: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500',
-    secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
-    outline: 'border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 focus:ring-indigo-500',
-    ghost: 'text-indigo-600 hover:bg-indigo-50 focus:ring-indigo-500',
+    primary: 'bg-[#0b2b43] text-white hover:bg-[#123651] focus:ring-[#0b2b43]',
+    secondary: 'bg-[#1f8e8b] text-white hover:bg-[#197c79] focus:ring-[#1f8e8b]',
+    outline: 'border-2 border-[#0b2b43] text-[#0b2b43] hover:bg-[#e6f2f4] focus:ring-[#0b2b43]',
+    ghost: 'text-[#0b2b43] hover:bg-[#e6f2f4] focus:ring-[#0b2b43]',
   };
   
   const sizes = {

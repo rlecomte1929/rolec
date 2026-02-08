@@ -12,3 +12,9 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 .vscode/
+.idea/
+
+# Secrets
+.env
+.env.local
+.env.*

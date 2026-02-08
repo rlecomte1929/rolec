@@ -42,6 +42,11 @@ class OverallStatus(str, Enum):
     AT_RISK = "At risk"
 
 
+class UserRole(str, Enum):
+    HR = "HR"
+    EMPLOYEE = "EMPLOYEE"
+
+
 # Child model
 class Child(BaseModel):
     firstName: Optional[str] = None
@@ -70,6 +75,7 @@ class Passport(BaseModel):
 class Employer(BaseModel):
     name: str = "Norwegian Investment"
     roleTitle: Optional[str] = None
+    jobLevel: Optional[str] = None
     contractType: Optional[ContractType] = None
     salaryBand: Optional[str] = None
 
@@ -87,6 +93,7 @@ class PrimaryApplicant(BaseModel):
     fullName: Optional[str] = None
     nationality: Optional[str] = None
     dateOfBirth: Optional[date] = None
+    photoUrl: Optional[str] = None
     passport: Passport = Field(default_factory=Passport)
     employer: Employer = Field(default_factory=Employer)
     assignment: Assignment = Field(default_factory=Assignment)
@@ -172,15 +179,33 @@ class Question(BaseModel):
 
 
 # API request/response models
+class RegisterRequest(BaseModel):
+    username: Optional[str] = None
+    email: Optional[str] = None
+    password: str
+    role: UserRole
+    name: Optional[str] = None
+
+
 class LoginRequest(BaseModel):
-    email: str
-    provider: str = "email"
+    identifier: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    username: Optional[str] = None
+    email: Optional[str] = None
+    role: UserRole
+    name: Optional[str] = None
+    company: Optional[str] = None
 
 
 class LoginResponse(BaseModel):
     token: str
-    userId: str
-    email: str
+    user: UserResponse
+
+
 
 
 class AnswerRequest(BaseModel):
@@ -264,3 +289,92 @@ class DashboardResponse(BaseModel):
     timeline: List[TimelinePhase]
     recommendations: Dict[str, List[Any]]
     overallStatus: OverallStatus
+
+
+class AssignmentStatus(str, Enum):
+    DRAFT = "DRAFT"
+    IN_PROGRESS = "IN_PROGRESS"
+    EMPLOYEE_SUBMITTED = "EMPLOYEE_SUBMITTED"
+    HR_REVIEW = "HR_REVIEW"
+    HR_APPROVED = "HR_APPROVED"
+    CHANGES_REQUESTED = "CHANGES_REQUESTED"
+
+
+class AssignmentSummary(BaseModel):
+    id: str
+    caseId: str
+    employeeIdentifier: str
+    status: AssignmentStatus
+    submittedAt: Optional[str] = None
+    complianceStatus: Optional[str] = None
+
+
+class AssignmentDetail(BaseModel):
+    id: str
+    caseId: str
+    employeeIdentifier: str
+    status: AssignmentStatus
+    submittedAt: Optional[str] = None
+    hrNotes: Optional[str] = None
+    profile: Optional[RelocationProfile] = None
+    completeness: Optional[int] = None
+    complianceReport: Optional[Dict[str, Any]] = None
+
+
+class HRAssignmentDecision(BaseModel):
+    decision: AssignmentStatus
+    notes: Optional[str] = None
+
+
+class CreateCaseResponse(BaseModel):
+    caseId: str
+
+
+class AssignCaseRequest(BaseModel):
+    employeeIdentifier: str
+
+
+class AssignCaseResponse(BaseModel):
+    assignmentId: str
+    inviteToken: Optional[str] = None
+
+
+class UpdateAssignmentIdentifierRequest(BaseModel):
+    employeeIdentifier: str
+
+
+class ClaimAssignmentRequest(BaseModel):
+    email: str
+
+
+class EmployeeJourneyRequest(BaseModel):
+    assignmentId: str
+    questionId: str
+    answer: Any
+
+
+class EmployeeJourneyNextQuestion(BaseModel):
+    question: Optional[Question] = None
+    isComplete: bool = False
+    progress: Dict[str, Any] = Field(default_factory=dict)
+    completeness: int = 0
+    missingItems: List[str] = Field(default_factory=list)
+    assignmentStatus: Optional[AssignmentStatus] = None
+    hrNotes: Optional[str] = None
+    profile: Optional[RelocationProfile] = None
+
+
+class UpdateProfilePhotoRequest(BaseModel):
+    assignmentId: str
+    photoUrl: str
+
+
+class PolicyExceptionRequest(BaseModel):
+    category: str
+    reason: Optional[str] = None
+    amount: Optional[float] = None
+class ComplianceActionRequest(BaseModel):
+    actionType: str
+    checkId: str
+    notes: Optional[str] = None
+    payload: Optional[Dict[str, Any]] = None

@@ -14,23 +14,23 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   color = 'indigo',
 }) => {
   const colors = {
-    indigo: 'bg-indigo-600',
-    green: 'bg-green-600',
-    yellow: 'bg-yellow-600',
-    red: 'bg-red-600',
+    indigo: 'bg-[#0b2b43]',
+    green: 'bg-[#1f8e8b]',
+    yellow: 'bg-[#7a5e2a]',
+    red: 'bg-[#7a2a2a]',
   };
   
   return (
     <div className="w-full">
-      {label && <div className="text-sm font-medium text-gray-700 mb-1">{label}</div>}
-      <div className="w-full bg-gray-200 rounded-full h-2.5">
+      {label && <div className="text-sm font-medium text-[#374151] mb-1">{label}</div>}
+      <div className="w-full bg-[#e2e8f0] rounded-full h-2.5">
         <div
           className={`h-2.5 rounded-full transition-all duration-300 ${colors[color]}`}
           style={{ width: `${Math.min(Math.max(value, 0), 100)}%` }}
         ></div>
       </div>
       {showLabel && (
-        <div className="text-xs text-gray-500 mt-1 text-right">{Math.round(value)}%</div>
+        <div className="text-xs text-[#6b7280] mt-1 text-right">{Math.round(value)}%</div>
       )}
     </div>
   );

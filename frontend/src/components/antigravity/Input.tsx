@@ -22,12 +22,12 @@ export const Input: React.FC<InputProps> = ({
   fullWidth = false,
 }) => {
   const widthClass = fullWidth ? 'w-full' : '';
-  const errorClass = error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500';
+  const errorClass = error ? 'border-[#7a2a2a] focus:ring-[#7a2a2a]' : 'border-[#d1d5db] focus:ring-[#0b2b43]';
   
   return (
     <div className={widthClass}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-[#374151] mb-1">
           {label}
         </label>
       )}
@@ -38,10 +38,10 @@ export const Input: React.FC<InputProps> = ({
         placeholder={placeholder}
         disabled={disabled}
         className={`px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all ${widthClass} ${errorClass} ${
-          disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+          disabled ? 'bg-[#f3f4f6] cursor-not-allowed' : 'bg-white'
         }`}
       />
-      {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
+      {error && <p className="text-sm text-[#7a2a2a] mt-1">{error}</p>}
     </div>
   );
 };

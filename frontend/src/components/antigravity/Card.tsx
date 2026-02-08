@@ -25,7 +25,7 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl shadow-md border border-gray-200 ${paddings[padding]} ${clickableClass} ${className}`}
+      className={`bg-white rounded-xl shadow-sm border border-[#e2e8f0] ${paddings[padding]} ${clickableClass} ${className}`}
     >
       {children}
     </div>

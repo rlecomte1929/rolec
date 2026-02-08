@@ -1,7 +1,9 @@
 import axios from 'axios';
+import { getAuthItem } from '../utils/demo';
 import type {
   LoginRequest,
   LoginResponse,
+  RegisterRequest,
   NextQuestionResponse,
   AnswerRequest,
   RelocationProfile,
@@ -9,9 +11,16 @@ import type {
   HousingRecommendation,
   SchoolRecommendation,
   MoverRecommendation,
+  AssignmentSummary,
+  AssignmentDetail,
+  AssignCaseResponse,
+  EmployeeJourneyResponse,
+  PolicyResponse,
+  ComplianceCaseReport,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 
 // Create axios instance
 const api = axios.create({
@@ -23,7 +32,7 @@ const api = axios.create({
 
 // Add auth token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('relopass_token');
+  const token = getAuthItem('relopass_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -34,6 +43,10 @@ api.interceptors.request.use((config) => {
 export const authAPI = {
   login: async (data: LoginRequest): Promise<LoginResponse> => {
     const response = await api.post('/api/auth/login', data);
+    return response.data;
+  },
+  register: async (data: RegisterRequest): Promise<LoginResponse> => {
+    const response = await api.post('/api/auth/register', data);
     return response.data;
   },
 };
@@ -87,4 +100,143 @@ export const dashboardAPI = {
   },
 };
 
+export const hrAPI = {
+  createCase: async (): Promise<{ caseId: string }> => {
+    const response = await api.post('/api/hr/cases');
+    return response.data;
+  },
+  assignCase: async (caseId: string, employeeIdentifier: string): Promise<AssignCaseResponse> => {
+    const response = await api.post(`/api/hr/cases/${caseId}/assign`, { employeeIdentifier });
+    return response.data;
+  },
+  listAssignments: async (): Promise<AssignmentSummary[]> => {
+    const response = await api.get('/api/hr/assignments');
+    return response.data;
+  },
+  getAssignment: async (assignmentId: string): Promise<AssignmentDetail> => {
+    const response = await api.get(`/api/hr/assignments/${assignmentId}`);
+    return response.data;
+  },
+  getPolicy: async (caseId: string): Promise<PolicyResponse> => {
+    const response = await api.get('/api/hr/policy', { params: { caseId } });
+    return response.data;
+  },
+  requestPolicyException: async (
+    caseId: string,
+    payload: { category: string; reason?: string; amount?: number }
+  ): Promise<any> => {
+    const response = await api.post(`/api/hr/cases/${caseId}/policy/exceptions`, payload);
+    return response.data;
+  },
+  getCaseCompliance: async (caseId: string): Promise<ComplianceCaseReport> => {
+    const response = await api.get(`/api/hr/cases/${caseId}/compliance`);
+    return response.data;
+  },
+  runCaseCompliance: async (caseId: string): Promise<ComplianceCaseReport> => {
+    const response = await api.post(`/api/hr/cases/${caseId}/compliance/run`);
+    return response.data;
+  },
+  recordComplianceAction: async (
+    caseId: string,
+    payload: { actionType: string; checkId: string; notes?: string; payload?: any }
+  ): Promise<any> => {
+    const response = await api.post(`/api/hr/cases/${caseId}/compliance/actions`, payload);
+    return response.data;
+  },
+  runCompliance: async (assignmentId: string): Promise<any> => {
+    const response = await api.post(`/api/hr/assignments/${assignmentId}/run-compliance`);
+    return response.data;
+  },
+  decide: async (assignmentId: string, decision: 'HR_APPROVED' | 'CHANGES_REQUESTED', notes?: string): Promise<any> => {
+    const response = await api.post(`/api/hr/assignments/${assignmentId}/decision`, { decision, notes });
+    return response.data;
+  },
+  updateIdentifier: async (assignmentId: string, employeeIdentifier: string): Promise<any> => {
+    const response = await api.post(`/api/hr/assignments/${assignmentId}/identifier`, { employeeIdentifier });
+    return response.data;
+  },
+};
+
+export const employeeAPI = {
+  getCurrentAssignment: async (): Promise<{ assignment: any }> => {
+    const response = await api.get('/api/employee/assignments/current');
+    return response.data;
+  },
+  claimAssignment: async (assignmentId: string, email: string): Promise<any> => {
+    const response = await api.post(`/api/employee/assignments/${assignmentId}/claim`, { email });
+    return response.data;
+  },
+  getNextQuestion: async (assignmentId: string): Promise<EmployeeJourneyResponse> => {
+    const response = await api.get('/api/employee/journey/next-question', { params: { assignmentId } });
+    return response.data;
+  },
+  submitAnswer: async (assignmentId: string, questionId: string, answer: any): Promise<EmployeeJourneyResponse> => {
+    const response = await api.post('/api/employee/journey/answer', { assignmentId, questionId, answer });
+    return response.data;
+  },
+  submitAssignment: async (assignmentId: string): Promise<any> => {
+    const response = await api.post(`/api/employee/assignments/${assignmentId}/submit`);
+    return response.data;
+  },
+  updateProfilePhoto: async (assignmentId: string, photoUrl: string): Promise<any> => {
+    const response = await api.post(`/api/employee/assignments/${assignmentId}/photo`, {
+      assignmentId,
+      photoUrl,
+    });
+    return response.data;
+  },
+};
+
 export default api;
+
+export async function apiGet<T>(path: string, opts?: { headers?: Record<string, string> }): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opts?.headers || {}),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function apiPost<T>(
+  path: string,
+  body?: any,
+  opts?: { headers?: Record<string, string> }
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opts?.headers || {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function apiPatch<T>(
+  path: string,
+  body?: any,
+  opts?: { headers?: Record<string, string> }
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opts?.headers || {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  return response.json() as Promise<T>;
+}

@@ -1,0 +1,42 @@
+{
+  "policyVersion": "v2.1",
+  "effectiveDate": "2024-10-01",
+  "jurisdictionNotes": "Base policy for global assignments. Local counsel required for exceptions.",
+  "caps": {
+    "housing": { "amount": 5000, "currency": "USD", "durationMonths": 12 },
+    "movers": { "amount": 10000, "currency": "USD" },
+    "schools": { "amount": 20000, "currency": "USD" },
+    "immigration": { "amount": 4000, "currency": "USD" }
+  },
+  "approvalRules": {
+    "nearLimit": "Manager",
+    "overLimit": "HR"
+  },
+  "exceptionWorkflow": {
+    "states": ["PENDING", "APPROVED", "REJECTED"],
+    "requiredFields": ["category", "reason", "amount"]
+  },
+  "requiredEvidence": {
+    "housing": ["Lease estimate", "Budget approval"],
+    "movers": ["Vendor quote", "Inventory list"],
+    "schools": ["School invoice", "Enrollment confirmation"],
+    "immigration": ["Legal engagement letter", "Filing receipt"]
+  },
+  "leadTimeRules": {
+    "minDays": 30
+  },
+  "riskThresholds": {
+    "low": 80,
+    "moderate": 60
+  },
+  "documentRequirements": {
+    "base": ["Passport scans", "Employment letter"],
+    "married": ["Marriage certificate"],
+    "children": ["Birth certificates"],
+    "spouseWork": ["Spouse resume"]
+  },
+  "approvalThresholds": {
+    "housing": { "jobLevelCapOverrides": { "L1": 5000, "L2": 7000, "L3": 10000 } },
+    "movers": { "storageWeeksIncluded": 4 }
+  }
+}

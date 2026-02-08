@@ -27,14 +27,14 @@ export const Select: React.FC<SelectProps> = ({
   return (
     <div className={widthClass}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-[#374151] mb-1">
           {label}
         </label>
       )}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all bg-white ${widthClass}`}
+        className={`px-4 py-2 border border-[#d1d5db] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0b2b43] transition-all bg-white ${widthClass}`}
       >
         {placeholder && <option value="">{placeholder}</option>}
         {options.map((option) => (

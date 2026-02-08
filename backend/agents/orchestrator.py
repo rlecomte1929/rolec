@@ -20,7 +20,12 @@ class IntakeOrchestrator:
         self.recommendation_engine = RecommendationEngine()
         self.all_questions = get_all_questions()
     
-    def get_next_question(self, profile: Dict[str, Any], answered_questions: Set[str]) -> NextQuestionResponse:
+    def get_next_question(
+        self,
+        profile: Dict[str, Any],
+        answered_questions: Set[str],
+        skip_question_ids: Optional[Set[str]] = None,
+    ) -> NextQuestionResponse:
         """
         Determine the next question to ask based on current profile state.
         Returns None if intake is complete.
@@ -31,7 +36,8 @@ class IntakeOrchestrator:
         all_complete = all(completeness_check.values())
         
         # Calculate progress
-        total_questions = len(self.all_questions)
+        questions = get_all_questions(skip_question_ids)
+        total_questions = len(questions)
         answered_count = len(answered_questions)
         progress = {
             "answeredCount": answered_count,
@@ -48,7 +54,7 @@ class IntakeOrchestrator:
             )
         
         # Find next unanswered question
-        for question in self.all_questions:
+        for question in questions:
             if question.id in answered_questions:
                 continue
             
@@ -85,7 +91,11 @@ class IntakeOrchestrator:
         
         return profile
     
-    def compute_completion_state(self, profile: Dict[str, Any]) -> Dict[str, Any]:
+    def compute_completion_state(
+        self,
+        profile: Dict[str, Any],
+        total_questions: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """
         Compute overall completion state including readiness and recommendations.
         """
@@ -97,7 +107,7 @@ class IntakeOrchestrator:
         
         # Calculate overall completeness percentage
         answered_fields = self._count_answered_fields(normalized_profile)
-        total_fields = self._count_total_fields()
+        total_fields = total_questions if total_questions is not None else self._count_total_fields()
         profile_completeness = int((answered_fields / total_fields) * 100) if total_fields > 0 else 0
         
         # Compute readiness rating

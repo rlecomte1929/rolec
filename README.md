@@ -1,8 +1,8 @@
 # ReloPass MVP
 
-**Your guided relocation journey from Oslo, Norway to Singapore**
+**Guided relocation journeys for HR teams**
 
-ReloPass is a multi-agent guided intake system that helps families relocate smoothly. This MVP is specifically designed for a family of four moving from Oslo to Singapore, collecting the minimum viable data needed to:
+ReloPass is a multi-agent guided intake system that helps HR teams manage relocations across multiple scenarios. This MVP collects the minimum viable data needed to:
 
 1. Start/prepare the immigration journey (informational readiness rating)
 2. Request quotes from moving companies
@@ -78,6 +78,21 @@ pip install -r requirements.txt
 # Run the server
 python main.py
 ```
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Run the dev server
+npm run dev
+```
+
+---
+
 
 The backend will start at `http://localhost:8000`
 
