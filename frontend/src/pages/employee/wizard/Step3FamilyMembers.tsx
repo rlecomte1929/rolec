@@ -13,7 +13,10 @@ interface StepProps {
 const isRequired = (requiredFields: string[], key: string) => requiredFields.includes(key);
 
 export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack }) => {
-  const [local, setLocal] = useState(draft.familyMembers);
+  const [local, setLocal] = useState({
+    ...draft.familyMembers,
+    maritalStatus: draft.familyMembers.maritalStatus || 'Single',
+  });
   const [children, setChildren] = useState<FamilyMemberDTO[]>(local.children || []);
 
   const update = (key: keyof typeof local, value: any) => {
@@ -27,20 +30,39 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
   };
 
   const nextDraft: CaseDraftDTO = { ...draft, familyMembers: { ...local, children } };
+  const maritalMissing = !local.maritalStatus;
+  const hasDependents = Boolean(draft.relocationBasics?.hasDependents);
+  const hasAnyDependent = Boolean(local.spouse?.fullName || children.some((c) => c.fullName));
+  const dependentsMissing = hasDependents && !hasAnyDependent;
+  const [error, setError] = useState('');
 
   return (
     <Card padding="lg">
       <div className="text-lg font-semibold text-[#0b2b43]">Family Members</div>
       <div className="text-sm text-[#6b7280] mt-1">Add spouse and dependent information if applicable.</div>
+      {error && (
+        <div className="mt-4 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
+          {error}
+        </div>
+      )}
 
       <div className="mt-6 space-y-4">
         <label className="text-sm text-[#0b2b43]">
-          Marital status{isRequired(requiredFields, 'familyMembers.maritalStatus') && ' *'}
-          <input
+          Marital status
+          {(isRequired(requiredFields, 'familyMembers.maritalStatus') || true) && maritalMissing && (
+            <span className="text-red-600"> *</span>
+          )}
+          <select
             value={local.maritalStatus || ''}
             onChange={(event) => update('maritalStatus', event.target.value)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-          />
+          >
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+            <option value="Partnership">Partnership</option>
+            <option value="Divorced">Divorced</option>
+            <option value="Widowed">Widowed</option>
+          </select>
         </label>
 
         <div className="border border-[#e2e8f0] rounded-lg p-4">
@@ -118,12 +140,27 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
             variant="outline"
             onClick={async () => {
               await onSave(nextDraft);
-              window.location.href = '/employee/dashboard';
+              window.location.href = '/employee/journey';
             }}
           >
             Save as draft & exit
           </Button>
-          <Button onClick={() => onNext(nextDraft)}>Next</Button>
+          <Button
+            onClick={() => {
+              if (maritalMissing) {
+                setError('Please select a marital status.');
+                return;
+              }
+              if (dependentsMissing) {
+                setError('You marked “Relocating with dependents”. Please add at least a spouse or one child.');
+                return;
+              }
+              setError('');
+              onNext(nextDraft);
+            }}
+          >
+            Next
+          </Button>
         </div>
       </div>
     </Card>

@@ -19,7 +19,10 @@ import type {
   ComplianceCaseReport,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// In production we default to same-origin (/api/...) unless explicitly overridden.
+// In local dev we default to the local FastAPI server.
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
 
 // Create axios instance
@@ -147,8 +150,16 @@ export const hrAPI = {
     const response = await api.post(`/api/hr/assignments/${assignmentId}/run-compliance`);
     return response.data;
   },
-  decide: async (assignmentId: string, decision: 'HR_APPROVED' | 'CHANGES_REQUESTED', notes?: string): Promise<any> => {
-    const response = await api.post(`/api/hr/assignments/${assignmentId}/decision`, { decision, notes });
+  decide: async (
+    assignmentId: string,
+    decision: 'HR_APPROVED' | 'CHANGES_REQUESTED',
+    opts?: { notes?: string; requestedSections?: string[] }
+  ): Promise<any> => {
+    const response = await api.post(`/api/hr/assignments/${assignmentId}/decision`, {
+      decision,
+      notes: opts?.notes,
+      requestedSections: opts?.requestedSections,
+    });
     return response.data;
   },
   updateIdentifier: async (assignmentId: string, employeeIdentifier: string): Promise<any> => {
@@ -189,6 +200,28 @@ export const employeeAPI = {
 
 export default api;
 
+function buildApiError(response: Response, bodyText: string) {
+  let detail: any = bodyText;
+  let message = bodyText || `${response.status} ${response.statusText}`;
+
+  try {
+    const parsed = JSON.parse(bodyText);
+    detail = parsed?.detail ?? parsed;
+    if (typeof detail === 'string') {
+      message = detail;
+    } else if (detail && typeof detail === 'object') {
+      message = detail.message || JSON.stringify(detail);
+    }
+  } catch {
+    // bodyText wasn't JSON
+  }
+
+  const err: any = new Error(message);
+  err.status = response.status;
+  err.detail = detail;
+  return err;
+}
+
 export async function apiGet<T>(path: string, opts?: { headers?: Record<string, string> }): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'GET',
@@ -198,7 +231,8 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
     },
   });
   if (!response.ok) {
-    throw new Error(await response.text());
+    const text = await response.text();
+    throw buildApiError(response, text);
   }
   return response.json() as Promise<T>;
 }
@@ -217,7 +251,8 @@ export async function apiPost<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
-    throw new Error(await response.text());
+    const text = await response.text();
+    throw buildApiError(response, text);
   }
   return response.json() as Promise<T>;
 }
@@ -236,7 +271,8 @@ export async function apiPatch<T>(
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) {
-    throw new Error(await response.text());
+    const text = await response.text();
+    throw buildApiError(response, text);
   }
   return response.json() as Promise<T>;
 }

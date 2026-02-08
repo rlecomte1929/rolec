@@ -10,24 +10,37 @@ interface StepProps {
   onBack: () => void;
 }
 
-const isRequired = (requiredFields: string[], key: string) => requiredFields.includes(key);
-
-export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack }) => {
+export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, onSave, onNext, onBack }) => {
   const [local, setLocal] = useState(draft.employeeProfile);
   const [passportFileName, setPassportFileName] = useState('');
   const [pendingPassport, setPendingPassport] = useState(false);
   const [ocrMessage, setOcrMessage] = useState('');
+  const [error, setError] = useState('');
 
   const update = (key: keyof typeof local, value: any) => {
     setLocal({ ...local, [key]: value });
   };
 
   const nextDraft: CaseDraftDTO = { ...draft, employeeProfile: local };
+  const requiredMissing = {
+    fullName: !local.fullName,
+    nationality: !local.nationality,
+    passportCountry: !local.passportCountry,
+    passportExpiry: !local.passportExpiry,
+    residenceCountry: !local.residenceCountry,
+    email: !local.email,
+  };
+  const hasMissing = Object.values(requiredMissing).some(Boolean);
 
   return (
     <Card padding="lg">
       <div className="text-lg font-semibold text-[#0b2b43]">Employee Profile</div>
       <div className="text-sm text-[#6b7280] mt-1">Collect identity details required for compliance.</div>
+      {error && (
+        <div className="mt-4 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
+          {error}
+        </div>
+      )}
 
       <div className="mt-5 border border-[#e2e8f0] rounded-lg p-4 bg-[#f8fafc]">
         <div className="text-sm font-semibold text-[#0b2b43]">Auto-fill with Passport</div>
@@ -73,7 +86,8 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
 
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <label className="text-sm text-[#0b2b43]">
-          Full name{isRequired(requiredFields, 'employeeProfile.fullName') && ' *'}
+          Full name
+          {requiredMissing.fullName && <span className="text-red-600"> *</span>}
           <input
             value={local.fullName || ''}
             onChange={(event) => update('fullName', event.target.value)}
@@ -81,7 +95,8 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
           />
         </label>
         <label className="text-sm text-[#0b2b43]">
-          Nationality{isRequired(requiredFields, 'employeeProfile.nationality') && ' *'}
+          Nationality
+          {requiredMissing.nationality && <span className="text-red-600"> *</span>}
           <input
             value={local.nationality || ''}
             onChange={(event) => update('nationality', event.target.value)}
@@ -89,7 +104,8 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
           />
         </label>
         <label className="text-sm text-[#0b2b43]">
-          Passport country{isRequired(requiredFields, 'employeeProfile.passportCountry') && ' *'}
+          Passport country
+          {requiredMissing.passportCountry && <span className="text-red-600"> *</span>}
           <input
             value={local.passportCountry || ''}
             onChange={(event) => update('passportCountry', event.target.value)}
@@ -97,7 +113,8 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
           />
         </label>
         <label className="text-sm text-[#0b2b43]">
-          Passport expiry{isRequired(requiredFields, 'employeeProfile.passportExpiry') && ' *'}
+          Passport expiry
+          {requiredMissing.passportExpiry && <span className="text-red-600"> *</span>}
           <input
             type="date"
             value={local.passportExpiry || ''}
@@ -106,7 +123,8 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
           />
         </label>
         <label className="text-sm text-[#0b2b43]">
-          Residence country{isRequired(requiredFields, 'employeeProfile.residenceCountry') && ' *'}
+          Residence country
+          {requiredMissing.residenceCountry && <span className="text-red-600"> *</span>}
           <input
             value={local.residenceCountry || ''}
             onChange={(event) => update('residenceCountry', event.target.value)}
@@ -114,7 +132,8 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
           />
         </label>
         <label className="text-sm text-[#0b2b43]">
-          Email{isRequired(requiredFields, 'employeeProfile.email') && ' *'}
+          Email
+          {requiredMissing.email && <span className="text-red-600"> *</span>}
           <input
             type="email"
             value={local.email || ''}
@@ -131,12 +150,23 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
             variant="outline"
             onClick={async () => {
               await onSave(nextDraft);
-              window.location.href = '/employee/dashboard';
+              window.location.href = '/employee/journey';
             }}
           >
             Save as draft & exit
           </Button>
-          <Button onClick={() => onNext(nextDraft)}>Next</Button>
+          <Button
+            onClick={() => {
+              if (hasMissing) {
+                setError('Please complete all required fields (marked with *).');
+                return;
+              }
+              setError('');
+              onNext(nextDraft);
+            }}
+          >
+            Next
+          </Button>
         </div>
       </div>
     </Card>

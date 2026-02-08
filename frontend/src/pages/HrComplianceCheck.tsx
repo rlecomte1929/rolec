@@ -46,7 +46,7 @@ export const HrComplianceCheck: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
+  const [_assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [policy, setPolicy] = useState<PolicyResponse | null>(null);
   const [report, setReport] = useState<ComplianceCaseReport | null>(null);

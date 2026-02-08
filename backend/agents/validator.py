@@ -67,7 +67,7 @@ class ProfileValidator:
         return errors
     
     def _validate_children_ages(self, profile: Dict[str, Any]) -> List[ValidationError]:
-        """Validate children are under 10 years old."""
+        """Flag child age-related schooling considerations (neutral messaging)."""
         errors = []
         
         dependents = profile.get("dependents", [])
@@ -81,7 +81,10 @@ class ProfileValidator:
                     if age > 10:
                         errors.append(ValidationError(
                             field=f"dependents.{idx}.dateOfBirth",
-                            message=f"Child {idx+1} appears to be over 10 years old. This profile is designed for children under 10."
+                            message=(
+                                f"Schooling requirements vary by age for this destination. "
+                                f"Review schooling requirements for child {idx+1}."
+                            )
                         ))
                 except Exception:
                     pass

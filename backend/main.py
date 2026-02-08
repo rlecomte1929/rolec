@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any, List
 import uuid
 from datetime import datetime
 import re
+import json
 
 from schemas import (
     RegisterRequest, LoginRequest, LoginResponse, AnswerRequest, NextQuestionResponse,
@@ -762,7 +763,16 @@ def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[st
     if request.decision not in [AssignmentStatus.HR_APPROVED, AssignmentStatus.CHANGES_REQUESTED]:
         raise HTTPException(status_code=400, detail="Invalid decision")
 
-    db.set_assignment_decision(assignment_id, request.decision.value, request.notes)
+    notes_payload = request.notes
+    if request.decision == AssignmentStatus.CHANGES_REQUESTED and request.requestedSections:
+        notes_payload = json.dumps(
+            {
+                "notes": request.notes,
+                "requestedSections": request.requestedSections,
+            }
+        )
+
+    db.set_assignment_decision(assignment_id, request.decision.value, notes_payload)
     return {"success": True}
 
 

@@ -81,8 +81,19 @@ def create_case(case_id: str):
 
         draft = json.loads(case.draft_json)
         basics = draft.get("relocationBasics", {})
-        if not basics.get("originCountry") or not basics.get("destCountry") or not basics.get("purpose"):
-            raise HTTPException(status_code=400, detail="Missing minimum required fields")
+        missing = []
+        for key in ["originCountry", "originCity", "destCountry", "destCity", "purpose", "targetMoveDate"]:
+            if not basics.get(key):
+                missing.append(f"relocationBasics.{key}")
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Missing minimum required fields",
+                    "missingFields": missing,
+                    "suggestedStep": 1,
+                },
+            )
 
         requirements = compute_case_requirements(case_id)
         snapshot_id = str(uuid.uuid4())

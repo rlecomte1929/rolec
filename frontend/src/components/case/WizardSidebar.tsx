@@ -11,7 +11,7 @@ const steps = [
   'Employee Profile',
   'Family Members',
   'Assignment / Context',
-  'Review & Create',
+  'Review & Submit',
 ];
 
 export const WizardSidebar: React.FC<WizardSidebarProps> = ({ currentStep, completedSteps, onSelect }) => {

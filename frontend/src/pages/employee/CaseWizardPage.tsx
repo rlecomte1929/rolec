@@ -5,7 +5,8 @@ import { CaseContextBar } from '../../components/case/CaseContextBar';
 import { WizardSidebar } from '../../components/case/WizardSidebar';
 import { Card } from '../../components/antigravity';
 import { getCase, getRequirements, patchCase, startResearch } from '../../api/cases';
-import type { CaseDTO, CaseDraftDTO } from '../../types';
+import { employeeAPI } from '../../api/client';
+import type { AssignmentStatus, CaseDTO, CaseDraftDTO } from '../../types';
 import { Step1RelocationBasics } from './wizard/Step1RelocationBasics';
 import { Step2EmployeeProfile } from './wizard/Step2EmployeeProfile';
 import { Step3FamilyMembers } from './wizard/Step3FamilyMembers';
@@ -28,9 +29,52 @@ export const CaseWizardPage: React.FC = () => {
   const [requiredFields, setRequiredFields] = useState<string[]>([]);
   const [banner, setBanner] = useState('');
   const [error, setError] = useState('');
+  const [assignmentStatus, setAssignmentStatus] = useState<AssignmentStatus | null>(null);
+  const [hrFeedback, setHrFeedback] = useState<string>('');
+  const [hrRequestedSections, setHrRequestedSections] = useState<string[]>([]);
 
   const stepFromRoute = step ? Number(step) : location.pathname.endsWith('/review') ? 5 : 1;
   const currentStep = Math.min(5, Math.max(1, stepFromRoute));
+
+  const stepCompletion = useMemo(() => {
+    const b = draft.relocationBasics || {};
+    const ep = draft.employeeProfile || {};
+    const fm = draft.familyMembers || {};
+    const ac = draft.assignmentContext || {};
+
+    const step1Done = Boolean(
+      b.originCountry && b.originCity && b.destCountry && b.destCity && b.purpose && b.targetMoveDate
+    );
+    const step2Done = Boolean(
+      ep.fullName && ep.nationality && ep.passportCountry && ep.passportExpiry && ep.residenceCountry && ep.email
+    );
+    const hasDependents = Boolean(b.hasDependents);
+    const spouseOk = Boolean(fm.spouse?.fullName);
+    const childOk = Boolean((fm.children || []).some((c) => c.fullName));
+    const step3Done = !hasDependents ? Boolean(fm.maritalStatus) : Boolean(fm.maritalStatus && (spouseOk || childOk));
+    const step4Done = Boolean(
+      ac.employerName && ac.jobTitle && ac.contractStartDate && ac.contractType && ac.salaryBand
+    );
+
+    const maxUnlocked =
+      step1Done ? (step2Done ? (step3Done ? (step4Done ? 5 : 4) : 3) : 2) : 1;
+
+    const completed: number[] = [];
+    if (step1Done) completed.push(1);
+    if (step2Done) completed.push(2);
+    if (step3Done) completed.push(3);
+    if (step4Done) completed.push(4);
+    return { step1Done, step2Done, step3Done, step4Done, maxUnlocked, completed };
+  }, [draft]);
+
+  // Enforce linear progression: cannot skip ahead.
+  useEffect(() => {
+    if (!caseId) return;
+    if (currentStep > stepCompletion.maxUnlocked) {
+      setError('Please complete the previous steps before continuing.');
+      navigate(`/employee/case/${caseId}/wizard/${stepCompletion.maxUnlocked}`, { replace: true });
+    }
+  }, [caseId, currentStep, stepCompletion.maxUnlocked, navigate]);
 
   const loadCase = async () => {
     if (!caseId) return;
@@ -60,6 +104,55 @@ export const CaseWizardPage: React.FC = () => {
     loadCase();
     loadRequirements();
   }, [caseId]);
+
+  // Route gating: the wizard is only for intake / changes-requested.
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const res = await employeeAPI.getCurrentAssignment();
+        const assignment = res.assignment;
+        if (!assignment) return;
+        if (caseId && assignment.id !== caseId) return;
+        setAssignmentStatus(assignment.status as AssignmentStatus);
+
+        const storedFeedback = sessionStorage.getItem('relopass_hr_notes') || '';
+        const hydrateFeedback = (raw: string) => {
+          if (!raw) return;
+          try {
+            const parsed = JSON.parse(raw);
+            const notes = typeof parsed?.notes === 'string' ? parsed.notes : '';
+            const sections = Array.isArray(parsed?.requestedSections)
+              ? parsed.requestedSections.filter((s: any) => typeof s === 'string')
+              : [];
+            setHrFeedback(notes || raw);
+            setHrRequestedSections(sections);
+          } catch {
+            setHrFeedback(raw);
+            setHrRequestedSections([]);
+          }
+        };
+
+        if (storedFeedback) {
+          hydrateFeedback(storedFeedback);
+        } else if (assignment.status === 'CHANGES_REQUESTED' && caseId) {
+          // If the employee opened the wizard directly, pull HR notes from journey API.
+          const journey = await employeeAPI.getNextQuestion(caseId);
+          if (journey.hrNotes) hydrateFeedback(journey.hrNotes);
+        }
+
+        const isSubmitted =
+          assignment.status === 'EMPLOYEE_SUBMITTED' ||
+          assignment.status === 'HR_REVIEW' ||
+          assignment.status === 'HR_APPROVED';
+        if (isSubmitted) {
+          navigate(ROUTES.EMP_DASH, { replace: true });
+        }
+      } catch {
+        // Best effort; wizard can still function for MVP draft creation.
+      }
+    };
+    run();
+  }, [caseId, navigate]);
 
   const handleSave = async (nextDraft: CaseDraftDTO) => {
     if (!caseId) return;
@@ -111,7 +204,7 @@ export const CaseWizardPage: React.FC = () => {
     return <Step5ReviewCreate {...stepProps} />;
   }, [currentStep, draft, requiredFields, banner]);
 
-  const completedSteps = Array.from({ length: currentStep - 1 }).map((_, idx) => idx + 1);
+  const completedSteps = stepCompletion.completed;
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] text-[#1f2937]">
@@ -130,6 +223,34 @@ export const CaseWizardPage: React.FC = () => {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+        {assignmentStatus === 'CHANGES_REQUESTED' && hrFeedback && (
+          <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
+            <div className="font-semibold">Changes requested by HR</div>
+            {hrRequestedSections.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {hrRequestedSections.map((section) => (
+                  <button
+                    key={section}
+                    className="rounded-full border border-[#f59e0b] bg-white px-3 py-1 text-[11px] font-semibold text-[#92400e]"
+                    onClick={() => {
+                      const map: Record<string, number> = {
+                        'Relocation Basics': 1,
+                        'Employee Profile': 2,
+                        'Family Members': 3,
+                        'Assignment / Context': 4,
+                      };
+                      const stepToOpen = map[section] || 1;
+                      navigate(`/employee/case/${caseId}/wizard/${stepToOpen}`);
+                    }}
+                  >
+                    Fix: {section}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="mt-2 text-xs text-[#92400e] whitespace-pre-wrap">{hrFeedback}</div>
+          </div>
+        )}
         {error && (
           <div className="rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
             {error}
@@ -148,7 +269,13 @@ export const CaseWizardPage: React.FC = () => {
             <WizardSidebar
               currentStep={currentStep}
               completedSteps={completedSteps}
-              onSelect={(stepNumber) => navigate(`/employee/case/${caseId}/wizard/${stepNumber}`)}
+              onSelect={(stepNumber) => {
+                if (stepNumber > stepCompletion.maxUnlocked) {
+                  setError('Complete the previous steps first.');
+                  return;
+                }
+                navigate(`/employee/case/${caseId}/wizard/${stepNumber}`);
+              }}
             />
             <Card padding="md">
               <div className="text-sm font-semibold text-[#0b2b43]">Need help?</div>

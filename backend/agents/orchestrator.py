@@ -109,6 +109,8 @@ class IntakeOrchestrator:
         answered_fields = self._count_answered_fields(normalized_profile)
         total_fields = total_questions if total_questions is not None else self._count_total_fields()
         profile_completeness = int((answered_fields / total_fields) * 100) if total_fields > 0 else 0
+        # Guardrail: the heuristic field counter can exceed total_fields due to nested defaults.
+        profile_completeness = max(0, min(100, profile_completeness))
         
         # Compute readiness rating
         immigration_readiness = None

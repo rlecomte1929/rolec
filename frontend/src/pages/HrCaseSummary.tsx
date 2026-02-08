@@ -28,6 +28,17 @@ export const HrCaseSummary: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [isDecisionOpen, setIsDecisionOpen] = useState(false);
+  const [decisionNotes, setDecisionNotes] = useState('');
+  const [requestedSections, setRequestedSections] = useState<string[]>([]);
+  const [isDeciding, setIsDeciding] = useState(false);
+
+  const SECTION_OPTIONS = [
+    'Relocation Basics',
+    'Employee Profile',
+    'Family Members',
+    'Assignment / Context',
+  ];
 
   const loadAssignment = async () => {
     if (!caseId) return;
@@ -62,6 +73,47 @@ export const HrCaseSummary: React.FC = () => {
       setError(err.response?.data?.detail || 'Unable to run compliance checks.');
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!assignment?.id) return;
+    setError('');
+    setIsDeciding(true);
+    try {
+      await hrAPI.decide(assignment.id, 'HR_APPROVED', { notes: decisionNotes || undefined });
+      setIsDecisionOpen(false);
+      setDecisionNotes('');
+      setRequestedSections([]);
+      await loadAssignment();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Unable to approve case.');
+    } finally {
+      setIsDeciding(false);
+    }
+  };
+
+  const handleRequestChanges = async () => {
+    if (!assignment?.id) return;
+    if (requestedSections.length === 0 && !decisionNotes.trim()) {
+      setError('Select at least one section or add a comment for the employee.');
+      return;
+    }
+    setError('');
+    setIsDeciding(true);
+    try {
+      await hrAPI.decide(assignment.id, 'CHANGES_REQUESTED', {
+        notes: decisionNotes || undefined,
+        requestedSections: requestedSections.length ? requestedSections : undefined,
+      });
+      setIsDecisionOpen(false);
+      setDecisionNotes('');
+      setRequestedSections([]);
+      await loadAssignment();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Unable to request changes.');
+    } finally {
+      setIsDeciding(false);
     }
   };
 
@@ -100,9 +152,67 @@ export const HrCaseSummary: React.FC = () => {
                 <Button onClick={handleRunCompliance} disabled={isRunning}>
                   {isRunning ? 'Running...' : 'Run compliance checks'}
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDecisionOpen((prev) => !prev)}
+                >
+                  {isDecisionOpen ? 'Close decision' : 'Approve / Request changes'}
+                </Button>
               </div>
             </div>
           </Card>
+
+          {isDecisionOpen && (
+            <Card padding="lg">
+              <div className="text-sm font-semibold text-[#0b2b43]">Decision</div>
+              <div className="text-xs text-[#6b7280] mt-1">
+                If you request changes, the employee will be routed back into the wizard with the sections you flagged.
+              </div>
+
+              <div className="mt-4">
+                <div className="text-xs uppercase tracking-wide text-[#6b7280] mb-2">Sections to update</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {SECTION_OPTIONS.map((label) => {
+                    const checked = requestedSections.includes(label);
+                    return (
+                      <label key={label} className="flex items-center gap-2 text-sm text-[#0b2b43]">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => {
+                            setRequestedSections((prev) => {
+                              if (event.target.checked) return Array.from(new Set([...prev, label]));
+                              return prev.filter((s) => s !== label);
+                            });
+                          }}
+                        />
+                        {label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <div className="text-xs uppercase tracking-wide text-[#6b7280] mb-2">Comment (optional)</div>
+                <textarea
+                  value={decisionNotes}
+                  onChange={(event) => setDecisionNotes(event.target.value)}
+                  className="w-full min-h-[84px] rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
+                  placeholder="Explain what to fix and why (visible to employee)."
+                />
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button onClick={handleApprove} disabled={isDeciding}>
+                  {isDeciding ? 'Saving...' : 'Approve'}
+                </Button>
+                <Button variant="outline" onClick={handleRequestChanges} disabled={isDeciding}>
+                  {isDeciding ? 'Saving...' : 'Request changes'}
+                </Button>
+              </div>
+            </Card>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <Card padding="md">

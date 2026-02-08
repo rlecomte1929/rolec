@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
-import { Button, Card, Badge } from '../components/antigravity';
+import { Button, Card } from '../components/antigravity';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 
@@ -19,7 +19,6 @@ export const Landing: React.FC = () => {
       <div className="space-y-14">
         <section className="grid grid-cols-1 lg:grid-cols-[1.1fr,0.9fr] gap-10 items-center">
           <div className="space-y-6">
-            <Badge variant="info">Relocation operations platform</Badge>
             <h1 className="text-4xl md:text-5xl font-semibold text-[#0b2b43] leading-tight">
               International relocations, under control.
             </h1>

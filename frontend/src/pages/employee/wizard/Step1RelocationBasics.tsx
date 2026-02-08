@@ -11,8 +11,6 @@ interface StepProps {
   onNext: (draft: CaseDraftDTO) => Promise<void>;
 }
 
-const isRequired = (requiredFields: string[], key: string) => requiredFields.includes(key);
-
 const COUNTRY_OPTIONS = [
   { code: 'NO', name: 'Norway', cities: ['Oslo', 'Bergen'] },
   { code: 'SG', name: 'Singapore', cities: ['Singapore'] },
@@ -21,10 +19,11 @@ const COUNTRY_OPTIONS = [
   { code: 'DE', name: 'Germany', cities: ['Berlin', 'Munich'] },
 ];
 
-export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFields, banner, onSave, onNext }) => {
+export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, banner, onSave, onNext }) => {
   const [local, setLocal] = useState(draft.relocationBasics);
   const [customOriginCity, setCustomOriginCity] = useState('');
   const [customDestCity, setCustomDestCity] = useState('');
+  const [error, setError] = useState('');
 
   const update = (key: keyof typeof local, value: any) => {
     setLocal({ ...local, [key]: value });
@@ -34,6 +33,15 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
     ...draft,
     relocationBasics: local,
   };
+  const missing = {
+    originCountry: !local.originCountry,
+    originCity: !local.originCity,
+    destCountry: !local.destCountry,
+    destCity: !local.destCity,
+    purpose: !local.purpose,
+    targetMoveDate: !local.targetMoveDate,
+  };
+  const hasMissing = Object.values(missing).some(Boolean);
 
   return (
     <Card padding="lg">
@@ -42,11 +50,16 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
         Capture the core details first. Destination research runs after this step.
       </div>
       {banner && <div className="mt-3 text-xs text-[#1f8e8b]">{banner}</div>}
+      {error && (
+        <div className="mt-4 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
+          {error}
+        </div>
+      )}
 
       <div className="mt-6 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="text-sm text-[#0b2b43]">
-            Origin Country{isRequired(requiredFields, 'relocationBasics.originCountry') && ' *'}
+            Origin Country{missing.originCountry && <span className="text-red-600"> *</span>}
             <select
               value={local.originCountry || ''}
               onChange={(event) => update('originCountry', event.target.value)}
@@ -61,7 +74,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
             </select>
           </label>
           <label className="text-sm text-[#0b2b43]">
-            Origin City{isRequired(requiredFields, 'relocationBasics.originCity') && ' *'}
+            Origin City{missing.originCity && <span className="text-red-600"> *</span>}
             <select
               value={local.originCity || ''}
               onChange={(event) => {
@@ -94,7 +107,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
             )}
           </label>
           <label className="text-sm text-[#0b2b43]">
-            Destination Country{isRequired(requiredFields, 'relocationBasics.destCountry') && ' *'}
+            Destination Country{missing.destCountry && <span className="text-red-600"> *</span>}
             <select
               value={local.destCountry || ''}
               onChange={(event) => update('destCountry', event.target.value)}
@@ -109,7 +122,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
             </select>
           </label>
           <label className="text-sm text-[#0b2b43]">
-            Destination City{isRequired(requiredFields, 'relocationBasics.destCity') && ' *'}
+            Destination City{missing.destCity && <span className="text-red-600"> *</span>}
             <select
               value={local.destCity || ''}
               onChange={(event) => {
@@ -144,7 +157,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
         </div>
 
         <label className="text-sm text-[#0b2b43]">
-          Purpose{isRequired(requiredFields, 'relocationBasics.purpose') && ' *'}
+          Purpose{missing.purpose && <span className="text-red-600"> *</span>}
           <select
             value={local.purpose || ''}
             onChange={(event) => update('purpose', event.target.value)}
@@ -160,7 +173,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="text-sm text-[#0b2b43]">
-            Target Move Date{isRequired(requiredFields, 'relocationBasics.targetMoveDate') && ' *'}
+            Target Move Date{missing.targetMoveDate && <span className="text-red-600"> *</span>}
             <input
               type="date"
               value={local.targetMoveDate || ''}
@@ -194,12 +207,23 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
           variant="outline"
           onClick={async () => {
             await onSave(nextDraft);
-            window.location.href = '/employee/dashboard';
+            window.location.href = '/employee/journey';
           }}
         >
           Save as draft & exit
         </Button>
-        <Button onClick={() => onNext(nextDraft)}>Next</Button>
+        <Button
+          onClick={() => {
+            if (hasMissing) {
+              setError('Please complete all required fields (marked with *).');
+              return;
+            }
+            setError('');
+            onNext(nextDraft);
+          }}
+        >
+          Next
+        </Button>
       </div>
     </Card>
   );

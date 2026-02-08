@@ -18,7 +18,7 @@ const statusBadge = (status: PolicySpendItem['status']) => {
 export const HrPolicy: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
+  const [_assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [policy, setPolicy] = useState<PolicyResponse | null>(null);
   const [error, setError] = useState('');

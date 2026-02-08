@@ -136,7 +136,6 @@ export const HrAssignmentReview: React.FC = () => {
     ? 'Stage: Approved'
     : 'Stage: Intake - In progress';
   const readiness = Math.max(0, Math.min(100, Math.round(assignment?.completeness ?? 0)));
-  const complianceStatus = compliance?.overallStatus || 'NEEDS_REVIEW';
   const blockingItems = compliance?.checks?.filter((check) => check.status !== 'COMPLIANT') || [];
 
   const missingItem = useMemo(() => {

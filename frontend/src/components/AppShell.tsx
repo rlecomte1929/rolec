@@ -20,11 +20,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
   const location = useLocation();
   const [navError, setNavError] = useState<string | null>(getNavigationError());
-
-  const isEmployee = location.pathname.startsWith('/employee');
-  const isHr = location.pathname.startsWith('/hr');
-
-  const roleBadge = role === 'HR' ? 'HR view' : role === 'EMPLOYEE' ? 'Employee view' : null;
   const isHrRole = role === 'HR';
   const lastAssignmentId = localStorage.getItem('relopass_last_assignment_id');
 
@@ -69,28 +64,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             />
             <div>
               <div className="text-lg font-semibold text-[#0b2b43]">ReloPass</div>
-              <div className="text-xs text-[#6b7280]">Relocation Operations</div>
             </div>
           </Link>
           <div className="flex items-center gap-4">
-            <div className="inline-flex rounded-full bg-[#f3f4f6] p-1 text-xs border border-[#e2e8f0]">
-              <Link
-                to={buildRoute('employeeJourney')}
-                className={`px-3 py-1 rounded-full ${
-                  isEmployee ? 'bg-white text-[#0b2b43] shadow-sm' : 'text-[#6b7280]'
-                }`}
-              >
-                Employee view
-              </Link>
-              <Link
-                to={buildRoute('hrDashboard')}
-                className={`px-3 py-1 rounded-full ${
-                  isHr ? 'bg-white text-[#0b2b43] shadow-sm' : 'text-[#6b7280]'
-                }`}
-              >
-                HR view
-              </Link>
-            </div>
             <button
               onClick={() => {
                 clearAuthItems();
@@ -100,11 +76,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             >
               Switch user
             </button>
-            {roleBadge && (
-              <span className="text-xs px-3 py-1 rounded-full bg-[#f3f4f6] text-[#374151] border border-[#e2e8f0]">
-                {roleBadge}
-              </span>
-            )}
             <div className="text-right text-sm text-slate-600">
               {identity && <div className="font-medium text-[#0f172a]">{identity}</div>}
               {role && <div className="uppercase tracking-wide text-xs text-[#6b7280]">{role}</div>}

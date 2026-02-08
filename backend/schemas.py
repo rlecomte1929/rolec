@@ -324,6 +324,7 @@ class AssignmentDetail(BaseModel):
 class HRAssignmentDecision(BaseModel):
     decision: AssignmentStatus
     notes: Optional[str] = None
+    requestedSections: Optional[List[str]] = None
 
 
 class CreateCaseResponse(BaseModel):
