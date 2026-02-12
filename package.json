@@ -1,0 +1,14 @@
+{
+  "name": "relopass-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build",
+    "dev": "npm --prefix frontend run dev",
+    "preview": "npm --prefix frontend run preview",
+    "verify-build": "bash scripts/verify-build.sh"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}
