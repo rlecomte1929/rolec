@@ -9,6 +9,6 @@
     "verify-build": "bash scripts/verify-build.sh"
   },
   "engines": {
-    "node": ">=18.18.0"
+    "node": ">=20.18.1"
   }
 }
