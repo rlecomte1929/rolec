@@ -4,6 +4,7 @@ FastAPI main application for ReloPass backend.
 from fastapi import FastAPI, HTTPException, Header, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, Dict, Any, List
+import os
 import uuid
 from datetime import datetime
 import re
@@ -33,13 +34,18 @@ init_db()
 seed_demo_cases()
 
 # CORS middleware
+default_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://relopass.relopass.com",
+]
+env_origins = os.getenv("CORS_ORIGINS")
+if env_origins:
+    default_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "https://relopass.relopass.com",
-    ],  # React dev servers + Cloudflare tunnel
+    allow_origins=default_origins,  # React dev servers + Cloudflare Pages
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -12,6 +12,18 @@ This repo hosts a Vite/React app in `frontend/`. The root `package.json` delegat
 
 Pages already handles deployment; no Wrangler deploy command is required.
 
+## Connect frontend to backend
+
+The hosted frontend must point to a reachable backend and the backend must allow the frontend origin.
+
+1) **Cloudflare Pages env vars** (frontend):
+   - `VITE_API_URL=https://<your-backend-host>`
+
+2) **Backend env vars** (FastAPI):
+   - `CORS_ORIGINS=https://<your-pages-domain>,http://localhost:5173`
+
+Without these, auth will work locally but fail online due to CORS or API base URL mismatch.
+
 ## If you keep a deploy command
 
 If your project settings still run `npx wrangler deploy`, this repo now includes `wrangler.jsonc` with an assets directory:
