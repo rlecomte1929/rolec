@@ -22,6 +22,10 @@ export const HrDashboard: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [destinationFilter, setDestinationFilter] = useState('');
   const [departingSoonOnly, setDepartingSoonOnly] = useState(false);
+  const [isManageMode, setIsManageMode] = useState(false);
+  const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
+  const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
   const loadAssignments = async () => {
@@ -102,6 +106,39 @@ export const HrDashboard: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to assign case.');
     }
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedForRemoval((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleRemoveSelected = async () => {
+    setIsDeleting(true);
+    setError('');
+    try {
+      for (const id of selectedForRemoval) {
+        await hrAPI.deleteAssignment(id);
+      }
+      setSelectedForRemoval(new Set());
+      setIsConfirmingRemoval(false);
+      setIsManageMode(false);
+      await loadAssignments();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to remove some cases.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelManageMode = () => {
+    setIsManageMode(false);
+    setSelectedForRemoval(new Set());
+    setIsConfirmingRemoval(false);
   };
 
   const caseStatusBadge = (status: AssignmentSummary['status']) => {
@@ -275,8 +312,59 @@ export const HrDashboard: React.FC = () => {
         <Card padding="lg">
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm font-semibold text-[#0b2b43]">Active relocation cases</div>
-            <Button variant="outline" onClick={loadAssignments}>Refresh</Button>
+            <div className="flex items-center gap-2">
+              {!isManageMode ? (
+                <>
+                  <Button variant="outline" onClick={loadAssignments}>Refresh</Button>
+                  <Button variant="outline" onClick={() => setIsManageMode(true)}>Manage Cases</Button>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-[#6b7280]">
+                    {selectedForRemoval.size} selected
+                  </span>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedForRemoval.size === 0) {
+                        setError('Select at least one case to remove.');
+                        return;
+                      }
+                      setIsConfirmingRemoval(true);
+                    }}
+                    disabled={selectedForRemoval.size === 0}
+                  >
+                    Remove selected
+                  </Button>
+                  <Button variant="outline" onClick={cancelManageMode}>Cancel</Button>
+                </>
+              )}
+            </div>
           </div>
+
+          {isConfirmingRemoval && (
+            <div className="mb-4 border border-red-200 bg-red-50 rounded-xl p-4">
+              <div className="text-sm font-semibold text-red-800 mb-2">
+                Confirm removal of {selectedForRemoval.size} case{selectedForRemoval.size > 1 ? 's' : ''}
+              </div>
+              <div className="text-xs text-red-700 mb-3">
+                This will permanently delete the selected case{selectedForRemoval.size > 1 ? 's' : ''} and all associated data.
+                This action cannot be undone.
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRemoveSelected}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isDeleting ? 'Removing...' : 'Confirm removal'}
+                </button>
+                <Button variant="outline" onClick={() => setIsConfirmingRemoval(false)} disabled={isDeleting}>
+                  Go back
+                </Button>
+              </div>
+            </div>
+          )}
 
           {isLoading && <div className="text-sm text-[#6b7280]">Loading assignments...</div>}
           {!isLoading && filteredAssignments.length === 0 && (
@@ -285,7 +373,8 @@ export const HrDashboard: React.FC = () => {
 
           {!isLoading && filteredAssignments.length > 0 && (
             <div className="border border-[#e2e8f0] rounded-xl overflow-hidden">
-              <div className="grid grid-cols-[1.6fr,1.6fr,1fr,1fr,0.3fr] gap-4 bg-[#f8fafc] px-4 py-3 text-[11px] uppercase tracking-wide text-[#6b7280]">
+              <div className={`grid gap-4 bg-[#f8fafc] px-4 py-3 text-[11px] uppercase tracking-wide text-[#6b7280] ${isManageMode ? 'grid-cols-[2rem,1.6fr,1.6fr,1fr,1fr,0.3fr]' : 'grid-cols-[1.6fr,1.6fr,1fr,1fr,0.3fr]'}`}>
+                {isManageMode && <div></div>}
                 <div>Employee name</div>
                 <div>Route (origin → dest)</div>
                 <div>Status</div>
@@ -295,15 +384,35 @@ export const HrDashboard: React.FC = () => {
               {filteredAssignments.map((assignment) => {
                 const detail = assignmentDetails[assignment.id];
                 const deadline = formatDeadline(detail);
+                const isSelected = selectedForRemoval.has(assignment.id);
                 return (
                   <div
                     key={assignment.id}
                     onClick={() => {
+                      if (isManageMode) {
+                        toggleSelection(assignment.id);
+                        return;
+                      }
                       localStorage.setItem('relopass_last_assignment_id', assignment.id);
                       navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
                     }}
-                    className="grid grid-cols-[1.6fr,1.6fr,1fr,1fr,0.3fr] gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer hover:bg-[#f8fafc]"
+                    className={`grid gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer ${
+                      isManageMode
+                        ? `grid-cols-[2rem,1.6fr,1.6fr,1fr,1fr,0.3fr] ${isSelected ? 'bg-red-50' : 'hover:bg-[#f8fafc]'}`
+                        : 'grid-cols-[1.6fr,1.6fr,1fr,1fr,0.3fr] hover:bg-[#f8fafc]'
+                    }`}
                   >
+                    {isManageMode && (
+                      <div className="flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(assignment.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 rounded border-[#d1d5db] text-red-600 focus:ring-red-500"
+                        />
+                      </div>
+                    )}
                     <div>
                       <div className="text-sm font-semibold text-[#0b2b43]">{displayName(assignment)}</div>
                       <div className="text-xs text-[#6b7280]">{assignment.employeeIdentifier}</div>
@@ -321,7 +430,7 @@ export const HrDashboard: React.FC = () => {
                       <div className="text-xs text-[#6b7280]">{deadline.helper}</div>
                     </div>
                     <div className="text-right text-[#94a3b8] text-lg">
-                      →
+                      {isManageMode ? '' : '→'}
                     </div>
                   </div>
                 );

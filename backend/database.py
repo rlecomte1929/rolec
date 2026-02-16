@@ -513,6 +513,23 @@ class Database:
         conn.close()
         return [dict(row) for row in rows]
 
+    def delete_assignment(self, assignment_id: str) -> bool:
+        """Delete a case assignment and its related data. Returns True if deleted."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT case_id FROM case_assignments WHERE id = ?", (assignment_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return False
+        case_id = row["case_id"]
+        cursor.execute("DELETE FROM assignment_invites WHERE case_id = ?", (case_id,))
+        cursor.execute("DELETE FROM case_assignments WHERE id = ?", (assignment_id,))
+        cursor.execute("DELETE FROM cases WHERE id = ?", (case_id,))
+        conn.commit()
+        conn.close()
+        return True
+
     def create_assignment_invite(
         self,
         invite_id: str,

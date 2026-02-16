@@ -20,7 +20,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
   const location = useLocation();
   const [navError, setNavError] = useState<string | null>(getNavigationError());
-  const isHrRole = role === 'HR';
+  const isHrRole = role === 'HR' || role === 'ADMIN';
   const lastAssignmentId = localStorage.getItem('relopass_last_assignment_id');
 
   const isActiveRoute = (path: string) => {
@@ -152,6 +152,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   >
                     Resources
                   </Link>
+                  {role === 'ADMIN' && (
+                    <Link
+                      to={buildRoute('employeeJourney')}
+                      className={`px-3 py-1 rounded-full border ${
+                        isActiveRoute(ROUTE_DEFS.employeeJourney.path)
+                          ? 'border-[#059669] text-[#059669] bg-[#ecfdf5]'
+                          : 'border-[#d1d5db] text-[#6b7280] hover:text-[#059669]'
+                      }`}
+                    >
+                      Employee View
+                    </Link>
+                  )}
                 </nav>
               </div>
               <div className="flex items-center gap-3">

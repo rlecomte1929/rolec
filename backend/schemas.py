@@ -45,6 +45,7 @@ class OverallStatus(str, Enum):
 class UserRole(str, Enum):
     HR = "HR"
     EMPLOYEE = "EMPLOYEE"
+    ADMIN = "ADMIN"
 
 
 # Child model

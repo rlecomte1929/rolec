@@ -170,6 +170,10 @@ export const hrAPI = {
     const response = await api.post(`/api/hr/assignments/${assignmentId}/identifier`, { employeeIdentifier });
     return response.data;
   },
+  deleteAssignment: async (assignmentId: string): Promise<any> => {
+    const response = await api.delete(`/api/hr/assignments/${assignmentId}`);
+    return response.data;
+  },
 };
 
 export const employeeAPI = {

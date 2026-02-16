@@ -197,6 +197,7 @@ export const Auth: React.FC = () => {
                   options={[
                     { value: 'HR', label: 'HR manager' },
                     { value: 'EMPLOYEE', label: 'Employee' },
+                    { value: 'ADMIN', label: 'Admin (full access)' },
                   ]}
                   fullWidth
                 />

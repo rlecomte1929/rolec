@@ -47,7 +47,7 @@ export interface RegisterRequest {
   name?: string;
 }
 
-export type UserRole = 'HR' | 'EMPLOYEE';
+export type UserRole = 'HR' | 'EMPLOYEE' | 'ADMIN';
 
 export interface User {
   id: string;

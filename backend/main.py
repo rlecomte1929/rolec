@@ -240,8 +240,12 @@ async def get_current_user(
 
 
 def require_role(role: UserRole):
+    """Require a specific role. ADMIN users pass all role checks."""
     def dependency(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-        if user.get("role") != role.value:
+        user_role = user.get("role")
+        if user_role == UserRole.ADMIN.value:
+            return user
+        if user_role != role.value:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return user
     return dependency
@@ -706,6 +710,14 @@ def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR)
             complianceStatus=report["overallStatus"] if report else None,
         ))
     return summaries
+
+
+@app.delete("/api/hr/assignments/{assignment_id}")
+def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    deleted = db.delete_assignment(assignment_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return {"success": True, "deleted": assignment_id}
 
 
 @app.get("/api/hr/assignments/{assignment_id}", response_model=AssignmentDetail)
