@@ -167,15 +167,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 </nav>
               </div>
               <div className="flex items-center gap-3">
-                <button className="h-9 w-9 rounded-full border border-[#e2e8f0] flex items-center justify-center text-[#64748b] hover:text-[#0b2b43]">
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7Z" />
-                    <path d="M13.73 21a2 2 0 01-3.46 0" />
-                  </svg>
-                </button>
-                <button className="h-9 w-9 rounded-full bg-[#0b2b43] text-white text-xs font-semibold">
-                  {identity ? identity.slice(0, 2).toUpperCase() : 'HR'}
-                </button>
               </div>
             </Container>
           </div>
