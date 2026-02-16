@@ -37,15 +37,17 @@ seed_demo_cases()
 default_origins = [
     "http://localhost:3000",
     "http://localhost:5173",
-    "https://relopass.relopass.com",
+    "https://relopass.com",
+    "https://www.relopass.com",
 ]
 env_origins = os.getenv("CORS_ORIGINS")
 if env_origins:
-    default_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+    extra = [o.strip() for o in env_origins.split(",") if o.strip()]
+    default_origins = list(dict.fromkeys(default_origins + extra))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=default_origins,  # React dev servers + Cloudflare Pages
+    allow_origins=default_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -57,7 +59,12 @@ app.include_router(admin_router.router)
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "service": "ReloPass API",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
 
 
 # Global orchestrator

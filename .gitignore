@@ -18,3 +18,8 @@ Thumbs.db
 .env
 .env.local
 .env.*
+
+# Allow non-secret env files to be committed
+!.env.example
+!frontend/.env.production
+!frontend/.env.development

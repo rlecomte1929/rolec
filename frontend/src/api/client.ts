@@ -19,10 +19,14 @@ import type {
   ComplianceCaseReport,
 } from '../types';
 
-// In production we default to same-origin (/api/...) unless explicitly overridden.
-// In local dev we default to the local FastAPI server.
-const API_BASE_URL =
+// VITE_API_URL must be set for every environment:
+//   - Development:  http://localhost:8000         (via frontend/.env.development)
+//   - Production:   https://api.relopass.com      (via frontend/.env.production)
+// Fallback keeps local dev working if .env.development is missing.
+const API_BASE_URL: string =
   import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '');
+
+export { API_BASE_URL };
 
 
 // Create axios instance
