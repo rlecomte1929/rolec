@@ -1,6 +1,11 @@
 """
 FastAPI main application for ReloPass backend.
 """
+import logging
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
+
 from fastapi import FastAPI, HTTPException, Header, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, Dict, Any, List
@@ -30,8 +35,11 @@ from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
 
 app = FastAPI(title="ReloPass API", version="1.0.0")
+log.info("Initializing database schemas...")
 init_db()
+log.info("Seeding demo cases...")
 seed_demo_cases()
+log.info("Startup complete.")
 
 # CORS middleware
 default_origins = [
