@@ -206,8 +206,12 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
         <Button
           variant="outline"
           onClick={async () => {
-            await onSave(nextDraft);
-            window.location.href = '/employee/journey';
+            try {
+              await onSave(nextDraft);
+              window.location.href = '/employee/journey';
+            } catch (err: any) {
+              setError(err?.message || 'Unable to save draft. Please try again.');
+            }
           }}
         >
           Save as draft & exit

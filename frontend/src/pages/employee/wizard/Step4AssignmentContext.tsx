@@ -129,8 +129,12 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
           <Button
             variant="outline"
             onClick={async () => {
-              await onSave(nextDraft);
-              window.location.href = '/employee/journey';
+              try {
+                await onSave(nextDraft);
+                window.location.href = '/employee/journey';
+              } catch (err: any) {
+                setError(err?.message || 'Unable to save draft. Please try again.');
+              }
             }}
           >
             Save as draft & exit

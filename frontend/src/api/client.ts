@@ -230,14 +230,25 @@ function buildApiError(response: Response, bodyText: string) {
   return err;
 }
 
+function authHeaders(): Record<string, string> {
+  const token = getAuthItem('relopass_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function apiGet<T>(path: string, opts?: { headers?: Record<string, string> }): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(opts?.headers || {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+        ...(opts?.headers || {}),
+      },
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Please check your connection and try again.');
+  }
   if (!response.ok) {
     const text = await response.text();
     throw buildApiError(response, text);
@@ -250,14 +261,20 @@ export async function apiPost<T>(
   body?: any,
   opts?: { headers?: Record<string, string> }
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(opts?.headers || {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+        ...(opts?.headers || {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Please check your connection and try again.');
+  }
   if (!response.ok) {
     const text = await response.text();
     throw buildApiError(response, text);
@@ -270,14 +287,20 @@ export async function apiPatch<T>(
   body?: any,
   opts?: { headers?: Record<string, string> }
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(opts?.headers || {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(),
+        ...(opts?.headers || {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Please check your connection and try again.');
+  }
   if (!response.ok) {
     const text = await response.text();
     throw buildApiError(response, text);

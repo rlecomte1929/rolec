@@ -83,9 +83,13 @@ export const CaseWizardPage: React.FC = () => {
       setCaseData(data);
       setDraft(data.draft || defaultDraft);
     } catch {
-      const data = await patchCase(caseId, defaultDraft);
-      setCaseData(data);
-      setDraft(data.draft || defaultDraft);
+      try {
+        const data = await patchCase(caseId, defaultDraft);
+        setCaseData(data);
+        setDraft(data.draft || defaultDraft);
+      } catch (err: any) {
+        setError(err?.message || 'Unable to load or create your case. Please try again.');
+      }
     }
   };
 
@@ -156,16 +160,11 @@ export const CaseWizardPage: React.FC = () => {
 
   const handleSave = async (nextDraft: CaseDraftDTO) => {
     if (!caseId) return;
-    try {
-      const updated = await patchCase(caseId, nextDraft);
-      setDraft(updated.draft);
-      setCaseData(updated);
-      await loadRequirements();
-      setError('');
-    } catch (err: any) {
-      setError(err?.message || 'Unable to save draft.');
-      throw err;
-    }
+    const updated = await patchCase(caseId, nextDraft);
+    setDraft(updated.draft);
+    setCaseData(updated);
+    await loadRequirements();
+    setError('');
   };
 
   const handleNext = async (nextDraft: CaseDraftDTO) => {
@@ -173,12 +172,16 @@ export const CaseWizardPage: React.FC = () => {
     try {
       await handleSave(nextDraft);
       if (currentStep === 1) {
-        await startResearch(caseId);
-        setBanner('Pulling destination requirements—shown in Step 5.');
+        try {
+          await startResearch(caseId);
+          setBanner('Pulling destination requirements—shown in Step 5.');
+        } catch {
+          // Research is non-blocking; continue to next step
+        }
       }
       navigate(`/employee/case/${caseId}/wizard/${currentStep + 1}`);
-    } catch {
-      // error already set in handleSave
+    } catch (err: any) {
+      setError(err?.message || 'Unable to save. Please try again.');
     }
   };
 
