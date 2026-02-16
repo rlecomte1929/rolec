@@ -10,7 +10,7 @@ from datetime import datetime
 import re
 import json
 
-from schemas import (
+from .schemas import (
     RegisterRequest, LoginRequest, LoginResponse, AnswerRequest, NextQuestionResponse,
     RelocationProfile, DashboardResponse, HousingRecommendation,
     SchoolRecommendation, MoverRecommendation, TimelinePhase, TimelineTask,
@@ -20,14 +20,14 @@ from schemas import (
     UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest
 )
-from database import db
-from agents.orchestrator import IntakeOrchestrator
-from agents.compliance_engine import ComplianceEngine
-from policy_engine import PolicyEngine
-from app.db import init_db
-from app.seed import seed_demo_cases
-from app.routers import cases as cases_router
-from app.routers import admin as admin_router
+from .database import db
+from .agents.orchestrator import IntakeOrchestrator
+from .agents.compliance_engine import ComplianceEngine
+from .policy_engine import PolicyEngine
+from .app.db import init_db
+from .app.seed import seed_demo_cases
+from .app.routers import cases as cases_router
+from .app.routers import admin as admin_router
 
 app = FastAPI(title="ReloPass API", version="1.0.0")
 init_db()
@@ -53,6 +53,12 @@ app.add_middleware(
 
 app.include_router(cases_router.router)
 app.include_router(admin_router.router)
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
 
 # Global orchestrator
 orchestrator = IntakeOrchestrator()

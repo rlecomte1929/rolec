@@ -5,8 +5,8 @@ Uses seed datasets + filtering logic.
 """
 from typing import Dict, Any, List
 from datetime import datetime, date
-from schemas import HousingRecommendation, SchoolRecommendation, MoverRecommendation
-from seed_data import get_housing_seed, get_schools_seed, get_movers_seed
+from ..schemas import HousingRecommendation, SchoolRecommendation, MoverRecommendation
+from ..seed_data import get_housing_seed, get_schools_seed, get_movers_seed
 
 
 class RecommendationEngine:

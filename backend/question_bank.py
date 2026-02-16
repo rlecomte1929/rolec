@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from schemas import Question, QuestionOption
+from .schemas import Question, QuestionOption
 
 
 SINGAPORE_AREAS = [

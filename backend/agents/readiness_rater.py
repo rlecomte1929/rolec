@@ -5,7 +5,7 @@ INFORMATIONAL ONLY - not legal advice.
 """
 from typing import Dict, Any, List
 from datetime import datetime, date
-from schemas import ImmigrationReadiness, ReadinessStatus
+from ..schemas import ImmigrationReadiness, ReadinessStatus
 
 
 class ReadinessRater:
