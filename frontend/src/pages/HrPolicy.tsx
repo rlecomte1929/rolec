@@ -6,8 +6,10 @@ import { hrAPI } from '../api/client';
 import type { AssignmentDetail, AssignmentSummary, PolicyResponse, PolicySpendItem } from '../types';
 import { safeNavigate } from '../navigation/safeNavigate';
 
-const formatCurrency = (value: number, currency = 'USD') =>
-  value.toLocaleString('en-US', { style: 'currency', currency, maximumFractionDigits: 0 });
+const formatCurrency = (value: number | undefined | null, currency = 'USD') => {
+  const safe = typeof value === 'number' && isFinite(value) ? value : 0;
+  return safe.toLocaleString('en-US', { style: 'currency', currency, maximumFractionDigits: 0 });
+};
 
 const statusBadge = (status: PolicySpendItem['status']) => {
   if (status === 'OVER_LIMIT') return { label: 'OVER LIMIT', classes: 'bg-[#fef2f2] text-[#7a2a2a]' };
@@ -83,7 +85,7 @@ export const HrPolicy: React.FC = () => {
     ? `${profile.movePlan.origin} → ${profile.movePlan.destination}`
     : 'Relocation route';
   const familySize = 1 + (profile?.spouse?.fullName ? 1 : 0) + (profile?.dependents?.length || 0);
-  const exceptionPending = policy?.exceptions?.some((exc) => exc.status === 'PENDING');
+  const exceptionPending = policy?.exceptions?.some?.((exc) => exc.status === 'PENDING') ?? false;
 
   const coverageItems = useMemo(() => {
     if (!policy) return [];
@@ -115,6 +117,18 @@ export const HrPolicy: React.FC = () => {
       {error && <Alert variant="error">{error}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading policy...</div>}
 
+      {!isLoading && !caseId && (
+        <Card padding="lg">
+          <div className="text-sm text-[#4b5563]">No case selected. Open a case from the HR Dashboard to view its policy.</div>
+        </Card>
+      )}
+
+      {!isLoading && caseId && !policy && !error && (
+        <Card padding="lg">
+          <div className="text-sm text-[#4b5563]">Policy data is not available for this case.</div>
+        </Card>
+      )}
+
       {!isLoading && policy && assignment && (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -126,14 +140,14 @@ export const HrPolicy: React.FC = () => {
                 Family size: {familySize}
               </span>
               <span className="text-xs px-3 py-1 rounded-full border border-[#e2e8f0] text-[#4b5563]">
-                Policy: {policy.policy.policyVersion}
+                Policy: {policy.policy?.policyVersion ?? '—'}
               </span>
               <span className="text-xs px-3 py-1 rounded-full border border-[#e2e8f0] text-[#4b5563]">
                 HR owner: {assignment.employeeIdentifier || 'HR'}
               </span>
             </div>
             <div className="text-xs text-[#6b7280]">
-              Effective: {new Date(policy.policy.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              Effective: {policy.policy?.effectiveDate ? new Date(policy.policy.effectiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
             </div>
           </div>
 
@@ -153,13 +167,13 @@ export const HrPolicy: React.FC = () => {
 
           <div className="flex items-center justify-between">
             <div className="text-lg font-semibold text-[#0b2b43]">Your Coverage Envelope</div>
-            <div className="text-xs text-[#6b7280]">Policy exceptions: {policy.exceptions.length}</div>
+            <div className="text-xs text-[#6b7280]">Policy exceptions: {policy.exceptions?.length ?? 0}</div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             {coverageItems.map((item) => {
               const badge = statusBadge(item.status);
-              const barPercent = Math.min(100, Math.round((item.used / item.cap) * 100));
+              const barPercent = item.cap ? Math.min(100, Math.round((item.used / item.cap) * 100)) : 0;
               return (
                 <Card key={item.key} padding="md">
                   <div className="flex items-center justify-between">
@@ -216,7 +230,7 @@ export const HrPolicy: React.FC = () => {
                     <div>
                       <div className="text-sm font-semibold text-[#0b2b43]">{item.title} Rules</div>
                       <div className="text-xs text-[#6b7280]">
-                        Cap: {formatCurrency(item.cap, item.currency)} · Approval: {policy.policy.approvalRules.overLimit}
+                        Cap: {formatCurrency(item.cap, item.currency)} · Approval: {policy.policy?.approvalRules?.['overLimit'] ?? 'Standard'}
                       </div>
                     </div>
                     <span className="text-xs text-[#6b7280]">View</span>
@@ -230,7 +244,7 @@ export const HrPolicy: React.FC = () => {
                     <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">
                       <div className="text-xs font-semibold text-[#0b2b43]">Required evidence</div>
                       <ul className="mt-2 space-y-1">
-                        {(policy.policy.requiredEvidence[item.key] || []).map((evidence) => (
+                        {(policy.policy?.requiredEvidence?.[item.key] ?? []).map((evidence) => (
                           <li key={evidence}>• {evidence}</li>
                         ))}
                       </ul>
