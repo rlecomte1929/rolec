@@ -7,8 +7,11 @@ import os
 
 
 class PolicyEngine:
-    def __init__(self, policy_path: str = "policy_config.json"):
-        self.policy_path = policy_path
+    def __init__(self, policy_path: str | None = None):
+        if policy_path:
+            self.policy_path = policy_path
+        else:
+            self.policy_path = os.path.join(os.path.dirname(__file__), "policy_config.json")
 
     def load_policy(self) -> Dict[str, Any]:
         if os.path.exists(self.policy_path):
