@@ -5,6 +5,8 @@ import { Alert, Button, Card } from '../components/antigravity';
 import { hrAPI } from '../api/client';
 import type { AssignmentDetail, AssignmentSummary, PolicyResponse, PolicySpendItem } from '../types';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { useSelectedCase } from '../contexts/SelectedCaseContext';
+import { CaseIncompleteBanner } from '../components/CaseIncompleteBanner';
 
 const formatCurrency = (value: number | undefined | null, currency = 'USD') => {
   const safe = typeof value === 'number' && isFinite(value) ? value : 0;
@@ -20,6 +22,7 @@ const statusBadge = (status: PolicySpendItem['status']) => {
 export const HrPolicy: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { selectedCaseId } = useSelectedCase();
   const [_assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [policy, setPolicy] = useState<PolicyResponse | null>(null);
@@ -30,7 +33,7 @@ export const HrPolicy: React.FC = () => {
   const [exceptionAmount, setExceptionAmount] = useState('');
   const [exceptionOpen, setExceptionOpen] = useState(false);
 
-  const caseId = searchParams.get('caseId') || localStorage.getItem('relopass_last_assignment_id') || '';
+  const caseId = searchParams.get('caseId') || selectedCaseId || '';
 
   const loadAssignments = async () => {
     try {
@@ -119,7 +122,7 @@ export const HrPolicy: React.FC = () => {
 
       {!isLoading && !caseId && (
         <Card padding="lg">
-          <div className="text-sm text-[#4b5563]">No case selected. Open a case from the HR Dashboard to view its policy.</div>
+          <div className="text-sm text-[#4b5563]">Select a case from the HR Dashboard to view its policy.</div>
         </Card>
       )}
 
@@ -127,6 +130,12 @@ export const HrPolicy: React.FC = () => {
         <Card padding="lg">
           <div className="text-sm text-[#4b5563]">Policy data is not available for this case.</div>
         </Card>
+      )}
+
+      {!isLoading && policy && assignment && (
+        <div className="mb-4">
+          <CaseIncompleteBanner assignment={assignment} />
+        </div>
       )}
 
       {!isLoading && policy && assignment && (

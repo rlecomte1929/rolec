@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { ROUTE_DEFS } from './navigation/routes';
 import { Landing } from './pages/Landing';
 import { Auth } from './pages/Auth';
@@ -23,6 +24,7 @@ function App() {
   return (
     <ErrorBoundary>
     <Router>
+      <SelectedCaseProvider>
       <Routes>
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
@@ -73,6 +75,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
       </Routes>
+      </SelectedCaseProvider>
     </Router>
     </ErrorBoundary>
   );

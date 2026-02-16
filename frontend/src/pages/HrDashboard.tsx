@@ -7,8 +7,11 @@ import type { AssignmentSummary, AssignmentDetail } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { useSelectedCase } from '../contexts/SelectedCaseContext';
+import { getCaseMissingFields } from '../components/CaseIncompleteBanner';
 
 export const HrDashboard: React.FC = () => {
+  const { setSelectedCaseId } = useSelectedCase();
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -393,7 +396,7 @@ export const HrDashboard: React.FC = () => {
                         toggleSelection(assignment.id);
                         return;
                       }
-                      localStorage.setItem('relopass_last_assignment_id', assignment.id);
+                      setSelectedCaseId(assignment.id);
                       navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
                     }}
                     className={`grid gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer ${
@@ -424,7 +427,12 @@ export const HrDashboard: React.FC = () => {
                         {detail?.profile?.movePlan?.housing?.budgetMonthlySGD || 'Relocation pathway'}
                       </div>
                     </div>
-                    <div>{caseStatusBadge(assignment.status)}</div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {caseStatusBadge(assignment.status)}
+                      {getCaseMissingFields(detail ?? null).length > 0 && (
+                        <Badge variant="warning">Incomplete</Badge>
+                      )}
+                    </div>
                     <div>
                       <div className="text-sm text-[#0b2b43]">{deadline.label}</div>
                       <div className="text-xs text-[#6b7280]">{deadline.helper}</div>

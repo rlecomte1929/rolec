@@ -5,6 +5,8 @@ import { clearAuthItems, getAuthItem } from '../utils/demo';
 import { getNavigationError } from '../navigation/safeNavigate';
 import { buildRoute, ROUTE_DEFS } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
+import { useSelectedCase } from '../contexts/SelectedCaseContext';
+import { SwitchUserModal } from './SwitchUserModal';
 
 const logoUrl = '/relopass-logo.png?v=1';
 
@@ -20,8 +22,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
   const location = useLocation();
   const [navError, setNavError] = useState<string | null>(getNavigationError());
+  const [switchUserOpen, setSwitchUserOpen] = useState(false);
   const isHrRole = role === 'HR' || role === 'ADMIN';
-  const lastAssignmentId = localStorage.getItem('relopass_last_assignment_id');
+  const { selectedCaseId } = useSelectedCase();
 
   const isActiveRoute = (path: string) => {
     if (path.includes('/:')) {
@@ -31,12 +34,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
-  const complianceRoute = lastAssignmentId
-    ? `${buildRoute('hrComplianceIndex')}?caseId=${lastAssignmentId}`
+  const complianceRoute = selectedCaseId
+    ? `${buildRoute('hrComplianceIndex')}?caseId=${selectedCaseId}`
     : buildRoute('hrComplianceIndex');
-  const policyRoute = lastAssignmentId
-    ? `${buildRoute('hrPolicy')}?caseId=${lastAssignmentId}`
+  const policyRoute = selectedCaseId
+    ? `${buildRoute('hrPolicy')}?caseId=${selectedCaseId}`
     : buildRoute('hrPolicy');
+  const messagesRoute = selectedCaseId
+    ? `${buildRoute('hrMessages')}?caseId=${selectedCaseId}`
+    : buildRoute('hrMessages');
 
   useRegisterNav('AppShell', [
     { label: 'Employee view', routeKey: 'employeeJourney' },
@@ -68,13 +74,19 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
           </Link>
           <div className="flex items-center gap-4">
             <button
+              onClick={() => setSwitchUserOpen(true)}
+              className="text-xs text-[#4b5563] hover:text-[#0b2b43] border border-[#e2e8f0] px-3 py-1 rounded-full"
+            >
+              Switch user
+            </button>
+            <button
               onClick={() => {
                 clearAuthItems();
                 window.location.href = buildRoute('landing');
               }}
-              className="text-xs text-[#4b5563] hover:text-[#0b2b43] border border-[#e2e8f0] px-3 py-1 rounded-full"
+              className="text-xs text-[#94a3b8] hover:text-[#0b2b43]"
             >
-              Switch user
+              Logout
             </button>
             <div className="text-right text-sm text-slate-600">
               {identity && <div className="font-medium text-[#0f172a]">{identity}</div>}
@@ -133,7 +145,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     HR Policy
                   </Link>
                   <Link
-                    to={buildRoute('hrMessages')}
+                    to={messagesRoute}
                     className={`px-3 py-1 rounded-full border ${
                       isActiveRoute(ROUTE_DEFS.hrMessages.path)
                         ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
@@ -167,6 +179,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 </nav>
               </div>
               <div className="flex items-center gap-3">
+                {selectedCaseId ? (
+                  <span className="text-xs px-3 py-1 rounded-full border border-[#c7d8ff] bg-[#eef4ff] text-[#1d4ed8]">
+                    Case: {selectedCaseId.slice(0, 8)}…
+                  </span>
+                ) : (
+                  <span className="text-xs px-3 py-1 rounded-full border border-[#fde68a] bg-[#fffbeb] text-[#92400e]">
+                    No case selected
+                  </span>
+                )}
               </div>
             </Container>
           </div>
@@ -200,6 +221,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
           </div>
         </Container>
       </footer>
+
+      <SwitchUserModal open={switchUserOpen} onClose={() => setSwitchUserOpen(false)} />
     </div>
   );
 };

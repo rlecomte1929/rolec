@@ -11,6 +11,8 @@ import type {
   PolicyResponse,
 } from '../types';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { useSelectedCase } from '../contexts/SelectedCaseContext';
+import { CaseIncompleteBanner } from '../components/CaseIncompleteBanner';
 
 type TabId = 'requirements' | 'verification' | 'risk';
 type OwnerFilter = 'ALL' | 'HR' | 'Employee' | 'Partner';
@@ -45,6 +47,7 @@ export const HrComplianceCheck: React.FC = () => {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { selectedCaseId } = useSelectedCase();
 
   const [_assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
@@ -56,7 +59,7 @@ export const HrComplianceCheck: React.FC = () => {
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('ALL');
   const [showBlockingOnly, setShowBlockingOnly] = useState(true);
 
-  const caseId = id || searchParams.get('caseId') || localStorage.getItem('relopass_last_assignment_id') || '';
+  const caseId = id || searchParams.get('caseId') || selectedCaseId || '';
 
   const loadAssignments = async () => {
     try {
@@ -192,6 +195,18 @@ export const HrComplianceCheck: React.FC = () => {
     <AppShell title="Compliance Check" subtitle={`Understand compliance requirements for ${employeeName}'s case.`}>
       {error && <Alert variant="error">{error}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading compliance checks...</div>}
+
+      {!isLoading && !caseId && (
+        <Card padding="lg">
+          <div className="text-sm text-[#4b5563]">Select a case from the HR Dashboard to view compliance checks.</div>
+        </Card>
+      )}
+
+      {!isLoading && report && assignment && (
+        <div className="mb-4">
+          <CaseIncompleteBanner assignment={assignment} />
+        </div>
+      )}
 
       {!isLoading && report && assignment && (
         <div className="space-y-6">
