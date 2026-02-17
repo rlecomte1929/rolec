@@ -25,14 +25,34 @@ from .schemas import (
     UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest
 )
-from .database import db
+from .database import db, Database
 from .agents.orchestrator import IntakeOrchestrator
 from .agents.compliance_engine import ComplianceEngine
 from .policy_engine import PolicyEngine
-from .app.db import init_db
+from .app.db import init_db, DATABASE_URL as _app_db_url
 from .app.seed import seed_demo_cases
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
+from pydantic import BaseModel as _BaseModel
+
+# ---------------------------------------------------------------------------
+# Startup: validate DATABASE_URL and log DB type
+# ---------------------------------------------------------------------------
+_db_info = Database.get_db_info()
+_db_scheme = _db_info["db_url_scheme"]
+_db_host = _db_info["db_host"] or "(local file)"
+
+log.info("DB engine: %s | host: %s", _db_scheme, _db_host)
+
+_raw_db_url_check = os.getenv("DATABASE_URL", "")
+if any(p in _raw_db_url_check for p in ["YOUR_PASSWORD", "YOUR_HOST", "<password>", "placeholder"]):
+    log.error("DATABASE_URL contains placeholder text! Fix it in Render env vars.")
+    raise RuntimeError("DATABASE_URL contains placeholder text — refusing to start.")
+
+if _db_scheme == "sqlite":
+    log.warning("Running with SQLite — data will NOT persist across Render redeploys!")
+else:
+    log.info("Running with PostgreSQL — data persists across redeploys.")
 
 app = FastAPI(title="ReloPass API", version="1.0.0")
 log.info("Initializing database schemas...")
@@ -73,6 +93,34 @@ def health_check():
         "version": "1.0.0",
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
+
+
+# ---------------------------------------------------------------------------
+# Debug / diagnostics endpoints
+# ---------------------------------------------------------------------------
+@app.get("/debug/db")
+def debug_db():
+    """Return non-secret database connectivity info."""
+    return Database.get_db_info()
+
+
+class _DebugKVBody(_BaseModel):
+    key: str
+    value: str
+
+
+@app.post("/debug/kv")
+def debug_kv_set(body: _DebugKVBody):
+    db.debug_kv_set(body.key, body.value)
+    return {"ok": True, "key": body.key}
+
+
+@app.get("/debug/kv/{key}")
+def debug_kv_get(key: str):
+    result = db.debug_kv_get(key)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Key '{key}' not found")
+    return result
 
 
 # Global orchestrator

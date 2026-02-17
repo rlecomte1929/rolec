@@ -178,6 +178,15 @@ class Database:
                 )
             """))
 
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS rp_debug_kv (
+                    id TEXT PRIMARY KEY,
+                    key TEXT UNIQUE NOT NULL,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """))
+
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
 
@@ -632,6 +641,65 @@ class Database:
                 "SELECT * FROM compliance_actions WHERE assignment_id = :aid ORDER BY created_at DESC"
             ), {"aid": assignment_id}).fetchall()
         return self._rows_to_list(rows)
+
+
+    # ==================================================================
+    # Debug KV operations
+    # ==================================================================
+    def debug_kv_set(self, key: str, value: str) -> None:
+        now = datetime.utcnow().isoformat()
+        kv_id = key
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                text("SELECT 1 FROM rp_debug_kv WHERE key = :key"), {"key": key}
+            ).fetchone()
+            if existing:
+                conn.execute(text(
+                    "UPDATE rp_debug_kv SET value = :value, updated_at = :now WHERE key = :key"
+                ), {"value": value, "now": now, "key": key})
+            else:
+                conn.execute(text(
+                    "INSERT INTO rp_debug_kv (id, key, value, updated_at) VALUES (:id, :key, :value, :now)"
+                ), {"id": kv_id, "key": key, "value": value, "now": now})
+
+    def debug_kv_get(self, key: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT key, value, updated_at FROM rp_debug_kv WHERE key = :key"),
+                {"key": key},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    # ==================================================================
+    # Debug: DB info
+    # ==================================================================
+    @staticmethod
+    def get_db_info() -> Dict[str, Any]:
+        """Return non-secret info about the database connection."""
+        scheme = "postgresql" if not _is_sqlite else "sqlite"
+        host = None
+        if not _is_sqlite and "@" in _raw_url:
+            after_at = _raw_url.split("@", 1)[-1]
+            host = after_at.split("/")[0] if "/" in after_at else after_at
+        connectivity = False
+        server_time = None
+        try:
+            with _engine.connect() as conn:
+                if _is_sqlite:
+                    row = conn.execute(text("SELECT datetime('now') AS t")).fetchone()
+                else:
+                    row = conn.execute(text("SELECT now() AS t")).fetchone()
+                if row:
+                    server_time = str(row._mapping["t"])
+                    connectivity = True
+        except Exception as exc:
+            server_time = f"error: {exc}"
+        return {
+            "db_url_scheme": scheme,
+            "db_host": host,
+            "connectivity": connectivity,
+            "server_time": server_time,
+        }
 
 
 # Global database instance

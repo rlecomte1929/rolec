@@ -23,3 +23,6 @@ Thumbs.db
 !.env.example
 !frontend/.env.production
 !frontend/.env.development
+
+# Logs
+*.log
