@@ -96,6 +96,7 @@ def create_case(case_id: str):
             )
 
         requirements = compute_case_requirements(case_id)
+
         snapshot_id = str(uuid.uuid4())
         crud.create_snapshot(
             db,
@@ -106,9 +107,10 @@ def create_case(case_id: str):
                 "purpose": basics.get("purpose"),
                 "created_at": datetime.utcnow(),
                 "snapshot_json": requirements.model_dump_json(),
-                "sources_json": json.dumps([source.model_dump() for source in requirements.sources]),
+                "sources_json": json.dumps([source.model_dump(mode="json") for source in requirements.sources]),
             },
         )
+
         case.status = "CREATED"
         case.requirements_snapshot_id = snapshot_id
         db.commit()

@@ -8,6 +8,7 @@ log = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any, List
 import os
 import uuid
@@ -25,11 +26,15 @@ from .schemas import (
     UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest
 )
+# Import db_config first and log before any DB connection attempt
+# TODO: Remove masked DB log after confirming production connectivity
+from .db_config import DATABASE_URL as _db_url, get_masked_db_log_line
+log.info("Startup DB config (user/host only, no password): %s", get_masked_db_log_line())
 from .database import db, Database
 from .agents.orchestrator import IntakeOrchestrator
 from .agents.compliance_engine import ComplianceEngine
 from .policy_engine import PolicyEngine
-from .app.db import init_db, DATABASE_URL as _app_db_url
+from .app.db import init_db
 from .app.seed import seed_demo_cases
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
@@ -44,8 +49,7 @@ _db_host = _db_info["db_host"] or "(local file)"
 
 log.info("DB engine: %s | host: %s", _db_scheme, _db_host)
 
-_raw_db_url_check = os.getenv("DATABASE_URL", "")
-if any(p in _raw_db_url_check for p in ["YOUR_PASSWORD", "YOUR_HOST", "<password>", "placeholder"]):
+if any(p in _db_url for p in ["YOUR_PASSWORD", "YOUR_HOST", "<password>", "placeholder"]):
     log.error("DATABASE_URL contains placeholder text! Fix it in Render env vars.")
     raise RuntimeError("DATABASE_URL contains placeholder text — refusing to start.")
 
@@ -83,6 +87,20 @@ app.add_middleware(
 
 app.include_router(cases_router.router)
 app.include_router(admin_router.router)
+
+# ---------------------------------------------------------------------------
+# Global exception handler: log unhandled errors
+# ---------------------------------------------------------------------------
+import traceback
+
+@app.exception_handler(Exception)
+def _log_unhandled_exception(request, exc: Exception):
+    from fastapi import HTTPException as _HTTP
+    if isinstance(exc, _HTTP):
+        raise exc
+    tb = traceback.format_exc()
+    log.error("Unhandled exception: %s\n%s", exc, tb)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/health")
