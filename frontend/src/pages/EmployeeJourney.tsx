@@ -200,6 +200,17 @@ export const EmployeeJourney: React.FC = () => {
                     This case is read-only during HR review. If HR requests changes, you’ll be guided back into the wizard.
                   </div>
                 </div>
+                <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
+                  <div className="text-xs text-[#6b7280] mb-1">Next steps</div>
+                  <div className="text-xs text-[#4b5563]">
+                    You can continue exploring relocation Providers while HR reviews your submission.
+                  </div>
+                  <div className="mt-3">
+                    <Button variant="outline" onClick={() => safeNavigate(navigate, 'providers')}>
+                      Open Providers
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </Card>

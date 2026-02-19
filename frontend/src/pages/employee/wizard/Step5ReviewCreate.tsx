@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card } from '../../../components/antigravity';
+import { Button, Card, Alert } from '../../../components/antigravity';
 import type { CaseDraftDTO, CaseRequirementsDTO, RequirementItemDTO } from '../../../types';
 import { createCase, getRequirements } from '../../../api/cases';
 import { RequirementList } from '../../../components/requirements/RequirementList';
@@ -18,6 +18,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
   const [requirements, setRequirements] = useState<CaseRequirementsDTO | null>(null);
   const [created, setCreated] = useState(false);
   const [error, setError] = useState('');
+  const [snapshotWarning, setSnapshotWarning] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -33,25 +34,38 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
 
   const handleCreate = async () => {
     setError('');
+    setSnapshotWarning('');
     setIsCreating(true);
     try {
-      // 1) Snapshot requirements / create case artifact (wizard backend)
-      await createCase(caseId);
-      // 2) Submit to HR (existing assignment state machine)
+      // 1) Submit to HR (existing assignment state machine) — primary action.
       await employeeAPI.submitAssignment(caseId);
+
+      // 2) Best-effort: snapshot requirements / create case artifact (wizard backend).
+      // If this fails due to transient backend/CORS/network issues, we still consider the submission successful.
+      try {
+        await createCase(caseId);
+      } catch {
+        setSnapshotWarning(
+          'Submitted to HR, but we could not save a requirements snapshot. You can continue; HR may still review your submission.'
+        );
+      }
+
       setCreated(true);
     } catch (err: any) {
-      // Prefer structured API error detail when present.
-      const detail = err?.detail;
+      // Extract API error detail: axios uses err.response?.data?.detail; fetch uses err.detail
+      const resData = err?.response?.data;
+      const detail = err?.detail ?? resData?.detail;
       if (detail && typeof detail === 'object' && detail.message) {
         const missing = Array.isArray(detail.missingFields) ? detail.missingFields : [];
-        if (missing.length) {
-          setError(`${detail.message}. Please complete Step 1 (Relocation Basics) required fields.`);
-        } else {
-          setError(detail.message);
-        }
+        setError(missing.length
+          ? `${detail.message}. Please complete Step 1 (Relocation Basics) required fields.`
+          : detail.message);
+      } else if (detail && typeof detail === 'string') {
+        setError(detail);
+      } else if (resData && typeof resData === 'object' && resData.message) {
+        setError(resData.message);
       } else {
-        setError(err?.message || 'Unable to submit to HR.');
+        setError('Unable to submit to HR. Please complete all wizard steps and try again.');
       }
     } finally {
       setIsCreating(false);
@@ -70,6 +84,20 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
       {error && (
         <div className="mt-4 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
           {error}
+        </div>
+      )}
+      {created && (
+        <div className="mt-4">
+          <Alert variant="success" title="Submitted to HR">
+            Your case was successfully submitted for HR review. You can now browse Providers while HR reviews your submission.
+          </Alert>
+        </div>
+      )}
+      {snapshotWarning && (
+        <div className="mt-3">
+          <Alert variant="warning" title="Snapshot not saved">
+            {snapshotWarning}
+          </Alert>
         </div>
       )}
 
@@ -112,7 +140,10 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
             {isCreating ? 'Submitting...' : 'Submit to HR for review'}
           </Button>
         ) : (
-          <Button onClick={() => (window.location.href = '/employee/dashboard')}>Go to dashboard</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => (window.location.href = '/providers')}>Providers</Button>
+            <Button onClick={() => (window.location.href = '/employee/dashboard')}>Go to dashboard</Button>
+          </div>
         )}
       </div>
     </Card>

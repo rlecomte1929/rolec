@@ -217,7 +217,7 @@ export const CaseWizardPage: React.FC = () => {
           <nav className="flex items-center gap-4 text-sm text-[#6b7280]">
             <Link to={ROUTES.EMP_DASH} className="hover:text-[#0b2b43]">Dashboard</Link>
             <Link to={`/employee/case/${caseId}/wizard/1`} className="text-[#0b2b43] font-semibold">My Case</Link>
-            <Link to="#" className="hover:text-[#0b2b43]">Providers</Link>
+            <Link to="/providers" className="hover:text-[#0b2b43]">Providers</Link>
             <Link to="/hr/policy" className="hover:text-[#0b2b43]">HR Policy</Link>
             <Link to="/messages" className="hover:text-[#0b2b43]">Messages</Link>
             <Link to="/resources" className="hover:text-[#0b2b43]">Resources</Link>

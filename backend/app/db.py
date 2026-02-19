@@ -1,18 +1,11 @@
-import os
 import logging
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
+from ..db_config import DATABASE_URL
+
 log = logging.getLogger(__name__)
-
-_raw_url = os.getenv("DATABASE_URL", "sqlite:///./relopass.db")
-
-# Render / Supabase sometimes expose postgres:// which SQLAlchemy 2.x rejects.
-if _raw_url.startswith("postgres://"):
-    _raw_url = _raw_url.replace("postgres://", "postgresql://", 1)
-
-DATABASE_URL: str = _raw_url
 
 _connect_args: dict = {}
 if DATABASE_URL.startswith("sqlite"):

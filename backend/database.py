@@ -1,8 +1,7 @@
 """
 Unified database layer — works with both SQLite and Postgres.
-Reads DATABASE_URL from env (defaults to local SQLite).
+Uses DATABASE_URL from db_config (single source of truth).
 """
-import os
 import json
 import logging
 from typing import Optional, Dict, Any, List
@@ -11,15 +10,13 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
+from .db_config import DATABASE_URL as _raw_url
+
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Engine setup (shared logic with backend/app/db.py)
 # ---------------------------------------------------------------------------
-_raw_url = os.getenv("DATABASE_URL", "sqlite:///./relopass.db")
-if _raw_url.startswith("postgres://"):
-    _raw_url = _raw_url.replace("postgres://", "postgresql://", 1)
-
 _connect_args: dict = {}
 if _raw_url.startswith("sqlite"):
     _connect_args = {"check_same_thread": False}

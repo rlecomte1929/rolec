@@ -34,7 +34,8 @@ from .database import db, Database
 from .agents.orchestrator import IntakeOrchestrator
 from .agents.compliance_engine import ComplianceEngine
 from .policy_engine import PolicyEngine
-from .app.db import init_db
+from .app.db import init_db, SessionLocal
+from .app import crud as app_crud
 from .app.seed import seed_demo_cases
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
@@ -726,6 +727,60 @@ def employee_submit_answer(
     return _build_employee_journey_payload(assignment)
 
 
+def _draft_to_relocation_profile(draft: Dict[str, Any], assignment_id: str) -> Dict[str, Any]:
+    """Convert wizard Case draft to RelocationProfile format for submission checks."""
+    basics = draft.get("relocationBasics", {}) or {}
+    ep = draft.get("employeeProfile", {}) or {}
+    fm = draft.get("familyMembers", {}) or {}
+    ac = draft.get("assignmentContext", {}) or {}
+    origin = ", ".join(filter(None, [basics.get("originCity"), basics.get("originCountry")])) or "Unknown"
+    dest = ", ".join(filter(None, [basics.get("destCity"), basics.get("destCountry")])) or "Unknown"
+    profile: Dict[str, Any] = {
+        "userId": assignment_id,
+        "familySize": 1,
+        "movePlan": {
+            "origin": origin,
+            "destination": dest,
+            "targetArrivalDate": basics.get("targetMoveDate"),
+        },
+        "primaryApplicant": {
+            "fullName": ep.get("fullName"),
+            "nationality": ep.get("nationality"),
+            "passport": {
+                "expiryDate": ep.get("passportExpiry"),
+                "issuingCountry": ep.get("passportCountry"),
+            },
+            "employer": {"name": ac.get("employerName"), "roleTitle": ac.get("jobTitle")},
+            "assignment": {"startDate": ac.get("contractStartDate")},
+        },
+        "maritalStatus": fm.get("maritalStatus"),
+        "spouse": {"fullName": (fm.get("spouse") or {}).get("fullName")},
+        "dependents": [],
+    }
+    for c in (fm.get("children") or []):
+        profile["dependents"].append({
+            "firstName": (c or {}).get("fullName", "").split()[0] if (c or {}).get("fullName") else None,
+            "dateOfBirth": (c or {}).get("dateOfBirth"),
+        })
+    emp = profile["primaryApplicant"].setdefault("employer", {})
+    if ac.get("contractType"):
+        emp["contractType"] = ac["contractType"]
+    if ac.get("salaryBand"):
+        emp["salaryBand"] = ac["salaryBand"]
+    return profile
+
+
+def _merge_profiles(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
+    """Deep-merge update into base; update wins for leaf values."""
+    result = dict(base)
+    for k, v in update.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            result[k] = _merge_profiles(result[k], v)
+        else:
+            result[k] = v
+    return result
+
+
 @app.post("/api/employee/assignments/{assignment_id}/submit")
 def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
     assignment = db.get_assignment_by_id(assignment_id)
@@ -735,11 +790,35 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
         raise HTTPException(status_code=403, detail="Assignment not assigned to user")
 
     profile = db.get_employee_profile(assignment_id)
+    wizard_complete = False
+    # If profile missing/incomplete, try syncing from wizard Case draft (wizard may use assignment_id or case_id as URL param)
+    if not profile or (orchestrator.compute_completion_state(profile).get("profileCompleteness", 0) < 90):
+        with SessionLocal() as session:
+            case = app_crud.get_case(session, assignment_id) or (
+                app_crud.get_case(session, assignment.get("case_id", "")) if assignment.get("case_id") else None
+            )
+            if case:
+                draft = json.loads(case.draft_json)
+                basics = draft.get("relocationBasics", {}) or {}
+                required_basics = ["originCountry", "originCity", "destCountry", "destCity", "purpose", "targetMoveDate"]
+                # Sync whenever wizard has step 1 basics; wizard_complete bypasses 90% check
+                if all(basics.get(k) for k in required_basics):
+                    wizard_profile = _draft_to_relocation_profile(draft, assignment_id)
+                    profile = _merge_profiles(profile or {}, wizard_profile) if profile else wizard_profile
+                    db.save_employee_profile(assignment_id, profile)
+                    wizard_complete = True
+
     if not profile:
-        raise HTTPException(status_code=400, detail="Profile is not complete")
+        raise HTTPException(
+            status_code=400,
+            detail="Profile is not complete. Please complete all 5 wizard steps (Relocation Basics, Employee Profile, Family, Assignment Context) and try again.",
+        )
     completion_state = orchestrator.compute_completion_state(profile)
-    if completion_state.get("profileCompleteness", 0) < 90:
-        raise HTTPException(status_code=400, detail="Profile is not complete")
+    if not wizard_complete and completion_state.get("profileCompleteness", 0) < 90:
+        raise HTTPException(
+            status_code=400,
+            detail="Profile is not complete. Please fill in all required fields in the wizard steps (Relocation Basics, Employee Profile, Family, Assignment Context).",
+        )
 
     db.set_assignment_submitted(assignment_id)
     return {"success": True}

@@ -17,8 +17,13 @@
 | `CORS_ORIGINS` | Optional | `https://relopass.com,https://www.relopass.com`      |
 
 - If `DATABASE_URL` is not set, the backend falls back to local SQLite (`relopass.db`).
-- Supabase provides the connection string under Project Settings → Database → Connection string → URI.
+- **Supabase Session Pooler** (required): Use the pooler connection string, not the direct connection.
+  - Go to Supabase → Project Settings → Database → Connection string → **URI** (Session mode)
+  - Host format: `aws-1-eu-west-1.pooler.supabase.com`, port `6543` (or `5432` depending on pooler type)
+  - Username format: `postgres.<project_ref>` (e.g. `postgres.nsvefcvpvwwwhuqyuqmp`), NOT plain `postgres`
 - If the URI starts with `postgres://`, the backend auto-converts it to `postgresql://`.
+- If the host is a Supabase pooler (`pooler.supabase.com`) and the URI has no `sslmode`, the backend auto-appends `?sslmode=require` (required to fix "SSL connection has been closed unexpectedly").
+- **Important:** Do NOT link a Render-managed Postgres database to this service. That would inject a `DATABASE_URL` with user `postgres` and override your Supabase string. Set `DATABASE_URL` manually in Environment Variables.
 
 ### Database Initialization
 
@@ -42,11 +47,17 @@ Expected:
 
 Look for these log lines in Render:
 ```
+INFO:backend.main:Startup DB config: db_config: scheme=postgresql user=postgres.XXXX host=... port=6543 ...
 INFO:backend.database:DB schema ensured (legacy tables)
 INFO:backend.main:Initializing database schemas...
 INFO:backend.app.db:DB schema ensured (SQLAlchemy tables)
 INFO:backend.main:Startup complete.
 ```
+
+**Validate DATABASE_URL on startup:** The first log line shows parsed DB config (password masked). For Supabase pooler:
+- `user` must be `postgres.<project_ref>`, not `postgres`
+- `host` should contain `pooler.supabase.com`
+- `sslmode=present` (or `require`) is expected
 
 ---
 
