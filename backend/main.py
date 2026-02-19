@@ -893,12 +893,13 @@ def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(requ
 
 @app.get("/api/hr/assignments/{assignment_id}", response_model=AssignmentDetail)
 def get_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    assignment = db.get_assignment_by_id(assignment_id)
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    profile = db.get_employee_profile(assignment_id)
-    report = db.get_latest_compliance_report(assignment_id)
+    aid = assignment["id"]
+    profile = db.get_employee_profile(aid)
+    report = db.get_latest_compliance_report(aid)
 
     completeness = None
     if profile:
@@ -906,7 +907,7 @@ def get_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
         completeness = completion_state.get("profileCompleteness", 0)
 
     return AssignmentDetail(
-        id=assignment["id"],
+        id=aid,
         caseId=assignment["case_id"],
         employeeIdentifier=assignment["employee_identifier"],
         status=AssignmentStatus(normalize_status(assignment["status"])),

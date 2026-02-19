@@ -431,6 +431,11 @@ class Database:
             row = conn.execute(text("SELECT * FROM case_assignments WHERE id = :id"), {"id": assignment_id}).fetchone()
         return self._row_to_dict(row)
 
+    def get_assignment_by_case_id(self, case_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT * FROM case_assignments WHERE case_id = :cid"), {"cid": case_id}).fetchone()
+        return self._row_to_dict(row)
+
     def get_assignment_for_employee(self, employee_user_id: str) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
             row = conn.execute(text(

@@ -51,7 +51,8 @@ export const HrCaseSummary: React.FC = () => {
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
-        setError('Unable to load case summary.');
+        const msg = err.response?.data?.detail ?? err.message ?? 'Unable to load case summary.';
+        setError(typeof msg === 'string' ? msg : 'Unable to load case summary.');
       }
     } finally {
       setIsLoading(false);

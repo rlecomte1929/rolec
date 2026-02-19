@@ -230,7 +230,7 @@ export const ProvidersPage: React.FC = () => {
                     <h3 className="font-semibold text-[#0b2b43]">{s.name}</h3>
                     <p className="text-sm text-[#6b7280]">{s.area}</p>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {s.curriculumTags.map((t) => (
+                      {s.curriculumTags.map((t: string) => (
                         <Badge key={t} variant="info" size="sm">{t}</Badge>
                       ))}
                       <Badge variant="neutral" size="sm">{s.ageRange}</Badge>
@@ -256,7 +256,7 @@ export const ProvidersPage: React.FC = () => {
                     <h3 className="font-semibold text-[#0b2b43]">{m.name}</h3>
                     <p className="text-sm italic text-[#6b7280]">{m.rationale}</p>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {m.serviceTags.map((t) => (
+                      {m.serviceTags.map((t: string) => (
                         <Badge key={t} variant="success" size="sm">{t}</Badge>
                       ))}
                     </div>
@@ -377,7 +377,7 @@ function EmptyState({ message }: { message: string }) {
     <Card padding="lg">
       <div className="text-center py-8">
         <p className="text-[#6b7280]">{message}</p>
-        <Button variant="outline" className="mt-4" onClick={() => window.location.href = '/employee/dashboard'}>
+        <Button variant="outline" className="mt-4" onClick={() => { window.location.href = '/employee/dashboard'; }}>
           Go to My Case
         </Button>
       </div>
