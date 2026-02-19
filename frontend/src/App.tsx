@@ -20,6 +20,7 @@ import { CountryDetailPage } from './pages/admin/CountryDetailPage';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { ProvidersPage } from './pages/ProvidersPage';
 
 function App() {
   return (
@@ -44,7 +45,7 @@ function App() {
         <Route path={ROUTE_DEFS.auditNavigation.path} element={<NavigationAudit />} />
         <Route
           path={ROUTE_DEFS.providers.path}
-          element={<PlaceholderPage title="Providers" description="Browse relocation providers and service partners." />}
+          element={<ProvidersPage />}
         />
         <Route
           path={ROUTE_DEFS.hrPolicy.path}

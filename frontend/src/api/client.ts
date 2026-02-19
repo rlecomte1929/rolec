@@ -204,6 +204,10 @@ export const employeeAPI = {
     });
     return response.data;
   },
+  getRecommendations: async (): Promise<{ housing: any[]; schools: any[]; movers: any[] }> => {
+    const response = await api.get('/api/employee/recommendations');
+    return response.data;
+  },
 };
 
 export default api;

@@ -505,6 +505,24 @@ def complete_profile(user: Dict[str, Any] = Depends(get_current_user)):
     }
 
 
+@app.get("/api/employee/recommendations")
+def get_employee_recommendations(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
+    """Get recommendations for employee's assignment (uses employee_profile from wizard)."""
+    assignment = db.get_assignment_for_employee(user["id"])
+    if not assignment:
+        return {"housing": [], "schools": [], "movers": []}
+    profile = db.get_employee_profile(assignment["id"])
+    if not profile:
+        return {"housing": [], "schools": [], "movers": []}
+    completion = orchestrator.compute_completion_state(profile)
+    recs = completion.get("recommendations", {})
+    return {
+        "housing": recs.get("housing", []),
+        "schools": recs.get("schools", []),
+        "movers": recs.get("movers", []),
+    }
+
+
 @app.get("/api/recommendations/housing")
 def get_housing_recommendations(user: Dict[str, Any] = Depends(get_current_user)) -> List[HousingRecommendation]:
     """Get housing recommendations based on profile."""

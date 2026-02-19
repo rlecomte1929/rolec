@@ -140,10 +140,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
             {isCreating ? 'Submitting...' : 'Submit to HR for review'}
           </Button>
         ) : (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => (window.location.href = '/providers')}>Providers</Button>
-            <Button onClick={() => (window.location.href = '/employee/dashboard')}>Go to dashboard</Button>
-          </div>
+          <Button onClick={() => (window.location.href = '/employee/dashboard')}>Go to dashboard</Button>
         )}
       </div>
     </Card>
