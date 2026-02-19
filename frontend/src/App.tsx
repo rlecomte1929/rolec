@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
+import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
 import { ROUTE_DEFS } from './navigation/routes';
 import { Landing } from './pages/Landing';
 import { Auth } from './pages/Auth';
@@ -25,6 +26,7 @@ function App() {
     <ErrorBoundary>
     <Router>
       <SelectedCaseProvider>
+      <EmployeeAssignmentProvider>
       <Routes>
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
@@ -75,6 +77,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
       </Routes>
+      </EmployeeAssignmentProvider>
       </SelectedCaseProvider>
     </Router>
     </ErrorBoundary>

@@ -6,7 +6,7 @@ import { getNavigationError } from '../navigation/safeNavigate';
 import { buildRoute, ROUTE_DEFS } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
-import { SwitchUserModal } from './SwitchUserModal';
+import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 
 const logoUrl = '/relopass-logo.png?v=1';
 
@@ -22,9 +22,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
   const location = useLocation();
   const [navError, setNavError] = useState<string | null>(getNavigationError());
-  const [switchUserOpen, setSwitchUserOpen] = useState(false);
   const isHrRole = role === 'HR' || role === 'ADMIN';
+  const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
   const { selectedCaseId } = useSelectedCase();
+  const { assignmentId } = useEmployeeAssignment();
 
   const isActiveRoute = (path: string) => {
     if (path.includes('/:')) {
@@ -68,17 +69,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
               alt="ReloPass logo"
               className="h-16 w-16 rounded-xl object-contain"
             />
-            <div>
-              <div className="text-lg font-semibold text-[#0b2b43]">ReloPass</div>
-            </div>
           </Link>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setSwitchUserOpen(true)}
-              className="text-xs text-[#4b5563] hover:text-[#0b2b43] border border-[#e2e8f0] px-3 py-1 rounded-full"
-            >
-              Switch user
-            </button>
             <button
               onClick={() => {
                 clearAuthItems();
@@ -89,11 +81,88 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
               Logout
             </button>
             <div className="text-right text-sm text-slate-600">
-              {identity && <div className="font-medium text-[#0f172a]">{identity}</div>}
-              {role && <div className="uppercase tracking-wide text-xs text-[#6b7280]">{role}</div>}
+              {identity && (
+                <Link
+                  to={role === 'EMPLOYEE' ? buildRoute('employeeJourney') : role === 'HR' || role === 'ADMIN' ? buildRoute('hrDashboard') : buildRoute('landing')}
+                  className="inline-flex flex-col items-end rounded-lg px-3 py-2 font-medium text-[#0f172a] hover:bg-[#eef4f8] hover:text-[#0b2b43] transition-colors"
+                >
+                  {identity}
+                  {role && <span className="uppercase tracking-wide text-xs text-[#6b7280] font-normal mt-0.5">{role}</span>}
+                </Link>
+              )}
             </div>
           </div>
         </Container>
+        {isEmployeeRole && !isHrRole && (
+          <div className="border-t border-[#e2e8f0]">
+            <Container maxWidth="xl" className="py-3">
+              <nav className="flex flex-wrap items-center gap-2 text-sm text-[#6b7280]">
+                <Link
+                  to={buildRoute('employeeJourney')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.employeeJourney.path) && !location.pathname.includes('/wizard')
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Dashboard
+                </Link>
+                {assignmentId && (
+                  <Link
+                    to={`/employee/case/${assignmentId}/wizard/1`}
+                    className={`px-3 py-1 rounded-full border ${
+                      location.pathname.includes('/wizard')
+                        ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    My Case
+                  </Link>
+                )}
+                <Link
+                  to={buildRoute('providers')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.providers.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Providers
+                </Link>
+                <Link
+                  to={buildRoute('hrPolicy')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.hrPolicy.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  HR Policy
+                </Link>
+                <Link
+                  to={buildRoute('messages')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.messages.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Messages
+                </Link>
+                <Link
+                  to={buildRoute('resources')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.resources.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Resources
+                </Link>
+              </nav>
+            </Container>
+          </div>
+        )}
         {isHrRole && (
           <div className="border-t border-[#e2e8f0]">
             <Container maxWidth="xl" className="py-3 flex items-center justify-between gap-6">
@@ -222,7 +291,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
         </Container>
       </footer>
 
-      <SwitchUserModal open={switchUserOpen} onClose={() => setSwitchUserOpen(false)} />
     </div>
   );
 };

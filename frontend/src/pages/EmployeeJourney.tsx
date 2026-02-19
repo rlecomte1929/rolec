@@ -33,7 +33,7 @@ export const EmployeeJourney: React.FC = () => {
     setError('');
     try {
       const response = await employeeAPI.getCurrentAssignment();
-      if (!response.assignment) {
+      if (!response?.assignment) {
         setAssignmentId(null);
         setJourney(null);
         return;
@@ -42,10 +42,14 @@ export const EmployeeJourney: React.FC = () => {
       const data = await employeeAPI.getNextQuestion(response.assignment.id);
       setJourney(data);
     } catch (err: any) {
-      if (err.response?.status === 401) {
+      if (err?.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
-        setError('Unable to load your case.');
+        setAssignmentId(null);
+        setJourney(null);
+        setError(
+          'We couldn\'t load your assignments. You can try claiming one below or refresh the page to retry.'
+        );
       }
     } finally {
       setIsLoading(false);
@@ -60,23 +64,13 @@ export const EmployeeJourney: React.FC = () => {
   const isIntake = status ? INTAKE_STATUSES.includes(status) : false;
   const isSubmitted = status ? SUBMITTED_STATUSES.includes(status) : false;
 
-  // Wizard-first, dashboard-later:
-  // - before submission: force the wizard
-  // - after submission: force the dashboard (read-only)
+  // Store HR notes when changes requested; allow free navigation between dashboard and wizard
   useEffect(() => {
     if (!assignmentId || !journey || !status) return;
     if (status === 'CHANGES_REQUESTED' && journey.hrNotes) {
       sessionStorage.setItem('relopass_hr_notes', journey.hrNotes);
     }
-    if (isIntake) {
-      navigate(`/employee/case/${assignmentId}/wizard/1`, { replace: true });
-      return;
-    }
-    if (isSubmitted) {
-      // If they came via /employee/journey, keep them here (this page is also /employee/dashboard).
-      return;
-    }
-  }, [assignmentId, journey, status, isIntake, isSubmitted, navigate]);
+  }, [assignmentId, journey, status]);
 
   const answeredCount = journey?.progress?.answeredCount || 0;
   const totalQuestions = journey?.progress?.totalQuestions || 0;
@@ -153,10 +147,11 @@ export const EmployeeJourney: React.FC = () => {
             <div className="space-y-2">
               <div className="font-semibold text-[#0b2b43]">Continue your case intake</div>
               <div className="text-sm text-[#4b5563]">
-                Complete your relocation details in the Case Wizard. Redirecting now.
+                Complete your relocation details in the Case Wizard. You can also browse Providers or other sections using the navigation above.
               </div>
               <div className="flex flex-wrap gap-2 pt-2">
                 <Button onClick={() => navigate(`/employee/case/${assignmentId}/wizard/1`)}>Open case wizard</Button>
+                <Button variant="outline" onClick={() => navigate('/providers')}>Browse Providers</Button>
                 <Button variant="outline" onClick={loadAssignment}>Refresh</Button>
               </div>
             </div>

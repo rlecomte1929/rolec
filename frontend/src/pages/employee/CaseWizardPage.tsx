@@ -6,6 +6,7 @@ import { WizardSidebar } from '../../components/case/WizardSidebar';
 import { Card } from '../../components/antigravity';
 import { getCase, getRequirements, patchCase, startResearch } from '../../api/cases';
 import { employeeAPI } from '../../api/client';
+import { getAuthItem } from '../../utils/demo';
 import type { AssignmentStatus, CaseDTO, CaseDraftDTO } from '../../types';
 import { Step1RelocationBasics } from './wizard/Step1RelocationBasics';
 import { Step2EmployeeProfile } from './wizard/Step2EmployeeProfile';
@@ -13,18 +14,27 @@ import { Step3FamilyMembers } from './wizard/Step3FamilyMembers';
 import { Step4AssignmentContext } from './wizard/Step4AssignmentContext';
 import { Step5ReviewCreate } from './wizard/Step5ReviewCreate';
 
-const defaultDraft: CaseDraftDTO = {
-  relocationBasics: {},
-  employeeProfile: {},
-  familyMembers: {},
-  assignmentContext: {},
-};
+function buildDefaultDraft(): CaseDraftDTO {
+  const name = getAuthItem('relopass_name');
+  const email = getAuthItem('relopass_email');
+  const username = getAuthItem('relopass_username');
+  const emailOrUsername = email || (username?.includes('@') ? username : undefined);
+  return {
+    relocationBasics: {},
+    employeeProfile: {
+      ...(name && { fullName: name }),
+      ...(emailOrUsername && { email: emailOrUsername }),
+    },
+    familyMembers: {},
+    assignmentContext: {},
+  };
+}
 
 export const CaseWizardPage: React.FC = () => {
   const { caseId, step } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [draft, setDraft] = useState<CaseDraftDTO>(defaultDraft);
+  const [draft, setDraft] = useState<CaseDraftDTO>(() => buildDefaultDraft());
   const [caseData, setCaseData] = useState<CaseDTO | null>(null);
   const [requiredFields, setRequiredFields] = useState<string[]>([]);
   const [banner, setBanner] = useState('');
@@ -81,12 +91,13 @@ export const CaseWizardPage: React.FC = () => {
     try {
       const data = await getCase(caseId);
       setCaseData(data);
-      setDraft(data.draft || defaultDraft);
+      setDraft(data.draft || buildDefaultDraft());
     } catch {
       try {
-        const data = await patchCase(caseId, defaultDraft);
+        const initialDraft = buildDefaultDraft();
+        const data = await patchCase(caseId, initialDraft);
         setCaseData(data);
-        setDraft(data.draft || defaultDraft);
+        setDraft(data.draft || initialDraft);
       } catch (err: any) {
         setError(err?.message || 'Unable to load or create your case. Please try again.');
       }
@@ -213,7 +224,9 @@ export const CaseWizardPage: React.FC = () => {
     <div className="min-h-screen bg-[#f5f7fa] text-[#1f2937]">
       <header className="bg-white border-b border-[#e2e8f0]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="text-lg font-semibold text-[#0b2b43]">ReloPass</div>
+          <Link to={ROUTES.EMP_DASH} className="shrink-0" aria-label="Dashboard">
+            <img src="/relopass-logo.png?v=1" alt="" className="h-10 w-10 rounded-lg object-contain" />
+          </Link>
           <nav className="flex items-center gap-4 text-sm text-[#6b7280]">
             <Link to={ROUTES.EMP_DASH} className="hover:text-[#0b2b43]">Dashboard</Link>
             <Link to={`/employee/case/${caseId}/wizard/1`} className="text-[#0b2b43] font-semibold">My Case</Link>
