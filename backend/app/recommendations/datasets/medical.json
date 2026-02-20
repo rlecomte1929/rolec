@@ -1,0 +1,12 @@
+[
+  {"item_id": "med-1", "name": "Raffles Medical", "specialties": ["general", "pediatrics", "dental"], "languages": ["en", "zh"], "wait_time_days": 3, "rating": 4.5, "rating_count": 890, "availability_level": "high", "next_available_days": 2, "confidence": 93},
+  {"item_id": "med-2", "name": "Parkway Health", "specialties": ["general", "pediatrics", "specialist"], "languages": ["en", "zh"], "wait_time_days": 5, "rating": 4.6, "rating_count": 756, "availability_level": "high", "next_available_days": 3, "confidence": 94},
+  {"item_id": "med-3", "name": "Mount Elizabeth", "specialties": ["general", "specialist", "surgery"], "languages": ["en", "zh"], "wait_time_days": 7, "rating": 4.7, "rating_count": 534, "availability_level": "medium", "next_available_days": 14, "confidence": 92},
+  {"item_id": "med-4", "name": "Gleneagles", "specialties": ["general", "pediatrics", "specialist"], "languages": ["en", "zh"], "wait_time_days": 5, "rating": 4.6, "rating_count": 423, "availability_level": "high", "next_available_days": 5, "confidence": 91},
+  {"item_id": "med-5", "name": "Thomson Medical", "specialties": ["general", "pediatrics", "maternity"], "languages": ["en", "zh"], "wait_time_days": 4, "rating": 4.5, "rating_count": 645, "availability_level": "high", "next_available_days": 3, "confidence": 90},
+  {"item_id": "med-6", "name": "Fullerton Health", "specialties": ["general", "corporate"], "languages": ["en"], "wait_time_days": 2, "rating": 4.4, "rating_count": 389, "availability_level": "high", "next_available_days": 1, "confidence": 88},
+  {"item_id": "med-7", "name": "IHH Healthcare", "specialties": ["general", "specialist"], "languages": ["en", "zh"], "wait_time_days": 10, "rating": 4.6, "rating_count": 267, "availability_level": "low", "next_available_days": 21, "confidence": 89},
+  {"item_id": "med-8", "name": "Minmed", "specialties": ["general"], "languages": ["en", "zh"], "wait_time_days": 1, "rating": 4.2, "rating_count": 534, "availability_level": "high", "next_available_days": 0, "confidence": 85},
+  {"item_id": "med-9", "name": "International Medical Clinic", "specialties": ["general", "pediatrics"], "languages": ["en"], "wait_time_days": 3, "rating": 4.7, "rating_count": 198, "availability_level": "high", "next_available_days": 2, "confidence": 95},
+  {"item_id": "med-10", "name": "Osler Health", "specialties": ["general", "family"], "languages": ["en"], "wait_time_days": 2, "rating": 4.5, "rating_count": 312, "availability_level": "high", "next_available_days": 1, "confidence": 90}
+]

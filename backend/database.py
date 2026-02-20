@@ -271,20 +271,44 @@ class Database:
             return False
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return None
         with self.engine.connect() as conn:
-            row = conn.execute(text("SELECT * FROM users WHERE email = :email"), {"email": email}).fetchone()
+            row = conn.execute(
+                text("SELECT * FROM users WHERE LOWER(TRIM(email)) = :email"),
+                {"email": email_norm},
+            ).fetchone()
         return self._row_to_dict(row)
 
     def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        username_norm = (username or "").strip()
+        if not username_norm:
+            return None
         with self.engine.connect() as conn:
-            row = conn.execute(text("SELECT * FROM users WHERE username = :username"), {"username": username}).fetchone()
+            row = conn.execute(
+                text("SELECT * FROM users WHERE TRIM(username) = :username"),
+                {"username": username_norm},
+            ).fetchone()
         return self._row_to_dict(row)
 
     def get_user_by_identifier(self, identifier: str) -> Optional[Dict[str, Any]]:
-        user = self.get_user_by_username(identifier)
+        ident = (identifier or "").strip()
+        if not ident:
+            return None
+        ident_lower = ident.lower()
+        if "@" in ident_lower:
+            return self.get_user_by_email(ident)
+        user = self.get_user_by_username(ident)
         if user:
             return user
-        return self.get_user_by_email(identifier)
+        return self.get_user_by_email(ident)
+
+    def delete_session_by_token(self, token: str) -> bool:
+        """Remove session on logout. Returns True if a row was deleted."""
+        with self.engine.begin() as conn:
+            result = conn.execute(text("DELETE FROM sessions WHERE token = :token"), {"token": token})
+            return result.rowcount > 0
 
     def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:

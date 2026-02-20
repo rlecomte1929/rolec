@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getAuthItem } from '../utils/demo';
+import { getAuthItem, clearAuthItems } from '../utils/demo';
 import type {
   LoginRequest,
   LoginResponse,
@@ -46,6 +46,32 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Global 401 handler: clear session and redirect to auth (skip for login/register)
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const status = err?.response?.status;
+    const url = err?.config?.url ?? '';
+    const isAuthEndpoint = /\/api\/auth\/(login|register)$/.test(url);
+    if (status === 401 && !isAuthEndpoint) {
+      try {
+        const d = typeof err?.response?.data?.detail === 'string'
+          ? err.response.data.detail
+          : JSON.stringify(err?.response?.data || 'Unknown');
+        localStorage.setItem('debug_last_auth_error', d);
+      } catch {
+        localStorage.setItem('debug_last_auth_error', '401 Unauthorized');
+      }
+      clearAuthItems();
+      const path = window.location.pathname || '';
+      if (!path.startsWith('/auth') && path !== '/' && path !== '') {
+        window.location.href = '/auth?mode=login';
+      }
+    }
+    return Promise.reject(err);
+  }
+);
+
 // Auth API
 export const authAPI = {
   login: async (data: LoginRequest): Promise<LoginResponse> => {
@@ -55,6 +81,13 @@ export const authAPI = {
   register: async (data: RegisterRequest): Promise<LoginResponse> => {
     const response = await api.post('/api/auth/register', data);
     return response.data;
+  },
+  logout: async (): Promise<void> => {
+    try {
+      await api.post('/api/auth/logout');
+    } catch {
+      // Ignore — client will clear session anyway
+    }
   },
 };
 

@@ -21,6 +21,7 @@ import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { ProvidersPage } from './pages/ProvidersPage';
+import { DebugAuth } from './pages/DebugAuth';
 
 function App() {
   return (
@@ -76,6 +77,9 @@ function App() {
           path={ROUTE_DEFS.submissionCenter.path}
           element={<PlaceholderPage title="Submission Center" description="Finalize and submit case documentation." />}
         />
+        {import.meta.env.DEV && (
+          <Route path="/debug/auth" element={<DebugAuth />} />
+        )}
         <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
       </Routes>
       </EmployeeAssignmentProvider>

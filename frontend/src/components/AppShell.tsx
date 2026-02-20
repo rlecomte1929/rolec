@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Container } from './antigravity';
 import { clearAuthItems, getAuthItem } from '../utils/demo';
+import { authAPI } from '../api/client';
 import { getNavigationError } from '../navigation/safeNavigate';
 import { buildRoute, ROUTE_DEFS } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
@@ -72,7 +73,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
           </Link>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => {
+              onClick={async () => {
+                await authAPI.logout();
                 clearAuthItems();
                 window.location.href = buildRoute('landing');
               }}

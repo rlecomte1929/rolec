@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Header, HTTPException
 
 from ..db import SessionLocal
@@ -10,13 +12,13 @@ import json
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
-def require_admin(role: str | None):
+def require_admin(role: Optional[str]):
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
 
 @router.get("/countries", response_model=schemas.CountryListDTO)
-def list_countries(x_role: str | None = Header(None)):
+def list_countries(x_role: Optional[str] = Header(None)):
     require_admin(x_role)
     with SessionLocal() as db:
         profiles = crud.list_country_profiles(db)
@@ -38,7 +40,7 @@ def list_countries(x_role: str | None = Header(None)):
 
 
 @router.get("/countries/{country_code}", response_model=schemas.CountryProfileDTO)
-def get_country(country_code: str, x_role: str | None = Header(None)):
+def get_country(country_code: str, x_role: Optional[str] = Header(None)):
     require_admin(x_role)
     with SessionLocal() as db:
         profile = crud.get_country_profile(db, country_code.upper())
@@ -79,7 +81,7 @@ def get_country(country_code: str, x_role: str | None = Header(None)):
 
 
 @router.post("/countries/{country_code}/research/rerun")
-def rerun_country(country_code: str, x_role: str | None = Header(None), opts: dict | None = None):
+def rerun_country(country_code: str, x_role: Optional[str] = Header(None), opts: Optional[dict] = None):
     require_admin(x_role)
     run_country_research(country_code, (opts or {}).get("purpose", "employment"), {})
     return {"jobId": country_code.lower() + "-job"}

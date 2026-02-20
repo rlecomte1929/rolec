@@ -36,7 +36,13 @@ export const Auth: React.FC = () => {
     try {
       await login({ identifier, password });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed. Please try again.');
+      const msg = err.response?.data?.detail || 'Login failed. Please try again.';
+      try {
+        localStorage.setItem('debug_last_auth_error', msg);
+      } catch {
+        /* ignore */
+      }
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +84,13 @@ export const Auth: React.FC = () => {
         name: name.trim() || undefined,
       });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      const msg = err.response?.data?.detail || 'Registration failed. Please try again.';
+      try {
+        localStorage.setItem('debug_last_auth_error', msg);
+      } catch {
+        /* ignore */
+      }
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

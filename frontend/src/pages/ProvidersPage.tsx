@@ -5,6 +5,9 @@ import { Card, Badge, Button, Alert } from '../components/antigravity';
 import { dashboardAPI, employeeAPI } from '../api/client';
 import type { DashboardResponse } from '../types';
 import { buildRoute } from '../navigation/routes';
+import { ProvidersCriteriaWizard } from '../features/recommendations/ProvidersCriteriaWizard';
+import { RecommendationResults } from '../features/recommendations/RecommendationResults';
+import type { RecommendationResponse } from '../features/recommendations/types';
 
 // Static recommendations for banks, insurances, electricity (no backend yet)
 const BANKS = [
@@ -39,15 +42,33 @@ const SERVICE_OPTIONS: { id: TabKey; label: string; description: string }[] = [
   { id: 'electricity', label: 'Electricity', description: 'Utilities and electricity retailers' },
 ];
 
+const CATEGORY_LABELS: Record<string, string> = {
+  housing: 'Living Areas',
+  schools: 'Schools',
+  movers: 'Movers',
+  banks: 'Banks',
+  insurances: 'Insurances',
+  electricity: 'Electricity',
+};
+
 export const ProvidersPage: React.FC = () => {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [employeeRecs, setEmployeeRecs] = useState<{ housing: any[]; schools: any[]; movers: any[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showQuestionnaire, setShowQuestionnaire] = useState(true);
+  // Wizard-first flow: always start with service selection, then criteria wizard, then results
+  const [flowStep, setFlowStep] = useState<'select' | 'wizard' | 'results'>('select');
+  const [engineResults, setEngineResults] = useState<Record<string, RecommendationResponse> | null>(null);
   const [selectedServices, setSelectedServices] = useState<Set<TabKey>>(new Set(SERVICE_OPTIONS.map((s) => s.id)));
   const [activeTab, setActiveTab] = useState<TabKey>('housing');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  const handleStartOver = () => {
+    setEngineResults(null);
+    setFlowStep('select');
+  };
+
+  const startWizard = () => setFlowStep('wizard');
 
   const toggleService = (id: TabKey) => {
     setSelectedServices((prev) => {
@@ -83,11 +104,11 @@ export const ProvidersPage: React.FC = () => {
           setEmployeeRecs(recs);
           setError('');
         } else {
-          setError('Complete your case wizard for personalized recommendations. Showing banks, insurances, and electricity below.');
+          setError('Select services below and answer a few questions to get personalized recommendations. Banks, insurances, and electricity are also available.');
         }
       } catch {
         setEmployeeRecs(null);
-        setError('Complete your case wizard for personalized recommendations. Showing banks, insurances, and electricity below.');
+        setError('Select services below and answer a few questions to get personalized recommendations. Banks, insurances, and electricity are also available.');
       }
     } finally {
       setIsLoading(false);
@@ -127,11 +148,11 @@ export const ProvidersPage: React.FC = () => {
         </Alert>
       )}
 
-      {showQuestionnaire ? (
+      {flowStep === 'select' ? (
         <Card padding="lg" className="mb-8">
           <h2 className="text-xl font-semibold text-[#0b2b43] mb-2">Which services do you need?</h2>
           <p className="text-sm text-[#6b7280] mb-6">
-            Select the services you want to explore. We'll show you recommended providers for each category.
+            Select the services you want to explore. You'll then answer a few questions so we can tailor recommendations to your needs.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {SERVICE_OPTIONS.map((opt) => (
@@ -156,21 +177,39 @@ export const ProvidersPage: React.FC = () => {
           </div>
           <Button
             className="mt-6"
-            onClick={() => {
-              const first = SERVICE_OPTIONS.find((o) => selectedServices.has(o.id))?.id ?? 'housing';
-              setActiveTab(first);
-              setShowQuestionnaire(false);
-            }}
+            onClick={startWizard}
             disabled={selectedServices.size === 0}
           >
-            Show recommendations
+            Answer questions & get recommendations
           </Button>
         </Card>
+      ) : flowStep === 'wizard' ? (
+        <ProvidersCriteriaWizard
+          selectedServices={selectedServices}
+          onComplete={(results: Record<string, RecommendationResponse>) => {
+            setEngineResults(results);
+            setFlowStep('results');
+            setError('');
+          }}
+          onBack={handleStartOver}
+        />
+      ) : engineResults ? (
+        <RecommendationResults
+          results={engineResults}
+          categoryLabels={CATEGORY_LABELS}
+          onStartOver={handleStartOver}
+        />
       ) : (
         <>
+          <Card padding="lg" className="mb-6">
+            <p className="text-[#4b5563] mb-4">Get personalized recommendations by answering a few questions about your preferences.</p>
+            <Button onClick={startWizard} disabled={selectedServices.size === 0}>
+              Start service preferences wizard
+            </Button>
+          </Card>
           <div className="mb-4 flex items-center justify-between">
             <button
-              onClick={() => setShowQuestionnaire(true)}
+              onClick={handleStartOver}
               className="text-sm text-[#0b2b43] hover:underline"
             >
               ← Change service selection
@@ -216,7 +255,7 @@ export const ProvidersPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <EmptyState message="Complete your relocation wizard and housing preferences for personalized area recommendations." />
+              <EmptyState message="Complete your relocation wizard and housing preferences for personalized area recommendations." onStartWizard={startWizard} />
             )}
             </Section>
           )}
@@ -242,7 +281,7 @@ export const ProvidersPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <EmptyState message="Add children and school preferences in your wizard for school recommendations." />
+              <EmptyState message="Add children and school preferences in your wizard for school recommendations." onStartWizard={startWizard} />
             )}
           </Section>
         )}
@@ -269,7 +308,7 @@ export const ProvidersPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <EmptyState message="Complete mover preferences in your wizard for personalized mover recommendations." />
+              <EmptyState message="Complete mover preferences in your wizard for personalized mover recommendations." onStartWizard={startWizard} />
             )}
           </Section>
         )}
@@ -372,14 +411,21 @@ function ProviderCard({ children }: { children: React.ReactNode }) {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
+function EmptyState({ message, onStartWizard }: { message: string; onStartWizard?: () => void }) {
   return (
     <Card padding="lg">
       <div className="text-center py-8">
         <p className="text-[#6b7280]">{message}</p>
-        <Button variant="outline" className="mt-4" onClick={() => { window.location.href = '/employee/dashboard'; }}>
-          Go to My Case
-        </Button>
+        <div className="flex flex-wrap justify-center gap-3 mt-4">
+          {onStartWizard && (
+            <Button onClick={onStartWizard}>
+              Answer questions for recommendations
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => { window.location.href = '/employee/journey'; }}>
+            Go to My Case
+          </Button>
+        </div>
       </div>
     </Card>
   );

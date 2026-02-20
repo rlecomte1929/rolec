@@ -39,6 +39,7 @@ from .app import crud as app_crud
 from .app.seed import seed_demo_cases
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
+from .app.recommendations.router import router as recommendations_router
 from pydantic import BaseModel as _BaseModel
 
 # ---------------------------------------------------------------------------
@@ -69,6 +70,7 @@ log.info("Startup complete.")
 # CORS middleware
 default_origins = [
     "http://localhost:3000",
+    "http://localhost:3001",
     "http://localhost:5173",
     "https://relopass.com",
     "https://www.relopass.com",
@@ -88,6 +90,7 @@ app.add_middleware(
 
 app.include_router(cases_router.router)
 app.include_router(admin_router.router)
+app.include_router(recommendations_router)
 
 # ---------------------------------------------------------------------------
 # Global exception handler: log unhandled errors
@@ -179,6 +182,7 @@ def _seed_demo_cases() -> None:
     employees = [
         ("demo-emp-001", "sarah.jenkins@relopass.local", "Sarah Jenkins"),
         ("demo-emp-002", "mark.thompson@relopass.local", "Mark Thompson"),
+        ("demo-emp-003", "demo@relopass.com", "Demo Employee"),
     ]
     for emp_id, emp_email, emp_name in employees:
         ensure_user(emp_id, emp_email, "EMPLOYEE", emp_name)
@@ -222,6 +226,33 @@ def _seed_demo_cases() -> None:
                     "hasMarriageCertificate": True,
                     "hasBirthCertificates": False,
                 },
+            ).model_dump(mode="json"),
+        },
+        {
+            "case_id": "demo-case-demo-emp",
+            "assignment_id": "demo-assignment-demo-emp",
+            "employee_identifier": "demo@relopass.com",
+            "status": AssignmentStatus.IN_PROGRESS.value,
+            "profile": RelocationProfile(
+                userId="demo-assignment-demo-emp",
+                familySize=2,
+                spouse={"fullName": "Alex Demo", "wantsToWork": True},
+                dependents=[],
+                primaryApplicant={
+                    "fullName": "Demo Employee",
+                    "nationality": "American",
+                    "employer": {"name": "Acme Corp", "roleTitle": "Engineer", "jobLevel": "L1", "salaryBand": "80k - 100k"},
+                    "assignment": {"startDate": "2024-12-01"},
+                },
+                movePlan={
+                    "origin": "San Francisco, USA",
+                    "destination": "Singapore",
+                    "targetArrivalDate": "2024-12-15",
+                    "housing": {"budgetMonthlySGD": "5000-7000"},
+                    "schooling": {"budgetAnnualSGD": "0"},
+                    "movers": {"inventoryRough": "medium"},
+                },
+                complianceDocs={"hasPassportScans": True, "hasEmploymentLetter": False, "hasMarriageCertificate": False, "hasBirthCertificates": False},
             ).model_dump(mode="json"),
         },
         {
@@ -336,7 +367,8 @@ def root():
 def register(request: RegisterRequest):
     """Register a new user with username or email and role."""
     username = request.username.strip() if request.username else None
-    email = request.email.strip() if request.email else None
+    email_raw = request.email.strip() if request.email else None
+    email = email_raw.lower() if email_raw else None
 
     if not username and not email:
         raise HTTPException(status_code=400, detail="Provide a username or email")
@@ -377,6 +409,7 @@ def register(request: RegisterRequest):
     token = str(uuid.uuid4())
     db.create_session(token, user_id)
 
+    log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
     return LoginResponse(
         token=token,
         user=UserResponse(
@@ -390,25 +423,43 @@ def register(request: RegisterRequest):
     )
 
 
+@app.post("/api/auth/logout")
+def logout(authorization: Optional[str] = Header(None)):
+    """Invalidate the current session. Client should also clear localStorage."""
+    if not authorization:
+        return {"success": True}
+    token = authorization.replace("Bearer ", "").strip()
+    if token:
+        db.delete_session_by_token(token)
+        log.info("auth_logout token_invalidated")
+    return {"success": True}
+
+
 @app.post("/api/auth/login", response_model=LoginResponse)
 def login(request: LoginRequest):
     """Login with username or email + password."""
-    identifier = request.identifier.strip()
+    identifier = (request.identifier or "").strip()
+    if not identifier:
+        log.warning("auth_login fail identifier_empty")
+        raise HTTPException(status_code=401, detail="Enter your username or email")
     user = db.get_user_by_identifier(identifier)
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        log.warning("auth_login fail user_not_found identifier=%s", identifier[:3] + "***")
+        raise HTTPException(status_code=401, detail="Invalid username or email. Check spelling or create an account.")
 
     if not user.get("password_hash"):
+        log.warning("auth_login fail no_password user_id=%s", user.get("id", "")[:8])
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     from passlib.context import CryptContext
-    # Use PBKDF2 to avoid bcrypt backend issues on Windows.
     pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
     if not pwd_context.verify(request.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        log.warning("auth_login fail wrong_password user_id=%s", user.get("id", "")[:8])
+        raise HTTPException(status_code=401, detail="Incorrect password. Try again or reset.")
 
     token = str(uuid.uuid4())
     db.create_session(token, user["id"])
+    log.info("auth_login success user_id=%s", user["id"][:8])
 
     return LoginResponse(
         token=token,
@@ -570,9 +621,29 @@ def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
     - All recommendations
     """
     profile = db.get_profile(user["id"])
-    
+    # Employees may use case/assignment flow: try assignment's employee_profile
+    if not profile and user.get("role") in (UserRole.EMPLOYEE.value, UserRole.ADMIN.value):
+        assignment = db.get_assignment_for_employee(user["id"])
+        if not assignment:
+            ident = (user.get("email") or user.get("username") or "").strip().lower()
+            if ident:
+                assignment = db.get_unassigned_assignment_by_identifier(ident)
+                if assignment:
+                    db.attach_employee_to_assignment(assignment["id"], user["id"])
+                    assignment = db.get_assignment_by_id(assignment["id"])
+        if assignment:
+            profile = db.get_employee_profile(assignment["id"])
+
     if not profile:
-        raise HTTPException(status_code=400, detail="No profile found")
+        # Return minimal dashboard instead of 400 so Providers/other pages can load
+        return DashboardResponse(
+            profileCompleteness=0,
+            immigrationReadiness={"score": 0, "status": "RED", "reasons": ["Complete your case wizard for full dashboard"], "missingDocs": []},
+            nextActions=["Complete your relocation case wizard"],
+            timeline=[],
+            recommendations={"housing": [], "schools": [], "movers": []},
+            overallStatus="incomplete",
+        )
     
     # Compute completion state
     completion_state = orchestrator.compute_completion_state(profile)
@@ -682,14 +753,24 @@ def claim_assignment(
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    if not request.email or not user.get("email"):
-        raise HTTPException(status_code=400, detail="Email required to claim assignment")
+    # User may have email, username, or both. HR can assign using either.
+    user_identifiers = [x.lower() for x in [user.get("email"), user.get("username")] if x]
+    if not user_identifiers:
+        raise HTTPException(status_code=400, detail="Your account must have an email or username set")
 
-    if request.email.strip().lower() != user["email"].lower():
-        raise HTTPException(status_code=403, detail="Email does not match logged-in user")
+    if not request.email or not request.email.strip():
+        raise HTTPException(status_code=400, detail="Enter your email or username to claim")
 
-    if assignment["employee_identifier"].lower() != user["email"].lower():
-        raise HTTPException(status_code=403, detail="Email does not match assignment")
+    req_id = request.email.strip().lower()
+    if req_id not in user_identifiers:
+        raise HTTPException(status_code=403, detail="The identifier you entered does not match your account. Use the same email or username you used to log in.")
+
+    assignment_identifier = (assignment["employee_identifier"] or "").strip().lower()
+    if assignment_identifier not in user_identifiers:
+        raise HTTPException(
+            status_code=403,
+            detail="This assignment was created for a different employee. HR must have entered your exact email or username (e.g. jane@relopass.com or janedoe) when assigning the case."
+        )
 
     if assignment.get("employee_user_id") and assignment["employee_user_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Assignment already claimed")

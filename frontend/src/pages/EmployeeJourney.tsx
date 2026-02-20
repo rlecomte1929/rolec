@@ -24,7 +24,7 @@ export const EmployeeJourney: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [claimId, setClaimId] = useState('');
-  const [claimEmail, setClaimEmail] = useState(getAuthItem('relopass_email') || '');
+  const [claimEmail, setClaimEmail] = useState(getAuthItem('relopass_email') || getAuthItem('relopass_username') || '');
 
   const navigate = useNavigate();
 
@@ -88,7 +88,7 @@ export const EmployeeJourney: React.FC = () => {
 
   const handleClaimAssignment = async () => {
     if (!claimId.trim() || !claimEmail.trim()) {
-      setError('Enter your email and the assignment ID provided by HR.');
+      setError('Enter your email or username and the assignment ID provided by HR.');
       return;
     }
     setError('');
@@ -105,7 +105,15 @@ export const EmployeeJourney: React.FC = () => {
       {isLoading && <div className="text-sm text-[#6b7280]">Loading...</div>}
 
       {!isLoading && error && (
-        <Alert variant="error">{error}</Alert>
+        <div className="space-y-3">
+          <Alert variant="error">{error}</Alert>
+          <p className="text-sm text-[#4b5563]">
+            You can still explore <strong>Service Providers</strong> to get recommendations for housing, schools, movers, banks, and more — no case required.
+          </p>
+          <Button variant="outline" onClick={() => safeNavigate(navigate, 'providers')}>
+            Go to Service Providers
+          </Button>
+        </div>
       )}
 
       {!isLoading && !assignmentId && (
@@ -117,11 +125,11 @@ export const EmployeeJourney: React.FC = () => {
             </div>
             <div className="pt-2 space-y-3">
               <Input
-                type="email"
+                type="text"
                 value={claimEmail}
                 onChange={setClaimEmail}
-                label="Email"
-                placeholder="you@example.com"
+                label="Email or username"
+                placeholder="you@example.com or your_username"
                 fullWidth
               />
               <Input
@@ -135,6 +143,10 @@ export const EmployeeJourney: React.FC = () => {
                 <Button onClick={handleClaimAssignment}>Start</Button>
                 <Button variant="outline" onClick={loadAssignment}>Refresh</Button>
               </div>
+              <p className="text-sm text-[#4b5563] pt-2">
+                Or explore <strong>Service Providers</strong> to get recommendations for housing, schools, movers, banks, and more.
+              </p>
+              <Button onClick={() => safeNavigate(navigate, 'providers')}>Go to Service Providers</Button>
               <Button variant="outline" onClick={() => safeNavigate(navigate, 'messages')}>Contact HR / Support</Button>
             </div>
           </div>
