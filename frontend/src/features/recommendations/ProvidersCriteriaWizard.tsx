@@ -225,7 +225,7 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
             {q.type === 'text' && (
               <Input
                 value={String(answers[q.id] ?? q.default ?? '')}
-                onChange={(e) => setAnswer(q.id, e.target.value)}
+                onChange={(val) => setAnswer(q.id, val)}
                 placeholder={q.placeholder}
                 fullWidth
               />
@@ -234,8 +234,8 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
               <Input
                 type="number"
                 value={String(answers[q.id] ?? q.default ?? '')}
-                onChange={(e) => {
-                  const n = parseInt(e.target.value, 10);
+                onChange={(val) => {
+                  const n = parseInt(val, 10);
                   setAnswer(q.id, isNaN(n) ? 0 : n);
                 }}
                 fullWidth
