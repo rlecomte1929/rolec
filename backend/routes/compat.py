@@ -9,6 +9,10 @@ from ..services.relocation_profile import compute_missing_fields
 from ..services.supabase_client import get_supabase_client
 from .relocation import _extract_bearer_token, _is_permission_error
 from ..database import db
+from ..app.db import SessionLocal
+from ..app import crud as app_crud
+from ..app.routers import cases as wizard_cases_router
+from ..app.services.requirements_builder import compute_case_requirements
 
 router = APIRouter(prefix="/api", tags=["compat"])
 
@@ -45,6 +49,15 @@ def _get_case_row_for_user(case_id: str, user_id: str) -> Optional[Dict[str, Any
     return db._row_to_dict(row)
 
 
+def _get_wizard_case_dto(case_id: str) -> Optional[Dict[str, Any]]:
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if not case:
+            return None
+        draft = json.loads(case.draft_json)
+        return wizard_cases_router._case_dto(case, draft).model_dump()
+
+
 def _safe_parse_profile(profile_json: Optional[str]) -> Dict[str, Any]:
     if not profile_json:
         return {}
@@ -75,6 +88,9 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
         row = result.data[0] or {}
     else:
         user = _get_user_from_session_token(token)
+        wizard_case = _get_wizard_case_dto(case_id)
+        if wizard_case:
+            return wizard_case
         row = _get_case_row_for_user(case_id, user["id"])
         if not row:
             raise HTTPException(status_code=404, detail="Case not found")
@@ -109,6 +125,10 @@ def compat_get_requirements(case_id: str, authorization: Optional[str] = Header(
         profile = _safe_parse_profile(result.data[0].get("profile_json"))
     else:
         user = _get_user_from_session_token(token)
+        try:
+            return compute_case_requirements(case_id).model_dump()
+        except ValueError:
+            pass
         row = _get_case_row_for_user(case_id, user["id"])
         if not row:
             raise HTTPException(status_code=404, detail="Case not found")
