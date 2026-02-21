@@ -58,6 +58,24 @@ def _get_wizard_case_dto(case_id: str) -> Optional[Dict[str, Any]]:
         return wizard_cases_router._case_dto(case, draft).model_dump()
 
 
+def _default_wizard_draft() -> Dict[str, Any]:
+    return {
+        "relocationBasics": {},
+        "employeeProfile": {},
+        "familyMembers": {},
+        "assignmentContext": {},
+    }
+
+
+def _ensure_wizard_case(case_id: str) -> Dict[str, Any]:
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if not case:
+            case = app_crud.create_case(session, case_id, _default_wizard_draft())
+        draft = json.loads(case.draft_json)
+        return wizard_cases_router._case_dto(case, draft).model_dump()
+
+
 def _safe_parse_profile(profile_json: Optional[str]) -> Dict[str, Any]:
     if not profile_json:
         return {}
@@ -93,7 +111,7 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
             return wizard_case
         row = _get_case_row_for_user(case_id, user["id"])
         if not row:
-            raise HTTPException(status_code=404, detail="Case not found")
+            return _ensure_wizard_case(case_id)
     profile = _safe_parse_profile(row.get("profile_json"))
     missing_fields = compute_missing_fields(profile)
 
@@ -131,7 +149,8 @@ def compat_get_requirements(case_id: str, authorization: Optional[str] = Header(
             pass
         row = _get_case_row_for_user(case_id, user["id"])
         if not row:
-            raise HTTPException(status_code=404, detail="Case not found")
+            _ensure_wizard_case(case_id)
+            return compute_case_requirements(case_id).model_dump()
         profile = _safe_parse_profile(row.get("profile_json"))
     missing_fields = compute_missing_fields(profile)
     label_map = {
