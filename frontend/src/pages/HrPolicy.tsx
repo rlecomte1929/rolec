@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card } from '../components/antigravity';
-import { hrAPI } from '../api/client';
+import { hrAPI, employeeAPI } from '../api/client';
 import type { AssignmentDetail, AssignmentSummary, PolicyResponse, PolicySpendItem } from '../types';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { CaseIncompleteBanner } from '../components/CaseIncompleteBanner';
+import { EmployeePolicyView } from '../features/policy/EmployeePolicyView';
+import { getAuthItem } from '../utils/demo';
+import { buildRoute } from '../navigation/routes';
 
 const formatCurrency = (value: number | undefined | null, currency = 'USD') => {
   const safe = typeof value === 'number' && isFinite(value) ? value : 0;
@@ -19,7 +22,58 @@ const statusBadge = (status: PolicySpendItem['status']) => {
   return { label: 'ON TRACK', classes: 'bg-[#eaf5f4] text-[#1f8e8b]' };
 };
 
+function EmployeePolicyContent() {
+  const [assignmentId, setAssignmentId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    employeeAPI
+      .getCurrentAssignment()
+      .then((res) => {
+        if (!cancelled && res?.assignment?.id) setAssignmentId(res.assignment.id);
+      })
+      .catch((err: any) => {
+        if (!cancelled && err?.response?.status !== 401) setError('Unable to load your assignment.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) return <div className="text-sm text-[#6b7280] py-8">Loading your policy...</div>;
+  if (error) return <Alert variant="error">{error}</Alert>;
+  if (!assignmentId) {
+    return (
+      <Card padding="lg">
+        <p className="text-[#4b5563]">You don't have an active assignment yet. Once your case is assigned, your applicable policy and benefit limits will appear here.</p>
+      </Card>
+    );
+  }
+  return <EmployeePolicyView assignmentId={assignmentId} compact={false} />;
+}
+
 export const HrPolicy: React.FC = () => {
+  const role = getAuthItem('relopass_role');
+  if (role === 'EMPLOYEE') {
+    return (
+      <AppShell title="Assignment Package & Limits" subtitle="View your applicable policy and benefit limits.">
+        <EmployeePolicyContent />
+      </AppShell>
+    );
+  }
+  return (
+    <AppShell title="Assignment Package & Limits" subtitle="Understand what is covered, what is capped, and what requires HR approval before proceeding.">
+      <HrPolicyContent />
+    </AppShell>
+  );
+};
+
+function HrPolicyContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { selectedCaseId } = useSelectedCase();
@@ -44,12 +98,15 @@ export const HrPolicy: React.FC = () => {
         localStorage.setItem('relopass_last_assignment_id', nextId);
         setSearchParams({ caseId: nextId });
       }
+      setError('');
     } catch (err: any) {
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
         setError('Unable to load assignments.');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -116,13 +173,25 @@ export const HrPolicy: React.FC = () => {
   };
 
   return (
-    <AppShell title="Assignment Package & Limits" subtitle="Understand what is covered, what is capped, and what requires HR approval before proceeding.">
+    <>
       {error && <Alert variant="error">{error}</Alert>}
+      <div className="flex items-center justify-between mb-4">
+        <span />
+        <Link
+          to={buildRoute('hrPolicyManagement')}
+          className="text-sm font-medium text-[#0b2b43] hover:underline px-3 py-2 rounded-lg border border-[#0b2b43] bg-white"
+        >
+          Manage policies →
+        </Link>
+      </div>
       {isLoading && <div className="text-sm text-[#6b7280]">Loading policy...</div>}
 
       {!isLoading && !caseId && (
         <Card padding="lg">
-          <div className="text-sm text-[#4b5563]">Select a case from the HR Dashboard to view its policy.</div>
+          <div className="text-sm text-[#4b5563] mb-4">Select a case from the HR Dashboard to view its policy.</div>
+          <Link to={buildRoute('hrPolicyManagement')}>
+            <Button>Create or edit policies</Button>
+          </Link>
         </Card>
       )}
 
@@ -311,6 +380,6 @@ export const HrPolicy: React.FC = () => {
           </Card>
         </div>
       )}
-    </AppShell>
+    </>
   );
-};
+}

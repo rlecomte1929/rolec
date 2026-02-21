@@ -19,6 +19,9 @@ export interface RecommendationItem {
     next_available_days?: number;
     waitlist_weeks?: number;
     confidence?: number;
+    estimated_cost_usd?: number;
+    cost_type?: 'monthly' | 'annual' | 'one_time';
+    map_query?: string;
   };
 }
 

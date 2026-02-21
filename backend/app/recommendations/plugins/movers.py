@@ -177,5 +177,11 @@ class MoversPlugin(BasePlugin):
                 "confidence": item.get("confidence", 85),
                 "volume_m3_estimate": vol_est,
                 "suggested_truck_class": vol_info["suggested_truck_class"],
+                "estimated_cost_usd": int(
+                    ({"high": 12000, "medium": 8000, "low": 5000}.get(
+                        cost_lvl, 8000
+                    ) * (vol_est / 25))
+                ),
+                "cost_type": "one_time",
             },
         }

@@ -5,8 +5,10 @@ import { Card, Badge, Button, Alert } from '../components/antigravity';
 import { dashboardAPI, employeeAPI } from '../api/client';
 import type { DashboardResponse } from '../types';
 import { buildRoute } from '../navigation/routes';
-import { ProvidersCriteriaWizard } from '../features/recommendations/ProvidersCriteriaWizard';
+import { ProvidersCriteriaWizard, profileToWizardAnswers } from '../features/recommendations/ProvidersCriteriaWizard';
 import { RecommendationResults } from '../features/recommendations/RecommendationResults';
+import { PackageSummary } from '../features/recommendations/PackageSummary';
+import { EmployeePolicyView } from '../features/policy/EmployeePolicyView';
 import type { RecommendationResponse } from '../features/recommendations/types';
 
 // Static recommendations for banks, insurances, electricity (no backend yet)
@@ -56,11 +58,14 @@ export const ProvidersPage: React.FC = () => {
   const [employeeRecs, setEmployeeRecs] = useState<{ housing: any[]; schools: any[]; movers: any[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // Wizard-first flow: always start with service selection, then criteria wizard, then results
-  const [flowStep, setFlowStep] = useState<'select' | 'wizard' | 'results'>('select');
+  const [flowStep, setFlowStep] = useState<'select' | 'wizard' | 'results' | 'summary'>('select');
   const [engineResults, setEngineResults] = useState<Record<string, RecommendationResponse> | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<Map<string, string>>(new Map());
+  const [wizardInitialAnswers, setWizardInitialAnswers] = useState<Record<string, unknown>>({});
   const [selectedServices, setSelectedServices] = useState<Set<TabKey>>(new Set(SERVICE_OPTIONS.map((s) => s.id)));
   const [activeTab, setActiveTab] = useState<TabKey>('housing');
   const [error, setError] = useState('');
+  const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleStartOver = () => {
@@ -68,7 +73,32 @@ export const ProvidersPage: React.FC = () => {
     setFlowStep('select');
   };
 
-  const startWizard = () => setFlowStep('wizard');
+  const startWizard = async () => {
+    setWizardInitialAnswers({});
+    try {
+      const res = await employeeAPI.getCurrentAssignment();
+      let profileAnswers: Record<string, unknown> = {};
+      let policyCriteria: Record<string, unknown> = {};
+      if (res?.assignment?.id) {
+        const [journey, applicable] = await Promise.all([
+          employeeAPI.getNextQuestion(res.assignment.id),
+          employeeAPI.getApplicablePolicy(res.assignment.id),
+        ]);
+        const profile = (journey as { profile?: Record<string, unknown> })?.profile;
+        if (profile && typeof profile === 'object') {
+          profileAnswers = profileToWizardAnswers(profile as Record<string, unknown>);
+        }
+        if (applicable?.wizardCriteria && typeof applicable.wizardCriteria === 'object') {
+          policyCriteria = applicable.wizardCriteria as Record<string, unknown>;
+        }
+      }
+      const merged = { ...profileAnswers, ...policyCriteria };
+      setWizardInitialAnswers(Object.keys(merged).length > 0 ? merged : {});
+    } catch {
+      // Use defaults if no assignment or API error
+    }
+    setFlowStep('wizard');
+  };
 
   const toggleService = (id: TabKey) => {
     setSelectedServices((prev) => {
@@ -89,9 +119,13 @@ export const ProvidersPage: React.FC = () => {
   const loadData = async () => {
     setError('');
     try {
-      const data = await dashboardAPI.get();
+      const [data, assignmentRes] = await Promise.all([
+        dashboardAPI.get(),
+        employeeAPI.getCurrentAssignment().catch(() => null),
+      ]);
       setDashboard(data);
       setEmployeeRecs(null);
+      setAssignmentId(assignmentRes?.assignment?.id ?? null);
     } catch (err: any) {
       if (err?.response?.status === 401) {
         navigate(buildRoute('landing'));
@@ -99,7 +133,11 @@ export const ProvidersPage: React.FC = () => {
       }
       setDashboard(null);
       try {
-        const recs = await employeeAPI.getRecommendations();
+        const [recs, assignRes] = await Promise.all([
+          employeeAPI.getRecommendations(),
+          employeeAPI.getCurrentAssignment().catch(() => null),
+        ]);
+        setAssignmentId(assignRes?.assignment?.id ?? null);
         if (recs && (recs.housing?.length || recs.schools?.length || recs.movers?.length)) {
           setEmployeeRecs(recs);
           setError('');
@@ -149,6 +187,12 @@ export const ProvidersPage: React.FC = () => {
       )}
 
       {flowStep === 'select' ? (
+        <>
+          {assignmentId && (
+            <div className="mb-6">
+              <EmployeePolicyView assignmentId={assignmentId} compact />
+            </div>
+          )}
         <Card padding="lg" className="mb-8">
           <h2 className="text-xl font-semibold text-[#0b2b43] mb-2">Which services do you need?</h2>
           <p className="text-sm text-[#6b7280] mb-6">
@@ -183,20 +227,34 @@ export const ProvidersPage: React.FC = () => {
             Answer questions & get recommendations
           </Button>
         </Card>
+        </>
       ) : flowStep === 'wizard' ? (
         <ProvidersCriteriaWizard
           selectedServices={selectedServices}
+          initialAnswers={wizardInitialAnswers}
           onComplete={(results: Record<string, RecommendationResponse>) => {
             setEngineResults(results);
+            setSelectedPackage(new Map());
             setFlowStep('results');
             setError('');
           }}
           onBack={handleStartOver}
         />
-      ) : engineResults ? (
+      ) : flowStep === 'results' && engineResults ? (
         <RecommendationResults
           results={engineResults}
           categoryLabels={CATEGORY_LABELS}
+          selectedPackage={selectedPackage}
+          onSelectedPackageChange={setSelectedPackage}
+          onStartOver={handleStartOver}
+          onViewSummary={() => setFlowStep('summary')}
+        />
+      ) : flowStep === 'summary' && engineResults ? (
+        <PackageSummary
+          results={engineResults}
+          selectedPackage={selectedPackage}
+          categoryLabels={CATEGORY_LABELS}
+          onBack={() => setFlowStep('results')}
           onStartOver={handleStartOver}
         />
       ) : (

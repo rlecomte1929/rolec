@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://relopass.com/schemas/hr-policy.json",
+  "title": "HRPolicy",
+  "description": "HR Policy data model for global mobility platform",
+  "type": "object",
+  "required": ["policyId", "effectiveDate", "companyEntity", "assignmentTypes", "employeeBands", "benefitCategories"],
+  "properties": {
+    "policyId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique policy identifier"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Policy version for audit and comparison"
+    },
+    "policyName": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "Human-readable policy name"
+    },
+    "companyEntity": {
+      "type": "string",
+      "description": "Company or legal entity ID"
+    },
+    "effectiveDate": {
+      "type": "string",
+      "format": "date",
+      "description": "YYYY-MM-DD"
+    },
+    "expiryDate": {
+      "type": ["string", "null"],
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "published", "archived"],
+      "default": "draft"
+    },
+    "employeeBands": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "e.g. Band1, Band2, Band3, Band4"
+    },
+    "assignmentTypes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["Permanent", "Long-Term", "Short-Term"]
+      },
+      "minItems": 1
+    },
+    "benefitCategories": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/BenefitDefinition" }
+    },
+    "bandAssignmentRules": {
+      "type": "object",
+      "description": "Keys: band_assignmentType (e.g. Band1_Permanent)",
+      "additionalProperties": { "$ref": "#/definitions/BandAssignmentRule" }
+    },
+    "jurisdictionOverrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "countryCode": { "type": "string" },
+          "overrideBenefitCategories": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/definitions/BenefitDefinition" }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "conditionalDependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "benefit": { "type": "string" },
+          "requires": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "condition": { "type": "string" }
+        }
+      }
+    },
+    "reimbursementRules": { "type": "string" },
+    "repaymentClauses": { "type": "string" },
+    "auditTrail": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "timestamp": { "type": "string", "format": "date-time" },
+          "userId": { "type": "string" },
+          "action": {
+            "type": "string",
+            "enum": ["create", "update", "publish", "archive"]
+          },
+          "changes": { "type": "object" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "BenefitDefinition": {
+      "type": "object",
+      "required": ["allowed"],
+      "properties": {
+        "allowed": { "type": "boolean" },
+        "maxAllowed": {
+          "type": "object",
+          "properties": {
+            "min": { "type": "number", "minimum": 0 },
+            "medium": { "type": "number", "minimum": 0 },
+            "extensive": { "type": "number", "minimum": 0 },
+            "premium": { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["currency", "days", "weeks", "months", "percentage"],
+          "default": "currency"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["NOK", "USD", "GBP", "SGD", "EUR"],
+          "default": "USD"
+        },
+        "documentationRequired": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "preApprovalRequired": {
+          "type": "boolean",
+          "default": false
+        },
+        "notes": { "type": "string" },
+        "supportDocUrl": { "type": "string", "format": "uri" }
+      },
+      "additionalProperties": false
+    },
+    "BandAssignmentRule": {
+      "type": "object",
+      "properties": {
+        "benefitOverrides": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/BenefitDefinition" }
+        },
+        "fallbackBand": {
+          "type": "string",
+          "description": "Band to use if no specific entry exists"
+        }
+      }
+    }
+  }
+}

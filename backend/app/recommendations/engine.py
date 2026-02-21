@@ -71,6 +71,10 @@ def recommend(
         items.append(rec)
 
     criteria_echo = _sanitize_criteria(criteria)
+    # Add office address for map directions (living areas, schools)
+    dest_city = (criteria.get("destination_city") or "Singapore").strip()
+    office = (criteria.get("office_address") or "").strip()
+    criteria_echo["office_address"] = office or _default_office_for_city(dest_city)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     return RecommendationResponse(
@@ -79,6 +83,19 @@ def recommend(
         criteria_echo=criteria_echo,
         recommendations=items,
     )
+
+
+def _default_office_for_city(city: str) -> str:
+    """Default office location for commute directions by city."""
+    city_lower = (city or "").lower()
+    defaults = {
+        "singapore": "Raffles Place MRT, Singapore",
+        "london": "Canary Wharf, London, UK",
+        "new york": "Midtown Manhattan, New York, NY",
+        "berlin": "Mitte, Berlin, Germany",
+        "oslo": "Sentrum, Oslo, Norway",
+    }
+    return defaults.get(city_lower) or f"{city}, city center"
 
 
 def _sanitize_criteria(criteria: Dict[str, Any]) -> Dict[str, Any]:

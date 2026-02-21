@@ -3,6 +3,7 @@ Unified database layer — works with both SQLite and Postgres.
 Uses DATABASE_URL from db_config (single source of truth).
 """
 import json
+import uuid
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -183,6 +184,170 @@ class Database:
                     updated_at TEXT NOT NULL
                 )
             """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS hr_policies (
+                    id TEXT PRIMARY KEY,
+                    policy_json TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'draft',
+                    company_entity TEXT,
+                    effective_date TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    created_by TEXT,
+                    version INTEGER NOT NULL DEFAULT 1
+                )
+            """))
+
+            # ------------------------------------------------------------------
+            # Admin console tables
+            # ------------------------------------------------------------------
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS profiles (
+                    id TEXT PRIMARY KEY,
+                    role TEXT NOT NULL,
+                    email TEXT,
+                    full_name TEXT,
+                    company_id TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS admin_allowlist (
+                    email TEXT PRIMARY KEY,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    added_by_user_id TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id TEXT PRIMARY KEY,
+                    actor_user_id TEXT NOT NULL,
+                    action_type TEXT NOT NULL,
+                    target_type TEXT NOT NULL,
+                    target_id TEXT,
+                    reason TEXT,
+                    metadata_json TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS companies (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    country TEXT,
+                    size_band TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS employees (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    profile_id TEXT NOT NULL,
+                    band TEXT,
+                    assignment_type TEXT,
+                    relocation_case_id TEXT,
+                    status TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS hr_users (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    profile_id TEXT NOT NULL,
+                    permissions_json TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS support_cases (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    created_by_profile_id TEXT NOT NULL,
+                    employee_id TEXT,
+                    hr_profile_id TEXT,
+                    category TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    summary TEXT,
+                    last_error_code TEXT,
+                    last_error_context_json TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS support_case_notes (
+                    id TEXT PRIMARY KEY,
+                    support_case_id TEXT NOT NULL,
+                    author_user_id TEXT NOT NULL,
+                    note TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS admin_sessions (
+                    token TEXT PRIMARY KEY,
+                    actor_user_id TEXT NOT NULL,
+                    target_user_id TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS eligibility_overrides (
+                    id TEXT PRIMARY KEY,
+                    assignment_id TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    allowed INTEGER NOT NULL DEFAULT 1,
+                    expires_at TEXT,
+                    note TEXT,
+                    created_by_user_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            # Best-effort schema extensions for relocation_cases
+            if _is_sqlite:
+                cols = conn.execute(text("PRAGMA table_info(relocation_cases)")).fetchall()
+                col_names = {r[1] for r in cols}
+                if "company_id" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN company_id TEXT"))
+                if "employee_id" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN employee_id TEXT"))
+                if "status" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN status TEXT"))
+                if "stage" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN stage TEXT"))
+                if "host_country" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN host_country TEXT"))
+                if "home_country" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN home_country TEXT"))
+            else:
+                conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS company_id TEXT"))
+                conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS employee_id TEXT"))
+                conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS status TEXT"))
+                conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS stage TEXT"))
+                conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS host_country TEXT"))
+                conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS home_country TEXT"))
+
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_status ON support_cases(status)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_severity ON support_cases(severity)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_relocation_cases_status ON relocation_cases(status)"))
 
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
@@ -668,6 +833,484 @@ class Database:
             ), {"aid": assignment_id}).fetchall()
         return self._rows_to_list(rows)
 
+    # ==================================================================
+    # Admin console operations
+    # ==================================================================
+    def ensure_profile_record(
+        self,
+        user_id: str,
+        email: Optional[str],
+        role: str,
+        full_name: Optional[str],
+        company_id: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                text("SELECT 1 FROM profiles WHERE id = :id"), {"id": user_id}
+            ).fetchone()
+            if existing:
+                conn.execute(text(
+                    "UPDATE profiles SET role = :role, email = :email, full_name = :full_name, company_id = :company_id "
+                    "WHERE id = :id"
+                ), {
+                    "id": user_id,
+                    "role": role,
+                    "email": (email or "").strip().lower() if email else None,
+                    "full_name": full_name,
+                    "company_id": company_id,
+                })
+            else:
+                conn.execute(text(
+                    "INSERT INTO profiles (id, role, email, full_name, company_id, created_at) "
+                    "VALUES (:id, :role, :email, :full_name, :company_id, :created_at)"
+                ), {
+                    "id": user_id,
+                    "role": role,
+                    "email": (email or "").strip().lower() if email else None,
+                    "full_name": full_name,
+                    "company_id": company_id,
+                    "created_at": now,
+                })
+
+    def get_profile_record(self, user_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT * FROM profiles WHERE id = :id"), {"id": user_id}).fetchone()
+        return self._row_to_dict(row)
+
+    def list_profiles(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
+        q = (query or "").strip().lower()
+        with self.engine.connect() as conn:
+            if q:
+                rows = conn.execute(text(
+                    "SELECT * FROM profiles WHERE LOWER(email) LIKE :q OR LOWER(full_name) LIKE :q ORDER BY created_at DESC"
+                ), {"q": f"%{q}%"}).fetchall()
+            else:
+                rows = conn.execute(text("SELECT * FROM profiles ORDER BY created_at DESC")).fetchall()
+        return self._rows_to_list(rows)
+
+    def add_admin_allowlist(self, email: str, added_by_user_id: Optional[str]) -> None:
+        now = datetime.utcnow().isoformat()
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO admin_allowlist (email, enabled, added_by_user_id, created_at) "
+                "VALUES (:email, 1, :added_by, :created_at) "
+                "ON CONFLICT(email) DO UPDATE SET enabled = 1, added_by_user_id = excluded.added_by_user_id"
+            ), {"email": email_norm, "added_by": added_by_user_id, "created_at": now})
+
+    def is_admin_allowlisted(self, email: str) -> bool:
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return False
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT enabled FROM admin_allowlist WHERE email = :email"
+            ), {"email": email_norm}).fetchone()
+        return bool(row and row._mapping.get("enabled") == 1)
+
+    def log_audit(
+        self,
+        actor_user_id: str,
+        action_type: str,
+        target_type: str,
+        target_id: Optional[str],
+        reason: Optional[str],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO audit_log (id, actor_user_id, action_type, target_type, target_id, reason, metadata_json, created_at) "
+                "VALUES (:id, :actor, :action, :target_type, :target_id, :reason, :meta, :created_at)"
+            ), {
+                "id": str(uuid.uuid4()),
+                "actor": actor_user_id,
+                "action": action_type,
+                "target_type": target_type,
+                "target_id": target_id,
+                "reason": reason,
+                "meta": json.dumps(metadata or {}),
+                "created_at": now,
+            })
+
+    def list_companies(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
+        q = (query or "").strip().lower()
+        with self.engine.connect() as conn:
+            if q:
+                rows = conn.execute(text(
+                    "SELECT * FROM companies WHERE LOWER(name) LIKE :q ORDER BY created_at DESC"
+                ), {"q": f"%{q}%"}).fetchall()
+            else:
+                rows = conn.execute(text("SELECT * FROM companies ORDER BY created_at DESC")).fetchall()
+        return self._rows_to_list(rows)
+
+    def get_company(self, company_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT * FROM companies WHERE id = :id"), {"id": company_id}).fetchone()
+        return self._row_to_dict(row)
+
+    def create_company(self, company_id: str, name: str, country: Optional[str], size_band: Optional[str]) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO companies (id, name, country, size_band, created_at) "
+                "VALUES (:id, :name, :country, :size_band, :created_at) "
+                "ON CONFLICT(id) DO UPDATE SET name = excluded.name, country = excluded.country, size_band = excluded.size_band"
+            ), {"id": company_id, "name": name, "country": country, "size_band": size_band, "created_at": now})
+
+    def create_employee(
+        self,
+        employee_id: str,
+        company_id: str,
+        profile_id: str,
+        band: Optional[str],
+        assignment_type: Optional[str],
+        relocation_case_id: Optional[str],
+        status: Optional[str],
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO employees (id, company_id, profile_id, band, assignment_type, relocation_case_id, status, created_at) "
+                "VALUES (:id, :cid, :pid, :band, :atype, :rcid, :status, :created_at) "
+                "ON CONFLICT(id) DO UPDATE SET company_id = excluded.company_id, profile_id = excluded.profile_id, band = excluded.band, "
+                "assignment_type = excluded.assignment_type, relocation_case_id = excluded.relocation_case_id, status = excluded.status"
+            ), {
+                "id": employee_id,
+                "cid": company_id,
+                "pid": profile_id,
+                "band": band,
+                "atype": assignment_type,
+                "rcid": relocation_case_id,
+                "status": status,
+                "created_at": now,
+            })
+
+    def create_hr_user(
+        self,
+        hr_id: str,
+        company_id: str,
+        profile_id: str,
+        permissions: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO hr_users (id, company_id, profile_id, permissions_json, created_at) "
+                "VALUES (:id, :cid, :pid, :perm, :created_at) "
+                "ON CONFLICT(id) DO UPDATE SET company_id = excluded.company_id, profile_id = excluded.profile_id, permissions_json = excluded.permissions_json"
+            ), {
+                "id": hr_id,
+                "cid": company_id,
+                "pid": profile_id,
+                "perm": json.dumps(permissions or {}),
+                "created_at": now,
+            })
+
+    def upsert_relocation_case(
+        self,
+        case_id: str,
+        company_id: Optional[str],
+        employee_id: Optional[str],
+        status: Optional[str],
+        stage: Optional[str],
+        host_country: Optional[str],
+        home_country: Optional[str],
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE relocation_cases SET company_id = :cid, employee_id = :eid, status = :status, "
+                "stage = :stage, host_country = :host, home_country = :home, updated_at = :now "
+                "WHERE id = :id"
+            ), {
+                "id": case_id,
+                "cid": company_id,
+                "eid": employee_id,
+                "status": status,
+                "stage": stage,
+                "host": host_country,
+                "home": home_country,
+                "now": now,
+            })
+
+    def create_support_case(
+        self,
+        support_case_id: str,
+        company_id: str,
+        created_by_profile_id: str,
+        category: str,
+        severity: str,
+        status: str,
+        summary: Optional[str],
+        employee_id: Optional[str] = None,
+        hr_profile_id: Optional[str] = None,
+        last_error_code: Optional[str] = None,
+        last_error_context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO support_cases "
+                "(id, company_id, created_by_profile_id, employee_id, hr_profile_id, category, severity, status, summary, last_error_code, last_error_context_json, created_at, updated_at) "
+                "VALUES (:id, :cid, :cbp, :eid, :hid, :cat, :sev, :status, :summary, :err, :ctx, :created_at, :updated_at) "
+                "ON CONFLICT(id) DO UPDATE SET company_id = excluded.company_id, status = excluded.status, summary = excluded.summary, "
+                "last_error_code = excluded.last_error_code, last_error_context_json = excluded.last_error_context_json, updated_at = excluded.updated_at"
+            ), {
+                "id": support_case_id,
+                "cid": company_id,
+                "cbp": created_by_profile_id,
+                "eid": employee_id,
+                "hid": hr_profile_id,
+                "cat": category,
+                "sev": severity,
+                "status": status,
+                "summary": summary,
+                "err": last_error_code,
+                "ctx": json.dumps(last_error_context or {}),
+                "created_at": now,
+                "updated_at": now,
+            })
+
+    def list_employees(self, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            if company_id:
+                rows = conn.execute(text(
+                    "SELECT * FROM employees WHERE company_id = :cid ORDER BY created_at DESC"
+                ), {"cid": company_id}).fetchall()
+            else:
+                rows = conn.execute(text("SELECT * FROM employees ORDER BY created_at DESC")).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_hr_users(self, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            if company_id:
+                rows = conn.execute(text(
+                    "SELECT * FROM hr_users WHERE company_id = :cid ORDER BY created_at DESC"
+                ), {"cid": company_id}).fetchall()
+            else:
+                rows = conn.execute(text("SELECT * FROM hr_users ORDER BY created_at DESC")).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_relocation_cases(self, company_id: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        params: Dict[str, Any] = {}
+        clauses = []
+        if company_id:
+            clauses.append("company_id = :cid")
+            params["cid"] = company_id
+        if status:
+            clauses.append("status = :status")
+            params["status"] = status
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                f"SELECT * FROM relocation_cases {where} ORDER BY updated_at DESC"
+            ), params).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_support_cases(
+        self,
+        status: Optional[str] = None,
+        severity: Optional[str] = None,
+        company_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        params: Dict[str, Any] = {}
+        clauses = []
+        if status:
+            clauses.append("status = :status")
+            params["status"] = status
+        if severity:
+            clauses.append("severity = :severity")
+            params["severity"] = severity
+        if company_id:
+            clauses.append("company_id = :cid")
+            params["cid"] = company_id
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                f"SELECT * FROM support_cases {where} ORDER BY updated_at DESC"
+            ), params).fetchall()
+        return self._rows_to_list(rows)
+
+    def add_support_note(self, support_case_id: str, author_user_id: str, note: str) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO support_case_notes (id, support_case_id, author_user_id, note, created_at) "
+                "VALUES (:id, :sid, :uid, :note, :created_at)"
+            ), {"id": str(uuid.uuid4()), "sid": support_case_id, "uid": author_user_id, "note": note, "created_at": now})
+
+    def list_support_notes(self, support_case_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM support_case_notes WHERE support_case_id = :sid ORDER BY created_at DESC"
+            ), {"sid": support_case_id}).fetchall()
+        return self._rows_to_list(rows)
+
+    def set_admin_session(self, token: str, actor_user_id: str, target_user_id: str, mode: str) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT OR REPLACE INTO admin_sessions (token, actor_user_id, target_user_id, mode, created_at) "
+                "VALUES (:token, :actor, :target, :mode, :created_at)"
+            ), {"token": token, "actor": actor_user_id, "target": target_user_id, "mode": mode, "created_at": now})
+
+    def clear_admin_session(self, token: str) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(text("DELETE FROM admin_sessions WHERE token = :token"), {"token": token})
+
+    def get_admin_session(self, token: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT * FROM admin_sessions WHERE token = :token"), {"token": token}).fetchone()
+        return self._row_to_dict(row)
+
+    def create_eligibility_override(
+        self,
+        assignment_id: str,
+        category: str,
+        allowed: bool,
+        expires_at: Optional[str],
+        note: Optional[str],
+        created_by_user_id: str,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO eligibility_overrides (id, assignment_id, category, allowed, expires_at, note, created_by_user_id, created_at) "
+                "VALUES (:id, :aid, :cat, :allowed, :expires, :note, :uid, :created_at)"
+            ), {
+                "id": str(uuid.uuid4()),
+                "aid": assignment_id,
+                "cat": category,
+                "allowed": 1 if allowed else 0,
+                "expires": expires_at,
+                "note": note,
+                "uid": created_by_user_id,
+                "created_at": now,
+            })
+
+    # ==================================================================
+    # HR Policies (full policy spec)
+    # ==================================================================
+    def create_hr_policy(
+        self,
+        policy_id: str,
+        policy_json: Dict[str, Any],
+        created_by: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        pj = json.dumps(policy_json)
+        status = policy_json.get("status", "draft")
+        company_entity = policy_json.get("companyEntity", "")
+        effective_date = policy_json.get("effectiveDate", "")
+        version = policy_json.get("version", 1)
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO hr_policies "
+                "(id, policy_json, status, company_entity, effective_date, created_at, updated_at, created_by, version) "
+                "VALUES (:id, :pj, :status, :ce, :ed, :ca, :ua, :cb, :ver)"
+            ), {
+                "id": policy_id, "pj": pj, "status": status, "ce": company_entity,
+                "ed": effective_date, "ca": now, "ua": now, "cb": created_by, "ver": version,
+            })
+
+    def update_hr_policy(
+        self,
+        policy_id: str,
+        policy_json: Dict[str, Any],
+    ) -> bool:
+        now = datetime.utcnow().isoformat()
+        pj = json.dumps(policy_json)
+        status = policy_json.get("status", "draft")
+        company_entity = policy_json.get("companyEntity", "")
+        effective_date = policy_json.get("effectiveDate", "")
+        version = policy_json.get("version", 1)
+        with self.engine.begin() as conn:
+            r = conn.execute(text(
+                "UPDATE hr_policies SET policy_json = :pj, status = :status, company_entity = :ce, "
+                "effective_date = :ed, updated_at = :ua, version = :ver WHERE id = :id"
+            ), {"pj": pj, "status": status, "ce": company_entity, "ed": effective_date, "ua": now, "ver": version, "id": policy_id})
+            return r.rowcount > 0
+
+    def get_hr_policy(self, policy_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT policy_json, status, created_at, updated_at, version FROM hr_policies WHERE id = :id"
+            ), {"id": policy_id}).fetchone()
+        if not row:
+            return None
+        policy = json.loads(row._mapping["policy_json"])
+        policy["_meta"] = {
+            "status": row._mapping["status"],
+            "created_at": row._mapping["created_at"],
+            "updated_at": row._mapping["updated_at"],
+            "version": row._mapping["version"],
+        }
+        return policy
+
+    def list_hr_policies(
+        self,
+        status_filter: Optional[str] = None,
+        company_entity: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            q = "SELECT id, policy_json, status, company_entity, effective_date, created_at, updated_at, version FROM hr_policies WHERE 1=1"
+            params: Dict[str, Any] = {}
+            if status_filter:
+                q += " AND status = :status"
+                params["status"] = status_filter
+            if company_entity:
+                q += " AND company_entity = :ce"
+                params["ce"] = company_entity
+            q += " ORDER BY effective_date DESC, created_at DESC"
+            rows = conn.execute(text(q), params).fetchall()
+        result = []
+        for row in rows:
+            policy = json.loads(row._mapping["policy_json"])
+            policy["id"] = row._mapping["id"]
+            policy["_meta"] = {
+                "status": row._mapping["status"],
+                "created_at": row._mapping["created_at"],
+                "updated_at": row._mapping["updated_at"],
+                "version": row._mapping["version"],
+            }
+            result.append(policy)
+        return result
+
+    def list_hr_policies_by_company(self, company_id: str) -> List[Dict[str, Any]]:
+        return self.list_hr_policies(company_entity=company_id)
+
+    def get_published_hr_policy_for_employee(
+        self,
+        employee_band: str,
+        assignment_type: str,
+        country_code: Optional[str] = None,
+        company_entity: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Return the first published policy that matches band, assignment type, optionally country/entity."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT id, policy_json FROM hr_policies WHERE status = 'published' "
+                "ORDER BY effective_date DESC, created_at DESC"
+            )).fetchall()
+        for row in rows:
+            policy = json.loads(row._mapping["policy_json"])
+            bands = policy.get("employeeBands", [])
+            types = policy.get("assignmentTypes", [])
+            if employee_band in bands and assignment_type in types:
+                if company_entity and policy.get("companyEntity") != company_entity:
+                    continue
+                policy["id"] = row._mapping["id"]
+                return policy
+        return None
+
+    def delete_hr_policy(self, policy_id: str) -> bool:
+        with self.engine.begin() as conn:
+            r = conn.execute(text("DELETE FROM hr_policies WHERE id = :id"), {"id": policy_id})
+            return r.rowcount > 0
 
     # ==================================================================
     # Debug KV operations

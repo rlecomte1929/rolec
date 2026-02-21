@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Depends
 
 from ..db import SessionLocal
+from ...database import db
 from .. import crud, schemas
 from ..services.research import run_country_research
 import json
@@ -12,14 +13,31 @@ import json
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
-def require_admin(role: Optional[str]):
-    if role != "admin":
+def _is_admin_user(user: dict) -> bool:
+    role = (user.get("role") or "").upper()
+    if role == "ADMIN":
+        return True
+    profile = db.get_profile_record(user.get("id"))
+    if profile and (profile.get("role") or "").upper() == "ADMIN":
+        return True
+    email = (user.get("email") or "").strip().lower()
+    if email.endswith("@relopass.com") and db.is_admin_allowlisted(email):
+        return True
+    return False
+
+
+def require_admin(authorization: Optional[str] = Header(None)) -> dict:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.replace("Bearer ", "").strip()
+    user = db.get_user_by_token(token)
+    if not user or not _is_admin_user(user):
         raise HTTPException(status_code=403, detail="Admin only")
+    return user
 
 
 @router.get("/countries", response_model=schemas.CountryListDTO)
-def list_countries(x_role: Optional[str] = Header(None)):
-    require_admin(x_role)
+def list_countries(user: dict = Depends(require_admin)):
     with SessionLocal() as db:
         profiles = crud.list_country_profiles(db)
         items = []
@@ -40,8 +58,7 @@ def list_countries(x_role: Optional[str] = Header(None)):
 
 
 @router.get("/countries/{country_code}", response_model=schemas.CountryProfileDTO)
-def get_country(country_code: str, x_role: Optional[str] = Header(None)):
-    require_admin(x_role)
+def get_country(country_code: str, user: dict = Depends(require_admin)):
     with SessionLocal() as db:
         profile = crud.get_country_profile(db, country_code.upper())
         if not profile:
@@ -81,7 +98,6 @@ def get_country(country_code: str, x_role: Optional[str] = Header(None)):
 
 
 @router.post("/countries/{country_code}/research/rerun")
-def rerun_country(country_code: str, x_role: Optional[str] = Header(None), opts: Optional[dict] = None):
-    require_admin(x_role)
+def rerun_country(country_code: str, user: dict = Depends(require_admin), opts: Optional[dict] = None):
     run_country_research(country_code, (opts or {}).get("purpose", "employment"), {})
     return {"jobId": country_code.lower() + "-job"}

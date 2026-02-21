@@ -526,3 +526,86 @@ export interface EmployeeJourneyResponse {
   profile?: RelocationProfile | null;
 }
 
+// ---------------------------------------------------------------------------
+// Admin console types
+// ---------------------------------------------------------------------------
+export interface AdminContextResponse {
+  isAdmin: boolean;
+  impersonation?: {
+    target_user_id: string;
+    mode: 'hr' | 'employee';
+  } | null;
+}
+
+export interface AdminCompany {
+  id: string;
+  name: string;
+  country?: string;
+  size_band?: string;
+  created_at: string;
+}
+
+export interface AdminProfile {
+  id: string;
+  role: string;
+  email?: string;
+  full_name?: string;
+  company_id?: string;
+  created_at: string;
+}
+
+export interface AdminEmployee {
+  id: string;
+  company_id: string;
+  profile_id: string;
+  band?: string;
+  assignment_type?: string;
+  relocation_case_id?: string;
+  status?: string;
+  created_at: string;
+}
+
+export interface AdminHrUser {
+  id: string;
+  company_id: string;
+  profile_id: string;
+  permissions_json?: string;
+  created_at: string;
+}
+
+export interface AdminRelocationCase {
+  id: string;
+  company_id?: string;
+  employee_id?: string;
+  status?: string;
+  stage?: string;
+  host_country?: string;
+  home_country?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AdminSupportCase {
+  id: string;
+  company_id: string;
+  created_by_profile_id: string;
+  employee_id?: string;
+  hr_profile_id?: string;
+  category: string;
+  severity: string;
+  status: string;
+  summary?: string;
+  last_error_code?: string;
+  last_error_context_json?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminSupportNote {
+  id: string;
+  support_case_id: string;
+  author_user_id: string;
+  note: string;
+  created_at: string;
+}
+

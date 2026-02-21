@@ -20,7 +20,13 @@ export const ROUTE_DEFS = {
   hrMessages: { path: '/hr/messages', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrResources: { path: '/hr/resources', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrPolicy: { path: '/hr/policy', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  hrPolicyManagement: { path: '/hr/policy-management', roles: ['HR', 'ADMIN'] as RouteRole[] },
   submissionCenter: { path: '/submission-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  adminConsole: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
+  adminCompanies: { path: '/admin/companies', roles: ['ADMIN'] as RouteRole[] },
+  adminUsers: { path: '/admin/users', roles: ['ADMIN'] as RouteRole[] },
+  adminRelocations: { path: '/admin/relocations', roles: ['ADMIN'] as RouteRole[] },
+  adminSupport: { path: '/admin/support', roles: ['ADMIN'] as RouteRole[] },
 };
 
 export type RouteKey = keyof typeof ROUTE_DEFS;

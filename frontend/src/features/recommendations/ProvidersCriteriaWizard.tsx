@@ -1,7 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Button, Input, Alert } from '../../components/antigravity';
 import { recommendationsEngineAPI } from './api';
 import type { RecommendationResponse } from './types';
+
+/** Map RelocationProfile (from employee journey) to wizard initial answers */
+export function profileToWizardAnswers(profile: Record<string, unknown> | null): Record<string, unknown> {
+  if (!profile) return {};
+  const mp = (profile.movePlan as Record<string, unknown>) || {};
+  const housing = (mp.housing as Record<string, unknown>) || {};
+  const schooling = (mp.schooling as Record<string, unknown>) || {};
+  const movers = (mp.movers as Record<string, unknown>) || {};
+  const dest = String(mp.destination || 'Singapore').split(',')[0].trim();
+  const origin = String(mp.origin || 'Oslo').split(',')[0].trim();
+
+  const budgetStr = String(housing.budgetMonthlySGD || '2000-5000');
+  const [budgetMin = 2000, budgetMax = 5000] = budgetStr
+    .replace(/[^0-9-]/g, '')
+    .split('-')
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n));
+
+  const schoolBudgetStr = String(schooling.budgetAnnualSGD || '0');
+  const schoolBudgetNum = parseInt(schoolBudgetStr.replace(/[^0-9]/g, ''), 10) || 20000;
+  const schoolBudgetLevel =
+    schoolBudgetNum >= 35000 ? 'high' : schoolBudgetNum <= 20000 ? 'low' : 'medium';
+
+  const currPref = String(schooling.curriculumPreference || '').toUpperCase();
+  const curriculum =
+    currPref && (currPref.includes('IB') || currPref.includes('UK') || currPref.includes('US'))
+      ? 'international'
+      : currPref === 'LOCAL'
+        ? 'local'
+        : 'either';
+
+  const dependents = (profile.dependents as unknown[]) || [];
+  const childAges = dependents
+    .filter((d) => d && typeof d === 'object')
+    .map((d) => {
+      const dob = (d as Record<string, unknown>).dateOfBirth;
+      if (typeof dob !== 'string') return null;
+      const y = parseInt(dob.slice(0, 4), 10);
+      return isNaN(y) ? null : new Date().getFullYear() - y;
+    })
+    .filter((a): a is number => a != null && a >= 0 && a <= 18);
+  const childAgesStr = childAges.length > 0 ? childAges.join(', ') : '8';
+
+  const inv = String(movers.inventoryRough || 'medium').toLowerCase();
+  const accType = inv === 'small' ? 'studio' : inv === 'large' ? 'house' : 'apartment';
+
+  return {
+    dest_city: dest || 'Singapore',
+    budget_min: budgetMin || 2000,
+    budget_max: budgetMax || 5000,
+    bedrooms: (housing.bedroomsMin as number) ?? 2,
+    sqm_min: 65,
+    commute_mins: 45,
+    child_ages: childAgesStr,
+    curriculum,
+    school_budget: schoolBudgetLevel,
+    origin_city: origin || 'Oslo',
+    move_dest: dest || 'Singapore',
+    move_type: 'international',
+    acc_type: accType,
+    acc_bedrooms: 2,
+    people: Math.max(2, 1 + (profile.spouse ? 1 : 0) + dependents.length),
+    packing: 'partial',
+    bank_lang: 'en',
+    bank_fees: 'medium',
+    ins_coverage: 'health',
+    ins_family: true,
+    elec_green: true,
+    elec_flex: 'medium',
+  };
+}
 
 /** Map frontend tab IDs to backend category keys */
 const CATEGORY_MAP: Record<string, string> = {
@@ -33,6 +104,7 @@ const WIZARD_QUESTIONS: WizardQuestion[] = [
   { id: 'bedrooms', label: 'Number of bedrooms', type: 'number', key: 'bedrooms', category: 'housing', default: 2 },
   { id: 'sqm_min', label: 'Minimum sqm', type: 'number', key: 'sqm_min', category: 'housing', default: 65 },
   { id: 'commute_mins', label: 'Max commute to work (minutes)', type: 'number', key: 'commute_mins', category: 'housing', default: 45 },
+  { id: 'office_address', label: 'Office/work address (optional, for map directions)', type: 'text', key: 'office_address', category: 'housing', placeholder: 'e.g. Raffles Place MRT, Singapore' },
   { id: 'child_ages', label: "Children's ages (comma-separated, e.g. 5,8)", type: 'text', key: 'child_ages', category: 'schools', default: '8' },
   { id: 'curriculum', label: 'Curriculum preference', type: 'select', key: 'curriculum', category: 'schools', options: [
     { value: 'international', label: 'International' },
@@ -101,7 +173,10 @@ function buildCriteriaFromAnswers(
     const maxB = typeof criteria.budget_max === 'number' ? criteria.budget_max : 5000;
     criteria.budget_monthly = { min: minB, max: maxB };
     if (typeof criteria.commute_mins === 'number') {
-      criteria.commute_work = { max_minutes: criteria.commute_mins, address: '', mode: 'transit' };
+      criteria.commute_work = { max_minutes: criteria.commute_mins, address: criteria.office_address || '', mode: 'transit' };
+    }
+    if (typeof criteria.office_address === 'string' && criteria.office_address.trim()) {
+      criteria.office_address = criteria.office_address.trim();
     }
   }
   if (category === 'movers') {
@@ -117,6 +192,9 @@ function buildCriteriaFromAnswers(
     delete criteria.budget_min;
     delete criteria.budget_max;
     delete criteria.commute_mins;
+  }
+  if (category === 'schools') {
+    criteria.destination_city = criteria.destination_city || answers.dest_city || 'Singapore';
   }
   if (category === 'schools' && typeof criteria.child_ages === 'string') {
     criteria.child_ages = (criteria.child_ages as string)
@@ -147,12 +225,14 @@ interface Props {
   selectedServices: Set<TabKey>;
   onComplete: (results: Record<string, RecommendationResponse>) => void;
   onBack: () => void;
+  initialAnswers?: Record<string, unknown>;
 }
 
 export const ProvidersCriteriaWizard: React.FC<Props> = ({
   selectedServices,
   onComplete,
   onBack,
+  initialAnswers,
 }) => {
   const categories = Array.from(selectedServices) as TabKey[];
   const questions = getQuestionsForCategories(categories);
@@ -161,10 +241,23 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
   const [answers, setAnswers] = useState<Record<string, unknown>>(() => {
     const a: Record<string, unknown> = {};
     for (const q of questions) {
-      a[q.id] = q.default;
+      a[q.id] = initialAnswers?.[q.id] ?? q.default;
     }
     return a;
   });
+
+  useEffect(() => {
+    if (initialAnswers && Object.keys(initialAnswers).length > 0) {
+      setAnswers((prev) => {
+        const next = { ...prev };
+        const questionIds = new Set(questions.map((q) => q.id));
+        for (const [id, val] of Object.entries(initialAnswers)) {
+          if (questionIds.has(id) && val !== undefined) next[id] = val;
+        }
+        return next;
+      });
+    }
+  }, [initialAnswers]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 

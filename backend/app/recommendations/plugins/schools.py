@@ -152,5 +152,12 @@ class SchoolsPlugin(BasePlugin):
                 "availability_level": avail,
                 "waitlist_weeks": waitlist,
                 "confidence": item.get("confidence", 85),
+                "estimated_cost_usd": int(
+                    {"high": 45000, "medium": 28000, "low": 15000}.get(
+                        item.get("tuition_level", "medium"), 28000
+                    ) * 0.74
+                ),
+                "cost_type": "annual",
+                "map_query": f"{item.get('name', '')}, {item.get('city', 'Singapore')}",
             },
         }

@@ -8,6 +8,8 @@ import { buildRoute, ROUTE_DEFS } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { useAdminContext } from '../features/admin/useAdminContext';
+import { adminAPI } from '../api/client';
 
 const logoUrl = '/relopass-logo.png?v=1';
 
@@ -27,6 +29,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
   const { selectedCaseId } = useSelectedCase();
   const { assignmentId } = useEmployeeAssignment();
+  const { context: adminContext, refresh: refreshAdminContext } = useAdminContext();
 
   const isActiveRoute = (path: string) => {
     if (path.includes('/:')) {
@@ -216,6 +219,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     HR Policy
                   </Link>
                   <Link
+                    to={buildRoute('hrPolicyManagement')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrPolicyManagement.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Policy Management
+                  </Link>
+                  <Link
                     to={messagesRoute}
                     className={`px-3 py-1 rounded-full border ${
                       isActiveRoute(ROUTE_DEFS.hrMessages.path)
@@ -225,6 +238,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   >
                     Messages
                   </Link>
+                  {role === 'ADMIN' && (
+                    <Link
+                      to={buildRoute('adminConsole')}
+                      className={`px-3 py-1 rounded-full border ${
+                        isActiveRoute(ROUTE_DEFS.adminConsole.path)
+                          ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                          : 'border-transparent hover:text-[#0b2b43]'
+                      }`}
+                    >
+                      Admin Console
+                    </Link>
+                  )}
                   <Link
                     to={buildRoute('hrResources')}
                     className={`px-3 py-1 rounded-full border ${
@@ -249,21 +274,37 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   )}
                 </nav>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="text-xs text-[#6b7280]">
                 {selectedCaseId ? (
-                  <span className="text-xs px-3 py-1 rounded-full border border-[#c7d8ff] bg-[#eef4ff] text-[#1d4ed8]">
-                    Case: {selectedCaseId.slice(0, 8)}…
+                  <span>
+                    Case in use: {selectedCaseId.slice(0, 8)}…{identity ? ` · User: ${identity}` : ''}
                   </span>
                 ) : (
-                  <span className="text-xs px-3 py-1 rounded-full border border-[#fde68a] bg-[#fffbeb] text-[#92400e]">
-                    No case selected
-                  </span>
+                  <span>No case selected{identity ? ` · User: ${identity}` : ''}</span>
                 )}
               </div>
             </Container>
           </div>
         )}
       </header>
+      {adminContext?.impersonation && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <Container maxWidth="xl" className="py-2 flex items-center justify-between text-sm text-amber-900">
+            <span>
+              View-as mode: {adminContext.impersonation.mode.toUpperCase()} — {adminContext.impersonation.target_user_id}
+            </span>
+            <button
+              onClick={async () => {
+                await adminAPI.stopImpersonation();
+                refreshAdminContext();
+              }}
+              className="text-xs px-3 py-1 rounded-full bg-amber-100 hover:bg-amber-200"
+            >
+              Stop view-as
+            </button>
+          </Container>
+        </div>
+      )}
 
       {navError && (
         <div className="bg-[#fff5f5] border-b border-[#fbd5d5] text-[#7a2a2a] text-sm">

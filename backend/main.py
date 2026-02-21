@@ -6,7 +6,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Query
+from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any, List
@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime
 import re
 import json
+from pydantic import BaseModel
 
 from .schemas import (
     RegisterRequest, LoginRequest, LoginResponse, AnswerRequest, NextQuestionResponse,
@@ -67,10 +68,14 @@ log.info("Seeding demo cases...")
 seed_demo_cases()
 log.info("Startup complete.")
 
-# CORS middleware
+# CORS middleware (include Vite fallback ports 3002–3005 for local dev)
 default_origins = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:3003",
+    "http://localhost:3004",
+    "http://localhost:3005",
     "http://localhost:5173",
     "https://relopass.com",
     "https://www.relopass.com",
@@ -186,6 +191,60 @@ def _seed_demo_cases() -> None:
     ]
     for emp_id, emp_email, emp_name in employees:
         ensure_user(emp_id, emp_email, "EMPLOYEE", emp_name)
+
+    # Admin seed + allowlist
+    admin_user_id = ensure_user(
+        user_id="demo-admin-001",
+        email="admin@relopass.com",
+        role="ADMIN",
+        name="ReloPass Admin",
+    )
+    db.add_admin_allowlist("admin@relopass.com", admin_user_id)
+
+    # Seed admin console entities
+    company_id = "demo-company-001"
+    db.create_company(company_id, "Acme Corp", "Singapore", "200-500")
+    db.ensure_profile_record(hr_user_id, "hr.demo@relopass.local", "HR", "HR Demo", company_id)
+    db.ensure_profile_record(admin_user_id, "admin@relopass.com", "ADMIN", "ReloPass Admin", None)
+    for emp_id, emp_email, emp_name in employees:
+        db.ensure_profile_record(emp_id, emp_email, "EMPLOYEE", emp_name, company_id)
+
+    db.create_hr_user("hr-001", company_id, hr_user_id, {"can_manage_policy": True})
+    db.create_employee("emp-001", company_id, "demo-emp-001", "Band2", "Long-Term", "demo-case-oslo-sg-family", "active")
+    db.create_employee("emp-002", company_id, "demo-emp-003", "Band1", "Long-Term", "demo-case-demo-emp", "active")
+
+    db.upsert_relocation_case(
+        case_id="demo-case-oslo-sg-family",
+        company_id=company_id,
+        employee_id="emp-001",
+        status="in_progress",
+        stage="docs",
+        host_country="Singapore",
+        home_country="Norway",
+    )
+    db.upsert_relocation_case(
+        case_id="demo-case-demo-emp",
+        company_id=company_id,
+        employee_id="emp-002",
+        status="blocked",
+        stage="policy",
+        host_country="Singapore",
+        home_country="United States",
+    )
+
+    db.create_support_case(
+        support_case_id="support-001",
+        company_id=company_id,
+        created_by_profile_id=hr_user_id,
+        category="policy",
+        severity="high",
+        status="open",
+        summary="Policy caps not matching assignment band",
+        employee_id="emp-002",
+        hr_profile_id=hr_user_id,
+        last_error_code="POLICY_CAP_MISMATCH",
+        last_error_context={"band": "Band1", "assignmentType": "Long-Term"},
+    )
 
     scenarios = [
         {
@@ -312,6 +371,54 @@ def _seed_demo_cases() -> None:
             )
             db.save_employee_profile(scenario["assignment_id"], scenario["profile"])
 
+    # Seed default published HR policy for wizard auto-fill
+    _seed_default_hr_policy()
+
+
+def _seed_default_hr_policy() -> None:
+    """Seed a default published HR policy so employees get wizard criteria auto-fill."""
+    policy_id = "demo-hr-policy-001"
+    if db.get_hr_policy(policy_id):
+        return
+    policy = {
+        "policyId": policy_id,
+        "policyName": "Global Relocation Policy (Demo)",
+        "companyEntity": "NOR-INV-001",
+        "effectiveDate": "2024-01-01",
+        "expiryDate": None,
+        "status": "published",
+        "version": 1,
+        "employeeBands": ["Band1", "Band2", "Band3", "Band4"],
+        "assignmentTypes": ["Permanent", "Long-Term", "Short-Term"],
+        "benefitCategories": {
+            "temporaryHousing": {
+                "allowed": True,
+                "maxAllowed": {"min": 2000, "medium": 4000, "extensive": 6000, "premium": 9000},
+                "unit": "currency",
+                "currency": "USD",
+                "documentationRequired": ["Lease agreement", "Receipts"],
+                "preApprovalRequired": True,
+            },
+            "educationSupport": {
+                "allowed": True,
+                "maxAllowed": {"min": 10000, "medium": 20000, "extensive": 35000, "premium": 45000},
+                "unit": "currency",
+                "currency": "USD",
+                "documentationRequired": ["School invoice", "Enrollment confirmation"],
+                "preApprovalRequired": False,
+            },
+            "shipment": {
+                "allowed": True,
+                "maxAllowed": {"min": 5000, "medium": 10000, "extensive": 15000, "premium": 25000},
+                "unit": "currency",
+                "currency": "USD",
+                "documentationRequired": ["Vendor quote", "Inventory list"],
+                "preApprovalRequired": True,
+            },
+        },
+    }
+    db.create_hr_policy(policy_id, policy, created_by=None)
+
 
 _seed_demo_cases()
 
@@ -342,7 +449,44 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    # Ensure admin profile record exists
+    db.ensure_profile_record(
+        user_id=user["id"],
+        email=user.get("email"),
+        role=user.get("role", UserRole.EMPLOYEE.value),
+        full_name=user.get("name"),
+        company_id=user.get("company"),
+    )
+
+    # Admin detection (role in profiles OR allowlisted @relopass.com)
+    if _is_admin_user(user):
+        user["role"] = UserRole.ADMIN.value
+        user["is_admin"] = True
+    else:
+        user["is_admin"] = False
+
+    # Admin impersonation context (server-side)
+    session = db.get_admin_session(token)
+    if session and session.get("target_user_id"):
+        user["impersonation"] = {
+            "target_user_id": session.get("target_user_id"),
+            "mode": session.get("mode"),
+        }
+
     return user
+
+
+def _is_admin_user(user: Dict[str, Any]) -> bool:
+    role = (user.get("role") or "").upper()
+    if role == UserRole.ADMIN.value:
+        return True
+    profile = db.get_profile_record(user.get("id"))
+    if profile and (profile.get("role") or "").upper() == UserRole.ADMIN.value:
+        return True
+    email = (user.get("email") or "").strip().lower()
+    if email.endswith("@relopass.com") and db.is_admin_allowlisted(email):
+        return True
+    return False
 
 
 def require_role(role: UserRole):
@@ -355,6 +499,51 @@ def require_role(role: UserRole):
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return user
     return dependency
+
+
+def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+    return user
+
+
+class AdminImpersonateRequest(BaseModel):
+    targetUserId: str
+    mode: str
+    reason: Optional[str] = None
+
+
+class AdminReasonRequest(BaseModel):
+    reason: str
+    breakGlass: Optional[bool] = False
+    payload: Optional[Dict[str, Any]] = None
+
+
+class AdminSupportNoteRequest(BaseModel):
+    note: str
+    reason: str
+
+
+def _require_reason(reason: Optional[str]) -> None:
+    if not reason or not reason.strip():
+        raise HTTPException(status_code=400, detail="Reason is required for admin actions")
+
+
+def _deny_if_impersonating(user: Dict[str, Any]) -> None:
+    if user.get("impersonation"):
+        raise HTTPException(status_code=403, detail="View-as mode is read-only. Use admin actions instead.")
+
+
+def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = None) -> Dict[str, Any]:
+    imp = user.get("impersonation")
+    if not imp:
+        return user
+    target = db.get_user_by_id(imp.get("target_user_id"))
+    if not target:
+        return user
+    if expected_role and target.get("role") != expected_role.value:
+        return user
+    return target
 
 
 @app.get("/")
@@ -394,13 +583,17 @@ def register(request: RegisterRequest):
     pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
     password_hash = pwd_context.hash(request.password)
 
+    role = request.role
+    if role == UserRole.ADMIN and (not email or not email.endswith("@relopass.com") or not db.is_admin_allowlisted(email)):
+        role = UserRole.EMPLOYEE
+
     user_id = str(uuid.uuid4())
     created = db.create_user(
         user_id=user_id,
         username=username,
         email=email,
         password_hash=password_hash,
-        role=request.role.value,
+        role=role.value,
         name=request.name,
     )
     if not created:
@@ -408,6 +601,13 @@ def register(request: RegisterRequest):
 
     token = str(uuid.uuid4())
     db.create_session(token, user_id)
+    db.ensure_profile_record(
+        user_id=user_id,
+        email=email,
+        role=role.value,
+        full_name=request.name,
+        company_id=None,
+    )
 
     log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
     return LoginResponse(
@@ -416,7 +616,7 @@ def register(request: RegisterRequest):
             id=user_id,
             username=username,
             email=email,
-            role=request.role,
+            role=role,
             name=request.name,
             company=None,
         )
@@ -459,6 +659,21 @@ def login(request: LoginRequest):
 
     token = str(uuid.uuid4())
     db.create_session(token, user["id"])
+
+    # Ensure profile record is synced
+    db.ensure_profile_record(
+        user_id=user["id"],
+        email=user.get("email"),
+        role=user.get("role", UserRole.EMPLOYEE.value),
+        full_name=user.get("name"),
+        company_id=user.get("company"),
+    )
+
+    # Admin override if allowlisted
+    effective_role = UserRole(user["role"])
+    if _is_admin_user(user):
+        effective_role = UserRole.ADMIN
+
     log.info("auth_login success user_id=%s", user["id"][:8])
 
     return LoginResponse(
@@ -467,21 +682,253 @@ def login(request: LoginRequest):
             id=user["id"],
             username=user.get("username"),
             email=user.get("email"),
-            role=UserRole(user["role"]),
+            role=effective_role,
             name=user.get("name"),
             company=user.get("company"),
         )
     )
 
 
+# ---------------------------------------------------------------------------
+# Admin console endpoints
+# ---------------------------------------------------------------------------
+@app.get("/api/admin/context")
+def get_admin_context(user: Dict[str, Any] = Depends(require_admin)):
+    return {
+        "isAdmin": True,
+        "impersonation": user.get("impersonation"),
+    }
+
+
+@app.post("/api/admin/impersonate/start")
+def start_impersonation(
+    request: AdminImpersonateRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+    authorization: Optional[str] = Header(None),
+):
+    token = (authorization or "").replace("Bearer ", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing auth token")
+    mode = request.mode.lower()
+    if mode not in ("hr", "employee"):
+        raise HTTPException(status_code=400, detail="Invalid impersonation mode")
+    db.set_admin_session(token, user["id"], request.targetUserId, mode)
+    db.log_audit(
+        actor_user_id=user["id"],
+        action_type="VIEW_AS",
+        target_type="profile",
+        target_id=request.targetUserId,
+        reason=request.reason,
+        metadata={"mode": mode},
+    )
+    return {"ok": True, "impersonation": {"targetUserId": request.targetUserId, "mode": mode}}
+
+
+@app.post("/api/admin/impersonate/stop")
+def stop_impersonation(
+    user: Dict[str, Any] = Depends(require_admin),
+    authorization: Optional[str] = Header(None),
+):
+    token = (authorization or "").replace("Bearer ", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing auth token")
+    db.clear_admin_session(token)
+    db.log_audit(
+        actor_user_id=user["id"],
+        action_type="VIEW_AS",
+        target_type="profile",
+        target_id=None,
+        reason="Stop impersonation",
+        metadata={},
+    )
+    return {"ok": True}
+
+
+@app.get("/api/admin/companies")
+def list_companies(q: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
+    items = db.list_companies(q)
+    db.log_audit(user["id"], "READ", "company", None, None, {"query": q})
+    return {"companies": items}
+
+
+@app.get("/api/admin/companies/{company_id}")
+def get_company_detail(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    company = db.get_company(company_id)
+    hr_users = db.list_hr_users(company_id)
+    employees = db.list_employees(company_id)
+    policies = db.list_hr_policies_by_company(company_id)
+    db.log_audit(user["id"], "READ", "company", company_id, None, {"detail": True})
+    return {
+        "company": company,
+        "hr_users": hr_users,
+        "employees": employees,
+        "policies": policies,
+    }
+
+
+@app.get("/api/admin/users")
+def list_users(q: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
+    items = db.list_profiles(q)
+    db.log_audit(user["id"], "READ", "profile", None, None, {"query": q})
+    return {"profiles": items}
+
+
+@app.get("/api/admin/employees")
+def list_employees(company_id: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
+    items = db.list_employees(company_id)
+    db.log_audit(user["id"], "READ", "employee", None, None, {"company_id": company_id})
+    return {"employees": items}
+
+
+@app.get("/api/admin/hr-users")
+def list_hr_users(company_id: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
+    items = db.list_hr_users(company_id)
+    db.log_audit(user["id"], "READ", "hr_user", None, None, {"company_id": company_id})
+    return {"hr_users": items}
+
+
+@app.get("/api/admin/relocations")
+def list_relocations(
+    company_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    items = db.list_relocation_cases(company_id=company_id, status=status)
+    db.log_audit(user["id"], "READ", "relocation_case", None, None, {"company_id": company_id, "status": status})
+    return {"relocations": items}
+
+
+@app.get("/api/admin/support-cases")
+def list_support_cases(
+    status: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    company_id: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    items = db.list_support_cases(status=status, severity=severity, company_id=company_id)
+    db.log_audit(user["id"], "READ", "support_case", None, None, {"status": status, "severity": severity, "company_id": company_id})
+    return {"support_cases": items}
+
+
+@app.get("/api/admin/support-cases/{case_id}/notes")
+def list_support_notes(case_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    items = db.list_support_notes(case_id)
+    db.log_audit(user["id"], "READ", "support_case", case_id, None, {"notes": True})
+    return {"notes": items}
+
+
+@app.post("/api/admin/support-cases/{case_id}/notes")
+def add_support_note(case_id: str, request: AdminSupportNoteRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    db.add_support_note(case_id, user["id"], request.note)
+    db.log_audit(
+        user["id"],
+        "COMMENT",
+        "support_case",
+        case_id,
+        request.reason,
+        {"note": request.note},
+    )
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/resend-invite")
+def admin_resend_invite(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    db.log_audit(user["id"], "RESEND_INVITE", "assignment", payload.get("assignment_id"), request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/reset-onboarding")
+def admin_reset_onboarding(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    assignment_id = payload.get("assignment_id")
+    if assignment_id:
+        db.update_assignment_status(assignment_id, payload.get("status", "IN_PROGRESS"))
+    db.log_audit(user["id"], "RESET", "assignment", assignment_id, request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/unlock-case")
+def admin_unlock_case(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    case_id = payload.get("case_id")
+    if case_id:
+        db.upsert_relocation_case(
+            case_id=case_id,
+            company_id=payload.get("company_id"),
+            employee_id=payload.get("employee_id"),
+            status="active",
+            stage=payload.get("stage"),
+            host_country=payload.get("host_country"),
+            home_country=payload.get("home_country"),
+        )
+    db.log_audit(user["id"], "UPDATE", "relocation_case", case_id, request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/rerun-document")
+def admin_rerun_document(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    db.log_audit(user["id"], "REPROCESS", "document", payload.get("document_id"), request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/refresh-policy")
+def admin_refresh_policy(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    db.log_audit(user["id"], "UPDATE", "policy", payload.get("policy_id"), request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/override-eligibility")
+def admin_override_eligibility(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    assignment_id = payload.get("assignment_id")
+    if assignment_id:
+        db.create_eligibility_override(
+            assignment_id=assignment_id,
+            category=payload.get("category", "unknown"),
+            allowed=bool(payload.get("allowed", True)),
+            expires_at=payload.get("expires_at"),
+            note=payload.get("note"),
+            created_by_user_id=user["id"],
+        )
+    db.log_audit(user["id"], "OVERRIDE", "assignment", assignment_id, request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/export-support-bundle")
+def admin_export_support_bundle(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    bundle = {
+        "support_case_id": payload.get("support_case_id"),
+        "exported_at": datetime.utcnow().isoformat(),
+        "note": "Anonymized snapshot",
+        "policy_ids": payload.get("policy_ids", []),
+        "error_codes": payload.get("error_codes", []),
+        "timestamps": payload.get("timestamps", []),
+    }
+    db.log_audit(user["id"], "EXPORT", "support_case", payload.get("support_case_id"), request.reason, payload)
+    return {"ok": True, "bundle": bundle}
+
+
 @app.get("/api/profile/current", response_model=RelocationProfile)
 def get_current_profile(user: Dict[str, Any] = Depends(get_current_user)):
     """Get current user's profile."""
-    profile = db.get_profile(user["id"])
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    profile = db.get_profile(effective["id"])
     
     if not profile:
         # Return empty profile
-        profile = RelocationProfile(userId=user["id"]).model_dump()
+        profile = RelocationProfile(userId=effective["id"]).model_dump()
     
     return profile
 
@@ -489,13 +936,14 @@ def get_current_profile(user: Dict[str, Any] = Depends(get_current_user)):
 @app.get("/api/profile/next-question", response_model=NextQuestionResponse)
 def get_next_question(user: Dict[str, Any] = Depends(get_current_user)):
     """Get the next question to ask the user."""
-    profile = db.get_profile(user["id"])
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    profile = db.get_profile(effective["id"])
     
     if not profile:
-        profile = RelocationProfile(userId=user["id"]).model_dump()
+        profile = RelocationProfile(userId=effective["id"]).model_dump()
     
     # Get answered questions
-    answers = db.get_answers(user["id"])
+    answers = db.get_answers(effective["id"])
     answered_question_ids = set(ans["question_id"] for ans in answers)
     
     # Get next question from orchestrator
@@ -510,23 +958,25 @@ def submit_answer(request: AnswerRequest, user: Dict[str, Any] = Depends(get_cur
     Submit an answer to a question.
     Updates profile and returns next question.
     """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
     # Get current profile
-    profile = db.get_profile(user["id"])
+    profile = db.get_profile(effective["id"])
     
     if not profile:
-        profile = RelocationProfile(userId=user["id"]).model_dump()
+        profile = RelocationProfile(userId=effective["id"]).model_dump()
     
     # Apply answer to profile
     profile = orchestrator.apply_answer(profile, request.questionId, request.answer, request.isUnknown)
     
     # Save profile
-    db.save_profile(user["id"], profile)
+    db.save_profile(effective["id"], profile)
     
     # Save answer to audit trail
-    db.save_answer(user["id"], request.questionId, request.answer, request.isUnknown)
+    db.save_answer(effective["id"], request.questionId, request.answer, request.isUnknown)
     
     # Get next question
-    answers = db.get_answers(user["id"])
+    answers = db.get_answers(effective["id"])
     answered_question_ids = set(ans["question_id"] for ans in answers)
     next_response = orchestrator.get_next_question(profile, answered_question_ids)
     
@@ -542,7 +992,9 @@ def complete_profile(user: Dict[str, Any] = Depends(get_current_user)):
     Mark profile as complete and compute final state.
     Returns readiness rating and recommendations.
     """
-    profile = db.get_profile(user["id"])
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    profile = db.get_profile(effective["id"])
     
     if not profile:
         raise HTTPException(status_code=400, detail="No profile found")
@@ -559,7 +1011,8 @@ def complete_profile(user: Dict[str, Any] = Depends(get_current_user)):
 @app.get("/api/employee/recommendations")
 def get_employee_recommendations(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
     """Get recommendations for employee's assignment (uses employee_profile from wizard)."""
-    assignment = db.get_assignment_for_employee(user["id"])
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    assignment = db.get_assignment_for_employee(effective["id"])
     if not assignment:
         return {"housing": [], "schools": [], "movers": []}
     profile = db.get_employee_profile(assignment["id"])
@@ -683,14 +1136,18 @@ def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
 
 @app.post("/api/hr/cases", response_model=CreateCaseResponse)
 def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
     case_id = str(uuid.uuid4())
-    profile = RelocationProfile(userId=user["id"]).model_dump()
-    db.create_case(case_id, user["id"], profile)
+    profile = RelocationProfile(userId=effective["id"]).model_dump()
+    db.create_case(case_id, effective["id"], profile)
     return CreateCaseResponse(caseId=case_id)
 
 
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
 def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
     case = db.get_case_by_id(case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -706,7 +1163,7 @@ def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] =
     db.create_assignment(
         assignment_id=assignment_id,
         case_id=case_id,
-        hr_user_id=user["id"],
+        hr_user_id=effective["id"],
         employee_user_id=employee_user["id"] if employee_user else None,
         employee_identifier=employee_identifier,
         status=AssignmentStatus.DRAFT.value,
@@ -727,13 +1184,14 @@ def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] =
 
 @app.get("/api/employee/assignments/current")
 def get_employee_assignment(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
-    assignment = db.get_assignment_for_employee(user["id"])
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    assignment = db.get_assignment_for_employee(effective["id"])
     if not assignment:
-        identifier = user.get("username") or user.get("email")
+        identifier = effective.get("username") or effective.get("email")
         if identifier:
             assignment = db.get_unassigned_assignment_by_identifier(identifier)
-            if assignment:
-                db.attach_employee_to_assignment(assignment["id"], user["id"])
+            if assignment and not user.get("impersonation"):
+                db.attach_employee_to_assignment(assignment["id"], effective["id"])
                 db.mark_invites_claimed(identifier)
                 assignment = db.get_assignment_by_id(assignment["id"])
 
@@ -749,12 +1207,14 @@ def claim_assignment(
     request: ClaimAssignmentRequest,
     user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))
 ):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     # User may have email, username, or both. HR can assign using either.
-    user_identifiers = [x.lower() for x in [user.get("email"), user.get("username")] if x]
+    user_identifiers = [x.lower() for x in [effective.get("email"), effective.get("username")] if x]
     if not user_identifiers:
         raise HTTPException(status_code=400, detail="Your account must have an email or username set")
 
@@ -772,10 +1232,10 @@ def claim_assignment(
             detail="This assignment was created for a different employee. HR must have entered your exact email or username (e.g. jane@relopass.com or janedoe) when assigning the case."
         )
 
-    if assignment.get("employee_user_id") and assignment["employee_user_id"] != user["id"]:
+    if assignment.get("employee_user_id") and assignment["employee_user_id"] != effective["id"]:
         raise HTTPException(status_code=403, detail="Assignment already claimed")
 
-    db.attach_employee_to_assignment(assignment_id, user["id"])
+    db.attach_employee_to_assignment(assignment_id, effective["id"])
     db.mark_invites_claimed(assignment["employee_identifier"])
     return {"success": True}
 
@@ -785,10 +1245,11 @@ def employee_next_question(
     assignmentId: str = Query(..., alias="assignmentId"),
     user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))
 ):
+    effective = _effective_user(user, UserRole.EMPLOYEE)
     assignment = db.get_assignment_by_id(assignmentId)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    if assignment.get("employee_user_id") != user["id"]:
+    if assignment.get("employee_user_id") != effective["id"]:
         raise HTTPException(status_code=403, detail="Assignment not assigned to user")
 
     return _build_employee_journey_payload(assignment)
@@ -799,10 +1260,12 @@ def employee_submit_answer(
     request: EmployeeJourneyRequest,
     user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))
 ):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
     assignment = db.get_assignment_by_id(request.assignmentId)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    if assignment.get("employee_user_id") != user["id"]:
+    if assignment.get("employee_user_id") != effective["id"]:
         raise HTTPException(status_code=403, detail="Assignment not assigned to user")
     if normalize_status(assignment["status"]) in [
         AssignmentStatus.EMPLOYEE_SUBMITTED.value,
@@ -882,10 +1345,12 @@ def _merge_profiles(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, A
 
 @app.post("/api/employee/assignments/{assignment_id}/submit")
 def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    if assignment.get("employee_user_id") != user["id"]:
+    if assignment.get("employee_user_id") != effective["id"]:
         raise HTTPException(status_code=403, detail="Assignment not assigned to user")
 
     profile = db.get_employee_profile(assignment_id)
@@ -949,7 +1414,11 @@ def update_profile_photo(
 
 @app.get("/api/hr/assignments", response_model=List[AssignmentSummary])
 def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    assignments = db.list_all_assignments()
+    if user.get("is_admin") and not user.get("impersonation"):
+        assignments = db.list_all_assignments()
+    else:
+        effective = _effective_user(user, UserRole.HR)
+        assignments = db.list_assignments_for_hr(effective["id"])
     summaries = []
     for assignment in assignments:
         report = db.get_latest_compliance_report(assignment["id"])
@@ -966,6 +1435,7 @@ def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR)
 
 @app.delete("/api/hr/assignments/{assignment_id}")
 def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
     deleted = db.delete_assignment(assignment_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -977,6 +1447,10 @@ def get_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
     assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    if (not user.get("is_admin")) or user.get("impersonation"):
+        effective = _effective_user(user, UserRole.HR)
+        if assignment.get("hr_user_id") != effective["id"]:
+            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
 
     aid = assignment["id"]
     profile = db.get_employee_profile(aid)
@@ -1020,6 +1494,7 @@ def update_assignment_identifier(
 
 @app.post("/api/hr/assignments/{assignment_id}/run-compliance")
 def run_compliance(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -1040,6 +1515,7 @@ def run_compliance(assignment_id: str, user: Dict[str, Any] = Depends(require_ro
 
 @app.post("/api/hr/assignments/{assignment_id}/decision")
 def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -1058,6 +1534,191 @@ def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[st
 
     db.set_assignment_decision(assignment_id, request.decision.value, notes_payload)
     return {"success": True}
+
+
+@app.get("/api/employee/policy/caps")
+def get_employee_policy_caps(user: Dict[str, Any] = Depends(get_current_user)):
+    """Return policy caps for package comparison (housing/month, movers, schools, in USD)."""
+    policy = policy_engine.load_policy()
+    caps = policy.get("caps", {})
+    return {
+        "housing_monthly_usd": caps.get("housing", {}).get("amount", 5000),
+        "movers_usd": caps.get("movers", {}).get("amount", 10000),
+        "schools_usd": caps.get("schools", {}).get("amount", 20000),
+        "immigration_usd": caps.get("immigration", {}).get("amount", 4000),
+    }
+
+
+# ---------------------------------------------------------------------------
+# HR Policy Management (full policy spec - create, edit, upload)
+# ---------------------------------------------------------------------------
+@app.get("/api/hr/policies")
+def list_hr_policies(
+    status: Optional[str] = Query(None),
+    companyEntity: Optional[str] = Query(None, alias="companyEntity"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    policies = db.list_hr_policies(status_filter=status, company_entity=companyEntity)
+    return {"policies": policies}
+
+
+@app.post("/api/hr/policies")
+def create_hr_policy(
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    policy_id = body.get("policyId") or str(uuid.uuid4())
+    body["policyId"] = policy_id
+    body["status"] = body.get("status", "draft")
+    body["version"] = body.get("version", 1)
+    db.create_hr_policy(policy_id, body, created_by=user.get("id"))
+    return {"policyId": policy_id, "policy": body}
+
+
+@app.post("/api/hr/policies/upload")
+async def upload_hr_policy(
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Upload HR policy JSON or YAML file. Creates a new policy from the file content."""
+    content = await file.read()
+    try:
+        raw = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded")
+    try:
+        if file.filename and (file.filename.endswith(".yaml") or file.filename.endswith(".yml")):
+            try:
+                import yaml
+                policy = yaml.safe_load(raw)
+            except ImportError:
+                raise HTTPException(status_code=400, detail="YAML support requires PyYAML. Use JSON format.")
+        else:
+            policy = json.loads(raw)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON/YAML: {str(e)}")
+    if not isinstance(policy, dict):
+        raise HTTPException(status_code=400, detail="Policy must be a JSON object")
+    policy_id = policy.get("policyId") or str(uuid.uuid4())
+    policy["policyId"] = policy_id
+    policy["status"] = policy.get("status", "draft")
+    policy["version"] = policy.get("version", 1)
+    if not policy.get("effectiveDate"):
+        policy["effectiveDate"] = datetime.utcnow().strftime("%Y-%m-%d")
+    if not policy.get("employeeBands"):
+        policy["employeeBands"] = ["Band1", "Band2", "Band3", "Band4"]
+    if not policy.get("assignmentTypes"):
+        policy["assignmentTypes"] = ["Permanent", "Long-Term", "Short-Term"]
+    if not policy.get("benefitCategories"):
+        policy["benefitCategories"] = {}
+    db.create_hr_policy(policy_id, policy, created_by=user.get("id"))
+    return {"policyId": policy_id, "policy": policy, "message": "Policy uploaded successfully"}
+
+
+@app.get("/api/hr/policies/{policy_id}")
+def get_hr_policy_by_id(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    policy = db.get_hr_policy(policy_id)
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    return policy
+
+
+@app.put("/api/hr/policies/{policy_id}")
+def update_hr_policy(
+    policy_id: str,
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    existing = db.get_hr_policy(policy_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    body["policyId"] = policy_id
+    version = existing.get("version", 1)
+    if body.get("status") == "published" and existing.get("_meta", {}).get("status") != "published":
+        version = version + 1
+    body["version"] = body.get("version", version)
+    db.update_hr_policy(policy_id, body)
+    return {"policyId": policy_id, "policy": body}
+
+
+@app.delete("/api/hr/policies/{policy_id}")
+def delete_hr_policy(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    ok = db.delete_hr_policy(policy_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    return {"success": True}
+
+
+# Employee: get applicable policy and wizard criteria for auto-fill
+@app.get("/api/employee/policy/applicable")
+def get_applicable_employee_policy(
+    assignmentId: Optional[str] = Query(None, alias="assignmentId"),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Return applicable HR policy for the employee's assignment, plus wizard criteria for auto-fill."""
+    from .app.services.hr_policy_resolver import resolve_applicable_benefits, policy_to_wizard_criteria
+
+    assignment = None
+    profile = None
+    if assignmentId:
+        assignment = db.get_assignment_by_id(assignmentId)
+        if assignment and assignment.get("employee_user_id") == user.get("id"):
+            profile = db.get_employee_profile(assignmentId)
+    if not assignment:
+        res = db.get_assignment_for_employee(user.get("id", ""))
+        if res:
+            assignment = res
+            assignmentId = res["id"]
+            profile = db.get_employee_profile(res["id"])
+
+    if not assignment:
+        return {"policy": None, "allowedBenefits": [], "wizardCriteria": {}, "message": "No assignment"}
+
+    profile = profile or {}
+    mp = profile.get("movePlan") or {}
+    dest = mp.get("destination", "Singapore")
+    country_code = None
+    if isinstance(dest, str) and "," in dest:
+        parts = dest.split(",")
+        if len(parts) >= 2:
+            country_code = parts[-1].strip()[:2].upper() if parts[-1].strip() else "SG"
+    if not country_code and "Singapore" in str(dest):
+        country_code = "SG"
+    employee_band = profile.get("primaryApplicant", {}).get("employer", {}).get("jobLevel") or "Band2"
+    if "L" in str(employee_band) and "Band" not in str(employee_band):
+        employee_band = f"Band{employee_band.replace('L', '')}" if employee_band.replace("L", "").isdigit() else "Band2"
+    assignment_type = "Long-Term"
+    policy = db.get_published_hr_policy_for_employee(
+        employee_band=employee_band,
+        assignment_type=assignment_type,
+        country_code=country_code,
+    )
+    if not policy:
+        return {"policy": None, "allowedBenefits": [], "wizardCriteria": {}, "message": "No matching published policy"}
+
+    allowed = resolve_applicable_benefits(policy, employee_band, assignment_type, country_code)
+    wizard_criteria = policy_to_wizard_criteria(policy, employee_band, assignment_type, country_code, profile)
+    return {
+        "policy": {
+            "policyId": policy.get("policyId"),
+            "policyName": policy.get("policyName"),
+            "effectiveDate": policy.get("effectiveDate"),
+            "employeeBands": policy.get("employeeBands"),
+            "assignmentTypes": policy.get("assignmentTypes"),
+        },
+        "allowedBenefits": allowed,
+        "wizardCriteria": wizard_criteria,
+        "employeeBand": employee_band,
+        "assignmentType": assignment_type,
+    }
 
 
 @app.get("/api/hr/policy")
@@ -1080,6 +1741,8 @@ def create_policy_exception(
     request: PolicyExceptionRequest,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
     assignment = db.get_assignment_by_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -1093,7 +1756,7 @@ def create_policy_exception(
         "PENDING",
         request.reason,
         request.amount,
-        user["id"],
+        effective["id"],
     )
     return {"success": True, "exceptionId": exception_id}
 
@@ -1120,6 +1783,7 @@ def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_rol
 
 @app.post("/api/hr/cases/{case_id}/compliance/run")
 def run_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
     assignment = db.get_assignment_by_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -1141,6 +1805,7 @@ def record_compliance_action(
     request: ComplianceActionRequest,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
+    _deny_if_impersonating(user)
     assignment = db.get_assignment_by_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")

@@ -14,9 +14,16 @@ import { HrAssignmentReview } from './pages/HrAssignmentReview';
 import { HrComplianceCheck } from './pages/HrComplianceCheck';
 import { HrAssignmentPackageReview } from './pages/HrAssignmentPackageReview';
 import { HrPolicy } from './pages/HrPolicy';
+import { HrPolicyManagement } from './pages/HrPolicyManagement';
 import { CaseWizardPage } from './pages/employee/CaseWizardPage';
 import { CountriesPage } from './pages/admin/CountriesPage';
 import { CountryDetailPage } from './pages/admin/CountryDetailPage';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { AdminCompanies } from './pages/admin/AdminCompanies';
+import { AdminUsers } from './pages/admin/AdminUsers';
+import { AdminRelocations } from './pages/admin/AdminRelocations';
+import { AdminSupport } from './pages/admin/AdminSupport';
+import { AdminCompanyDetail } from './pages/admin/AdminCompanyDetail';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
@@ -48,15 +55,19 @@ function App() {
           path={ROUTE_DEFS.providers.path}
           element={<ProvidersPage />}
         />
-        <Route
-          path={ROUTE_DEFS.hrPolicy.path}
-          element={<HrPolicy />}
-        />
+        <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
+        <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<HrPolicyManagement />} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
+        <Route path={ROUTE_DEFS.adminConsole.path} element={<AdminDashboard />} />
+        <Route path={ROUTE_DEFS.adminCompanies.path} element={<AdminCompanies />} />
+        <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
+        <Route path={ROUTE_DEFS.adminUsers.path} element={<AdminUsers />} />
+        <Route path={ROUTE_DEFS.adminRelocations.path} element={<AdminRelocations />} />
+        <Route path={ROUTE_DEFS.adminSupport.path} element={<AdminSupport />} />
         <Route
           path={ROUTE_DEFS.messages.path}
           element={<PlaceholderPage title="Messages" description="Review case communications and updates." />}

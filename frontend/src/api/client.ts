@@ -17,6 +17,14 @@ import type {
   EmployeeJourneyResponse,
   PolicyResponse,
   ComplianceCaseReport,
+  AdminContextResponse,
+  AdminCompany,
+  AdminProfile,
+  AdminEmployee,
+  AdminHrUser,
+  AdminRelocationCase,
+  AdminSupportCase,
+  AdminSupportNote,
 } from '../types';
 
 // VITE_API_URL must be set for every environment:
@@ -209,6 +217,62 @@ export const hrAPI = {
   },
 };
 
+// Admin API
+export const adminAPI = {
+  getContext: async (): Promise<AdminContextResponse> => {
+    const response = await api.get('/api/admin/context');
+    return response.data;
+  },
+  startImpersonation: async (payload: { targetUserId: string; mode: 'hr' | 'employee'; reason?: string }) => {
+    const response = await api.post('/api/admin/impersonate/start', payload);
+    return response.data;
+  },
+  stopImpersonation: async (): Promise<{ ok: boolean }> => {
+    const response = await api.post('/api/admin/impersonate/stop');
+    return response.data;
+  },
+  listCompanies: async (q?: string): Promise<{ companies: AdminCompany[] }> => {
+    const response = await api.get('/api/admin/companies', { params: { q } });
+    return response.data;
+  },
+  getCompanyDetail: async (companyId: string): Promise<{ company: AdminCompany | null; hr_users: AdminHrUser[]; employees: AdminEmployee[]; policies: any[] }> => {
+    const response = await api.get(`/api/admin/companies/${companyId}`);
+    return response.data;
+  },
+  listProfiles: async (q?: string): Promise<{ profiles: AdminProfile[] }> => {
+    const response = await api.get('/api/admin/users', { params: { q } });
+    return response.data;
+  },
+  listEmployees: async (companyId?: string): Promise<{ employees: AdminEmployee[] }> => {
+    const response = await api.get('/api/admin/employees', { params: { company_id: companyId } });
+    return response.data;
+  },
+  listHrUsers: async (companyId?: string): Promise<{ hr_users: AdminHrUser[] }> => {
+    const response = await api.get('/api/admin/hr-users', { params: { company_id: companyId } });
+    return response.data;
+  },
+  listRelocations: async (params?: { company_id?: string; status?: string }): Promise<{ relocations: AdminRelocationCase[] }> => {
+    const response = await api.get('/api/admin/relocations', { params });
+    return response.data;
+  },
+  listSupportCases: async (params?: { status?: string; severity?: string; company_id?: string }): Promise<{ support_cases: AdminSupportCase[] }> => {
+    const response = await api.get('/api/admin/support-cases', { params });
+    return response.data;
+  },
+  listSupportNotes: async (caseId: string): Promise<{ notes: AdminSupportNote[] }> => {
+    const response = await api.get(`/api/admin/support-cases/${caseId}/notes`);
+    return response.data;
+  },
+  addSupportNote: async (caseId: string, payload: { note: string; reason: string }) => {
+    const response = await api.post(`/api/admin/support-cases/${caseId}/notes`, payload);
+    return response.data;
+  },
+  adminAction: async (action: string, payload: { reason: string; breakGlass?: boolean; payload?: any }) => {
+    const response = await api.post(`/api/admin/actions/${action}`, payload);
+    return response.data;
+  },
+};
+
 export const employeeAPI = {
   getCurrentAssignment: async (): Promise<{ assignment: any }> => {
     const response = await api.get('/api/employee/assignments/current');
@@ -240,6 +304,56 @@ export const employeeAPI = {
   getRecommendations: async (): Promise<{ housing: any[]; schools: any[]; movers: any[] }> => {
     const response = await api.get('/api/employee/recommendations');
     return response.data;
+  },
+  getPolicyCaps: async (): Promise<{
+    housing_monthly_usd: number;
+    movers_usd: number;
+    schools_usd: number;
+    immigration_usd: number;
+  }> => {
+    const response = await api.get('/api/employee/policy/caps');
+    return response.data;
+  },
+  getApplicablePolicy: async (assignmentId?: string): Promise<{
+    policy: Record<string, unknown> | null;
+    allowedBenefits: Array<Record<string, unknown>>;
+    wizardCriteria: Record<string, unknown>;
+    employeeBand?: string;
+    assignmentType?: string;
+  }> => {
+    const params = assignmentId ? { assignmentId } : {};
+    const response = await api.get('/api/employee/policy/applicable', { params });
+    return response.data;
+  },
+};
+
+export const hrPolicyAPI = {
+  list: async (params?: { status?: string; companyEntity?: string }): Promise<{ policies: any[] }> => {
+    const response = await api.get('/api/hr/policies', { params: params || {} });
+    return response.data;
+  },
+  get: async (policyId: string): Promise<any> => {
+    const response = await api.get(`/api/hr/policies/${policyId}`);
+    return response.data;
+  },
+  create: async (policy: Record<string, unknown>): Promise<{ policyId: string; policy: any }> => {
+    const response = await api.post('/api/hr/policies', policy);
+    return response.data;
+  },
+  update: async (policyId: string, policy: Record<string, unknown>): Promise<any> => {
+    const response = await api.put(`/api/hr/policies/${policyId}`, policy);
+    return response.data;
+  },
+  upload: async (file: File): Promise<{ policyId: string; policy: any }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/api/hr/policies/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  delete: async (policyId: string): Promise<void> => {
+    await api.delete(`/api/hr/policies/${policyId}`);
   },
 };
 
