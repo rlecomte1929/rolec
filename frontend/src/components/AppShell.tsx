@@ -78,8 +78,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             <button
               onClick={async () => {
                 await authAPI.logout();
-                clearAuthItems();
-                window.location.href = buildRoute('landing');
+                window.location.replace(buildRoute('landing'));
               }}
               className="text-xs text-[#94a3b8] hover:text-[#0b2b43]"
             >

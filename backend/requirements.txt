@@ -10,3 +10,4 @@ python-jose==3.3.0
 passlib==1.7.4
 python-dateutil==2.8.2
 PyYAML>=6.0
+supabase==2.5.1

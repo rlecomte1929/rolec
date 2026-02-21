@@ -91,11 +91,17 @@ export const authAPI = {
     return response.data;
   },
   logout: async (): Promise<void> => {
+    const token = getAuthItem('relopass_token');
     try {
-      await api.post('/api/auth/logout');
+      await api.post(
+        '/api/auth/logout',
+        null,
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+      );
     } catch {
       // Ignore — client will clear session anyway
     }
+    clearAuthItems();
   },
 };
 

@@ -40,6 +40,8 @@ from .app import crud as app_crud
 from .app.seed import seed_demo_cases
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
+from .routes import relocation as relocation_router
+from .routes import compat as compat_router
 from .app.recommendations.router import router as recommendations_router
 from pydantic import BaseModel as _BaseModel
 
@@ -93,9 +95,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(compat_router.router)
 app.include_router(cases_router.router)
 app.include_router(admin_router.router)
 app.include_router(recommendations_router)
+app.include_router(relocation_router.router)
+app.include_router(relocation_router.api_router)
 
 # ---------------------------------------------------------------------------
 # Global exception handler: log unhandled errors

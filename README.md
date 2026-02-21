@@ -323,7 +323,14 @@ Local dev uses `frontend/.env.development` (auto-loaded by Vite):
 VITE_API_URL=http://localhost:8000
 ```
 
-No backend env vars are needed for local development — CORS defaults include localhost origins.
+Backend env vars for Supabase-backed features:
+
+```
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+```
+
+No backend env vars are needed for local development unless using Supabase features — CORS defaults include localhost origins.
 
 ---
 
@@ -357,6 +364,8 @@ VITE_API_URL = https://api.relopass.com
 
 ```
 CORS_ORIGINS = https://relopass.com,https://www.relopass.com
+SUPABASE_URL = https://your-project.supabase.co
+SUPABASE_ANON_KEY = your-anon-key
 ```
 
 ### Verify Deployment
