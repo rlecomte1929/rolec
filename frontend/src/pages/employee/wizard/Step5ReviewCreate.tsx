@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Card, Alert } from '../../../components/antigravity';
 import type { CaseDraftDTO, CaseRequirementsDTO, RequirementItemDTO } from '../../../types';
 import { createCase } from '../../../api/cases';
@@ -16,6 +17,7 @@ interface StepProps {
 }
 
 export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
+  const navigate = useNavigate();
   const [requirements, setRequirements] = useState<CaseRequirementsDTO | null>(null);
   const [created, setCreated] = useState(false);
   const [error, setError] = useState('');
@@ -123,7 +125,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
       {localStorage.getItem('demo_role') === 'admin' && (
         <button
           className="mt-3 text-xs text-[#0b2b43] underline"
-          onClick={() => (window.location.href = '/admin/countries')}
+          onClick={() => navigate('/admin/countries')}
         >
           View Country Requirements DB
         </button>
@@ -145,7 +147,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
             {isCreating ? 'Submitting...' : 'Submit to HR for review'}
           </Button>
         ) : (
-          <Button onClick={() => (window.location.href = '/employee/dashboard')}>Go to dashboard</Button>
+          <Button onClick={() => navigate('/employee/dashboard')}>Go to dashboard</Button>
         )}
       </div>
     </Card>

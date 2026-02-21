@@ -1,6 +1,14 @@
 import { API_BASE_URL } from './client';
 import { supabase } from './supabase';
-import type { RelocationCase, RelocationCaseListItem, RelocationRun, RequirementItemDTO, CaseRequirementsDTO } from '../types';
+import type {
+  RelocationCase,
+  RelocationCaseListItem,
+  RelocationRun,
+  RequirementItemDTO,
+  CaseRequirementsDTO,
+  CaseClassification,
+  NextAction,
+} from '../types';
 
 const missingFieldLabels: Record<string, string> = {
   origin_country: 'Origin country',
@@ -46,6 +54,27 @@ const apiFetch = async <T>(path: string): Promise<T> => {
   return res.json() as Promise<T>;
 };
 
+const apiPost = async <T>(path: string): Promise<T> => {
+  const token = await getSessionToken();
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error('Not authenticated');
+    }
+    if (res.status === 404) {
+      throw new Error('Not found');
+    }
+    throw new Error('Unable to reach the server. Please check your connection and try again.');
+  }
+  return res.json() as Promise<T>;
+};
+
 export const listRelocationCases = async (): Promise<RelocationCaseListItem[]> => {
   return apiFetch<RelocationCaseListItem[]>('/api/relocation/cases');
 };
@@ -56,6 +85,30 @@ export const getRelocationCase = async (caseId: string): Promise<RelocationCase>
 
 export const getRelocationRuns = async (caseId: string): Promise<RelocationRun[]> => {
   return apiFetch<RelocationRun[]>(`/api/relocation/case/${caseId}/runs`);
+};
+
+export const classifyRelocationCase = async (
+  caseId: string
+): Promise<{ case_id: string; classification: CaseClassification }> => {
+  return apiPost<{ case_id: string; classification: CaseClassification }>(
+    `/api/relocation/case/${caseId}/classify`
+  );
+};
+
+export const getRelocationCaseClassification = async (
+  caseId: string
+): Promise<{ case_id: string; classification: CaseClassification; version: number; created_at: string }> => {
+  return apiFetch<{ case_id: string; classification: CaseClassification; version: number; created_at: string }>(
+    `/api/relocation/case/${caseId}/classification`
+  );
+};
+
+export const buildNextActionsFromMissingFields = (missingFields: string[]): NextAction[] => {
+  return missingFields.map((field) => ({
+    key: `collect_${field}`,
+    label: `Add your ${(missingFieldLabels[field] || toTitleCase(field)).toLowerCase()}`,
+    priority: 'high',
+  }));
 };
 
 export const buildRequirementsFromMissingFields = (caseId: string, missingFields: string[]): CaseRequirementsDTO => {

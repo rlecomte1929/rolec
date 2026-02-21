@@ -42,6 +42,7 @@ from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
 from .routes import relocation as relocation_router
 from .routes import compat as compat_router
+from .routes import relocation_classify as relocation_classify_router
 from .app.recommendations.router import router as recommendations_router
 from pydantic import BaseModel as _BaseModel
 
@@ -101,6 +102,7 @@ app.include_router(admin_router.router)
 app.include_router(recommendations_router)
 app.include_router(relocation_router.router)
 app.include_router(relocation_router.api_router)
+app.include_router(relocation_classify_router.router)
 
 # ---------------------------------------------------------------------------
 # Global exception handler: log unhandled errors

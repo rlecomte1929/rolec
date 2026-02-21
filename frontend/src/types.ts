@@ -408,6 +408,21 @@ export interface RelocationRun {
   model_name?: string | null;
 }
 
+export type NextActionPriority = 'high' | 'medium' | 'low';
+
+export interface NextAction {
+  key: string;
+  label: string;
+  priority: NextActionPriority;
+}
+
+export interface CaseClassification {
+  case_type: 'employee_sponsored' | 'remote_worker' | 'student' | 'self_employed' | 'unknown';
+  risk_flags: string[];
+  blockers: string[];
+  next_actions: NextAction[];
+}
+
 export interface RelocationProfile {
   userId?: string;
   familySize: number;

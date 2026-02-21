@@ -4,11 +4,11 @@ import { ROUTES } from '../../routes';
 import { CaseContextBar } from '../../components/case/CaseContextBar';
 import { WizardSidebar } from '../../components/case/WizardSidebar';
 import { Card } from '../../components/antigravity';
-import { patchCase, startResearch } from '../../api/cases';
-import { getRelocationCase } from '../../api/relocation';
+import { getCase, patchCase, startResearch } from '../../api/cases';
+import { buildNextActionsFromMissingFields, classifyRelocationCase, getRelocationCase } from '../../api/relocation';
 import { employeeAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
-import type { AssignmentStatus, CaseDTO, CaseDraftDTO } from '../../types';
+import type { AssignmentStatus, CaseDTO, CaseDraftDTO, NextAction } from '../../types';
 import { Step1RelocationBasics } from './wizard/Step1RelocationBasics';
 import { Step2EmployeeProfile } from './wizard/Step2EmployeeProfile';
 import { Step3FamilyMembers } from './wizard/Step3FamilyMembers';
@@ -38,6 +38,8 @@ export const CaseWizardPage: React.FC = () => {
   const [draft, setDraft] = useState<CaseDraftDTO>(() => buildDefaultDraft());
   const [caseData, setCaseData] = useState<CaseDTO | null>(null);
   const [requiredFields, setRequiredFields] = useState<string[]>([]);
+  const [nextActions, setNextActions] = useState<NextAction[]>([]);
+  const [isClassifying, setIsClassifying] = useState(false);
   const [banner, setBanner] = useState('');
   const [error, setError] = useState('');
   const [assignmentStatus, setAssignmentStatus] = useState<AssignmentStatus | null>(null);
@@ -90,20 +92,26 @@ export const CaseWizardPage: React.FC = () => {
   const loadCase = async () => {
     if (!caseId) return;
     try {
-      const relocation = await getRelocationCase(caseId);
-      setCaseData({
-        id: relocation.id,
-        status: relocation.status || 'DRAFT',
-        draft: buildDefaultDraft(),
-        createdAt: relocation.created_at || new Date().toISOString(),
-        updatedAt: relocation.updated_at || new Date().toISOString(),
-        originCountry: relocation.home_country || undefined,
-        destCountry: relocation.host_country || undefined,
-      });
-      setDraft(buildDefaultDraft());
+      const data = await getCase(caseId);
+      setCaseData(data);
+      setDraft(data.draft || buildDefaultDraft());
     } catch {
-      setCaseData(null);
-      setDraft(buildDefaultDraft());
+      try {
+        const relocation = await getRelocationCase(caseId);
+        setCaseData({
+          id: relocation.id,
+          status: relocation.status || 'DRAFT',
+          draft: buildDefaultDraft(),
+          createdAt: relocation.created_at || new Date().toISOString(),
+          updatedAt: relocation.updated_at || new Date().toISOString(),
+          originCountry: relocation.home_country || undefined,
+          destCountry: relocation.host_country || undefined,
+        });
+        setDraft(buildDefaultDraft());
+      } catch {
+        setCaseData(null);
+        setDraft(buildDefaultDraft());
+      }
     }
   };
 
@@ -111,9 +119,12 @@ export const CaseWizardPage: React.FC = () => {
     if (!caseId) return;
     try {
       const relocation = await getRelocationCase(caseId);
-      setRequiredFields(relocation.missing_fields || []);
+      const missing = relocation.missing_fields || [];
+      setRequiredFields(missing);
+      setNextActions(buildNextActionsFromMissingFields(missing));
     } catch {
       setRequiredFields([]);
+      setNextActions([]);
     }
   };
 
@@ -203,6 +214,19 @@ export const CaseWizardPage: React.FC = () => {
     navigate(`/employee/case/${caseId}/wizard/${currentStep - 1}`);
   };
 
+  const handleClassify = async () => {
+    if (!caseId) return;
+    setIsClassifying(true);
+    try {
+      const res = await classifyRelocationCase(caseId);
+      setNextActions(res.classification.next_actions || []);
+    } catch (err: any) {
+      setError(err?.message || 'Unable to generate next steps.');
+    } finally {
+      setIsClassifying(false);
+    }
+  };
+
   const stepProps = {
     caseId: caseId || '',
     draft,
@@ -281,6 +305,39 @@ export const CaseWizardPage: React.FC = () => {
           targetDate={draft.relocationBasics.targetMoveDate}
           stage={`Step ${currentStep} of 5`}
         />
+        {(requiredFields.length > 0 || nextActions.length > 0) && (
+          <Card padding="md">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[#0b2b43]">Next actions</div>
+                <div className="text-xs text-[#6b7280]">
+                  Complete these items to keep your case moving.
+                </div>
+              </div>
+              <button
+                onClick={handleClassify}
+                disabled={isClassifying}
+                className="rounded-full border border-[#0b2b43] px-3 py-1 text-xs font-semibold text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white disabled:opacity-60"
+              >
+                {isClassifying ? 'Generating...' : 'Generate next steps'}
+              </button>
+            </div>
+            <ul className="mt-3 space-y-2 text-sm text-[#1f2937]">
+              {nextActions.length > 0 ? (
+                nextActions.map((action) => (
+                  <li key={action.key} className="flex items-center justify-between">
+                    <span>{action.label}</span>
+                    <span className="text-[11px] uppercase tracking-wide text-[#6b7280]">
+                      {action.priority}
+                    </span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-xs text-[#6b7280]">No next actions yet.</li>
+              )}
+            </ul>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[260px,1fr] gap-6">
           <div className="space-y-6">
