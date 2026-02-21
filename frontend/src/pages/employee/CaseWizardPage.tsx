@@ -4,7 +4,8 @@ import { ROUTES } from '../../routes';
 import { CaseContextBar } from '../../components/case/CaseContextBar';
 import { WizardSidebar } from '../../components/case/WizardSidebar';
 import { Card } from '../../components/antigravity';
-import { getCase, getRequirements, patchCase, startResearch } from '../../api/cases';
+import { patchCase, startResearch } from '../../api/cases';
+import { getRelocationCase } from '../../api/relocation';
 import { employeeAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
 import type { AssignmentStatus, CaseDTO, CaseDraftDTO } from '../../types';
@@ -89,27 +90,28 @@ export const CaseWizardPage: React.FC = () => {
   const loadCase = async () => {
     if (!caseId) return;
     try {
-      const data = await getCase(caseId);
-      setCaseData(data);
-      setDraft(data.draft || buildDefaultDraft());
+      const relocation = await getRelocationCase(caseId);
+      setCaseData({
+        id: relocation.id,
+        status: relocation.status || 'DRAFT',
+        draft: buildDefaultDraft(),
+        createdAt: relocation.created_at || new Date().toISOString(),
+        updatedAt: relocation.updated_at || new Date().toISOString(),
+        originCountry: relocation.home_country || undefined,
+        destCountry: relocation.host_country || undefined,
+      });
+      setDraft(buildDefaultDraft());
     } catch {
-      try {
-        const initialDraft = buildDefaultDraft();
-        const data = await patchCase(caseId, initialDraft);
-        setCaseData(data);
-        setDraft(data.draft || initialDraft);
-      } catch (err: any) {
-        setError(err?.message || 'Unable to load or create your case. Please try again.');
-      }
+      setCaseData(null);
+      setDraft(buildDefaultDraft());
     }
   };
 
   const loadRequirements = async () => {
     if (!caseId) return;
     try {
-      const data = await getRequirements(caseId);
-      const fields = data.requirements.flatMap((req) => req.requiredFields);
-      setRequiredFields(fields);
+      const relocation = await getRelocationCase(caseId);
+      setRequiredFields(relocation.missing_fields || []);
     } catch {
       setRequiredFields([]);
     }

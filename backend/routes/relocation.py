@@ -185,30 +185,70 @@ def _get_supabase_client_from_header(authorization: Optional[str]):
     return client, user_jwt
 
 
+def _safe_parse_profile(profile_json: Optional[str]) -> Dict[str, Any]:
+    if not profile_json:
+        return {}
+    try:
+        parsed = json.loads(profile_json)
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
 @api_router.get("/cases")
 def list_relocation_cases(authorization: Optional[str] = Header(None)):
     client, _ = _get_supabase_client_from_header(authorization)
-    result = client.table("relocation_cases").select("*").order("updated_at", desc=True).execute()
+    result = (
+        client.table("relocation_cases")
+        .select(
+            "id,status,stage,home_country,host_country,created_at,updated_at,employee_id,hr_user_id,company_id"
+        )
+        .order("updated_at", desc=True)
+        .execute()
+    )
     if result.error:
         message = getattr(result.error, "message", str(result.error))
         if _is_permission_error(message):
-            raise HTTPException(status_code=403, detail="Forbidden")
+            raise HTTPException(status_code=404, detail="Not found")
         raise HTTPException(status_code=500, detail="Supabase error")
-    return {"cases": result.data or []}
+    return result.data or []
 
 
 @api_router.get("/case/{case_id}")
 def get_relocation_case(case_id: str, authorization: Optional[str] = Header(None)):
     client, _ = _get_supabase_client_from_header(authorization)
-    result = client.table("relocation_cases").select("*").eq("id", case_id).execute()
+    result = (
+        client.table("relocation_cases")
+        .select(
+            "id,status,stage,home_country,host_country,profile_json,created_at,updated_at"
+        )
+        .eq("id", case_id)
+        .execute()
+    )
     if result.error:
         message = getattr(result.error, "message", str(result.error))
         if _is_permission_error(message):
-            raise HTTPException(status_code=403, detail="Forbidden")
+            raise HTTPException(status_code=404, detail="Not found")
         raise HTTPException(status_code=500, detail="Supabase error")
     if not result.data:
         raise HTTPException(status_code=404, detail="Case not found")
-    return {"case": result.data[0]}
+
+    row = result.data[0] or {}
+    profile = _safe_parse_profile(row.get("profile_json"))
+    missing_fields = compute_missing_fields(profile)
+    stage = row.get("stage") or ("incomplete" if missing_fields else "complete")
+
+    return {
+        "id": row.get("id"),
+        "status": row.get("status"),
+        "stage": stage,
+        "home_country": row.get("home_country"),
+        "host_country": row.get("host_country"),
+        "profile": profile,
+        "missing_fields": missing_fields,
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+    }
 
 
 @api_router.get("/case/{case_id}/runs")
@@ -216,7 +256,7 @@ def list_relocation_runs(case_id: str, authorization: Optional[str] = Header(Non
     client, _ = _get_supabase_client_from_header(authorization)
     result = (
         client.table("relocation_runs")
-        .select("*")
+        .select("id,created_at,run_type,input_payload,output_payload,error,model_provider,model_name")
         .eq("case_id", case_id)
         .order("created_at", desc=True)
         .execute()
@@ -224,9 +264,9 @@ def list_relocation_runs(case_id: str, authorization: Optional[str] = Header(Non
     if result.error:
         message = getattr(result.error, "message", str(result.error))
         if _is_permission_error(message):
-            raise HTTPException(status_code=403, detail="Forbidden")
+            raise HTTPException(status_code=404, detail="Not found")
         raise HTTPException(status_code=500, detail="Supabase error")
-    return {"runs": result.data or []}
+    return result.data or []
 
 
 router.add_api_route(

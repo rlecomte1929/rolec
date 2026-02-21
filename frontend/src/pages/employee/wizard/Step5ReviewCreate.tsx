@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Card, Alert } from '../../../components/antigravity';
 import type { CaseDraftDTO, CaseRequirementsDTO, RequirementItemDTO } from '../../../types';
-import { createCase, getRequirements } from '../../../api/cases';
+import { createCase } from '../../../api/cases';
+import { buildRequirementsFromMissingFields, getRelocationCase } from '../../../api/relocation';
 import { RequirementList } from '../../../components/requirements/RequirementList';
 import { employeeAPI } from '../../../api/client';
 
@@ -23,7 +24,11 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
 
   useEffect(() => {
     if (!caseId) return;
-    getRequirements(caseId).then(setRequirements);
+    getRelocationCase(caseId)
+      .then((relocation) =>
+        setRequirements(buildRequirementsFromMissingFields(caseId, relocation.missing_fields || []))
+      )
+      .catch(() => setRequirements(null));
   }, [caseId]);
 
   const grouped = requirements?.requirements.reduce<Record<string, RequirementItemDTO[]>>((acc, item) => {

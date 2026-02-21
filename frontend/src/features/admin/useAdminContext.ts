@@ -10,7 +10,9 @@ export const useAdminContext = () => {
   const refresh = async () => {
     setLoading(true);
     const token = getAuthItem('relopass_token');
-    if (!token) {
+    const role = getAuthItem('relopass_role');
+    const isPrivileged = role === 'ADMIN' || role === 'HR';
+    if (!token || !isPrivileged) {
       setContext(null);
       setLoading(false);
       return;

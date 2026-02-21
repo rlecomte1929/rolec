@@ -372,6 +372,42 @@ export interface CaseRequirementsDTO {
   sources: SourceRecordDTO[];
 }
 
+export interface RelocationCaseListItem {
+  id: string;
+  status?: string | null;
+  stage?: string | null;
+  home_country?: string | null;
+  host_country?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  employee_id?: string | null;
+  hr_user_id?: string | null;
+  company_id?: string | null;
+}
+
+export interface RelocationCase {
+  id: string;
+  status?: string | null;
+  stage?: string | null;
+  home_country?: string | null;
+  host_country?: string | null;
+  profile: Record<string, unknown>;
+  missing_fields: string[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RelocationRun {
+  id: string;
+  created_at: string;
+  run_type: string;
+  input_payload: Record<string, unknown>;
+  output_payload: Record<string, unknown>;
+  error?: string | null;
+  model_provider?: string | null;
+  model_name?: string | null;
+}
+
 export interface RelocationProfile {
   userId?: string;
   familySize: number;
