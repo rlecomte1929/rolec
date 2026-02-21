@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Container } from './antigravity';
-import { clearAuthItems, getAuthItem } from '../utils/demo';
+import { getAuthItem } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { getNavigationError } from '../navigation/safeNavigate';
 import { buildRoute, ROUTE_DEFS } from '../navigation/routes';
