@@ -542,6 +542,9 @@ export interface AdminCompany {
   name: string;
   country?: string;
   size_band?: string;
+  address?: string;
+  phone?: string;
+  hr_contact?: string;
   created_at: string;
 }
 
