@@ -1984,6 +1984,13 @@ def _build_employee_journey_payload(
     if not profile:
         profile = RelocationProfile(userId=assignment_id).model_dump()
         db.save_employee_profile(assignment_id, profile)
+    else:
+        # Normalize profile fields before validation (legacy wizard can store Title Case).
+        marital = profile.get("maritalStatus")
+        if isinstance(marital, str):
+            normalized = marital.strip().lower()
+            allowed = {"married", "single", "divorced", "widowed"}
+            profile["maritalStatus"] = normalized if normalized in allowed else marital
     answers = db.get_employee_answers(assignment_id)
     answered_question_ids = set(ans["question_id"] for ans in answers)
 
