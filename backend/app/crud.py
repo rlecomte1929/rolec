@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
@@ -30,12 +30,38 @@ def update_case(db: Session, case: models.Case, draft: Dict[str, Any], derived: 
     case.dest_country = derived.get("dest_country")
     case.dest_city = derived.get("dest_city")
     case.purpose = derived.get("purpose")
-    case.target_move_date = derived.get("target_move_date")
+    case.target_move_date = _parse_date(derived.get("target_move_date"))
     case.flags_json = json.dumps(flags)
     case.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(case)
     return case
+
+
+def _parse_date(value: Any) -> Optional[date]:
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str) and value.strip():
+        raw = value.strip()
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            pass
+        # Fallbacks for common UI formats: DD.MM.YYYY or DD/MM/YYYY
+        try:
+            if len(raw) == 10 and raw[2] in (".", "/") and raw[5] in (".", "/"):
+                d1, d2, y = raw[:2], raw[3:5], raw[6:]
+                day = int(d1)
+                month = int(d2)
+                year = int(y)
+                # If month looks invalid, swap
+                if month > 12 and day <= 12:
+                    day, month = month, day
+                return date(year, month, day)
+        except Exception:
+            return None
+        return None
+    return None
 
 
 def list_country_profiles(db: Session) -> List[models.CountryProfile]:

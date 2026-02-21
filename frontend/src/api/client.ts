@@ -176,6 +176,18 @@ export const hrAPI = {
     const response = await api.post(`/api/hr/cases/${caseId}/policy/exceptions`, payload);
     return response.data;
   },
+  getCompanyProfile: async (): Promise<{ company: any | null }> => {
+    const response = await api.get('/api/hr/company-profile');
+    return response.data;
+  },
+  saveCompanyProfile: async (payload: { name: string; country?: string; size_band?: string; address?: string; phone?: string; hr_contact?: string }): Promise<any> => {
+    const response = await api.post('/api/hr/company-profile', payload);
+    return response.data;
+  },
+  listMessages: async (): Promise<{ messages: any[] }> => {
+    const response = await api.get('/api/hr/messages');
+    return response.data;
+  },
   getCaseCompliance: async (caseId: string): Promise<ComplianceCaseReport> => {
     const response = await api.get(`/api/hr/cases/${caseId}/compliance`);
     return response.data;
@@ -276,6 +288,10 @@ export const adminAPI = {
 export const employeeAPI = {
   getCurrentAssignment: async (): Promise<{ assignment: any }> => {
     const response = await api.get('/api/employee/assignments/current');
+    return response.data;
+  },
+  listMessages: async (): Promise<{ messages: any[] }> => {
+    const response = await api.get('/api/employee/messages');
     return response.data;
   },
   claimAssignment: async (assignmentId: string, email: string): Promise<any> => {

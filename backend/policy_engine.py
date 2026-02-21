@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import json
 import os
 
 
 class PolicyEngine:
-    def __init__(self, policy_path: str | None = None):
+    def __init__(self, policy_path: Optional[str] = None):
         if policy_path:
             self.policy_path = policy_path
         else:
@@ -76,7 +76,7 @@ class PolicyEngine:
         policy: Dict[str, Any],
         spend: Dict[str, Any],
         exceptions: List[Dict[str, Any]],
-        assignment_status: str | None = None,
+        assignment_status: Optional[str] = None,
     ) -> Dict[str, Any]:
         checks: List[Dict[str, Any]] = []
         conflicts: List[Dict[str, Any]] = []
@@ -205,7 +205,7 @@ class PolicyEngine:
         return self._check(check_id, f"{label} status unknown", "WARN", "MED", "LOW", owner,
                            f"{label} status not provided.", [label], ["Ask Employee"])
 
-    def _passport_validity_check(self, expiry: date | None, target: date | None) -> Dict[str, Any]:
+    def _passport_validity_check(self, expiry: Optional[date], target: Optional[date]) -> Dict[str, Any]:
         if not expiry or not target:
             return self._check(
                 "passport_validity",
@@ -242,7 +242,7 @@ class PolicyEngine:
             []
         )
 
-    def _lead_time_check(self, planned: date | None, min_days: int) -> Dict[str, Any]:
+    def _lead_time_check(self, planned: Optional[date], min_days: int) -> Dict[str, Any]:
         if not planned:
             return self._check(
                 "lead_time",
@@ -386,7 +386,7 @@ class PolicyEngine:
             return "Approved"
         return "Intake/In Progress"
 
-    def _parse_date(self, value: Any) -> date | None:
+    def _parse_date(self, value: Any) -> Optional[date]:
         if not value:
             return None
         try:

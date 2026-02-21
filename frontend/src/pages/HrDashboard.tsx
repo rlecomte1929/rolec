@@ -73,6 +73,16 @@ export const HrDashboard: React.FC = () => {
     loadAssignments();
   }, []);
 
+  useEffect(() => {
+    hrAPI.getCompanyProfile()
+      .then((res) => {
+        if (!res.company) {
+          safeNavigate(navigate, 'hrCompanyProfile');
+        }
+      })
+      .catch(() => undefined);
+  }, [navigate]);
+
   useRegisterNav('HrDashboard', [
     { label: 'Case Summary', routeKey: 'hrCaseSummary' },
     { label: 'Compliance', routeKey: 'hrCompliance' },

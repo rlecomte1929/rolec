@@ -241,6 +241,9 @@ class Database:
                     name TEXT NOT NULL,
                     country TEXT,
                     size_band TEXT,
+                    address TEXT,
+                    phone TEXT,
+                    hr_contact TEXT,
                     created_at TEXT NOT NULL
                 )
             """))
@@ -297,6 +300,19 @@ class Database:
             """))
 
             conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS messages (
+                    id TEXT PRIMARY KEY,
+                    assignment_id TEXT,
+                    hr_user_id TEXT,
+                    employee_identifier TEXT,
+                    subject TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'draft',
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS admin_sessions (
                     token TEXT PRIMARY KEY,
                     actor_user_id TEXT NOT NULL,
@@ -321,6 +337,14 @@ class Database:
 
             # Best-effort schema extensions for relocation_cases
             if _is_sqlite:
+                cols = conn.execute(text("PRAGMA table_info(companies)")).fetchall()
+                col_names = {r[1] for r in cols}
+                if "address" not in col_names:
+                    conn.execute(text("ALTER TABLE companies ADD COLUMN address TEXT"))
+                if "phone" not in col_names:
+                    conn.execute(text("ALTER TABLE companies ADD COLUMN phone TEXT"))
+                if "hr_contact" not in col_names:
+                    conn.execute(text("ALTER TABLE companies ADD COLUMN hr_contact TEXT"))
                 cols = conn.execute(text("PRAGMA table_info(relocation_cases)")).fetchall()
                 col_names = {r[1] for r in cols}
                 if "company_id" not in col_names:
@@ -336,6 +360,9 @@ class Database:
                 if "home_country" not in col_names:
                     conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN home_country TEXT"))
             else:
+                conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS address TEXT"))
+                conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS phone TEXT"))
+                conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS hr_contact TEXT"))
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS company_id TEXT"))
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS employee_id TEXT"))
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS status TEXT"))
@@ -850,16 +877,27 @@ class Database:
                 text("SELECT 1 FROM profiles WHERE id = :id"), {"id": user_id}
             ).fetchone()
             if existing:
-                conn.execute(text(
-                    "UPDATE profiles SET role = :role, email = :email, full_name = :full_name, company_id = :company_id "
-                    "WHERE id = :id"
-                ), {
-                    "id": user_id,
-                    "role": role,
-                    "email": (email or "").strip().lower() if email else None,
-                    "full_name": full_name,
-                    "company_id": company_id,
-                })
+                if company_id is None:
+                    conn.execute(text(
+                        "UPDATE profiles SET role = :role, email = :email, full_name = :full_name "
+                        "WHERE id = :id"
+                    ), {
+                        "id": user_id,
+                        "role": role,
+                        "email": (email or "").strip().lower() if email else None,
+                        "full_name": full_name,
+                    })
+                else:
+                    conn.execute(text(
+                        "UPDATE profiles SET role = :role, email = :email, full_name = :full_name, company_id = :company_id "
+                        "WHERE id = :id"
+                    ), {
+                        "id": user_id,
+                        "role": role,
+                        "email": (email or "").strip().lower() if email else None,
+                        "full_name": full_name,
+                        "company_id": company_id,
+                    })
             else:
                 conn.execute(text(
                     "INSERT INTO profiles (id, role, email, full_name, company_id, created_at) "
@@ -877,6 +915,18 @@ class Database:
         with self.engine.connect() as conn:
             row = conn.execute(text("SELECT * FROM profiles WHERE id = :id"), {"id": user_id}).fetchone()
         return self._row_to_dict(row)
+
+    def set_profile_company(self, user_id: str, company_id: str) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE profiles SET company_id = :cid WHERE id = :id"
+            ), {"cid": company_id, "id": user_id})
+
+    def get_company_for_user(self, user_id: str) -> Optional[Dict[str, Any]]:
+        profile = self.get_profile_record(user_id)
+        if not profile or not profile.get("company_id"):
+            return None
+        return self.get_company(profile["company_id"])
 
     def list_profiles(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
         q = (query or "").strip().lower()
@@ -952,14 +1002,33 @@ class Database:
             row = conn.execute(text("SELECT * FROM companies WHERE id = :id"), {"id": company_id}).fetchone()
         return self._row_to_dict(row)
 
-    def create_company(self, company_id: str, name: str, country: Optional[str], size_band: Optional[str]) -> None:
+    def create_company(
+        self,
+        company_id: str,
+        name: str,
+        country: Optional[str],
+        size_band: Optional[str],
+        address: Optional[str] = None,
+        phone: Optional[str] = None,
+        hr_contact: Optional[str] = None,
+    ) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             conn.execute(text(
-                "INSERT INTO companies (id, name, country, size_band, created_at) "
-                "VALUES (:id, :name, :country, :size_band, :created_at) "
-                "ON CONFLICT(id) DO UPDATE SET name = excluded.name, country = excluded.country, size_band = excluded.size_band"
-            ), {"id": company_id, "name": name, "country": country, "size_band": size_band, "created_at": now})
+                "INSERT INTO companies (id, name, country, size_band, address, phone, hr_contact, created_at) "
+                "VALUES (:id, :name, :country, :size_band, :address, :phone, :hr_contact, :created_at) "
+                "ON CONFLICT(id) DO UPDATE SET name = excluded.name, country = excluded.country, size_band = excluded.size_band, "
+                "address = excluded.address, phone = excluded.phone, hr_contact = excluded.hr_contact"
+            ), {
+                "id": company_id,
+                "name": name,
+                "country": country,
+                "size_band": size_band,
+                "address": address,
+                "phone": phone,
+                "hr_contact": hr_contact,
+                "created_at": now,
+            })
 
     def create_employee(
         self,
@@ -1150,6 +1219,49 @@ class Database:
             ), {"sid": support_case_id}).fetchall()
         return self._rows_to_list(rows)
 
+    def create_message(
+        self,
+        message_id: str,
+        assignment_id: Optional[str],
+        hr_user_id: Optional[str],
+        employee_identifier: Optional[str],
+        subject: str,
+        body: str,
+        status: str = "draft",
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO messages (id, assignment_id, hr_user_id, employee_identifier, subject, body, status, created_at) "
+                "VALUES (:id, :aid, :hr, :emp, :sub, :body, :status, :created_at)"
+            ), {
+                "id": message_id,
+                "aid": assignment_id,
+                "hr": hr_user_id,
+                "emp": employee_identifier,
+                "sub": subject,
+                "body": body,
+                "status": status,
+                "created_at": now,
+            })
+
+    def list_messages_for_hr(self, hr_user_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM messages WHERE hr_user_id = :hr ORDER BY created_at DESC"
+            ), {"hr": hr_user_id}).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_messages_for_employee(self, employee_user_id: str) -> List[Dict[str, Any]]:
+        assignment = self.get_assignment_for_employee(employee_user_id)
+        if not assignment:
+            return []
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM messages WHERE assignment_id = :aid ORDER BY created_at DESC"
+            ), {"aid": assignment["id"]}).fetchall()
+        return self._rows_to_list(rows)
+
     def set_admin_session(self, token: str, actor_user_id: str, target_user_id: str, mode: str) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
@@ -1191,6 +1303,70 @@ class Database:
                 "uid": created_by_user_id,
                 "created_at": now,
             })
+
+    def purge_inactive_cases(self, active_statuses: List[str]) -> Dict[str, int]:
+        """Remove inactive case/assignment data and related records."""
+        status_list = [s for s in active_statuses if s]
+        if not status_list:
+            return {"assignments_deleted": 0, "relocation_cases_deleted": 0}
+
+        placeholders = ", ".join([f":s{i}" for i in range(len(status_list))])
+        params = {f"s{i}": status_list[i] for i in range(len(status_list))}
+
+        with self.engine.begin() as conn:
+            # Collect assignments to delete
+            rows = conn.execute(text(
+                f"SELECT id FROM case_assignments WHERE status NOT IN ({placeholders})"
+            ), params).fetchall()
+            assignment_ids = [r._mapping["id"] for r in rows]
+
+            if assignment_ids:
+                id_placeholders = ", ".join([f":a{i}" for i in range(len(assignment_ids))])
+                id_params = {f"a{i}": assignment_ids[i] for i in range(len(assignment_ids))}
+
+                conn.execute(text(
+                    f"DELETE FROM employee_profiles WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM employee_answers WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM compliance_reports WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM compliance_runs WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM policy_exceptions WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+                conn.execute(text(
+                    f"DELETE FROM compliance_actions WHERE assignment_id IN ({id_placeholders})"
+                ), id_params)
+
+                conn.execute(text(
+                    f"DELETE FROM assignment_invites WHERE case_id IN (SELECT case_id FROM case_assignments WHERE id IN ({id_placeholders}))"
+                ), id_params)
+
+                conn.execute(text(
+                    f"DELETE FROM case_assignments WHERE id IN ({id_placeholders})"
+                ), id_params)
+
+            # Purge relocation_cases not active
+            rows_cases = conn.execute(text(
+                f"SELECT id FROM relocation_cases WHERE status NOT IN ({placeholders})"
+            ), params).fetchall()
+            case_ids = [r._mapping["id"] for r in rows_cases]
+            if case_ids:
+                case_placeholders = ", ".join([f":c{i}" for i in range(len(case_ids))])
+                case_params = {f"c{i}": case_ids[i] for i in range(len(case_ids))}
+                conn.execute(text(
+                    f"DELETE FROM relocation_cases WHERE id IN ({case_placeholders})"
+                ), case_params)
+
+        return {
+            "assignments_deleted": len(assignment_ids),
+            "relocation_cases_deleted": len(case_ids),
+        }
 
     # ==================================================================
     # HR Policies (full policy spec)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 
 def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, Any]]) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
@@ -72,7 +72,7 @@ def apply_rules(case_draft: Dict[str, Any], base_requirements: List[Dict[str, An
     return required_fields, expanded, flags
 
 
-def _child_age(date_str: str | None) -> int:
+def _child_age(date_str: Optional[str]) -> int:
     if not date_str:
         return 0
     try:

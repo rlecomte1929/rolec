@@ -29,6 +29,8 @@ import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { ProvidersPage } from './pages/ProvidersPage';
 import { DebugAuth } from './pages/DebugAuth';
+import { Messages } from './pages/Messages';
+import { HrCompanyProfile } from './pages/HrCompanyProfile';
 
 function App() {
   return (
@@ -70,7 +72,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminSupport.path} element={<AdminSupport />} />
         <Route
           path={ROUTE_DEFS.messages.path}
-          element={<PlaceholderPage title="Messages" description="Review case communications and updates." />}
+          element={<Messages />}
         />
         <Route
           path={ROUTE_DEFS.resources.path}
@@ -78,12 +80,13 @@ function App() {
         />
         <Route
           path={ROUTE_DEFS.hrMessages.path}
-          element={<PlaceholderPage title="Messages" description="Review HR case communications and updates." />}
+          element={<Messages />}
         />
         <Route
           path={ROUTE_DEFS.hrResources.path}
           element={<PlaceholderPage title="Resources" description="Access HR relocation resources and guides." />}
         />
+        <Route path={ROUTE_DEFS.hrCompanyProfile.path} element={<HrCompanyProfile />} />
         <Route
           path={ROUTE_DEFS.submissionCenter.path}
           element={<PlaceholderPage title="Submission Center" description="Finalize and submit case documentation." />}

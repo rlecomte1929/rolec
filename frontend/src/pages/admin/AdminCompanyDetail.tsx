@@ -28,6 +28,9 @@ export const AdminCompanyDetail: React.FC = () => {
         <div className="text-sm text-[#6b7280]">Company</div>
         <div className="text-lg font-semibold text-[#0b2b43]">{company?.name || '—'}</div>
         <div className="text-xs text-[#6b7280]">{company?.country || '—'} · {company?.size_band || '—'}</div>
+        <div className="text-xs text-[#6b7280] mt-1">
+          {company?.address || '—'} · {company?.phone || '—'} · {company?.hr_contact || '—'}
+        </div>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

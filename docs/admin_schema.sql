@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS companies (
   name TEXT NOT NULL,
   country TEXT,
   size_band TEXT,
+  address TEXT,
+  phone TEXT,
+  hr_contact TEXT,
   created_at TEXT NOT NULL
 );
 

@@ -124,6 +124,8 @@ function HrPolicyContent() {
     } catch (err: any) {
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
+      } else if (err.response?.status === 405) {
+        setError('Unable to load policy details. The API is outdated (GET /api/hr/assignments/{id} missing). Please deploy the latest backend.');
       } else {
         setError('Unable to load policy details.');
       }

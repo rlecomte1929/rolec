@@ -203,7 +203,7 @@ def _seed_demo_cases() -> None:
 
     # Seed admin console entities
     company_id = "demo-company-001"
-    db.create_company(company_id, "Acme Corp", "Singapore", "200-500")
+    db.create_company(company_id, "Acme Corp", "Singapore", "200-500", "1 Raffles Place, Singapore", "+65 6123 4567", "hr@acme.com")
     db.ensure_profile_record(hr_user_id, "hr.demo@relopass.local", "HR", "HR Demo", company_id)
     db.ensure_profile_record(admin_user_id, "admin@relopass.com", "ADMIN", "ReloPass Admin", None)
     for emp_id, emp_email, emp_name in employees:
@@ -524,6 +524,15 @@ class AdminSupportNoteRequest(BaseModel):
     reason: str
 
 
+class CompanyProfileRequest(BaseModel):
+    name: str
+    country: Optional[str] = None
+    size_band: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    hr_contact: Optional[str] = None
+
+
 def _require_reason(reason: Optional[str]) -> None:
     if not reason or not reason.strip():
         raise HTTPException(status_code=400, detail="Reason is required for admin actions")
@@ -668,6 +677,7 @@ def login(request: LoginRequest):
         full_name=user.get("name"),
         company_id=user.get("company"),
     )
+    profile = db.get_profile_record(user["id"])
 
     # Admin override if allowlisted
     effective_role = UserRole(user["role"])
@@ -684,7 +694,7 @@ def login(request: LoginRequest):
             email=user.get("email"),
             role=effective_role,
             name=user.get("name"),
-            company=user.get("company"),
+            company=profile.get("company_id") if profile else user.get("company"),
         )
     )
 
@@ -920,6 +930,20 @@ def admin_export_support_bundle(request: AdminReasonRequest, user: Dict[str, Any
     return {"ok": True, "bundle": bundle}
 
 
+@app.post("/api/admin/actions/purge-cases")
+def admin_purge_cases(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    active_statuses = payload.get("active_statuses") or [
+        AssignmentStatus.IN_PROGRESS.value,
+        AssignmentStatus.EMPLOYEE_SUBMITTED.value,
+        AssignmentStatus.HR_REVIEW.value,
+    ]
+    stats = db.purge_inactive_cases(active_statuses)
+    db.log_audit(user["id"], "RESET", "assignment", None, request.reason, {"active_statuses": active_statuses, **stats})
+    return {"ok": True, "stats": stats}
+
+
 @app.get("/api/profile/current", response_model=RelocationProfile)
 def get_current_profile(user: Dict[str, Any] = Depends(get_current_user)):
     """Get current user's profile."""
@@ -1144,6 +1168,42 @@ def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     return CreateCaseResponse(caseId=case_id)
 
 
+@app.get("/api/hr/company-profile")
+def get_company_profile(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    effective = _effective_user(user, UserRole.HR)
+    company = db.get_company_for_user(effective["id"])
+    return {"company": company}
+
+
+@app.post("/api/hr/company-profile")
+def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        company_id = str(uuid.uuid4())
+        db.set_profile_company(effective["id"], company_id)
+    db.create_company(
+        company_id,
+        request.name,
+        request.country,
+        request.size_band,
+        request.address,
+        request.phone,
+        request.hr_contact,
+    )
+    db.log_audit(effective["id"], "UPDATE", "company", company_id, "HR company profile update", {
+        "name": request.name,
+        "country": request.country,
+        "size_band": request.size_band,
+        "address": request.address,
+        "phone": request.phone,
+        "hr_contact": request.hr_contact,
+    })
+    return {"ok": True, "company_id": company_id}
+
+
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
 def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
@@ -1157,6 +1217,25 @@ def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] =
         raise HTTPException(status_code=400, detail="Employee identifier required")
 
     employee_user = db.get_user_by_identifier(employee_identifier)
+    created_new_employee = False
+    if not employee_user and "@" in employee_identifier:
+        # Auto-register employee user with a temporary password
+        from passlib.context import CryptContext
+        pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+        temp_password = "Passw0rd!"
+        employee_user_id = str(uuid.uuid4())
+        created = db.create_user(
+            user_id=employee_user_id,
+            username=None,
+            email=employee_identifier.lower(),
+            password_hash=pwd_context.hash(temp_password),
+            role=UserRole.EMPLOYEE.value,
+            name=employee_identifier.split("@")[0],
+        )
+        if created:
+            employee_user = db.get_user_by_id(employee_user_id)
+            db.ensure_profile_record(employee_user_id, employee_identifier, UserRole.EMPLOYEE.value, employee_identifier.split("@")[0], None)
+            created_new_employee = True
     assignment_id = str(uuid.uuid4())
     invite_token = None
 
@@ -1179,6 +1258,29 @@ def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] =
             token=invite_token,
         )
 
+    # Prefill invitation message in Messages
+    invite_line = f"Invitation token: {invite_token}" if invite_token else "You can claim your assignment after signing in."
+    temp_line = "Temporary password: Passw0rd!\n\n" if created_new_employee else ""
+    message_body = (
+        f"Hello,\n\n"
+        f"You have been registered for a relocation case on ReloPass.\n\n"
+        f"Assignment ID: {assignment_id}\n"
+        f"Employee identifier: {employee_identifier}\n"
+        f"{invite_line}\n\n"
+        f"Login at https://relopass.com/auth?mode=login\n"
+        f"{temp_line}"
+        f"Once logged in, go to My Case to start your intake.\n"
+    )
+    db.create_message(
+        message_id=str(uuid.uuid4()),
+        assignment_id=assignment_id,
+        hr_user_id=effective["id"],
+        employee_identifier=employee_identifier,
+        subject="Your relocation case is ready",
+        body=message_body,
+        status="draft",
+    )
+
     return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
 
 
@@ -1199,6 +1301,13 @@ def get_employee_assignment(user: Dict[str, Any] = Depends(require_role(UserRole
         return {"assignment": None}
     assignment["status"] = normalize_status(assignment["status"])
     return {"assignment": assignment}
+
+
+@app.get("/api/employee/messages")
+def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    items = db.list_messages_for_employee(effective["id"])
+    return {"messages": items}
 
 
 @app.post("/api/employee/assignments/{assignment_id}/claim")
@@ -1431,6 +1540,13 @@ def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR)
             complianceStatus=report["overallStatus"] if report else None,
         ))
     return summaries
+
+
+@app.get("/api/hr/messages")
+def list_hr_messages(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    effective = _effective_user(user, UserRole.HR)
+    items = db.list_messages_for_hr(effective["id"])
+    return {"messages": items}
 
 
 @app.delete("/api/hr/assignments/{assignment_id}")

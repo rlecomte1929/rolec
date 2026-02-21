@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from .schemas import Question, QuestionOption
 
 
@@ -454,7 +454,7 @@ def get_question_by_id(question_id: str) -> Question:
     return None
 
 
-def get_all_questions(skip_ids: set | None = None) -> List[Question]:
+def get_all_questions(skip_ids: Optional[set] = None) -> List[Question]:
     """Get all questions, optionally skipping IDs for scenario logic."""
     if not skip_ids:
         return QUESTION_BANK
