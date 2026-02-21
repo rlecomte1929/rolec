@@ -5,6 +5,7 @@ interface InputProps {
   value: string | number;
   onChange: (value: string) => void;
   placeholder?: string;
+  autoComplete?: string;
   label?: string;
   error?: string;
   disabled?: boolean;
@@ -16,6 +17,7 @@ export const Input: React.FC<InputProps> = ({
   value,
   onChange,
   placeholder,
+  autoComplete,
   label,
   error,
   disabled = false,
@@ -36,6 +38,7 @@ export const Input: React.FC<InputProps> = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        autoComplete={autoComplete}
         disabled={disabled}
         className={`px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition-all ${widthClass} ${errorClass} ${
           disabled ? 'bg-[#f3f4f6] cursor-not-allowed' : 'bg-white'
