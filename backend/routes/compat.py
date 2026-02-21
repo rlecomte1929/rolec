@@ -3,10 +3,12 @@ from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, Header, HTTPException
 from jose import jwt
+from sqlalchemy import text
 
 from ..services.relocation_profile import compute_missing_fields
 from ..services.supabase_client import get_supabase_client
 from .relocation import _extract_bearer_token, _is_permission_error
+from ..database import db
 
 router = APIRouter(prefix="/api", tags=["compat"])
 
@@ -18,6 +20,29 @@ def _get_supabase_client_from_header(authorization: Optional[str]):
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return client, user_jwt
+
+
+def _is_jwt(token: str) -> bool:
+    return token.count(".") == 2
+
+
+def _get_user_from_session_token(token: str) -> Dict[str, Any]:
+    user = db.get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+
+def _get_case_row_for_user(case_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    with db.engine.connect() as conn:
+        row = conn.execute(
+            text(
+                "SELECT * FROM relocation_cases "
+                "WHERE id = :id AND (employee_id = :uid OR hr_user_id = :uid)"
+            ),
+            {"id": case_id, "uid": user_id},
+        ).fetchone()
+    return db._row_to_dict(row)
 
 
 def _safe_parse_profile(profile_json: Optional[str]) -> Dict[str, Any]:
@@ -36,17 +61,23 @@ def _title_case_fallback(value: str) -> str:
 
 @router.get("/cases/{case_id}")
 def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
-    client, _ = _get_supabase_client_from_header(authorization)
-    result = client.table("relocation_cases").select("*").eq("id", case_id).execute()
-    if result.error:
-        message = getattr(result.error, "message", str(result.error))
-        if _is_permission_error(message):
-            raise HTTPException(status_code=403, detail="Forbidden")
-        raise HTTPException(status_code=500, detail="Supabase error")
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Case not found")
-
-    row = result.data[0] or {}
+    token = _extract_bearer_token(authorization)
+    if _is_jwt(token):
+        client, _ = _get_supabase_client_from_header(authorization)
+        result = client.table("relocation_cases").select("*").eq("id", case_id).execute()
+        if result.error:
+            message = getattr(result.error, "message", str(result.error))
+            if _is_permission_error(message):
+                raise HTTPException(status_code=403, detail="Forbidden")
+            raise HTTPException(status_code=500, detail="Supabase error")
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Case not found")
+        row = result.data[0] or {}
+    else:
+        user = _get_user_from_session_token(token)
+        row = _get_case_row_for_user(case_id, user["id"])
+        if not row:
+            raise HTTPException(status_code=404, detail="Case not found")
     profile = _safe_parse_profile(row.get("profile_json"))
     missing_fields = compute_missing_fields(profile)
 
@@ -64,17 +95,24 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
 
 @router.get("/cases/{case_id}/requirements")
 def compat_get_requirements(case_id: str, authorization: Optional[str] = Header(None)):
-    client, _ = _get_supabase_client_from_header(authorization)
-    result = client.table("relocation_cases").select("profile_json").eq("id", case_id).execute()
-    if result.error:
-        message = getattr(result.error, "message", str(result.error))
-        if _is_permission_error(message):
-            raise HTTPException(status_code=403, detail="Forbidden")
-        raise HTTPException(status_code=500, detail="Supabase error")
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Case not found")
-
-    profile = _safe_parse_profile(result.data[0].get("profile_json"))
+    token = _extract_bearer_token(authorization)
+    if _is_jwt(token):
+        client, _ = _get_supabase_client_from_header(authorization)
+        result = client.table("relocation_cases").select("profile_json").eq("id", case_id).execute()
+        if result.error:
+            message = getattr(result.error, "message", str(result.error))
+            if _is_permission_error(message):
+                raise HTTPException(status_code=403, detail="Forbidden")
+            raise HTTPException(status_code=500, detail="Supabase error")
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Case not found")
+        profile = _safe_parse_profile(result.data[0].get("profile_json"))
+    else:
+        user = _get_user_from_session_token(token)
+        row = _get_case_row_for_user(case_id, user["id"])
+        if not row:
+            raise HTTPException(status_code=404, detail="Case not found")
+        profile = _safe_parse_profile(row.get("profile_json"))
     missing_fields = compute_missing_fields(profile)
     label_map = {
         "origin_country": "Origin country",
