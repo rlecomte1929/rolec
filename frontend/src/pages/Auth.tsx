@@ -154,6 +154,7 @@ export const Auth: React.FC = () => {
                   onChange={setIdentifier}
                   label="Username or Email"
                   placeholder="username or you@example.com"
+                  autoComplete="username"
                   fullWidth
                 />
                 <Input
@@ -162,6 +163,7 @@ export const Auth: React.FC = () => {
                   onChange={setPassword}
                   label="Password"
                   placeholder="Enter your password"
+                  autoComplete="current-password"
                   fullWidth
                 />
                 <Button type="submit" fullWidth disabled={!identifier || !password || isLoading}>
@@ -184,6 +186,7 @@ export const Auth: React.FC = () => {
                   onChange={setUsername}
                   label="Username"
                   placeholder="username (3–30 chars, letters/numbers/_)"
+                  autoComplete="username"
                   fullWidth
                 />
                 <Input
@@ -192,6 +195,7 @@ export const Auth: React.FC = () => {
                   onChange={setEmail}
                   label="Email"
                   placeholder="you@example.com"
+                  autoComplete="email"
                   fullWidth
                 />
                 <Input
@@ -200,6 +204,7 @@ export const Auth: React.FC = () => {
                   onChange={setPassword}
                   label="Password"
                   placeholder="Create a password"
+                  autoComplete="new-password"
                   fullWidth
                 />
                 <Select

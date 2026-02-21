@@ -31,6 +31,29 @@ export const HrDashboard: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
+  const loadAssignmentDetails = async (items: AssignmentSummary[]) => {
+    if (items.length === 0) {
+      setAssignmentDetails({});
+      return;
+    }
+
+    const detailEntries = await Promise.allSettled(
+      items.map(async (assignment) => {
+        const detail = await hrAPI.getAssignment(assignment.id);
+        return [assignment.id, detail] as const;
+      })
+    );
+
+    const nextDetails: Record<string, AssignmentDetail> = {};
+    detailEntries.forEach((entry) => {
+      if (entry.status === 'fulfilled') {
+        const [id, detail] = entry.value;
+        if (detail) nextDetails[id] = detail;
+      }
+    });
+    setAssignmentDetails(nextDetails);
+  };
+
   const loadAssignments = async () => {
     setIsLoading(true);
     try {
@@ -39,32 +62,14 @@ export const HrDashboard: React.FC = () => {
       if (data.length > 0) {
         localStorage.setItem('relopass_last_assignment_id', data[0].id);
       }
-      if (data.length > 0) {
-        const detailEntries = await Promise.all(
-          data.map(async (assignment) => {
-            try {
-              const detail = await hrAPI.getAssignment(assignment.id);
-              return [assignment.id, detail] as const;
-            } catch {
-              return [assignment.id, null] as const;
-            }
-          })
-        );
-        const nextDetails: Record<string, AssignmentDetail> = {};
-        detailEntries.forEach(([id, detail]) => {
-          if (detail) nextDetails[id] = detail;
-        });
-        setAssignmentDetails(nextDetails);
-      } else {
-        setAssignmentDetails({});
-      }
+      setIsLoading(false);
+      await loadAssignmentDetails(data);
     } catch (err: any) {
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
         setError('Unable to load assignments.');
       }
-    } finally {
       setIsLoading(false);
     }
   };

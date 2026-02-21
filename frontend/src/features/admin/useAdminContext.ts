@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminAPI } from '../../api/client';
+import { getAuthItem } from '../../utils/demo';
 import type { AdminContextResponse } from '../../types';
 
 export const useAdminContext = () => {
@@ -8,6 +9,12 @@ export const useAdminContext = () => {
 
   const refresh = async () => {
     setLoading(true);
+    const token = getAuthItem('relopass_token');
+    if (!token) {
+      setContext(null);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await adminAPI.getContext();
       setContext(res);
