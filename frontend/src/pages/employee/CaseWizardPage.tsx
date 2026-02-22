@@ -31,6 +31,40 @@ function buildDefaultDraft(): CaseDraftDTO {
   };
 }
 
+function caseToWizardDraft(caseData: CaseDTO | null): CaseDraftDTO {
+  const base = buildDefaultDraft();
+  if (!caseData) return base;
+
+  const legacyBasics = {
+    originCountry: caseData.originCountry,
+    originCity: caseData.originCity,
+    destCountry: caseData.destCountry,
+    destCity: caseData.destCity,
+    purpose: caseData.purpose,
+    targetMoveDate: caseData.targetMoveDate,
+  };
+
+  return {
+    relocationBasics: {
+      ...base.relocationBasics,
+      ...legacyBasics,
+      ...(caseData.draft?.relocationBasics || {}),
+    },
+    employeeProfile: {
+      ...base.employeeProfile,
+      ...(caseData.draft?.employeeProfile || {}),
+    },
+    familyMembers: {
+      ...base.familyMembers,
+      ...(caseData.draft?.familyMembers || {}),
+    },
+    assignmentContext: {
+      ...base.assignmentContext,
+      ...(caseData.draft?.assignmentContext || {}),
+    },
+  };
+}
+
 export const CaseWizardPage: React.FC = () => {
   const { caseId, step } = useParams();
   const navigate = useNavigate();
@@ -94,11 +128,11 @@ export const CaseWizardPage: React.FC = () => {
     try {
       const data = await getCase(caseId);
       setCaseData(data);
-      setDraft(data.draft || buildDefaultDraft());
+      setDraft(caseToWizardDraft(data));
     } catch {
       try {
         const relocation = await getRelocationCase(caseId);
-        setCaseData({
+        const fallbackCase: CaseDTO = {
           id: relocation.id,
           status: relocation.status || 'DRAFT',
           draft: buildDefaultDraft(),
@@ -106,8 +140,9 @@ export const CaseWizardPage: React.FC = () => {
           updatedAt: relocation.updated_at || new Date().toISOString(),
           originCountry: relocation.home_country || undefined,
           destCountry: relocation.host_country || undefined,
-        });
-        setDraft(buildDefaultDraft());
+        };
+        setCaseData(fallbackCase);
+        setDraft(caseToWizardDraft(fallbackCase));
       } catch {
         setCaseData(null);
         setDraft(buildDefaultDraft());
@@ -132,6 +167,12 @@ export const CaseWizardPage: React.FC = () => {
     loadCase();
     loadRequirements();
   }, [caseId]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (!caseData) return;
+    console.debug('Wizard defaults (relocationBasics):', caseToWizardDraft(caseData).relocationBasics);
+  }, [caseData?.id, caseData?.updatedAt]);
 
   // Route gating: the wizard is only for intake / changes-requested.
   useEffect(() => {
@@ -185,7 +226,7 @@ export const CaseWizardPage: React.FC = () => {
   const handleSave = async (nextDraft: CaseDraftDTO) => {
     if (!caseId) return;
     const updated = await patchCase(caseId, nextDraft);
-    setDraft(updated.draft);
+    setDraft(caseToWizardDraft(updated));
     setCaseData(updated);
     await loadRequirements();
     setError('');

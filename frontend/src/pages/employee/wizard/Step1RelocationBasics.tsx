@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
@@ -27,6 +27,12 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
   const [customOriginCity, setCustomOriginCity] = useState('');
   const [customDestCity, setCustomDestCity] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setLocal(draft.relocationBasics || {});
+    setCustomOriginCity(draft.relocationBasics?.originCity || '');
+    setCustomDestCity(draft.relocationBasics?.destCity || '');
+  }, [draft.relocationBasics]);
 
   const update = (key: keyof typeof local, value: any) => {
     setLocal({ ...local, [key]: value });

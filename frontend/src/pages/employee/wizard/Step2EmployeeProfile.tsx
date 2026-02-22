@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
@@ -19,6 +19,10 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
   const [pendingPassport, setPendingPassport] = useState(false);
   const [ocrMessage, setOcrMessage] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setLocal(draft.employeeProfile || {});
+  }, [draft.employeeProfile]);
 
   const update = (key: keyof typeof local, value: any) => {
     setLocal({ ...local, [key]: value });

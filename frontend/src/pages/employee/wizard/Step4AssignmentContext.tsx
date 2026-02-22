@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
@@ -18,6 +18,10 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
   const navigate = useNavigate();
   const [local, setLocal] = useState(draft.assignmentContext);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setLocal(draft.assignmentContext || {});
+  }, [draft.assignmentContext]);
 
   const update = (key: keyof typeof local, value: any) => {
     setLocal({ ...local, [key]: value });

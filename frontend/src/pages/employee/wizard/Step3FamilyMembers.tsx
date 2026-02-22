@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../../../components/antigravity';
 import type { CaseDraftDTO, FamilyMemberDTO } from '../../../types';
@@ -38,6 +38,15 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
   const hasAnyDependent = Boolean(local.spouse?.fullName || children.some((c) => c.fullName));
   const dependentsMissing = hasDependents && !hasAnyDependent;
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const nextLocal = {
+      ...draft.familyMembers,
+      maritalStatus: draft.familyMembers.maritalStatus || 'Single',
+    };
+    setLocal(nextLocal);
+    setChildren(nextLocal.children || []);
+  }, [draft.familyMembers]);
 
   return (
     <Card padding="lg">
