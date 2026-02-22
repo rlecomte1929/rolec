@@ -1,5 +1,6 @@
 import json
 import uuid
+import logging
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
@@ -8,10 +9,15 @@ from pydantic import BaseModel
 from jose import jwt
 
 from ..services.relocation_profile import compute_missing_fields
+from ..services.relocation_classification import (
+    compute_case_classification,
+    persist_case_classification,
+)
 from ..services.supabase_client import get_supabase_client
 
 router = APIRouter(prefix="/relocation", tags=["relocation"])
 api_router = APIRouter(prefix="/api/relocation", tags=["relocation"])
+logger = logging.getLogger(__name__)
 
 
 def _extract_bearer_token(authorization: Optional[str]) -> str:
@@ -59,6 +65,35 @@ class RelocationCaseResponse(BaseModel):
     stage: str
 
 
+def _extract_relevant_fields(profile: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "origin_country": profile.get("origin_country"),
+        "destination_country": profile.get("destination_country"),
+        "move_date": profile.get("move_date"),
+        "employment_type": profile.get("employment_type"),
+        "employer_country": profile.get("employer_country"),
+        "works_remote": profile.get("works_remote"),
+        "has_corporate_tax_support": profile.get("has_corporate_tax_support"),
+    }
+
+
+def _diff_relevant_fields(
+    prev_profile: Dict[str, Any],
+    next_profile: Dict[str, Any],
+    prev_missing: List[str],
+    next_missing: List[str],
+) -> List[str]:
+    changed: List[str] = []
+    prev_fields = _extract_relevant_fields(prev_profile)
+    next_fields = _extract_relevant_fields(next_profile)
+    for key, prev_value in prev_fields.items():
+        if prev_value != next_fields.get(key):
+            changed.append(key)
+    if set(prev_missing) != set(next_missing):
+        changed.append("missing_fields")
+    return changed
+
+
 def upsert_relocation_case(
     payload: RelocationCaseRequest,
     authorization: Optional[str] = Header(None),
@@ -79,11 +114,15 @@ def upsert_relocation_case(
     profile_json = json.dumps(profile)
     home_country = profile.get("origin_country")
     host_country = profile.get("destination_country")
+    prev_profile: Dict[str, Any] = {}
+    prev_missing_fields: List[str] = []
+    prev_status: Optional[str] = None
+    prev_stage: Optional[str] = None
 
     if payload.case_id:
         lookup = (
             client.table("relocation_cases")
-            .select("status")
+            .select("status,stage,profile_json,home_country,host_country")
             .eq("id", case_id)
             .execute()
         )
@@ -95,7 +134,12 @@ def upsert_relocation_case(
         if not lookup.data:
             raise HTTPException(status_code=404, detail="Case not found")
 
-        existing_status = lookup.data[0].get("status")
+        row = lookup.data[0] or {}
+        existing_status = row.get("status")
+        prev_status = existing_status
+        prev_stage = row.get("stage")
+        prev_profile = _safe_parse_profile(row.get("profile_json"))
+        prev_missing_fields = compute_missing_fields(prev_profile)
         update_payload: Dict[str, Any] = {
             "profile_json": profile_json,
             "stage": stage,
@@ -168,6 +212,37 @@ def upsert_relocation_case(
         if _is_permission_error(message):
             raise HTTPException(status_code=403, detail="Forbidden")
         raise HTTPException(status_code=500, detail="Supabase error")
+
+    should_classify = payload.case_id is None
+    changed_fields: List[str] = []
+    if payload.case_id is not None:
+        changed_fields = _diff_relevant_fields(
+            prev_profile, profile, prev_missing_fields, missing_fields
+        )
+        if changed_fields:
+            should_classify = True
+
+    if should_classify:
+        if changed_fields:
+            logger.info("auto_classify triggered case_id=%s changed_fields=%s", case_id, changed_fields)
+        else:
+            logger.info("auto_classify triggered case_id=%s reason=created", case_id)
+        input_payload = {"profile": profile, "missing_fields": missing_fields}
+        output_payload = compute_case_classification(
+            {**profile, "missing_fields": missing_fields}
+        )
+        try:
+            persist_case_classification(client, case_id, input_payload, output_payload)
+        except RuntimeError as exc:
+            message = str(exc)
+            if _is_permission_error(message):
+                raise HTTPException(status_code=403, detail="Forbidden") from exc
+            raise HTTPException(status_code=500, detail="Supabase error") from exc
+    else:
+        logger.info(
+            "auto_classify skipped case_id=%s reason=no_relevant_changes",
+            case_id,
+        )
 
     return RelocationCaseResponse(
         case_id=case_id,

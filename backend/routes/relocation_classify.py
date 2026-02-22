@@ -3,8 +3,11 @@ from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Header, HTTPException
 
+from ..services.relocation_classification import (
+    compute_case_classification,
+    persist_case_classification,
+)
 from ..services.relocation_profile import compute_missing_fields
-from ..services.relocation_classifier import classify_case
 from ..services.supabase_client import get_supabase_client
 from .relocation import _extract_bearer_token, _is_permission_error
 
@@ -47,68 +50,25 @@ def _get_case(client, case_id: str) -> Dict[str, Any]:
     return result.data[0]
 
 
-def _get_next_version(client, case_id: str) -> int:
-    result = (
-        client.table("relocation_artifacts")
-        .select("version")
-        .eq("case_id", case_id)
-        .eq("artifact_type", "case_classification")
-        .order("version", desc=True)
-        .limit(1)
-        .execute()
-    )
-    if result.error:
-        message = getattr(result.error, "message", str(result.error))
-        if _is_permission_error(message):
-            raise HTTPException(status_code=404, detail="Case not found")
-        raise HTTPException(status_code=500, detail="Supabase error")
-    if result.data:
-        return int(result.data[0]["version"]) + 1
-    return 1
-
-
 @router.post("/case/{case_id}/classify")
 def classify_relocation_case(case_id: str, authorization: Optional[str] = Header(None)):
     client = _get_client(authorization)
     case_row = _get_case(client, case_id)
     profile = _safe_parse_profile(case_row.get("profile_json"))
     missing_fields = compute_missing_fields(profile)
-    classification = classify_case(profile, missing_fields)
-
-    version = _get_next_version(client, case_id)
-    artifact_payload = {
-        "case_id": case_id,
-        "artifact_type": "case_classification",
-        "version": version,
-        "content": classification.model_dump(),
-        "content_text": None,
-    }
-    artifact_res = client.table("relocation_artifacts").insert(artifact_payload).execute()
-    if artifact_res.error:
-        message = getattr(artifact_res.error, "message", str(artifact_res.error))
+    input_payload = {"profile": profile, "missing_fields": missing_fields}
+    output_payload = compute_case_classification({**profile, "missing_fields": input_payload["missing_fields"]})
+    try:
+        persist_case_classification(client, case_id, input_payload, output_payload)
+    except RuntimeError as exc:
+        message = str(exc)
         if _is_permission_error(message):
             raise HTTPException(status_code=403, detail="Forbidden")
-        raise HTTPException(status_code=500, detail="Supabase error")
-
-    run_payload = {
-        "case_id": case_id,
-        "run_type": "case_classification",
-        "input_payload": {"profile": profile, "missing_fields": missing_fields},
-        "output_payload": classification.model_dump(),
-        "model_provider": None,
-        "model_name": None,
-        "error": None,
-    }
-    run_res = client.table("relocation_runs").insert(run_payload).execute()
-    if run_res.error:
-        message = getattr(run_res.error, "message", str(run_res.error))
-        if _is_permission_error(message):
-            raise HTTPException(status_code=403, detail="Forbidden")
-        raise HTTPException(status_code=500, detail="Supabase error")
+        raise HTTPException(status_code=500, detail="Supabase error") from exc
 
     return {
         "case_id": case_id,
-        "classification": classification.model_dump(),
+        "classification": output_payload,
     }
 
 
