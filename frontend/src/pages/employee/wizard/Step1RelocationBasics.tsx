@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
+import { ROUTES } from '../../../routes';
 
 interface StepProps {
   caseId: string;
@@ -20,6 +22,7 @@ const COUNTRY_OPTIONS = [
 ];
 
 export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, banner, onSave, onNext }) => {
+  const navigate = useNavigate();
   const [local, setLocal] = useState(draft.relocationBasics);
   const [customOriginCity, setCustomOriginCity] = useState('');
   const [customDestCity, setCustomDestCity] = useState('');
@@ -208,7 +211,10 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
           onClick={async () => {
             try {
               await onSave(nextDraft);
-              window.location.href = '/employee/journey';
+                if (import.meta.env.DEV) {
+                  console.debug('Save & Exit -> /employee/dashboard');
+                }
+                navigate(ROUTES.EMP_DASH);
             } catch (err: any) {
               setError(err?.message || 'Unable to save draft. Please try again.');
             }

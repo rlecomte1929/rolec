@@ -43,7 +43,7 @@ function App() {
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         <Route path="/journey" element={<Journey />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path={ROUTE_DEFS.employeeJourney.path} element={<EmployeeJourney />} />
+        <Route path={ROUTE_DEFS.employeeJourney.path} element={<Navigate to={WIZARD_ROUTES.EMP_DASH} replace />} />
         <Route path={WIZARD_ROUTES.EMP_DASH} element={<EmployeeJourney />} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />

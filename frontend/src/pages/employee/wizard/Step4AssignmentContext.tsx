@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
+import { ROUTES } from '../../../routes';
 
 interface StepProps {
   draft: CaseDraftDTO;
@@ -13,6 +15,7 @@ interface StepProps {
 const isRequired = (requiredFields: string[], key: string) => requiredFields.includes(key);
 
 export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack }) => {
+  const navigate = useNavigate();
   const [local, setLocal] = useState(draft.assignmentContext);
   const [error, setError] = useState('');
 
@@ -131,7 +134,10 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
             onClick={async () => {
               try {
                 await onSave(nextDraft);
-                window.location.href = '/employee/journey';
+                if (import.meta.env.DEV) {
+                  console.debug('Save & Exit -> /employee/dashboard');
+                }
+                navigate(ROUTES.EMP_DASH);
               } catch (err: any) {
                 setError(err?.message || 'Unable to save draft. Please try again.');
               }
