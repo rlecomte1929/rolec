@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
@@ -16,6 +16,7 @@ import { HrAssignmentPackageReview } from './pages/HrAssignmentPackageReview';
 import { HrPolicy } from './pages/HrPolicy';
 import { HrPolicyManagement } from './pages/HrPolicyManagement';
 import { CaseWizardPage } from './pages/employee/CaseWizardPage';
+import { EmployeeCaseSummary } from './pages/employee/EmployeeCaseSummary';
 import { CountriesPage } from './pages/admin/CountriesPage';
 import { CountryDetailPage } from './pages/admin/CountryDetailPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -31,6 +32,14 @@ import { ProvidersPage } from './pages/ProvidersPage';
 import { DebugAuth } from './pages/DebugAuth';
 import { Messages } from './pages/Messages';
 import { HrCompanyProfile } from './pages/HrCompanyProfile';
+
+function ReviewToEmployeeDashboardRedirect() {
+  const { caseId } = useParams<{ caseId: string }>();
+  const to = caseId
+    ? `${ROUTE_DEFS.hrEmployeeDashboard.path}?caseId=${encodeURIComponent(caseId)}`
+    : ROUTE_DEFS.hrEmployeeDashboard.path;
+  return <Navigate to={to} replace />;
+}
 
 function App() {
   return (
@@ -48,6 +57,8 @@ function App() {
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<HrCaseSummary />} />
+        <Route path={ROUTE_DEFS.hrReview.path} element={<Navigate to={ROUTE_DEFS.hrEmployeeDashboard.path} replace />} />
+        <Route path={ROUTE_DEFS.hrReviewCase.path} element={<ReviewToEmployeeDashboardRedirect />} />
         <Route path={ROUTE_DEFS.hrAssignmentReview.path} element={<HrAssignmentReview />} />
         <Route path={ROUTE_DEFS.hrComplianceIndex.path} element={<HrComplianceCheck />} />
         <Route path={ROUTE_DEFS.hrCompliance.path} element={<HrComplianceCheck />} />
@@ -62,6 +73,7 @@ function App() {
         <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<CaseWizardPage />} />
+        <Route path={WIZARD_ROUTES.CASE_SUMMARY} element={<EmployeeCaseSummary />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<AdminDashboard />} />
@@ -104,3 +116,12 @@ function App() {
 }
 
 export default App;
+
+
+/* import TestRpc from "./dev/TestRpc";
+
+function App() {
+  return <TestRpc />;
+}
+
+export default App; */

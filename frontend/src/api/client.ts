@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
+import { signOutSupabase } from './supabaseAuth';
 import type {
   LoginRequest,
   LoginResponse,
@@ -101,6 +102,7 @@ export const authAPI = {
     } catch {
       // Ignore — client will clear session anyway
     }
+    await signOutSupabase();
     clearAuthItems();
   },
 };
@@ -233,6 +235,14 @@ export const hrAPI = {
     const response = await api.delete(`/api/hr/assignments/${assignmentId}`);
     return response.data;
   },
+  postFeedback: async (assignmentId: string, message: string): Promise<{ ok: boolean; id: string; created_at: string }> => {
+    const response = await api.post(`/api/hr/assignments/${assignmentId}/feedback`, { message });
+    return response.data;
+  },
+  getFeedback: async (assignmentId: string): Promise<Array<{ id: string; assignment_id: string; hr_user_id: string; employee_user_id: string | null; message: string; created_at: string }>> => {
+    const response = await api.get(`/api/hr/assignments/${assignmentId}/feedback`);
+    return response.data;
+  },
 };
 
 // Admin API
@@ -306,6 +316,10 @@ export const employeeAPI = {
   },
   getNextQuestion: async (assignmentId: string): Promise<EmployeeJourneyResponse> => {
     const response = await api.get('/api/employee/journey/next-question', { params: { assignmentId } });
+    return response.data;
+  },
+  getFeedback: async (assignmentId: string): Promise<Array<{ id: string; assignment_id: string; message: string; created_at: string }>> => {
+    const response = await api.get('/api/employee/assignment-feedback', { params: { assignment_id: assignmentId } });
     return response.data;
   },
   submitAnswer: async (assignmentId: string, questionId: string, answer: any): Promise<EmployeeJourneyResponse> => {

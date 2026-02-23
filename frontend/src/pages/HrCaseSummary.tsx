@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card } from '../components/antigravity';
 import { hrAPI } from '../api/client';
+import { hrReopenAssignment } from '../api/rpc';
 import type { AssignmentDetail, AssignmentStatus } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
@@ -32,6 +33,10 @@ export const HrCaseSummary: React.FC = () => {
   const [decisionNotes, setDecisionNotes] = useState('');
   const [requestedSections, setRequestedSections] = useState<string[]>([]);
   const [isDeciding, setIsDeciding] = useState(false);
+  const [isReopenOpen, setIsReopenOpen] = useState(false);
+  const [reopenNote, setReopenNote] = useState('');
+  const [isReopening, setIsReopening] = useState(false);
+  const [reopenSuccess, setReopenSuccess] = useState('');
 
   const SECTION_OPTIONS = [
     'Relocation Basics',
@@ -118,6 +123,30 @@ export const HrCaseSummary: React.FC = () => {
     }
   };
 
+  const handleReopen = async () => {
+    if (!assignment?.id) return;
+    setError('');
+    setReopenSuccess('');
+    setIsReopening(true);
+    if (import.meta.env.DEV) {
+      console.debug('RPC transition_assignment: HR_REOPEN', {
+        assignmentId: assignment.id,
+        note: reopenNote || null,
+      });
+    }
+    const { error: rpcError } = await hrReopenAssignment(assignment.id, reopenNote || undefined);
+    if (rpcError) {
+      setError(rpcError);
+      setIsReopening(false);
+      return;
+    }
+    setIsReopening(false);
+    setIsReopenOpen(false);
+    setReopenNote('');
+    setReopenSuccess('Reopened for employee edits.');
+    await loadAssignment();
+  };
+
   const headerName =
     assignment?.profile?.primaryApplicant?.fullName || assignment?.employeeIdentifier || 'Employee';
   const origin = assignment?.profile?.movePlan?.origin;
@@ -125,6 +154,7 @@ export const HrCaseSummary: React.FC = () => {
 
   const blockingItems = assignment?.complianceReport?.checks?.filter((check) => check.status !== 'COMPLIANT') || [];
   const complianceStatus = assignment?.complianceReport?.overallStatus || 'NEEDS_REVIEW';
+  const canReopen = assignment?.status === 'EMPLOYEE_SUBMITTED' || assignment?.status === 'HR_REVIEW';
 
   const nextDeadline = useMemo(() => {
     const target = assignment?.profile?.movePlan?.targetArrivalDate;
@@ -136,6 +166,7 @@ export const HrCaseSummary: React.FC = () => {
   return (
     <AppShell title="Case Summary" subtitle="Overview of the relocation case for review.">
       {error && <Alert variant="error">{error}</Alert>}
+      {reopenSuccess && <Alert variant="success">{reopenSuccess}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading case summary...</div>}
 
       {!isLoading && assignment && (
@@ -153,6 +184,11 @@ export const HrCaseSummary: React.FC = () => {
                 <Button onClick={handleRunCompliance} disabled={isRunning}>
                   {isRunning ? 'Running...' : 'Run compliance checks'}
                 </Button>
+                {canReopen && (
+                  <Button variant="outline" onClick={() => setIsReopenOpen((prev) => !prev)}>
+                    {isReopenOpen ? 'Close reopen' : 'Reopen for employee'}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={() => setIsDecisionOpen((prev) => !prev)}
@@ -162,6 +198,32 @@ export const HrCaseSummary: React.FC = () => {
               </div>
             </div>
           </Card>
+
+          {canReopen && isReopenOpen && (
+            <Card padding="lg">
+              <div className="text-sm font-semibold text-[#0b2b43]">Reopen for employee</div>
+              <div className="text-xs text-[#6b7280] mt-1">
+                This will move the case back to Draft and allow the employee to edit their responses.
+              </div>
+              <div className="mt-4">
+                <div className="text-xs uppercase tracking-wide text-[#6b7280] mb-2">Note (optional)</div>
+                <textarea
+                  value={reopenNote}
+                  onChange={(event) => setReopenNote(event.target.value)}
+                  className="w-full min-h-[84px] rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
+                  placeholder="Optional note for the employee."
+                />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button onClick={handleReopen} disabled={isReopening}>
+                  {isReopening ? 'Reopening...' : 'Reopen for employee'}
+                </Button>
+                <Button variant="outline" onClick={() => setIsReopenOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </Card>
+          )}
 
           {isDecisionOpen && (
             <Card padding="lg">

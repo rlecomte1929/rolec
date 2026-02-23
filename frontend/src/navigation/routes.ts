@@ -9,6 +9,8 @@ export const ROUTE_DEFS = {
   hrDashboard: { path: '/hr/dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrEmployeeDashboard: { path: '/hr/employee-dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCaseSummary: { path: '/hr/cases/:caseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  hrReview: { path: '/hr/review', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  hrReviewCase: { path: '/hr/review/case/:caseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrAssignmentReview: { path: '/hr/assignments/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrComplianceIndex: { path: '/hr/compliance', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompliance: { path: '/hr/compliance/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },

@@ -23,6 +23,8 @@ export const EmployeeJourney: React.FC = () => {
   const [journey, setJourney] = useState<EmployeeJourneyResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionError, _setActionError] = useState('');
+  const [actionSuccess, _setActionSuccess] = useState('');
   const [claimId, setClaimId] = useState('');
   const [claimEmail, setClaimEmail] = useState(getAuthItem('relopass_email') || getAuthItem('relopass_username') || '');
 
@@ -103,6 +105,8 @@ export const EmployeeJourney: React.FC = () => {
   return (
     <AppShell title="Employee Journey" subtitle="Complete your relocation profile for HR review.">
       {isLoading && <div className="text-sm text-[#6b7280]">Loading...</div>}
+      {!isLoading && actionError && <Alert variant="error">{actionError}</Alert>}
+      {!isLoading && actionSuccess && <Alert variant="success">{actionSuccess}</Alert>}
 
       {!isLoading && error && (
         <div className="space-y-3">
@@ -163,6 +167,11 @@ export const EmployeeJourney: React.FC = () => {
               </div>
               <div className="flex flex-wrap gap-2 pt-2">
                 <Button onClick={() => navigate(`/employee/case/${assignmentId}/wizard/1`)}>Open case wizard</Button>
+                {status === 'DRAFT' && (
+                  <Button variant="outline" onClick={() => navigate(`/employee/case/${assignmentId}/wizard/1`)}>
+                    Edit responses
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => navigate('/providers')}>Browse Providers</Button>
                 <Button variant="outline" onClick={loadAssignment}>Refresh</Button>
               </div>
@@ -201,12 +210,14 @@ export const EmployeeJourney: React.FC = () => {
                     <div className="h-1.5 rounded-full bg-[#0b2b43]" style={{ width: `${progressPercentCapped}%` }} />
                   </div>
                 </div>
-                <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
-                  <div className="text-xs text-[#6b7280] mb-1">Edits</div>
-                  <div className="text-xs text-[#4b5563]">
-                    This case is read-only during HR review. If HR requests changes, you’ll be guided back into the wizard.
+                {status === 'EMPLOYEE_SUBMITTED' && (
+                  <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
+                    <div className="text-xs text-[#6b7280] mb-1">Status</div>
+                    <div className="text-xs text-[#4b5563]">
+                      Submitted to HR for review.
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
                   <div className="text-xs text-[#6b7280] mb-1">Next steps</div>
                   <div className="text-xs text-[#4b5563]">

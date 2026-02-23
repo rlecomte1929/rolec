@@ -335,6 +335,17 @@ class Database:
                 )
             """))
 
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS hr_feedback (
+                    id TEXT PRIMARY KEY,
+                    assignment_id TEXT NOT NULL,
+                    hr_user_id TEXT NOT NULL,
+                    employee_user_id TEXT,
+                    message TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
             # Best-effort schema extensions for relocation_cases
             if _is_sqlite:
                 cols = conn.execute(text("PRAGMA table_info(companies)")).fetchall()
@@ -673,6 +684,30 @@ class Database:
             rows = conn.execute(text(
                 "SELECT * FROM case_assignments WHERE hr_user_id = :hr ORDER BY created_at DESC"
             ), {"hr": hr_user_id}).fetchall()
+        return self._rows_to_list(rows)
+
+    def insert_hr_feedback(
+        self,
+        feedback_id: str,
+        assignment_id: str,
+        hr_user_id: str,
+        employee_user_id: Optional[str],
+        message: str,
+    ) -> Dict[str, Any]:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO hr_feedback (id, assignment_id, hr_user_id, employee_user_id, message, created_at) "
+                "VALUES (:id, :aid, :hr, :emp, :msg, :ca)"
+            ), {"id": feedback_id, "aid": assignment_id, "hr": hr_user_id, "emp": employee_user_id, "msg": message, "ca": now})
+        return {"id": feedback_id, "assignment_id": assignment_id, "message": message, "created_at": now}
+
+    def list_hr_feedback(self, assignment_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT id, assignment_id, hr_user_id, employee_user_id, message, created_at "
+                "FROM hr_feedback WHERE assignment_id = :aid ORDER BY created_at DESC"
+            ), {"aid": assignment_id}).fetchall()
         return self._rows_to_list(rows)
 
     def list_all_assignments(self) -> List[Dict[str, Any]]:

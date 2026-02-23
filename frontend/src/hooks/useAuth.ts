@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/client';
+import { signInSupabase } from '../api/supabaseAuth';
 import type { LoginRequest, RegisterRequest, UserRole } from '../types';
 import { setAuthItem } from '../utils/demo';
 import { safeNavigate } from '../navigation/safeNavigate';
@@ -23,6 +24,13 @@ export const useAuth = () => {
   const login = async (payload: LoginRequest) => {
     const response = await authAPI.login(payload);
     setSession(response.token, response.user);
+
+    // Establish Supabase session so tokens auto-refresh (feedback, review, RPC)
+    const email = response.user.email ?? (payload.identifier?.includes('@') ? payload.identifier.trim() : null);
+    if (email && payload.password) {
+      await signInSupabase(email, payload.password);
+    }
+
     redirectByRole(response.user.role);
     return response;
   };

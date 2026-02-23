@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card } from './antigravity';
 import { TEST_ACCOUNTS, type TestAccount } from '../config/testAccounts';
 import { authAPI } from '../api/client';
+import { signInSupabase, signOutSupabase } from '../api/supabaseAuth';
 import { clearAuthItems, setAuthItem } from '../utils/demo';
 
 interface Props {
@@ -23,8 +24,13 @@ export const SwitchUserModal: React.FC<Props> = ({ open, onClose }) => {
         identifier: account.email,
         password: account.password,
       });
+      await signOutSupabase();
       clearAuthItems();
       setAuthItem('relopass_token', response.token);
+      setAuthItem('relopass_user_id', response.user.id);
+
+      // Establish Supabase session so tokens auto-refresh
+      await signInSupabase(account.email, account.password);
       setAuthItem('relopass_role', response.user.role);
       if (response.user.name) setAuthItem('relopass_name', response.user.name);
       if (response.user.email) setAuthItem('relopass_email', response.user.email);

@@ -540,6 +540,10 @@ class CompanyProfileRequest(BaseModel):
     hr_contact: Optional[str] = None
 
 
+class HrFeedbackRequest(BaseModel):
+    message: str
+
+
 def _require_reason(reason: Optional[str]) -> None:
     if not reason or not reason.strip():
         raise HTTPException(status_code=400, detail="Reason is required for admin actions")
@@ -1595,6 +1599,61 @@ def get_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
         completeness=completeness,
         complianceReport=report
     )
+
+
+@app.post("/api/hr/assignments/{assignment_id}/feedback")
+def post_hr_feedback(
+    assignment_id: str,
+    request: HrFeedbackRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR))
+):
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    effective = _effective_user(user, UserRole.HR)
+    if assignment.get("hr_user_id") != effective["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    message = (request.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    row = db.insert_hr_feedback(
+        feedback_id=str(uuid.uuid4()),
+        assignment_id=assignment_id,
+        hr_user_id=effective["id"],
+        employee_user_id=assignment.get("employee_user_id"),
+        message=message,
+    )
+    return {"ok": True, "id": row["id"], "created_at": row["created_at"]}
+
+
+@app.get("/api/hr/assignments/{assignment_id}/feedback")
+def get_hr_feedback(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    effective = _effective_user(user, UserRole.HR)
+    if assignment.get("hr_user_id") != effective["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    rows = db.list_hr_feedback(assignment_id)
+    return [
+        {"id": r["id"], "assignment_id": r["assignment_id"], "hr_user_id": r["hr_user_id"], "employee_user_id": r.get("employee_user_id"), "message": r["message"], "created_at": r["created_at"]}
+        for r in rows
+    ]
+
+
+@app.get("/api/employee/assignment-feedback")
+def get_employee_assignment_feedback(assignment_id: str = Query(...), user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    if assignment.get("employee_user_id") != effective["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    rows = db.list_hr_feedback(assignment_id)
+    return [
+        {"id": r["id"], "assignment_id": r["assignment_id"], "message": r["message"], "created_at": r["created_at"]}
+        for r in rows
+    ]
 
 
 @app.post("/api/hr/assignments/{assignment_id}/identifier")
