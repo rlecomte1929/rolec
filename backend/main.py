@@ -1229,82 +1229,113 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
 
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
 def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    _deny_if_impersonating(user)
-    effective = _effective_user(user, UserRole.HR)
-    case = db.get_case_by_id(case_id)
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+    request_id = str(uuid.uuid4())
+    try:
+        _deny_if_impersonating(user)
+        effective = _effective_user(user, UserRole.HR)
+        case = db.get_case_by_id(case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
 
-    employee_identifier = request.employeeIdentifier.strip()
-    if not employee_identifier:
-        raise HTTPException(status_code=400, detail="Employee identifier required")
+        employee_identifier = request.employeeIdentifier.strip()
+        if not employee_identifier:
+            raise HTTPException(status_code=400, detail="Employee identifier required")
 
-    employee_user = db.get_user_by_identifier(employee_identifier)
-    created_new_employee = False
-    if not employee_user and "@" in employee_identifier:
-        # Auto-register employee user with a temporary password
-        from passlib.context import CryptContext
-        pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-        temp_password = "Passw0rd!"
-        employee_user_id = str(uuid.uuid4())
-        created = db.create_user(
-            user_id=employee_user_id,
-            username=None,
-            email=employee_identifier.lower(),
-            password_hash=pwd_context.hash(temp_password),
-            role=UserRole.EMPLOYEE.value,
-            name=employee_identifier.split("@")[0],
-        )
-        if created:
-            employee_user = db.get_user_by_id(employee_user_id)
-            db.ensure_profile_record(employee_user_id, employee_identifier, UserRole.EMPLOYEE.value, employee_identifier.split("@")[0], None)
-            created_new_employee = True
-    assignment_id = str(uuid.uuid4())
-    invite_token = None
+        employee_user = db.get_user_by_identifier(employee_identifier)
+        created_new_employee = False
+        if not employee_user and "@" in employee_identifier:
+            # Auto-register employee user with a temporary password
+            from passlib.context import CryptContext
 
-    db.create_assignment(
-        assignment_id=assignment_id,
-        case_id=case_id,
-        hr_user_id=effective["id"],
-        employee_user_id=employee_user["id"] if employee_user else None,
-        employee_identifier=employee_identifier,
-        status=AssignmentStatus.DRAFT.value,
-    )
+            pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+            temp_password = "Passw0rd!"
+            employee_user_id = str(uuid.uuid4())
+            created = db.create_user(
+                user_id=employee_user_id,
+                username=None,
+                email=employee_identifier.lower(),
+                password_hash=pwd_context.hash(temp_password),
+                role=UserRole.EMPLOYEE.value,
+                name=employee_identifier.split("@")[0],
+            )
+            if created:
+                employee_user = db.get_user_by_id(employee_user_id)
+                db.ensure_profile_record(
+                    employee_user_id,
+                    employee_identifier,
+                    UserRole.EMPLOYEE.value,
+                    employee_identifier.split("@")[0],
+                    None,
+                )
+                created_new_employee = True
+        assignment_id = str(uuid.uuid4())
+        invite_token = None
 
-    if not employee_user:
-        invite_token = str(uuid.uuid4())
-        db.create_assignment_invite(
-            invite_id=str(uuid.uuid4()),
+        db.create_assignment(
+            assignment_id=assignment_id,
             case_id=case_id,
-            hr_user_id=user["id"],
+            hr_user_id=effective["id"],
+            employee_user_id=employee_user["id"] if employee_user else None,
             employee_identifier=employee_identifier,
-            token=invite_token,
+            status=AssignmentStatus.DRAFT.value,
         )
 
-    # Prefill invitation message in Messages
-    invite_line = f"Invitation token: {invite_token}" if invite_token else "You can claim your assignment after signing in."
-    temp_line = "Temporary password: Passw0rd!\n\n" if created_new_employee else ""
-    message_body = (
-        f"Hello,\n\n"
-        f"You have been registered for a relocation case on ReloPass.\n\n"
-        f"Assignment ID: {assignment_id}\n"
-        f"Employee identifier: {employee_identifier}\n"
-        f"{invite_line}\n\n"
-        f"Login at https://relopass.com/auth?mode=login\n"
-        f"{temp_line}"
-        f"Once logged in, go to My Case to start your intake.\n"
-    )
-    db.create_message(
-        message_id=str(uuid.uuid4()),
-        assignment_id=assignment_id,
-        hr_user_id=effective["id"],
-        employee_identifier=employee_identifier,
-        subject="Your relocation case is ready",
-        body=message_body,
-        status="draft",
-    )
+        if not employee_user:
+            invite_token = str(uuid.uuid4())
+            db.create_assignment_invite(
+                invite_id=str(uuid.uuid4()),
+                case_id=case_id,
+                hr_user_id=user["id"],
+                employee_identifier=employee_identifier,
+                token=invite_token,
+            )
 
-    return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
+        # Prefill invitation message in Messages
+        invite_line = (
+            f"Invitation token: {invite_token}"
+            if invite_token
+            else "You can claim your assignment after signing in."
+        )
+        temp_line = "Temporary password: Passw0rd!\n\n" if created_new_employee else ""
+        message_body = (
+            f"Hello,\n\n"
+            f"You have been registered for a relocation case on ReloPass.\n\n"
+            f"Assignment ID: {assignment_id}\n"
+            f"Employee identifier: {employee_identifier}\n"
+            f"{invite_line}\n\n"
+            f"Login at https://relopass.com/auth?mode=login\n"
+            f"{temp_line}"
+            f"Once logged in, go to My Case to start your intake.\n"
+        )
+        db.create_message(
+            message_id=str(uuid.uuid4()),
+            assignment_id=assignment_id,
+            hr_user_id=effective["id"],
+            employee_identifier=employee_identifier,
+            subject="Your relocation case is ready",
+            body=message_body,
+            status="draft",
+        )
+
+        return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
+    except HTTPException:
+        # Let explicit 4xx/404 propagate as-is.
+        raise
+    except Exception as e:
+        log.error(
+            "request_id=%s method=POST route=/api/hr/cases/%s/assign user_id=%s email=%s employee_identifier=%s error=%s",
+            request_id,
+            case_id,
+            user.get("id"),
+            user.get("email"),
+            getattr(request, "employeeIdentifier", None),
+            repr(e),
+            exc_info=True,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to assign case", "request_id": request_id},
+        )
 
 
 @app.get("/api/employee/assignments/current")
