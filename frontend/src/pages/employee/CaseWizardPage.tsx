@@ -301,16 +301,17 @@ export const CaseWizardPage: React.FC = () => {
 
         if (storedFeedback) {
           hydrateFeedback(storedFeedback);
-        } else if (assignment.status === 'CHANGES_REQUESTED' && assignmentId) {
+        } else if (assignment.status === 'awaiting_intake' && assignmentId) {
           // If the employee opened the wizard directly, pull HR notes from journey API.
           const journey = await employeeAPI.getNextQuestion(assignmentId);
           if (journey.hrNotes) hydrateFeedback(journey.hrNotes);
         }
 
         const isSubmitted =
-          assignment.status === 'EMPLOYEE_SUBMITTED' ||
-          assignment.status === 'HR_REVIEW' ||
-          assignment.status === 'HR_APPROVED';
+          assignment.status === 'submitted' ||
+          assignment.status === 'approved' ||
+          assignment.status === 'rejected' ||
+          assignment.status === 'closed';
         if (isSubmitted) {
           setAssignmentStatus(assignment.status as AssignmentStatus);
         }
@@ -435,7 +436,7 @@ export const CaseWizardPage: React.FC = () => {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        {assignmentStatus === 'CHANGES_REQUESTED' && hrFeedback && (
+        {assignmentStatus === 'awaiting_intake' && hrFeedback && (
           <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
             <div className="font-semibold">Changes requested by HR</div>
             {hrRequestedSections.length > 0 && (

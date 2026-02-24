@@ -160,11 +160,13 @@ export const HrDashboard: React.FC = () => {
   };
 
   const caseStatusBadge = (status: AssignmentSummary['status']) => {
-    if (status === 'HR_APPROVED') return <Badge variant="success">Approved</Badge>;
-    if (status === 'CHANGES_REQUESTED') return <Badge variant="warning">Changes requested</Badge>;
-    if (status === 'EMPLOYEE_SUBMITTED' || status === 'HR_REVIEW') return <Badge variant="info">HR review</Badge>;
-    if (status === 'IN_PROGRESS') return <Badge variant="warning">Intake in progress</Badge>;
-    return <Badge variant="neutral">Awaiting intake</Badge>;
+    if (status === 'approved') return <Badge variant="success">Approved</Badge>;
+    if (status === 'rejected') return <Badge variant="warning">Rejected</Badge>;
+    if (status === 'submitted') return <Badge variant="info">HR review</Badge>;
+    if (status === 'assigned' || status === 'awaiting_intake') {
+      return <Badge variant="warning">Intake in progress</Badge>;
+    }
+    return <Badge variant="neutral">Created</Badge>;
   };
 
   const parseDate = (value?: string | null) => (value ? new Date(value) : null);
@@ -234,19 +236,17 @@ export const HrDashboard: React.FC = () => {
   const highlightedBlocking =
     highlightedDetail?.complianceReport?.checks?.filter((check) => check.status !== 'COMPLIANT').length || 0;
 
-  const activeStatuses = new Set([
-    'DRAFT',
-    'IN_PROGRESS',
-    'EMPLOYEE_SUBMITTED',
-    'HR_REVIEW',
-    'CHANGES_REQUESTED',
-    'HR_APPROVED',
+  const activeStatuses = new Set<AssignmentStatus>([
+    'created',
+    'assigned',
+    'awaiting_intake',
+    'submitted',
   ]);
 
   const totalActive = assignments.filter((assignment) => activeStatuses.has(assignment.status)).length;
-  const completed = assignments.filter((assignment) => assignment.status === 'HR_APPROVED').length;
+  const completed = assignments.filter((assignment) => assignment.status === 'approved').length;
   const actionRequired = assignments.filter((assignment) => {
-    const requiresStatus = ['CHANGES_REQUESTED', 'HR_REVIEW', 'EMPLOYEE_SUBMITTED'].includes(assignment.status);
+    const requiresStatus = assignment.status === 'submitted';
     const detail = assignmentDetails[assignment.id];
     const blockingCount = detail?.complianceReport?.checks?.filter((check) => check.status !== 'COMPLIANT').length || 0;
     return requiresStatus || blockingCount > 0;
@@ -510,12 +510,11 @@ export const HrDashboard: React.FC = () => {
                   className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm"
                 >
                   <option value="all">All statuses</option>
-                  <option value="DRAFT">Draft</option>
-                  <option value="IN_PROGRESS">In progress</option>
-                  <option value="EMPLOYEE_SUBMITTED">Employee submitted</option>
-                  <option value="HR_REVIEW">HR review</option>
-                  <option value="CHANGES_REQUESTED">Changes requested</option>
-                  <option value="HR_APPROVED">Approved</option>
+                  <option value="created">Created</option>
+                  <option value="assigned">Assigned</option>
+                  <option value="awaiting_intake">Awaiting intake</option>
+                  <option value="submitted">HR review</option>
+                  <option value="approved">Approved</option>
                 </select>
               </div>
               <div>

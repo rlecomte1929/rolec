@@ -7,14 +7,18 @@ import { getAuthItem } from '../utils/demo';
 import type { AssignmentStatus, EmployeeJourneyResponse } from '../types';
 import { safeNavigate } from '../navigation/safeNavigate';
 
-const INTAKE_STATUSES: AssignmentStatus[] = ['DRAFT', 'IN_PROGRESS', 'CHANGES_REQUESTED'];
-const SUBMITTED_STATUSES: AssignmentStatus[] = ['EMPLOYEE_SUBMITTED', 'HR_REVIEW', 'HR_APPROVED'];
+// Canonical assignment statuses.
+const INTAKE_STATUSES: AssignmentStatus[] = ['created', 'assigned', 'awaiting_intake'];
+const SUBMITTED_STATUSES: AssignmentStatus[] = ['submitted', 'approved', 'rejected', 'closed'];
 
 function statusLabel(status?: AssignmentStatus) {
-  if (status === 'HR_APPROVED') return 'Approved';
-  if (status === 'HR_REVIEW') return 'Under HR review';
-  if (status === 'EMPLOYEE_SUBMITTED') return 'Submitted to HR';
-  if (status === 'CHANGES_REQUESTED') return 'Changes requested';
+  if (status === 'approved') return 'Approved';
+  if (status === 'rejected') return 'Rejected';
+  if (status === 'submitted') return 'Submitted to HR';
+  if (status === 'closed') return 'Closed';
+  if (status === 'awaiting_intake') return 'Awaiting intake';
+  if (status === 'assigned') return 'Assigned';
+  if (status === 'created') return 'Created';
   return 'In intake';
 }
 
@@ -69,7 +73,9 @@ export const EmployeeJourney: React.FC = () => {
   // Store HR notes when changes requested; allow free navigation between dashboard and wizard
   useEffect(() => {
     if (!assignmentId || !journey || !status) return;
-    if (status === 'CHANGES_REQUESTED' && journey.hrNotes) {
+    // When HR has requested changes, the backend normalizes legacy CHANGES_REQUESTED
+    // into 'awaiting_intake' and exposes hrNotes with guidance.
+    if (status === 'awaiting_intake' && journey.hrNotes) {
       sessionStorage.setItem('relopass_hr_notes', journey.hrNotes);
     }
   }, [assignmentId, journey, status]);
@@ -167,7 +173,7 @@ export const EmployeeJourney: React.FC = () => {
               </div>
               <div className="flex flex-wrap gap-2 pt-2">
                 <Button onClick={() => navigate(`/employee/case/${assignmentId}/wizard/1`)}>Open case wizard</Button>
-                {status === 'DRAFT' && (
+                {status === 'created' && (
                   <Button variant="outline" onClick={() => navigate(`/employee/case/${assignmentId}/wizard/1`)}>
                     Edit responses
                   </Button>
@@ -210,7 +216,7 @@ export const EmployeeJourney: React.FC = () => {
                     <div className="h-1.5 rounded-full bg-[#0b2b43]" style={{ width: `${progressPercentCapped}%` }} />
                   </div>
                 </div>
-                {status === 'EMPLOYEE_SUBMITTED' && (
+                {status === 'submitted' && (
                   <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
                     <div className="text-xs text-[#6b7280] mb-1">Status</div>
                     <div className="text-xs text-[#4b5563]">

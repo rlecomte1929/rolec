@@ -10,11 +10,13 @@ import { safeNavigate } from '../navigation/safeNavigate';
 
 const statusBadge = (status?: AssignmentStatus) => {
   if (!status) return <Badge variant="neutral">Unknown</Badge>;
-  if (status === 'HR_APPROVED') return <Badge variant="success">Approved</Badge>;
-  if (status === 'CHANGES_REQUESTED') return <Badge variant="warning">Changes requested</Badge>;
-  if (status === 'EMPLOYEE_SUBMITTED' || status === 'HR_REVIEW') return <Badge variant="info">HR review</Badge>;
-  if (status === 'IN_PROGRESS') return <Badge variant="warning">Intake in progress</Badge>;
-  return <Badge variant="neutral">Draft</Badge>;
+  if (status === 'approved') return <Badge variant="success">Approved</Badge>;
+  if (status === 'rejected') return <Badge variant="warning">Rejected</Badge>;
+  if (status === 'submitted') return <Badge variant="info">HR review</Badge>;
+  if (status === 'assigned' || status === 'awaiting_intake') {
+    return <Badge variant="warning">Intake in progress</Badge>;
+  }
+  return <Badge variant="neutral">Created</Badge>;
 };
 
 const clampPercent = (value?: number | null) => {
@@ -86,7 +88,7 @@ export const HrCaseSummary: React.FC = () => {
     setError('');
     setIsDeciding(true);
     try {
-      await hrAPI.decide(assignment.id, 'HR_APPROVED', { notes: decisionNotes || undefined });
+      await hrAPI.decide(assignment.id, 'approved', { notes: decisionNotes || undefined });
       setIsDecisionOpen(false);
       setDecisionNotes('');
       setRequestedSections([]);
@@ -107,7 +109,7 @@ export const HrCaseSummary: React.FC = () => {
     setError('');
     setIsDeciding(true);
     try {
-      await hrAPI.decide(assignment.id, 'CHANGES_REQUESTED', {
+      await hrAPI.decide(assignment.id, 'rejected', {
         notes: decisionNotes || undefined,
         requestedSections: requestedSections.length ? requestedSections : undefined,
       });
@@ -153,7 +155,7 @@ export const HrCaseSummary: React.FC = () => {
 
   const blockingItems = assignment?.complianceReport?.checks?.filter((check) => check.status !== 'COMPLIANT') || [];
   const complianceStatus = assignment?.complianceReport?.overallStatus || 'NEEDS_REVIEW';
-  const canReopen = assignment?.status === 'EMPLOYEE_SUBMITTED' || assignment?.status === 'HR_REVIEW';
+  const canReopen = assignment?.status === 'submitted';
 
   const nextDeadline = useMemo(() => {
     const target = assignment?.profile?.movePlan?.targetArrivalDate;

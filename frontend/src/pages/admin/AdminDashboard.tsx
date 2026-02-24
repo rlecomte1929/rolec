@@ -72,7 +72,7 @@ export const AdminDashboard: React.FC = () => {
               const res = await adminAPI.adminAction('purge-cases', {
                 reason,
                 payload: {
-                  active_statuses: ['IN_PROGRESS', 'EMPLOYEE_SUBMITTED', 'HR_REVIEW'],
+                  active_statuses: ['assigned', 'awaiting_intake', 'submitted'],
                 },
               });
               alert(`Purge complete. Assignments deleted: ${res.stats?.assignments_deleted ?? 0}, Relocation cases deleted: ${res.stats?.relocation_cases_deleted ?? 0}`);

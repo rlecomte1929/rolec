@@ -226,13 +226,14 @@ export const HrAssignmentReview: React.FC = () => {
         year: 'numeric',
       })
     : '—';
-  const stageLabel = assignment?.status === 'EMPLOYEE_SUBMITTED'
-    ? 'Stage: Intake - Profile Review'
-    : assignment?.status === 'CHANGES_REQUESTED'
-    ? 'Stage: Changes Requested'
-    : assignment?.status === 'HR_APPROVED'
-    ? 'Stage: Approved'
-    : 'Stage: Intake - In progress';
+  const stageLabel =
+    assignment?.status === 'submitted'
+      ? 'Stage: Intake - Profile Review'
+      : assignment?.status === 'approved'
+      ? 'Stage: Approved'
+      : assignment?.status === 'rejected'
+      ? 'Stage: Rejected'
+      : 'Stage: Intake - In progress';
   const readiness = Math.max(0, Math.min(100, Math.round(assignment?.completeness ?? 0)));
   const blockingItems = compliance?.checks?.filter((check) => check.status !== 'COMPLIANT') || [];
 

@@ -260,7 +260,7 @@ def _seed_demo_cases() -> None:
             "case_id": "demo-case-oslo-sg-family",
             "assignment_id": "demo-assignment-oslo-sg-family",
             "employee_identifier": "sarah.jenkins@relopass.local",
-            "status": AssignmentStatus.EMPLOYEE_SUBMITTED.value,
+            "status": AssignmentStatus.SUBMITTED.value,
             "profile": RelocationProfile(
                 userId="demo-assignment-oslo-sg-family",
                 familySize=4,
@@ -300,7 +300,7 @@ def _seed_demo_cases() -> None:
             "case_id": "demo-case-demo-emp",
             "assignment_id": "demo-assignment-demo-emp",
             "employee_identifier": "demo@relopass.com",
-            "status": AssignmentStatus.IN_PROGRESS.value,
+            "status": AssignmentStatus.ASSIGNED.value,
             "profile": RelocationProfile(
                 userId="demo-assignment-demo-emp",
                 familySize=2,
@@ -327,7 +327,7 @@ def _seed_demo_cases() -> None:
             "case_id": "demo-case-sg-ny-single",
             "assignment_id": "demo-assignment-sg-ny-single",
             "employee_identifier": "mark.thompson@relopass.local",
-            "status": AssignmentStatus.IN_PROGRESS.value,
+            "status": AssignmentStatus.ASSIGNED.value,
             "profile": RelocationProfile(
                 userId="demo-assignment-sg-ny-single",
                 familySize=1,
@@ -431,16 +431,73 @@ def _seed_default_hr_policy() -> None:
 
 _seed_demo_cases()
 
-LEGACY_STATUS_MAP = {
-    "PENDING_EMPLOYEE": AssignmentStatus.DRAFT.value,
-    "SUBMITTED_TO_HR": AssignmentStatus.EMPLOYEE_SUBMITTED.value,
-    "APPROVED": AssignmentStatus.HR_APPROVED.value,
-}
+
+_CANONICAL_STATUS_VALUES = {s.value for s in AssignmentStatus}
 
 
-def normalize_status(status: str) -> str:
-    # Map legacy DB values to the new state machine.
-    return LEGACY_STATUS_MAP.get(status, status)
+def normalize_status(status: Optional[str]) -> str:
+    """
+    Normalize legacy / mixed-case status values to canonical Postgres values.
+
+    Canonical statuses (and ONLY these) are:
+      created | assigned | awaiting_intake | submitted | approved | rejected | closed
+
+    - Accepts Optional[str] and returns one of the canonical strings.
+    - Case-insensitive, trims whitespace.
+    - Maps legacy values like DRAFT / IN_PROGRESS / EMPLOYEE_SUBMITTED / HR_APPROVED, etc.
+    - Unknown or empty values fall back to 'created' (and are logged once).
+    """
+    if not status:
+        return AssignmentStatus.CREATED.value
+
+    raw = str(status).strip()
+    if not raw:
+        return AssignmentStatus.CREATED.value
+
+    lower = raw.lower()
+    upper = raw.upper()
+
+    # Already canonical
+    if lower in _CANONICAL_STATUS_VALUES:
+        return lower
+
+    legacy_map = {
+        # Old uppercase workflow statuses
+        "DRAFT": AssignmentStatus.AWAITING_INTAKE.value,
+        "IN_PROGRESS": AssignmentStatus.ASSIGNED.value,
+        "EMPLOYEE_SUBMITTED": AssignmentStatus.SUBMITTED.value,
+        "PENDING_EMPLOYEE": AssignmentStatus.AWAITING_INTAKE.value,
+        "SUBMITTED_TO_HR": AssignmentStatus.SUBMITTED.value,
+        "HR_APPROVED": AssignmentStatus.APPROVED.value,
+        "APPROVED": AssignmentStatus.APPROVED.value,
+        "HR_REJECTED": AssignmentStatus.REJECTED.value,
+        "REJECTED": AssignmentStatus.REJECTED.value,
+        "DONE": AssignmentStatus.CLOSED.value,
+        "CLOSED": AssignmentStatus.CLOSED.value,
+        # Transitional / review states get folded into submitted
+        "HR_REVIEW": AssignmentStatus.SUBMITTED.value,
+        "CHANGES_REQUESTED": AssignmentStatus.AWAITING_INTAKE.value,
+    }
+
+    mapped = legacy_map.get(upper)
+    if mapped:
+        return mapped
+
+    # Fallback: log once per distinct unknown value and return 'created'
+    log.warning("Unknown assignment status '%s', normalizing to 'created'", raw)
+    return AssignmentStatus.CREATED.value
+
+
+def assert_canonical_status(status: str) -> None:
+    """
+    Guard to ensure we only ever write canonical assignment statuses to the DB.
+    Raises a 400 if a non-canonical value is about to be persisted.
+    """
+    if status not in _CANONICAL_STATUS_VALUES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid assignment status '{status}'. Must be one of: {sorted(_CANONICAL_STATUS_VALUES)}",
+        )
 
 
 # Auth dependency
@@ -879,7 +936,10 @@ def admin_reset_onboarding(request: AdminReasonRequest, user: Dict[str, Any] = D
     payload = request.payload or {}
     assignment_id = payload.get("assignment_id")
     if assignment_id:
-        db.update_assignment_status(assignment_id, payload.get("status", "IN_PROGRESS"))
+        # Default active status after reset is 'assigned'.
+        new_status = normalize_status(payload.get("status") or AssignmentStatus.ASSIGNED.value)
+        assert_canonical_status(new_status)
+        db.update_assignment_status(assignment_id, new_status)
     db.log_audit(user["id"], "RESET", "assignment", assignment_id, request.reason, payload)
     return {"ok": True}
 
@@ -958,9 +1018,9 @@ def admin_purge_cases(request: AdminReasonRequest, user: Dict[str, Any] = Depend
     _require_reason(request.reason)
     payload = request.payload or {}
     active_statuses = payload.get("active_statuses") or [
-        AssignmentStatus.IN_PROGRESS.value,
-        AssignmentStatus.EMPLOYEE_SUBMITTED.value,
-        AssignmentStatus.HR_REVIEW.value,
+        AssignmentStatus.ASSIGNED.value,
+        AssignmentStatus.AWAITING_INTAKE.value,
+        AssignmentStatus.SUBMITTED.value,
     ]
     stats = db.purge_inactive_cases(active_statuses)
     db.log_audit(user["id"], "RESET", "assignment", None, request.reason, {"active_statuses": active_statuses, **stats})
@@ -1271,13 +1331,15 @@ def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] =
         assignment_id = str(uuid.uuid4())
         invite_token = None
 
+        # New assignments created by HR are immediately in the 'assigned' state.
+        assert_canonical_status(AssignmentStatus.ASSIGNED.value)
         db.create_assignment(
             assignment_id=assignment_id,
             case_id=case_id,
             hr_user_id=effective["id"],
             employee_user_id=employee_user["id"] if employee_user else None,
             employee_identifier=employee_identifier,
-            status=AssignmentStatus.DRAFT.value,
+            status=AssignmentStatus.ASSIGNED.value,
         )
 
         if not employee_user:
@@ -1430,10 +1492,12 @@ def employee_submit_answer(
         raise HTTPException(status_code=404, detail="Assignment not found")
     if assignment.get("employee_user_id") != effective["id"]:
         raise HTTPException(status_code=403, detail="Assignment not assigned to user")
-    if normalize_status(assignment["status"]) in [
-        AssignmentStatus.EMPLOYEE_SUBMITTED.value,
-        AssignmentStatus.HR_REVIEW.value,
-        AssignmentStatus.HR_APPROVED.value,
+    normalized_status = normalize_status(assignment["status"])
+    if normalized_status in [
+        AssignmentStatus.SUBMITTED.value,
+        AssignmentStatus.APPROVED.value,
+        AssignmentStatus.REJECTED.value,
+        AssignmentStatus.CLOSED.value,
     ]:
         raise HTTPException(status_code=400, detail="Assignment is read-only")
 
@@ -1445,8 +1509,10 @@ def employee_submit_answer(
     db.save_employee_profile(request.assignmentId, profile)
     db.save_employee_answer(request.assignmentId, request.questionId, request.answer)
 
-    if normalize_status(assignment["status"]) == AssignmentStatus.DRAFT.value:
-        db.update_assignment_status(request.assignmentId, AssignmentStatus.IN_PROGRESS.value)
+    if normalized_status in [AssignmentStatus.CREATED.value, AssignmentStatus.ASSIGNED.value]:
+        # First meaningful employee input moves the assignment into awaiting_intake.
+        assert_canonical_status(AssignmentStatus.AWAITING_INTAKE.value)
+        db.update_assignment_status(request.assignmentId, AssignmentStatus.AWAITING_INTAKE.value)
 
     assignment = db.get_assignment_by_id(request.assignmentId)
     return _build_employee_journey_payload(assignment)
@@ -1754,12 +1820,18 @@ def get_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
         completion_state = orchestrator.compute_completion_state(profile)
         completeness = completion_state.get("profileCompleteness", 0)
 
+    submitted_at = assignment.get("submitted_at")
+    if isinstance(submitted_at, datetime):
+        submitted_at_str = submitted_at.isoformat()
+    else:
+        submitted_at_str = submitted_at
+
     return AssignmentDetail(
         id=aid,
         caseId=assignment["case_id"],
         employeeIdentifier=assignment["employee_identifier"],
         status=AssignmentStatus(normalize_status(assignment["status"])),
-        submittedAt=assignment.get("submitted_at"),
+        submittedAt=submitted_at_str,
         hrNotes=assignment.get("hr_notes"),
         profile=RelocationProfile(**profile) if profile else None,
         completeness=completeness,
@@ -2066,11 +2138,13 @@ def run_compliance(assignment_id: str, user: Dict[str, Any] = Depends(require_ro
 
     report = compliance_engine.run(profile)
     db.save_compliance_report(str(uuid.uuid4()), assignment_id, report)
-    if normalize_status(assignment["status"]) in [
-        AssignmentStatus.EMPLOYEE_SUBMITTED.value,
-        AssignmentStatus.CHANGES_REQUESTED.value,
-    ]:
-        db.update_assignment_status(assignment_id, AssignmentStatus.HR_REVIEW.value)
+
+    status = normalize_status(assignment["status"])
+    # For canonical workflow, keep the assignment in 'submitted' once compliance has run
+    # (or move awaiting_intake -> submitted if HR runs compliance pre-submission).
+    if status in [AssignmentStatus.SUBMITTED.value, AssignmentStatus.AWAITING_INTAKE.value]:
+        assert_canonical_status(AssignmentStatus.SUBMITTED.value)
+        db.update_assignment_status(assignment_id, AssignmentStatus.SUBMITTED.value)
     return report
 
 
@@ -2081,18 +2155,12 @@ def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[st
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    if request.decision not in [AssignmentStatus.HR_APPROVED, AssignmentStatus.CHANGES_REQUESTED]:
+    if request.decision not in [AssignmentStatus.APPROVED, AssignmentStatus.REJECTED]:
         raise HTTPException(status_code=400, detail="Invalid decision")
 
     notes_payload = request.notes
-    if request.decision == AssignmentStatus.CHANGES_REQUESTED and request.requestedSections:
-        notes_payload = json.dumps(
-            {
-                "notes": request.notes,
-                "requestedSections": request.requestedSections,
-            }
-        )
-
+    # For the simplified canonical lifecycle we treat decisions as final approved / rejected.
+    assert_canonical_status(request.decision.value)
     db.set_assignment_decision(assignment_id, request.decision.value, notes_payload)
     return {"success": True}
 
@@ -2420,6 +2488,7 @@ def _build_employee_journey_payload(
     assignment: Dict[str, Any],
 ) -> EmployeeJourneyNextQuestion:
     assignment_id = assignment["id"]
+    normalized_status = normalize_status(assignment.get("status"))
     profile = db.get_employee_profile(assignment_id)
     if not profile:
         profile = RelocationProfile(userId=assignment_id).model_dump()
@@ -2448,10 +2517,11 @@ def _build_employee_journey_payload(
 
     response = orchestrator.get_next_question(profile, answered_question_ids)
 
-    if normalize_status(assignment["status"]) in [
-        AssignmentStatus.EMPLOYEE_SUBMITTED.value,
-        AssignmentStatus.HR_REVIEW.value,
-        AssignmentStatus.HR_APPROVED.value,
+    if normalized_status in [
+        AssignmentStatus.SUBMITTED.value,
+        AssignmentStatus.APPROVED.value,
+        AssignmentStatus.REJECTED.value,
+        AssignmentStatus.CLOSED.value,
     ]:
         response.question = None
         response.isComplete = True

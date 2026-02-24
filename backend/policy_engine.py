@@ -378,13 +378,28 @@ class PolicyEngine:
         return f"L-{job_level} Specialized Knowledge" if job_level else "L-1B Specialized Knowledge"
 
     def _stage_label(self, status: Any) -> str:
-        if status == "EMPLOYEE_SUBMITTED":
-            return "Intake/Pre-Submission"
-        if status == "CHANGES_REQUESTED":
-            return "Changes Requested"
-        if status == "HR_APPROVED":
+        """
+        Map canonical / legacy assignment statuses to human-readable stage labels.
+        """
+        if not status:
+            return "Intake / Created"
+        s = str(status).strip().lower()
+        if s in {"submitted"}:
+            return "Intake / Submitted"
+        if s in {"approved"}:
             return "Approved"
-        return "Intake/In Progress"
+        if s in {"rejected"}:
+            return "Rejected"
+        if s in {"awaiting_intake", "assigned"}:
+            return "Awaiting Intake"
+        # Legacy fallbacks
+        if s in {"employee_submitted"}:
+            return "Intake / Submitted"
+        if s in {"changes_requested"}:
+            return "Awaiting Intake"
+        if s in {"hr_approved"}:
+            return "Approved"
+        return "Intake / In Progress"
 
     def _parse_date(self, value: Any) -> Optional[date]:
         if not value:

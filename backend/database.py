@@ -667,13 +667,17 @@ class Database:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             conn.execute(text(
-                "UPDATE case_assignments SET status = 'EMPLOYEE_SUBMITTED', submitted_at = :now, updated_at = :now WHERE id = :id"
-            ), {"now": now, "id": assignment_id})
+                "UPDATE case_assignments "
+                "SET status = :status, submitted_at = :now, updated_at = :now "
+                "WHERE id = :id"
+            ), {"status": "submitted", "now": now, "id": assignment_id})
 
     def set_assignment_decision(self, assignment_id: str, decision: str, notes: Optional[str]) -> None:
         with self.engine.begin() as conn:
             conn.execute(text(
-                "UPDATE case_assignments SET status = :decision, decision = :decision, hr_notes = :notes, updated_at = :ua WHERE id = :id"
+                "UPDATE case_assignments "
+                "SET status = :decision, decision = :decision, hr_notes = :notes, updated_at = :ua "
+                "WHERE id = :id"
             ), {"decision": decision, "notes": notes, "ua": datetime.utcnow().isoformat(), "id": assignment_id})
 
     def get_assignment_by_id(self, assignment_id: str) -> Optional[Dict[str, Any]]:

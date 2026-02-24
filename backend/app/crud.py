@@ -14,7 +14,7 @@ def create_case(db: Session, case_id: str, draft: Dict[str, Any]) -> models.Case
     case = models.Case(
         id=case_id,
         draft_json=json.dumps(draft),
-        status="DRAFT",
+        status="created",
         flags_json=json.dumps({}),
     )
     db.add(case)

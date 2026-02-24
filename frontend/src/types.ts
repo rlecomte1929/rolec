@@ -504,13 +504,15 @@ export interface DashboardResponse {
   overallStatus: 'On track' | 'At risk';
 }
 
+// Canonical assignment statuses (aligned with Postgres constraint and backend).
 export type AssignmentStatus =
-  | 'IN_PROGRESS'
-  | 'DRAFT'
-  | 'EMPLOYEE_SUBMITTED'
-  | 'HR_REVIEW'
-  | 'HR_APPROVED'
-  | 'CHANGES_REQUESTED';
+  | 'created'
+  | 'assigned'
+  | 'awaiting_intake'
+  | 'submitted'
+  | 'approved'
+  | 'rejected'
+  | 'closed';
 
 export interface AssignmentSummary {
   id: string;

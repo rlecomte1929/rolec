@@ -18,7 +18,9 @@ class Case(Base):
     purpose = Column(String, nullable=True)
     target_move_date = Column(Date, nullable=True)
     flags_json = Column(Text, nullable=True)
-    status = Column(String, nullable=False, default="DRAFT")
+    # Workflow status for wizard cases. Use canonical-style default to avoid
+    # conflicting with assignment status enums elsewhere in the system.
+    status = Column(String, nullable=False, default="created")
     requirements_snapshot_id = Column(String, nullable=True)
 
 

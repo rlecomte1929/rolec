@@ -293,12 +293,20 @@ class DashboardResponse(BaseModel):
 
 
 class AssignmentStatus(str, Enum):
-    DRAFT = "DRAFT"
-    IN_PROGRESS = "IN_PROGRESS"
-    EMPLOYEE_SUBMITTED = "EMPLOYEE_SUBMITTED"
-    HR_REVIEW = "HR_REVIEW"
-    HR_APPROVED = "HR_APPROVED"
-    CHANGES_REQUESTED = "CHANGES_REQUESTED"
+    """
+    Canonical assignment statuses (aligned with Postgres constraint).
+
+    All API responses and internal logic should use these values only.
+    Legacy/uppercase variants are normalized via normalize_status() in main.py.
+    """
+
+    CREATED = "created"
+    ASSIGNED = "assigned"
+    AWAITING_INTAKE = "awaiting_intake"
+    SUBMITTED = "submitted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CLOSED = "closed"
 
 
 class AssignmentSummary(BaseModel):

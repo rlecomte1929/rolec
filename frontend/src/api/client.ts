@@ -218,7 +218,7 @@ export const hrAPI = {
   },
   decide: async (
     assignmentId: string,
-    decision: 'HR_APPROVED' | 'CHANGES_REQUESTED',
+    decision: 'approved' | 'rejected',
     opts?: { notes?: string; requestedSections?: string[] }
   ): Promise<any> => {
     const response = await api.post(`/api/hr/assignments/${assignmentId}/decision`, {
