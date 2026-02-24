@@ -131,7 +131,7 @@ export function subscribeToNotificationsRealtime(
           }
         }
       )
-      .subscribe((status, err) => {
+      .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           stopFallback();
           reconnectAttempts = 0;

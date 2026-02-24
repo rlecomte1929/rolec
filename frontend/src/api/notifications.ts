@@ -4,7 +4,6 @@
 
 import api from './client';
 import { upsertNotificationPreference as upsertPrefRpc } from './rpc';
-import type { Notification } from '../constants/notificationTypes';
 
 const POLL_INTERVAL_MS = 30_000;
 
