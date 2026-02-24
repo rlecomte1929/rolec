@@ -1629,12 +1629,21 @@ def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR)
         for assignment in assignments:
             report = db.get_latest_compliance_report(assignment["id"])
             case_meta = cases_by_id.get(assignment.get("case_id"))
+
+            submitted_at = assignment.get("submitted_at")
+            # In SQLite this is stored as text; in Postgres it may be timestamptz.
+            # Pydantic model expects Optional[str], so normalize here.
+            if isinstance(submitted_at, datetime):
+                submitted_at_str = submitted_at.isoformat()
+            else:
+                submitted_at_str = submitted_at
+
             summaries.append(AssignmentSummary(
                 id=assignment["id"],
                 caseId=assignment["case_id"],
                 employeeIdentifier=assignment["employee_identifier"],
                 status=AssignmentStatus(normalize_status(assignment["status"])),
-                submittedAt=assignment.get("submitted_at"),
+                submittedAt=submitted_at_str,
                 complianceStatus=report["overallStatus"] if report else None,
                 case=case_meta,
             ))
