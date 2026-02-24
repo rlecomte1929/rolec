@@ -30,8 +30,10 @@ import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { ProvidersPage } from './pages/ProvidersPage';
 import { DebugAuth } from './pages/DebugAuth';
+import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
 import { Messages } from './pages/Messages';
 import { HrCompanyProfile } from './pages/HrCompanyProfile';
+import { NotificationSettings } from './pages/NotificationSettings';
 
 function ReviewToEmployeeDashboardRedirect() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -99,12 +101,16 @@ function App() {
           element={<PlaceholderPage title="Resources" description="Access HR relocation resources and guides." />}
         />
         <Route path={ROUTE_DEFS.hrCompanyProfile.path} element={<HrCompanyProfile />} />
+        <Route path={ROUTE_DEFS.notificationSettings.path} element={<NotificationSettings />} />
         <Route
           path={ROUTE_DEFS.submissionCenter.path}
           element={<PlaceholderPage title="Submission Center" description="Finalize and submit case documentation." />}
         />
         {import.meta.env.DEV && (
-          <Route path="/debug/auth" element={<DebugAuth />} />
+          <>
+            <Route path="/debug/auth" element={<DebugAuth />} />
+            <Route path="/debug/assignment" element={<AssignmentDebugPage />} />
+          </>
         )}
         <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
       </Routes>

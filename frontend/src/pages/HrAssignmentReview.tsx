@@ -3,10 +3,11 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravity';
 import { hrAPI } from '../api/client';
-import { getCase } from '../api/cases';
+import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
 import type { AssignmentDetail, AssignmentSummary, CaseDraftDTO, ComplianceReport } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { AssignmentDebugPanel } from './AssignmentDebugPanel';
 
 type TabKey = 'timeline' | 'intake' | 'documents' | 'providers' | 'messages';
 
@@ -56,17 +57,21 @@ export const HrAssignmentReview: React.FC = () => {
     try {
       const data = await hrAPI.listAssignments();
       setAssignments(data);
+      const paramCaseId = searchParams.get('caseId') || id || localStorage.getItem('relopass_last_assignment_id');
       if (data.length > 0) {
-        const paramCaseId = searchParams.get('caseId');
-        const matchByCaseId = paramCaseId ? data.find((item) => item.caseId === paramCaseId) : null;
-        const initial = id || (matchByCaseId ? matchByCaseId.id : null) || searchParams.get('caseId') || localStorage.getItem('relopass_last_assignment_id');
-        const nextId = matchByCaseId
-          ? matchByCaseId.id
+        const match = paramCaseId
+          ? data.find((item) => item.id === paramCaseId || item.caseId === paramCaseId)
+          : null;
+        const initial = match ? match.id : paramCaseId;
+        const nextId = match
+          ? match.id
           : initial && data.some((item) => item.id === initial)
           ? initial
           : data[0].id;
         setSelectedCaseId(nextId);
         localStorage.setItem('relopass_last_assignment_id', nextId);
+      } else if (paramCaseId) {
+        setSelectedCaseId(paramCaseId);
       }
     } catch (err: any) {
       if (err.response?.status === 401) {
@@ -80,6 +85,7 @@ export const HrAssignmentReview: React.FC = () => {
   const loadAssignment = async (caseId: string) => {
     if (!caseId) return;
     setIsLoading(true);
+    setError('');
     try {
       const data = await hrAPI.getAssignment(caseId);
       setAssignment(data);
@@ -89,7 +95,7 @@ export const HrAssignmentReview: React.FC = () => {
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
-        setError('Unable to load case details.');
+        setError('Assignment not found or not visible under RLS.');
       }
     } finally {
       setIsLoading(false);
@@ -111,29 +117,41 @@ export const HrAssignmentReview: React.FC = () => {
     }
   }, [selectedCaseId]);
 
-  const loadIntakeDraft = useCallback(async (caseId: string) => {
+  const loadIntakeDraft = useCallback(async (assignmentId: string) => {
     setIntakeError('');
     setIntakeLoading(true);
     try {
-      const data = await getCase(caseId);
-      setIntakeDraft(data?.draft ?? null);
+      const { data, error } = await getCaseDetailsByAssignmentId(assignmentId);
+      if (error) {
+        setIntakeDraft(null);
+        setIntakeError(
+          error.includes('Case row missing')
+            ? error
+            : 'Assignment not found or not visible under RLS. The employee may not have started the wizard yet.'
+        );
+      } else if (data) {
+        setIntakeDraft(data.case?.draft ?? null);
+      } else {
+        setIntakeDraft(null);
+        setIntakeError('Unable to load intake responses. The employee may not have started the wizard yet.');
+      }
     } catch {
       setIntakeDraft(null);
-      setIntakeError('Unable to load intake responses. The employee may not have started the wizard yet.');
+      setIntakeError('Assignment not found or not visible under RLS.');
     } finally {
       setIntakeLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (assignment?.caseId) {
-      loadIntakeDraft(assignment.caseId);
+    if (assignment?.id) {
+      loadIntakeDraft(assignment.id);
     } else {
       setIntakeDraft(null);
       setIntakeError('');
       setIntakeLoading(false);
     }
-  }, [assignment?.caseId, loadIntakeDraft]);
+  }, [assignment?.id, loadIntakeDraft]);
 
   const loadHrFeedback = useCallback(async (assignmentId: string) => {
     setHrFeedbackError('');
@@ -278,7 +296,16 @@ export const HrAssignmentReview: React.FC = () => {
 
   return (
     <AppShell title="Employee Dashboard" subtitle="Review case progress, compliance, and next actions.">
-      {error && <Alert variant="error">{error}</Alert>}
+      {error && (
+        <Alert variant="error">
+          {error}
+          {import.meta.env.DEV && selectedCaseId && (
+            <div className="mt-2 text-xs font-mono text-[#6b7280]">
+              assignmentId: {selectedCaseId}
+            </div>
+          )}
+        </Alert>
+      )}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading case...</div>}
 
       {!isLoading && assignment && (
@@ -678,6 +705,9 @@ export const HrAssignmentReview: React.FC = () => {
         </div>
       )}
 
+      {(import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') && selectedCaseId && (
+        <AssignmentDebugPanel assignmentIdFromRoute={selectedCaseId} />
+      )}
       {isNudgeOpen && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
           <Card padding="lg" className="w-full max-w-lg">

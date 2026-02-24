@@ -16,6 +16,7 @@ from datetime import datetime
 import re
 import json
 from pydantic import BaseModel
+from sqlalchemy import text
 
 from .schemas import (
     RegisterRequest, LoginRequest, LoginResponse, AnswerRequest, NextQuestionResponse,
@@ -45,6 +46,7 @@ from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
 from .app.recommendations.router import router as recommendations_router
 from pydantic import BaseModel as _BaseModel
+from .services.supabase_client import get_supabase_admin_client
 
 # ---------------------------------------------------------------------------
 # Startup: validate DATABASE_URL and log DB type
@@ -512,6 +514,16 @@ def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str,
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="Admin only")
     return user
+
+
+def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Allow HR or Employee. Admin passes as HR."""
+    r = user.get("role")
+    if r == UserRole.ADMIN.value:
+        return user
+    if r in (UserRole.HR.value, UserRole.EMPLOYEE.value):
+        return user
+    raise HTTPException(status_code=403, detail="HR or Employee only")
 
 
 class AdminImpersonateRequest(BaseModel):
@@ -1534,23 +1546,137 @@ def update_profile_photo(
 
 @app.get("/api/hr/assignments", response_model=List[AssignmentSummary])
 def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    if user.get("is_admin") and not user.get("impersonation"):
-        assignments = db.list_all_assignments()
-    else:
-        effective = _effective_user(user, UserRole.HR)
-        assignments = db.list_assignments_for_hr(effective["id"])
-    summaries = []
-    for assignment in assignments:
-        report = db.get_latest_compliance_report(assignment["id"])
-        summaries.append(AssignmentSummary(
-            id=assignment["id"],
-            caseId=assignment["case_id"],
-            employeeIdentifier=assignment["employee_identifier"],
-            status=AssignmentStatus(normalize_status(assignment["status"])),
-            submittedAt=assignment.get("submitted_at"),
-            complianceStatus=report["overallStatus"] if report else None,
-        ))
-    return summaries
+    """
+    List HR assignments with attached relocation case summary.
+
+    - Auth: HR (or ADMIN).
+    - Data: assignments from case_assignments filtered by hr_user_id (or all for admin),
+      plus case metadata from relocation_cases.
+    """
+    request_id = str(uuid.uuid4())
+    try:
+        if user.get("is_admin") and not user.get("impersonation"):
+            assignments = db.list_all_assignments()
+        else:
+            effective = _effective_user(user, UserRole.HR)
+            assignments = db.list_assignments_for_hr(effective["id"])
+
+        if not assignments:
+            return []
+
+        # Collect case_ids for bulk lookup.
+        case_ids = [a.get("case_id") for a in assignments if a.get("case_id")]
+        cases_by_id: Dict[str, Any] = {}
+
+        if case_ids:
+            # Deduplicate to keep query small.
+            unique_ids = list({cid for cid in case_ids if cid})
+            if unique_ids:
+                # Build a parameterized IN clause to support both SQLite and Postgres.
+                placeholders = ", ".join(f":id{i}" for i in range(len(unique_ids)))
+                sql = (
+                    "SELECT id, status, stage, home_country, host_country, "
+                    "employee_id, company_id "
+                    "FROM relocation_cases WHERE id IN (" + placeholders + ")"
+                )
+                params = {f"id{i}": cid for i, cid in enumerate(unique_ids)}
+                with db.engine.connect() as conn:
+                    rows = conn.execute(text(sql), params).fetchall()
+                for row in rows:
+                    m = row._mapping
+                    cases_by_id[m["id"]] = {
+                        "id": m["id"],
+                        "status": m.get("status"),
+                        "stage": m.get("stage"),
+                        "home_country": m.get("home_country"),
+                        "host_country": m.get("host_country"),
+                        "employee_id": m.get("employee_id"),
+                        "company_id": m.get("company_id"),
+                    }
+
+        summaries: List[AssignmentSummary] = []
+        for assignment in assignments:
+            report = db.get_latest_compliance_report(assignment["id"])
+            case_meta = cases_by_id.get(assignment.get("case_id"))
+            summaries.append(AssignmentSummary(
+                id=assignment["id"],
+                caseId=assignment["case_id"],
+                employeeIdentifier=assignment["employee_identifier"],
+                status=AssignmentStatus(normalize_status(assignment["status"])),
+                submittedAt=assignment.get("submitted_at"),
+                complianceStatus=report["overallStatus"] if report else None,
+                case=case_meta,
+            ))
+        return summaries
+    except Exception as e:
+        # Structured error log with request_id and user identity.
+        log.error(
+            "request_id=%s method=GET route=/api/hr/assignments user_id=%s email=%s error=%s",
+            request_id,
+            user.get("id"),
+            user.get("email"),
+            repr(e),
+            exc_info=True,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to load assignments", "request_id": request_id},
+        )
+
+
+@app.get("/api/debug/supabase")
+def debug_supabase():
+    """
+    Lightweight Supabase admin connectivity check.
+    - Verifies SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are present.
+    - Runs a small SELECT via service-role client.
+    """
+    request_id = str(uuid.uuid4())
+    supabase_url_present = bool(os.getenv("SUPABASE_URL"))
+    service_role_present = bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+
+    if not supabase_url_present or not service_role_present:
+        log.error(
+            "request_id=%s supabase debug missing envs: url_present=%s service_role_present=%s",
+            request_id,
+            supabase_url_present,
+            service_role_present,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": "Supabase environment variables missing",
+                "supabase_url_present": supabase_url_present,
+                "service_role_key_present": service_role_present,
+                "request_id": request_id,
+            },
+        )
+
+    try:
+        client = get_supabase_admin_client()
+        # Lightweight query: try to select a single row (or none) from notifications.
+        res = client.table("notifications").select("id").limit(1).execute()
+        db_ok = res is not None
+        return {
+            "ok": True,
+            "db_ok": db_ok,
+            "supabase_url_present": True,
+            "service_role_key_present": True,
+            "request_id": request_id,
+        }
+    except Exception as e:
+        log.error("request_id=%s supabase debug query failed: %s", request_id, e, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": "Supabase query failed",
+                "supabase_url_present": True,
+                "service_role_key_present": True,
+                "request_id": request_id,
+            },
+        )
 
 
 @app.get("/api/hr/messages")
@@ -1623,6 +1749,32 @@ def post_hr_feedback(
         employee_user_id=assignment.get("employee_user_id"),
         message=message,
     )
+    emp_id = assignment.get("employee_user_id")
+    if emp_id:
+        try:
+            db.create_notification_with_preferences(
+                user_id=emp_id,
+                type_="HR_FEEDBACK_POSTED",
+                title="New feedback from HR",
+                body=(message[:120] + "…") if len(message) > 120 else message,
+                assignment_id=assignment_id,
+                case_id=assignment.get("case_id"),
+                metadata={"feedback_id": row["id"], "assignment_id": assignment_id},
+            )
+        except Exception as e:
+            try:
+                db.insert_notification(
+                    notification_id=str(uuid.uuid4()),
+                    user_id=emp_id,
+                    type_="HR_FEEDBACK_POSTED",
+                    title="New feedback from HR",
+                    body=(message[:120] + "…") if len(message) > 120 else message,
+                    assignment_id=assignment_id,
+                    case_id=assignment.get("case_id"),
+                    metadata={"feedback_id": row["id"], "assignment_id": assignment_id},
+                )
+            except Exception as e2:
+                log.warning("Failed to create notification for HR feedback: %s", e2)
     return {"ok": True, "id": row["id"], "created_at": row["created_at"]}
 
 
@@ -1654,6 +1806,193 @@ def get_employee_assignment_feedback(assignment_id: str = Query(...), user: Dict
         {"id": r["id"], "assignment_id": r["assignment_id"], "message": r["message"], "created_at": r["created_at"]}
         for r in rows
     ]
+
+
+@app.get("/api/case-details-by-assignment")
+def get_case_details_by_assignment(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Load case details through the assignment relationship only.
+    Access is gated by case_assignments (user must be employee or HR for this assignment).
+    """
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found or not visible under RLS")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    visible = False
+    if is_employee and emp_id == effective["id"]:
+        visible = True
+    if is_hr and (effective.get("is_admin") or hr_id == effective["id"]):
+        visible = True
+    if not visible:
+        raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case_id")
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if not case:
+            case = app_crud.create_case(session, case_id, {
+                "relocationBasics": {},
+                "employeeProfile": {},
+                "familyMembers": {},
+                "assignmentContext": {},
+            })
+        draft = json.loads(case.draft_json or "{}")
+        case_dto = cases_router._case_dto(case, draft)
+    return {
+        "assignment": {
+            "id": assignment["id"],
+            "case_id": assignment["case_id"],
+            "employee_user_id": emp_id,
+            "hr_user_id": hr_id,
+            "status": assignment.get("status", ""),
+            "employee_identifier": assignment.get("employee_identifier"),
+        },
+        "case": case_dto.model_dump(mode="json"),
+    }
+
+
+@app.get("/api/notifications")
+def list_notifications(
+    limit: int = Query(25, ge=1, le=100),
+    only_unread: bool = Query(False),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    role = UserRole.EMPLOYEE if user.get("role") == UserRole.EMPLOYEE.value else UserRole.HR
+    effective = _effective_user(user, role)
+    uid = effective.get("id")
+    if not uid:
+        return []
+    rows = db.list_notifications(uid, limit=limit, only_unread=only_unread)
+    return [
+        {
+            "id": r["id"],
+            "created_at": r["created_at"],
+            "assignment_id": r.get("assignment_id"),
+            "case_id": r.get("case_id"),
+            "type": r["type"],
+            "title": r["title"],
+            "body": r.get("body"),
+            "metadata": json.loads(r["metadata"]) if isinstance(r.get("metadata"), str) else (r.get("metadata") or {}),
+            "read_at": r.get("read_at"),
+        }
+        for r in rows
+    ]
+
+
+@app.get("/api/notifications/unread-count")
+def get_unread_count(user: Dict[str, Any] = Depends(get_current_user)):
+    role = UserRole.EMPLOYEE if user.get("role") == UserRole.EMPLOYEE.value else UserRole.HR
+    effective = _effective_user(user, role)
+    uid = effective.get("id")
+    if not uid:
+        return {"count": 0}
+    return {"count": db.count_unread_notifications(uid)}
+
+
+@app.patch("/api/notifications/{notification_id}/read")
+def mark_notification_read(
+    notification_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    role = UserRole.EMPLOYEE if user.get("role") == UserRole.EMPLOYEE.value else UserRole.HR
+    effective = _effective_user(user, role)
+    uid = effective.get("id")
+    if not uid:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if not db.mark_notification_read(notification_id, uid):
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"ok": True}
+
+
+class NotifyHrRequest(BaseModel):
+    assignment_id: str
+
+
+@app.post("/api/notifications/notify-hr")
+def notify_hr_employee_saved(
+    request: NotifyHrRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    assignment = db.get_assignment_by_id(request.assignment_id) or db.get_assignment_by_case_id(request.assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    if assignment.get("employee_user_id") != effective["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    hr_id = assignment.get("hr_user_id")
+    if not hr_id:
+        return {"ok": True}
+    try:
+        db.create_notification_with_preferences(
+            user_id=hr_id,
+            type_="EMPLOYEE_SAVED",
+            title="Employee updated the case",
+            body=f"New updates were saved for case {request.assignment_id[:8]}…",
+            assignment_id=request.assignment_id,
+            case_id=assignment.get("case_id"),
+            metadata={"assignment_id": request.assignment_id},
+        )
+    except Exception as e:
+        try:
+            db.insert_notification(
+                notification_id=str(uuid.uuid4()),
+                user_id=hr_id,
+                type_="EMPLOYEE_SAVED",
+                title="Employee updated the case",
+                body=f"New updates were saved for case {request.assignment_id[:8]}…",
+                assignment_id=request.assignment_id,
+                case_id=assignment.get("case_id"),
+                metadata={"assignment_id": request.assignment_id},
+            )
+        except Exception as e2:
+            log.warning("Failed to create notification for employee save: %s", e2)
+    return {"ok": True}
+
+
+@app.get("/api/debug/assignment-check")
+def debug_assignment_check(
+    assignment_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Dev-only: verify assignment visibility for current user. Uses backend auth (relopass_token)."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        return {"found": False, "row": None, "current_user_id": user.get("id")}
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    visible = False
+    if is_employee and emp_id == effective["id"]:
+        visible = True
+    if is_hr and (effective.get("is_admin") or hr_id == effective["id"]):
+        visible = True
+    if not visible:
+        return {"found": False, "row": None, "current_user_id": effective.get("id")}
+    return {
+        "found": True,
+        "row": {
+            "id": assignment["id"],
+            "case_id": assignment["case_id"],
+            "employee_user_id": emp_id,
+            "hr_user_id": hr_id,
+            "status": assignment.get("status", ""),
+            "created_at": assignment.get("created_at", ""),
+            "updated_at": assignment.get("updated_at", ""),
+        },
+        "current_user_id": effective.get("id"),
+    }
 
 
 @app.post("/api/hr/assignments/{assignment_id}/identifier")

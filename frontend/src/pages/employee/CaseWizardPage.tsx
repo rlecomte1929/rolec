@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ROUTES } from '../../routes';
 import { CaseContextBar } from '../../components/case/CaseContextBar';
 import { WizardSidebar } from '../../components/case/WizardSidebar';
 import { Card } from '../../components/antigravity';
-import { getCase, patchCase, startResearch } from '../../api/cases';
+import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
+import { patchCase, startResearch } from '../../api/cases';
+import { notifyHrEmployeeSaved } from '../../api/notifications';
 import { buildNextActionsFromMissingFields, classifyRelocationCase, getRelocationCase } from '../../api/relocation';
 import { employeeAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
@@ -156,11 +158,12 @@ const buildTestDraft = (seedKey: string, baseDraft: CaseDraftDTO): CaseDraftDTO 
 };
 
 export const CaseWizardPage: React.FC = () => {
-  const { caseId, step } = useParams();
+  const { caseId: assignmentIdFromRoute, step } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [draft, setDraft] = useState<CaseDraftDTO>(() => buildDefaultDraft());
   const [caseData, setCaseData] = useState<CaseDTO | null>(null);
+  const [resolvedCaseId, setResolvedCaseId] = useState<string | null>(null);
   const [requiredFields, setRequiredFields] = useState<string[]>([]);
   const [nextActions, setNextActions] = useState<NextAction[]>([]);
   const [isClassifying, setIsClassifying] = useState(false);
@@ -208,46 +211,44 @@ export const CaseWizardPage: React.FC = () => {
     return { step1Done, step2Done, step3Done, step4Done, maxUnlocked, completed };
   }, [draft]);
 
+  const assignmentId = assignmentIdFromRoute;
+
   // Enforce linear progression: cannot skip ahead.
   useEffect(() => {
-    if (!caseId) return;
+    if (!assignmentId) return;
     if (currentStep > stepCompletion.maxUnlocked) {
       setError('Please complete the previous steps before continuing.');
-      navigate(`/employee/case/${caseId}/wizard/${stepCompletion.maxUnlocked}`, { replace: true });
+      navigate(`/employee/case/${assignmentId}/wizard/${stepCompletion.maxUnlocked}`, { replace: true });
     }
-  }, [caseId, currentStep, stepCompletion.maxUnlocked, navigate]);
+  }, [assignmentId, currentStep, stepCompletion.maxUnlocked, navigate]);
 
   const loadCase = async () => {
-    if (!caseId) return;
+    if (!assignmentIdFromRoute) return;
     try {
-      const data = await getCase(caseId);
-      setCaseData(data);
-      setDraft(caseToWizardDraft(data));
-    } catch {
-      try {
-        const relocation = await getRelocationCase(caseId);
-        const fallbackCase: CaseDTO = {
-          id: relocation.id,
-          status: relocation.status || 'DRAFT',
-          draft: buildDefaultDraft(),
-          createdAt: relocation.created_at || new Date().toISOString(),
-          updatedAt: relocation.updated_at || new Date().toISOString(),
-          originCountry: relocation.home_country || undefined,
-          destCountry: relocation.host_country || undefined,
-        };
-        setCaseData(fallbackCase);
-        setDraft(caseToWizardDraft(fallbackCase));
-      } catch {
+      const { data, error: loadError } = await getCaseDetailsByAssignmentId(assignmentIdFromRoute);
+      if (loadError || !data) {
         setCaseData(null);
         setDraft(buildDefaultDraft());
+        setResolvedCaseId(null);
+        if (loadError) setError(loadError.includes('Case row missing') ? loadError : 'Assignment not found or not visible under RLS.');
+      } else {
+        setCaseData(data.case);
+        setDraft(caseToWizardDraft(data.case));
+        setResolvedCaseId(data.case.id);
       }
+    } catch {
+      setCaseData(null);
+      setDraft(buildDefaultDraft());
+      setResolvedCaseId(null);
+      setError('Assignment not found or not visible under RLS.');
     }
   };
 
-  const loadRequirements = async () => {
-    if (!caseId) return;
+  const loadRequirements = useCallback(async () => {
+    const caseIdForReq = resolvedCaseId || assignmentIdFromRoute;
+    if (!caseIdForReq) return;
     try {
-      const relocation = await getRelocationCase(caseId);
+      const relocation = await getRelocationCase(caseIdForReq);
       const missing = relocation.missing_fields || [];
       setRequiredFields(missing);
       setNextActions(buildNextActionsFromMissingFields(missing));
@@ -255,12 +256,15 @@ export const CaseWizardPage: React.FC = () => {
       setRequiredFields([]);
       setNextActions([]);
     }
-  };
+  }, [resolvedCaseId, assignmentIdFromRoute]);
 
   useEffect(() => {
     loadCase();
-    loadRequirements();
-  }, [caseId]);
+  }, [assignmentIdFromRoute]);
+
+  useEffect(() => {
+    if (resolvedCaseId || assignmentIdFromRoute) loadRequirements();
+  }, [resolvedCaseId, assignmentIdFromRoute, loadRequirements]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -275,7 +279,7 @@ export const CaseWizardPage: React.FC = () => {
         const res = await employeeAPI.getCurrentAssignment();
         const assignment = res.assignment;
         if (!assignment) return;
-        if (caseId && assignment.id !== caseId) return;
+        if (assignmentId && assignment.id !== assignmentId) return;
         setAssignmentStatus(assignment.status as AssignmentStatus);
 
         const storedFeedback = sessionStorage.getItem('relopass_hr_notes') || '';
@@ -297,9 +301,9 @@ export const CaseWizardPage: React.FC = () => {
 
         if (storedFeedback) {
           hydrateFeedback(storedFeedback);
-        } else if (assignment.status === 'CHANGES_REQUESTED' && caseId) {
+        } else if (assignment.status === 'CHANGES_REQUESTED' && assignmentId) {
           // If the employee opened the wizard directly, pull HR notes from journey API.
-          const journey = await employeeAPI.getNextQuestion(caseId);
+          const journey = await employeeAPI.getNextQuestion(assignmentId);
           if (journey.hrNotes) hydrateFeedback(journey.hrNotes);
         }
 
@@ -315,15 +319,14 @@ export const CaseWizardPage: React.FC = () => {
       }
     };
     run();
-  }, [caseId, navigate]);
+  }, [assignmentId, navigate]);
 
   useEffect(() => {
-    if (!caseId) return;
+    if (!assignmentId) return;
     let cancelled = false;
     (async () => {
-      const aid = caseId;
       try {
-        const data = await employeeAPI.getFeedback(aid);
+        const data = await employeeAPI.getFeedback(assignmentId);
         if (!cancelled && data) {
           setCaseFeedback(data.map((f) => ({ id: f.id, message: f.message, created_at: f.created_at })));
         }
@@ -332,45 +335,48 @@ export const CaseWizardPage: React.FC = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [caseId]);
+  }, [assignmentId]);
 
   const handleSave = async (nextDraft: CaseDraftDTO) => {
-    if (!caseId) return;
-    const updated = await patchCase(caseId, nextDraft);
+    if (!resolvedCaseId) return;
+    const updated = await patchCase(resolvedCaseId, nextDraft);
     setDraft(caseToWizardDraft(updated));
     setCaseData(updated);
     await loadRequirements();
     setError('');
+    if (assignmentId) {
+      notifyHrEmployeeSaved(assignmentId).catch(() => {});
+    }
   };
 
   const handleNext = async (nextDraft: CaseDraftDTO) => {
-    if (!caseId) return;
+    if (!resolvedCaseId || !assignmentId) return;
     try {
       await handleSave(nextDraft);
       if (currentStep === 1) {
         try {
-          await startResearch(caseId);
+          await startResearch(resolvedCaseId);
           setBanner('Pulling destination requirements—shown in Step 5.');
         } catch {
           // Research is non-blocking; continue to next step
         }
       }
-      navigate(`/employee/case/${caseId}/wizard/${currentStep + 1}`);
+      navigate(`/employee/case/${assignmentId}/wizard/${currentStep + 1}`);
     } catch (err: any) {
       setError(err?.message || 'Unable to save. Please try again.');
     }
   };
 
   const handleBack = () => {
-    if (!caseId) return;
-    navigate(`/employee/case/${caseId}/wizard/${currentStep - 1}`);
+    if (!assignmentId) return;
+    navigate(`/employee/case/${assignmentId}/wizard/${currentStep - 1}`);
   };
 
   const handleFillForTest = async () => {
-    if (!caseId) return;
+    if (!resolvedCaseId || !assignmentId) return;
     setError('');
     const baseDraft = caseToWizardDraft(caseData);
-    const nextDraft = buildTestDraft(caseId, baseDraft);
+    const nextDraft = buildTestDraft(assignmentId, baseDraft);
     try {
       await handleSave(nextDraft);
     } catch (err: any) {
@@ -379,10 +385,10 @@ export const CaseWizardPage: React.FC = () => {
   };
 
   const handleClassify = async () => {
-    if (!caseId) return;
+    if (!resolvedCaseId) return;
     setIsClassifying(true);
     try {
-      const res = await classifyRelocationCase(caseId);
+      const res = await classifyRelocationCase(resolvedCaseId);
       setNextActions(res.classification.next_actions || []);
     } catch (err: any) {
       setError(err?.message || 'Unable to generate next steps.');
@@ -392,7 +398,7 @@ export const CaseWizardPage: React.FC = () => {
   };
 
   const stepProps = {
-    caseId: caseId || '',
+    caseId: resolvedCaseId || assignmentId || '',
     draft,
     requiredFields,
     onSave: handleSave,
@@ -419,7 +425,7 @@ export const CaseWizardPage: React.FC = () => {
           </Link>
           <nav className="flex items-center gap-4 text-sm text-[#6b7280]">
             <Link to={ROUTES.EMP_DASH} className="hover:text-[#0b2b43]">Dashboard</Link>
-            <Link to={`/employee/case/${caseId}/wizard/1`} className="text-[#0b2b43] font-semibold">My Case</Link>
+            <Link to={`/employee/case/${assignmentId}/wizard/1`} className="text-[#0b2b43] font-semibold">My Case</Link>
             <Link to="/providers" className="hover:text-[#0b2b43]">Providers</Link>
             <Link to="/hr/policy" className="hover:text-[#0b2b43]">HR Policy</Link>
             <Link to="/messages" className="hover:text-[#0b2b43]">Messages</Link>
@@ -446,7 +452,7 @@ export const CaseWizardPage: React.FC = () => {
                         'Assignment / Context': 4,
                       };
                       const stepToOpen = map[section] || 1;
-                      navigate(`/employee/case/${caseId}/wizard/${stepToOpen}`);
+                      navigate(`/employee/case/${assignmentId}/wizard/${stepToOpen}`);
                     }}
                   >
                     Fix: {section}
@@ -460,6 +466,9 @@ export const CaseWizardPage: React.FC = () => {
         {error && (
           <div className="rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
             {error}
+            {import.meta.env.DEV && assignmentId && (
+              <div className="mt-2 text-xs font-mono text-[#6b7280]">assignmentId: {assignmentId}</div>
+            )}
           </div>
         )}
         {caseFeedback.length > 0 && (
@@ -545,7 +554,7 @@ export const CaseWizardPage: React.FC = () => {
                   setError('Complete the previous steps first.');
                   return;
                 }
-                navigate(`/employee/case/${caseId}/wizard/${stepNumber}`);
+                navigate(`/employee/case/${assignmentId}/wizard/${stepNumber}`);
               }}
             />
             <Card padding="md">

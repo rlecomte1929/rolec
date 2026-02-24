@@ -62,7 +62,8 @@ api.interceptors.response.use(
     const status = err?.response?.status;
     const url = err?.config?.url ?? '';
     const isAuthEndpoint = /\/api\/auth\/(login|register)$/.test(url);
-    if (status === 401 && !isAuthEndpoint) {
+    const isDebugEndpoint = /\/api\/debug\//.test(url);
+    if (status === 401 && !isAuthEndpoint && !isDebugEndpoint) {
       try {
         const d = typeof err?.response?.data?.detail === 'string'
           ? err.response.data.detail

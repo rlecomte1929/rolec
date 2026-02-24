@@ -10,6 +10,7 @@ import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
+import { NotificationBell } from './NotificationBell';
 
 const logoUrl = '/relopass-logo.png?v=1';
 
@@ -74,7 +75,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
               className="h-16 w-16 rounded-xl object-contain"
             />
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            {(isHrRole || isEmployeeRole) && <NotificationBell />}
             <button
               onClick={async () => {
                 await authAPI.logout();

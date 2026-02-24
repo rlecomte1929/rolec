@@ -103,6 +103,21 @@ export const employeeSubmitAssignment = async (assignmentId: string) => {
   return transitionAssignment(assignmentId, 'EMPLOYEE_SUBMIT');
 };
 
+/** 6C: Upsert notification preference. */
+export const upsertNotificationPreference = async (opts: {
+  type: string;
+  in_app: boolean;
+  email: boolean;
+  muted_until?: string | null;
+}) => {
+  return callRpc<null>('upsert_notification_preference', {
+    p_type: opts.type,
+    p_in_app: opts.in_app,
+    p_email: opts.email,
+    p_muted_until: opts.muted_until ?? null,
+  });
+};
+
 // Manual test checklist:
 // 1) Call transitionAssignment with EMPLOYEE_SUBMIT from DRAFT.
 // 2) Call transitionAssignment with EMPLOYEE_UNSUBMIT from EMPLOYEE_SUBMITTED.

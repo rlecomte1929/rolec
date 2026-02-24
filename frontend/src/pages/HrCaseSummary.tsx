@@ -56,8 +56,7 @@ export const HrCaseSummary: React.FC = () => {
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
-        const msg = err.response?.data?.detail ?? err.message ?? 'Unable to load case summary.';
-        setError(typeof msg === 'string' ? msg : 'Unable to load case summary.');
+        setError('Assignment not found or not visible under RLS.');
       }
     } finally {
       setIsLoading(false);
@@ -165,7 +164,14 @@ export const HrCaseSummary: React.FC = () => {
 
   return (
     <AppShell title="Case Summary" subtitle="Overview of the relocation case for review.">
-      {error && <Alert variant="error">{error}</Alert>}
+      {error && (
+        <Alert variant="error">
+          {error}
+          {import.meta.env.DEV && caseId && (
+            <div className="mt-2 text-xs font-mono text-[#6b7280]">assignmentId/caseId: {caseId}</div>
+          )}
+        </Alert>
+      )}
       {reopenSuccess && <Alert variant="success">{reopenSuccess}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading case summary...</div>}
 

@@ -308,6 +308,9 @@ class AssignmentSummary(BaseModel):
     status: AssignmentStatus
     submittedAt: Optional[str] = None
     complianceStatus: Optional[str] = None
+    # 6B/6C: Optional relocation case summary attached to assignment
+    # Contains a safe subset of fields from relocation_cases.
+    case: Optional[Dict[str, Any]] = None
 
 
 class AssignmentDetail(BaseModel):

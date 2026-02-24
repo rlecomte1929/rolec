@@ -346,6 +346,29 @@ class Database:
                 )
             """))
 
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    assignment_id TEXT,
+                    case_id TEXT,
+                    type TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    body TEXT,
+                    metadata TEXT NOT NULL DEFAULT '{}',
+                    read_at TEXT
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_notifications_user_created "
+                "ON notifications(user_id, created_at DESC)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_notifications_user_read "
+                "ON notifications(user_id, read_at)"
+            ))
+
             # Best-effort schema extensions for relocation_cases
             if _is_sqlite:
                 cols = conn.execute(text("PRAGMA table_info(companies)")).fetchall()
@@ -709,6 +732,166 @@ class Database:
                 "FROM hr_feedback WHERE assignment_id = :aid ORDER BY created_at DESC"
             ), {"aid": assignment_id}).fetchall()
         return self._rows_to_list(rows)
+
+    def _get_notification_preference(
+        self, user_id: str, type_: str
+    ) -> Optional[Dict[str, Any]]:
+        """6C: Get preference for user/type. Returns None if no row or table missing (use defaults)."""
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        "SELECT in_app, email, muted_until FROM notification_preferences "
+                        "WHERE user_id::text = :uid AND type = :type"
+                    ),
+                    {"uid": str(user_id), "type": type_},
+                ).fetchone()
+            if row:
+                return {"in_app": row._mapping.get("in_app"), "email": row._mapping.get("email"), "muted_until": row._mapping.get("muted_until")}
+        except Exception as e:
+            log.debug("notification_preferences not available: %s", e)
+        return None
+
+    def _insert_notification_outbox(
+        self,
+        notification_id: str,
+        user_id: str,
+        to_email: str,
+        type_: str,
+        payload: Dict[str, Any],
+    ) -> None:
+        """6C: Insert outbox row for email delivery. No-op if table missing."""
+        try:
+            outbox_id = str(uuid.uuid4())
+            now = datetime.utcnow().isoformat()
+            payload_json = json.dumps(payload)
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "INSERT INTO notification_outbox "
+                        "(id, notification_id, user_id, to_email, type, payload, status) "
+                        "VALUES (:id, :nid, :uid, :email, :type, CAST(:payload AS jsonb), 'pending')"
+                    ),
+                    {
+                        "id": outbox_id, "nid": notification_id, "uid": user_id,
+                        "email": to_email, "type": type_, "payload": payload_json,
+                    },
+                )
+        except Exception as e:
+            log.warning("Failed to insert notification outbox: %s", e)
+
+    def create_notification_with_preferences(
+        self,
+        user_id: str,
+        type_: str,
+        title: str,
+        body: Optional[str] = None,
+        assignment_id: Optional[str] = None,
+        case_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """6C: Create notification respecting preferences and muted_until. Returns notification id or None."""
+        pref = self._get_notification_preference(user_id, type_)
+        in_app = True
+        email = False
+        muted_until = None
+        if pref:
+            in_app = pref.get("in_app") if pref.get("in_app") is not None else True
+            email = pref.get("email") or False
+            muted_until = pref.get("muted_until")
+        if muted_until:
+            try:
+                if isinstance(muted_until, str):
+                    muted_dt = datetime.fromisoformat(muted_until.replace("Z", "+00:00"))
+                else:
+                    muted_dt = muted_until
+                if muted_dt and muted_dt > datetime.utcnow():
+                    return None
+            except Exception:
+                pass
+        if not in_app and not email:
+            return None
+        notification_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        meta_json = json.dumps(metadata or {})
+        with self.engine.begin() as conn:
+                conn.execute(
+                text(
+                    "INSERT INTO notifications (id, created_at, user_id, assignment_id, case_id, type, title, body, metadata) "
+                    "VALUES (:id, :ca, :uid, :aid, :cid, :type, :title, :body, :meta)"
+                ),
+                {
+                    "id": notification_id, "ca": now, "uid": user_id, "aid": assignment_id,
+                    "cid": case_id, "type": type_, "title": title, "body": body, "meta": meta_json,
+                },
+            )
+        if email:
+            user = self.get_user_by_id(user_id)
+            to_email = (user or {}).get("email") or ""
+            if to_email:
+                self._insert_notification_outbox(
+                    notification_id=notification_id,
+                    user_id=user_id,
+                    to_email=to_email,
+                    type_=type_,
+                    payload={
+                        "title": title,
+                        "body": body or "",
+                        "assignment_id": assignment_id,
+                        "case_id": case_id,
+                        **(metadata or {}),
+                    },
+                )
+        return notification_id
+
+    def insert_notification(
+        self,
+        notification_id: str,
+        user_id: str,
+        type_: str,
+        title: str,
+        body: Optional[str] = None,
+        assignment_id: Optional[str] = None,
+        case_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        meta_json = json.dumps(metadata or {})
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO notifications (id, created_at, user_id, assignment_id, case_id, type, title, body, metadata) "
+                "VALUES (:id, :ca, :uid, :aid, :cid, :type, :title, :body, :meta)"
+            ), {
+                "id": notification_id, "ca": now, "uid": user_id, "aid": assignment_id,
+                "cid": case_id, "type": type_, "title": title, "body": body, "meta": meta_json,
+            })
+
+    def list_notifications(self, user_id: str, limit: int = 25, only_unread: bool = False) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            q = (
+                "SELECT id, created_at, assignment_id, case_id, type, title, body, metadata, read_at "
+                "FROM notifications WHERE user_id = :uid"
+            )
+            if only_unread:
+                q += " AND read_at IS NULL"
+            q += " ORDER BY created_at DESC LIMIT :lim"
+            rows = conn.execute(text(q), {"uid": user_id, "lim": min(limit, 100)}).fetchall()
+        return self._rows_to_list(rows)
+
+    def count_unread_notifications(self, user_id: str) -> int:
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND read_at IS NULL"
+            ), {"uid": user_id}).fetchone()
+        return row[0] if row else 0
+
+    def mark_notification_read(self, notification_id: str, user_id: str) -> bool:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            result = conn.execute(text(
+                "UPDATE notifications SET read_at = :ra WHERE id = :id AND user_id = :uid"
+            ), {"ra": now, "id": notification_id, "uid": user_id})
+        return result.rowcount > 0
 
     def list_all_assignments(self) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:

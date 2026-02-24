@@ -7,10 +7,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Card } from '../../components/antigravity';
-import { getCase } from '../../api/cases';
-import { getRelocationCase } from '../../api/relocation';
+import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { employeeAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
+import { AssignmentDebugPanel } from '../AssignmentDebugPanel';
 import type { CaseDTO, CaseDraftDTO } from '../../types';
 
 function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -74,45 +74,44 @@ function caseToWizardDraft(caseData: CaseDTO | null): CaseDraftDTO {
 
 export const EmployeeCaseSummary: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
+  const assignmentId = caseId;
   const [draft, setDraft] = useState<CaseDraftDTO | null>(null);
   const [feedback, setFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    if (!caseId) return;
+    if (!assignmentId) return;
     setIsLoading(true);
     setError('');
     try {
-      const data = await getCase(caseId);
-      setDraft(caseToWizardDraft(data));
-    } catch {
-      try {
-        const relocation = await getRelocationCase(caseId);
-        const fallbackCase: CaseDTO = {
-          id: relocation.id,
-          status: relocation.status || 'DRAFT',
-          draft: buildDefaultDraft(),
-          createdAt: relocation.created_at || new Date().toISOString(),
-          updatedAt: relocation.updated_at || new Date().toISOString(),
-          originCountry: relocation.home_country || undefined,
-          destCountry: relocation.host_country || undefined,
-        };
-        setDraft(caseToWizardDraft(fallbackCase));
-      } catch {
+      const { data, error: loadError } = await getCaseDetailsByAssignmentId(assignmentId);
+      if (loadError) {
         setDraft(buildDefaultDraft());
-        setError('Unable to load your case. You can try editing from the wizard.');
+        setError(
+          loadError.includes('Case row missing')
+            ? loadError
+            : 'Assignment not found or not visible under RLS. You can try editing from the wizard.'
+        );
+      } else if (data?.case) {
+        setDraft(caseToWizardDraft(data.case));
+      } else {
+        setDraft(buildDefaultDraft());
+        setError('Assignment not found or not visible under RLS.');
       }
+    } catch {
+      setDraft(buildDefaultDraft());
+      setError('Assignment not found or not visible under RLS.');
     }
 
     try {
-      const fb = await employeeAPI.getFeedback(caseId);
+      const fb = await employeeAPI.getFeedback(assignmentId);
       setFeedback((fb ?? []).map((f) => ({ id: f.id, message: f.message, created_at: f.created_at })));
     } catch {
       setFeedback([]);
     }
     setIsLoading(false);
-  }, [caseId]);
+  }, [assignmentId]);
 
   useEffect(() => {
     load();
@@ -133,14 +132,21 @@ export const EmployeeCaseSummary: React.FC = () => {
     <AppShell title="My Case" subtitle="Summary of your intake responses.">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Link
-          to={caseId ? `/employee/case/${caseId}/wizard/1` : '/employee/journey'}
+          to={assignmentId ? `/employee/case/${assignmentId}/wizard/1` : '/employee/journey'}
           className="inline-flex items-center justify-center font-medium rounded-lg px-4 py-2 border-2 border-[#0b2b43] text-[#0b2b43] hover:bg-[#e6f2f4] transition-colors"
         >
           Continue editing
         </Link>
       </div>
 
-      {error && <Alert variant="error">{error}</Alert>}
+      {error && (
+        <Alert variant="error">
+          {error}
+          {import.meta.env.DEV && assignmentId && (
+            <div className="mt-2 text-xs font-mono text-[#6b7280]">assignmentId: {assignmentId}</div>
+          )}
+        </Alert>
+      )}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading your case...</div>}
 
       {!isLoading && draft && (
@@ -196,6 +202,10 @@ export const EmployeeCaseSummary: React.FC = () => {
 
       {!isLoading && draft && !hasAnyData && (
         <p className="text-sm text-[#6b7280]">You haven&apos;t filled in the intake wizard yet. Click &quot;Continue editing&quot; to get started.</p>
+      )}
+
+      {(import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') && assignmentId && (
+        <AssignmentDebugPanel assignmentIdFromRoute={assignmentId} />
       )}
     </AppShell>
   );

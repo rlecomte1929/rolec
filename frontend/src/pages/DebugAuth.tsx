@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card } from '../components/antigravity';
 import { getAuthItem } from '../utils/demo';
@@ -51,6 +52,12 @@ export const DebugAuth: React.FC = () => {
           </div>
         </div>
       </Card>
+      <Link
+        to="/debug/assignment"
+        className="inline-block mt-4 text-sm text-[#0b2b43] hover:underline"
+      >
+        → Assignment Debug
+      </Link>
     </AppShell>
   );
 };
