@@ -178,7 +178,6 @@ def timed(span: str, request_id: Optional[str] = None):
           log.info("request_id=%s span=%s dur_ms=%.2f", request_id, span, dur_ms)
       else:
           log.info("span=%s dur_ms=%.2f", span, dur_ms)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/health")

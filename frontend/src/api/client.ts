@@ -50,7 +50,7 @@ const api = axios.create({
 // Add auth token + request/perf metadata to requests
 api.interceptors.request.use((config) => {
   const token = getAuthItem('relopass_token');
-  if (!config.headers) config.headers = {};
+  if (!config.headers) (config as { headers?: Record<string, string> }).headers = {};
   if (token) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (config.headers as any).Authorization = `Bearer ${token}`;
@@ -63,8 +63,7 @@ api.interceptors.request.use((config) => {
   const requestId =
     existingId ||
     (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? // @ts-expect-error randomUUID in modern browsers
-        (crypto.randomUUID() as string)
+      ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -503,8 +502,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
   const requestId =
     opts?.requestId ||
     (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? // @ts-expect-error randomUUID
-        (crypto.randomUUID() as string)
+      ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
   const pathOnly = path.split('?')[0] || '/';
   try {
@@ -561,8 +559,7 @@ export async function apiPost<T>(
   const requestId =
     opts?.requestId ||
     (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? // @ts-expect-error randomUUID
-        (crypto.randomUUID() as string)
+      ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
   const pathOnly = path.split('?')[0] || '/';
   try {
@@ -620,8 +617,7 @@ export async function apiPatch<T>(
   const requestId =
     opts?.requestId ||
     (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? // @ts-expect-error randomUUID
-        (crypto.randomUUID() as string)
+      ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
   const pathOnly = path.split('?')[0] || '/';
   try {
