@@ -567,8 +567,8 @@ def assert_canonical_status(status: str) -> None:
 
 # Auth dependency
 async def get_current_user(
+    request: Request,
     authorization: Optional[str] = Header(None),
-    request: Request | None = None,
 ) -> Dict[str, Any]:
     """Extract user from authorization header."""
     if not authorization:
@@ -1372,10 +1372,10 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
 def assign_case(
     case_id: str,
     request: AssignCaseRequest,
+    request_obj: Request,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
-    request_obj: Request | None = None,
 ):
-    request_id = getattr(request_obj.state, "request_id", None) if request_obj else str(uuid.uuid4())
+    request_id = getattr(request_obj.state, "request_id", None) or str(uuid.uuid4())
     try:
         _deny_if_impersonating(user)
         effective = _effective_user(user, UserRole.HR)
