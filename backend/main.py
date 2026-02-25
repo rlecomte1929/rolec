@@ -2,11 +2,12 @@
 FastAPI main application for ReloPass backend.
 """
 import logging
+import time
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File
+from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any, List
@@ -46,6 +47,7 @@ from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
 from .app.recommendations.router import router as recommendations_router
 from pydantic import BaseModel as _BaseModel
+from contextlib import contextmanager
 from .services.supabase_client import get_supabase_admin_client
 
 # ---------------------------------------------------------------------------
@@ -98,6 +100,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def request_id_and_timing_middleware(request: Request, call_next):
+    """
+    Attach a request_id to each request/response and log overall handler duration.
+    Correlates with frontend X-Request-ID and DB/query spans.
+    """
+    req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = req_id
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.error(
+            "request_id=%s method=%s path=%s error=%s dur_ms=%.2f",
+            req_id,
+            request.method,
+            request.url.path,
+            repr(exc),
+            dur_ms,
+            exc_info=True,
+        )
+        raise
+    dur_ms = (time.perf_counter() - start) * 1000
+    response.headers["X-Request-ID"] = req_id
+    user_id = getattr(request.state, "user_id", None)
+    log.info(
+        "request_id=%s method=%s path=%s status=%s dur_ms=%.2f user_id=%s",
+        req_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        dur_ms,
+        user_id,
+    )
+    return response
+
 app.include_router(compat_router.router)
 app.include_router(cases_router.router)
 app.include_router(admin_router.router)
@@ -118,6 +158,26 @@ def _log_unhandled_exception(request, exc: Exception):
         raise exc
     tb = traceback.format_exc()
     log.error("Unhandled exception: %s\n%s", exc, tb)
+
+
+@contextmanager
+def timed(span: str, request_id: Optional[str] = None):
+  """
+  Lightweight span timing helper for endpoint internals.
+
+  Usage:
+      with timed("db.get_assignment_by_id", request.state.request_id):
+          ...
+  """
+  start = time.perf_counter()
+  try:
+      yield
+  finally:
+      dur_ms = (time.perf_counter() - start) * 1000
+      if request_id:
+          log.info("request_id=%s span=%s dur_ms=%.2f", request_id, span, dur_ms)
+      else:
+          log.info("span=%s dur_ms=%.2f", span, dur_ms)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
@@ -429,7 +489,10 @@ def _seed_default_hr_policy() -> None:
     db.create_hr_policy(policy_id, policy, created_by=None)
 
 
-_seed_demo_cases()
+# Only run legacy demo seed (relocation_cases with string IDs) on SQLite.
+# Production Supabase uses UUID for relocation_cases.id; seeding would crash.
+if _db_scheme == "sqlite":
+    _seed_demo_cases()
 
 
 _CANONICAL_STATUS_VALUES = {s.value for s in AssignmentStatus}
@@ -503,6 +566,7 @@ def assert_canonical_status(status: str) -> None:
 # Auth dependency
 async def get_current_user(
     authorization: Optional[str] = Header(None),
+    request: Request | None = None,
 ) -> Dict[str, Any]:
     """Extract user from authorization header."""
     if not authorization:
@@ -530,6 +594,14 @@ async def get_current_user(
         user["is_admin"] = True
     else:
         user["is_admin"] = False
+
+    # Attach user id for middleware logging (if Request is available).
+    if request is not None:
+        try:
+            request.state.user_id = user.get("id")
+        except Exception:
+            # request may be a test stub; ignore
+            pass
 
     # Admin impersonation context (server-side)
     session = db.get_admin_session(token)
@@ -1116,10 +1188,13 @@ def complete_profile(user: Dict[str, Any] = Depends(get_current_user)):
 
 
 @app.get("/api/employee/recommendations")
-def get_employee_recommendations(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
+def get_employee_recommendations(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
     """Get recommendations for employee's assignment (uses employee_profile from wizard)."""
     effective = _effective_user(user, UserRole.EMPLOYEE)
-    assignment = db.get_assignment_for_employee(effective["id"])
+    assignment = db.get_assignment_for_employee(effective["id"], request_id=request.state.request_id)
     if not assignment:
         return {"housing": [], "schools": [], "movers": []}
     profile = db.get_employee_profile(assignment["id"])
@@ -1171,7 +1246,7 @@ def get_mover_recommendations(user: Dict[str, Any] = Depends(get_current_user)) 
 
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
-def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
+def get_dashboard(request: Request, user: Dict[str, Any] = Depends(get_current_user)):
     """
     Get complete dashboard data including:
     - Profile completeness
@@ -1183,14 +1258,18 @@ def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
     profile = db.get_profile(user["id"])
     # Employees may use case/assignment flow: try assignment's employee_profile
     if not profile and user.get("role") in (UserRole.EMPLOYEE.value, UserRole.ADMIN.value):
-        assignment = db.get_assignment_for_employee(user["id"])
+        assignment = db.get_assignment_for_employee(user["id"], request_id=request.state.request_id)
         if not assignment:
             ident = (user.get("email") or user.get("username") or "").strip().lower()
             if ident:
-                assignment = db.get_unassigned_assignment_by_identifier(ident)
+                assignment = db.get_unassigned_assignment_by_identifier(
+                    ident, request_id=request.state.request_id
+                )
                 if assignment:
-                    db.attach_employee_to_assignment(assignment["id"], user["id"])
-                    assignment = db.get_assignment_by_id(assignment["id"])
+                    db.attach_employee_to_assignment(
+                        assignment["id"], user["id"], request_id=request.state.request_id
+                    )
+                    assignment = db.get_assignment_by_id(assignment["id"], request_id=request.state.request_id)
         if assignment:
             profile = db.get_employee_profile(assignment["id"])
 
@@ -1288,8 +1367,13 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
 
 
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
-def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    request_id = str(uuid.uuid4())
+def assign_case(
+    case_id: str,
+    request: AssignCaseRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+    request_obj: Request | None = None,
+):
+    request_id = getattr(request_obj.state, "request_id", None) if request_obj else str(uuid.uuid4())
     try:
         _deny_if_impersonating(user)
         effective = _effective_user(user, UserRole.HR)
@@ -1333,14 +1417,16 @@ def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] =
 
         # New assignments created by HR are immediately in the 'assigned' state.
         assert_canonical_status(AssignmentStatus.ASSIGNED.value)
-        db.create_assignment(
-            assignment_id=assignment_id,
-            case_id=case_id,
-            hr_user_id=effective["id"],
-            employee_user_id=employee_user["id"] if employee_user else None,
-            employee_identifier=employee_identifier,
-            status=AssignmentStatus.ASSIGNED.value,
-        )
+        with timed("db.create_assignment", request_id):
+            db.create_assignment(
+                assignment_id=assignment_id,
+                case_id=case_id,
+                hr_user_id=effective["id"],
+                employee_user_id=employee_user["id"] if employee_user else None,
+                employee_identifier=employee_identifier,
+                status=AssignmentStatus.ASSIGNED.value,
+                request_id=request_id,
+            )
 
         if not employee_user:
             invite_token = str(uuid.uuid4())
@@ -1401,17 +1487,24 @@ def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] =
 
 
 @app.get("/api/employee/assignments/current")
-def get_employee_assignment(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
+def get_employee_assignment(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
     effective = _effective_user(user, UserRole.EMPLOYEE)
-    assignment = db.get_assignment_for_employee(effective["id"])
+    assignment = db.get_assignment_for_employee(effective["id"], request_id=request.state.request_id)
     if not assignment:
         identifier = effective.get("username") or effective.get("email")
         if identifier:
-            assignment = db.get_unassigned_assignment_by_identifier(identifier)
+            assignment = db.get_unassigned_assignment_by_identifier(
+                identifier, request_id=request.state.request_id
+            )
             if assignment and not user.get("impersonation"):
-                db.attach_employee_to_assignment(assignment["id"], effective["id"])
+                db.attach_employee_to_assignment(
+                    assignment["id"], effective["id"], request_id=request.state.request_id
+                )
                 db.mark_invites_claimed(identifier)
-                assignment = db.get_assignment_by_id(assignment["id"])
+                assignment = db.get_assignment_by_id(assignment["id"], request_id=request.state.request_id)
 
     if not assignment:
         return {"assignment": None}
@@ -1642,7 +1735,10 @@ def update_profile_photo(
 
 
 @app.get("/api/hr/assignments", response_model=List[AssignmentSummary])
-def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+def list_hr_assignments(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
     """
     List HR assignments with attached relocation case summary.
 
@@ -1650,13 +1746,15 @@ def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR)
     - Data: assignments from case_assignments filtered by hr_user_id (or all for admin),
       plus case metadata from relocation_cases.
     """
-    request_id = str(uuid.uuid4())
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
     try:
         if user.get("is_admin") and not user.get("impersonation"):
-            assignments = db.list_all_assignments()
+            with timed("db.list_all_assignments", request_id):
+                assignments = db.list_all_assignments()
         else:
             effective = _effective_user(user, UserRole.HR)
-            assignments = db.list_assignments_for_hr(effective["id"])
+            with timed("db.list_assignments_for_hr", request_id):
+                assignments = db.list_assignments_for_hr(effective["id"], request_id=request_id)
 
         if not assignments:
             return []
@@ -1677,7 +1775,7 @@ def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR)
                     "FROM relocation_cases WHERE id IN (" + placeholders + ")"
                 )
                 params = {f"id{i}": cid for i, cid in enumerate(unique_ids)}
-                with db.engine.connect() as conn:
+                with db.engine.connect() as conn, timed("db.load_relocation_cases_bulk", request_id):
                     rows = conn.execute(text(sql), params).fetchall()
                 for row in rows:
                     m = row._mapping
@@ -1974,6 +2072,7 @@ def get_case_details_by_assignment(
 
 @app.get("/api/notifications")
 def list_notifications(
+    request: Request,
     limit: int = Query(25, ge=1, le=100),
     only_unread: bool = Query(False),
     user: Dict[str, Any] = Depends(get_current_user),
@@ -1983,7 +2082,12 @@ def list_notifications(
     uid = effective.get("id")
     if not uid:
         return []
-    rows = db.list_notifications(uid, limit=limit, only_unread=only_unread)
+    rows = db.list_notifications(
+        uid,
+        limit=limit,
+        only_unread=only_unread,
+        request_id=getattr(request.state, "request_id", None),
+    )
     return [
         {
             "id": r["id"],
@@ -2001,13 +2105,17 @@ def list_notifications(
 
 
 @app.get("/api/notifications/unread-count")
-def get_unread_count(user: Dict[str, Any] = Depends(get_current_user)):
+def get_unread_count(request: Request, user: Dict[str, Any] = Depends(get_current_user)):
     role = UserRole.EMPLOYEE if user.get("role") == UserRole.EMPLOYEE.value else UserRole.HR
     effective = _effective_user(user, role)
     uid = effective.get("id")
     if not uid:
         return {"count": 0}
-    return {"count": db.count_unread_notifications(uid)}
+    return {
+        "count": db.count_unread_notifications(
+            uid, request_id=getattr(request.state, "request_id", None)
+        )
+    }
 
 
 @app.patch("/api/notifications/{notification_id}/read")

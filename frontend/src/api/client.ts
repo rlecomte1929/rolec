@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { getAuthItem, clearAuthItems } from '../utils/demo';
 import { signOutSupabase } from './supabaseAuth';
+import { getCurrentInteractionId, recordRequestPerf } from '../perf/perf';
 import type {
   LoginRequest,
   LoginResponse,
@@ -46,19 +47,92 @@ const api = axios.create({
   },
 });
 
-// Add auth token to requests
+// Add auth token + request/perf metadata to requests
 api.interceptors.request.use((config) => {
   const token = getAuthItem('relopass_token');
+  if (!config.headers) config.headers = {};
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (config.headers as any).Authorization = `Bearer ${token}`;
   }
+
+  // Attach / propagate X-Request-ID for correlation with backend.
+  const existingId =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((config.headers as any)['X-Request-ID'] as string | undefined) || getCurrentInteractionId();
+  const requestId =
+    existingId ||
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? // @ts-expect-error randomUUID in modern browsers
+        (crypto.randomUUID() as string)
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (config.headers as any)['X-Request-ID'] = requestId;
+
+  // Stash perf metadata on the config (type-cast to avoid axios type extension).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (config as any)._perfMeta = {
+    requestId,
+    tStart: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+  };
+
   return config;
 });
 
-// Global 401 handler: clear session and redirect to auth (skip for login/register)
+// Global 401 handler + perf logging
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const meta = (res.config as any)._perfMeta as { requestId: string; tStart: number } | undefined;
+      if (meta) {
+        const tEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const duration = tEnd - meta.tStart;
+        // With axios we don't get a separate "headers" vs "body" hook; treat both as full duration.
+        const path = (res.config.url || '').split('?')[0] || '/';
+        const method = (res.config.method || 'GET').toUpperCase();
+        recordRequestPerf({
+          requestId: meta.requestId,
+          method,
+          path,
+          status: res.status,
+          ok: res.status >= 200 && res.status < 300,
+          durationHeadersMs: duration,
+          durationBodyMs: duration,
+          startedAt: meta.tStart,
+        });
+      }
+    } catch {
+      // do not block response on perf logging failures
+    }
+    return res;
+  },
   (err) => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cfg = (err?.config || {}) as any;
+      const meta = cfg._perfMeta as { requestId: string; tStart: number } | undefined;
+      const status = err?.response?.status ?? 0;
+      if (meta) {
+        const tEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const duration = tEnd - meta.tStart;
+        const path = (cfg.url || '').split('?')[0] || '/';
+        const method = (cfg.method || 'GET').toUpperCase();
+        recordRequestPerf({
+          requestId: meta.requestId,
+          method,
+          path,
+          status,
+          ok: false,
+          durationHeadersMs: duration,
+          durationBodyMs: duration,
+          startedAt: meta.tStart,
+        });
+      }
+    } catch {
+      // ignore
+    }
     const status = err?.response?.status;
     const url = err?.config?.url ?? '';
     const isAuthEndpoint = /\/api\/auth\/(login|register)$/.test(url);
@@ -423,8 +497,16 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function apiGet<T>(path: string, opts?: { headers?: Record<string, string> }): Promise<T> {
+export async function apiGet<T>(path: string, opts?: { headers?: Record<string, string>; requestId?: string }): Promise<T> {
   let response: Response;
+  const tStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const requestId =
+    opts?.requestId ||
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? // @ts-expect-error randomUUID
+        (crypto.randomUUID() as string)
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+  const pathOnly = path.split('?')[0] || '/';
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: 'GET',
@@ -432,6 +514,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
         'Content-Type': 'application/json',
         ...authHeaders(),
         ...(opts?.headers || {}),
+        'X-Request-ID': requestId,
       },
     });
   } catch {
@@ -439,17 +522,49 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
   }
   if (!response.ok) {
     const text = await response.text();
+    const tBody = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    recordRequestPerf({
+      requestId,
+      method: 'GET',
+      path: pathOnly,
+      status: response.status,
+      ok: false,
+      durationHeadersMs: tBody - tStart,
+      durationBodyMs: tBody - tStart,
+      startedAt: tStart,
+    });
     throw buildApiError(response, text);
   }
-  return response.json() as Promise<T>;
+  const jsonStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const data = (await response.json()) as T;
+  const tEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  recordRequestPerf({
+    requestId,
+    method: 'GET',
+    path: pathOnly,
+    status: response.status,
+    ok: true,
+    durationHeadersMs: jsonStart - tStart,
+    durationBodyMs: tEnd - tStart,
+    startedAt: tStart,
+  });
+  return data;
 }
 
 export async function apiPost<T>(
   path: string,
   body?: any,
-  opts?: { headers?: Record<string, string> }
+  opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
+  const tStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const requestId =
+    opts?.requestId ||
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? // @ts-expect-error randomUUID
+        (crypto.randomUUID() as string)
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+  const pathOnly = path.split('?')[0] || '/';
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
@@ -457,6 +572,7 @@ export async function apiPost<T>(
         'Content-Type': 'application/json',
         ...authHeaders(),
         ...(opts?.headers || {}),
+        'X-Request-ID': requestId,
       },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -465,17 +581,49 @@ export async function apiPost<T>(
   }
   if (!response.ok) {
     const text = await response.text();
+    const tBody = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    recordRequestPerf({
+      requestId,
+      method: 'POST',
+      path: pathOnly,
+      status: response.status,
+      ok: false,
+      durationHeadersMs: tBody - tStart,
+      durationBodyMs: tBody - tStart,
+      startedAt: tStart,
+    });
     throw buildApiError(response, text);
   }
-  return response.json() as Promise<T>;
+  const jsonStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const data = (await response.json()) as T;
+  const tEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  recordRequestPerf({
+    requestId,
+    method: 'POST',
+    path: pathOnly,
+    status: response.status,
+    ok: true,
+    durationHeadersMs: jsonStart - tStart,
+    durationBodyMs: tEnd - tStart,
+    startedAt: tStart,
+  });
+  return data;
 }
 
 export async function apiPatch<T>(
   path: string,
   body?: any,
-  opts?: { headers?: Record<string, string> }
+  opts?: { headers?: Record<string, string>; requestId?: string }
 ): Promise<T> {
   let response: Response;
+  const tStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const requestId =
+    opts?.requestId ||
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? // @ts-expect-error randomUUID
+        (crypto.randomUUID() as string)
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+  const pathOnly = path.split('?')[0] || '/';
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: 'PATCH',
@@ -483,6 +631,7 @@ export async function apiPatch<T>(
         'Content-Type': 'application/json',
         ...authHeaders(),
         ...(opts?.headers || {}),
+        'X-Request-ID': requestId,
       },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -491,7 +640,31 @@ export async function apiPatch<T>(
   }
   if (!response.ok) {
     const text = await response.text();
+    const tBody = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    recordRequestPerf({
+      requestId,
+      method: 'PATCH',
+      path: pathOnly,
+      status: response.status,
+      ok: false,
+      durationHeadersMs: tBody - tStart,
+      durationBodyMs: tBody - tStart,
+      startedAt: tStart,
+    });
     throw buildApiError(response, text);
   }
-  return response.json() as Promise<T>;
+  const jsonStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const data = (await response.json()) as T;
+  const tEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  recordRequestPerf({
+    requestId,
+    method: 'PATCH',
+    path: pathOnly,
+    status: response.status,
+    ok: true,
+    durationHeadersMs: jsonStart - tStart,
+    durationBodyMs: tEnd - tStart,
+    startedAt: tStart,
+  });
+  return data;
 }

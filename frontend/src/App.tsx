@@ -34,6 +34,7 @@ import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
 import { Messages } from './pages/Messages';
 import { HrCompanyProfile } from './pages/HrCompanyProfile';
 import { NotificationSettings } from './pages/NotificationSettings';
+import { PerfPanel } from './components/PerfPanel';
 
 function ReviewToEmployeeDashboardRedirect() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -116,6 +117,7 @@ function App() {
       </Routes>
       </EmployeeAssignmentProvider>
       </SelectedCaseProvider>
+      <PerfPanel />
     </Router>
     </ErrorBoundary>
   );

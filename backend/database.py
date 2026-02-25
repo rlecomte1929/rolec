@@ -5,6 +5,7 @@ Uses DATABASE_URL from db_config (single source of truth).
 import json
 import uuid
 import logging
+import time
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -38,6 +39,26 @@ class Database:
     def __init__(self) -> None:
         self.engine = _engine
         self.init_db()
+
+    def _exec(
+        self,
+        conn,
+        sql: str,
+        params: Dict[str, Any],
+        op_name: str,
+        request_id: Optional[str] = None,
+    ):
+        """
+        Execute a SQL statement with basic timing and optional request correlation.
+        """
+        start = time.perf_counter()
+        result = conn.execute(text(sql), params)
+        dur_ms = (time.perf_counter() - start) * 1000
+        if request_id:
+            log.info("request_id=%s db_op=%s dur_ms=%.2f", request_id, op_name, dur_ms)
+        else:
+            log.info("db_op=%s dur_ms=%.2f", op_name, dur_ms)
+        return result
 
     # ------------------------------------------------------------------
     # Schema creation
@@ -632,24 +653,38 @@ class Database:
         employee_user_id: Optional[str],
         employee_identifier: str,
         status: str,
+        request_id: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
-            conn.execute(text(
+            self._exec(
+                conn,
                 "INSERT INTO case_assignments "
                 "(id, case_id, hr_user_id, employee_user_id, employee_identifier, status, created_at, updated_at) "
-                "VALUES (:id, :cid, :hr, :emp, :ident, :status, :ca, :ua)"
-            ), {
-                "id": assignment_id, "cid": case_id, "hr": hr_user_id,
-                "emp": employee_user_id, "ident": employee_identifier,
-                "status": status, "ca": now, "ua": now,
-            })
+                "VALUES (:id, :cid, :hr, :emp, :ident, :status, :ca, :ua)",
+                {
+                    "id": assignment_id,
+                    "cid": case_id,
+                    "hr": hr_user_id,
+                    "emp": employee_user_id,
+                    "ident": employee_identifier,
+                    "status": status,
+                    "ca": now,
+                    "ua": now,
+                },
+                op_name="create_assignment",
+                request_id=request_id,
+            )
 
-    def update_assignment_status(self, assignment_id: str, status: str) -> None:
+    def update_assignment_status(self, assignment_id: str, status: str, request_id: Optional[str] = None) -> None:
         with self.engine.begin() as conn:
-            conn.execute(text(
-                "UPDATE case_assignments SET status = :status, updated_at = :ua WHERE id = :id"
-            ), {"status": status, "ua": datetime.utcnow().isoformat(), "id": assignment_id})
+            self._exec(
+                conn,
+                "UPDATE case_assignments SET status = :status, updated_at = :ua WHERE id = :id",
+                {"status": status, "ua": datetime.utcnow().isoformat(), "id": assignment_id},
+                op_name="update_assignment_status",
+                request_id=request_id,
+            )
 
     def update_assignment_identifier(self, assignment_id: str, employee_identifier: str) -> None:
         with self.engine.begin() as conn:
@@ -657,60 +692,115 @@ class Database:
                 "UPDATE case_assignments SET employee_identifier = :ident, updated_at = :ua WHERE id = :id"
             ), {"ident": employee_identifier, "ua": datetime.utcnow().isoformat(), "id": assignment_id})
 
-    def attach_employee_to_assignment(self, assignment_id: str, employee_user_id: str) -> None:
+    def attach_employee_to_assignment(
+        self,
+        assignment_id: str,
+        employee_user_id: str,
+        request_id: Optional[str] = None,
+    ) -> None:
         with self.engine.begin() as conn:
-            conn.execute(text(
-                "UPDATE case_assignments SET employee_user_id = :emp, updated_at = :ua WHERE id = :id"
-            ), {"emp": employee_user_id, "ua": datetime.utcnow().isoformat(), "id": assignment_id})
+            self._exec(
+                conn,
+                "UPDATE case_assignments SET employee_user_id = :emp, updated_at = :ua WHERE id = :id",
+                {"emp": employee_user_id, "ua": datetime.utcnow().isoformat(), "id": assignment_id},
+                op_name="attach_employee_to_assignment",
+                request_id=request_id,
+            )
 
-    def set_assignment_submitted(self, assignment_id: str) -> None:
+    def set_assignment_submitted(self, assignment_id: str, request_id: Optional[str] = None) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
-            conn.execute(text(
+            self._exec(
+                conn,
                 "UPDATE case_assignments "
                 "SET status = :status, submitted_at = :now, updated_at = :now "
-                "WHERE id = :id"
-            ), {"status": "submitted", "now": now, "id": assignment_id})
+                "WHERE id = :id",
+                {"status": "submitted", "now": now, "id": assignment_id},
+                op_name="set_assignment_submitted",
+                request_id=request_id,
+            )
 
-    def set_assignment_decision(self, assignment_id: str, decision: str, notes: Optional[str]) -> None:
+    def set_assignment_decision(
+        self,
+        assignment_id: str,
+        decision: str,
+        notes: Optional[str],
+        request_id: Optional[str] = None,
+    ) -> None:
         with self.engine.begin() as conn:
-            conn.execute(text(
+            self._exec(
+                conn,
                 "UPDATE case_assignments "
                 "SET status = :decision, decision = :decision, hr_notes = :notes, updated_at = :ua "
-                "WHERE id = :id"
-            ), {"decision": decision, "notes": notes, "ua": datetime.utcnow().isoformat(), "id": assignment_id})
+                "WHERE id = :id",
+                {"decision": decision, "notes": notes, "ua": datetime.utcnow().isoformat(), "id": assignment_id},
+                op_name="set_assignment_decision",
+                request_id=request_id,
+            )
 
-    def get_assignment_by_id(self, assignment_id: str) -> Optional[Dict[str, Any]]:
+    def get_assignment_by_id(self, assignment_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
-            row = conn.execute(text("SELECT * FROM case_assignments WHERE id = :id"), {"id": assignment_id}).fetchone()
+            row = self._exec(
+                conn,
+                "SELECT * FROM case_assignments WHERE id = :id",
+                {"id": assignment_id},
+                op_name="get_assignment_by_id",
+                request_id=request_id,
+            ).fetchone()
         return self._row_to_dict(row)
 
-    def get_assignment_by_case_id(self, case_id: str) -> Optional[Dict[str, Any]]:
+    def get_assignment_by_case_id(self, case_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
-            row = conn.execute(text("SELECT * FROM case_assignments WHERE case_id = :cid"), {"cid": case_id}).fetchone()
+            row = self._exec(
+                conn,
+                "SELECT * FROM case_assignments WHERE case_id = :cid",
+                {"cid": case_id},
+                op_name="get_assignment_by_case_id",
+                request_id=request_id,
+            ).fetchone()
         return self._row_to_dict(row)
 
-    def get_assignment_for_employee(self, employee_user_id: str) -> Optional[Dict[str, Any]]:
+    def get_assignment_for_employee(
+        self,
+        employee_user_id: str,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
-            row = conn.execute(text(
-                "SELECT * FROM case_assignments WHERE employee_user_id = :emp ORDER BY created_at DESC LIMIT 1"
-            ), {"emp": employee_user_id}).fetchone()
+            row = self._exec(
+                conn,
+                "SELECT * FROM case_assignments WHERE employee_user_id = :emp ORDER BY created_at DESC LIMIT 1",
+                {"emp": employee_user_id},
+                op_name="get_assignment_for_employee",
+                request_id=request_id,
+            ).fetchone()
         return self._row_to_dict(row)
 
-    def get_unassigned_assignment_by_identifier(self, identifier: str) -> Optional[Dict[str, Any]]:
+    def get_unassigned_assignment_by_identifier(
+        self,
+        identifier: str,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
-            row = conn.execute(text(
+            row = self._exec(
+                conn,
                 "SELECT * FROM case_assignments "
                 "WHERE employee_user_id IS NULL AND employee_identifier = :ident "
-                "ORDER BY created_at DESC LIMIT 1"
-            ), {"ident": identifier}).fetchone()
+                "ORDER BY created_at DESC LIMIT 1",
+                {"ident": identifier},
+                op_name="get_unassigned_assignment_by_identifier",
+                request_id=request_id,
+            ).fetchone()
         return self._row_to_dict(row)
 
-    def list_assignments_for_hr(self, hr_user_id: str) -> List[Dict[str, Any]]:
+    def list_assignments_for_hr(self, hr_user_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT * FROM case_assignments WHERE hr_user_id = :hr ORDER BY created_at DESC"
-            ), {"hr": hr_user_id}).fetchall()
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_assignments WHERE hr_user_id = :hr ORDER BY created_at DESC",
+                {"hr": hr_user_id},
+                op_name="list_assignments_for_hr",
+                request_id=request_id,
+            ).fetchall()
         return self._rows_to_list(rows)
 
     def insert_hr_feedback(
@@ -870,7 +960,13 @@ class Database:
                 "cid": case_id, "type": type_, "title": title, "body": body, "meta": meta_json,
             })
 
-    def list_notifications(self, user_id: str, limit: int = 25, only_unread: bool = False) -> List[Dict[str, Any]]:
+    def list_notifications(
+        self,
+        user_id: str,
+        limit: int = 25,
+        only_unread: bool = False,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
             q = (
                 "SELECT id, created_at, assignment_id, case_id, type, title, body, metadata, read_at "
@@ -879,14 +975,24 @@ class Database:
             if only_unread:
                 q += " AND read_at IS NULL"
             q += " ORDER BY created_at DESC LIMIT :lim"
-            rows = conn.execute(text(q), {"uid": user_id, "lim": min(limit, 100)}).fetchall()
+            rows = self._exec(
+                conn,
+                q,
+                {"uid": user_id, "lim": min(limit, 100)},
+                op_name="list_notifications",
+                request_id=request_id,
+            ).fetchall()
         return self._rows_to_list(rows)
 
-    def count_unread_notifications(self, user_id: str) -> int:
+    def count_unread_notifications(self, user_id: str, request_id: Optional[str] = None) -> int:
         with self.engine.connect() as conn:
-            row = conn.execute(text(
-                "SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND read_at IS NULL"
-            ), {"uid": user_id}).fetchone()
+            row = self._exec(
+                conn,
+                "SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND read_at IS NULL",
+                {"uid": user_id},
+                op_name="count_unread_notifications",
+                request_id=request_id,
+            ).fetchone()
         return row[0] if row else 0
 
     def mark_notification_read(self, notification_id: str, user_id: str) -> bool:

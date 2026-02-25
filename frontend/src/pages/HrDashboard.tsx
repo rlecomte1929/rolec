@@ -4,6 +4,7 @@ import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert, Badge } from '../components/antigravity';
 import { hrAPI } from '../api/client';
 import type { AssignmentSummary, AssignmentDetail, AssignmentStatus } from '../types';
+import { startInteraction, endInteraction } from '../perf/perf';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
@@ -114,6 +115,7 @@ export const HrDashboard: React.FC = () => {
     setError('');
     setInviteToken(null);
     setAssignmentId(null);
+    const interaction = startInteraction('HR_ASSIGN_CLICK');
     try {
       const response = await hrAPI.assignCase(caseId, employeeIdentifier.trim());
       setAssignmentId(response.assignmentId);
@@ -123,6 +125,9 @@ export const HrDashboard: React.FC = () => {
       await loadAssignments();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to assign case.');
+    } finally {
+      // Measure click -> UI render (best-effort).
+      void endInteraction(interaction);
     }
   };
 
