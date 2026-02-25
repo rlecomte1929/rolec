@@ -131,7 +131,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                       : 'border-transparent hover:text-[#0b2b43]'
                   }`}
                 >
-                  Providers
+                  Services
                 </Link>
                 <Link
                   to={buildRoute('hrPolicy')}
@@ -171,10 +171,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
           <div className="border-t border-[#e2e8f0]">
             <Container maxWidth="xl" className="py-3 flex items-center justify-between gap-6">
               <div className="flex flex-wrap items-center gap-4">
-                <input
-                  placeholder="Search cases..."
-                  className="w-56 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
-                />
                 <nav className="flex flex-wrap items-center gap-2 text-sm text-[#6b7280]">
                   <Link
                     to={buildRoute('hrDashboard')}
@@ -185,6 +181,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     }`}
                   >
                     HR Dashboard
+                  </Link>
+                  <Link
+                    to={buildRoute('hrCompanyProfile')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrCompanyProfile.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Company Profile
                   </Link>
                   <Link
                     to={buildRoute('hrEmployeeDashboard')}
@@ -226,16 +232,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     }`}
                   >
                     Policy Management
-                  </Link>
-                  <Link
-                    to={buildRoute('hrCompanyProfile')}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrCompanyProfile.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    Company Profile
                   </Link>
                   <Link
                     to={messagesRoute}
@@ -282,15 +278,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     </Link>
                   )}
                 </nav>
-              </div>
-              <div className="text-xs text-[#6b7280]">
-                {selectedCaseId ? (
-                  <span>
-                    Case in use: {selectedCaseId.slice(0, 8)}…{identity ? ` · User: ${identity}` : ''}
-                  </span>
-                ) : (
-                  <span>No case selected{identity ? ` · User: ${identity}` : ''}</span>
-                )}
               </div>
             </Container>
           </div>

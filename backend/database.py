@@ -390,6 +390,28 @@ class Database:
                 "ON notifications(user_id, read_at)"
             ))
 
+            # Message state: delivered_at, read_at, dismissed_at, recipient_user_id, sender_user_id
+            if _is_sqlite:
+                cols = conn.execute(text("PRAGMA table_info(messages)")).fetchall()
+                col_names = {r[1] for r in cols}
+                for col in ("delivered_at", "read_at", "dismissed_at", "recipient_user_id", "sender_user_id"):
+                    if col not in col_names:
+                        conn.execute(text(f"ALTER TABLE messages ADD COLUMN {col} TEXT"))
+            else:
+                conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivered_at TEXT"))
+                conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TEXT"))
+                conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS dismissed_at TEXT"))
+                conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS recipient_user_id TEXT"))
+                conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_user_id TEXT"))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_messages_recipient_unread "
+                "ON messages(recipient_user_id, read_at, dismissed_at, created_at DESC)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_messages_assignment_created "
+                "ON messages(assignment_id, created_at)"
+            ))
+
             # Best-effort schema extensions for relocation_cases
             if _is_sqlite:
                 cols = conn.execute(text("PRAGMA table_info(companies)")).fetchall()
@@ -1556,12 +1578,25 @@ class Database:
         subject: str,
         body: str,
         status: str = "draft",
+        sender_user_id: Optional[str] = None,
+        recipient_user_id: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
+        sender = sender_user_id or hr_user_id
+        recipient = recipient_user_id
+        if not recipient and assignment_id and hr_user_id:
+            # HR sent: recipient is employee
+            assignment = self.get_assignment_by_id(assignment_id)
+            if assignment and assignment.get("employee_user_id"):
+                recipient = assignment["employee_user_id"]
+            elif assignment and employee_identifier:
+                user = self.get_user_by_identifier(employee_identifier)
+                if user:
+                    recipient = user["id"]
         with self.engine.begin() as conn:
             conn.execute(text(
-                "INSERT INTO messages (id, assignment_id, hr_user_id, employee_identifier, subject, body, status, created_at) "
-                "VALUES (:id, :aid, :hr, :emp, :sub, :body, :status, :created_at)"
+                "INSERT INTO messages (id, assignment_id, hr_user_id, employee_identifier, subject, body, status, created_at, delivered_at, sender_user_id, recipient_user_id) "
+                "VALUES (:id, :aid, :hr, :emp, :sub, :body, :status, :created_at, :delivered_at, :sender, :recipient)"
             ), {
                 "id": message_id,
                 "aid": assignment_id,
@@ -1571,6 +1606,9 @@ class Database:
                 "body": body,
                 "status": status,
                 "created_at": now,
+                "delivered_at": now,
+                "sender": sender,
+                "recipient": recipient,
             })
 
     def list_messages_for_hr(self, hr_user_id: str) -> List[Dict[str, Any]]:
@@ -1589,6 +1627,65 @@ class Database:
                 "SELECT * FROM messages WHERE assignment_id = :aid ORDER BY created_at DESC"
             ), {"aid": assignment["id"]}).fetchall()
         return self._rows_to_list(rows)
+
+    def mark_conversation_read(self, assignment_id: str, recipient_user_id: str) -> int:
+        """Set read_at and dismissed_at for all messages in this assignment to the recipient. Returns count updated."""
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            result = conn.execute(text(
+                "UPDATE messages SET read_at = :now, dismissed_at = :now "
+                "WHERE assignment_id = :aid AND recipient_user_id = :uid AND read_at IS NULL"
+            ), {"now": now, "aid": assignment_id, "uid": recipient_user_id})
+        return result.rowcount if hasattr(result, "rowcount") else 0
+
+    def dismiss_message_notification(self, message_id: str, recipient_user_id: str) -> bool:
+        """Set dismissed_at for one message. Returns True if updated."""
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            result = conn.execute(text(
+                "UPDATE messages SET dismissed_at = :now "
+                "WHERE id = :mid AND recipient_user_id = :uid AND dismissed_at IS NULL"
+            ), {"now": now, "mid": message_id, "uid": recipient_user_id})
+        return (result.rowcount if hasattr(result, "rowcount") else 0) > 0
+
+    def get_unread_message_count(self, recipient_user_id: str) -> int:
+        """Count messages where recipient hasn't read and hasn't dismissed."""
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT COUNT(*) as n FROM messages "
+                "WHERE recipient_user_id = :uid AND read_at IS NULL AND dismissed_at IS NULL"
+            ), {"uid": recipient_user_id}).fetchone()
+        return row[0] if row else 0
+
+    def list_unread_message_notifications(
+        self, recipient_user_id: str, limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """List unread, non-dismissed messages for the recipient with sender name and snippet."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT m.id as message_id, m.assignment_id as conversation_id,
+                       m.body, m.created_at,
+                       COALESCE(u.name, u.email, u.username, 'HR') as sender_name
+                FROM messages m
+                LEFT JOIN users u ON u.id = COALESCE(m.sender_user_id, m.hr_user_id)
+                WHERE m.recipient_user_id = :uid AND m.read_at IS NULL AND m.dismissed_at IS NULL
+                ORDER BY m.created_at DESC
+                LIMIT :lim
+            """), {"uid": recipient_user_id, "lim": limit}).fetchall()
+        out = []
+        for r in rows:
+            row = dict(r._mapping)
+            body = (row.get("body") or "")[:80]
+            if len((row.get("body") or "")) > 80:
+                body = body.rstrip() + "…"
+            out.append({
+                "message_id": row.get("message_id"),
+                "conversation_id": row.get("conversation_id") or row.get("assignment_id"),
+                "sender_name": row.get("sender_name") or "HR",
+                "snippet": body,
+                "created_at": row.get("created_at"),
+            })
+        return out
 
     def set_admin_session(self, token: str, actor_user_id: str, target_user_id: str, mode: str) -> None:
         now = datetime.utcnow().isoformat()

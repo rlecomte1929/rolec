@@ -9,7 +9,15 @@ import { ProvidersCriteriaWizard, profileToWizardAnswers } from '../features/rec
 import { RecommendationResults } from '../features/recommendations/RecommendationResults';
 import { PackageSummary } from '../features/recommendations/PackageSummary';
 import { EmployeePolicyView } from '../features/policy/EmployeePolicyView';
+import { TrustBlock } from '../features/services/TrustBlock';
+import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
+import { StickyContinueBar } from '../features/services/StickyContinueBar';
+import { SERVICE_CONFIG, CATEGORY_LABELS } from '../features/services/serviceConfig';
 import type { RecommendationResponse } from '../features/recommendations/types';
+
+type TabKey = 'housing' | 'schools' | 'movers' | 'banks' | 'insurances' | 'electricity';
+
+const WIZARD_KEYS: Set<string> = new Set(['housing', 'schools', 'movers', 'banks', 'insurances', 'electricity']);
 
 // Static recommendations for banks, insurances, electricity (no backend yet)
 const BANKS = [
@@ -33,26 +41,6 @@ const ELECTRICITY = [
   { id: '4', name: 'Senoko Energy', plans: ['24-month fix'], contact: 'senokoenergy.com', notes: 'Stable pricing for new arrivals.' },
 ];
 
-type TabKey = 'housing' | 'schools' | 'movers' | 'banks' | 'insurances' | 'electricity';
-
-const SERVICE_OPTIONS: { id: TabKey; label: string; description: string }[] = [
-  { id: 'housing', label: 'Living areas', description: 'Recommended neighbourhoods and housing options' },
-  { id: 'schools', label: 'Schools', description: 'International and local school recommendations' },
-  { id: 'movers', label: 'Movers', description: 'International relocation and moving companies' },
-  { id: 'banks', label: 'Banks', description: 'Banking and account setup for expats' },
-  { id: 'insurances', label: 'Insurances', description: 'Health, travel, and life insurance providers' },
-  { id: 'electricity', label: 'Electricity', description: 'Utilities and electricity retailers' },
-];
-
-const CATEGORY_LABELS: Record<string, string> = {
-  housing: 'Living Areas',
-  schools: 'Schools',
-  movers: 'Movers',
-  banks: 'Banks',
-  insurances: 'Insurances',
-  electricity: 'Electricity',
-};
-
 export const ProvidersPage: React.FC = () => {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [employeeRecs, setEmployeeRecs] = useState<{ housing: any[]; schools: any[]; movers: any[] } | null>(null);
@@ -62,7 +50,8 @@ export const ProvidersPage: React.FC = () => {
   const [engineResults, setEngineResults] = useState<Record<string, RecommendationResponse> | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Map<string, string>>(new Map());
   const [wizardInitialAnswers, setWizardInitialAnswers] = useState<Record<string, unknown>>({});
-  const [selectedServices, setSelectedServices] = useState<Set<TabKey>>(new Set(SERVICE_OPTIONS.map((s) => s.id)));
+  const enabledKeys = SERVICE_CONFIG.filter((s) => s.enabled).map((s) => s.key);
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set(enabledKeys));
   const [activeTab, setActiveTab] = useState<TabKey>('housing');
   const [error, setError] = useState('');
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
@@ -100,17 +89,19 @@ export const ProvidersPage: React.FC = () => {
     setFlowStep('wizard');
   };
 
-  const toggleService = (id: TabKey) => {
+  const toggleService = (key: string) => {
     setSelectedServices((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(id);
+        next.add(key);
       }
       return next;
     });
   };
+
+  const wizardSelectedServices = new Set([...selectedServices].filter((k) => WIZARD_KEYS.has(k))) as Set<TabKey>;
 
   useEffect(() => {
     loadData();
@@ -165,11 +156,11 @@ export const ProvidersPage: React.FC = () => {
     { id: 'insurances', label: 'Insurances', count: INSURANCES.length },
     { id: 'electricity', label: 'Electricity', count: ELECTRICITY.length },
   ];
-  const tabs = allTabs.filter((t) => selectedServices.has(t.id));
+  const tabs = allTabs.filter((t) => wizardSelectedServices.has(t.id));
 
   if (isLoading) {
     return (
-      <AppShell title="Service Providers" subtitle="Find recommended partners for your relocation.">
+      <AppShell title="Services" subtitle="Find recommended partners for your relocation.">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0b2b43] mx-auto mb-4" />
           <p className="text-[#6b7280]">Loading recommendations...</p>
@@ -179,7 +170,7 @@ export const ProvidersPage: React.FC = () => {
   }
 
   return (
-    <AppShell title="Service Providers" subtitle="Choose the services you need and browse recommendations.">
+    <AppShell title="Services" subtitle="Choose the services you need and browse recommendations.">
       {error && (
         <Alert variant="info" className="mb-6">
           {error}
@@ -193,44 +184,40 @@ export const ProvidersPage: React.FC = () => {
               <EmployeePolicyView assignmentId={assignmentId} compact />
             </div>
           )}
-        <Card padding="lg" className="mb-8">
-          <h2 className="text-xl font-semibold text-[#0b2b43] mb-2">Which services do you need?</h2>
-          <p className="text-sm text-[#6b7280] mb-6">
-            Select the services you want to explore. You'll then answer a few questions so we can tailor recommendations to your needs.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {SERVICE_OPTIONS.map((opt) => (
-              <label
-                key={opt.id}
-                className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-colors ${
-                  selectedServices.has(opt.id) ? 'border-[#0b2b43] bg-[#eef4f8]' : 'border-[#e2e8f0] hover:border-[#94a3b8]'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedServices.has(opt.id)}
-                  onChange={() => toggleService(opt.id)}
-                  className="mt-1 h-4 w-4 rounded border-[#e2e8f0] text-[#0b2b43]"
-                />
-                <div>
-                  <div className="font-medium text-[#0b2b43]">{opt.label}</div>
-                  <div className="text-sm text-[#6b7280]">{opt.description}</div>
-                </div>
-              </label>
-            ))}
+          <div className="mb-8">
+            <h1 className="text-2xl font-semibold text-[#0b2b43] mb-2">Your relocation plan</h1>
+            <p className="text-[#6b7280] mb-1">
+              Select the areas where you need support — we'll build a clear plan so nothing falls through the cracks.
+            </p>
+            <p className="text-sm text-[#94a3b8]">~3 min to complete</p>
           </div>
-          <Button
-            className="mt-6"
-            onClick={startWizard}
-            disabled={selectedServices.size === 0}
-          >
-            Answer questions & get recommendations
-          </Button>
-        </Card>
+          <TrustBlock className="mb-8" />
+          <ServiceGroupSection
+            group="before"
+            items={SERVICE_CONFIG.filter((s) => s.group === 'before')}
+            selectedKeys={selectedServices}
+            onToggle={toggleService}
+          />
+          <ServiceGroupSection
+            group="arrival"
+            items={SERVICE_CONFIG.filter((s) => s.group === 'arrival')}
+            selectedKeys={selectedServices}
+            onToggle={toggleService}
+          />
+          <ServiceGroupSection
+            group="settle"
+            items={SERVICE_CONFIG.filter((s) => s.group === 'settle')}
+            selectedKeys={selectedServices}
+            onToggle={toggleService}
+          />
+          <StickyContinueBar
+            selectedCount={wizardSelectedServices.size}
+            onContinue={startWizard}
+          />
         </>
       ) : flowStep === 'wizard' ? (
         <ProvidersCriteriaWizard
-          selectedServices={selectedServices}
+          selectedServices={wizardSelectedServices}
           initialAnswers={wizardInitialAnswers}
           onComplete={(results: Record<string, RecommendationResponse>) => {
             setEngineResults(results);
@@ -261,7 +248,7 @@ export const ProvidersPage: React.FC = () => {
         <>
           <Card padding="lg" className="mb-6">
             <p className="text-[#4b5563] mb-4">Get personalized recommendations by answering a few questions about your preferences.</p>
-            <Button onClick={startWizard} disabled={selectedServices.size === 0}>
+            <Button onClick={startWizard} disabled={wizardSelectedServices.size === 0}>
               Start service preferences wizard
             </Button>
           </Card>
@@ -477,7 +464,7 @@ function EmptyState({ message, onStartWizard }: { message: string; onStartWizard
         <div className="flex flex-wrap justify-center gap-3 mt-4">
           {onStartWizard && (
             <Button onClick={onStartWizard}>
-              Answer questions for recommendations
+              Start Service Wizard
             </Button>
           )}
           <Button variant="outline" onClick={() => { window.location.href = '/employee/journey'; }}>

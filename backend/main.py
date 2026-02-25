@@ -1892,7 +1892,54 @@ def list_hr_messages(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     return {"messages": items}
 
 
-@app.delete("/api/hr/assignments/{assignment_id}")
+# Message state / notification bell (HR + Employee)
+@app.get("/api/messages/unread-count")
+def get_message_unread_count(user: Dict[str, Any] = Depends(require_hr_or_employee)):
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    count = db.get_unread_message_count(effective["id"])
+    return {"count": count}
+
+
+@app.get("/api/messages/unread-list")
+def list_message_unread(
+    limit: int = 20,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    items = db.list_unread_message_notifications(effective["id"], limit=min(limit, 50))
+    return {"notifications": items}
+
+
+class MarkConversationReadRequest(BaseModel):
+    assignment_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+
+
+@app.post("/api/messages/mark-conversation-read")
+def mark_conversation_read(
+    req: MarkConversationReadRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment_id = req.assignment_id or req.conversation_id
+    if not assignment_id:
+        raise HTTPException(status_code=400, detail="assignment_id or conversation_id required")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    db.mark_conversation_read(assignment_id, effective["id"])
+    return {"success": True}
+
+
+@app.post("/api/messages/dismiss/{message_id}")
+def dismiss_message_notification(
+    message_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    updated = db.dismiss_message_notification(message_id, effective["id"])
+    return {"success": updated}
 def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
     deleted = db.delete_assignment(assignment_id)

@@ -1,44 +1,42 @@
 /**
- * NotificationBell - Option 6A/6B in-app notifications.
- * Uses Supabase Realtime (6B) when available; falls back to polling.
+ * NotificationBell - Message notifications (delivered/unread/read).
+ * Shows unread message count; dropdown lists recent unread messages.
+ * Polling every 60s when no realtime; refreshes on focus.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { getAuthItem } from '../utils/demo';
+import { useNavigate } from 'react-router-dom';
 import {
-  listNotifications,
-  getUnreadCount,
-  markNotificationRead,
-  type NotificationListItem,
-} from '../api/notifications';
-import { subscribeToNotificationsRealtime } from '../api/notificationsRealtime';
-import { getNotificationTarget } from '../constants/notificationTypes';
-import { buildRoute } from '../navigation/routes';
+  getUnreadMessageCount,
+  listUnreadMessageNotifications,
+  markConversationRead,
+  dismissMessageNotification,
+  type MessageNotificationItem,
+} from '../api/messageNotifications';
 
-function dedupeById(items: NotificationListItem[]): NotificationListItem[] {
-  const seen = new Set<string>();
-  return items.filter((n) => {
-    if (seen.has(n.id)) return false;
-    seen.add(n.id);
-    return true;
-  });
+function formatRelative(time: string): string {
+  const d = new Date(time);
+  const now = new Date();
+  const sec = Math.floor((now.getTime() - d.getTime()) / 1000);
+  if (sec < 60) return 'Just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 604800) return `${Math.floor(sec / 86400)}d ago`;
+  return d.toLocaleDateString();
 }
 
 export const NotificationBell: React.FC = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationListItem[]>([]);
+  const [notifications, setNotifications] = useState<MessageNotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
-  const role = (getAuthItem('relopass_role') as 'HR' | 'EMPLOYEE' | 'ADMIN') || 'EMPLOYEE';
-  const userId = getAuthItem('relopass_user_id');
 
   const fetchAll = useCallback(async () => {
     try {
       const [list, count] = await Promise.all([
-        listNotifications({ limit: 25 }),
-        getUnreadCount(),
+        listUnreadMessageNotifications(20),
+        getUnreadMessageCount(),
       ]);
       setNotifications(list);
       setUnreadCount(count);
@@ -53,40 +51,14 @@ export const NotificationBell: React.FC = () => {
   }, [fetchAll]);
 
   useEffect(() => {
-    if (!userId) {
-      const id = setInterval(fetchAll, 60_000);
-      return () => clearInterval(id);
-    }
-
-    const unsubscribe = subscribeToNotificationsRealtime(userId, {
-      onInsert: (n) => {
-        setNotifications((prev) => dedupeById([n, ...prev]).slice(0, 25));
-        if (!n.read_at) {
-          setUnreadCount((c) => c + 1);
-        }
-      },
-      onUpdate: (n) => {
-        setNotifications((prev) =>
-          prev.map((x) => (x.id === n.id ? { ...x, read_at: n.read_at } : x))
-        );
-        if (n.read_at) {
-          setUnreadCount((c) => Math.max(0, c - 1));
-        }
-      },
-      onReconnect: fetchAll,
-    });
-
-    return unsubscribe;
-  }, [userId, fetchAll]);
-
-  const handleFocus = useCallback(() => {
-    fetchAll();
+    const id = setInterval(fetchAll, 60_000);
+    return () => clearInterval(id);
   }, [fetchAll]);
 
   useEffect(() => {
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [handleFocus]);
+    window.addEventListener('focus', fetchAll);
+    return () => window.removeEventListener('focus', fetchAll);
+  }, [fetchAll]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -98,21 +70,27 @@ export const NotificationBell: React.FC = () => {
     return () => document.removeEventListener('click', handler);
   }, [open]);
 
-  const handleNotificationClick = async (n: NotificationListItem) => {
-    if (!n.read_at) {
-      try {
-        await markNotificationRead(n.id);
-        setUnreadCount((c) => Math.max(0, c - 1));
-        setNotifications((prev) =>
-          prev.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x))
-        );
-      } catch {
-        // ignore
-      }
+  const handleItemClick = async (n: MessageNotificationItem) => {
+    try {
+      await markConversationRead(n.conversation_id);
+      setUnreadCount((c) => Math.max(0, c - 1));
+      setNotifications((prev) => prev.filter((x) => x.message_id !== n.message_id));
+    } catch {
+      // ignore
     }
-    const target = getNotificationTarget(role, n);
     setOpen(false);
-    navigate(target);
+    navigate(`/messages?assignmentId=${n.conversation_id}`);
+  };
+
+  const handleDismiss = async (e: React.MouseEvent, n: MessageNotificationItem) => {
+    e.stopPropagation();
+    try {
+      await dismissMessageNotification(n.message_id);
+      setUnreadCount((c) => Math.max(0, c - 1));
+      setNotifications((prev) => prev.filter((x) => x.message_id !== n.message_id));
+    } catch {
+      // ignore
+    }
   };
 
   return (
@@ -120,9 +98,9 @@ export const NotificationBell: React.FC = () => {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        onFocus={handleFocus}
+        onFocus={fetchAll}
         className="relative p-2 rounded-lg hover:bg-[#eef4f8] text-[#0b2b43] transition-colors"
-        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+        aria-label={`Messages${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
         <svg
           className="w-5 h-5"
@@ -147,41 +125,47 @@ export const NotificationBell: React.FC = () => {
       {open && (
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-auto rounded-xl border border-[#e2e8f0] bg-white shadow-lg z-50">
           <div className="px-4 py-3 border-b border-[#e2e8f0] font-semibold text-sm text-[#0b2b43]">
-            Notifications
+            Messages
           </div>
           <div className="max-h-72 overflow-auto">
             {notifications.length === 0 ? (
               <div className="px-4 py-6 text-sm text-[#6b7280] text-center">
-                No notifications
+                No unread messages
               </div>
             ) : (
-              <>
-              {notifications.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => handleNotificationClick(n)}
-                  className={`w-full text-left px-4 py-3 hover:bg-[#f8fafc] border-b border-[#f1f5f9] last:border-b-0 transition-colors ${
-                    !n.read_at ? 'bg-[#eff6ff]' : ''
-                  }`}
+              notifications.map((n) => (
+                <div
+                  key={n.message_id}
+                  className="flex items-start gap-2 px-4 py-3 hover:bg-[#f8fafc] border-b border-[#f1f5f9] last:border-b-0 group"
                 >
-                  <div className="text-sm font-medium text-[#0b2b43]">{n.title}</div>
-                  {n.body && (
-                    <div className="text-xs text-[#6b7280] mt-0.5 line-clamp-2">{n.body}</div>
-                  )}
-                  <div className="text-[10px] text-[#94a3b8] mt-1">
-                    {new Date(n.created_at).toLocaleString()}
-                  </div>
-                </button>
-              ))}
-              <Link
-                to={buildRoute('notificationSettings')}
-                className="block w-full text-center py-3 text-sm text-[#0b2b43] hover:bg-[#f8fafc] border-t border-[#f1f5f9]"
-                onClick={() => setOpen(false)}
-              >
-                Notification settings
-              </Link>
-              </>
+                  <button
+                    type="button"
+                    onClick={() => handleItemClick(n)}
+                    className="flex-1 text-left min-w-0"
+                  >
+                    <div className="text-sm font-medium text-[#0b2b43]">{n.sender_name}</div>
+                    <div className="text-xs text-[#6b7280] mt-0.5 line-clamp-2 truncate">
+                      {n.snippet}
+                    </div>
+                    <div
+                      className="text-[10px] text-[#94a3b8] mt-1"
+                      title={new Date(n.created_at).toLocaleString()}
+                    >
+                      {formatRelative(n.created_at)}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDismiss(e, n)}
+                    className="shrink-0 p-1 rounded hover:bg-[#e2e8f0] text-[#6b7280] opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Dismiss"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))
             )}
           </div>
         </div>
