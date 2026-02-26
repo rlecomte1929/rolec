@@ -7,14 +7,53 @@ import { RequirementList } from '../../../components/requirements/RequirementLis
 
 interface StepProps {
   caseId: string;
+  assignmentId?: string | null;
   draft: CaseDraftDTO;
   requiredFields: string[];
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
   onBack: () => void;
+  onGoToStep?: (stepNumber: number) => void;
 }
 
-export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, draft, onSave, onBack }) => {
+function SummarySection({
+  title,
+  stepNumber,
+  onEdit,
+  children,
+}: {
+  title: string;
+  stepNumber: number;
+  onEdit?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-sm font-semibold text-[#0b2b43]">{title}</div>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-xs text-[#0b2b43] underline hover:no-underline"
+          >
+            Edit (Step {stepNumber})
+          </button>
+        )}
+      </div>
+      <div className="text-sm text-[#4b5563] space-y-1">{children}</div>
+    </div>
+  );
+}
+
+export const Step5ReviewCreate: React.FC<StepProps> = ({
+  caseId,
+  assignmentId,
+  draft,
+  onSave,
+  onBack,
+  onGoToStep,
+}) => {
   const navigate = useNavigate();
   const [requirements, setRequirements] = useState<CaseRequirementsDTO | null>(null);
   const [saved, setSaved] = useState(false);
@@ -82,6 +121,52 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, draft, onSave, 
         Review the requirements generated from destination research. Save to persist your data.
       </div>
 
+      <div className="mt-6">
+        <div className="text-sm font-semibold text-[#0b2b43] mb-3">Case overview — validate your responses</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SummarySection
+            title="Relocation Basics"
+            stepNumber={1}
+            onEdit={onGoToStep ? () => onGoToStep(1) : undefined}
+          >
+            <div>Origin: {[draft.relocationBasics?.originCity, draft.relocationBasics?.originCountry].filter(Boolean).join(', ') || '—'}</div>
+            <div>Destination: {[draft.relocationBasics?.destCity, draft.relocationBasics?.destCountry].filter(Boolean).join(', ') || '—'}</div>
+            <div>Purpose: {draft.relocationBasics?.purpose || '—'}</div>
+            <div>Target move date: {draft.relocationBasics?.targetMoveDate || '—'}</div>
+            <div>Duration: {draft.relocationBasics?.durationMonths != null ? `${draft.relocationBasics.durationMonths} months` : '—'}</div>
+          </SummarySection>
+          <SummarySection
+            title="Employee Profile"
+            stepNumber={2}
+            onEdit={onGoToStep ? () => onGoToStep(2) : undefined}
+          >
+            <div>Name: {draft.employeeProfile?.fullName || '—'}</div>
+            <div>Email: {draft.employeeProfile?.email || '—'}</div>
+            <div>Nationality: {draft.employeeProfile?.nationality || '—'}</div>
+            <div>Passport: {draft.employeeProfile?.passportCountry || '—'}</div>
+            <div>Residence: {draft.employeeProfile?.residenceCountry || '—'}</div>
+          </SummarySection>
+          <SummarySection
+            title="Family Members"
+            stepNumber={3}
+            onEdit={onGoToStep ? () => onGoToStep(3) : undefined}
+          >
+            <div>Spouse: {draft.familyMembers?.spouse?.fullName || '—'}</div>
+            <div>Children: {draft.familyMembers?.children?.length ? `${draft.familyMembers.children.length} child(ren)` : '—'}</div>
+          </SummarySection>
+          <SummarySection
+            title="Assignment / Context"
+            stepNumber={4}
+            onEdit={onGoToStep ? () => onGoToStep(4) : undefined}
+          >
+            <div>Employer: {draft.assignmentContext?.employerName || '—'}</div>
+            <div>Job title: {draft.assignmentContext?.jobTitle || '—'}</div>
+            <div>Contract start: {draft.assignmentContext?.contractStartDate || '—'}</div>
+            <div>Contract type: {draft.assignmentContext?.contractType || '—'}</div>
+          </SummarySection>
+        </div>
+      </div>
+
       {localStorage.getItem('demo_role') === 'admin' && (
         <button
           className="mt-3 text-xs text-[#0b2b43] underline"
@@ -106,7 +191,15 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, draft, onSave, 
           {isSaving ? 'Saving...' : 'Save'}
         </Button>
         {saved && (
-          <Button onClick={() => navigate('/employee/dashboard')}>Go to dashboard</Button>
+          <Button
+            onClick={() =>
+              assignmentId
+                ? navigate(`/employee/case/${assignmentId}/summary`)
+                : navigate('/employee/dashboard')
+            }
+          >
+            Go to dashboard
+          </Button>
         )}
       </div>
     </Card>

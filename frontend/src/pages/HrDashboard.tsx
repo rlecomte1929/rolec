@@ -30,6 +30,7 @@ export const HrDashboard: React.FC = () => {
   const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
   const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState(false);
   const navigate = useNavigate();
 
   const loadAssignmentDetails = async (items: AssignmentSummary[]) => {
@@ -271,65 +272,57 @@ export const HrDashboard: React.FC = () => {
       <div className="space-y-6">
         {error && <Alert variant="error">{error}</Alert>}
 
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <input
-                id="hr-search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search employees..."
-                className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setIsFilterOpen(true)}>
-              Filter
-            </Button>
-            <Button onClick={handleCreateCase}>New Case</Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Total active cases</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{totalActive}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Currently in progress</div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Card padding="sm">
+            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Total active cases</div>
+            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{totalActive}</div>
+            <div className="text-[10px] text-[#6b7280]">Currently in progress</div>
           </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Action required</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{actionRequired}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Needs HR attention</div>
+          <Card padding="sm">
+            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Action required</div>
+            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{actionRequired}</div>
+            <div className="text-[10px] text-[#6b7280]">Needs HR attention</div>
           </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Departing soon</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{departingSoon}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Next 30 days</div>
+          <Card padding="sm">
+            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Departing soon</div>
+            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{departingSoon}</div>
+            <div className="text-[10px] text-[#6b7280]">Next 30 days</div>
           </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Completed (YTD)</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{completed}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Approved cases</div>
+          <Card padding="sm">
+            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Completed (YTD)</div>
+            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{completed}</div>
+            <div className="text-[10px] text-[#6b7280]">Approved cases</div>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Profile completeness</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{highlightedCompleteness}%</div>
-            <div className="text-xs text-[#6b7280] mt-1">Highlighted case</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Card padding="sm">
+            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Profile completeness</div>
+            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{highlightedCompleteness}%</div>
+            <div className="text-[10px] text-[#6b7280]">Highlighted case</div>
           </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Compliance status</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{highlightedCompliance}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Latest checks</div>
+          <Card padding="sm">
+            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Compliance status</div>
+            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{highlightedCompliance}</div>
+            <div className="text-[10px] text-[#6b7280]">Latest checks</div>
           </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Blocking items</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{highlightedBlocking}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Needs HR attention</div>
+          <Card padding="sm">
+            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Blocking items</div>
+            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{highlightedBlocking}</div>
+            <div className="text-[10px] text-[#6b7280]">Needs HR attention</div>
           </Card>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 mb-2">
+          <input
+            id="hr-search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search employees..."
+            className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
+          />
+          <Button variant="outline" onClick={() => setIsFilterOpen(true)}>Filter</Button>
+          <Button onClick={handleCreateCase}>New Case</Button>
         </div>
 
         <Card padding="lg">
@@ -470,7 +463,6 @@ export const HrDashboard: React.FC = () => {
         {caseId && (
           <Card padding="lg">
             <div className="space-y-3">
-              <div className="text-sm text-[#4b5563]">Case created: {caseId}</div>
               <Input
                 value={employeeIdentifier}
                 onChange={setEmployeeIdentifier}
@@ -481,7 +473,31 @@ export const HrDashboard: React.FC = () => {
               <Button onClick={handleAssign}>Assign</Button>
               {assignmentId && (
                 <Alert variant="info" title="Assignment created">
-                  Assignment ID: <strong>{assignmentId}</strong>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span>Assignment ID: <strong>{assignmentId}</strong></span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(assignmentId);
+                          setCopyFeedback(true);
+                          setTimeout(() => setCopyFeedback(false), 2000);
+                        } catch {
+                          const el = document.createElement('input');
+                          el.value = assignmentId;
+                          document.body.appendChild(el);
+                          el.select();
+                          document.execCommand('copy');
+                          document.body.removeChild(el);
+                          setCopyFeedback(true);
+                          setTimeout(() => setCopyFeedback(false), 2000);
+                        }
+                      }}
+                    >
+                      {copyFeedback ? 'Copied!' : 'Copy Assignment ID'}
+                    </Button>
+                  </div>
                 </Alert>
               )}
               {inviteToken && (

@@ -444,7 +444,7 @@ export const HrAssignmentReview: React.FC = () => {
                         activeTab === tab ? 'text-[#0b2b43] font-semibold' : 'hover:text-[#0b2b43]'
                       }`}
                     >
-                      {tab}
+                      {tab === 'providers' ? 'Services' : tab}
                     </button>
                   ))}
                 </div>
@@ -569,7 +569,7 @@ export const HrAssignmentReview: React.FC = () => {
 
               {activeTab === 'providers' && (
                 <Card padding="lg">
-                  <div className="text-sm font-semibold text-[#0b2b43] mb-4">Providers</div>
+                  <div className="text-sm font-semibold text-[#0b2b43] mb-4">Services</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
                       { title: 'Housing partner', status: 'Shortlist', owner: 'HR' },

@@ -118,10 +118,10 @@ export const EmployeeJourney: React.FC = () => {
         <div className="space-y-3">
           <Alert variant="error">{error}</Alert>
           <p className="text-sm text-[#4b5563]">
-            You can still explore <strong>Service Providers</strong> to get recommendations for housing, schools, movers, banks, and more — no case required.
+            You can still explore <strong>Services</strong> to get recommendations for housing, schools, movers, banks, and more — no case required.
           </p>
           <Button variant="outline" onClick={() => safeNavigate(navigate, 'providers')}>
-            Go to Service Providers
+            Go to Services
           </Button>
         </div>
       )}
@@ -154,9 +154,9 @@ export const EmployeeJourney: React.FC = () => {
                 <Button variant="outline" onClick={loadAssignment}>Refresh</Button>
               </div>
               <p className="text-sm text-[#4b5563] pt-2">
-                Or explore <strong>Service Providers</strong> to get recommendations for housing, schools, movers, banks, and more.
+                Or explore <strong>Services</strong> to get recommendations for housing, schools, movers, banks, and more.
               </p>
-              <Button onClick={() => safeNavigate(navigate, 'providers')}>Go to Service Providers</Button>
+              <Button onClick={() => safeNavigate(navigate, 'providers')}>Go to Services</Button>
               <Button variant="outline" onClick={() => safeNavigate(navigate, 'messages')}>Contact HR / Support</Button>
             </div>
           </div>
@@ -169,7 +169,7 @@ export const EmployeeJourney: React.FC = () => {
             <div className="space-y-2">
               <div className="font-semibold text-[#0b2b43]">Continue your case intake</div>
               <div className="text-sm text-[#4b5563]">
-                Complete your relocation details in the Case Wizard. You can also browse Providers or other sections using the navigation above.
+                Complete your relocation details in the Case Wizard. You can also browse Services or other sections using the navigation above.
               </div>
               <div className="flex flex-wrap gap-2 pt-2">
                 <Button onClick={() => navigate(`/employee/case/${assignmentId}/wizard/1`)}>Open case wizard</Button>
@@ -178,7 +178,7 @@ export const EmployeeJourney: React.FC = () => {
                     Edit responses
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => navigate('/providers')}>Browse Providers</Button>
+                <Button variant="outline" onClick={() => navigate('/providers')}>Browse Services</Button>
                 <Button variant="outline" onClick={loadAssignment}>Refresh</Button>
               </div>
             </div>
@@ -227,11 +227,11 @@ export const EmployeeJourney: React.FC = () => {
                 <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
                   <div className="text-xs text-[#6b7280] mb-1">Next steps</div>
                   <div className="text-xs text-[#4b5563]">
-                    You can continue exploring relocation Providers while HR reviews your submission.
+                    You can continue exploring relocation Services while HR reviews your submission.
                   </div>
                   <div className="mt-3">
                     <Button variant="outline" onClick={() => safeNavigate(navigate, 'providers')}>
-                      Open Providers
+                      Open Services
                     </Button>
                   </div>
                 </div>

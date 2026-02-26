@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ROUTES } from '../../routes';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { AppShell } from '../../components/AppShell';
 import { CaseContextBar } from '../../components/case/CaseContextBar';
 import { WizardSidebar } from '../../components/case/WizardSidebar';
 import { Card } from '../../components/antigravity';
@@ -400,11 +400,14 @@ export const CaseWizardPage: React.FC = () => {
 
   const stepProps = {
     caseId: resolvedCaseId || assignmentId || '',
+    assignmentId: assignmentId || null,
     draft,
     requiredFields,
     onSave: handleSave,
     onNext: handleNext,
     onBack: handleBack,
+    onGoToStep: (stepNumber: number) =>
+      assignmentId && navigate(`/employee/case/${assignmentId}/wizard/${stepNumber}`),
   };
 
   const stepNode = useMemo(() => {
@@ -418,24 +421,8 @@ export const CaseWizardPage: React.FC = () => {
   const completedSteps = stepCompletion.completed;
 
   return (
-    <div className="min-h-screen bg-[#f5f7fa] text-[#1f2937]">
-      <header className="bg-white border-b border-[#e2e8f0]">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to={ROUTES.EMP_DASH} className="shrink-0" aria-label="Dashboard">
-            <img src="/relopass-logo.png?v=1" alt="" className="h-10 w-10 rounded-lg object-contain" />
-          </Link>
-          <nav className="flex items-center gap-4 text-sm text-[#6b7280]">
-            <Link to={ROUTES.EMP_DASH} className="hover:text-[#0b2b43]">Dashboard</Link>
-            <Link to={`/employee/case/${assignmentId}/wizard/1`} className="text-[#0b2b43] font-semibold">My Case</Link>
-            <Link to="/providers" className="hover:text-[#0b2b43]">Providers</Link>
-            <Link to="/hr/policy" className="hover:text-[#0b2b43]">HR Policy</Link>
-            <Link to="/messages" className="hover:text-[#0b2b43]">Messages</Link>
-            <Link to="/resources" className="hover:text-[#0b2b43]">Resources</Link>
-          </nav>
-        </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+    <AppShell title="My Case" subtitle="Complete your relocation intake.">
+      <div className="max-w-6xl mx-auto space-y-6">
         {assignmentStatus === 'awaiting_intake' && hrFeedback && (
           <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
             <div className="font-semibold">Changes requested by HR</div>
@@ -567,6 +554,6 @@ export const CaseWizardPage: React.FC = () => {
           <div>{stepNode}</div>
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 };

@@ -28,8 +28,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const [navError, setNavError] = useState<string | null>(getNavigationError());
   const isHrRole = role === 'HR' || role === 'ADMIN';
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
+  const isOnEmployeeRoute = location.pathname.startsWith('/employee/');
+  const showEmployeeNav = (isEmployeeRole && !isHrRole) || (role === 'ADMIN' && isOnEmployeeRoute);
+  const showHrNav = isHrRole && !(role === 'ADMIN' && isOnEmployeeRoute);
   const { selectedCaseId } = useSelectedCase();
-  const { assignmentId } = useEmployeeAssignment();
+  const { assignmentId: assignmentIdFromContext } = useEmployeeAssignment();
+  const assignmentIdFromPath = location.pathname.match(/^\/employee\/case\/([^/]+)/)?.[1] ?? null;
+  const assignmentId = assignmentIdFromContext ?? assignmentIdFromPath;
   const { context: adminContext, refresh: refreshAdminContext } = useAdminContext();
 
   const isActiveRoute = (path: string) => {
@@ -99,7 +104,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             </div>
           </div>
         </Container>
-        {isEmployeeRole && !isHrRole && (
+        {showEmployeeNav && (
           <div className="border-t border-[#e2e8f0]">
             <Container maxWidth="xl" className="py-3">
               <nav className="flex flex-wrap items-center gap-2 text-sm text-[#6b7280]">
@@ -167,7 +172,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             </Container>
           </div>
         )}
-        {isHrRole && (
+        {showHrNav && (
           <div className="border-t border-[#e2e8f0]">
             <Container maxWidth="xl" className="py-3 flex items-center justify-between gap-6">
               <div className="flex flex-wrap items-center gap-4">
