@@ -3,6 +3,7 @@ Unified database layer — works with both SQLite and Postgres.
 Uses DATABASE_URL from db_config (single source of truth).
 """
 import json
+import os
 import math
 import uuid
 import logging
