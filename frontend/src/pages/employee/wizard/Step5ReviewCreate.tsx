@@ -74,7 +74,6 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [dossierQuestions, setDossierQuestions] = useState<DossierQuestion[]>([]);
   const [dossierAnswers, setDossierAnswers] = useState<Record<string, any>>({});
-  const [dossierMandatoryUnanswered, setDossierMandatoryUnanswered] = useState(0);
   const [dossierComplete, setDossierComplete] = useState(true);
   const [dossierSources, setDossierSources] = useState<Array<{ title?: string; url: string; snippet?: string }>>([]);
   const [dossierLoading, setDossierLoading] = useState(false);
@@ -127,7 +126,6 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
       .then((res) => {
         setDossierQuestions(res.questions || []);
         setDossierAnswers(res.answers || {});
-        setDossierMandatoryUnanswered(res.mandatory_unanswered_count || 0);
         setDossierComplete(Boolean(res.is_step5_complete));
         setDossierSources(res.sources_used || []);
       })
@@ -197,7 +195,6 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
         const refreshed = await dossierAPI.getQuestions(caseId);
         setDossierQuestions(refreshed.questions || []);
         setDossierAnswers(refreshed.answers || {});
-        setDossierMandatoryUnanswered(refreshed.mandatory_unanswered_count || 0);
         setDossierComplete(Boolean(refreshed.is_step5_complete));
         setDossierSources(refreshed.sources_used || []);
       }
