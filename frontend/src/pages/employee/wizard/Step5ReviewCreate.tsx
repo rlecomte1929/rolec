@@ -115,7 +115,6 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
     if (missingFields.length === 0 && approvedMissingFields.length === 0) {
       setDossierQuestions([]);
       setDossierAnswers({});
-      setDossierMandatoryUnanswered(0);
       setDossierComplete(true);
       setDossierSources([]);
       return;
@@ -247,7 +246,6 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
       const refreshed = await dossierAPI.getQuestions(caseId);
       setDossierQuestions(refreshed.questions || []);
       setDossierAnswers(refreshed.answers || {});
-      setDossierMandatoryUnanswered(refreshed.mandatory_unanswered_count || 0);
       setDossierComplete(Boolean(refreshed.is_step5_complete));
       setDossierSources(refreshed.sources_used || []);
       setDossierSuggestions((prev) => prev.filter((s) => s.question_text !== suggestion.question_text));
