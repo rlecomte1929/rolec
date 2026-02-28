@@ -56,7 +56,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
     : buildRoute('hrMessages');
 
   useRegisterNav('AppShell', [
-    { label: 'Employee view', routeKey: 'employeeJourney' },
+    { label: 'Employee view', routeKey: 'employeeDashboard' },
     { label: 'HR view', routeKey: 'hrDashboard' },
   ]);
 
@@ -118,7 +118,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             <div className="text-right text-sm text-slate-600">
               {identity && (
                 <Link
-                  to={role === 'EMPLOYEE' ? buildRoute('employeeJourney') : role === 'HR' || role === 'ADMIN' ? buildRoute('hrDashboard') : buildRoute('landing')}
+                  to={role === 'EMPLOYEE' ? buildRoute('employeeDashboard') : role === 'HR' || role === 'ADMIN' ? buildRoute('hrDashboard') : buildRoute('landing')}
                   className="inline-flex flex-col items-end rounded-lg px-3 py-2 font-medium text-[#0f172a] hover:bg-[#eef4f8] hover:text-[#0b2b43] transition-colors"
                 >
                   {identity}
@@ -133,9 +133,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             <Container maxWidth="xl" className="py-3">
               <nav className="flex flex-wrap items-center gap-2 text-sm text-[#6b7280]">
                 <Link
-                  to={buildRoute('employeeJourney')}
+                  to={buildRoute('employeeDashboard')}
                   className={`px-3 py-1 rounded-full border ${
-                    isActiveRoute(ROUTE_DEFS.employeeJourney.path) && !location.pathname.includes('/wizard')
+                    isActiveRoute(ROUTE_DEFS.employeeDashboard.path) && !location.pathname.includes('/wizard')
                       ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
                       : 'border-transparent hover:text-[#0b2b43]'
                   }`}
@@ -143,7 +143,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   Dashboard
                 </Link>
                 <Link
-                  to={assignmentId ? `/employee/case/${assignmentId}/summary` : buildRoute('employeeJourney')}
+                  to={assignmentId ? `/employee/case/${assignmentId}/wizard/1` : buildRoute('employeeDashboard')}
                   className={`px-3 py-1 rounded-full border ${
                     (location.pathname.includes('/wizard') || location.pathname.includes('/summary'))
                       ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
@@ -306,9 +306,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   </Link>
                   {role === 'ADMIN' && (
                     <Link
-                      to={buildRoute('employeeJourney')}
+                      to={buildRoute('employeeDashboard')}
                       className={`px-3 py-1 rounded-full border ${
-                        isActiveRoute(ROUTE_DEFS.employeeJourney.path)
+                        isActiveRoute(ROUTE_DEFS.employeeDashboard.path)
                           ? 'border-[#059669] text-[#059669] bg-[#ecfdf5]'
                           : 'border-[#d1d5db] text-[#6b7280] hover:text-[#059669]'
                       }`}

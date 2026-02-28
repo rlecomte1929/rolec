@@ -33,6 +33,7 @@ import { ProvidersPage } from './pages/ProvidersPage';
 import { DebugAuth } from './pages/DebugAuth';
 import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
 import { Messages } from './pages/Messages';
+import { Resources } from './pages/Resources';
 import { HrCompanyProfile } from './pages/HrCompanyProfile';
 import { HrCommandCenter } from './pages/HrCommandCenter';
 import { HrCommandCenterCaseDetail } from './pages/HrCommandCenterCaseDetail';
@@ -58,8 +59,9 @@ function App() {
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         <Route path="/journey" element={<Journey />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path={ROUTE_DEFS.employeeJourney.path} element={<Navigate to={WIZARD_ROUTES.EMP_DASH} replace />} />
-        <Route path={WIZARD_ROUTES.EMP_DASH} element={<EmployeeJourney />} />
+        <Route path={ROUTE_DEFS.employeeJourney.path} element={<Navigate to={ROUTE_DEFS.employeeDashboard.path} replace />} />
+        <Route path={ROUTE_DEFS.employeeDashboard.path} element={<EmployeeJourney />} />
+        <Route path={WIZARD_ROUTES.EMP_DASH} element={<Navigate to={ROUTE_DEFS.employeeDashboard.path} replace />} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
         <Route path={ROUTE_DEFS.hrCommandCenter.path} element={<HrCommandCenter />} />
         <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<HrCommandCenterCaseDetail />} />
@@ -97,7 +99,7 @@ function App() {
         />
         <Route
           path={ROUTE_DEFS.resources.path}
-          element={<PlaceholderPage title="Resources" description="Access relocation resources and guides." />}
+          element={<Resources />}
         />
         <Route
           path={ROUTE_DEFS.hrMessages.path}

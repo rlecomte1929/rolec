@@ -18,7 +18,7 @@ export const useAuth = () => {
   };
 
   const redirectByRole = (role: UserRole) => {
-    safeNavigate(navigate, role === 'EMPLOYEE' ? 'employeeJourney' : 'hrDashboard');
+    safeNavigate(navigate, role === 'EMPLOYEE' ? 'employeeDashboard' : 'hrDashboard');
   };
 
   const login = async (payload: LoginRequest) => {

@@ -54,7 +54,14 @@ function EmployeePolicyContent() {
       </Card>
     );
   }
-  return <EmployeePolicyView assignmentId={assignmentId} compact={false} />;
+  return (
+    <div className="space-y-4">
+      <EmployeePolicyView assignmentId={assignmentId} compact={false} />
+      <Link to={buildRoute('providers')}>
+        <Button variant="outline">Back to Services</Button>
+      </Link>
+    </div>
+  );
 }
 
 export const HrPolicy: React.FC = () => {

@@ -3,98 +3,94 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card, Input } from '../components/antigravity';
 import { employeeAPI } from '../api/client';
-import { getAuthItem } from '../utils/demo';
-import type { AssignmentStatus, EmployeeJourneyResponse } from '../types';
+import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
+import { getRelocationCase } from '../api/relocation';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { buildRoute } from '../navigation/routes';
+import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { getAuthItem } from '../utils/demo';
 
-// Canonical assignment statuses.
-const INTAKE_STATUSES: AssignmentStatus[] = ['created', 'assigned', 'awaiting_intake'];
-const SUBMITTED_STATUSES: AssignmentStatus[] = ['submitted', 'approved', 'rejected', 'closed'];
-
-function statusLabel(status?: AssignmentStatus) {
-  if (status === 'approved') return 'Approved';
-  if (status === 'rejected') return 'Rejected';
-  if (status === 'submitted') return 'Submitted to HR';
-  if (status === 'closed') return 'Closed';
-  if (status === 'awaiting_intake') return 'Awaiting intake';
-  if (status === 'assigned') return 'Assigned';
-  if (status === 'created') return 'Created';
-  return 'In intake';
-}
+const FLOW_STEPS = [
+  '1. Fill your case',
+  '2. Choose services',
+  '3. Review budget vs policy',
+  '4. (Soon) Request quotes',
+  '5. Exchange with HR',
+];
 
 export const EmployeeJourney: React.FC = () => {
-  const [assignmentId, setAssignmentId] = useState<string | null>(null);
-  const [journey, setJourney] = useState<EmployeeJourneyResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [actionError, _setActionError] = useState('');
-  const [actionSuccess, _setActionSuccess] = useState('');
-  const [claimId, setClaimId] = useState('');
-  const [claimEmail, setClaimEmail] = useState(getAuthItem('relopass_email') || getAuthItem('relopass_username') || '');
-
   const navigate = useNavigate();
-
-  const loadAssignment = async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const response = await employeeAPI.getCurrentAssignment();
-      if (!response?.assignment) {
-        setAssignmentId(null);
-        setJourney(null);
-        return;
-      }
-      setAssignmentId(response.assignment.id);
-      const data = await employeeAPI.getNextQuestion(response.assignment.id);
-      setJourney(data);
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else {
-        setAssignmentId(null);
-        setJourney(null);
-        setError(
-          'We couldn\'t load your assignments. You can try claiming one below or refresh the page to retry.'
-        );
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { assignmentId, isLoading: assignmentLoading } = useEmployeeAssignment();
+  const [caseId, setCaseId] = useState<string | null>(null);
+  const [missingCount, setMissingCount] = useState<number | null>(null);
+  const [servicesSelected, setServicesSelected] = useState<number | null>(null);
+  const [budgetStatus, setBudgetStatus] = useState<string>('Policy not provided');
+  const [error, setError] = useState('');
+  const [claimId, setClaimId] = useState('');
+  const [claimEmail, setClaimEmail] = useState(
+    getAuthItem('relopass_email') || getAuthItem('relopass_username') || ''
+  );
 
   useEffect(() => {
-    loadAssignment();
-  }, []);
-
-  const status = journey?.assignmentStatus as AssignmentStatus | undefined;
-  const isIntake = status ? INTAKE_STATUSES.includes(status) : false;
-  const isSubmitted = status ? SUBMITTED_STATUSES.includes(status) : false;
-
-  // Store HR notes when changes requested; allow free navigation between dashboard and wizard
-  useEffect(() => {
-    if (!assignmentId || !journey || !status) return;
-    // When HR has requested changes, the backend normalizes legacy CHANGES_REQUESTED
-    // into 'awaiting_intake' and exposes hrNotes with guidance.
-    if (status === 'awaiting_intake' && journey.hrNotes) {
-      sessionStorage.setItem('relopass_hr_notes', journey.hrNotes);
+    if (assignmentLoading) return;
+    if (!assignmentId) {
+      setCaseId(null);
+      setMissingCount(null);
+      setServicesSelected(null);
+      return;
     }
-  }, [assignmentId, journey, status]);
+    const load = async () => {
+      try {
+        const caseDetails = await getCaseDetailsByAssignmentId(assignmentId);
+        const cid = caseDetails.data?.case?.id || null;
+        setCaseId(cid);
+        if (cid) {
+          try {
+            const relocation = await getRelocationCase(cid);
+            setMissingCount(relocation.missing_fields?.length ?? 0);
+          } catch {
+            setMissingCount(null);
+          }
+        }
+        const serviceRes = await employeeAPI.getAssignmentServices(assignmentId);
+        const selected = (serviceRes.services || []).filter((svc) => Boolean(svc.selected)).length;
+        setServicesSelected(selected);
+        const policyRes = await employeeAPI.getPolicyBudget(assignmentId);
+        const caps = policyRes?.caps || {};
+        const totals: Record<string, number> = {};
+        serviceRes.services?.forEach((svc) => {
+          if (!svc.selected) return;
+          if (svc.estimated_cost === null || svc.estimated_cost === undefined) return;
+          totals[svc.category] = (totals[svc.category] || 0) + Number(svc.estimated_cost);
+        });
+        let exceeding = false;
+        Object.entries(totals).forEach(([category, total]) => {
+          const cap = caps[category];
+          if (cap !== undefined && total > cap) exceeding = true;
+        });
+        if (Object.keys(caps).length === 0) {
+          setBudgetStatus('Policy not provided');
+        } else {
+          setBudgetStatus(exceeding ? 'Exceeding policy' : 'Within policy');
+        }
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          safeNavigate(navigate, 'landing');
+          return;
+        }
+        setError('We could not load your case summary yet. Please refresh to retry.');
+      }
+    };
+    load();
+  }, [assignmentId, assignmentLoading, navigate]);
 
-  const answeredCount = journey?.progress?.answeredCount || 0;
-  const totalQuestions = journey?.progress?.totalQuestions || 0;
-  const requiredDone = Math.min(answeredCount, totalQuestions);
-  const progressPercent = totalQuestions > 0 ? Math.round((requiredDone / totalQuestions) * 100) : 0;
-  const progressPercentCapped = Math.max(0, Math.min(100, progressPercent));
+  const primaryCtaLabel = assignmentId ? 'Continue My Case' : 'Start My Case';
 
-  const profile = journey?.profile;
-
-  const family = useMemo(() => {
-    const spouseName = profile?.spouse?.fullName || '';
-    const children = profile?.dependents?.filter((child) => child.firstName) || [];
-    return { spouseName, children };
-  }, [profile?.spouse?.fullName, profile?.dependents]);
-
-  const handleClaimAssignment = async () => {
+  const handlePrimaryCta = async () => {
+    if (assignmentId) {
+      navigate(`/employee/case/${assignmentId}/wizard/1`);
+      return;
+    }
     if (!claimId.trim() || !claimEmail.trim()) {
       setError('Enter your email or username and the assignment ID provided by HR.');
       return;
@@ -102,236 +98,112 @@ export const EmployeeJourney: React.FC = () => {
     setError('');
     try {
       const res = await employeeAPI.claimAssignment(claimId.trim(), claimEmail.trim());
-      const assignmentId = res.assignmentId || claimId.trim();
-      navigate(`/employee/case/${assignmentId}/wizard/1`);
+      const nextAssignment = res.assignmentId || claimId.trim();
+      navigate(`/employee/case/${nextAssignment}/wizard/1`);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Unable to claim assignment.');
+      setError(err?.response?.data?.detail || 'Unable to claim assignment.');
     }
   };
 
+  const flowchart = useMemo(() => {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-sm text-[#0b2b43]">
+        {FLOW_STEPS.map((step, idx) => (
+          <div key={step} className="flex items-center gap-2">
+            <div className="rounded-full border border-[#cbd5f5] bg-[#eef4f8] px-3 py-1 font-medium">{step}</div>
+            {idx < FLOW_STEPS.length - 1 && <span className="text-[#94a3b8]">→</span>}
+          </div>
+        ))}
+      </div>
+    );
+  }, []);
+
   return (
-    <AppShell title="Employee Journey" subtitle="Complete your relocation profile for HR review.">
-      {isLoading && <div className="text-sm text-[#6b7280]">Loading...</div>}
-      {!isLoading && actionError && <Alert variant="error">{actionError}</Alert>}
-      {!isLoading && actionSuccess && <Alert variant="success">{actionSuccess}</Alert>}
+    <AppShell title="Welcome" subtitle="Here’s what happens next with your relocation case.">
+      {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
-      {!isLoading && error && (
-        <div className="space-y-3">
-          <Alert variant="error">{error}</Alert>
-          <p className="text-sm text-[#4b5563]">
-            You can still explore <strong>Services</strong> to get recommendations for housing, schools, movers, banks, and more — no case required.
-          </p>
-          <Button variant="outline" onClick={() => safeNavigate(navigate, 'providers')}>
-            Go to Services
-          </Button>
-        </div>
-      )}
+      <Card padding="lg" className="mb-6">
+        <div className="text-lg font-semibold text-[#0b2b43] mb-2">Your relocation flow</div>
+        {flowchart}
+      </Card>
 
-      {!isLoading && !assignmentId && (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <Card padding="lg">
-          <div className="space-y-3">
-            <div className="text-lg font-semibold text-[#0b2b43]">No relocation case assigned yet</div>
-            <div className="text-sm text-[#4b5563]">
-              When HR assigns your relocation case, you’ll complete a short 5-step wizard. If you already received an assignment ID, enter it below.
-            </div>
-            <div className="pt-2 space-y-3">
-              <Input
-                type="text"
-                value={claimEmail}
-                onChange={setClaimEmail}
-                label="Email or username"
-                placeholder="you@example.com or your_username"
-                fullWidth
-              />
-              <Input
-                value={claimId}
-                onChange={setClaimId}
-                label="Assignment ID"
-                placeholder="Paste the assignment ID from HR"
-                fullWidth
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={handleClaimAssignment}>Start</Button>
-                <Button variant="outline" onClick={loadAssignment}>Refresh</Button>
-              </div>
-              <p className="text-sm text-[#4b5563] pt-2">
-                Or explore <strong>Services</strong> to get recommendations for housing, schools, movers, banks, and more.
-              </p>
-              <Button onClick={() => safeNavigate(navigate, 'providers')}>Go to Services</Button>
-              <Button variant="outline" onClick={() => safeNavigate(navigate, 'messages')}>Contact HR / Support</Button>
-            </div>
+          <div className="text-xs uppercase tracking-wide text-[#6b7280]">Case completeness</div>
+          <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
+            {missingCount === null ? '—' : `${missingCount} missing`}
+          </div>
+          <div className="text-sm text-[#6b7280] mt-2">
+            Complete your case to unlock tailored services.
+          </div>
+        </Card>
+        <Card padding="lg">
+          <div className="text-xs uppercase tracking-wide text-[#6b7280]">Services selected</div>
+          <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
+            {servicesSelected === null ? '—' : servicesSelected}
+          </div>
+          <div className="text-sm text-[#6b7280] mt-2">
+            Add or edit services anytime.
+          </div>
+        </Card>
+        <Card padding="lg">
+          <div className="text-xs uppercase tracking-wide text-[#6b7280]">Budget status</div>
+          <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{budgetStatus}</div>
+          <div className="text-sm text-[#6b7280] mt-2">
+            Compare selected services against policy caps.
+          </div>
+        </Card>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 mb-8">
+        <Button onClick={handlePrimaryCta}>{primaryCtaLabel}</Button>
+        <Button
+          variant="outline"
+          onClick={() => navigate(buildRoute('providers'))}
+          disabled={!assignmentId}
+        >
+          Go to Services
+        </Button>
+        <Button variant="outline" onClick={() => safeNavigate(navigate, 'messages')}>Messages</Button>
+      </div>
+
+      {!assignmentId && (
+        <Card padding="lg">
+          <div className="text-lg font-semibold text-[#0b2b43]">No case assigned yet</div>
+          <div className="text-sm text-[#4b5563] mt-2">
+            If HR has shared an assignment ID, enter it below to start your case.
+          </div>
+          <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              type="text"
+              value={claimEmail}
+              onChange={setClaimEmail}
+              label="Email or username"
+              placeholder="you@example.com or your_username"
+              fullWidth
+            />
+            <Input
+              value={claimId}
+              onChange={setClaimId}
+              label="Assignment ID"
+              placeholder="Paste the assignment ID from HR"
+              fullWidth
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button onClick={handlePrimaryCta}>Start</Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>Refresh</Button>
           </div>
         </Card>
       )}
 
-      {!isLoading && assignmentId && journey && isIntake && (
+      {assignmentId && caseId && (
         <Card padding="lg">
-          <Alert variant="info">
-            <div className="space-y-2">
-              <div className="font-semibold text-[#0b2b43]">Continue your case intake</div>
-              <div className="text-sm text-[#4b5563]">
-                Complete your relocation details in the Case Wizard. You can also browse Services or other sections using the navigation above.
-              </div>
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Button onClick={() => navigate(`/employee/case/${assignmentId}/wizard/1`)}>Open case wizard</Button>
-                {status === 'created' && (
-                  <Button variant="outline" onClick={() => navigate(`/employee/case/${assignmentId}/wizard/1`)}>
-                    Edit responses
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => navigate('/providers')}>Browse Services</Button>
-                <Button variant="outline" onClick={loadAssignment}>Refresh</Button>
-              </div>
-            </div>
-          </Alert>
-        </Card>
-      )}
-
-      {!isLoading && assignmentId && journey && isSubmitted && (
-        <div className="space-y-6">
-          <Card padding="lg">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div>
-                <div className="text-2xl font-semibold text-[#0b2b43]">
-                  {profile?.primaryApplicant?.fullName || 'Employee'}
-                </div>
-                <div className="text-sm text-[#6b7280] mt-2">
-                  {profile?.movePlan?.origin || '—'} → {profile?.movePlan?.destination || '—'}
-                </div>
-                <div className="text-xs text-[#6b7280] mt-1">
-                  Target move: {profile?.movePlan?.targetArrivalDate || '—'}
-                </div>
-                <div className="mt-3 inline-flex items-center rounded-full bg-[#eef4f8] text-[#0b2b43] px-3 py-1 text-xs font-semibold">
-                  {statusLabel(status)}
-                </div>
-              </div>
-
-              <div className="w-full max-w-xs space-y-3">
-                <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
-                  <div className="text-xs text-[#6b7280] mb-2">Progress</div>
-                  <div className="flex items-center justify-between text-xs text-[#6b7280]">
-                    <span>{requiredDone} of {totalQuestions} required items completed</span>
-                    <span className="font-semibold text-[#0b2b43]">{progressPercentCapped}%</span>
-                  </div>
-                  <div className="mt-2 h-1.5 w-full rounded-full bg-[#e2e8f0]">
-                    <div className="h-1.5 rounded-full bg-[#0b2b43]" style={{ width: `${progressPercentCapped}%` }} />
-                  </div>
-                </div>
-                {status === 'submitted' && (
-                  <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
-                    <div className="text-xs text-[#6b7280] mb-1">Status</div>
-                    <div className="text-xs text-[#4b5563]">
-                      Submitted to HR for review.
-                    </div>
-                  </div>
-                )}
-                <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
-                  <div className="text-xs text-[#6b7280] mb-1">Next steps</div>
-                  <div className="text-xs text-[#4b5563]">
-                    You can continue exploring relocation Services while HR reviews your submission.
-                  </div>
-                  <div className="mt-3">
-                    <Button variant="outline" onClick={() => safeNavigate(navigate, 'providers')}>
-                      Open Services
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43]">Relocation Basics</div>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Origin</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.movePlan?.origin || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Destination</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.movePlan?.destination || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Target move date</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.movePlan?.targetArrivalDate || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Purpose</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">Employment</div>
-                </div>
-              </div>
-            </Card>
-
-            <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43]">Employee Profile</div>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Nationality</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.nationality || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Role title</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.employer?.roleTitle || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Passport expiry</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.passport?.expiryDate || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Job level</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.employer?.jobLevel || '—'}</div>
-                </div>
-              </div>
-            </Card>
-
-            <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43] mb-3">Family Members</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Spouse</div>
-                  <div className="text-sm font-medium text-[#0b2b43] mt-1">{family.spouseName || 'Not included'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Children</div>
-                  <div className="text-sm font-medium text-[#0b2b43] mt-1">{family.children.length}</div>
-                </div>
-              </div>
-              {family.children.length > 0 ? (
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {family.children.map((child, idx) => (
-                    <div key={`${child.firstName}-${idx}`} className="border border-[#e2e8f0] rounded-lg p-3">
-                      <div className="text-xs uppercase tracking-wide text-[#6b7280]">Child</div>
-                      <div className="text-sm font-medium text-[#0b2b43] mt-1">{child.firstName}</div>
-                      <div className="text-xs text-[#6b7280]">{child.dateOfBirth || 'DOB not set'}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </Card>
-
-            <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43]">Assignment / Context</div>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Employer</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.employer?.name || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Contract start</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.assignment?.startDate || '—'}</div>
-                </div>
-              </div>
-              <div className="mt-4">
-                <Button variant="outline" onClick={() => safeNavigate(navigate, 'messages')}>
-                  Contact HR / Support
-                </Button>
-              </div>
-            </Card>
+          <div className="text-sm text-[#6b7280]">
+            Case ID: <span className="font-semibold text-[#0b2b43]">{caseId}</span>
           </div>
-        </div>
+        </Card>
       )}
     </AppShell>
   );
 };
-

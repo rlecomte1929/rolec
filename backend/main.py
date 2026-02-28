@@ -31,6 +31,7 @@ from .schemas import (
 )
 from .services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
 from .services.guidance_pack_service import generate_guidance_pack
+from .services.policy_adapter import normalize_policy_caps
 from .app.services.requirements_sufficiency import compute_requirements_sufficiency
 # Import db_config first and log before any DB connection attempt
 # TODO: Remove masked DB log after confirming production connectivity
@@ -2126,6 +2127,18 @@ class MarkConversationReadRequest(BaseModel):
     conversation_id: Optional[str] = None
 
 
+class CaseServiceItem(BaseModel):
+    service_key: str
+    category: str
+    selected: bool = True
+    estimated_cost: Optional[float] = None
+    currency: Optional[str] = None
+
+
+class CaseServicesUpsert(BaseModel):
+    services: List[CaseServiceItem]
+
+
 @app.post("/api/messages/mark-conversation-read")
 def mark_conversation_read(
     req: MarkConversationReadRequest,
@@ -2329,6 +2342,78 @@ def get_case_details_by_assignment(
         },
         "case": case_dto.model_dump(mode="json"),
     }
+
+
+def _require_assignment_visibility(
+    assignment_id: str,
+    user: Dict[str, Any],
+):
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    visible = False
+    if is_employee and emp_id == effective["id"]:
+        visible = True
+    if is_hr and (effective.get("is_admin") or hr_id == effective["id"]):
+        visible = True
+    if not visible:
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    return assignment
+
+
+@app.get("/api/employee/assignments/{assignment_id}/services")
+def get_assignment_services(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment = _require_assignment_visibility(assignment_id, user)
+    services = db.list_case_services(assignment["id"])
+    return {
+        "assignment_id": assignment["id"],
+        "case_id": assignment.get("case_id"),
+        "services": services,
+    }
+
+
+@app.post("/api/employee/assignments/{assignment_id}/services")
+def upsert_assignment_services(
+    assignment_id: str,
+    payload: CaseServicesUpsert,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=400, detail="Assignment missing case_id")
+    items = [
+        {
+            "service_key": item.service_key,
+            "category": item.category,
+            "selected": item.selected,
+            "estimated_cost": item.estimated_cost,
+            "currency": item.currency,
+        }
+        for item in payload.services
+    ]
+    db.upsert_case_services(assignment["id"], case_id, items)
+    updated = db.list_case_services(assignment["id"])
+    return {"ok": True, "services": updated}
+
+
+@app.get("/api/employee/assignments/{assignment_id}/policy-budget")
+def get_assignment_policy_budget(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    _ = _require_assignment_visibility(assignment_id, user)
+    policy = policy_engine.load_policy()
+    return normalize_policy_caps(policy)
 
 
 @app.get("/api/dossier/questions", response_model=DossierQuestionsResponse)

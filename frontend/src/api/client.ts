@@ -525,6 +525,44 @@ export const employeeAPI = {
     const response = await api.get('/api/employee/policy/caps');
     return response.data;
   },
+  getAssignmentServices: async (assignmentId: string): Promise<{
+    assignment_id: string;
+    case_id: string;
+    services: Array<{
+      id: string;
+      assignment_id: string;
+      case_id: string;
+      service_key: string;
+      category: string;
+      selected: number | boolean;
+      estimated_cost: number | null;
+      currency: string | null;
+    }>;
+  }> => {
+    const response = await api.get(`/api/employee/assignments/${assignmentId}/services`);
+    return response.data;
+  },
+  saveAssignmentServices: async (
+    assignmentId: string,
+    services: Array<{
+      service_key: string;
+      category: string;
+      selected: boolean;
+      estimated_cost: number | null;
+      currency?: string | null;
+    }>
+  ): Promise<{ ok: boolean; services: any[] }> => {
+    const response = await api.post(`/api/employee/assignments/${assignmentId}/services`, { services });
+    return response.data;
+  },
+  getPolicyBudget: async (assignmentId: string): Promise<{
+    currency: string;
+    caps: Record<string, number>;
+    total_cap?: number | null;
+  }> => {
+    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-budget`);
+    return response.data;
+  },
   getApplicablePolicy: async (assignmentId?: string): Promise<{
     policy: Record<string, unknown> | null;
     allowedBenefits: Array<Record<string, unknown>>;

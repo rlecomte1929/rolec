@@ -172,7 +172,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
     ? dossierQuestions.filter((q) => q.is_mandatory).filter((q) => !isAnswered(dossierAnswers[q.id])).length
     : 0;
 
-  const handleSave = async () => {
+  const handleSave = async (nextRoute?: string) => {
     setError('');
     setDossierError('');
     setIsSaving(true);
@@ -199,6 +199,9 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
       }
       await onSave(draft);
       setSaved(true);
+      if (nextRoute) {
+        navigate(nextRoute);
+      }
     } catch (err: any) {
       const resData = err?.response?.data;
       const detail = err?.detail ?? resData?.detail;
@@ -495,22 +498,23 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
         <GuidancePackPanel caseId={caseId} isStep5Complete={dossierComplete} />
       </div>
 
-      <div className="mt-6 flex items-center justify-between">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" onClick={onBack}>Back</Button>
-        <Button onClick={handleSave} disabled={isSaving || dossierSaving}>
-          {isSaving || dossierSaving ? 'Saving...' : 'Save'}
-        </Button>
-        {saved && (
+        <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() =>
-              assignmentId
-                ? navigate(`/employee/case/${assignmentId}/summary`)
-                : navigate('/employee/dashboard')
-            }
+            variant="outline"
+            onClick={() => handleSave('/employee/dashboard')}
+            disabled={isSaving || dossierSaving}
           >
-            Go to dashboard
+            {isSaving || dossierSaving ? 'Saving...' : 'Save & Exit'}
           </Button>
-        )}
+          <Button
+            onClick={() => handleSave('/providers')}
+            disabled={isSaving || dossierSaving}
+          >
+            {isSaving || dossierSaving ? 'Saving...' : 'Save & go to Services'}
+          </Button>
+        </div>
       </div>
     </Card>
   );

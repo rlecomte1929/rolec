@@ -178,6 +178,21 @@ class Database:
             """))
 
             conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS case_services (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    assignment_id TEXT NOT NULL,
+                    service_key TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    selected INTEGER NOT NULL DEFAULT 1,
+                    estimated_cost REAL,
+                    currency TEXT DEFAULT 'EUR',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS compliance_runs (
                     id TEXT PRIMARY KEY,
                     assignment_id TEXT NOT NULL,
@@ -1104,6 +1119,64 @@ class Database:
                 request_id=request_id,
             ).fetchone()
         return self._row_to_dict(row)
+
+    def list_case_services(self, assignment_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_services WHERE assignment_id = :aid ORDER BY category, service_key",
+                {"aid": assignment_id},
+                op_name="list_case_services",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def upsert_case_services(
+        self,
+        assignment_id: str,
+        case_id: str,
+        services: List[Dict[str, Any]],
+        request_id: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            for item in services:
+                payload = {
+                    "id": item.get("id") or str(uuid.uuid4()),
+                    "case_id": case_id,
+                    "assignment_id": assignment_id,
+                    "service_key": item.get("service_key"),
+                    "category": item.get("category"),
+                    "selected": 1 if item.get("selected", True) else 0,
+                    "estimated_cost": item.get("estimated_cost"),
+                    "currency": item.get("currency") or "EUR",
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                self._exec(
+                    conn,
+                    """
+                    INSERT INTO case_services (
+                        id, case_id, assignment_id, service_key, category,
+                        selected, estimated_cost, currency, created_at, updated_at
+                    )
+                    VALUES (
+                        :id, :case_id, :assignment_id, :service_key, :category,
+                        :selected, :estimated_cost, :currency, :created_at, :updated_at
+                    )
+                    ON CONFLICT(case_id, service_key)
+                    DO UPDATE SET
+                        assignment_id = excluded.assignment_id,
+                        category = excluded.category,
+                        selected = excluded.selected,
+                        estimated_cost = excluded.estimated_cost,
+                        currency = excluded.currency,
+                        updated_at = excluded.updated_at
+                    """,
+                    payload,
+                    op_name="upsert_case_services",
+                    request_id=request_id,
+                )
 
     def get_assignment_for_employee(
         self,

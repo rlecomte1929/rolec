@@ -140,6 +140,12 @@ export const Messages: React.FC = () => {
           </div>
         )}
       </div>
+      <div className="mt-6 rounded-xl border border-dashed border-[#cbd5f5] bg-[#f8fafc] p-4 text-sm text-[#6b7280]">
+        <div className="font-semibold text-[#0b2b43] mb-1">Supplier messaging (Coming soon)</div>
+        <div>
+          You will be able to message relocation service providers directly once quotes are enabled.
+        </div>
+      </div>
     </AppShell>
   );
 };
