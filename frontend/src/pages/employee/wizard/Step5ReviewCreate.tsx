@@ -15,7 +15,6 @@ import { GuidancePackPanel } from '../../../components/guidance/GuidancePackPane
 
 interface StepProps {
   caseId: string;
-  assignmentId?: string | null;
   draft: CaseDraftDTO;
   requiredFields: string[];
   onSave: (draft: CaseDraftDTO) => Promise<void>;
@@ -60,7 +59,6 @@ function SummarySection({
 
 export const Step5ReviewCreate: React.FC<StepProps> = ({
   caseId,
-  assignmentId,
   draft,
   onSave,
   onBack,

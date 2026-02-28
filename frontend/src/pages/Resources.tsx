@@ -35,7 +35,7 @@ export const Resources: React.FC = () => {
     if (!assignmentId) return;
     const load = async () => {
       const res = await getCaseDetailsByAssignmentId(assignmentId);
-      const dest = res.data?.case?.destCountry || res.data?.case?.destination_country || null;
+      const dest = res.data?.case?.destCountry || null;
       setDestination(dest);
     };
     load();
