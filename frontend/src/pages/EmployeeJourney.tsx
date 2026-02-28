@@ -101,8 +101,9 @@ export const EmployeeJourney: React.FC = () => {
     }
     setError('');
     try {
-      await employeeAPI.claimAssignment(claimId.trim(), claimEmail.trim());
-      await loadAssignment();
+      const res = await employeeAPI.claimAssignment(claimId.trim(), claimEmail.trim());
+      const assignmentId = res.assignmentId || claimId.trim();
+      navigate(`/employee/case/${assignmentId}/wizard/1`);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to claim assignment.');
     }

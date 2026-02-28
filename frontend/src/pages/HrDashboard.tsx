@@ -21,6 +21,7 @@ export const HrDashboard: React.FC = () => {
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const [assignmentDetails, setAssignmentDetails] = useState<Record<string, AssignmentDetail>>({});
+  const [detailsLoadedCount, setDetailsLoadedCount] = useState(0);
   const [search, setSearch] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -33,14 +34,20 @@ export const HrDashboard: React.FC = () => {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const navigate = useNavigate();
 
-  const loadAssignmentDetails = async (items: AssignmentSummary[]) => {
+  const loadAssignmentDetails = async (items: AssignmentSummary[], limit = 20) => {
     if (items.length === 0) {
       setAssignmentDetails({});
+      setDetailsLoadedCount(0);
       return;
     }
 
+    const targets = items
+      .filter((assignment) => !assignmentDetails[assignment.id])
+      .slice(0, limit);
+    if (targets.length === 0) return;
+
     const detailEntries = await Promise.allSettled(
-      items.map(async (assignment) => {
+      targets.map(async (assignment) => {
         const detail = await hrAPI.getAssignment(assignment.id);
         return [assignment.id, detail] as const;
       })
@@ -53,7 +60,8 @@ export const HrDashboard: React.FC = () => {
         if (detail) nextDetails[id] = detail;
       }
     });
-    setAssignmentDetails(nextDetails);
+    setAssignmentDetails((prev) => ({ ...prev, ...nextDetails }));
+    setDetailsLoadedCount((prev) => prev + targets.length);
   };
 
   const loadAssignments = async () => {
@@ -65,7 +73,8 @@ export const HrDashboard: React.FC = () => {
         localStorage.setItem('relopass_last_assignment_id', data[0].id);
       }
       setIsLoading(false);
-      await loadAssignmentDetails(data);
+      // Load a small batch of details first to keep the page responsive.
+      void loadAssignmentDetails(data, 20);
     } catch (err: any) {
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
@@ -279,6 +288,17 @@ export const HrDashboard: React.FC = () => {
               )}
             </div>
           </div>
+          {detailsLoadedCount < assignments.length && !isManageMode && (
+            <div className="mb-3 text-xs text-[#6b7280] flex items-center gap-2">
+              Loaded details for {detailsLoadedCount}/{assignments.length} cases.
+              <Button
+                variant="outline"
+                onClick={() => loadAssignmentDetails(assignments, assignments.length)}
+              >
+                Load remaining details
+              </Button>
+            </div>
+          )}
 
           {isConfirmingRemoval && (
             <div className="mb-4 border border-red-200 bg-red-50 rounded-xl p-4">

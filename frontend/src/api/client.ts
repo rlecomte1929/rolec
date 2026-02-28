@@ -485,7 +485,7 @@ export const employeeAPI = {
     const response = await api.get('/api/employee/messages');
     return response.data;
   },
-  claimAssignment: async (assignmentId: string, email: string): Promise<any> => {
+  claimAssignment: async (assignmentId: string, email: string): Promise<{ success: boolean; assignmentId?: string }> => {
     const response = await api.post(`/api/employee/assignments/${assignmentId}/claim`, { email });
     return response.data;
   },

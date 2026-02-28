@@ -1766,7 +1766,7 @@ def claim_assignment(
 
     db.attach_employee_to_assignment(assignment_id, effective["id"])
     db.mark_invites_claimed(assignment["employee_identifier"])
-    return {"success": True}
+    return {"success": True, "assignmentId": assignment_id}
 
 
 @app.get("/api/employee/journey/next-question", response_model=EmployeeJourneyNextQuestion)
