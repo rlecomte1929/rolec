@@ -25,6 +25,7 @@ import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminRelocations } from './pages/admin/AdminRelocations';
 import { AdminSupport } from './pages/admin/AdminSupport';
 import { AdminCompanyDetail } from './pages/admin/AdminCompanyDetail';
+import { AdminResearch } from './pages/admin/AdminResearch';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
@@ -85,6 +86,7 @@ function App() {
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<AdminDashboard />} />
         <Route path={ROUTE_DEFS.adminCompanies.path} element={<AdminCompanies />} />
+        <Route path={ROUTE_DEFS.adminResearch.path} element={<AdminResearch />} />
         <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
         <Route path={ROUTE_DEFS.adminUsers.path} element={<AdminUsers />} />
         <Route path={ROUTE_DEFS.adminRelocations.path} element={<AdminRelocations />} />

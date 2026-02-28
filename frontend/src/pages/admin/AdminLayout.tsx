@@ -38,6 +38,16 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
           Companies
         </Link>
         <Link
+          to={buildRoute('adminResearch')}
+          className={`px-3 py-1 rounded-full border text-sm ${
+            isActive(ROUTE_DEFS.adminResearch.path)
+              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+              : 'border-transparent hover:text-[#0b2b43]'
+          }`}
+        >
+          Research
+        </Link>
+        <Link
           to={buildRoute('adminUsers')}
           className={`px-3 py-1 rounded-full border text-sm ${
             isActive(ROUTE_DEFS.adminUsers.path)

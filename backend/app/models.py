@@ -63,6 +63,39 @@ class RequirementItem(Base):
     last_verified_at = Column(DateTime, nullable=False)
 
 
+class ResearchSourceCandidate(Base):
+    __tablename__ = "research_source_candidates"
+
+    id = Column(String, primary_key=True, index=True)
+    country_code = Column(String, index=True)
+    destination_country = Column(String, nullable=True)
+    purpose = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    publisher_domain = Column(String, nullable=False)
+    retrieved_at = Column(DateTime, nullable=False)
+    snippet = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default="pending")
+    content_hash = Column(String, nullable=False, unique=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class KnowledgeDocIngestJob(Base):
+    __tablename__ = "knowledge_doc_ingest_jobs"
+
+    id = Column(String, primary_key=True, index=True)
+    candidate_id = Column(String, nullable=True)
+    doc_id = Column(String, nullable=True)
+    url = Column(String, nullable=False)
+    destination_country = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="queued")
+    error = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
 class CaseRequirementsSnapshot(Base):
     __tablename__ = "case_requirements_snapshots"
 

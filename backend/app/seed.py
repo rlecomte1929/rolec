@@ -62,7 +62,7 @@ def seed_demo_cases() -> None:
 
     # Seed country requirements for destinations
     for country in {case["draft"]["relocationBasics"]["destCountry"] for case in cases}:
-        run_country_research(country, "employment", {})
+        run_country_research(country, "employment", {"seed_curated": "true"})
 
 
 def _case_draft(

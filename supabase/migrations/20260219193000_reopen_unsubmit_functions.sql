@@ -1,5 +1,11 @@
 -- Reopen/unsubmit assignment RPCs (public schema, additive).
+-- Guarded so local supabase start doesn't fail before core tables exist.
 
+do $do$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'case_assignments')
+     and exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'assignment_audit_log') then
+    execute $fn$
 create or replace function public.employee_unsubmit_assignment(p_assignment_id text)
 returns jsonb
 language plpgsql
@@ -62,7 +68,9 @@ begin
   );
 end;
 $$;
+    $fn$;
 
+    execute $fn$
 create or replace function public.hr_reopen_assignment(p_assignment_id text, p_hr_note text default null)
 returns jsonb
 language plpgsql
@@ -137,6 +145,11 @@ begin
   );
 end;
 $$;
+    $fn$;
 
-grant execute on function public.employee_unsubmit_assignment(text) to authenticated;
-grant execute on function public.hr_reopen_assignment(text, text) to authenticated;
+    execute 'grant execute on function public.employee_unsubmit_assignment(text) to authenticated';
+    execute 'grant execute on function public.hr_reopen_assignment(text, text) to authenticated';
+  else
+    raise notice 'Skipping reopen/unsubmit RPCs; core tables not created yet.';
+  end if;
+end $do$;

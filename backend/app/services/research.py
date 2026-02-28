@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Protocol
+from urllib.parse import urlparse
 import hashlib
 import uuid
 import json
@@ -51,6 +52,20 @@ class StubResearchProvider:
         return f"Stub content for {url}"
 
 
+ALLOWED_DOMAINS = {
+    "SG": ["mom.gov.sg", "ica.gov.sg", "iras.gov.sg", "gov.sg"],
+    "US": ["uscis.gov", "travel.state.gov", "ssa.gov", "irs.gov", "cbp.gov"],
+    "NO": ["udi.no", "skatteetaten.no"],
+    "UK": ["gov.uk"],
+}
+
+
+def _is_official_domain(url: str, country_code: str) -> bool:
+    host = urlparse(url).netloc.lower()
+    allowed = ALLOWED_DOMAINS.get(country_code.upper(), [])
+    return any(host.endswith(domain) for domain in allowed)
+
+
 def run_country_research(dest_country: str, purpose: str, flags: Dict[str, str]) -> Dict[str, str]:
     provider: ResearchProvider = StubResearchProvider()
     query = f"{dest_country} relocation requirements {purpose}"
@@ -70,25 +85,52 @@ def run_country_research(dest_country: str, purpose: str, flags: Dict[str, str])
 
         source_ids: List[str] = []
         for result in results:
+            if not _is_official_domain(result["url"], dest_country.upper()):
+                continue
             content = provider.fetch(result["url"])
             content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-            record = crud.create_source_record(
+            candidate = crud.create_research_candidate(
                 db,
                 {
                     "id": str(uuid.uuid4()),
                     "country_code": profile.country_code,
+                    "destination_country": profile.country_code,
+                    "purpose": purpose,
                     "url": result["url"],
                     "title": result["title"],
                     "publisher_domain": result["url"].split("/")[2],
                     "retrieved_at": datetime.utcnow(),
                     "snippet": content[:140],
+                    "notes": "Pending review – official source candidate.",
+                    "status": "pending",
                     "content_hash": content_hash,
                 },
             )
-            source_ids.append(record.id)
+            source_ids.append(candidate.id)
 
-        for item in _default_requirements(dest_country.upper(), purpose, source_ids):
-            crud.create_requirement_item(db, item)
+        if flags.get("seed_curated") == "true":
+            for result in results:
+                if not _is_official_domain(result["url"], dest_country.upper()):
+                    continue
+                content = provider.fetch(result["url"])
+                content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                record = crud.create_source_record(
+                    db,
+                    {
+                        "id": str(uuid.uuid4()),
+                        "country_code": profile.country_code,
+                        "url": result["url"],
+                        "title": result["title"],
+                        "publisher_domain": result["url"].split("/")[2],
+                        "retrieved_at": datetime.utcnow(),
+                        "snippet": content[:140],
+                        "content_hash": content_hash,
+                    },
+                )
+                source_ids.append(record.id)
+
+            for item in _default_requirements(dest_country.upper(), purpose, source_ids):
+                crud.create_requirement_item(db, item)
 
     return {"status": "ok"}
 

@@ -128,6 +128,85 @@ def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.Requ
     return item
 
 
+def create_research_candidate(db: Session, payload: Dict[str, Any]) -> models.ResearchSourceCandidate:
+    existing = (
+        db.query(models.ResearchSourceCandidate)
+        .filter(models.ResearchSourceCandidate.content_hash == payload["content_hash"])
+        .first()
+    )
+    if existing:
+        return existing
+    record = models.ResearchSourceCandidate(**payload)
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def list_research_candidates(
+    db: Session,
+    destination_country: Optional[str] = None,
+    status: Optional[str] = None,
+) -> List[models.ResearchSourceCandidate]:
+    query = db.query(models.ResearchSourceCandidate)
+    if destination_country:
+        query = query.filter(
+            (models.ResearchSourceCandidate.destination_country == destination_country)
+            | (models.ResearchSourceCandidate.country_code == destination_country)
+        )
+    if status:
+        query = query.filter(models.ResearchSourceCandidate.status == status)
+    return query.order_by(models.ResearchSourceCandidate.created_at.desc()).all()
+
+
+def update_research_candidate_status(db: Session, candidate_id: str, status: str) -> Optional[models.ResearchSourceCandidate]:
+    candidate = db.query(models.ResearchSourceCandidate).filter(models.ResearchSourceCandidate.id == candidate_id).first()
+    if not candidate:
+        return None
+    candidate.status = status
+    db.commit()
+    db.refresh(candidate)
+    return candidate
+
+
+def create_ingest_job(db: Session, payload: Dict[str, Any]) -> models.KnowledgeDocIngestJob:
+    job = models.KnowledgeDocIngestJob(**payload)
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def update_ingest_job(
+    db: Session,
+    job_id: str,
+    status: str,
+    doc_id: Optional[str] = None,
+    error: Optional[str] = None,
+) -> Optional[models.KnowledgeDocIngestJob]:
+    job = db.query(models.KnowledgeDocIngestJob).filter(models.KnowledgeDocIngestJob.id == job_id).first()
+    if not job:
+        return None
+    job.status = status
+    if doc_id:
+        job.doc_id = doc_id
+    job.error = error
+    if status in ("running", "done", "failed"):
+        job.started_at = job.started_at or datetime.utcnow()
+    if status in ("done", "failed"):
+        job.finished_at = datetime.utcnow()
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def list_ingest_jobs(db: Session, status: Optional[str] = None) -> List[models.KnowledgeDocIngestJob]:
+    query = db.query(models.KnowledgeDocIngestJob)
+    if status:
+        query = query.filter(models.KnowledgeDocIngestJob.status == status)
+    return query.order_by(models.KnowledgeDocIngestJob.created_at.desc()).all()
+
+
 def list_requirements(db: Session, country_code: str, purpose: Optional[str] = None) -> List[models.RequirementItem]:
     query = db.query(models.RequirementItem).filter(models.RequirementItem.country_code == country_code)
     if purpose:

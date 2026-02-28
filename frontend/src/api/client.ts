@@ -28,6 +28,8 @@ import type {
   AdminSupportCase,
   AdminSupportNote,
   CompanyProfilePayload,
+  DossierQuestionsResponse,
+  DossierSearchSuggestionsResponse,
 } from '../types';
 
 // VITE_API_URL must be set for every environment:
@@ -417,6 +419,61 @@ export const adminAPI = {
     const response = await api.post(`/api/admin/actions/${action}`, payload);
     return response.data;
   },
+  listResearchCandidates: async (params?: { destination_country?: string; status?: string }) => {
+    const response = await api.get('/api/admin/research/candidates', { params });
+    return response.data;
+  },
+  researchHealth: async (params: { destination: string }) => {
+    const response = await api.get('/api/admin/research/health', { params });
+    return response.data;
+  },
+  approveResearchCandidate: async (candidateId: string, payload: { domain_area: string }) => {
+    const response = await api.post(`/api/admin/research/candidates/${candidateId}/approve`, payload);
+    return response.data;
+  },
+  ingestUrl: async (payload: { url: string; destination_country: string; domain_area: string }) => {
+    const response = await api.post('/api/admin/ingest/url', payload);
+    return response.data;
+  },
+  ingestBatch: async (payload: { urls: Array<string | { url: string; domain_area?: string }>; destination_country: string; domain_area?: string }) => {
+    const response = await api.post('/api/admin/ingest/batch', payload);
+    return response.data;
+  },
+  listIngestJobs: async (params?: { status?: string }) => {
+    const response = await api.get('/api/admin/ingest/jobs', { params });
+    return response.data;
+  },
+  listKnowledgeDocs: async (params: { destination_country: string }) => {
+    const response = await api.get('/api/admin/knowledge/docs', { params });
+    return response.data;
+  },
+  listRequirementEntities: async (params: { destination: string; status?: string }) => {
+    const response = await api.get('/api/admin/requirements/entities', { params });
+    return response.data;
+  },
+  listRequirementFacts: async (entityId: string, params?: { status?: string }) => {
+    const response = await api.get(`/api/admin/requirements/entities/${entityId}/facts`, { params });
+    return response.data;
+  },
+  listRequirementCriteria: async (params: { destination: string; status?: string }) => {
+    const response = await api.get('/api/admin/requirements/criteria', { params });
+    return response.data;
+  },
+  approveRequirementFacts: async (payload: { fact_ids: string[] }) => {
+    const response = await api.post('/api/admin/requirements/facts/approve', payload);
+    return response.data;
+  },
+  rejectRequirementFacts: async (payload: { fact_ids: string[] }) => {
+    const response = await api.post('/api/admin/requirements/facts/reject', payload);
+    return response.data;
+  },
+};
+
+export const requirementsAPI = {
+  getSufficiency: async (caseId: string): Promise<any> => {
+    const response = await api.get('/api/requirements/sufficiency', { params: { case_id: caseId } });
+    return response.data;
+  },
 };
 
 export const employeeAPI = {
@@ -508,6 +565,51 @@ export const hrPolicyAPI = {
   },
   delete: async (policyId: string): Promise<void> => {
     await api.delete(`/api/hr/policies/${policyId}`);
+  },
+};
+
+export const dossierAPI = {
+  getQuestions: async (caseId: string): Promise<DossierQuestionsResponse> => {
+    const response = await api.get('/api/dossier/questions', { params: { case_id: caseId } });
+    return response.data;
+  },
+  saveAnswers: async (payload: { case_id: string; answers: Array<{ question_id?: string | null; case_question_id?: string | null; answer: any }> }): Promise<{ ok: boolean }> => {
+    const response = await api.post('/api/dossier/answers', payload);
+    return response.data;
+  },
+  searchSuggestions: async (caseId: string): Promise<DossierSearchSuggestionsResponse> => {
+    const response = await api.post('/api/dossier/search-suggestions', { case_id: caseId });
+    return response.data;
+  },
+  addCaseQuestion: async (payload: { case_id: string; question_text: string; answer_type: string; options?: string[] | null; is_mandatory?: boolean; sources?: Array<{ title?: string; url: string }> }): Promise<any> => {
+    const response = await api.post('/api/dossier/case-questions', payload);
+    return response.data;
+  },
+};
+
+export const guidanceAPI = {
+  generate: async (caseId: string, mode?: 'demo' | 'strict'): Promise<{
+    guidance_pack_id: string;
+    guidance_mode?: 'demo' | 'strict';
+    pack_hash?: string;
+    rule_set?: any[];
+    plan: any;
+    checklist: any;
+    markdown: string;
+    sources: Array<{ doc_id: string; title?: string; url: string; publisher?: string }>;
+    not_covered: string[];
+    coverage?: any;
+  }> => {
+    const response = await api.post('/api/guidance/generate', { case_id: caseId, mode });
+    return response.data;
+  },
+  getLatest: async (caseId: string): Promise<any> => {
+    const response = await api.get('/api/guidance/latest', { params: { case_id: caseId } });
+    return response.data;
+  },
+  explain: async (caseId: string): Promise<any> => {
+    const response = await api.get('/api/guidance/explain', { params: { case_id: caseId } });
+    return response.data;
   },
 };
 

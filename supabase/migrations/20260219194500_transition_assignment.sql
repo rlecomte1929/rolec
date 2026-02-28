@@ -1,5 +1,11 @@
 -- Canonical assignment transition RPC + timestamp sync (additive).
+-- Guarded so local supabase start doesn't fail before core tables exist.
 
+do $do$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'case_assignments')
+     and exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'assignment_audit_log') then
+    execute $fn$
 alter table if exists public.case_assignments
   add column if not exists created_at_ts timestamptz,
   add column if not exists updated_at_ts timestamptz,
@@ -154,5 +160,10 @@ begin
   );
 end;
 $$;
+    $fn$;
 
-grant execute on function public.transition_assignment(text, text, text) to authenticated;
+    execute 'grant execute on function public.transition_assignment(text, text, text) to authenticated';
+  else
+    raise notice 'Skipping transition_assignment RPCs; core tables not created yet.';
+  end if;
+end $do$;

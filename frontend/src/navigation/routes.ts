@@ -30,6 +30,7 @@ export const ROUTE_DEFS = {
   notificationSettings: { path: '/settings/notifications', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   adminConsole: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
   adminCompanies: { path: '/admin/companies', roles: ['ADMIN'] as RouteRole[] },
+  adminResearch: { path: '/admin/research', roles: ['ADMIN'] as RouteRole[] },
   adminUsers: { path: '/admin/users', roles: ['ADMIN'] as RouteRole[] },
   adminRelocations: { path: '/admin/relocations', roles: ['ADMIN'] as RouteRole[] },
   adminSupport: { path: '/admin/support', roles: ['ADMIN'] as RouteRole[] },

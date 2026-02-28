@@ -86,6 +86,38 @@ export interface CompanyProfilePayload {
   default_working_location?: string;
 }
 
+export interface DossierQuestion {
+  id: string;
+  question_text: string;
+  answer_type: 'text' | 'boolean' | 'select' | 'date' | 'multiselect';
+  options?: string[] | null;
+  is_mandatory: boolean;
+  domain: string;
+  question_key?: string | null;
+  source: 'library' | 'case';
+}
+
+export interface DossierQuestionsResponse {
+  destination_country?: string | null;
+  questions: DossierQuestion[];
+  answers: Record<string, any>;
+  mandatory_unanswered_count: number;
+  is_step5_complete: boolean;
+  sources_used: Array<{ title?: string; url: string; snippet?: string }>;
+}
+
+export interface DossierSuggestion {
+  question_text: string;
+  answer_type: 'text' | 'boolean' | 'select' | 'date' | 'multiselect';
+  sources: Array<{ title?: string; url: string }>;
+}
+
+export interface DossierSearchSuggestionsResponse {
+  destination_country?: string | null;
+  sources: Array<{ title?: string; url: string; snippet?: string }>;
+  suggestions: DossierSuggestion[];
+}
+
 export interface User {
   id: string;
   username?: string;

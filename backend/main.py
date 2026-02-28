@@ -29,6 +29,9 @@ from .schemas import (
     UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest
 )
+from .services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
+from .services.guidance_pack_service import generate_guidance_pack
+from .app.services.requirements_sufficiency import compute_requirements_sufficiency
 # Import db_config first and log before any DB connection attempt
 # TODO: Remove masked DB log after confirming production connectivity
 from .db_config import DATABASE_URL as _db_url, get_masked_db_log_line
@@ -690,6 +693,68 @@ class CompanyProfileRequest(BaseModel):
     default_working_location: Optional[str] = None
 
 
+class DossierQuestionDTO(BaseModel):
+    id: str
+    question_text: str
+    answer_type: str
+    options: Optional[List[str]] = None
+    is_mandatory: bool
+    domain: str
+    question_key: Optional[str] = None
+    source: str = "library"
+
+
+class DossierQuestionsResponse(BaseModel):
+    destination_country: Optional[str]
+    questions: List[DossierQuestionDTO]
+    answers: Dict[str, Any]
+    mandatory_unanswered_count: int
+    is_step5_complete: bool
+    sources_used: List[Dict[str, Any]] = []
+
+
+class DossierAnswerItem(BaseModel):
+    question_id: Optional[str] = None
+    case_question_id: Optional[str] = None
+    answer: Any
+
+
+class DossierAnswersRequest(BaseModel):
+    case_id: str
+    answers: List[DossierAnswerItem]
+
+
+class DossierSearchSuggestionsRequest(BaseModel):
+    case_id: str
+
+
+class DossierSuggestionDTO(BaseModel):
+    question_text: str
+    answer_type: str
+    sources: List[Dict[str, Any]]
+
+
+class DossierSearchSuggestionsResponse(BaseModel):
+    destination_country: Optional[str]
+    sources: List[Dict[str, Any]]
+    suggestions: List[DossierSuggestionDTO]
+
+
+class DossierCaseQuestionRequest(BaseModel):
+    case_id: str
+    question_text: str
+    answer_type: str
+    options: Optional[List[str]] = None
+    is_mandatory: bool = False
+    sources: Optional[List[Dict[str, Any]]] = None
+
+
+class GuidanceGenerateRequest(BaseModel):
+    case_id: str
+    mode: Optional[str] = None
+
+
+
 class HrFeedbackRequest(BaseModel):
     message: str
 
@@ -714,6 +779,46 @@ def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = No
     if expected_role and target.get("role") != expected_role.value:
         return user
     return target
+
+
+def _normalize_destination_country(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    normalized = value.strip().upper()
+    if normalized in ("SG", "SINGAPORE"):
+        return "SG"
+    if normalized in ("US", "USA", "UNITED STATES"):
+        return "US"
+    return None
+
+
+def _build_profile_snapshot(draft: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "relocationBasics": draft.get("relocationBasics") or {},
+        "employeeProfile": draft.get("employeeProfile") or {},
+        "familyMembers": draft.get("familyMembers") or {},
+        "assignmentContext": draft.get("assignmentContext") or {},
+    }
+
+
+def _require_case_access(case_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
+    assignment = db.get_assignment_by_case_id(case_id) or db.get_assignment_by_id(case_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found or not visible under RLS")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    visible = False
+    if is_employee and emp_id == effective["id"]:
+        visible = True
+    if is_hr and (effective.get("is_admin") or hr_id == effective["id"]):
+        visible = True
+    if not visible:
+        raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
+    return {"assignment": assignment, "effective_user": effective}
 
 
 @app.get("/")
@@ -2226,6 +2331,387 @@ def get_case_details_by_assignment(
     }
 
 
+@app.get("/api/dossier/questions", response_model=DossierQuestionsResponse)
+def get_dossier_questions(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    access = _require_case_access(case_id, user)
+    effective = access["effective_user"]
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if not case:
+            case = app_crud.create_case(session, case_id, {
+                "relocationBasics": {},
+                "employeeProfile": {},
+                "familyMembers": {},
+                "assignmentContext": {},
+            })
+        draft = json.loads(case.draft_json or "{}")
+    dest = _normalize_destination_country(
+        (draft.get("relocationBasics") or {}).get("destCountry") or case.dest_country
+    )
+    if not dest:
+        return DossierQuestionsResponse(
+            destination_country=None,
+            questions=[],
+            answers={},
+            mandatory_unanswered_count=0,
+            is_step5_complete=True,
+            sources_used=[],
+        )
+    profile = _build_profile_snapshot(draft)
+    raw_questions = db.list_dossier_questions(dest)
+    questions: List[DossierQuestionDTO] = []
+    for q in raw_questions:
+        if not evaluate_applies_if(q.get("applies_if"), profile):
+            continue
+        questions.append(DossierQuestionDTO(
+            id=q["id"],
+            question_text=q["question_text"],
+            answer_type=q["answer_type"],
+            options=q.get("options"),
+            is_mandatory=bool(q.get("is_mandatory")),
+            domain=q.get("domain") or "other",
+            question_key=q.get("question_key"),
+            source="library",
+        ))
+    case_questions = db.list_dossier_case_questions(case_id)
+    for q in case_questions:
+        questions.append(DossierQuestionDTO(
+            id=q["id"],
+            question_text=q["question_text"],
+            answer_type=q["answer_type"],
+            options=q.get("options"),
+            is_mandatory=bool(q.get("is_mandatory")),
+            domain="other",
+            question_key=None,
+            source="case",
+        ))
+
+    answers = {a["question_id"]: a["answer"] for a in db.list_dossier_answers(case_id, effective["id"])}
+    case_answers = {a["case_question_id"]: a["answer"] for a in db.list_dossier_case_answers(case_id, effective["id"])}
+
+    def _is_answered(value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.strip() != ""
+        if isinstance(value, list):
+            return len(value) > 0
+        return True
+
+    mandatory_unanswered = 0
+    for q in questions:
+        if not q.is_mandatory:
+            continue
+        value = answers.get(q.id) if q.source == "library" else case_answers.get(q.id)
+        if not _is_answered(value):
+            mandatory_unanswered += 1
+
+    sources_rows = db.list_dossier_source_suggestions(case_id)
+    seen_urls = set()
+    sources_used: List[Dict[str, Any]] = []
+    for row in sources_rows:
+        for item in row.get("results") or []:
+            url = item.get("url")
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            sources_used.append({"title": item.get("title"), "url": url, "snippet": item.get("snippet", "")})
+
+    return DossierQuestionsResponse(
+        destination_country=dest,
+        questions=questions,
+        answers={**answers, **case_answers},
+        mandatory_unanswered_count=mandatory_unanswered,
+        is_step5_complete=mandatory_unanswered == 0,
+        sources_used=sources_used,
+    )
+
+
+@app.post("/api/dossier/answers")
+def save_dossier_answers(
+    request: DossierAnswersRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    access = _require_case_access(request.case_id, user)
+    effective = access["effective_user"]
+    raw_questions = db.list_dossier_questions("SG") + db.list_dossier_questions("US")
+    question_lookup = {q["id"]: q for q in raw_questions}
+    case_questions = db.list_dossier_case_questions(request.case_id)
+    case_lookup = {q["id"]: q for q in case_questions}
+
+    library_payload: List[Dict[str, Any]] = []
+    case_payload: List[Dict[str, Any]] = []
+    for item in request.answers:
+        if item.question_id:
+            q = question_lookup.get(item.question_id)
+            if not q:
+                raise HTTPException(status_code=400, detail="Unknown dossier question")
+            err = validate_answer(item.answer, q["answer_type"], q.get("options"))
+            if err:
+                raise HTTPException(status_code=400, detail=err)
+            library_payload.append({"question_id": item.question_id, "answer": item.answer})
+        elif item.case_question_id:
+            q = case_lookup.get(item.case_question_id)
+            if not q:
+                raise HTTPException(status_code=400, detail="Unknown case dossier question")
+            err = validate_answer(item.answer, q["answer_type"], q.get("options"))
+            if err:
+                raise HTTPException(status_code=400, detail=err)
+            case_payload.append({"case_question_id": item.case_question_id, "answer": item.answer})
+        else:
+            raise HTTPException(status_code=400, detail="question_id or case_question_id required")
+
+    if library_payload:
+        db.upsert_dossier_answers(request.case_id, effective["id"], library_payload)
+    if case_payload:
+        db.upsert_dossier_case_answers(request.case_id, effective["id"], case_payload)
+    return {"ok": True}
+
+
+@app.post("/api/dossier/search-suggestions", response_model=DossierSearchSuggestionsResponse)
+def dossier_search_suggestions(
+    request: DossierSearchSuggestionsRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    _require_case_access(request.case_id, user)
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, request.case_id)
+        if not case:
+            return DossierSearchSuggestionsResponse(destination_country=None, sources=[], suggestions=[])
+        draft = json.loads(case.draft_json or "{}")
+    dest = _normalize_destination_country(
+        (draft.get("relocationBasics") or {}).get("destCountry") or case.dest_country
+    )
+    if not dest:
+        return DossierSearchSuggestionsResponse(destination_country=None, sources=[], suggestions=[])
+    profile = _build_profile_snapshot(draft)
+    search = fetch_search_results(dest, profile)
+    results = search.get("results", [])
+    if results:
+        grouped: Dict[str, List[Dict[str, Any]]] = {}
+        for r in results:
+            grouped.setdefault(r.get("query") or "query", []).append({
+                "title": r.get("title"),
+                "url": r.get("url"),
+                "snippet": r.get("snippet", ""),
+            })
+        for q, items in grouped.items():
+            db.add_dossier_source_suggestion(request.case_id, dest, q, items)
+    suggestions = build_suggested_questions(dest, results)
+    sources = [
+        {"title": r.get("title"), "url": r.get("url"), "snippet": r.get("snippet", "")}
+        for r in results
+    ]
+    return DossierSearchSuggestionsResponse(
+        destination_country=dest,
+        sources=sources,
+        suggestions=[DossierSuggestionDTO(**s) for s in suggestions],
+    )
+
+
+@app.post("/api/dossier/case-questions")
+def add_dossier_case_question(
+    request: DossierCaseQuestionRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    _require_case_access(request.case_id, user)
+    allowed_types = {"text", "boolean", "select", "date", "multiselect"}
+    if request.answer_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Unsupported answer_type")
+    row = db.add_dossier_case_question(
+        request.case_id,
+        request.question_text,
+        request.answer_type,
+        request.options,
+        request.is_mandatory,
+        request.sources,
+    )
+    return {"question": row}
+
+
+@app.post("/api/guidance/generate")
+def generate_guidance(
+    request: GuidanceGenerateRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    if os.getenv("GUIDANCE_PACK_ENABLED", "true").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=404, detail="Guidance pack is disabled")
+    access = _require_case_access(request.case_id, user)
+    effective = access["effective_user"]
+    guidance_mode = os.getenv("GUIDANCE_MODE", "demo").lower()
+    if request.mode and user.get("is_admin"):
+        if request.mode in ("demo", "strict"):
+            guidance_mode = request.mode
+
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, request.case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        draft = json.loads(case.draft_json or "{}")
+    dest = _normalize_destination_country(
+        (draft.get("relocationBasics") or {}).get("destCountry") or case.dest_country
+    )
+    if not dest:
+        raise HTTPException(status_code=400, detail="Destination country not available")
+    if dest not in ("SG", "US"):
+        raise HTTPException(status_code=400, detail="Unsupported destination corridor")
+
+    packs = [p for p in db.list_knowledge_packs(dest) if p.get("status") == "active"]
+    pack_ids = [p["id"] for p in packs]
+    docs = db.list_knowledge_docs(pack_ids)
+    rules = db.list_knowledge_rules(pack_ids)
+    pack_versions = {p["id"]: p.get("version", 1) for p in packs}
+    for rule in rules:
+        rule["pack_version"] = pack_versions.get(rule.get("pack_id"), 1)
+    docs_by_id = {d["id"]: d for d in docs}
+
+    # Map dossier answers using question_key for stability
+    dossier_answers = {}
+    questions = db.list_dossier_questions(dest)
+    q_by_id = {q["id"]: q for q in questions}
+    for ans in db.list_dossier_answers(request.case_id, effective["id"]):
+        q = q_by_id.get(ans["question_id"])
+        if q and q.get("question_key"):
+            dossier_answers[q["question_key"]] = ans["answer"]
+
+    trace_id = str(uuid.uuid4())
+    db.insert_trace_event(trace_id, request.case_id, "build_snapshot", {"dest": dest}, {}, "ok", None)
+    outputs = generate_guidance_pack(
+        case_id=request.case_id,
+        user_id=effective["id"],
+        destination_country=dest,
+        draft=draft,
+        dossier_answers=dossier_answers,
+        rules=rules,
+        docs_by_id=docs_by_id,
+        guidance_mode=guidance_mode,
+    )
+    db.insert_trace_event(trace_id, request.case_id, "build_plan", {}, {"items": len(outputs["plan"].get("items", []))}, "ok", None)
+
+    row = db.insert_guidance_pack(
+        case_id=request.case_id,
+        user_id=effective["id"],
+        destination_country=dest,
+        profile_snapshot=outputs["snapshot"],
+        plan=outputs["plan"],
+        checklist=outputs["checklist"],
+        markdown=outputs["markdown"],
+        sources=outputs["sources"],
+        not_covered=outputs["not_covered"],
+        coverage=outputs["coverage"],
+        guidance_mode=guidance_mode,
+        pack_hash=outputs["pack_hash"],
+        rule_set=outputs["rule_set"],
+    )
+    now = datetime.utcnow().isoformat() + "Z"
+    log_rows = []
+    for log_item in outputs.get("rule_logs", []):
+        log_rows.append({
+            "id": str(uuid.uuid4()),
+            "trace_id": trace_id,
+            "case_id": request.case_id,
+            "user_id": effective["id"],
+            "destination_country": dest,
+            "rule_id": log_item.get("rule_id"),
+            "rule_key": log_item.get("rule_key"),
+            "rule_version": log_item.get("rule_version", 1),
+            "pack_id": log_item.get("pack_id"),
+            "pack_version": log_item.get("pack_version", 1),
+            "applies_if": json.dumps(log_item.get("applies_if")) if log_item.get("applies_if") is not None else None,
+            "evaluation_result": 1 if log_item.get("evaluation_result") else 0,
+            "was_baseline": 1 if log_item.get("was_baseline") else 0,
+            "injected_for_minimum": 1 if log_item.get("injected_for_minimum") else 0,
+            "citations": json.dumps(log_item.get("citations") or []),
+            "snapshot_subset": json.dumps(log_item.get("snapshot_subset") or {}),
+            "created_at": now,
+        })
+    db.insert_rule_evaluation_logs(log_rows)
+    db.insert_trace_event(trace_id, request.case_id, "persist_pack", {"id": row["id"]}, {}, "ok", None)
+    return {
+        "guidance_pack_id": row["id"],
+        "guidance_mode": guidance_mode,
+        "pack_hash": outputs["pack_hash"],
+        "rule_set": outputs["rule_set"],
+        "plan": outputs["plan"],
+        "checklist": outputs["checklist"],
+        "markdown": outputs["markdown"],
+        "sources": outputs["sources"],
+        "not_covered": outputs["not_covered"],
+        "coverage": outputs["coverage"],
+    }
+
+
+@app.get("/api/guidance/latest")
+def get_guidance_latest(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    if os.getenv("GUIDANCE_PACK_ENABLED", "true").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=404, detail="Guidance pack is disabled")
+    access = _require_case_access(case_id, user)
+    effective = access["effective_user"]
+    row = db.get_latest_guidance_pack(case_id, effective["id"])
+    if not row:
+        raise HTTPException(status_code=404, detail="No guidance pack found")
+    return row
+
+
+@app.get("/api/guidance/trace")
+def get_guidance_trace(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    _require_case_access(case_id, user)
+    return {"events": db.list_trace_events(case_id)}
+
+
+@app.get("/api/guidance/explain")
+def get_guidance_explain(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    _require_case_access(case_id, user)
+    trace_events = db.list_trace_events(case_id)
+    trace_id = trace_events[0]["trace_id"] if trace_events else None
+    logs = db.list_rule_evaluation_logs(case_id, trace_id)
+    if not user.get("is_admin"):
+        rejected_count = len([l for l in logs if not l.get("evaluation_result")])
+        logs = [l for l in logs if l.get("evaluation_result")]
+    else:
+        rejected_count = len([l for l in logs if not l.get("evaluation_result")])
+    return {
+        "trace_id": trace_id,
+        "rejected_count": rejected_count,
+        "logs": [
+            {
+                "rule_key": l.get("rule_key"),
+                "version": l.get("rule_version"),
+                "evaluation_result": l.get("evaluation_result"),
+                "was_baseline": l.get("was_baseline"),
+                "injected_for_minimum": l.get("injected_for_minimum"),
+                "snapshot_subset": l.get("snapshot_subset"),
+                "citations": l.get("citations"),
+                "pack_version": l.get("pack_version"),
+            }
+            for l in logs
+        ],
+    }
+
+
+@app.get("/api/requirements/sufficiency")
+def get_requirements_sufficiency(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    access = _require_case_access(case_id, user)
+    effective = access["effective_user"]
+    data = compute_requirements_sufficiency(case_id, effective["id"])
+    return data
+
+
 @app.get("/api/notifications")
 def list_notifications(
     request: Request,
@@ -2837,6 +3323,8 @@ def _build_employee_journey_payload(
         profile = RelocationProfile(userId=assignment_id).model_dump()
         db.save_employee_profile(assignment_id, profile)
     else:
+        # Coerce empty strings to None to avoid date/enum parsing errors.
+        profile = _normalize_profile_values(profile)
         # Normalize profile fields before validation (legacy wizard can store Title Case).
         marital = profile.get("maritalStatus")
         if isinstance(marital, str):
@@ -2869,6 +3357,12 @@ def _build_employee_journey_payload(
         response.question = None
         response.isComplete = True
 
+    try:
+        parsed_profile = RelocationProfile(**profile)
+    except Exception as exc:  # pragma: no cover - defensive
+        log.warning("Invalid employee profile for assignment %s: %s", assignment_id, exc)
+        parsed_profile = RelocationProfile(userId=assignment_id)
+
     return EmployeeJourneyNextQuestion(
         question=response.question,
         isComplete=response.isComplete,
@@ -2877,8 +3371,19 @@ def _build_employee_journey_payload(
         missingItems=missing_items,
         assignmentStatus=AssignmentStatus(normalize_status(assignment["status"])),
         hrNotes=assignment.get("hr_notes"),
-        profile=RelocationProfile(**profile),
+        profile=parsed_profile,
     )
+
+
+def _normalize_profile_values(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _normalize_profile_values(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_normalize_profile_values(v) for v in value]
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped if stripped else None
+    return value
 
 
 def _build_timeline(profile: Dict[str, Any], completion_state: Dict[str, Any]) -> List[TimelinePhase]:

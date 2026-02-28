@@ -293,6 +293,271 @@ class Database:
                 )
             """))
 
+            # Dynamic dossier (Phase 1)
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS dossier_questions (
+                    id TEXT PRIMARY KEY,
+                    destination_country TEXT NOT NULL,
+                    domain TEXT NOT NULL,
+                    question_key TEXT NOT NULL,
+                    question_text TEXT NOT NULL,
+                    answer_type TEXT NOT NULL,
+                    options TEXT,
+                    is_mandatory INTEGER NOT NULL DEFAULT 0,
+                    applies_if TEXT,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    version INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_dossier_questions_key
+                ON dossier_questions (destination_country, question_key, version)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS dossier_answers (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    question_id TEXT NOT NULL,
+                    answer_json TEXT NOT NULL,
+                    answered_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_dossier_answers_unique
+                ON dossier_answers (case_id, user_id, question_id)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS dossier_source_suggestions (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    destination_country TEXT NOT NULL,
+                    query TEXT NOT NULL,
+                    results TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS dossier_case_questions (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    question_text TEXT NOT NULL,
+                    answer_type TEXT NOT NULL,
+                    options TEXT,
+                    is_mandatory INTEGER NOT NULL DEFAULT 0,
+                    sources TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS dossier_case_answers (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    case_question_id TEXT NOT NULL,
+                    answer_json TEXT NOT NULL,
+                    answered_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_dossier_case_answers_unique
+                ON dossier_case_answers (case_id, user_id, case_question_id)
+            """))
+
+            # Guidance packs (Phase 2)
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS knowledge_packs (
+                    id TEXT PRIMARY KEY,
+                    destination_country TEXT NOT NULL,
+                    domain TEXT NOT NULL,
+                    version INTEGER NOT NULL DEFAULT 1,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    effective_from TEXT,
+                    effective_to TEXT,
+                    last_verified_at TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS knowledge_docs (
+                    id TEXT PRIMARY KEY,
+                    pack_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    publisher TEXT,
+                    source_url TEXT NOT NULL,
+                    text_content TEXT NOT NULL,
+                    checksum TEXT,
+                    fetched_at TEXT,
+                    fetch_status TEXT NOT NULL DEFAULT 'not_fetched',
+                    content_excerpt TEXT,
+                    content_sha256 TEXT,
+                    last_verified_at TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS knowledge_rules (
+                    id TEXT PRIMARY KEY,
+                    pack_id TEXT NOT NULL,
+                    rule_key TEXT NOT NULL,
+                    applies_if TEXT,
+                    title TEXT NOT NULL,
+                    phase TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    guidance_md TEXT NOT NULL,
+                    citations TEXT NOT NULL,
+                    version INTEGER NOT NULL DEFAULT 1,
+                    supersedes_rule_id TEXT,
+                    is_baseline INTEGER NOT NULL DEFAULT 0,
+                    baseline_priority INTEGER NOT NULL DEFAULT 100,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS relocation_guidance_packs (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    destination_country TEXT NOT NULL,
+                    profile_snapshot TEXT NOT NULL,
+                    plan TEXT NOT NULL,
+                    checklist TEXT NOT NULL,
+                    markdown TEXT NOT NULL,
+                    sources TEXT NOT NULL,
+                    not_covered TEXT NOT NULL,
+                    coverage TEXT,
+                    guidance_mode TEXT,
+                    pack_hash TEXT,
+                    rule_set TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS relocation_trace_events (
+                    id TEXT PRIMARY KEY,
+                    trace_id TEXT NOT NULL,
+                    case_id TEXT NOT NULL,
+                    step_name TEXT NOT NULL,
+                    input_json TEXT NOT NULL,
+                    output_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    error TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS rule_evaluation_logs (
+                    id TEXT PRIMARY KEY,
+                    trace_id TEXT NOT NULL,
+                    case_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    destination_country TEXT NOT NULL,
+                    rule_id TEXT NOT NULL,
+                    rule_key TEXT NOT NULL,
+                    rule_version INTEGER NOT NULL,
+                    pack_id TEXT NOT NULL,
+                    pack_version INTEGER NOT NULL,
+                    applies_if TEXT,
+                    evaluation_result INTEGER NOT NULL,
+                    was_baseline INTEGER NOT NULL,
+                    injected_for_minimum INTEGER NOT NULL DEFAULT 0,
+                    citations TEXT NOT NULL,
+                    snapshot_subset TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS requirement_entities (
+                    id TEXT PRIMARY KEY,
+                    destination_country TEXT NOT NULL,
+                    domain_area TEXT NOT NULL,
+                    topic_key TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_requirement_entities_topic
+                ON requirement_entities (destination_country, topic_key)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS requirement_facts (
+                    id TEXT PRIMARY KEY,
+                    entity_id TEXT NOT NULL,
+                    fact_type TEXT NOT NULL,
+                    fact_key TEXT NOT NULL,
+                    fact_text TEXT NOT NULL,
+                    applies_to TEXT NOT NULL,
+                    required_fields TEXT NOT NULL,
+                    source_doc_id TEXT NOT NULL,
+                    source_url TEXT NOT NULL,
+                    evidence_quote TEXT,
+                    confidence TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS requirement_reviews (
+                    id TEXT PRIMARY KEY,
+                    entity_id TEXT,
+                    fact_id TEXT,
+                    reviewer_user_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    notes TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            # Ensure coverage column exists for local guidance packs
+            try:
+                cols = conn.execute(text("PRAGMA table_info(relocation_guidance_packs)")).fetchall()
+                col_names = {r[1] for r in cols}
+                if "coverage" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN coverage TEXT"))
+                if "guidance_mode" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN guidance_mode TEXT"))
+                if "pack_hash" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN pack_hash TEXT"))
+                if "rule_set" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN rule_set TEXT"))
+            except Exception:
+                pass
+            try:
+                cols = conn.execute(text("PRAGMA table_info(knowledge_docs)")).fetchall()
+                col_names = {r[1] for r in cols}
+                if "fetched_at" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN fetched_at TEXT"))
+                if "fetch_status" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN fetch_status TEXT"))
+                if "content_excerpt" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN content_excerpt TEXT"))
+                if "content_sha256" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN content_sha256 TEXT"))
+                if "last_verified_at" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN last_verified_at TEXT"))
+            except Exception:
+                pass
+            try:
+                cols = conn.execute(text("PRAGMA table_info(knowledge_rules)")).fetchall()
+                col_names = {r[1] for r in cols}
+                if "version" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN version INTEGER NOT NULL DEFAULT 1"))
+                if "supersedes_rule_id" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN supersedes_rule_id TEXT"))
+                if "is_baseline" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN is_baseline INTEGER NOT NULL DEFAULT 0"))
+                if "baseline_priority" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN baseline_priority INTEGER NOT NULL DEFAULT 100"))
+                if "is_active" not in col_names:
+                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"))
+            except Exception:
+                pass
+
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS support_cases (
                     id TEXT PRIMARY KEY,
@@ -1073,6 +1338,713 @@ class Database:
         with self.engine.connect() as conn:
             rows = conn.execute(text("SELECT * FROM case_assignments ORDER BY created_at DESC")).fetchall()
         return self._rows_to_list(rows)
+
+    # ------------------------------------------------------------------
+    # Dynamic dossier (Phase 1)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _json_load(value: Optional[str]) -> Optional[Any]:
+        if value is None:
+            return None
+        if isinstance(value, (dict, list)):
+            return value
+        try:
+            return json.loads(value)
+        except Exception:
+            return None
+
+    def list_dossier_questions(self, destination_country: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM dossier_questions WHERE destination_country = :dest "
+                "ORDER BY sort_order ASC, created_at ASC"
+            ), {"dest": destination_country}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["options"] = self._json_load(item.get("options"))
+            item["applies_if"] = self._json_load(item.get("applies_if"))
+        return items
+
+    def list_dossier_answers(self, case_id: str, user_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM dossier_answers WHERE case_id = :cid AND user_id = :uid"
+            ), {"cid": case_id, "uid": user_id}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["answer"] = self._json_load(item.get("answer_json"))
+        return items
+
+    def upsert_dossier_answers(self, case_id: str, user_id: str, answers: List[Dict[str, Any]]) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            for ans in answers:
+                payload = {
+                    "id": ans.get("id") or str(uuid.uuid4()),
+                    "cid": case_id,
+                    "uid": user_id,
+                    "qid": ans["question_id"],
+                    "answer": json.dumps(ans["answer"]),
+                    "answered_at": now,
+                }
+                conn.execute(text(
+                    "INSERT INTO dossier_answers (id, case_id, user_id, question_id, answer_json, answered_at) "
+                    "VALUES (:id, :cid, :uid, :qid, :answer, :answered_at) "
+                    "ON CONFLICT(case_id, user_id, question_id) DO UPDATE SET "
+                    "answer_json = excluded.answer_json, answered_at = excluded.answered_at"
+                ), payload)
+
+    def list_dossier_case_questions(self, case_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM dossier_case_questions WHERE case_id = :cid ORDER BY created_at ASC"
+            ), {"cid": case_id}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["options"] = self._json_load(item.get("options"))
+            item["sources"] = self._json_load(item.get("sources"))
+        return items
+
+    def add_dossier_case_question(
+        self,
+        case_id: str,
+        question_text: str,
+        answer_type: str,
+        options: Optional[Any],
+        is_mandatory: bool,
+        sources: Optional[Any],
+    ) -> Dict[str, Any]:
+        now = datetime.utcnow().isoformat()
+        row = {
+            "id": str(uuid.uuid4()),
+            "case_id": case_id,
+            "question_text": question_text,
+            "answer_type": answer_type,
+            "options": json.dumps(options) if options is not None else None,
+            "is_mandatory": 1 if is_mandatory else 0,
+            "sources": json.dumps(sources) if sources is not None else None,
+            "created_at": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO dossier_case_questions "
+                "(id, case_id, question_text, answer_type, options, is_mandatory, sources, created_at) "
+                "VALUES (:id, :case_id, :question_text, :answer_type, :options, :is_mandatory, :sources, :created_at)"
+            ), row)
+        return row
+
+    def list_dossier_case_answers(self, case_id: str, user_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM dossier_case_answers WHERE case_id = :cid AND user_id = :uid"
+            ), {"cid": case_id, "uid": user_id}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["answer"] = self._json_load(item.get("answer_json"))
+        return items
+
+    def upsert_dossier_case_answers(self, case_id: str, user_id: str, answers: List[Dict[str, Any]]) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            for ans in answers:
+                payload = {
+                    "id": ans.get("id") or str(uuid.uuid4()),
+                    "cid": case_id,
+                    "uid": user_id,
+                    "qid": ans["case_question_id"],
+                    "answer": json.dumps(ans["answer"]),
+                    "answered_at": now,
+                }
+                conn.execute(text(
+                    "INSERT INTO dossier_case_answers (id, case_id, user_id, case_question_id, answer_json, answered_at) "
+                    "VALUES (:id, :cid, :uid, :qid, :answer, :answered_at) "
+                    "ON CONFLICT(case_id, user_id, case_question_id) DO UPDATE SET "
+                    "answer_json = excluded.answer_json, answered_at = excluded.answered_at"
+                ), payload)
+
+    def list_dossier_source_suggestions(self, case_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM dossier_source_suggestions WHERE case_id = :cid ORDER BY created_at DESC"
+            ), {"cid": case_id}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["results"] = self._json_load(item.get("results"))
+        return items
+
+    def add_dossier_source_suggestion(
+        self,
+        case_id: str,
+        destination_country: str,
+        query: str,
+        results: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        now = datetime.utcnow().isoformat()
+        row = {
+            "id": str(uuid.uuid4()),
+            "case_id": case_id,
+            "destination_country": destination_country,
+            "query": query,
+            "results": json.dumps(results),
+            "created_at": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO dossier_source_suggestions "
+                "(id, case_id, destination_country, query, results, created_at) "
+                "VALUES (:id, :case_id, :destination_country, :query, :results, :created_at)"
+            ), row)
+        return row
+
+    # ------------------------------------------------------------------
+    # Guidance packs (Phase 2)
+    # ------------------------------------------------------------------
+    def list_knowledge_packs(self, destination_country: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM knowledge_packs "
+                "WHERE destination_country = :dest AND status = 'active'"
+            ), {"dest": destination_country}).fetchall()
+        return self._rows_to_list(rows)
+
+    def count_knowledge_packs_by_destination(self, destination_country: str) -> int:
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT COUNT(*) as count FROM knowledge_packs WHERE destination_country = :dest"
+            ), {"dest": destination_country}).fetchone()
+        return int(row[0] if row else 0)
+
+    def ensure_knowledge_pack(self, destination_country: str, domain: str) -> Dict[str, Any]:
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT * FROM knowledge_packs WHERE destination_country = :dest AND domain = :domain AND status = 'active' "
+                "ORDER BY created_at DESC LIMIT 1"
+            ), {"dest": destination_country, "domain": domain}).fetchone()
+        item = self._row_to_dict(row)
+        if item:
+            return item
+        now = datetime.utcnow().isoformat()
+        pack = {
+            "id": str(uuid.uuid4()),
+            "destination_country": destination_country,
+            "domain": domain,
+            "version": 1,
+            "status": "active",
+            "effective_from": None,
+            "effective_to": None,
+            "last_verified_at": now,
+            "created_at": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO knowledge_packs "
+                "(id, destination_country, domain, version, status, effective_from, effective_to, last_verified_at, created_at) "
+                "VALUES (:id, :destination_country, :domain, :version, :status, :effective_from, :effective_to, :last_verified_at, :created_at)"
+            ), pack)
+        return pack
+
+    def upsert_knowledge_doc_by_url(
+        self,
+        pack_id: str,
+        source_url: str,
+        title: str,
+        publisher: Optional[str],
+        text_content: str,
+        fetched_at: Optional[str],
+        fetch_status: str,
+        content_excerpt: Optional[str],
+        content_sha256: Optional[str],
+        last_verified_at: Optional[str],
+    ) -> Dict[str, Any]:
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT * FROM knowledge_docs WHERE source_url = :url ORDER BY created_at DESC LIMIT 1"
+            ), {"url": source_url}).fetchone()
+        existing = self._row_to_dict(row)
+        now = datetime.utcnow().isoformat()
+        if existing:
+            with self.engine.begin() as conn:
+                conn.execute(text(
+                    "UPDATE knowledge_docs SET "
+                    "pack_id = :pack_id, title = :title, publisher = :publisher, text_content = :text_content, "
+                    "fetched_at = :fetched_at, fetch_status = :fetch_status, content_excerpt = :content_excerpt, "
+                    "content_sha256 = :content_sha256, last_verified_at = :last_verified_at "
+                    "WHERE id = :id"
+                ), {
+                    "id": existing["id"],
+                    "pack_id": pack_id,
+                    "title": title,
+                    "publisher": publisher,
+                    "text_content": text_content,
+                    "fetched_at": fetched_at,
+                    "fetch_status": fetch_status,
+                    "content_excerpt": content_excerpt,
+                    "content_sha256": content_sha256,
+                    "last_verified_at": last_verified_at,
+                })
+            existing.update({
+                "pack_id": pack_id,
+                "title": title,
+                "publisher": publisher,
+                "text_content": text_content,
+                "fetched_at": fetched_at,
+                "fetch_status": fetch_status,
+                "content_excerpt": content_excerpt,
+                "content_sha256": content_sha256,
+                "last_verified_at": last_verified_at,
+            })
+            return existing
+        doc = {
+            "id": str(uuid.uuid4()),
+            "pack_id": pack_id,
+            "title": title,
+            "publisher": publisher,
+            "source_url": source_url,
+            "text_content": text_content,
+            "checksum": None,
+            "fetched_at": fetched_at,
+            "fetch_status": fetch_status,
+            "content_excerpt": content_excerpt,
+            "content_sha256": content_sha256,
+            "last_verified_at": last_verified_at,
+            "created_at": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO knowledge_docs "
+                "(id, pack_id, title, publisher, source_url, text_content, checksum, fetched_at, fetch_status, content_excerpt, "
+                "content_sha256, last_verified_at, created_at) "
+                "VALUES (:id, :pack_id, :title, :publisher, :source_url, :text_content, :checksum, :fetched_at, :fetch_status, "
+                ":content_excerpt, :content_sha256, :last_verified_at, :created_at)"
+            ), doc)
+        return doc
+
+    def create_baseline_rule_for_doc(
+        self,
+        pack_id: str,
+        doc_id: str,
+        doc_title: str,
+        domain_area: str,
+    ) -> str:
+        now = datetime.utcnow().isoformat()
+        rule_id = str(uuid.uuid4())
+        phase_map = {
+            "immigration": "pre_move",
+            "registration": "arrival",
+            "tax": "first_tax_year",
+            "other": "first_90_days",
+        }
+        category_map = {
+            "immigration": "immigration",
+            "registration": "registration",
+            "tax": "tax",
+            "other": "other",
+        }
+        baseline_priority_map = {
+            "pre_move": 10,
+            "arrival": 20,
+            "first_90_days": 30,
+            "first_tax_year": 40,
+        }
+        phase = phase_map.get(domain_area, "pre_move")
+        category = category_map.get(domain_area, "other")
+        baseline_priority = baseline_priority_map.get(phase, 100)
+        rule_key = f"AUTO_{domain_area.upper()}_{uuid.uuid4().hex[:8]}"
+        guidance_md = (
+            "Review the official guidance linked below and confirm which requirements apply to your situation. "
+            "Capture any required documents, deadlines, and online accounts you may need. "
+            "If unclear, keep this as a checkpoint and ask HR or immigration counsel."
+        )
+        row = {
+            "id": rule_id,
+            "pack_id": pack_id,
+            "rule_key": rule_key,
+            "applies_if": None,
+            "title": f"Review official guidance: {doc_title}",
+            "phase": phase,
+            "category": category,
+            "guidance_md": guidance_md,
+            "citations": json.dumps([doc_id]),
+            "version": 1,
+            "supersedes_rule_id": None,
+            "is_baseline": 1,
+            "baseline_priority": baseline_priority,
+            "is_active": 1,
+            "created_at": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO knowledge_rules "
+                "(id, pack_id, rule_key, applies_if, title, phase, category, guidance_md, citations, version, supersedes_rule_id, "
+                "is_baseline, baseline_priority, is_active, created_at) "
+                "VALUES (:id, :pack_id, :rule_key, :applies_if, :title, :phase, :category, :guidance_md, :citations, :version, "
+                ":supersedes_rule_id, :is_baseline, :baseline_priority, :is_active, :created_at)"
+            ), row)
+        return rule_id
+
+    def list_knowledge_docs_by_destination(self, destination_country: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT d.* FROM knowledge_docs d "
+                "JOIN knowledge_packs p ON p.id = d.pack_id "
+                "WHERE p.destination_country = :dest "
+                "ORDER BY d.created_at DESC"
+            ), {"dest": destination_country}).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_knowledge_docs(self, pack_ids: List[str]) -> List[Dict[str, Any]]:
+        if not pack_ids:
+            return []
+        placeholders = ",".join([f":p{i}" for i in range(len(pack_ids))])
+        params = {f"p{i}": pid for i, pid in enumerate(pack_ids)}
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                f"SELECT * FROM knowledge_docs WHERE pack_id IN ({placeholders})"
+            ), params).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_knowledge_docs_by_destination(self, destination_country: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT d.* FROM knowledge_docs d "
+                "JOIN knowledge_packs p ON p.id = d.pack_id "
+                "WHERE p.destination_country = :dest "
+                "ORDER BY COALESCE(d.last_verified_at, d.created_at) DESC"
+            ), {"dest": destination_country}).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_all_knowledge_docs(self) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM knowledge_docs ORDER BY created_at DESC"
+            )).fetchall()
+        return self._rows_to_list(rows)
+
+    def count_knowledge_docs_by_destination(self, destination_country: str) -> int:
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT COUNT(*) as count FROM knowledge_docs d "
+                "JOIN knowledge_packs p ON p.id = d.pack_id "
+                "WHERE p.destination_country = :dest"
+            ), {"dest": destination_country}).fetchone()
+        return int(row[0] if row else 0)
+
+    def count_knowledge_rules_by_destination(self, destination_country: str) -> int:
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT COUNT(*) as count FROM knowledge_rules r "
+                "JOIN knowledge_packs p ON p.id = r.pack_id "
+                "WHERE p.destination_country = :dest"
+            ), {"dest": destination_country}).fetchone()
+        return int(row[0] if row else 0)
+
+    def list_knowledge_rules(self, pack_ids: List[str]) -> List[Dict[str, Any]]:
+        if not pack_ids:
+            return []
+        placeholders = ",".join([f":p{i}" for i in range(len(pack_ids))])
+        params = {f"p{i}": pid for i, pid in enumerate(pack_ids)}
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                f"SELECT * FROM knowledge_rules WHERE pack_id IN ({placeholders})"
+            ), params).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["applies_if"] = self._json_load(item.get("applies_if"))
+            item["citations"] = self._json_load(item.get("citations")) or []
+            item["is_baseline"] = bool(item.get("is_baseline"))
+            item["baseline_priority"] = int(item.get("baseline_priority") or 100)
+            item["is_active"] = bool(item.get("is_active", 1))
+        return items
+
+    def upsert_requirement_entity(
+        self,
+        destination_country: str,
+        domain_area: str,
+        topic_key: str,
+        title: str,
+        status: str = "pending",
+    ) -> Dict[str, Any]:
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT * FROM requirement_entities WHERE destination_country = :dest AND topic_key = :topic LIMIT 1"
+            ), {"dest": destination_country, "topic": topic_key}).fetchone()
+        existing = self._row_to_dict(row)
+        now = datetime.utcnow().isoformat()
+        if existing:
+            with self.engine.begin() as conn:
+                conn.execute(text(
+                    "UPDATE requirement_entities SET domain_area = :domain, title = :title, status = :status, updated_at = :updated_at "
+                    "WHERE id = :id"
+                ), {
+                    "id": existing["id"],
+                    "domain": domain_area,
+                    "title": title,
+                    "status": status,
+                    "updated_at": now,
+                })
+            existing.update({
+                "domain_area": domain_area,
+                "title": title,
+                "status": status,
+                "updated_at": now,
+            })
+            return existing
+        entity = {
+            "id": str(uuid.uuid4()),
+            "destination_country": destination_country,
+            "domain_area": domain_area,
+            "topic_key": topic_key,
+            "title": title,
+            "status": status,
+            "created_at": now,
+            "updated_at": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO requirement_entities "
+                "(id, destination_country, domain_area, topic_key, title, status, created_at, updated_at) "
+                "VALUES (:id, :destination_country, :domain_area, :topic_key, :title, :status, :created_at, :updated_at)"
+            ), entity)
+        return entity
+
+    def insert_requirement_facts(self, facts: List[Dict[str, Any]]) -> None:
+        if not facts:
+            return
+        with self.engine.begin() as conn:
+            for fact in facts:
+                conn.execute(text(
+                    "INSERT INTO requirement_facts "
+                    "(id, entity_id, fact_type, fact_key, fact_text, applies_to, required_fields, source_doc_id, source_url, "
+                    "evidence_quote, confidence, status, created_at) "
+                    "VALUES (:id, :entity_id, :fact_type, :fact_key, :fact_text, :applies_to, :required_fields, :source_doc_id, "
+                    ":source_url, :evidence_quote, :confidence, :status, :created_at)"
+                ), fact)
+
+    def list_requirement_entities(self, destination_country: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            if status:
+                rows = conn.execute(text(
+                    "SELECT * FROM requirement_entities WHERE destination_country = :dest AND status = :status "
+                    "ORDER BY updated_at DESC"
+                ), {"dest": destination_country, "status": status}).fetchall()
+            else:
+                rows = conn.execute(text(
+                    "SELECT * FROM requirement_entities WHERE destination_country = :dest ORDER BY updated_at DESC"
+                ), {"dest": destination_country}).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_requirement_facts(self, entity_id: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            if status:
+                rows = conn.execute(text(
+                    "SELECT * FROM requirement_facts WHERE entity_id = :eid AND status = :status ORDER BY created_at DESC"
+                ), {"eid": entity_id, "status": status}).fetchall()
+            else:
+                rows = conn.execute(text(
+                    "SELECT * FROM requirement_facts WHERE entity_id = :eid ORDER BY created_at DESC"
+                ), {"eid": entity_id}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["applies_to"] = self._json_load(item.get("applies_to")) or {}
+            item["required_fields"] = self._json_load(item.get("required_fields")) or []
+        return items
+
+    def list_requirement_facts_by_destination(self, destination_country: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            if status:
+                rows = conn.execute(text(
+                    "SELECT f.* FROM requirement_facts f "
+                    "JOIN requirement_entities e ON e.id = f.entity_id "
+                    "WHERE e.destination_country = :dest AND f.status = :status "
+                    "ORDER BY f.created_at DESC"
+                ), {"dest": destination_country, "status": status}).fetchall()
+            else:
+                rows = conn.execute(text(
+                    "SELECT f.* FROM requirement_facts f "
+                    "JOIN requirement_entities e ON e.id = f.entity_id "
+                    "WHERE e.destination_country = :dest "
+                    "ORDER BY f.created_at DESC"
+                ), {"dest": destination_country}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["applies_to"] = self._json_load(item.get("applies_to")) or {}
+            item["required_fields"] = self._json_load(item.get("required_fields")) or []
+        return items
+
+    def list_approved_requirement_facts(self, destination_country: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT f.* FROM requirement_facts f "
+                "JOIN requirement_entities e ON e.id = f.entity_id "
+                "WHERE e.destination_country = :dest AND f.status = 'approved'"
+            ), {"dest": destination_country}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["applies_to"] = self._json_load(item.get("applies_to")) or {}
+            item["required_fields"] = self._json_load(item.get("required_fields")) or []
+        return items
+
+    def update_requirement_fact_status(
+        self,
+        fact_ids: List[str],
+        status: str,
+        reviewer_user_id: str,
+        notes: Optional[str] = None,
+    ) -> None:
+        if not fact_ids:
+            return
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            for fid in fact_ids:
+                conn.execute(text(
+                    "UPDATE requirement_facts SET status = :status WHERE id = :id"
+                ), {"status": status, "id": fid})
+                conn.execute(text(
+                    "INSERT INTO requirement_reviews "
+                    "(id, entity_id, fact_id, reviewer_user_id, action, notes, created_at) "
+                    "VALUES (:id, :entity_id, :fact_id, :reviewer_user_id, :action, :notes, :created_at)"
+                ), {
+                    "id": str(uuid.uuid4()),
+                    "entity_id": None,
+                    "fact_id": fid,
+                    "reviewer_user_id": reviewer_user_id,
+                    "action": "approve" if status == "approved" else "reject",
+                    "notes": notes,
+                    "created_at": now,
+                })
+
+    def insert_guidance_pack(
+        self,
+        case_id: str,
+        user_id: str,
+        destination_country: str,
+        profile_snapshot: Dict[str, Any],
+        plan: Dict[str, Any],
+        checklist: Dict[str, Any],
+        markdown: str,
+        sources: List[Dict[str, Any]],
+        not_covered: List[str],
+        coverage: Dict[str, Any],
+        guidance_mode: str,
+        pack_hash: str,
+        rule_set: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        now = datetime.utcnow().isoformat()
+        row = {
+            "id": str(uuid.uuid4()),
+            "case_id": case_id,
+            "user_id": user_id,
+            "destination_country": destination_country,
+            "profile_snapshot": json.dumps(profile_snapshot),
+            "plan": json.dumps(plan),
+            "checklist": json.dumps(checklist),
+            "markdown": markdown,
+            "sources": json.dumps(sources),
+            "not_covered": json.dumps(not_covered),
+            "coverage": json.dumps(coverage),
+            "guidance_mode": guidance_mode,
+            "pack_hash": pack_hash,
+            "rule_set": json.dumps(rule_set),
+            "created_at": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO relocation_guidance_packs "
+                "(id, case_id, user_id, destination_country, profile_snapshot, plan, checklist, markdown, sources, not_covered, coverage, guidance_mode, pack_hash, rule_set, created_at) "
+                "VALUES (:id, :case_id, :user_id, :destination_country, :profile_snapshot, :plan, :checklist, :markdown, :sources, :not_covered, :coverage, :guidance_mode, :pack_hash, :rule_set, :created_at)"
+            ), row)
+        return row
+
+    def get_latest_guidance_pack(self, case_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT * FROM relocation_guidance_packs "
+                "WHERE case_id = :cid AND user_id = :uid ORDER BY created_at DESC LIMIT 1"
+            ), {"cid": case_id, "uid": user_id}).fetchone()
+        item = self._row_to_dict(row)
+        if not item:
+            return None
+        item["profile_snapshot"] = self._json_load(item.get("profile_snapshot")) or {}
+        item["plan"] = self._json_load(item.get("plan")) or {}
+        item["checklist"] = self._json_load(item.get("checklist")) or {}
+        item["sources"] = self._json_load(item.get("sources")) or []
+        item["not_covered"] = self._json_load(item.get("not_covered")) or []
+        item["coverage"] = self._json_load(item.get("coverage")) or {}
+        item["rule_set"] = self._json_load(item.get("rule_set")) or []
+        return item
+
+    def insert_rule_evaluation_logs(self, rows: List[Dict[str, Any]]) -> None:
+        if not rows:
+            return
+        with self.engine.begin() as conn:
+            for row in rows:
+                conn.execute(text(
+                    "INSERT INTO rule_evaluation_logs "
+                    "(id, trace_id, case_id, user_id, destination_country, rule_id, rule_key, rule_version, "
+                    "pack_id, pack_version, applies_if, evaluation_result, was_baseline, injected_for_minimum, "
+                    "citations, snapshot_subset, created_at) "
+                    "VALUES (:id, :trace_id, :case_id, :user_id, :destination_country, :rule_id, :rule_key, :rule_version, "
+                    ":pack_id, :pack_version, :applies_if, :evaluation_result, :was_baseline, :injected_for_minimum, "
+                    ":citations, :snapshot_subset, :created_at)"
+                ), row)
+
+    def list_rule_evaluation_logs(self, case_id: str, trace_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            if trace_id:
+                rows = conn.execute(text(
+                    "SELECT * FROM rule_evaluation_logs WHERE case_id = :cid AND trace_id = :tid "
+                    "ORDER BY created_at DESC"
+                ), {"cid": case_id, "tid": trace_id}).fetchall()
+            else:
+                rows = conn.execute(text(
+                    "SELECT * FROM rule_evaluation_logs WHERE case_id = :cid ORDER BY created_at DESC"
+                ), {"cid": case_id}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["applies_if"] = self._json_load(item.get("applies_if"))
+            item["citations"] = self._json_load(item.get("citations")) or []
+            item["snapshot_subset"] = self._json_load(item.get("snapshot_subset")) or {}
+        return items
+
+    def list_trace_events(self, case_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT * FROM relocation_trace_events WHERE case_id = :cid "
+                "ORDER BY created_at DESC LIMIT :lim"
+            ), {"cid": case_id, "lim": limit}).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["input"] = self._json_load(item.get("input_json")) or {}
+            item["output"] = self._json_load(item.get("output_json")) or {}
+        return items
+
+    def insert_trace_event(
+        self,
+        trace_id: str,
+        case_id: str,
+        step_name: str,
+        input_payload: Dict[str, Any],
+        output_payload: Dict[str, Any],
+        status: str,
+        error: Optional[str],
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO relocation_trace_events "
+                "(id, trace_id, case_id, step_name, input_json, output_json, status, error, created_at) "
+                "VALUES (:id, :trace_id, :case_id, :step_name, :input_json, :output_json, :status, :error, :created_at)"
+            ), {
+                "id": str(uuid.uuid4()),
+                "trace_id": trace_id,
+                "case_id": case_id,
+                "step_name": step_name,
+                "input_json": json.dumps(input_payload),
+                "output_json": json.dumps(output_payload),
+                "status": status,
+                "error": error,
+                "created_at": now,
+            })
 
     # ------------------------------------------------------------------
     # HR Command Center

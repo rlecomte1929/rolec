@@ -32,33 +32,37 @@ export const NotificationBell: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const fetchAll = useCallback(async () => {
+  const fetchCount = useCallback(async () => {
     try {
-      const [list, count] = await Promise.all([
-        listUnreadMessageNotifications(20),
-        getUnreadMessageCount(),
-      ]);
-      setNotifications(list);
+      const count = await getUnreadMessageCount();
       setUnreadCount(count);
     } catch {
-      setNotifications([]);
       setUnreadCount(0);
     }
   }, []);
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+  const fetchList = useCallback(async () => {
+    try {
+      const list = await listUnreadMessageNotifications(20);
+      setNotifications(list);
+    } catch {
+      setNotifications([]);
+    }
+  }, []);
 
   useEffect(() => {
-    const id = setInterval(fetchAll, 60_000);
+    fetchCount();
+  }, [fetchCount]);
+
+  useEffect(() => {
+    const id = setInterval(fetchCount, 60_000);
     return () => clearInterval(id);
-  }, [fetchAll]);
+  }, [fetchCount]);
 
   useEffect(() => {
-    window.addEventListener('focus', fetchAll);
-    return () => window.removeEventListener('focus', fetchAll);
-  }, [fetchAll]);
+    window.addEventListener('focus', fetchCount);
+    return () => window.removeEventListener('focus', fetchCount);
+  }, [fetchCount]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -97,8 +101,11 @@ export const NotificationBell: React.FC = () => {
     <div className="relative" ref={panelRef}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        onFocus={fetchAll}
+        onClick={() => {
+          setOpen((o) => !o);
+          if (!open) fetchList();
+        }}
+        onFocus={fetchCount}
         className="relative p-2 rounded-lg hover:bg-[#eef4f8] text-[#0b2b43] transition-colors"
         aria-label={`Messages${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
       >
