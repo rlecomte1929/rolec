@@ -61,10 +61,23 @@ class Database:
             log.info("db_op=%s dur_ms=%.2f", op_name, dur_ms)
         return result
 
+    def _db_healthcheck(self, conn) -> None:
+        info = Database.get_db_info()
+        host = info.get("db_host") or "(local)"
+        log.info("DB healthcheck: scheme=%s host=%s", info.get("db_url_scheme"), host)
+        conn.execute(text("SELECT 1"))
+
     # ------------------------------------------------------------------
     # Schema creation
     # ------------------------------------------------------------------
     def init_db(self) -> None:
+        # In production (Render), avoid runtime DDL. Use Supabase migrations instead.
+        if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):
+            with self.engine.connect() as conn:
+                self._db_healthcheck(conn)
+            log.info("Runtime DDL disabled via DISABLE_RUNTIME_DDL. Skipping init_db DDL.")
+            return
+
         with self.engine.begin() as conn:
             if _is_sqlite:
                 self._ensure_users_table_sqlite(conn)
