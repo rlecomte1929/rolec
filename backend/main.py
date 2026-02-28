@@ -681,6 +681,13 @@ class CompanyProfileRequest(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     hr_contact: Optional[str] = None
+    legal_name: Optional[str] = None
+    website: Optional[str] = None
+    hq_city: Optional[str] = None
+    industry: Optional[str] = None
+    default_destination_country: Optional[str] = None
+    support_email: Optional[str] = None
+    default_working_location: Optional[str] = None
 
 
 class HrFeedbackRequest(BaseModel):
@@ -1339,6 +1346,13 @@ def get_company_profile(user: Dict[str, Any] = Depends(require_role(UserRole.HR)
     return {"company": company}
 
 
+@app.get("/api/company")
+def get_current_user_company(user: Dict[str, Any] = Depends(get_current_user)):
+    """Return the authenticated user's company (for header branding). Available to HR and Employee."""
+    company = db.get_company_for_user(user["id"])
+    return {"company": company}
+
+
 @app.post("/api/hr/company-profile")
 def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
@@ -1356,6 +1370,13 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
         request.address,
         request.phone,
         request.hr_contact,
+        legal_name=request.legal_name,
+        website=request.website,
+        hq_city=request.hq_city,
+        industry=request.industry,
+        default_destination_country=request.default_destination_country,
+        support_email=request.support_email,
+        default_working_location=request.default_working_location,
     )
     db.log_audit(effective["id"], "UPDATE", "company", company_id, "HR company profile update", {
         "name": request.name,
@@ -1364,8 +1385,91 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
         "address": request.address,
         "phone": request.phone,
         "hr_contact": request.hr_contact,
+        "legal_name": request.legal_name,
+        "website": request.website,
+        "hq_city": request.hq_city,
+        "industry": request.industry,
+        "default_destination_country": request.default_destination_country,
+        "support_email": request.support_email,
+        "default_working_location": request.default_working_location,
     })
     return {"ok": True, "company_id": company_id}
+
+
+ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "svg"}
+ALLOWED_LOGO_CONTENT_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/svg+xml"}
+MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024  # 2MB
+
+
+def _logo_extension_from_filename(filename: str) -> Optional[str]:
+    if not filename or "." not in filename:
+        return None
+    ext = filename.rsplit(".", 1)[-1].lower()
+    return ext if ext in ALLOWED_LOGO_EXTENSIONS else None
+
+
+@app.post("/api/hr/company-profile/logo")
+async def upload_company_logo(
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+
+    ext = _logo_extension_from_filename(file.filename or "")
+    if not ext:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Use PNG, JPG, or SVG.",
+        )
+    content_type = file.content_type or ""
+    if content_type and content_type.lower() not in ALLOWED_LOGO_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid content type. Use image/png, image/jpeg, or image/svg+xml.",
+        )
+
+    content = await file.read()
+    if len(content) > MAX_LOGO_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="Logo must be 2MB or smaller")
+
+    try:
+        supabase = get_supabase_admin_client()
+        path = f"companies/{company_id}/logo.{ext}"
+        supabase.storage.from_("company-logos").upload(
+            path,
+            content,
+            file_options={"content-type": content_type or "image/png", "upsert": True},
+        )
+    except Exception as e:
+        log.warning("company logo upload failed: %s", e)
+        raise HTTPException(
+            status_code=502,
+            detail="Logo upload failed. Check Supabase storage and bucket company-logos.",
+        ) from e
+
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    logo_url = f"{supabase_url}/storage/v1/object/public/company-logos/{path}"
+    db.update_company_logo(company_id, logo_url)
+    db.log_audit(effective["id"], "UPDATE", "company", company_id, "HR company logo upload", {"logo_url": logo_url})
+    return {"ok": True, "logo_url": logo_url}
+
+
+@app.post("/api/hr/company-profile/remove-logo")
+def remove_company_logo(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    db.update_company_logo(company_id, None)
+    db.log_audit(effective["id"], "UPDATE", "company", company_id, "HR company logo removed", {})
+    return {"ok": True}
 
 
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
@@ -2621,6 +2725,9 @@ class CommandCenterKPIs(BaseModel):
     overdueTasksCount: int
     avgVisaDurationDays: Optional[float] = None
     budgetOverrunsCount: int
+    actionRequiredCount: int
+    departingSoonCount: int
+    completedCount: int
 
 
 class CommandCenterCaseRow(BaseModel):

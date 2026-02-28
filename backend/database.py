@@ -3,6 +3,7 @@ Unified database layer — works with both SQLite and Postgres.
 Uses DATABASE_URL from db_config (single source of truth).
 """
 import json
+import math
 import uuid
 import logging
 import time
@@ -422,6 +423,11 @@ class Database:
                     conn.execute(text("ALTER TABLE companies ADD COLUMN phone TEXT"))
                 if "hr_contact" not in col_names:
                     conn.execute(text("ALTER TABLE companies ADD COLUMN hr_contact TEXT"))
+                for col in ("legal_name", "website", "hq_city", "industry", "logo_url", "brand_color", "updated_at", "default_destination_country", "support_email", "default_working_location"):
+                    cols = conn.execute(text("PRAGMA table_info(companies)")).fetchall()
+                    col_names = {r[1] for r in cols}
+                    if col not in col_names:
+                        conn.execute(text(f"ALTER TABLE companies ADD COLUMN {col} TEXT"))
                 cols = conn.execute(text("PRAGMA table_info(relocation_cases)")).fetchall()
                 col_names = {r[1] for r in cols}
                 if "company_id" not in col_names:
@@ -440,6 +446,8 @@ class Database:
                 conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS address TEXT"))
                 conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS phone TEXT"))
                 conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS hr_contact TEXT"))
+                for col in ("legal_name", "website", "hq_city", "industry", "logo_url", "brand_color", "updated_at", "default_destination_country", "support_email", "default_working_location"):
+                    conn.execute(text(f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {col} TEXT"))
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS company_id TEXT"))
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS employee_id TEXT"))
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS status TEXT"))
@@ -452,6 +460,42 @@ class Database:
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_status ON support_cases(status)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_severity ON support_cases(severity)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_relocation_cases_status ON relocation_cases(status)"))
+
+            # HR Command Center: risk/budget columns, tasks, case_events
+            if _is_sqlite:
+                cc_cols = [
+                    ("case_assignments", "risk_status", "TEXT"),
+                    ("case_assignments", "budget_limit", "REAL"),
+                    ("case_assignments", "budget_estimated", "REAL"),
+                    ("case_assignments", "expected_start_date", "TEXT"),
+                ]
+                for tbl, col, typ in cc_cols:
+                    try:
+                        cols = conn.execute(text(f"PRAGMA table_info({tbl})")).fetchall()
+                        if not any(c[1] == col for c in cols):
+                            conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN {col} {typ}"))
+                    except Exception:
+                        pass
+            else:
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS risk_status TEXT DEFAULT 'green'"))
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS budget_limit NUMERIC"))
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS budget_estimated NUMERIC"))
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS expected_start_date DATE"))
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS relocation_tasks (
+                        id TEXT PRIMARY KEY, case_id TEXT, assignment_id TEXT, title TEXT,
+                        phase TEXT, owner_role TEXT, status TEXT DEFAULT 'todo', due_date TEXT, created_at TEXT
+                    )
+                """))
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS case_events (
+                        id TEXT PRIMARY KEY, case_id TEXT, assignment_id TEXT, actor_user_id TEXT,
+                        event_type TEXT, description TEXT, created_at TEXT
+                    )
+                """))
+            except Exception:
+                pass
 
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
@@ -1030,6 +1074,228 @@ class Database:
             rows = conn.execute(text("SELECT * FROM case_assignments ORDER BY created_at DESC")).fetchall()
         return self._rows_to_list(rows)
 
+    # ------------------------------------------------------------------
+    # HR Command Center
+    # ------------------------------------------------------------------
+    def get_command_center_kpis(self, hr_user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Aggregate KPIs. hr_user_id=None means admin (all cases)."""
+        try:
+            with self.engine.connect() as conn:
+                where = "WHERE hr_user_id = :hr" if hr_user_id else ""
+                params: Dict[str, Any] = {"hr": hr_user_id} if hr_user_id else {}
+                base = f"SELECT * FROM case_assignments {where}"
+                rows = conn.execute(text(f"{base} ORDER BY created_at DESC"), params).fetchall()
+                assignments = self._rows_to_list(rows)
+        except Exception:
+            return {
+                "activeCases": 0, "atRiskCount": 0, "attentionNeededCount": 0,
+                "overdueTasksCount": 0, "avgVisaDurationDays": None, "budgetOverrunsCount": 0,
+                "actionRequiredCount": 0, "departingSoonCount": 0, "completedCount": 0,
+            }
+        at_risk = sum(1 for a in assignments if (a.get("risk_status") or "green") == "red")
+        attention = sum(1 for a in assignments if (a.get("risk_status") or "green") == "yellow")
+        budget_overruns = 0
+        action_required = 0
+        departing_soon = 0
+        completed = 0
+        now = datetime.utcnow()
+
+        def _parse_date(value: Optional[str]) -> Optional[datetime]:
+            if not value:
+                return None
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except Exception:
+                return None
+
+        def _days_until(target: datetime) -> int:
+            diff = target - now
+            return int(math.ceil(diff.total_seconds() / (60 * 60 * 24)))
+        for a in assignments:
+            bl, be = a.get("budget_limit"), a.get("budget_estimated")
+            if bl is not None and be is not None and float(be or 0) > float(bl or 0):
+                budget_overruns += 1
+
+            status = a.get("status")
+            created_at = _parse_date(a.get("created_at"))
+            if status == "approved":
+                if created_at is None or created_at.year == now.year:
+                    completed += 1
+
+            is_action_required = status == "submitted"
+            try:
+                report = self.get_latest_compliance_report(a["id"])
+                checks = report.get("checks") if isinstance(report, dict) else None
+                if checks and any((c.get("status") != "COMPLIANT") for c in checks if isinstance(c, dict)):
+                    is_action_required = True
+            except Exception:
+                pass
+            if is_action_required:
+                action_required += 1
+
+            try:
+                profile = self.get_employee_profile(a["id"]) or {}
+                move_plan = profile.get("movePlan") if isinstance(profile, dict) else {}
+                target_date = _parse_date(move_plan.get("targetArrivalDate") if isinstance(move_plan, dict) else None)
+                if target_date:
+                    remaining = _days_until(target_date)
+                    if 0 <= remaining <= 30:
+                        departing_soon += 1
+                else:
+                    submitted_at = _parse_date(a.get("submitted_at"))
+                    if submitted_at:
+                        remaining = _days_until(submitted_at)
+                        if 0 <= remaining <= 14:
+                            departing_soon += 1
+            except Exception:
+                pass
+        overdue = 0
+        try:
+            for a in assignments:
+                with self.engine.connect() as conn:
+                    r = conn.execute(text(
+                        "SELECT COUNT(*) FROM relocation_tasks WHERE assignment_id = :aid AND status = 'overdue'"
+                    ), {"aid": a["id"]}).fetchone()
+                    overdue += (r[0] or 0)
+        except Exception:
+            pass
+        return {
+            "activeCases": len([a for a in assignments if a.get("status") not in ("closed", "rejected")]),
+            "atRiskCount": at_risk,
+            "attentionNeededCount": attention,
+            "overdueTasksCount": overdue,
+            "avgVisaDurationDays": None,
+            "budgetOverrunsCount": budget_overruns,
+            "actionRequiredCount": action_required,
+            "departingSoonCount": departing_soon,
+            "completedCount": completed,
+        }
+
+    def list_command_center_cases(
+        self,
+        hr_user_id: Optional[str] = None,
+        page: int = 1,
+        limit: int = 25,
+        risk_filter: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Paginated cases with task % and risk. hr_user_id=None for admin."""
+        try:
+            with self.engine.connect() as conn:
+                where = "WHERE ca.hr_user_id = :hr" if hr_user_id else "WHERE 1=1"
+                params: Dict[str, Any] = {"limit": limit, "offset": (page - 1) * limit}
+                if hr_user_id:
+                    params["hr"] = hr_user_id
+                if risk_filter:
+                    where += " AND COALESCE(ca.risk_status, 'green') = :risk"
+                    params["risk"] = risk_filter
+                sql = f"""
+                    SELECT ca.id, ca.employee_identifier, ca.status,
+                           COALESCE(ca.risk_status, 'green') as risk_status,
+                           ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
+                           rc.host_country as dest_country
+                    FROM case_assignments ca
+                    LEFT JOIN relocation_cases rc ON rc.id = ca.case_id
+                    {where}
+                    ORDER BY ca.updated_at DESC
+                    LIMIT :limit OFFSET :offset
+                """
+                rows = conn.execute(text(sql), params).fetchall()
+                result = []
+                for row in rows:
+                    m = row._mapping
+                    a_id = m["id"]
+                    tasks_done, tasks_total = 0, 0
+                    next_due = None
+                    try:
+                        tr = conn.execute(text(
+                            "SELECT status, due_date FROM relocation_tasks WHERE assignment_id = :aid"
+                        ), {"aid": a_id}).fetchall()
+                        tasks_total = len(tr)
+                        tasks_done = sum(1 for r in tr if r._mapping.get("status") in ("done",))
+                        overdues = [r._mapping.get("due_date") for r in tr if r._mapping.get("status") == "overdue" and r._mapping.get("due_date")]
+                        next_due = min(overdues) if overdues else None
+                    except Exception:
+                        pass
+                    pct = round(100 * tasks_done / tasks_total) if tasks_total else 0
+                    result.append({
+                        "id": a_id,
+                        "employeeIdentifier": m.get("employee_identifier") or "",
+                        "destCountry": m.get("dest_country"),
+                        "status": m.get("status") or "",
+                        "riskStatus": m.get("risk_status") or "green",
+                        "tasksDonePercent": pct,
+                        "budgetLimit": m.get("budget_limit"),
+                        "budgetEstimated": m.get("budget_estimated"),
+                        "nextDeadline": str(next_due) if next_due else None,
+                    })
+                return result
+        except Exception as e:
+            log.warning("list_command_center_cases: %s", e)
+            return []
+
+    def get_command_center_case_detail(
+        self, assignment_id: str, hr_user_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Full case detail: tasks, budget, events."""
+        try:
+            with self.engine.connect() as conn:
+                where = "ca.id = :aid"
+                params: Dict[str, Any] = {"aid": assignment_id}
+                if hr_user_id:
+                    where += " AND ca.hr_user_id = :hr"
+                    params["hr"] = hr_user_id
+                row = conn.execute(text(f"""
+                    SELECT ca.*, rc.host_country as dest_country
+                    FROM case_assignments ca
+                    LEFT JOIN relocation_cases rc ON rc.id = ca.case_id
+                    WHERE {where}
+                """), params).fetchone()
+                if not row:
+                    return None
+                m = row._mapping
+                tasks = []
+                try:
+                    tr = conn.execute(text(
+                        "SELECT * FROM relocation_tasks WHERE assignment_id = :aid ORDER BY due_date"
+                    ), {"aid": assignment_id}).fetchall()
+                    tasks = self._rows_to_list(tr)
+                except Exception:
+                    pass
+                events = []
+                try:
+                    er = conn.execute(text(
+                        "SELECT * FROM case_events WHERE assignment_id = :aid ORDER BY created_at DESC LIMIT 50"
+                    ), {"aid": assignment_id}).fetchall()
+                    events = self._rows_to_list(er)
+                except Exception:
+                    pass
+                tasks_done = sum(1 for t in tasks if t.get("status") == "done")
+                tasks_overdue = sum(1 for t in tasks if t.get("status") == "overdue")
+                phases: Dict[str, List[Dict]] = {}
+                for t in tasks:
+                    ph = t.get("phase") or "General"
+                    if ph not in phases:
+                        phases[ph] = []
+                    phases[ph].append({"title": t.get("title"), "status": t.get("status"), "due_date": t.get("due_date")})
+                return {
+                    "id": assignment_id,
+                    "employeeIdentifier": m.get("employee_identifier") or "",
+                    "destCountry": m.get("dest_country"),
+                    "status": m.get("status") or "",
+                    "riskStatus": m.get("risk_status") or "green",
+                    "budgetLimit": m.get("budget_limit"),
+                    "budgetEstimated": m.get("budget_estimated"),
+                    "expectedStartDate": str(m.get("expected_start_date")) if m.get("expected_start_date") else None,
+                    "tasksTotal": len(tasks),
+                    "tasksDone": tasks_done,
+                    "tasksOverdue": tasks_overdue,
+                    "phases": [{"phase": k, "tasks": v} for k, v in phases.items()],
+                    "events": [{"event_type": e.get("event_type"), "description": e.get("description"), "created_at": e.get("created_at")} for e in events],
+                }
+        except Exception as e:
+            log.warning("get_command_center_case_detail: %s", e)
+            return None
+
     def delete_assignment(self, assignment_id: str) -> bool:
         with self.engine.begin() as conn:
             row = conn.execute(text(
@@ -1361,14 +1627,38 @@ class Database:
         address: Optional[str] = None,
         phone: Optional[str] = None,
         hr_contact: Optional[str] = None,
+        legal_name: Optional[str] = None,
+        website: Optional[str] = None,
+        hq_city: Optional[str] = None,
+        industry: Optional[str] = None,
+        logo_url: Optional[str] = None,
+        brand_color: Optional[str] = None,
+        default_destination_country: Optional[str] = None,
+        support_email: Optional[str] = None,
+        default_working_location: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             conn.execute(text(
-                "INSERT INTO companies (id, name, country, size_band, address, phone, hr_contact, created_at) "
-                "VALUES (:id, :name, :country, :size_band, :address, :phone, :hr_contact, :created_at) "
-                "ON CONFLICT(id) DO UPDATE SET name = excluded.name, country = excluded.country, size_band = excluded.size_band, "
-                "address = excluded.address, phone = excluded.phone, hr_contact = excluded.hr_contact"
+                "INSERT INTO companies (id, name, country, size_band, address, phone, hr_contact, created_at, "
+                "legal_name, website, hq_city, industry, logo_url, brand_color, updated_at, "
+                "default_destination_country, support_email, default_working_location) "
+                "VALUES (:id, :name, :country, :size_band, :address, :phone, :hr_contact, :created_at, "
+                ":legal_name, :website, :hq_city, :industry, :logo_url, :brand_color, :updated_at, "
+                ":default_destination_country, :support_email, :default_working_location) "
+                "ON CONFLICT(id) DO UPDATE SET "
+                "name = excluded.name, country = excluded.country, size_band = excluded.size_band, "
+                "address = excluded.address, phone = excluded.phone, hr_contact = excluded.hr_contact, "
+                "legal_name = COALESCE(excluded.legal_name, companies.legal_name), "
+                "website = COALESCE(excluded.website, companies.website), "
+                "hq_city = COALESCE(excluded.hq_city, companies.hq_city), "
+                "industry = COALESCE(excluded.industry, companies.industry), "
+                "logo_url = COALESCE(excluded.logo_url, companies.logo_url), "
+                "brand_color = COALESCE(excluded.brand_color, companies.brand_color), "
+                "updated_at = excluded.updated_at, "
+                "default_destination_country = COALESCE(excluded.default_destination_country, companies.default_destination_country), "
+                "support_email = COALESCE(excluded.support_email, companies.support_email), "
+                "default_working_location = COALESCE(excluded.default_working_location, companies.default_working_location)"
             ), {
                 "id": company_id,
                 "name": name,
@@ -1378,7 +1668,24 @@ class Database:
                 "phone": phone,
                 "hr_contact": hr_contact,
                 "created_at": now,
+                "legal_name": legal_name,
+                "website": website,
+                "hq_city": hq_city,
+                "industry": industry,
+                "logo_url": logo_url,
+                "brand_color": brand_color,
+                "updated_at": now,
+                "default_destination_country": default_destination_country,
+                "support_email": support_email,
+                "default_working_location": default_working_location,
             })
+
+    def update_company_logo(self, company_id: str, logo_url: Optional[str]) -> None:
+        with self.engine.begin() as conn:
+            if _is_sqlite:
+                conn.execute(text("UPDATE companies SET logo_url = :url WHERE id = :id"), {"url": logo_url, "id": company_id})
+            else:
+                conn.execute(text("UPDATE companies SET logo_url = :url, updated_at = now() WHERE id = :id"), {"url": logo_url, "id": company_id})
 
     def create_employee(
         self,

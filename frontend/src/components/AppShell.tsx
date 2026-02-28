@@ -11,6 +11,7 @@ import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
 import { NotificationBell } from './NotificationBell';
+import { CompanyBrand } from './CompanyBrand';
 
 const logoUrl = '/relopass-logo.png?v=1';
 
@@ -81,7 +82,12 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             />
           </Link>
           <div className="flex items-center gap-2">
-            {(isHrRole || isEmployeeRole) && <NotificationBell />}
+            {(isHrRole || isEmployeeRole) && (
+              <>
+                <CompanyBrand />
+                <NotificationBell />
+              </>
+            )}
             <button
               onClick={async () => {
                 await authAPI.logout();
@@ -186,6 +192,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     }`}
                   >
                     HR Dashboard
+                  </Link>
+                  <Link
+                    to={buildRoute('hrCommandCenter')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrCommandCenter.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Command Center
                   </Link>
                   <Link
                     to={buildRoute('hrCompanyProfile')}

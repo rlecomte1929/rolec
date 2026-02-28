@@ -49,6 +49,43 @@ export interface RegisterRequest {
 
 export type UserRole = 'HR' | 'EMPLOYEE' | 'ADMIN';
 
+export interface Company {
+  id?: string;
+  name: string;
+  legal_name?: string | null;
+  website?: string | null;
+  country?: string | null;
+  hq_city?: string | null;
+  industry?: string | null;
+  logo_url?: string | null;
+  brand_color?: string | null;
+  size_band?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  hr_contact?: string | null;
+  default_destination_country?: string | null;
+  support_email?: string | null;
+  default_working_location?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CompanyProfilePayload {
+  name: string;
+  country?: string;
+  size_band?: string;
+  address?: string;
+  phone?: string;
+  hr_contact?: string;
+  legal_name?: string;
+  website?: string;
+  hq_city?: string;
+  industry?: string;
+  default_destination_country?: string;
+  support_email?: string;
+  default_working_location?: string;
+}
+
 export interface User {
   id: string;
   username?: string;

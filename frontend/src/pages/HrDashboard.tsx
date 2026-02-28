@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert, Badge } from '../components/antigravity';
 import { hrAPI } from '../api/client';
-import type { AssignmentSummary, AssignmentDetail, AssignmentStatus } from '../types';
+import type { AssignmentSummary, AssignmentDetail } from '../types';
 import { startInteraction, endInteraction } from '../perf/perf';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
@@ -182,11 +182,6 @@ export const HrDashboard: React.FC = () => {
     return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   };
 
-  const clampPercent = (value?: number | null) => {
-    if (value === null || value === undefined) return 0;
-    return Math.max(0, Math.min(100, Math.round(value)));
-  };
-
   const formatRoute = (detail?: AssignmentDetail) => {
     const origin = detail?.profile?.movePlan?.origin;
     const destination = detail?.profile?.movePlan?.destination;
@@ -235,83 +230,10 @@ export const HrDashboard: React.FC = () => {
     return fallbackDays !== null && fallbackDays >= 0 && fallbackDays <= 14;
   });
 
-  const highlightedAssignment = filteredAssignments[0] || assignments[0] || null;
-  const highlightedDetail = highlightedAssignment ? assignmentDetails[highlightedAssignment.id] : null;
-  const highlightedCompleteness = clampPercent(highlightedDetail?.completeness ?? 0);
-  const highlightedCompliance = highlightedDetail?.complianceReport?.overallStatus || 'Not run';
-  const highlightedBlocking =
-    highlightedDetail?.complianceReport?.checks?.filter((check) => check.status !== 'COMPLIANT').length || 0;
-
-  const activeStatuses = new Set<AssignmentStatus>([
-    'created',
-    'assigned',
-    'awaiting_intake',
-    'submitted',
-  ]);
-
-  const totalActive = assignments.filter((assignment) => activeStatuses.has(assignment.status)).length;
-  const completed = assignments.filter((assignment) => assignment.status === 'approved').length;
-  const actionRequired = assignments.filter((assignment) => {
-    const requiresStatus = assignment.status === 'submitted';
-    const detail = assignmentDetails[assignment.id];
-    const blockingCount = detail?.complianceReport?.checks?.filter((check) => check.status !== 'COMPLIANT').length || 0;
-    return requiresStatus || blockingCount > 0;
-  }).length;
-  const departingSoon = assignments.filter((assignment) => {
-    const detail = assignmentDetails[assignment.id];
-    const target = parseDate(detail?.profile?.movePlan?.targetArrivalDate);
-    const targetDays = daysUntil(target);
-    if (targetDays !== null) return targetDays >= 0 && targetDays <= 30;
-    const fallback = parseDate(detail?.submittedAt);
-    const fallbackDays = daysUntil(fallback);
-    return fallbackDays !== null && fallbackDays >= 0 && fallbackDays <= 14;
-  }).length;
-
   return (
     <AppShell title="HR Dashboard" subtitle="Monitor relocations, readiness, and approvals.">
       <div className="space-y-6">
         {error && <Alert variant="error">{error}</Alert>}
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Card padding="sm">
-            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Total active cases</div>
-            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{totalActive}</div>
-            <div className="text-[10px] text-[#6b7280]">Currently in progress</div>
-          </Card>
-          <Card padding="sm">
-            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Action required</div>
-            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{actionRequired}</div>
-            <div className="text-[10px] text-[#6b7280]">Needs HR attention</div>
-          </Card>
-          <Card padding="sm">
-            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Departing soon</div>
-            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{departingSoon}</div>
-            <div className="text-[10px] text-[#6b7280]">Next 30 days</div>
-          </Card>
-          <Card padding="sm">
-            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Completed (YTD)</div>
-            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{completed}</div>
-            <div className="text-[10px] text-[#6b7280]">Approved cases</div>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Card padding="sm">
-            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Profile completeness</div>
-            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{highlightedCompleteness}%</div>
-            <div className="text-[10px] text-[#6b7280]">Highlighted case</div>
-          </Card>
-          <Card padding="sm">
-            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Compliance status</div>
-            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{highlightedCompliance}</div>
-            <div className="text-[10px] text-[#6b7280]">Latest checks</div>
-          </Card>
-          <Card padding="sm">
-            <div className="text-[10px] uppercase tracking-wide text-[#6b7280]">Blocking items</div>
-            <div className="text-lg font-semibold text-[#0b2b43] mt-1">{highlightedBlocking}</div>
-            <div className="text-[10px] text-[#6b7280]">Needs HR attention</div>
-          </Card>
-        </div>
 
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <input

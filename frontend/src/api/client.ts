@@ -27,6 +27,7 @@ import type {
   AdminRelocationCase,
   AdminSupportCase,
   AdminSupportNote,
+  CompanyProfilePayload,
 } from '../types';
 
 // VITE_API_URL must be set for every environment:
@@ -262,8 +263,20 @@ export const hrAPI = {
     const response = await api.get('/api/hr/company-profile');
     return response.data;
   },
-  saveCompanyProfile: async (payload: { name: string; country?: string; size_band?: string; address?: string; phone?: string; hr_contact?: string }): Promise<any> => {
+  saveCompanyProfile: async (payload: CompanyProfilePayload): Promise<any> => {
     const response = await api.post('/api/hr/company-profile', payload);
+    return response.data;
+  },
+  uploadCompanyLogo: async (file: File): Promise<{ ok: boolean; logo_url: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/api/hr/company-profile/logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  removeCompanyLogo: async (): Promise<{ ok: boolean }> => {
+    const response = await api.post('/api/hr/company-profile/remove-logo');
     return response.data;
   },
   listMessages: async (): Promise<{ messages: any[] }> => {
@@ -315,6 +328,37 @@ export const hrAPI = {
   },
   getFeedback: async (assignmentId: string): Promise<Array<{ id: string; assignment_id: string; hr_user_id: string; employee_user_id: string | null; message: string; created_at: string }>> => {
     const response = await api.get(`/api/hr/assignments/${assignmentId}/feedback`);
+    return response.data;
+  },
+  // Command Center
+  getCommandCenterKPIs: async (): Promise<{
+    activeCases: number;
+    atRiskCount: number;
+    attentionNeededCount: number;
+    overdueTasksCount: number;
+    avgVisaDurationDays?: number;
+    budgetOverrunsCount: number;
+    actionRequiredCount: number;
+    departingSoonCount: number;
+    completedCount: number;
+  }> => {
+    const response = await api.get('/api/hr/command-center/kpis');
+    return response.data;
+  },
+  listCommandCenterCases: async (params?: { page?: number; limit?: number; risk_filter?: string }): Promise<Array<{ id: string; employeeIdentifier: string; destCountry?: string; status: string; riskStatus: string; tasksDonePercent: number; budgetLimit?: number; budgetEstimated?: number; nextDeadline?: string }>> => {
+    const response = await api.get('/api/hr/command-center/cases', { params });
+    return response.data;
+  },
+  getCommandCenterCaseDetail: async (assignmentId: string): Promise<{ id: string; employeeIdentifier: string; destCountry?: string; status: string; riskStatus: string; budgetLimit?: number; budgetEstimated?: number; expectedStartDate?: string; tasksTotal: number; tasksDone: number; tasksOverdue: number; phases: Array<{ phase: string; tasks: Array<{ title: string; status: string; due_date?: string }> }>; events: Array<{ event_type: string; description?: string; created_at: string }> }> => {
+    const response = await api.get(`/api/hr/command-center/cases/${assignmentId}`);
+    return response.data;
+  },
+};
+
+// Company API (for header branding: HR and Employee)
+export const companyAPI = {
+  get: async (): Promise<{ company: { id?: string; name: string; logo_url?: string | null; [key: string]: unknown } | null }> => {
+    const response = await api.get('/api/company');
     return response.data;
   },
 };
