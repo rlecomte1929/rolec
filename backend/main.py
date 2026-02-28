@@ -1940,6 +1940,9 @@ def dismiss_message_notification(
     effective = _effective_user(user, role)
     updated = db.dismiss_message_notification(message_id, effective["id"])
     return {"success": updated}
+
+
+@app.delete("/api/hr/assignments/{assignment_id}")
 def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
     deleted = db.delete_assignment(assignment_id)
@@ -2606,6 +2609,82 @@ def record_compliance_action(
         user["id"],
     )
     return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# HR Command Center (Portfolio & Risk Dashboard)
+# ---------------------------------------------------------------------------
+class CommandCenterKPIs(BaseModel):
+    activeCases: int
+    atRiskCount: int
+    attentionNeededCount: int
+    overdueTasksCount: int
+    avgVisaDurationDays: Optional[float] = None
+    budgetOverrunsCount: int
+
+
+class CommandCenterCaseRow(BaseModel):
+    id: str
+    employeeIdentifier: str
+    destCountry: Optional[str] = None
+    status: str
+    riskStatus: str
+    tasksDonePercent: int
+    budgetLimit: Optional[float] = None
+    budgetEstimated: Optional[float] = None
+    nextDeadline: Optional[str] = None
+
+
+class CommandCenterCaseDetail(BaseModel):
+    id: str
+    employeeIdentifier: str
+    destCountry: Optional[str] = None
+    status: str
+    riskStatus: str
+    budgetLimit: Optional[float] = None
+    budgetEstimated: Optional[float] = None
+    expectedStartDate: Optional[str] = None
+    tasksTotal: int
+    tasksDone: int
+    tasksOverdue: int
+    phases: List[Dict[str, Any]] = []
+    events: List[Dict[str, Any]] = []
+
+
+def _effective_hr_user(user: Dict[str, Any]) -> Optional[str]:
+    if user.get("is_admin") and not user.get("impersonation"):
+        return None
+    return user.get("id")
+
+
+@app.get("/api/hr/command-center/kpis", response_model=CommandCenterKPIs)
+def get_command_center_kpis(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    kpis = db.get_command_center_kpis(hr_user_id=_effective_hr_user(user))
+    return CommandCenterKPIs(**kpis)
+
+
+@app.get("/api/hr/command-center/cases", response_model=List[CommandCenterCaseRow])
+def list_command_center_cases(
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=100),
+    risk_filter: Optional[str] = Query(None, pattern="^(green|yellow|red)$"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    rows = db.list_command_center_cases(
+        hr_user_id=_effective_hr_user(user), page=page, limit=limit, risk_filter=risk_filter
+    )
+    return [CommandCenterCaseRow(**r) for r in rows]
+
+
+@app.get("/api/hr/command-center/cases/{assignment_id}", response_model=CommandCenterCaseDetail)
+def get_command_center_case_detail(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    detail = db.get_command_center_case_detail(assignment_id=assignment_id, hr_user_id=_effective_hr_user(user))
+    if not detail:
+        raise HTTPException(status_code=404, detail="Case not found or not visible")
+    return CommandCenterCaseDetail(**detail)
 
 
 def _build_next_actions(profile: Dict[str, Any], completion_state: Dict[str, Any]) -> List[str]:
