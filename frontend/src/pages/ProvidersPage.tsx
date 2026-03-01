@@ -76,7 +76,6 @@ export const ProvidersPage: React.FC = () => {
   const [services, setServices] = useState<Record<string, ServiceState>>({});
   const [policy, setPolicy] = useState<{ currency: string; caps: Record<string, number>; total_cap?: number | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [flowStep, setFlowStep] = useState<'select' | 'wizard' | 'results' | 'summary'>('select');
   const [engineResults, setEngineResults] = useState<Record<string, RecommendationResponse> | null>(null);
@@ -186,7 +185,7 @@ export const ProvidersPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!assignmentId) return;
-    setIsSaving(true);
+    // keep minimal UI state changes
     setMessage('');
     try {
       const payload = ENABLED_SERVICES.map((svc) => {
@@ -207,7 +206,7 @@ export const ProvidersPage: React.FC = () => {
       setMessage(detail || 'Unable to save services. Please try again.');
       return false;
     } finally {
-      setIsSaving(false);
+      // no-op
     }
   };
 
