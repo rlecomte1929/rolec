@@ -339,8 +339,19 @@ export const CaseWizardPage: React.FC = () => {
   }, [assignmentId]);
 
   const handleSave = async (nextDraft: CaseDraftDTO) => {
-    if (!resolvedCaseId) return;
-    const updated = await patchCase(resolvedCaseId, nextDraft);
+    let caseIdToSave = resolvedCaseId;
+    if (!caseIdToSave && assignmentIdFromRoute) {
+      const { data, error: loadError } = await getCaseDetailsByAssignmentId(assignmentIdFromRoute);
+      if (loadError || !data?.case?.id) {
+        throw new Error('Unable to locate your case. Please refresh and try again.');
+      }
+      caseIdToSave = data.case.id;
+      setResolvedCaseId(caseIdToSave);
+    }
+    if (!caseIdToSave) {
+      throw new Error('Unable to locate your case. Please refresh and try again.');
+    }
+    const updated = await patchCase(caseIdToSave, nextDraft);
     setDraft(caseToWizardDraft(updated));
     setCaseData(updated);
     await loadRequirements();
@@ -400,7 +411,6 @@ export const CaseWizardPage: React.FC = () => {
 
   const stepProps = {
     caseId: resolvedCaseId || assignmentId || '',
-    assignmentId: assignmentId || null,
     draft,
     requiredFields,
     onSave: handleSave,
