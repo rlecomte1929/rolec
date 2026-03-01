@@ -201,11 +201,20 @@ export const ProvidersPage: React.FC = () => {
       });
       await employeeAPI.saveAssignmentServices(assignmentId, payload);
       setMessage('Saved services successfully.');
+      return true;
     } catch (err: any) {
       const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message;
       setMessage(detail || 'Unable to save services. Please try again.');
+      return false;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleContinue = async () => {
+    const ok = await handleSave();
+    if (ok && recommendationSelection.size > 0) {
+      await startWizard();
     }
   };
 
@@ -276,6 +285,7 @@ export const ProvidersPage: React.FC = () => {
               <p className="text-[#6b7280]">
                 Select the areas where you need support — we’ll build a clear plan so nothing falls through the cracks.
               </p>
+              <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
             </div>
             <TrustBlock className="mb-8" />
             <ServiceGroupSection
@@ -298,8 +308,7 @@ export const ProvidersPage: React.FC = () => {
             />
             <StickyContinueBar
               selectedCount={selectedKeys.size}
-              onContinue={handleSave}
-              buttonLabel="Save services"
+              onContinue={handleContinue}
             />
           </Card>
 
@@ -315,7 +324,7 @@ export const ProvidersPage: React.FC = () => {
                 onClick={startWizard}
                 disabled={recommendationSelection.size === 0}
               >
-                Answer questions & get recommendations
+                Start service wizard
               </Button>
             </div>
           </Card>
@@ -399,12 +408,9 @@ export const ProvidersPage: React.FC = () => {
           </Card>
 
           <Card padding="lg">
-            <div className="text-sm text-[#6b7280] mb-4">
-              Save your service selections so HR can review budget alignment.
+            <div className="text-sm text-[#6b7280]">
+              Selections are saved when you continue.
             </div>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? 'Saving…' : 'Save services'}
-            </Button>
           </Card>
         </div>
       </div>
