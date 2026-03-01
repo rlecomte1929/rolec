@@ -5,23 +5,32 @@ import { Alert, Badge, Button, Card, Input } from '../components/antigravity';
 import { employeeAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { TrustBlock } from '../features/services/TrustBlock';
+import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
+import { StickyContinueBar } from '../features/services/StickyContinueBar';
+import { SERVICE_CONFIG, type ServiceKey } from '../features/services/serviceConfig';
 
-type ServiceItem = {
-  key: string;
-  label: string;
-  description: string;
-  category: string;
+const ENABLED_SERVICES = SERVICE_CONFIG.filter((svc) => svc.enabled);
+
+const CATEGORY_MAP: Record<ServiceKey, string> = {
+  visa: 'immigration',
+  housing: 'housing',
+  schools: 'schools',
+  childcare: 'schools',
+  movers: 'moving',
+  temp_accommodation: 'housing',
+  banks: 'settling_in',
+  insurances: 'settling_in',
+  registration: 'settling_in',
+  electricity: 'settling_in',
+  internet: 'settling_in',
+  mobile: 'settling_in',
+  transport: 'settling_in',
+  drivers_license: 'settling_in',
+  language: 'settling_in',
+  spouse: 'settling_in',
+  community: 'settling_in',
 };
-
-const SERVICE_CATALOG: ServiceItem[] = [
-  { key: 'temporary_housing', label: 'Temporary housing', description: 'Short-term stay support on arrival.', category: 'housing' },
-  { key: 'long_term_rental', label: 'Long-term rental support', description: 'Help finding longer-term housing.', category: 'housing' },
-  { key: 'school_search', label: 'School search', description: 'Guidance on school selection and enrollment.', category: 'schools' },
-  { key: 'visa_support', label: 'Visa support', description: 'Immigration and visa documentation assistance.', category: 'immigration' },
-  { key: 'tax_consult', label: 'Tax consultation', description: 'High-level tax onboarding consultation.', category: 'tax' },
-  { key: 'movers', label: 'Movers', description: 'Moving logistics and shipment coordination.', category: 'moving' },
-  { key: 'settling_in', label: 'Settling-in services', description: 'Bank, SIM, healthcare registration support.', category: 'settling_in' },
-];
 
 type ServiceState = {
   selected: boolean;
@@ -52,10 +61,11 @@ export const ProvidersPage: React.FC = () => {
           employeeAPI.getPolicyBudget(assignmentId),
         ]);
         const baseState: Record<string, ServiceState> = {};
-        SERVICE_CATALOG.forEach((svc) => {
+        ENABLED_SERVICES.forEach((svc) => {
           baseState[svc.key] = { selected: false, estimated_cost: '' };
         });
         serviceRes.services?.forEach((row) => {
+          if (!baseState[row.service_key]) return;
           baseState[row.service_key] = {
             selected: Boolean(row.selected),
             estimated_cost: row.estimated_cost !== null && row.estimated_cost !== undefined ? String(row.estimated_cost) : '',
@@ -79,16 +89,22 @@ export const ProvidersPage: React.FC = () => {
   const totals = useMemo(() => {
     const byCategory: Record<string, number> = {};
     let total = 0;
-    SERVICE_CATALOG.forEach((svc) => {
-      const state = services[svc.key];
+    ENABLED_SERVICES.forEach((svc) => {
+      const state = services[svc.key] || { selected: false, estimated_cost: '' };
       if (!state?.selected) return;
       const cost = Number(state.estimated_cost);
       if (!Number.isFinite(cost)) return;
-      byCategory[svc.category] = (byCategory[svc.category] || 0) + cost;
+      const category = CATEGORY_MAP[svc.key] || 'other';
+      byCategory[category] = (byCategory[category] || 0) + cost;
       total += cost;
     });
     return { byCategory, total };
   }, [services]);
+
+  const selectedKeys = useMemo(
+    () => new Set(Object.entries(services).filter(([, v]) => v.selected).map(([k]) => k)),
+    [services]
+  );
 
   const handleToggle = (key: string) => {
     setServices((prev) => ({
@@ -109,11 +125,11 @@ export const ProvidersPage: React.FC = () => {
     setIsSaving(true);
     setMessage('');
     try {
-      const payload = SERVICE_CATALOG.map((svc) => {
+      const payload = ENABLED_SERVICES.map((svc) => {
         const state = services[svc.key] || { selected: false, estimated_cost: '' };
         return {
           service_key: svc.key,
-          category: svc.category,
+          category: CATEGORY_MAP[svc.key] || 'other',
           selected: state.selected,
           estimated_cost: state.estimated_cost ? Number(state.estimated_cost) : null,
           currency: policy?.currency || 'EUR',
@@ -122,7 +138,8 @@ export const ProvidersPage: React.FC = () => {
       await employeeAPI.saveAssignmentServices(assignmentId, payload);
       setMessage('Saved services successfully.');
     } catch (err: any) {
-      setMessage(err?.response?.data?.detail || 'Unable to save services. Please try again.');
+      const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message;
+      setMessage(detail || 'Unable to save services. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -159,46 +176,38 @@ export const ProvidersPage: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-6">
           <Card padding="lg">
-            <div className="text-lg font-semibold text-[#0b2b43] mb-2">Select services</div>
-            <div className="space-y-4">
-              {SERVICE_CATALOG.map((svc) => {
-                const state = services[svc.key] || { selected: false, estimated_cost: '' };
-                const cap = policy?.caps?.[svc.category];
-                return (
-                  <div key={svc.key} className="border border-[#e2e8f0] rounded-lg p-4 space-y-2">
-                    <div className="flex items-start justify-between gap-4">
-                      <label className="flex items-start gap-3 text-sm text-[#0b2b43]">
-                        <input
-                          type="checkbox"
-                          checked={state.selected}
-                          onChange={() => handleToggle(svc.key)}
-                        />
-                        <div>
-                          <div className="font-semibold">{svc.label}</div>
-                          <div className="text-xs text-[#6b7280]">{svc.description}</div>
-                        </div>
-                      </label>
-                      <Badge variant="neutral">{svc.category.replace('_', ' ')}</Badge>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-[#6b7280]">
-                      <Input
-                        type="number"
-                        label="Estimated cost"
-                        value={state.estimated_cost}
-                        onChange={(value) => handleCostChange(svc.key, value)}
-                        placeholder="0"
-                        fullWidth
-                      />
-                      <div className="text-xs">
-                        Policy cap: {cap ? `${policy?.currency} ${cap}` : 'policy not provided'}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="mb-6">
+              <h1 className="text-2xl font-semibold text-[#0b2b43] mb-2">Your relocation plan</h1>
+              <p className="text-[#6b7280]">
+                Select the areas where you need support — we’ll build a clear plan so nothing falls through the cracks.
+              </p>
             </div>
+            <TrustBlock className="mb-8" />
+            <ServiceGroupSection
+              group="before"
+              items={ENABLED_SERVICES.filter((s) => s.group === 'before')}
+              selectedKeys={selectedKeys}
+              onToggle={handleToggle}
+            />
+            <ServiceGroupSection
+              group="arrival"
+              items={ENABLED_SERVICES.filter((s) => s.group === 'arrival')}
+              selectedKeys={selectedKeys}
+              onToggle={handleToggle}
+            />
+            <ServiceGroupSection
+              group="settle"
+              items={ENABLED_SERVICES.filter((s) => s.group === 'settle')}
+              selectedKeys={selectedKeys}
+              onToggle={handleToggle}
+            />
+            <StickyContinueBar
+              selectedCount={selectedKeys.size}
+              onContinue={handleSave}
+              buttonLabel="Save services"
+            />
           </Card>
 
           <Card padding="lg">
@@ -213,6 +222,38 @@ export const ProvidersPage: React.FC = () => {
         </div>
 
         <div className="space-y-4">
+          <Card padding="lg">
+            <div className="text-lg font-semibold text-[#0b2b43] mb-2">Estimated costs</div>
+            <div className="space-y-3 text-sm">
+              {ENABLED_SERVICES.filter((svc) => services[svc.key]?.selected).length === 0 && (
+                <div className="text-[#6b7280]">Select services to add estimates.</div>
+              )}
+              {ENABLED_SERVICES.filter((svc) => services[svc.key]?.selected).map((svc) => {
+                const state = services[svc.key] || { selected: false, estimated_cost: '' };
+                const category = CATEGORY_MAP[svc.key] || 'other';
+                const cap = policy?.caps?.[category];
+                return (
+                  <div key={svc.key} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-[#0b2b43]">{svc.title}</div>
+                      <Badge variant="neutral">{category.replace('_', ' ')}</Badge>
+                    </div>
+                    <Input
+                      type="number"
+                      label="Estimated cost"
+                      value={state.estimated_cost}
+                      onChange={(value) => handleCostChange(svc.key, value)}
+                      placeholder="0"
+                      fullWidth
+                    />
+                    <div className="text-xs text-[#6b7280]">
+                      Policy cap: {cap ? `${policy?.currency} ${cap}` : 'policy not provided'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
           <Card padding="lg">
             <div className="text-lg font-semibold text-[#0b2b43] mb-2">Budget summary</div>
             <div className="space-y-3 text-sm">
