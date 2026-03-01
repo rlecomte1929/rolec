@@ -163,9 +163,16 @@ import traceback
 def _log_unhandled_exception(request, exc: Exception):
     from fastapi import HTTPException as _HTTP
     if isinstance(exc, _HTTP):
-        raise exc
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     tb = traceback.format_exc()
     log.error("Unhandled exception: %s\n%s", exc, tb)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "request_id": getattr(request.state, "request_id", None),
+        },
+    )
 
 
 @contextmanager
@@ -2453,9 +2460,13 @@ def upsert_assignment_services(
         }
         for item in payload.services
     ]
-    db.upsert_case_services(assignment["id"], case_id, items)
-    updated = db.list_case_services(assignment["id"])
-    return {"ok": True, "services": updated}
+    try:
+        db.upsert_case_services(assignment["id"], case_id, items)
+        updated = db.list_case_services(assignment["id"])
+        return {"ok": True, "services": updated}
+    except Exception as e:
+        log.warning("upsert_case_services failed for assignment %s: %s", assignment["id"], e, exc_info=True)
+        return {"ok": False, "services": []}
 
 
 @app.get("/api/services/answers")

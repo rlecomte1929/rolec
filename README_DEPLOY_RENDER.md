@@ -34,6 +34,20 @@ No Alembic or pre-deploy command needed. On every startup, the backend:
 
 Both steps are idempotent and safe to run on every boot.
 
+### Manual migration (Option B)
+
+If you disable runtime DDL in production, apply required schema changes manually:
+
+```bash
+psql "$DATABASE_URL" -f backend/sql/render_case_services.sql
+```
+
+Optional performance indexes for slow assignment lookups:
+
+```bash
+psql "$DATABASE_URL" -f backend/sql/render_performance_indexes.sql
+```
+
 ### Verify Deployment
 
 ```bash
