@@ -50,6 +50,38 @@ const api = axios.create({
   },
 });
 
+type CacheEntry<T> = {
+  ts: number;
+  data?: T;
+  promise?: Promise<T>;
+};
+
+const apiCache = new Map<string, CacheEntry<any>>();
+
+const cachedRequest = <T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> => {
+  const now = Date.now();
+  const existing = apiCache.get(key);
+  if (existing?.data && now - existing.ts < ttlMs) {
+    return Promise.resolve(existing.data as T);
+  }
+  if (existing?.promise) {
+    return existing.promise as Promise<T>;
+  }
+  const promise = fetcher()
+    .then((data) => {
+      apiCache.set(key, { ts: Date.now(), data });
+      return data;
+    })
+    .finally(() => {
+      const current = apiCache.get(key);
+      if (current?.promise) {
+        apiCache.set(key, { ts: current.ts, data: current.data });
+      }
+    });
+  apiCache.set(key, { ts: now, promise });
+  return promise;
+};
+
 // Add auth token + request/perf metadata to requests
 api.interceptors.request.use((config) => {
   const token = getAuthItem('relopass_token');
@@ -360,8 +392,10 @@ export const hrAPI = {
 // Company API (for header branding: HR and Employee)
 export const companyAPI = {
   get: async (): Promise<{ company: { id?: string; name: string; logo_url?: string | null; [key: string]: unknown } | null }> => {
-    const response = await api.get('/api/company');
-    return response.data;
+    return cachedRequest('company:get', 60_000, async () => {
+      const response = await api.get('/api/company');
+      return response.data;
+    });
   },
 };
 
@@ -478,8 +512,10 @@ export const requirementsAPI = {
 
 export const employeeAPI = {
   getCurrentAssignment: async (): Promise<{ assignment: any }> => {
-    const response = await api.get('/api/employee/assignments/current');
-    return response.data;
+    return cachedRequest('employee:current-assignment', 30_000, async () => {
+      const response = await api.get('/api/employee/assignments/current');
+      return response.data;
+    });
   },
   listMessages: async (): Promise<{ messages: any[] }> => {
     const response = await api.get('/api/employee/messages');

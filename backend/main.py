@@ -97,10 +97,12 @@ env_origins = os.getenv("CORS_ORIGINS")
 if env_origins:
     extra = [o.strip() for o in env_origins.split(",") if o.strip()]
     default_origins = list(dict.fromkeys(default_origins + extra))
+origin_regex = os.getenv("CORS_ORIGIN_REGEX") or r"https://.*\.relopass\.com"
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=default_origins,
+    allow_origin_regex=origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
