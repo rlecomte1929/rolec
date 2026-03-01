@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="0; url=/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReloPass</title>
+    <script>
+      (function () {
+        var path = window.location.pathname + window.location.search + window.location.hash;
+        var target = "/?__redirect=" + encodeURIComponent(path);
+        window.location.replace(target);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

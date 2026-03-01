@@ -2421,7 +2421,11 @@ def get_assignment_services(
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     assignment = _require_assignment_visibility(assignment_id, user)
-    services = db.list_case_services(assignment["id"])
+    try:
+        services = db.list_case_services(assignment["id"])
+    except Exception as e:
+        log.warning("list_case_services failed for assignment %s: %s", assignment["id"], e, exc_info=True)
+        services = []
     return {
         "assignment_id": assignment["id"],
         "case_id": assignment.get("case_id"),
@@ -2884,8 +2888,20 @@ def get_requirements_sufficiency(
 ):
     access = _require_case_access(case_id, user)
     effective = access["effective_user"]
-    data = compute_requirements_sufficiency(case_id, effective["id"])
-    return data
+    try:
+        data = compute_requirements_sufficiency(case_id, effective["id"])
+        return data
+    except ValueError as e:
+        if "Case not found" in str(e):
+            raise HTTPException(status_code=404, detail="Case not found")
+        raise
+    except Exception as e:
+        log.warning("compute_requirements_sufficiency failed for case %s: %s", case_id, e, exc_info=True)
+        return {
+            "destination_country": None,
+            "missing_fields": [],
+            "supporting_requirements": [],
+        }
 
 
 @app.get("/api/notifications")

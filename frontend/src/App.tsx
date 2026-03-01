@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
@@ -57,6 +58,25 @@ function ReviewToEmployeeDashboardRedirect() {
   return <Navigate to={to} replace />;
 }
 
+function QueryRedirect() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get('__redirect');
+    if (!redirect || !redirect.startsWith('/')) return;
+
+    params.delete('__redirect');
+    const remaining = params.toString();
+    const target = remaining
+      ? `${redirect}${redirect.includes('?') ? '&' : '?'}${remaining}`
+      : redirect;
+    navigate(target, { replace: true });
+  }, [navigate]);
+
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -64,6 +84,7 @@ function App() {
       <SelectedCaseProvider>
       <EmployeeAssignmentProvider>
       <ServicesFlowProvider>
+      <QueryRedirect />
       <Routes>
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
