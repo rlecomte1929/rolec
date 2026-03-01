@@ -576,6 +576,28 @@ export const employeeAPI = {
   },
 };
 
+export const servicesAPI = {
+  getServiceAnswers: async (caseId: string): Promise<{ case_id: string; answers: any[] }> => {
+    const response = await api.get('/api/services/answers', { params: { case_id: caseId } });
+    return response.data;
+  },
+  saveServiceAnswers: async (
+    caseId: string,
+    items: Array<{ service_key: string; answers: Record<string, any> }>
+  ): Promise<{ ok: boolean }> => {
+    const response = await api.post('/api/services/answers', { case_id: caseId, items });
+    return response.data;
+  },
+  createRfq: async (
+    caseId: string,
+    items: Array<{ service_key: string; requirements: Record<string, any> }>,
+    vendorIds: string[]
+  ): Promise<{ ok: boolean; rfq: { id: string; rfq_ref: string } }> => {
+    const response = await api.post('/api/rfqs', { case_id: caseId, items, vendor_ids: vendorIds });
+    return response.data;
+  },
+};
+
 export const hrPolicyAPI = {
   list: async (params?: { status?: string; companyEntity?: string }): Promise<{ policies: any[] }> => {
     const response = await api.get('/api/hr/policies', { params: params || {} });
@@ -603,6 +625,44 @@ export const hrPolicyAPI = {
   },
   delete: async (policyId: string): Promise<void> => {
     await api.delete(`/api/hr/policies/${policyId}`);
+  },
+};
+
+export const companyPolicyAPI = {
+  list: async (): Promise<{ policies: any[] }> => {
+    const response = await api.get('/api/company-policies');
+    return response.data;
+  },
+  getLatest: async (): Promise<{ policy: any; benefits: any[] }> => {
+    const response = await api.get('/api/company-policies/latest');
+    return response.data;
+  },
+  getById: async (policyId: string): Promise<{ policy: any; benefits: any[] }> => {
+    const response = await api.get(`/api/company-policies/${policyId}`);
+    return response.data;
+  },
+  getDownloadUrl: async (policyId: string): Promise<{ url: string }> => {
+    const response = await api.get(`/api/company-policies/${policyId}/download-url`);
+    return response.data;
+  },
+  upload: async (file: File, meta: { title: string; version?: string; effective_date?: string }): Promise<{ policy: any }> => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('title', meta.title);
+    if (meta.version) form.append('version', meta.version);
+    if (meta.effective_date) form.append('effective_date', meta.effective_date);
+    const response = await api.post('/api/company-policies/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  extract: async (policyId: string): Promise<{ policy: any; benefits: any[] }> => {
+    const response = await api.post(`/api/policies/${policyId}/extract`);
+    return response.data;
+  },
+  saveBenefits: async (policyId: string, benefits: any[]): Promise<{ policy: any; benefits: any[] }> => {
+    const response = await api.put(`/api/company-policies/${policyId}/benefits`, { benefits });
+    return response.data;
   },
 };
 

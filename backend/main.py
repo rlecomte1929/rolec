@@ -7,7 +7,7 @@ import time
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request
+from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any, List
@@ -32,6 +32,8 @@ from .schemas import (
 from .services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
 from .services.guidance_pack_service import generate_guidance_pack
 from .services.policy_adapter import normalize_policy_caps
+from .services.policy_extractor import extract_policy_from_bytes
+from .services.supabase_client import get_supabase_admin_client
 from .app.services.requirements_sufficiency import compute_requirements_sufficiency
 # Import db_config first and log before any DB connection attempt
 # TODO: Remove masked DB log after confirming production connectivity
@@ -2139,6 +2141,43 @@ class CaseServicesUpsert(BaseModel):
     services: List[CaseServiceItem]
 
 
+class ServiceAnswerItem(BaseModel):
+    service_key: str
+    answers: Dict[str, Any]
+
+
+class ServiceAnswersUpsert(BaseModel):
+    case_id: str
+    items: List[ServiceAnswerItem]
+
+
+class RfqItemInput(BaseModel):
+    service_key: str
+    requirements: Dict[str, Any] = {}
+
+
+class RfqCreatePayload(BaseModel):
+    case_id: str
+    items: List[RfqItemInput]
+    vendor_ids: List[str]
+
+
+class PolicyBenefitItem(BaseModel):
+    service_category: str
+    benefit_key: str
+    benefit_label: str
+    eligibility: Optional[Dict[str, Any]] = None
+    limits: Optional[Dict[str, Any]] = None
+    notes: Optional[str] = None
+    source_quote: Optional[str] = None
+    source_section: Optional[str] = None
+    confidence: Optional[float] = None
+
+
+class PolicyBenefitsUpsert(BaseModel):
+    benefits: List[PolicyBenefitItem]
+
+
 @app.post("/api/messages/mark-conversation-read")
 def mark_conversation_read(
     req: MarkConversationReadRequest,
@@ -2367,6 +2406,13 @@ def _require_assignment_visibility(
     return assignment
 
 
+def _require_company_for_user(user: Dict[str, Any]) -> Dict[str, Any]:
+    profile = db.get_profile_record(user.get("id"))
+    if not profile or not profile.get("company_id"):
+        raise HTTPException(status_code=400, detail="User missing company association")
+    return profile
+
+
 @app.get("/api/employee/assignments/{assignment_id}/services")
 def get_assignment_services(
     assignment_id: str,
@@ -2404,6 +2450,49 @@ def upsert_assignment_services(
     db.upsert_case_services(assignment["id"], case_id, items)
     updated = db.list_case_services(assignment["id"])
     return {"ok": True, "services": updated}
+
+
+@app.get("/api/services/answers")
+def get_service_answers(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment = _require_assignment_visibility(case_id, user)
+    effective_case_id = assignment.get("case_id") or case_id
+    answers = db.list_case_service_answers(effective_case_id)
+    return {"case_id": effective_case_id, "answers": answers}
+
+
+@app.post("/api/services/answers")
+def upsert_service_answers(
+    payload: ServiceAnswersUpsert,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment = _require_assignment_visibility(payload.case_id, user)
+    effective_case_id = assignment.get("case_id") or payload.case_id
+    for item in payload.items:
+        db.upsert_case_service_answers(
+            case_id=effective_case_id,
+            service_key=item.service_key,
+            answers=item.answers,
+        )
+    return {"ok": True}
+
+
+@app.post("/api/rfqs")
+def create_rfq(
+    payload: RfqCreatePayload,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment = _require_assignment_visibility(payload.case_id, user)
+    effective_case_id = assignment.get("case_id") or payload.case_id
+    result = db.create_rfq(
+        case_id=effective_case_id,
+        creator_user_id=user.get("id"),
+        items=[i.model_dump(mode="json") for i in payload.items],
+        vendor_ids=payload.vendor_ids,
+    )
+    return {"ok": True, "rfq": result}
 
 
 @app.get("/api/employee/assignments/{assignment_id}/policy-budget")
@@ -3079,6 +3168,155 @@ async def upload_hr_policy(
         policy["benefitCategories"] = {}
     db.create_hr_policy(policy_id, policy, created_by=user.get("id"))
     return {"policyId": policy_id, "policy": policy, "message": "Policy uploaded successfully"}
+
+
+# ---------------------------------------------------------------------------
+# Company Policy Documents (docx/pdf + extracted benefits)
+# ---------------------------------------------------------------------------
+@app.get("/api/company-policies")
+def list_company_policies(
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    profile = _require_company_for_user(user)
+    policies = db.list_company_policies(profile["company_id"])
+    return {"policies": policies}
+
+
+@app.get("/api/company-policies/latest")
+def get_latest_company_policy(
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    profile = _require_company_for_user(user)
+    policy = db.get_latest_company_policy(profile["company_id"])
+    benefits = db.list_policy_benefits(policy["id"]) if policy else []
+    return {"policy": policy, "benefits": benefits}
+
+
+@app.get("/api/company-policies/{policy_id}")
+def get_company_policy(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    profile = _require_company_for_user(user)
+    policy = db.get_company_policy(policy_id)
+    if not policy or policy.get("company_id") != profile["company_id"]:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    benefits = db.list_policy_benefits(policy_id)
+    return {"policy": policy, "benefits": benefits}
+
+
+@app.get("/api/company-policies/{policy_id}/download-url")
+def get_company_policy_download_url(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    profile = _require_company_for_user(user)
+    policy = db.get_company_policy(policy_id)
+    if not policy or policy.get("company_id") != profile["company_id"]:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    file_path = policy.get("file_url") or ""
+    if "/hr-policies/" in file_path:
+        file_path = file_path.split("/hr-policies/", 1)[-1]
+    try:
+        supabase = get_supabase_admin_client()
+        signed = supabase.storage.from_("hr-policies").create_signed_url(file_path, 3600)
+        return {"url": signed.get("signedURL") or signed.get("signed_url")}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to create download url: {str(exc)}")
+
+
+@app.post("/api/company-policies/upload")
+async def upload_company_policy(
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    version: Optional[str] = Form(None),
+    effective_date: Optional[str] = Form(None),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    profile = _require_company_for_user(user)
+    filename = file.filename or "policy"
+    ext = filename.split(".")[-1].lower()
+    if ext not in ("docx", "pdf"):
+        raise HTTPException(status_code=400, detail="Only .docx or .pdf supported")
+    policy_id = str(uuid.uuid4())
+    path = f"companies/{profile['company_id']}/policies/{policy_id}/{filename}"
+    content = await file.read()
+    try:
+        supabase = get_supabase_admin_client()
+        supabase.storage.from_("hr-policies").upload(
+            path,
+            content,
+            {
+                "content-type": file.content_type or "application/octet-stream",
+                "upsert": True,
+            },
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(exc)}")
+    db.create_company_policy(
+        policy_id=policy_id,
+        company_id=profile["company_id"],
+        title=title,
+        version=version,
+        effective_date=effective_date,
+        file_url=path,
+        file_type=ext,
+        created_by=user.get("id"),
+    )
+    policy = db.get_company_policy(policy_id)
+    return {"policy": policy}
+
+
+@app.put("/api/company-policies/{policy_id}/benefits")
+def update_company_policy_benefits(
+    policy_id: str,
+    payload: PolicyBenefitsUpsert,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    profile = _require_company_for_user(user)
+    policy = db.get_company_policy(policy_id)
+    if not policy or policy.get("company_id") != profile["company_id"]:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    db.replace_policy_benefits(
+        policy_id,
+        [b.model_dump(mode="json") for b in payload.benefits],
+        updated_by=user.get("id"),
+    )
+    benefits = db.list_policy_benefits(policy_id)
+    return {"policy": policy, "benefits": benefits}
+
+
+@app.post("/api/policies/{policy_id}/extract")
+def extract_company_policy(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    profile = _require_company_for_user(user)
+    policy = db.get_company_policy(policy_id)
+    if not policy or policy.get("company_id") != profile["company_id"]:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    file_path = policy.get("file_url") or ""
+    if "/hr-policies/" in file_path:
+        file_path = file_path.split("/hr-policies/", 1)[-1]
+    try:
+        supabase = get_supabase_admin_client()
+        data = supabase.storage.from_("hr-policies").download(file_path)
+        extraction = extract_policy_from_bytes(data, policy.get("file_type") or "docx")
+        meta = extraction.get("policy_meta", {})
+        db.update_company_policy_meta(
+            policy_id,
+            title=meta.get("title") if not policy.get("title") else None,
+            version=meta.get("version") if not policy.get("version") else None,
+            effective_date=meta.get("effective_date") if not policy.get("effective_date") else None,
+        )
+        db.replace_policy_benefits(policy_id, extraction.get("benefits", []), updated_by=user.get("id"))
+        db.update_company_policy_status(policy_id, "extracted", extracted_at=extraction.get("extracted_at"))
+    except Exception as exc:
+        db.update_company_policy_status(policy_id, "failed", extracted_at=None)
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {str(exc)}")
+    policy = db.get_company_policy(policy_id)
+    benefits = db.list_policy_benefits(policy_id)
+    return {"policy": policy, "benefits": benefits}
 
 
 @app.get("/api/hr/policies/{policy_id}")

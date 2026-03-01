@@ -226,6 +226,10 @@ interface Props {
   onComplete: (results: Record<string, RecommendationResponse>) => void;
   onBack: () => void;
   initialAnswers?: Record<string, unknown>;
+  onAnswersChange?: (
+    answers: Record<string, unknown>,
+    byCategory: Record<string, Record<string, unknown>>
+  ) => void;
 }
 
 export const ProvidersCriteriaWizard: React.FC<Props> = ({
@@ -233,6 +237,7 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
   onComplete,
   onBack,
   initialAnswers,
+  onAnswersChange,
 }) => {
   const categories = Array.from(selectedServices) as TabKey[];
   const questions = getQuestionsForCategories(categories);
@@ -245,6 +250,20 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
     }
     return a;
   });
+
+  useEffect(() => {
+    if (!onAnswersChange) return;
+    const handle = window.setTimeout(() => {
+      const grouped: Record<string, Record<string, unknown>> = {};
+      for (const q of questions) {
+        const cat = q.category;
+        if (!grouped[cat]) grouped[cat] = {};
+        grouped[cat][q.id] = answers[q.id];
+      }
+      onAnswersChange(answers, grouped);
+    }, 500);
+    return () => window.clearTimeout(handle);
+  }, [answers, onAnswersChange]);
 
   useEffect(() => {
     if (initialAnswers && Object.keys(initialAnswers).length > 0) {

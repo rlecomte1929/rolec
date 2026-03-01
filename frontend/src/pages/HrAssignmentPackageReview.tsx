@@ -65,7 +65,7 @@ export const HrAssignmentPackageReview: React.FC = () => {
   const exceptionPending = coverage.some((item) => item.status === 'over_limit');
 
   useRegisterNav('HrAssignmentPackageReview', [
-    { label: 'Back to Services', routeKey: 'providers' },
+    { label: 'Back to Services', routeKey: 'services' },
     { label: 'Continue to Submission Center', routeKey: 'submissionCenter' },
     { label: 'View rules', routeKey: 'hrPolicy' },
     { label: 'Request exception', routeKey: 'hrPolicy' },
@@ -94,7 +94,7 @@ export const HrAssignmentPackageReview: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => safeNavigate(navigate, 'providers')}>Back to Services</Button>
+              <Button variant="outline" onClick={() => safeNavigate(navigate, 'services')}>Back to Services</Button>
               <Button variant="outline" onClick={() => safeNavigate(navigate, 'submissionCenter')}>
                 Continue to Submission Center
               </Button>

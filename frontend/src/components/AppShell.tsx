@@ -153,9 +153,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   My Case
                 </Link>
                 <Link
-                  to={buildRoute('providers')}
+                  to={buildRoute('services')}
                   className={`px-3 py-1 rounded-full border ${
-                    isActiveRoute(ROUTE_DEFS.providers.path)
+                    isActiveRoute(ROUTE_DEFS.services.path) || isActiveRoute(ROUTE_DEFS.providers.path)
                       ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
                       : 'border-transparent hover:text-[#0b2b43]'
                   }`}
@@ -181,6 +181,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   }`}
                 >
                   Messages
+                </Link>
+                <Link
+                  to={buildRoute('quotesInbox')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.quotesInbox.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Quotes
                 </Link>
                 <Link
                   to={buildRoute('resources')}

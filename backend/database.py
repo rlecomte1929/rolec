@@ -193,6 +193,167 @@ class Database:
             """))
 
             conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS company_policies (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    version TEXT,
+                    effective_date TEXT,
+                    file_url TEXT NOT NULL,
+                    file_type TEXT NOT NULL,
+                    extraction_status TEXT NOT NULL,
+                    extracted_at TEXT,
+                    created_by TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_benefits (
+                    id TEXT PRIMARY KEY,
+                    policy_id TEXT NOT NULL,
+                    service_category TEXT NOT NULL,
+                    benefit_key TEXT NOT NULL,
+                    benefit_label TEXT NOT NULL,
+                    eligibility TEXT,
+                    limits TEXT,
+                    notes TEXT,
+                    source_quote TEXT,
+                    source_section TEXT,
+                    confidence REAL,
+                    updated_by TEXT,
+                    updated_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS case_service_answers (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    service_key TEXT NOT NULL,
+                    answers TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(case_id, service_key)
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS vendors (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    service_types TEXT NOT NULL,
+                    countries TEXT NOT NULL,
+                    logo_url TEXT,
+                    contact_email TEXT,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS vendor_users (
+                    user_id TEXT PRIMARY KEY,
+                    vendor_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS case_vendor_shortlist (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    service_key TEXT NOT NULL,
+                    vendor_id TEXT NOT NULL,
+                    selected INTEGER NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS rfqs (
+                    id TEXT PRIMARY KEY,
+                    rfq_ref TEXT NOT NULL,
+                    case_id TEXT NOT NULL,
+                    created_by_user_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS rfq_items (
+                    id TEXT PRIMARY KEY,
+                    rfq_id TEXT NOT NULL,
+                    service_key TEXT NOT NULL,
+                    requirements TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS rfq_recipients (
+                    id TEXT PRIMARY KEY,
+                    rfq_id TEXT NOT NULL,
+                    vendor_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    last_activity_at TEXT
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS quote_conversations (
+                    id TEXT PRIMARY KEY,
+                    thread_type TEXT NOT NULL,
+                    case_id TEXT,
+                    rfq_id TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS quote_participants (
+                    conversation_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (conversation_id, user_id)
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS quote_messages (
+                    id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL,
+                    sender_user_id TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS quotes (
+                    id TEXT PRIMARY KEY,
+                    rfq_id TEXT NOT NULL,
+                    vendor_id TEXT NOT NULL,
+                    currency TEXT NOT NULL,
+                    total_amount REAL NOT NULL,
+                    valid_until TEXT,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS quote_lines (
+                    id TEXT PRIMARY KEY,
+                    quote_id TEXT NOT NULL,
+                    label TEXT NOT NULL,
+                    amount REAL NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS compliance_runs (
                     id TEXT PRIMARY KEY,
                     assignment_id TEXT NOT NULL,
@@ -1177,6 +1338,133 @@ class Database:
                     op_name="upsert_case_services",
                     request_id=request_id,
                 )
+
+    def list_case_service_answers(
+        self,
+        case_id: str,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_service_answers WHERE case_id = :case_id ORDER BY service_key",
+                {"case_id": case_id},
+                op_name="list_case_service_answers",
+                request_id=request_id,
+            ).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            try:
+                item["answers"] = json.loads(item.get("answers") or "{}")
+            except Exception:
+                item["answers"] = {}
+        return items
+
+    def upsert_case_service_answers(
+        self,
+        case_id: str,
+        service_key: str,
+        answers: Dict[str, Any],
+        request_id: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        sql = """
+            INSERT INTO case_service_answers (id, case_id, service_key, answers, updated_at)
+            VALUES (:id, :case_id, :service_key, :answers, :updated_at)
+            ON CONFLICT(case_id, service_key) DO UPDATE SET
+                answers = excluded.answers,
+                updated_at = excluded.updated_at
+        """
+        params = {
+            "id": str(uuid.uuid4()),
+            "case_id": case_id,
+            "service_key": service_key,
+            "answers": json.dumps(answers),
+            "updated_at": now,
+        }
+        with self.engine.begin() as conn:
+            self._exec(conn, sql, params, op_name="upsert_case_service_answers", request_id=request_id)
+
+    def create_rfq(
+        self,
+        case_id: str,
+        creator_user_id: str,
+        items: List[Dict[str, Any]],
+        vendor_ids: List[str],
+        request_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        now = datetime.utcnow().isoformat()
+        rfq_id = str(uuid.uuid4())
+        rfq_ref = f"RFQ-{datetime.utcnow().strftime('%Y%m%d')}-{rfq_id.split('-')[0]}"
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                """
+                INSERT INTO rfqs (id, rfq_ref, case_id, created_by_user_id, status, created_at)
+                VALUES (:id, :rfq_ref, :case_id, :created_by_user_id, :status, :created_at)
+                """,
+                {
+                    "id": rfq_id,
+                    "rfq_ref": rfq_ref,
+                    "case_id": case_id,
+                    "created_by_user_id": creator_user_id,
+                    "status": "sent",
+                    "created_at": now,
+                },
+                op_name="create_rfq",
+                request_id=request_id,
+            )
+            for item in items:
+                self._exec(
+                    conn,
+                    """
+                    INSERT INTO rfq_items (id, rfq_id, service_key, requirements, created_at)
+                    VALUES (:id, :rfq_id, :service_key, :requirements, :created_at)
+                    """,
+                    {
+                        "id": str(uuid.uuid4()),
+                        "rfq_id": rfq_id,
+                        "service_key": item.get("service_key", "unknown"),
+                        "requirements": json.dumps(item.get("requirements", {})),
+                        "created_at": now,
+                    },
+                    op_name="create_rfq_item",
+                    request_id=request_id,
+                )
+            for vendor_id in vendor_ids:
+                self._exec(
+                    conn,
+                    """
+                    INSERT INTO rfq_recipients (id, rfq_id, vendor_id, status, last_activity_at)
+                    VALUES (:id, :rfq_id, :vendor_id, :status, :last_activity_at)
+                    """,
+                    {
+                        "id": str(uuid.uuid4()),
+                        "rfq_id": rfq_id,
+                        "vendor_id": vendor_id,
+                        "status": "sent",
+                        "last_activity_at": now,
+                    },
+                    op_name="create_rfq_recipient",
+                    request_id=request_id,
+                )
+            self._exec(
+                conn,
+                """
+                INSERT INTO quote_conversations (id, thread_type, case_id, rfq_id, created_at)
+                VALUES (:id, :thread_type, :case_id, :rfq_id, :created_at)
+                """,
+                {
+                    "id": str(uuid.uuid4()),
+                    "thread_type": "vendor_quote",
+                    "case_id": case_id,
+                    "rfq_id": rfq_id,
+                    "created_at": now,
+                },
+                op_name="create_quote_conversation",
+                request_id=request_id,
+            )
+        return {"id": rfq_id, "rfq_ref": rfq_ref}
 
     def get_assignment_for_employee(
         self,
@@ -3278,6 +3566,162 @@ class Database:
         with self.engine.begin() as conn:
             r = conn.execute(text("DELETE FROM hr_policies WHERE id = :id"), {"id": policy_id})
             return r.rowcount > 0
+
+    # ==================================================================
+    # Company policy documents + extracted benefits
+    # ==================================================================
+    def create_company_policy(
+        self,
+        policy_id: str,
+        company_id: str,
+        title: str,
+        version: Optional[str],
+        effective_date: Optional[str],
+        file_url: str,
+        file_type: str,
+        created_by: Optional[str],
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO company_policies "
+                    "(id, company_id, title, version, effective_date, file_url, file_type, extraction_status, created_by, created_at) "
+                    "VALUES (:id, :cid, :title, :ver, :ed, :url, :ft, :status, :cb, :ca)"
+                ),
+                {
+                    "id": policy_id,
+                    "cid": company_id,
+                    "title": title,
+                    "ver": version,
+                    "ed": effective_date,
+                    "url": file_url,
+                    "ft": file_type,
+                    "status": "pending",
+                    "cb": created_by,
+                    "ca": now,
+                },
+            )
+
+    def list_company_policies(self, company_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM company_policies WHERE company_id = :cid "
+                    "ORDER BY created_at DESC"
+                ),
+                {"cid": company_id},
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def get_company_policy(self, policy_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM company_policies WHERE id = :id"),
+                {"id": policy_id},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_latest_company_policy(self, company_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT * FROM company_policies WHERE company_id = :cid "
+                    "ORDER BY created_at DESC LIMIT 1"
+                ),
+                {"cid": company_id},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def update_company_policy_status(
+        self,
+        policy_id: str,
+        status: str,
+        extracted_at: Optional[str] = None,
+    ) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE company_policies SET extraction_status = :status, extracted_at = :ea "
+                    "WHERE id = :id"
+                ),
+                {"status": status, "ea": extracted_at, "id": policy_id},
+            )
+
+    def update_company_policy_meta(
+        self,
+        policy_id: str,
+        title: Optional[str] = None,
+        version: Optional[str] = None,
+        effective_date: Optional[str] = None,
+    ) -> None:
+        fields = []
+        params: Dict[str, Any] = {"id": policy_id}
+        if title is not None:
+            fields.append("title = :title")
+            params["title"] = title
+        if version is not None:
+            fields.append("version = :version")
+            params["version"] = version
+        if effective_date is not None:
+            fields.append("effective_date = :effective_date")
+            params["effective_date"] = effective_date
+        if not fields:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(text(f"UPDATE company_policies SET {', '.join(fields)} WHERE id = :id"), params)
+
+    def list_policy_benefits(self, policy_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT * FROM policy_benefits WHERE policy_id = :pid ORDER BY service_category, benefit_label"),
+                {"pid": policy_id},
+            ).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            try:
+                item["eligibility"] = json.loads(item.get("eligibility") or "null")
+            except Exception:
+                item["eligibility"] = None
+            try:
+                item["limits"] = json.loads(item.get("limits") or "null")
+            except Exception:
+                item["limits"] = None
+        return items
+
+    def replace_policy_benefits(
+        self,
+        policy_id: str,
+        benefits: List[Dict[str, Any]],
+        updated_by: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(text("DELETE FROM policy_benefits WHERE policy_id = :pid"), {"pid": policy_id})
+            for item in benefits:
+                conn.execute(
+                    text(
+                        "INSERT INTO policy_benefits "
+                        "(id, policy_id, service_category, benefit_key, benefit_label, eligibility, limits, notes, "
+                        "source_quote, source_section, confidence, updated_by, updated_at) "
+                        "VALUES (:id, :pid, :cat, :key, :label, :elig, :limits, :notes, :quote, :section, :conf, :ub, :ua)"
+                    ),
+                    {
+                        "id": item.get("id") or str(uuid.uuid4()),
+                        "pid": policy_id,
+                        "cat": item.get("service_category"),
+                        "key": item.get("benefit_key"),
+                        "label": item.get("benefit_label"),
+                        "elig": json.dumps(item.get("eligibility")) if item.get("eligibility") is not None else None,
+                        "limits": json.dumps(item.get("limits")) if item.get("limits") is not None else None,
+                        "notes": item.get("notes"),
+                        "quote": item.get("source_quote"),
+                        "section": item.get("source_section"),
+                        "conf": item.get("confidence"),
+                        "ub": updated_by,
+                        "ua": now,
+                    },
+                )
 
     # ==================================================================
     # Debug KV operations

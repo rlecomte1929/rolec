@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'rea
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
+import { ServicesFlowProvider } from './features/services/ServicesFlowContext';
 import { ROUTE_DEFS } from './navigation/routes';
 import { Landing } from './pages/Landing';
 import { Auth } from './pages/Auth';
@@ -34,6 +35,14 @@ import { DebugAuth } from './pages/DebugAuth';
 import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
 import { Messages } from './pages/Messages';
 import { Resources } from './pages/Resources';
+import { ServicesQuestions } from './pages/services/ServicesQuestions';
+import { ServicesRecommendations } from './pages/services/ServicesRecommendations';
+import { ServicesEstimate } from './pages/services/ServicesEstimate';
+import { ServicesRfqNew } from './pages/services/ServicesRfqNew';
+import { ServicesConclusion } from './pages/services/ServicesConclusion';
+import { QuotesInbox } from './pages/services/QuotesInbox';
+import { VendorInbox } from './pages/vendor/VendorInbox';
+import { VendorRfq } from './pages/vendor/VendorRfq';
 import { HrCompanyProfile } from './pages/HrCompanyProfile';
 import { HrCommandCenter } from './pages/HrCommandCenter';
 import { HrCommandCenterCaseDetail } from './pages/HrCommandCenterCaseDetail';
@@ -54,6 +63,7 @@ function App() {
     <Router>
       <SelectedCaseProvider>
       <EmployeeAssignmentProvider>
+      <ServicesFlowProvider>
       <Routes>
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
@@ -76,8 +86,20 @@ function App() {
         <Route path={ROUTE_DEFS.auditNavigation.path} element={<NavigationAudit />} />
         <Route
           path={ROUTE_DEFS.providers.path}
+          element={<Navigate to={ROUTE_DEFS.services.path} replace />}
+        />
+        <Route
+          path={ROUTE_DEFS.services.path}
           element={<ProvidersPage />}
         />
+        <Route path={ROUTE_DEFS.servicesQuestions.path} element={<ServicesQuestions />} />
+        <Route path={ROUTE_DEFS.servicesRecommendations.path} element={<ServicesRecommendations />} />
+        <Route path={ROUTE_DEFS.servicesEstimate.path} element={<ServicesEstimate />} />
+        <Route path={ROUTE_DEFS.servicesRfqNew.path} element={<ServicesRfqNew />} />
+        <Route path={ROUTE_DEFS.servicesConclusion.path} element={<ServicesConclusion />} />
+        <Route path={ROUTE_DEFS.quotesInbox.path} element={<QuotesInbox />} />
+        <Route path={ROUTE_DEFS.vendorInbox.path} element={<VendorInbox />} />
+        <Route path={ROUTE_DEFS.vendorRfq.path} element={<VendorRfq />} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
         <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<HrPolicyManagement />} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<CaseWizardPage />} />
@@ -123,6 +145,7 @@ function App() {
         )}
         <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
       </Routes>
+      </ServicesFlowProvider>
       </EmployeeAssignmentProvider>
       </SelectedCaseProvider>
       <PerfPanel />

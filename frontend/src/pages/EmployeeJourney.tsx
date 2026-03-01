@@ -159,7 +159,7 @@ export const EmployeeJourney: React.FC = () => {
         <Button onClick={handlePrimaryCta}>{primaryCtaLabel}</Button>
         <Button
           variant="outline"
-          onClick={() => navigate(buildRoute('providers'))}
+          onClick={() => navigate(buildRoute('services'))}
           disabled={!assignmentId}
         >
           Go to Services

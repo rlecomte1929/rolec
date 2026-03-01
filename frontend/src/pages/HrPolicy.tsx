@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
-import { Alert, Button, Card } from '../components/antigravity';
-import { hrAPI, employeeAPI } from '../api/client';
+import { Alert, Button, Card, Input } from '../components/antigravity';
+import { hrAPI, employeeAPI, companyPolicyAPI } from '../api/client';
 import type { AssignmentDetail, AssignmentSummary, PolicyResponse, PolicySpendItem } from '../types';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { CaseIncompleteBanner } from '../components/CaseIncompleteBanner';
 import { EmployeePolicyView } from '../features/policy/EmployeePolicyView';
+import { PolicyBenefitsTable, type PolicyBenefitRow } from '../features/policy/PolicyBenefitsTable';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
 
@@ -26,11 +27,31 @@ function EmployeePolicyContent() {
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [policyDoc, setPolicyDoc] = useState<any | null>(null);
+  const [benefits, setBenefits] = useState<PolicyBenefitRow[]>([]);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError('');
+    companyPolicyAPI
+      .getLatest()
+      .then(async (res) => {
+        if (cancelled) return;
+        setPolicyDoc(res.policy || null);
+        setBenefits(res.benefits || []);
+        if (res.policy?.id) {
+          const dl = await companyPolicyAPI.getDownloadUrl(res.policy.id);
+          setDownloadUrl(dl.url);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPolicyDoc(null);
+          setBenefits([]);
+        }
+      });
     employeeAPI
       .getCurrentAssignment()
       .then((res) => {
@@ -47,7 +68,7 @@ function EmployeePolicyContent() {
 
   if (loading) return <div className="text-sm text-[#6b7280] py-8">Loading your policy...</div>;
   if (error) return <Alert variant="error">{error}</Alert>;
-  if (!assignmentId) {
+  if (!assignmentId && !policyDoc) {
     return (
       <Card padding="lg">
         <p className="text-[#4b5563]">You don't have an active assignment yet. Once your case is assigned, your applicable policy and benefit limits will appear here.</p>
@@ -56,8 +77,27 @@ function EmployeePolicyContent() {
   }
   return (
     <div className="space-y-4">
-      <EmployeePolicyView assignmentId={assignmentId} compact={false} />
-      <Link to={buildRoute('providers')}>
+      {policyDoc && (
+        <Card padding="lg">
+          <div className="text-lg font-semibold text-[#0b2b43] mb-2">HR Policy summary</div>
+          <div className="text-sm text-[#6b7280] mb-4">
+            Version {policyDoc.version || '—'} • Effective {policyDoc.effective_date || '—'}
+          </div>
+          {downloadUrl && (
+            <a className="text-sm text-[#0b2b43] underline" href={downloadUrl} target="_blank" rel="noreferrer">
+              Download policy document
+            </a>
+          )}
+          <div className="mt-4">
+            <PolicyBenefitsTable benefits={benefits} />
+          </div>
+          <div className="text-xs text-[#6b7280] mt-4">
+            Informational summary — the policy document remains the source of truth.
+          </div>
+        </Card>
+      )}
+      {!policyDoc && assignmentId && <EmployeePolicyView assignmentId={assignmentId} compact={false} />}
+      <Link to={buildRoute('services')}>
         <Button variant="outline">Back to Services</Button>
       </Link>
     </div>
@@ -75,10 +115,152 @@ export const HrPolicy: React.FC = () => {
   }
   return (
     <AppShell title="Assignment Package & Limits" subtitle="Understand what is covered, what is capped, and what requires HR approval before proceeding.">
-      <HrPolicyContent />
+      <CompanyPolicyDocumentSection />
+      <div className="mt-8">
+        <HrPolicyContent />
+      </div>
     </AppShell>
   );
 };
+
+function CompanyPolicyDocumentSection() {
+  const [policies, setPolicies] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [benefits, setBenefits] = useState<PolicyBenefitRow[]>([]);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('International Relocation Policy');
+  const [version, setVersion] = useState('');
+  const [effectiveDate, setEffectiveDate] = useState('');
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const loadPolicies = async () => {
+    setLoading(true);
+    try {
+      const res = await companyPolicyAPI.list();
+      setPolicies(res.policies || []);
+      const first = res.policies?.[0];
+      setSelectedId(first?.id || null);
+    } catch (err: any) {
+      setMessage(err?.response?.data?.detail || 'Unable to load policies');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPolicies();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    companyPolicyAPI.getById(selectedId).then(async (res) => {
+      setBenefits(res.benefits || []);
+      const dl = await companyPolicyAPI.getDownloadUrl(selectedId);
+      setDownloadUrl(dl.url);
+    });
+  }, [selectedId]);
+
+  const handleUpload = async () => {
+    if (!uploadFile) return;
+    setMessage('');
+    try {
+      await companyPolicyAPI.upload(uploadFile, { title, version, effective_date: effectiveDate || undefined });
+      setUploadFile(null);
+      await loadPolicies();
+    } catch (err: any) {
+      setMessage(err?.response?.data?.detail || 'Upload failed');
+    }
+  };
+
+  const handleExtract = async () => {
+    if (!selectedId) return;
+    setMessage('');
+    try {
+      const res = await companyPolicyAPI.extract(selectedId);
+      setBenefits(res.benefits || []);
+    } catch (err: any) {
+      setMessage(err?.response?.data?.detail || 'Extraction failed');
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedId) return;
+    setMessage('');
+    try {
+      const res = await companyPolicyAPI.saveBenefits(selectedId, benefits);
+      setBenefits(res.benefits || []);
+      setMessage('Saved');
+    } catch (err: any) {
+      setMessage(err?.response?.data?.detail || 'Save failed');
+    }
+  };
+
+  return (
+    <Card padding="lg">
+      <div className="text-lg font-semibold text-[#0b2b43]">Upload policy document</div>
+      <div className="text-sm text-[#6b7280] mt-1">
+        Upload a .docx or .pdf policy document. Extracted benefits are informational only.
+      </div>
+
+      {message && <Alert variant={message === 'Saved' ? 'success' : 'error'} className="mt-4">{message}</Alert>}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <Input label="Policy name" value={title} onChange={setTitle} />
+        <Input label="Version" value={version} onChange={setVersion} />
+        <Input label="Effective date" type="date" value={effectiveDate} onChange={setEffectiveDate} />
+      </div>
+      <div className="flex items-center gap-3 mt-4">
+        <input type="file" accept=".docx,.pdf" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
+        <Button onClick={handleUpload} disabled={!uploadFile}>Upload policy</Button>
+      </div>
+
+      <div className="mt-6 border-t border-[#e2e8f0] pt-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm text-[#6b7280]">Current policy</div>
+            {loading && <div className="text-sm text-[#6b7280]">Loading…</div>}
+            {!loading && policies.length === 0 && <div className="text-sm text-[#6b7280]">No policy uploaded yet.</div>}
+            {!loading && policies.length > 0 && (
+              <select
+                value={selectedId || ''}
+                onChange={(e) => setSelectedId(e.target.value)}
+                className="mt-1 border border-[#e2e8f0] rounded-md px-2 py-1 text-sm"
+              >
+                {policies.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title} {p.version ? `v${p.version}` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {downloadUrl && (
+              <a className="text-sm text-[#0b2b43] underline" href={downloadUrl} target="_blank" rel="noreferrer">
+                Download policy
+              </a>
+            )}
+            <Button variant="outline" onClick={handleExtract} disabled={!selectedId}>
+              Extract benefits
+            </Button>
+          </div>
+        </div>
+
+        {benefits.length > 0 && (
+          <div className="mt-6">
+            <div className="text-sm text-[#6b7280] mb-2">Extracted benefits table</div>
+            <PolicyBenefitsTable benefits={benefits} editable onChange={setBenefits} onSave={handleSave} />
+            <div className="text-xs text-[#6b7280] mt-4">
+              Informational summary — policy document remains the source of truth.
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 function HrPolicyContent() {
   const [searchParams, setSearchParams] = useSearchParams();
