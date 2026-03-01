@@ -28,13 +28,12 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
   };
 
   const nextDraft: CaseDraftDTO = { ...draft, assignmentContext: local };
-  const employerMissing = !local.employerName;
   const jobTitleMissing = !local.jobTitle;
   const contractStartMissing = !local.contractStartDate;
   const contractTypeMissing = !local.contractType;
   const salaryBandMissing = !local.salaryBand;
   const hasMissing =
-    employerMissing || jobTitleMissing || contractStartMissing || contractTypeMissing || salaryBandMissing;
+    jobTitleMissing || contractStartMissing || contractTypeMissing || salaryBandMissing;
 
   return (
     <Card padding="lg">
@@ -47,30 +46,26 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
       )}
 
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <label className="text-sm text-[#0b2b43]">
-          Employer name
-          {(isRequired(requiredFields, 'assignmentContext.employerName') || true) && employerMissing && (
-            <span className="text-red-600"> *</span>
-          )}
-          <input
-            value={local.employerName || ''}
-            onChange={(event) => update('employerName', event.target.value)}
-            className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-            placeholder="Provided by HR"
-            disabled={!employerMissing}
-          />
-          <div className="text-xs text-[#6b7280] mt-1">
-            {employerMissing ? 'If blank, ask HR to provide the employer name.' : 'Provided by HR'}
-          </div>
-        </label>
-        <label className="text-sm text-[#0b2b43]">
-          Employer country
-          <input
-            value={local.employerCountry || ''}
-            onChange={(event) => update('employerCountry', event.target.value)}
-            className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-          />
-        </label>
+        {local.employerName && (
+          <label className="text-sm text-[#0b2b43]">
+            Employer name (provided by HR)
+            <input
+              value={local.employerName || ''}
+              readOnly
+              className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm bg-[#f8fafc]"
+            />
+          </label>
+        )}
+        {local.employerCountry && (
+          <label className="text-sm text-[#0b2b43]">
+            Employer country (provided by HR)
+            <input
+              value={local.employerCountry || ''}
+              readOnly
+              className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm bg-[#f8fafc]"
+            />
+          </label>
+        )}
         <label className="text-sm text-[#0b2b43]">
           Job title
           {(isRequired(requiredFields, 'assignmentContext.jobTitle') || true) && jobTitleMissing && (

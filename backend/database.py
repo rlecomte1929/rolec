@@ -1314,30 +1314,66 @@ class Database:
                     "created_at": now,
                     "updated_at": now,
                 }
-                self._exec(
-                    conn,
-                    """
-                    INSERT INTO case_services (
-                        id, case_id, assignment_id, service_key, category,
-                        selected, estimated_cost, currency, created_at, updated_at
+                if _is_sqlite:
+                    # SQLite local dev: no unique constraint on (case_id, service_key)
+                    update = self._exec(
+                        conn,
+                        """
+                        UPDATE case_services
+                        SET assignment_id = :assignment_id,
+                            category = :category,
+                            selected = :selected,
+                            estimated_cost = :estimated_cost,
+                            currency = :currency,
+                            updated_at = :updated_at
+                        WHERE case_id = :case_id AND service_key = :service_key
+                        """,
+                        payload,
+                        op_name="update_case_services",
+                        request_id=request_id,
                     )
-                    VALUES (
-                        :id, :case_id, :assignment_id, :service_key, :category,
-                        :selected, :estimated_cost, :currency, :created_at, :updated_at
+                    if update.rowcount == 0:
+                        self._exec(
+                            conn,
+                            """
+                            INSERT INTO case_services (
+                                id, case_id, assignment_id, service_key, category,
+                                selected, estimated_cost, currency, created_at, updated_at
+                            )
+                            VALUES (
+                                :id, :case_id, :assignment_id, :service_key, :category,
+                                :selected, :estimated_cost, :currency, :created_at, :updated_at
+                            )
+                            """,
+                            payload,
+                            op_name="insert_case_services",
+                            request_id=request_id,
+                        )
+                else:
+                    self._exec(
+                        conn,
+                        """
+                        INSERT INTO case_services (
+                            id, case_id, assignment_id, service_key, category,
+                            selected, estimated_cost, currency, created_at, updated_at
+                        )
+                        VALUES (
+                            :id, :case_id, :assignment_id, :service_key, :category,
+                            :selected, :estimated_cost, :currency, :created_at, :updated_at
+                        )
+                        ON CONFLICT(case_id, service_key)
+                        DO UPDATE SET
+                            assignment_id = excluded.assignment_id,
+                            category = excluded.category,
+                            selected = excluded.selected,
+                            estimated_cost = excluded.estimated_cost,
+                            currency = excluded.currency,
+                            updated_at = excluded.updated_at
+                        """,
+                        payload,
+                        op_name="upsert_case_services",
+                        request_id=request_id,
                     )
-                    ON CONFLICT(case_id, service_key)
-                    DO UPDATE SET
-                        assignment_id = excluded.assignment_id,
-                        category = excluded.category,
-                        selected = excluded.selected,
-                        estimated_cost = excluded.estimated_cost,
-                        currency = excluded.currency,
-                        updated_at = excluded.updated_at
-                    """,
-                    payload,
-                    op_name="upsert_case_services",
-                    request_id=request_id,
-                )
 
     def list_case_service_answers(
         self,

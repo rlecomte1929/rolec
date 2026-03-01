@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
+import { COUNTRY_OPTIONS } from '../../../utils/countries';
 
 interface StepProps {
   caseId: string;
@@ -12,14 +13,6 @@ interface StepProps {
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
 }
-
-const COUNTRY_OPTIONS = [
-  { code: 'NO', name: 'Norway', cities: ['Oslo', 'Bergen'] },
-  { code: 'SG', name: 'Singapore', cities: ['Singapore'] },
-  { code: 'US', name: 'United States', cities: ['New York', 'San Francisco'] },
-  { code: 'UK', name: 'United Kingdom', cities: ['London', 'Manchester'] },
-  { code: 'DE', name: 'Germany', cities: ['Berlin', 'Munich'] },
-];
 
 export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, banner, onSave, onNext }) => {
   const navigate = useNavigate();

@@ -61,10 +61,7 @@ export const ProvidersPage: React.FC = () => {
       setLoadError('');
       setLoadErrorDetails('');
       try {
-        const [serviceRes, policyRes] = await Promise.all([
-          employeeAPI.getAssignmentServices(assignmentId),
-          employeeAPI.getPolicyBudget(assignmentId),
-        ]);
+        const serviceRes = await employeeAPI.getAssignmentServices(assignmentId);
         const baseState: Record<string, ServiceState> = {};
         ENABLED_SERVICES.forEach((svc) => {
           baseState[svc.key] = { selected: false, estimated_cost: '' };
@@ -77,7 +74,13 @@ export const ProvidersPage: React.FC = () => {
           };
         });
         setServices(baseState);
-        setPolicy(policyRes);
+        try {
+          const policyRes = await employeeAPI.getPolicyBudget(assignmentId);
+          setPolicy(policyRes);
+        } catch {
+          // policy budget is optional; keep services usable
+          setPolicy(null);
+        }
       } catch (err: any) {
         if (err?.response?.status === 401) {
           navigate(buildRoute('landing'));

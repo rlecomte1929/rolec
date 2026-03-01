@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
+import { COUNTRY_OPTIONS } from '../../../utils/countries';
 
 interface StepProps {
   draft: CaseDraftDTO;
@@ -104,20 +105,34 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
         <label className="text-sm text-[#0b2b43]">
           Nationality
           {requiredMissing.nationality && <span className="text-red-600"> *</span>}
-          <input
+          <select
             value={local.nationality || ''}
             onChange={(event) => update('nationality', event.target.value)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-          />
+          >
+            <option value="">Select country</option>
+            {COUNTRY_OPTIONS.map((country) => (
+              <option key={country.code} value={country.name}>
+                {country.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="text-sm text-[#0b2b43]">
           Passport country
           {requiredMissing.passportCountry && <span className="text-red-600"> *</span>}
-          <input
+          <select
             value={local.passportCountry || ''}
             onChange={(event) => update('passportCountry', event.target.value)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-          />
+          >
+            <option value="">Select country</option>
+            {COUNTRY_OPTIONS.map((country) => (
+              <option key={country.code} value={country.name}>
+                {country.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="text-sm text-[#0b2b43]">
           Passport expiry
@@ -132,11 +147,18 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
         <label className="text-sm text-[#0b2b43]">
           Residence country
           {requiredMissing.residenceCountry && <span className="text-red-600"> *</span>}
-          <input
+          <select
             value={local.residenceCountry || ''}
             onChange={(event) => update('residenceCountry', event.target.value)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-          />
+          >
+            <option value="">Select country</option>
+            {COUNTRY_OPTIONS.map((country) => (
+              <option key={country.code} value={country.name}>
+                {country.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="text-sm text-[#0b2b43]">
           Email
