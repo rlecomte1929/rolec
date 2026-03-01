@@ -2,15 +2,21 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, Input } from '../components/antigravity';
-import { employeeAPI } from '../api/client';
+import { dashboardAPI, employeeAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { TrustBlock } from '../features/services/TrustBlock';
 import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
 import { StickyContinueBar } from '../features/services/StickyContinueBar';
 import { SERVICE_CONFIG, type ServiceKey } from '../features/services/serviceConfig';
+import { ProvidersCriteriaWizard, profileToWizardAnswers } from '../features/recommendations/ProvidersCriteriaWizard';
+import { RecommendationResults } from '../features/recommendations/RecommendationResults';
+import { PackageSummary } from '../features/recommendations/PackageSummary';
+import type { RecommendationResponse } from '../features/recommendations/types';
+import type { DashboardResponse } from '../types';
 
 const ENABLED_SERVICES = SERVICE_CONFIG.filter((svc) => svc.enabled);
+const ALL_SERVICES = SERVICE_CONFIG;
 
 const CATEGORY_MAP: Record<ServiceKey, string> = {
   visa: 'immigration',
@@ -32,6 +38,32 @@ const CATEGORY_MAP: Record<ServiceKey, string> = {
   community: 'settling_in',
 };
 
+const RECOMMENDATION_KEYS = new Set<ServiceKey>([
+  'housing',
+  'schools',
+  'movers',
+  'banks',
+  'insurances',
+  'electricity',
+]);
+
+const RECOMMENDATION_LABELS: Record<string, string> = {
+  living_areas: 'Living Areas',
+  schools: 'Schools',
+  movers: 'Movers',
+  banks: 'Banks',
+  insurance: 'Insurance',
+  electricity: 'Electricity',
+  medical: 'Medical',
+  telecom: 'Telecom',
+  childcare: 'Childcare',
+  storage: 'Storage',
+  transport: 'Transport',
+  language_integration: 'Language',
+  legal_admin: 'Legal & Admin',
+  tax_finance: 'Tax & Finance',
+};
+
 type ServiceState = {
   selected: boolean;
   estimated_cost: string;
@@ -39,11 +71,17 @@ type ServiceState = {
 
 export const ProvidersPage: React.FC = () => {
   const { assignmentId, isLoading: assignmentLoading } = useEmployeeAssignment();
+  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [employeeRecs, setEmployeeRecs] = useState<{ housing: any[]; schools: any[]; movers: any[] } | null>(null);
   const [services, setServices] = useState<Record<string, ServiceState>>({});
   const [policy, setPolicy] = useState<{ currency: string; caps: Record<string, number>; total_cap?: number | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [flowStep, setFlowStep] = useState<'select' | 'wizard' | 'results' | 'summary'>('select');
+  const [engineResults, setEngineResults] = useState<Record<string, RecommendationResponse> | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<Map<string, string>>(new Map());
+  const [wizardInitialAnswers, setWizardInitialAnswers] = useState<Record<string, unknown>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -54,7 +92,6 @@ export const ProvidersPage: React.FC = () => {
     }
     const load = async () => {
       setIsLoading(true);
-      setMessage('');
       try {
         const [serviceRes, policyRes] = await Promise.all([
           employeeAPI.getAssignmentServices(assignmentId),
@@ -78,13 +115,40 @@ export const ProvidersPage: React.FC = () => {
           navigate(buildRoute('landing'));
           return;
         }
-        setMessage('Unable to load services. Please refresh and try again.');
+        setPolicy(null);
       } finally {
         setIsLoading(false);
       }
     };
     load();
   }, [assignmentId, assignmentLoading, navigate]);
+
+  useEffect(() => {
+    const loadRecommendations = async () => {
+      try {
+        const data = await dashboardAPI.get();
+        setDashboard(data);
+        setEmployeeRecs(null);
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          navigate(buildRoute('landing'));
+          return;
+        }
+        setDashboard(null);
+        try {
+          const recs = await employeeAPI.getRecommendations();
+          if (recs && (recs.housing?.length || recs.schools?.length || recs.movers?.length)) {
+            setEmployeeRecs(recs);
+          } else {
+            setEmployeeRecs(null);
+          }
+        } catch {
+          setEmployeeRecs(null);
+        }
+      }
+    };
+    loadRecommendations();
+  }, [navigate]);
 
   const totals = useMemo(() => {
     const byCategory: Record<string, number> = {};
@@ -145,6 +209,35 @@ export const ProvidersPage: React.FC = () => {
     }
   };
 
+  const recommendationSelection = useMemo(() => {
+    const keys = Object.entries(services)
+      .filter(([, v]) => v.selected)
+      .map(([k]) => k as ServiceKey)
+      .filter((k) => RECOMMENDATION_KEYS.has(k));
+    return new Set(keys as unknown as string[]);
+  }, [services]);
+
+  const startWizard = async () => {
+    setWizardInitialAnswers({});
+    try {
+      if (assignmentId) {
+        const journey = await employeeAPI.getNextQuestion(assignmentId);
+        const profile = (journey as { profile?: Record<string, unknown> })?.profile;
+        const profileAnswers = profileToWizardAnswers(profile || null);
+        setWizardInitialAnswers(profileAnswers);
+      }
+    } catch {
+      // Keep defaults when profile isn't available
+    }
+    setFlowStep('wizard');
+  };
+
+  const handleStartOver = () => {
+    setEngineResults(null);
+    setSelectedPackage(new Map());
+    setFlowStep('select');
+  };
+
   if (assignmentLoading || isLoading) {
     return (
       <AppShell title="Services" subtitle="Choose the services you need for your relocation.">
@@ -187,19 +280,19 @@ export const ProvidersPage: React.FC = () => {
             <TrustBlock className="mb-8" />
             <ServiceGroupSection
               group="before"
-              items={ENABLED_SERVICES.filter((s) => s.group === 'before')}
+              items={ALL_SERVICES.filter((s) => s.group === 'before')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
             />
             <ServiceGroupSection
               group="arrival"
-              items={ENABLED_SERVICES.filter((s) => s.group === 'arrival')}
+              items={ALL_SERVICES.filter((s) => s.group === 'arrival')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
             />
             <ServiceGroupSection
               group="settle"
-              items={ENABLED_SERVICES.filter((s) => s.group === 'settle')}
+              items={ALL_SERVICES.filter((s) => s.group === 'settle')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
             />
@@ -208,6 +301,23 @@ export const ProvidersPage: React.FC = () => {
               onContinue={handleSave}
               buttonLabel="Save services"
             />
+          </Card>
+
+          <Card padding="lg">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="text-lg font-semibold text-[#0b2b43]">Service providers</div>
+                <div className="text-sm text-[#6b7280]">
+                  Answer a few questions to unlock recommendations with maps and commute links.
+                </div>
+              </div>
+              <Button
+                onClick={startWizard}
+                disabled={recommendationSelection.size === 0}
+              >
+                Answer questions & get recommendations
+              </Button>
+            </div>
           </Card>
 
           <Card padding="lg">
@@ -297,6 +407,53 @@ export const ProvidersPage: React.FC = () => {
             </Button>
           </Card>
         </div>
+      </div>
+
+      <div className="mt-8 space-y-6">
+        {flowStep === 'wizard' && (
+          <ProvidersCriteriaWizard
+            selectedServices={recommendationSelection as unknown as Set<any>}
+            initialAnswers={wizardInitialAnswers}
+            onComplete={(results: Record<string, RecommendationResponse>) => {
+              setEngineResults(results);
+              setSelectedPackage(new Map());
+              setFlowStep('results');
+            }}
+            onBack={handleStartOver}
+          />
+        )}
+
+        {flowStep === 'results' && engineResults && (
+          <RecommendationResults
+            results={engineResults}
+            categoryLabels={RECOMMENDATION_LABELS}
+            selectedPackage={selectedPackage}
+            onSelectedPackageChange={setSelectedPackage}
+            onStartOver={handleStartOver}
+            onViewSummary={() => setFlowStep('summary')}
+          />
+        )}
+
+        {flowStep === 'summary' && engineResults && (
+          <PackageSummary
+            results={engineResults}
+            selectedPackage={selectedPackage}
+            categoryLabels={RECOMMENDATION_LABELS}
+            onBack={() => setFlowStep('results')}
+            onStartOver={handleStartOver}
+          />
+        )}
+
+        {flowStep === 'select' && !engineResults && (dashboard || employeeRecs) && (
+          <RecommendationResults
+            results={(dashboard?.recommendations || employeeRecs || {}) as Record<string, RecommendationResponse>}
+            categoryLabels={RECOMMENDATION_LABELS}
+            selectedPackage={selectedPackage}
+            onSelectedPackageChange={setSelectedPackage}
+            onStartOver={handleStartOver}
+            onViewSummary={() => setFlowStep('summary')}
+          />
+        )}
       </div>
     </AppShell>
   );
