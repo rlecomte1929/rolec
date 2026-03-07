@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
-import { Alert, Badge, Button, Card, Input } from '../components/antigravity';
+import { Alert, Button, Card } from '../components/antigravity';
 import { API_BASE_URL, employeeAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { TrustBlock } from '../features/services/TrustBlock';
 import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
 import { StickyContinueBar } from '../features/services/StickyContinueBar';
+import { ServicesNavRibbon } from '../features/services/ServicesNavRibbon';
 import { SERVICE_CONFIG, type ServiceKey } from '../features/services/serviceConfig';
 import { useServicesFlow } from '../features/services/ServicesFlowContext';
 
@@ -105,21 +106,6 @@ export const ProvidersPage: React.FC = () => {
     load();
   }, [assignmentId, assignmentLoading, navigate]);
 
-  const totals = useMemo(() => {
-    const byCategory: Record<string, number> = {};
-    let total = 0;
-    ENABLED_SERVICES.forEach((svc) => {
-      const state = services[svc.key] || { selected: false, estimated_cost: '' };
-      if (!state?.selected) return;
-      const cost = Number(state.estimated_cost);
-      if (!Number.isFinite(cost)) return;
-      const category = CATEGORY_MAP[svc.key] || 'other';
-      byCategory[category] = (byCategory[category] || 0) + cost;
-      total += cost;
-    });
-    return { byCategory, total };
-  }, [services]);
-
   const selectedKeys = useMemo(
     () => new Set(Object.entries(services).filter(([, v]) => v.selected).map(([k]) => k)),
     [services]
@@ -129,13 +115,6 @@ export const ProvidersPage: React.FC = () => {
     setServices((prev) => ({
       ...prev,
       [key]: { selected: !prev[key]?.selected, estimated_cost: prev[key]?.estimated_cost || '' },
-    }));
-  };
-
-  const handleCostChange = (key: string, value: string) => {
-    setServices((prev) => ({
-      ...prev,
-      [key]: { selected: prev[key]?.selected || false, estimated_cost: value },
     }));
   };
 
@@ -206,7 +185,8 @@ export const ProvidersPage: React.FC = () => {
   }
 
   return (
-    <AppShell title="Services" subtitle="Choose the services you need and compare against HR policy budgets.">
+    <AppShell title="Services" subtitle="Choose the services you need for your relocation.">
+      <ServicesNavRibbon />
       {loadError && (
         <Alert variant="error" className="mb-6">
           <div className="space-y-2">
@@ -228,9 +208,8 @@ export const ProvidersPage: React.FC = () => {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card padding="lg">
+      <div className="w-full">
+        <Card padding="lg">
             <div className="mb-6">
               <h1 className="text-2xl font-semibold text-[#0b2b43] mb-2">Your relocation plan</h1>
               <p className="text-[#6b7280]">
@@ -263,82 +242,6 @@ export const ProvidersPage: React.FC = () => {
               buttonLabel="Continue to questions"
             />
           </Card>
-
-        </div>
-
-        <div className="space-y-4">
-          <Card padding="lg">
-            <div className="text-lg font-semibold text-[#0b2b43] mb-2">Estimated costs</div>
-            <div className="space-y-3 text-sm">
-              {ENABLED_SERVICES.filter((svc) => services[svc.key]?.selected).length === 0 && (
-                <div className="text-[#6b7280]">Select services to add estimates.</div>
-              )}
-              {ENABLED_SERVICES.filter((svc) => services[svc.key]?.selected).map((svc) => {
-                const state = services[svc.key] || { selected: false, estimated_cost: '' };
-                const category = CATEGORY_MAP[svc.key] || 'other';
-                const cap = policy?.caps?.[category];
-                return (
-                  <div key={svc.key} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium text-[#0b2b43]">{svc.title}</div>
-                      <Badge variant="neutral">{category.replace('_', ' ')}</Badge>
-                    </div>
-                    <Input
-                      type="number"
-                      label="Estimated cost"
-                      value={state.estimated_cost}
-                      onChange={(value) => handleCostChange(svc.key, value)}
-                      placeholder="0"
-                      fullWidth
-                    />
-                    <div className="text-xs text-[#6b7280]">
-                      Policy cap: {cap ? `${policy?.currency} ${cap}` : 'policy not provided'}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-          <Card padding="lg">
-            <div className="text-lg font-semibold text-[#0b2b43] mb-2">Budget summary</div>
-            <div className="space-y-3 text-sm">
-              {Object.entries(totals.byCategory).length === 0 && (
-                <div className="text-[#6b7280]">No services selected yet.</div>
-              )}
-              {Object.entries(totals.byCategory).map(([category, total]) => {
-                const cap = policy?.caps?.[category];
-                const within = cap ? total <= cap : null;
-                return (
-                  <div key={category} className="flex items-center justify-between">
-                    <div className="text-[#0b2b43] capitalize">{category.replace('_', ' ')}</div>
-                    <div className="text-right">
-                      <div>{policy?.currency || 'EUR'} {total.toFixed(0)}</div>
-                      {cap ? (
-                        <div className={`text-xs ${within ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {within ? 'Within policy' : `Exceeding by ${policy?.currency} ${(total - cap).toFixed(0)}`}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-[#6b7280]">Policy not provided</div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              <div className="border-t border-[#e2e8f0] pt-3 flex items-center justify-between">
-                <div className="font-semibold text-[#0b2b43]">Total</div>
-                <div className="text-right">
-                  <div className="font-semibold">{policy?.currency || 'EUR'} {totals.total.toFixed(0)}</div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card padding="lg">
-            <div className="text-sm text-[#6b7280]">
-              Selections are saved when you continue.
-            </div>
-          </Card>
-        </div>
       </div>
     </AppShell>
   );

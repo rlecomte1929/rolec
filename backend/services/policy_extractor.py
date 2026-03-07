@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Tuple
 from datetime import datetime
 
 
+# Deterministic category mapping per MVP spec
 CATEGORY_KEYWORDS: Dict[str, List[str]] = {
     "housing": ["temporary housing", "housing", "rental", "deposit", "accommodation"],
     "movers": ["shipment", "household goods", "movers", "moving", "freight", "shipping"],
@@ -19,7 +20,7 @@ CATEGORY_KEYWORDS: Dict[str, List[str]] = {
     "home_sale": ["home sale", "home purchase", "property sale", "property purchase"],
 }
 
-
+# benefit_key, label, keywords, category
 BENEFIT_KEYS: List[Tuple[str, str, List[str], str]] = [
     ("temporary_housing", "Temporary housing duration", ["temporary housing", "temporary accommodation"], "housing"),
     ("rental_deposit", "Rental deposit support", ["deposit", "rental deposit"], "housing"),
@@ -33,6 +34,7 @@ BENEFIT_KEYS: List[Tuple[str, str, List[str], str]] = [
     ("language_training", "Language/cultural training", ["language", "cultural", "training"], "integration"),
     ("repatriation", "Repatriation", ["repatriation", "return shipment"], "repatriation"),
     ("scouting_trip", "Scouting trip", ["scouting trip", "pre-assignment visit"], "travel"),
+    ("home_sale_purchase", "Home sale/purchase", ["home sale", "home purchase", "property sale", "property purchase"], "home_sale"),
 ]
 
 
@@ -86,7 +88,7 @@ def _guess_meta(lines: List[str]) -> Dict[str, Any]:
     title = ""
     version = ""
     effective_date = None
-    for line in lines[:40]:
+    for line in lines[:60]:
         if not title and "policy" in line.lower():
             title = line
         if not version:
@@ -97,6 +99,18 @@ def _guess_meta(lines: List[str]) -> Dict[str, Any]:
             m = re.search(r"(effective|valid from)\s*[:\-]?\s*([0-9]{4}-[0-9]{2}-[0-9]{2})", line, re.I)
             if m:
                 effective_date = m.group(2)
+            if not m:
+                m = re.search(r"([0-9]{1,2}[/\-][0-9]{1,2}[/\-][0-9]{4})", line)
+                if m:
+                    d = m.group(1)
+                    parts = re.split(r"[/\-]", d)
+                    if len(parts) == 3:
+                        y, mo, day = (parts[2], parts[0], parts[1]) if len(parts[2]) == 4 else (parts[2], parts[1], parts[0])
+                        effective_date = f"{y}-{mo.zfill(2)}-{day.zfill(2)}"
+            if not m:
+                m = re.search(r"([0-9]{4})-([0-9]{2})-([0-9]{2})", line)
+                if m:
+                    effective_date = m.group(0)
     return {
         "title": title or "Relocation Policy",
         "version": version or None,
@@ -113,10 +127,15 @@ def _extract_limits(text: str) -> Dict[str, Any]:
     if percent_match:
         limits["percent"] = int(percent_match.group(1))
     amounts: Dict[str, float] = {}
+    # Location-specific caps: "Oslo NOK 30,000", "NY USD 6000", "London GBP 4500"
+    for m in re.finditer(r"([A-Za-z]+)\s+(NOK|USD|EUR|GBP|SGD)\s+([0-9][0-9,\.]*)", text):
+        loc, cur, val_str = m.group(1), m.group(2).upper(), m.group(3)
+        key = f"{loc.upper().replace(' ', '_')}_{cur}"
+        amounts[key] = float(val_str.replace(",", ""))
     for m in re.finditer(r"([A-Z]{2,3})\s?([0-9][0-9,\.]+)", text):
         cur = m.group(1).upper()
-        val = float(m.group(2).replace(",", ""))
-        amounts[cur] = val
+        if cur in ("USD", "EUR", "NOK", "GBP", "SGD"):
+            amounts[cur] = float(m.group(2).replace(",", ""))
     for m in re.finditer(r"([0-9][0-9,\.]+)\s?(USD|EUR|NOK|GBP|SGD)", text, re.I):
         cur = m.group(2).upper()
         val = float(m.group(1).replace(",", ""))
@@ -152,15 +171,21 @@ def extract_policy_from_bytes(file_bytes: bytes, file_type: str) -> Dict[str, An
     meta = _guess_meta(lines)
     benefits: List[Dict[str, Any]] = []
     seen_keys: set = set()
+    current_section = ""
 
-    for line in lines:
+    for i, line in enumerate(lines):
         lower = line.lower()
+        # Detect section headings (short lines, often numbered like "6.3 Temporary Housing")
+        if len(line) < 80 and re.match(r"^[\d.]+\s+\w+", line):
+            current_section = line.strip()
+
         for key, label, keywords, category in BENEFIT_KEYS:
             if key in seen_keys:
                 continue
             if any(k in lower for k in keywords):
-                elig = _extract_eligibility(line)
-                limits = _extract_limits(line)
+                context = " ".join(lines[max(0, i - 1) : i + 2])
+                elig = _extract_eligibility(context)
+                limits = _extract_limits(context)
                 benefits.append(
                     {
                         "service_category": category,
@@ -169,8 +194,8 @@ def extract_policy_from_bytes(file_bytes: bytes, file_type: str) -> Dict[str, An
                         "eligibility": elig or None,
                         "limits": limits or None,
                         "notes": None,
-                        "source_section": None,
-                        "source_quote": line[:200],
+                        "source_section": current_section or None,
+                        "source_quote": (line[:200] if len(line) > 30 else context[:200]),
                         "confidence": 0.6 if limits or elig else 0.4,
                     }
                 )

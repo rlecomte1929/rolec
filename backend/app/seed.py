@@ -12,6 +12,36 @@ from .services.research import run_country_research
 
 def seed_demo_cases() -> None:
     cases = [
+        # Demo assignments from main._seed_demo_cases (SQLite) use these case_ids
+        {
+            "id": "demo-case-demo-emp",
+            "draft": _case_draft(
+                origin_country="United States",
+                origin_city="San Francisco",
+                dest_country="Singapore",
+                dest_city="Singapore",
+                purpose="employment",
+                target_move_date="2024-12-01",
+                has_dependents=True,
+                spouse_work=True,
+                kids_school_age=False,
+            ),
+        },
+        {
+            "id": "demo-case-oslo-sg-family",
+            "draft": _case_draft(
+                origin_country="Norway",
+                origin_city="Oslo",
+                dest_country="Singapore",
+                dest_city="Singapore",
+                purpose="employment",
+                target_move_date="2024-12-01",
+                has_dependents=True,
+                spouse_work=True,
+                kids_school_age=True,
+            ),
+        },
+        # Original app seed cases
         {
             "id": "case-oslo-sg-family",
             "draft": _case_draft(

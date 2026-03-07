@@ -25,7 +25,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ item, selected, onTogg
         }
       }}
       className={`
-        flex items-center gap-4 p-4 rounded-xl border transition-all duration-150
+        flex items-center gap-3 py-3 px-4 rounded-lg border transition-all duration-150
         ${disabled
           ? 'opacity-60 cursor-not-allowed border-[#e2e8f0] bg-[#f8fafc]'
           : selected
@@ -34,7 +34,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ item, selected, onTogg
         }
       `}
     >
-      <div className="shrink-0 w-10 h-10 rounded-lg bg-[#f1f5f9] flex items-center justify-center text-xl">
+      <div className="shrink-0 w-9 h-9 rounded-lg bg-[#f1f5f9] flex items-center justify-center text-lg">
         {item.icon}
       </div>
       <div className="flex-1 min-w-0">
@@ -46,7 +46,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ item, selected, onTogg
             </span>
           )}
         </div>
-        <p className="text-sm text-[#6b7280] mt-0.5">{item.description}</p>
+        <p className="text-sm text-[#6b7280] mt-0.5 line-clamp-2">{item.description}</p>
       </div>
       <div className="shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center">
         {selected ? (

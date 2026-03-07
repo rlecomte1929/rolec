@@ -15,6 +15,20 @@ const CATEGORY_LABELS: Record<string, string> = {
   home_sale: 'Home sale / purchase',
 };
 
+const CATEGORY_ICONS: Record<string, string> = {
+  housing: '🏠',
+  movers: '📦',
+  schools: '🎓',
+  immigration: '🛂',
+  travel: '✈️',
+  settling_in: '🏘️',
+  tax: '📊',
+  spouse: '👫',
+  integration: '🌐',
+  repatriation: '↩️',
+  home_sale: '🏡',
+};
+
 export interface PolicyBenefitRow {
   id?: string;
   service_category: string;
@@ -33,17 +47,19 @@ const formatLimits = (limits?: Record<string, any> | null) => {
   const parts: string[] = [];
   if (limits.days) parts.push(`${limits.days} days`);
   if (limits.percent) parts.push(`${limits.percent}%`);
-  if (limits.monthly_cap) {
-    const caps = Object.entries(limits.monthly_cap)
-      .map(([cur, val]) => `${cur} ${val}`)
+  const caps = limits.monthly_cap || limits.cap;
+  if (caps && typeof caps === 'object') {
+    const entries = Object.entries(caps)
+      .map(([k, v]) => (typeof v === 'number' ? `${k} ${v}` : `${k}: ${v}`))
       .join(', ');
-    parts.push(`Monthly cap: ${caps}`);
+    parts.push(limits.monthly_cap ? `Monthly cap: ${entries}` : `Cap: ${entries}`);
   }
-  if (limits.cap && !limits.monthly_cap) {
-    const caps = Object.entries(limits.cap)
-      .map(([cur, val]) => `${cur} ${val}`)
-      .join(', ');
-    parts.push(`Cap: ${caps}`);
+  if (limits.per_assignment_type && typeof limits.per_assignment_type === 'object') {
+    const summaries = Object.entries(limits.per_assignment_type)
+      .slice(0, 2)
+      .map(([k, v]) => (typeof v === 'object' ? `${k}` : `${k}: ${v}`))
+      .join('; ');
+    parts.push(`By type: ${summaries}`);
   }
   return parts.length ? parts.join(' • ') : '—';
 };
@@ -91,7 +107,8 @@ export const PolicyBenefitsTable: React.FC<{
     <div className="space-y-6">
       {Object.entries(grouped).map(([category, rows]) => (
         <div key={category} className="border border-[#e2e8f0] rounded-xl">
-          <div className="px-4 py-3 border-b border-[#e2e8f0] bg-[#f8fafc] font-semibold text-[#0b2b43]">
+          <div className="px-4 py-3 border-b border-[#e2e8f0] bg-[#f8fafc] font-semibold text-[#0b2b43] flex items-center gap-2">
+            <span className="text-lg" aria-hidden>{CATEGORY_ICONS[category] || '📋'}</span>
             {CATEGORY_LABELS[category] || category}
           </div>
           <div className="divide-y divide-[#eef2f7]">

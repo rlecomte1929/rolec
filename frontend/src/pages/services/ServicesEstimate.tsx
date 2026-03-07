@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card } from '../../components/antigravity';
 import { PackageSummary } from '../../features/recommendations/PackageSummary';
+import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -33,6 +34,7 @@ export const ServicesEstimate: React.FC = () => {
 
   return (
     <AppShell title="Estimate review" subtitle="Compare your shortlist with HR policy caps.">
+      <ServicesNavRibbon />
       <Card padding="lg" className="mb-6">
         <div className="text-sm text-[#4b5563]">
           Next steps: 1) Select vendors  2) Request quotations  3) Receive offers  4) Decide

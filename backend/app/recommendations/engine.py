@@ -41,8 +41,10 @@ def recommend(
         sc["norm_score"] = norm_scores[i] if i < len(norm_scores) else 0
         sc["tier"] = plugin.tier(sc["norm_score"])
 
-    scored_items.sort(key=lambda x: x["norm_score"], reverse=True)
-    top = scored_items[:top_n]
+    # Filter out items that don't match destination (score 0 = wrong city, etc.)
+    matching = [s for s in scored_items if s["score_raw"] > 0]
+    matching.sort(key=lambda x: x["norm_score"], reverse=True)
+    top = matching[:top_n]
 
     items: List[RecommendationItem] = []
     for t in top:
@@ -92,6 +94,7 @@ def _default_office_for_city(city: str) -> str:
         "singapore": "Raffles Place MRT, Singapore",
         "london": "Canary Wharf, London, UK",
         "new york": "Midtown Manhattan, New York, NY",
+        "san francisco": "1 Market St, San Francisco, CA",
         "berlin": "Mitte, Berlin, Germany",
         "oslo": "Sentrum, Oslo, Norway",
     }

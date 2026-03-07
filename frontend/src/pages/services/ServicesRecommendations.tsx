@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card } from '../../components/antigravity';
 import { RecommendationResults } from '../../features/recommendations/RecommendationResults';
+import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -41,6 +42,7 @@ export const ServicesRecommendations: React.FC = () => {
 
   return (
     <AppShell title="Recommendations" subtitle="Shortlist providers for each service.">
+      <ServicesNavRibbon />
       <Card padding="lg" className="mb-6">
         <div className="text-sm text-[#4b5563]">
           Next steps: 1) Select vendors  2) Request quotations  3) Receive offers  4) Decide

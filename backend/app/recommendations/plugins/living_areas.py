@@ -78,7 +78,10 @@ class LivingAreasPlugin(BasePlugin):
         w_rating = w.get("rating", 0.1)
         w_avail = w.get("availability", 0.1)
 
-        if item.get("city", "").lower() != c.destination_city.lower():
+        def _norm(s: str) -> str:
+            return (s or "").split(",")[0].strip().lower()
+
+        if _norm(item.get("city", "")) != _norm(c.destination_city):
             return {"score_raw": 0, "breakdown": {}, "summary": "Wrong city", "rationale": f"Area is in {item.get('city')}, not {c.destination_city}.", "pros": [], "cons": ["Wrong city"], "metadata": {}}
 
         b_min = c.budget_monthly.get("min", 2000)

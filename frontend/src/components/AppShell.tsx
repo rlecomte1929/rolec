@@ -143,7 +143,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   Dashboard
                 </Link>
                 <Link
-                  to={assignmentId ? `/employee/case/${assignmentId}/wizard/1` : buildRoute('employeeDashboard')}
+                  to={assignmentId ? `/employee/case/${assignmentId}/summary` : buildRoute('employeeDashboard')}
                   className={`px-3 py-1 rounded-full border ${
                     (location.pathname.includes('/wizard') || location.pathname.includes('/summary'))
                       ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'

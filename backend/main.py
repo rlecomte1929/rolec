@@ -33,6 +33,13 @@ from .services.dossier import evaluate_applies_if, validate_answer, fetch_search
 from .services.guidance_pack_service import generate_guidance_pack
 from .services.policy_adapter import normalize_policy_caps
 from .services.policy_extractor import extract_policy_from_bytes
+from .services.country_resources import (
+    build_profile_context,
+    get_personalization_hints,
+    get_default_section_content,
+    RESOURCE_SECTIONS,
+    SECTION_LABELS,
+)
 from .services.supabase_client import get_supabase_admin_client
 from .app.services.requirements_sufficiency import compute_requirements_sufficiency
 # Import db_config first and log before any DB connection attempt
@@ -2392,6 +2399,91 @@ def get_case_details_by_assignment(
     }
 
 
+# ---------------------------------------------------------------------------
+# Country Resources (personalized by wizard profile)
+# ---------------------------------------------------------------------------
+def _get_section_content(country_code: str, city: str, section_key: str) -> Dict[str, Any]:
+    """Fetch section content from DB (Supabase) if available, else from Python defaults."""
+    try:
+        supabase = get_supabase_admin_client()
+        # Try city-specific first, then country-level (city is null)
+        for city_val in ([city] if city else []) + [None]:
+            q = (
+                supabase.table("country_resource_sections")
+                .select("content_json, title")
+                .eq("country_code", country_code.upper())
+                .eq("section_key", section_key)
+            )
+            if city_val:
+                q = q.eq("city", city_val)
+            else:
+                q = q.is_("city", "null")
+            r = q.limit(1).execute()
+            if r.data and len(r.data) > 0:
+                return r.data[0].get("content_json") or {}
+    except Exception:
+        pass
+    return get_default_section_content(country_code, city, section_key)
+
+
+@app.get("/api/resources/country")
+def get_country_resources(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    filters: Optional[str] = Query(None, description="JSON filters: city, family_type, budget, category, etc."),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Return profile context and section content for the country Resources page."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found or not visible under RLS")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    visible = (is_employee and emp_id == effective["id"]) or (is_hr and (effective.get("is_admin") or hr_id == effective["id"]))
+    if not visible:
+        raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case_id")
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if not case:
+            draft = {}
+        else:
+            draft = json.loads(case.draft_json or "{}")
+
+    profile = build_profile_context(draft)
+    hints = get_personalization_hints(profile)
+    country_code = profile.get("country_code") or "NO"
+    city = profile.get("destination_city") or ""
+
+    sections = []
+    for key in RESOURCE_SECTIONS:
+        content = _get_section_content(country_code, city, key)
+        sections.append({
+            "key": key,
+            "title": SECTION_LABELS.get(key, key.replace("_", " ").title()),
+            "content": content,
+        })
+
+    filter_dict = {}
+    if filters:
+        try:
+            filter_dict = json.loads(filters)
+        except json.JSONDecodeError:
+            pass
+
+    return {
+        "profile": profile,
+        "hints": hints,
+        "sections": sections,
+        "filters_applied": filter_dict,
+    }
+
+
 def _require_assignment_visibility(
     assignment_id: str,
     user: Dict[str, Any],
@@ -3217,8 +3309,12 @@ def get_latest_company_policy(
 ):
     profile = _require_company_for_user(user)
     policy = db.get_latest_company_policy(profile["company_id"])
-    benefits = db.list_policy_benefits(policy["id"]) if policy else []
-    return {"policy": policy, "benefits": benefits}
+    if not policy:
+        return {"policy": None, "benefits": [], "company_name": None}
+    benefits = db.list_policy_benefits(policy["id"])
+    company = db.get_company(profile["company_id"])
+    company_name = company.get("name") if company else None
+    return {"policy": policy, "benefits": benefits, "company_name": company_name}
 
 
 @app.get("/api/company-policies/{policy_id}")

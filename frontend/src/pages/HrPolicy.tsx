@@ -30,6 +30,7 @@ function EmployeePolicyContent() {
   const [policyDoc, setPolicyDoc] = useState<any | null>(null);
   const [benefits, setBenefits] = useState<PolicyBenefitRow[]>([]);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,6 +42,7 @@ function EmployeePolicyContent() {
         if (cancelled) return;
         setPolicyDoc(res.policy || null);
         setBenefits(res.benefits || []);
+        setCompanyName(res.company_name || null);
         if (res.policy?.id) {
           const dl = await companyPolicyAPI.getDownloadUrl(res.policy.id);
           setDownloadUrl(dl.url);
@@ -80,8 +82,11 @@ function EmployeePolicyContent() {
       {policyDoc && (
         <Card padding="lg">
           <div className="text-lg font-semibold text-[#0b2b43] mb-2">HR Policy summary</div>
+          {companyName && (
+            <div className="text-sm text-[#4b5563] mb-2">Company: {companyName}</div>
+          )}
           <div className="text-sm text-[#6b7280] mb-4">
-            Version {policyDoc.version || '—'} • Effective {policyDoc.effective_date || '—'}
+            Version {policyDoc.version || '—'} • Effective {policyDoc.effective_date ? formatDate(policyDoc.effective_date) : '—'}
           </div>
           {downloadUrl && (
             <a className="text-sm text-[#0b2b43] underline" href={downloadUrl} target="_blank" rel="noreferrer">
@@ -123,9 +128,19 @@ export const HrPolicy: React.FC = () => {
   );
 };
 
+function formatDate(val: string | null | undefined): string {
+  if (!val) return '—';
+  try {
+    return new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return val;
+  }
+}
+
 function CompanyPolicyDocumentSection() {
   const [policies, setPolicies] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedPolicy, setSelectedPolicy] = useState<any | null>(null);
   const [benefits, setBenefits] = useState<PolicyBenefitRow[]>([]);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [title, setTitle] = useState('International Relocation Policy');
@@ -156,9 +171,13 @@ function CompanyPolicyDocumentSection() {
   useEffect(() => {
     if (!selectedId) return;
     companyPolicyAPI.getById(selectedId).then(async (res) => {
+      setSelectedPolicy(res.policy);
       setBenefits(res.benefits || []);
       const dl = await companyPolicyAPI.getDownloadUrl(selectedId);
       setDownloadUrl(dl.url);
+    }).catch(() => {
+      setSelectedPolicy(null);
+      setBenefits([]);
     });
   }, [selectedId]);
 
@@ -199,9 +218,10 @@ function CompanyPolicyDocumentSection() {
 
   return (
     <Card padding="lg">
+      {/* Section A: Upload policy document */}
       <div className="text-lg font-semibold text-[#0b2b43]">Upload policy document</div>
       <div className="text-sm text-[#6b7280] mt-1">
-        Upload a .docx or .pdf policy document. Extracted benefits are informational only.
+        Upload .docx or .pdf. Extracted benefits are informational only.
       </div>
 
       {message && <Alert variant={message === 'Saved' ? 'success' : 'error'} className="mt-4">{message}</Alert>}
@@ -216,8 +236,23 @@ function CompanyPolicyDocumentSection() {
         <Button onClick={handleUpload} disabled={!uploadFile}>Upload policy</Button>
       </div>
 
+      {/* Current policy metadata */}
+      {selectedPolicy && (
+        <div className="mt-6 p-4 rounded-lg bg-[#f8fafc] border border-[#e2e8f0]">
+          <div className="text-sm font-medium text-[#0b2b43] mb-2">Current policy version</div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm text-[#4b5563]">
+            <div><span className="text-[#6b7280]">Policy:</span> {selectedPolicy.title || '—'}</div>
+            <div><span className="text-[#6b7280]">Version:</span> {selectedPolicy.version || '—'}</div>
+            <div><span className="text-[#6b7280]">Effective:</span> {formatDate(selectedPolicy.effective_date)}</div>
+            <div><span className="text-[#6b7280]">Upload date:</span> {formatDate(selectedPolicy.created_at)}</div>
+            <div><span className="text-[#6b7280]">Status:</span> {selectedPolicy.extraction_status || 'pending'}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Section B: Extracted benefits table */}
       <div className="mt-6 border-t border-[#e2e8f0] pt-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <div className="text-sm text-[#6b7280]">Current policy</div>
             {loading && <div className="text-sm text-[#6b7280]">Loading…</div>}
@@ -250,7 +285,7 @@ function CompanyPolicyDocumentSection() {
 
         {benefits.length > 0 && (
           <div className="mt-6">
-            <div className="text-sm text-[#6b7280] mb-2">Extracted benefits table</div>
+            <div className="text-sm font-medium text-[#0b2b43] mb-2">Extracted benefits table</div>
             <PolicyBenefitsTable benefits={benefits} editable onChange={setBenefits} onSave={handleSave} />
             <div className="text-xs text-[#6b7280] mt-4">
               Informational summary — policy document remains the source of truth.

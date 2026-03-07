@@ -29,6 +29,7 @@ class FamilyMemberDTO(BaseModel):
     dateOfBirth: Optional[date] = None
     relationship: Optional[str] = None
     nationality: Optional[str] = None
+    wantsToWork: Optional[bool] = None
 
 
 class FamilyMembersDTO(BaseModel):

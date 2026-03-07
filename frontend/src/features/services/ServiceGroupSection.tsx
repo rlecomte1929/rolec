@@ -19,10 +19,10 @@ export const ServiceGroupSection: React.FC<ServiceGroupSectionProps> = ({
   const { title, subtitle } = GROUP_LABELS[group];
 
   return (
-    <section className="mb-10">
+    <section className="mb-6">
       <h3 className="text-lg font-semibold text-[#0b2b43] mb-1">{title}</h3>
       <p className="text-sm text-[#6b7280] mb-4">{subtitle}</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {items.map((item) => (
           <ServiceCard
             key={item.key}

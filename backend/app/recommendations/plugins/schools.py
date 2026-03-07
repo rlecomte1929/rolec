@@ -29,6 +29,7 @@ def _parse_date(s: Optional[str]) -> Optional[date]:
 
 
 class SchoolsCriteria(BaseModel):
+    destination_city: str = "Singapore"
     child_ages: List[int] = Field(default_factory=lambda: [8])
     curriculum: str = "international"
     language_of_instruction: List[str] = Field(default_factory=lambda: ["en"])
@@ -57,6 +58,22 @@ class SchoolsPlugin(BasePlugin):
     def score(self, criteria: SchoolsCriteria, item: Dict[str, Any]) -> Dict[str, Any]:
         c = criteria
         w = c.weights or {}
+        def _norm(s: str) -> str:
+            return (s or "").split(",")[0].strip().lower()
+
+        dest_city = (getattr(c, "destination_city", None) or "Singapore").strip()
+        item_city = (item.get("city") or "Singapore").strip()
+        if dest_city and _norm(item_city) != _norm(dest_city):
+            return {
+                "score_raw": 0,
+                "breakdown": {},
+                "summary": "Wrong city",
+                "rationale": f"School is in {item_city}, not {dest_city}.",
+                "pros": [],
+                "cons": ["Wrong city"],
+                "metadata": {},
+            }
+
         ages = c.child_ages or [8]
         grades_needed = [_age_to_grade(a) for a in ages]
         g_min, g_max = item.get("grades_supported", [0, 18])[:2]
@@ -74,7 +91,13 @@ class SchoolsPlugin(BasePlugin):
         lang_fit = 100.0 if need_langs.issubset(set(langs)) or not need_langs else 60.0
 
         stype = item.get("type", "private")
-        type_fit = 100.0 if c.school_type == "either" or stype == c.school_type else 30.0
+        requested_type = (c.school_type or "either").lower()
+        type_match = requested_type == "either" or stype == requested_type
+        if not type_match and requested_type in ("international", "american", "british", "french", "german"):
+            curr_map = {"american": "american", "british": "uk", "french": "french", "german": "german", "international": "international"}
+            item_curr = (curr or "").lower()
+            type_match = curr_map.get(requested_type) in item_curr or requested_type in item_curr
+        type_fit = 100.0 if type_match else 30.0
 
         quality = item.get("quality_score", 6)
         extra = item.get("extracurricular_score", 6)

@@ -105,9 +105,20 @@ const WIZARD_QUESTIONS: WizardQuestion[] = [
   { id: 'sqm_min', label: 'Minimum sqm', type: 'number', key: 'sqm_min', category: 'housing', default: 65 },
   { id: 'commute_mins', label: 'Max commute to work (minutes)', type: 'number', key: 'commute_mins', category: 'housing', default: 45 },
   { id: 'office_address', label: 'Office/work address (optional, for map directions)', type: 'text', key: 'office_address', category: 'housing', placeholder: 'e.g. Raffles Place MRT, Singapore' },
+  { id: 'school_dest_city', label: 'Destination city', type: 'text', key: 'destination_city', category: 'schools', default: 'Singapore' },
   { id: 'child_ages', label: "Children's ages (comma-separated, e.g. 5,8)", type: 'text', key: 'child_ages', category: 'schools', default: '8' },
-  { id: 'curriculum', label: 'Curriculum preference', type: 'select', key: 'curriculum', category: 'schools', options: [
+  { id: 'school_type', label: 'School type', type: 'select', key: 'school_type', category: 'schools', options: [
     { value: 'international', label: 'International' },
+    { value: 'french', label: 'French' },
+    { value: 'german', label: 'German' },
+    { value: 'american', label: 'American' },
+    { value: 'british', label: 'British' },
+    { value: 'public', label: 'Public' },
+    { value: 'private', label: 'Private' },
+    { value: 'either', label: 'Either / No preference' },
+  ], default: 'international' },
+  { id: 'curriculum', label: 'Curriculum preference', type: 'select', key: 'curriculum', category: 'schools', options: [
+    { value: 'international', label: 'International (IB, etc.)' },
     { value: 'local', label: 'Local' },
     { value: 'either', label: 'Either' },
   ], default: 'international' },
@@ -194,7 +205,7 @@ function buildCriteriaFromAnswers(
     delete criteria.commute_mins;
   }
   if (category === 'schools') {
-    criteria.destination_city = criteria.destination_city || answers.dest_city || 'Singapore';
+    criteria.destination_city = criteria.destination_city || answers.school_dest_city || answers.dest_city || 'Singapore';
   }
   if (category === 'schools' && typeof criteria.child_ages === 'string') {
     criteria.child_ages = (criteria.child_ages as string)

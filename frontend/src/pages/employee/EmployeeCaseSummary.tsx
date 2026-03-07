@@ -137,6 +137,16 @@ export const EmployeeCaseSummary: React.FC = () => {
         >
           Continue editing
         </Link>
+        {assignmentId && (
+          <button
+            type="button"
+            onClick={() => load()}
+            disabled={isLoading}
+            className="inline-flex items-center justify-center font-medium rounded-lg px-4 py-2 border border-[#6b7280] text-[#6b7280] hover:bg-[#f3f4f6] disabled:opacity-50 transition-colors"
+          >
+            {isLoading ? 'Loading…' : 'Refresh'}
+          </button>
+        )}
       </div>
 
       {error && (

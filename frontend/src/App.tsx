@@ -122,6 +122,7 @@ function App() {
         <Route path={ROUTE_DEFS.vendorInbox.path} element={<VendorInbox />} />
         <Route path={ROUTE_DEFS.vendorRfq.path} element={<VendorRfq />} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
+        <Route path={ROUTE_DEFS.employeeHrPolicy.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
         <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<HrPolicyManagement />} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<CaseWizardPage />} />

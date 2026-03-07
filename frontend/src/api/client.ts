@@ -702,6 +702,25 @@ export const companyPolicyAPI = {
   },
 };
 
+export const resourcesAPI = {
+  getCountryResources: async (
+    assignmentId: string,
+    filters?: Record<string, string | number | boolean | null>
+  ): Promise<{
+    profile: Record<string, any>;
+    hints: { priorities: string[]; recommendations: string[] };
+    sections: Array<{ key: string; title: string; content: any }>;
+    filters_applied: Record<string, any>;
+  }> => {
+    const params: Record<string, string> = { assignment_id: assignmentId };
+    if (filters && Object.keys(filters).length) {
+      params.filters = JSON.stringify(filters);
+    }
+    const response = await api.get('/api/resources/country', { params });
+    return response.data;
+  },
+};
+
 export const dossierAPI = {
   getQuestions: async (caseId: string): Promise<DossierQuestionsResponse> => {
     const response = await api.get('/api/dossier/questions', { params: { case_id: caseId } });
