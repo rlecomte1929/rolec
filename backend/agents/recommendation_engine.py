@@ -17,7 +17,7 @@ class RecommendationEngine:
         housing_prefs = profile.get("movePlan", {}).get("housing", {})
         
         budget_range = housing_prefs.get("budgetMonthlySGD")
-        bedrooms = housing_prefs.get("bedroomsMin", 3)
+        bedrooms = int(housing_prefs.get("bedroomsMin", 3))  # Ensure int type
         preferred_areas = housing_prefs.get("preferredAreas", [])
         must_haves = housing_prefs.get("mustHave", [])
         

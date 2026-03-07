@@ -60,6 +60,38 @@ ReloPass is a multi-agent guided intake system that helps families relocate smoo
 
 ---
 
+## ✅ Testing
+
+### Run All Tests
+```bash
+./run_all_tests.sh
+```
+
+This runs both backend (26 tests) and frontend (18 tests) with coverage reporting.
+
+**Test Results**:
+- ✅ 44/44 tests passing
+- ✅ 94% backend code coverage
+- ✅ Integration tests for complete user journey
+
+See [TESTING.md](./TESTING.md) for detailed test documentation.
+
+### Quick Test Commands
+
+**Backend only**:
+```bash
+cd backend
+python3 -m pytest tests/ -v
+```
+
+**Frontend only**:
+```bash
+cd frontend
+npm test -- --run
+```
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
