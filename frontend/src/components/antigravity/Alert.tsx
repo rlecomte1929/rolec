@@ -4,12 +4,14 @@ interface AlertProps {
   children: React.ReactNode;
   variant?: 'info' | 'success' | 'warning' | 'error';
   title?: string;
+  className?: string;
 }
 
 export const Alert: React.FC<AlertProps> = ({
   children,
   variant = 'info',
   title,
+  className = '',
 }) => {
   const variants = {
     info: 'bg-blue-50 border-blue-200 text-blue-800',
@@ -19,7 +21,7 @@ export const Alert: React.FC<AlertProps> = ({
   };
   
   return (
-    <div className={`border-l-4 p-4 rounded ${variants[variant]}`}>
+    <div className={`border-l-4 p-4 rounded ${variants[variant]} ${className}`}>
       {title && <h3 className="font-semibold mb-1">{title}</h3>}
       <div className="text-sm">{children}</div>
     </div>

@@ -5,13 +5,11 @@ import type { Question } from '../types';
 interface GuidedQuestionCardProps {
   question: Question;
   onAnswer: (answer: any, isUnknown: boolean) => void;
-  onSkip?: () => void;
 }
 
 export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
   question,
   onAnswer,
-  onSkip,
 }) => {
   const [answer, setAnswer] = useState<any>('');
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);

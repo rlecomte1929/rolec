@@ -3,16 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { ProgressHeader } from '../components/ProgressHeader';
 import { GuidedQuestionCard } from '../components/GuidedQuestionCard';
 import { ProfileSidebar } from '../components/ProfileSidebar';
-import { Container, Button, Alert } from '../components/antigravity';
+import { Container, Alert, Button } from '../components/antigravity';
 import { profileAPI } from '../api/client';
-import type { Question, RelocationProfile, NextQuestionResponse } from '../types';
+import type { RelocationProfile, NextQuestionResponse } from '../types';
 
 export const Journey: React.FC = () => {
   const [profile, setProfile] = useState<RelocationProfile | null>(null);
   const [nextQuestion, setNextQuestion] = useState<NextQuestionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showSidebar, setShowSidebar] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -145,13 +144,11 @@ export const Journey: React.FC = () => {
           </div>
 
           {/* Sidebar */}
-          {showSidebar && (
-            <div className="lg:w-80">
-              <div className="sticky top-8">
-                <ProfileSidebar profile={profile} />
-              </div>
+          <div className="lg:w-80">
+            <div className="sticky top-8">
+              <ProfileSidebar profile={profile} />
             </div>
-          )}
+          </div>
         </div>
       </Container>
     </div>

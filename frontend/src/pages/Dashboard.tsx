@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Container, Card, Badge, Button, ProgressBar, Alert } from '../components/antigravity';
 import { RecommendationPanel } from '../components/RecommendationPanel';
 import { dashboardAPI } from '../api/client';
-import type { DashboardResponse, TimelinePhase } from '../types';
+import type { DashboardResponse } from '../types';
 
 export const Dashboard: React.FC = () => {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
