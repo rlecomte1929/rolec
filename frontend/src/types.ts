@@ -590,6 +590,8 @@ export interface AssignmentSummary {
   status: AssignmentStatus;
   submittedAt?: string;
   complianceStatus?: string | null;
+  employeeFirstName?: string | null;
+  employeeLastName?: string | null;
 }
 
 export interface AssignmentDetail {
@@ -602,6 +604,8 @@ export interface AssignmentDetail {
   profile?: RelocationProfile | null;
   completeness?: number | null;
   complianceReport?: ComplianceReport | null;
+  employeeFirstName?: string | null;
+  employeeLastName?: string | null;
 }
 
 export interface ComplianceReport {
@@ -732,5 +736,109 @@ export interface AdminSupportNote {
   author_user_id: string;
   note: string;
   created_at: string;
+}
+
+// --- Public Resources (safe, published content only) ---
+
+export interface ResourceContext {
+  caseId: string;
+  countryCode: string;
+  countryName?: string | null;
+  cityName?: string | null;
+  familyType: 'single' | 'couple' | 'family';
+  hasChildren: boolean;
+  childAges: number[];
+  spouseWorking?: boolean | null;
+  relocationType?: 'short_term' | 'long_term' | 'permanent' | null;
+  preferredLanguage?: string | null;
+  recommendedTags: string[];
+}
+
+export interface PublicResource {
+  id: string;
+  countryCode: string;
+  countryName?: string | null;
+  cityName?: string | null;
+  categoryId?: string | null;
+  title: string;
+  summary: string;
+  contentJson?: unknown;
+  body?: string | null;
+  resourceType?: string;
+  audienceType?: string;
+  minChildAge?: number | null;
+  maxChildAge?: number | null;
+  budgetTier?: string | null;
+  languageCode?: string | null;
+  isFamilyFriendly: boolean;
+  isFeatured: boolean;
+  address?: string | null;
+  district?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  priceRangeText?: string | null;
+  externalUrl?: string | null;
+  bookingUrl?: string | null;
+  contactInfo?: unknown;
+  openingHours?: unknown;
+  trustTier?: string | null;
+  tags?: ResourceTag[];
+}
+
+export interface PublicEvent {
+  id: string;
+  countryCode: string;
+  countryName?: string | null;
+  cityName?: string | null;
+  title: string;
+  description?: string | null;
+  eventType: string;
+  venueName?: string | null;
+  address?: string | null;
+  startDatetime: string;
+  endDatetime?: string | null;
+  priceText?: string | null;
+  currency?: string | null;
+  isFree: boolean;
+  isFamilyFriendly: boolean;
+  minAge?: number | null;
+  maxAge?: number | null;
+  languageCode?: string | null;
+  externalUrl?: string | null;
+  bookingUrl?: string | null;
+  trustTier?: string | null;
+}
+
+export interface ResourceCategory {
+  id: string;
+  key: string;
+  label: string;
+  description?: string | null;
+  iconName?: string | null;
+  sortOrder?: number;
+}
+
+export interface ResourceTag {
+  id: string;
+  key: string;
+  label: string;
+  tagGroup?: string | null;
+}
+
+export interface RecommendationGroup {
+  recommendedForYou: PublicResource[];
+  firstSteps: PublicResource[];
+  familyEssentials: PublicResource[];
+  thisWeekend: PublicEvent[];
+}
+
+export interface ResourcesPagePayload {
+  context: ResourceContext;
+  categories: ResourceCategory[];
+  resources: PublicResource[];
+  events: PublicEvent[];
+  recommended: RecommendationGroup;
+  hints: { priorities: string[]; recommendations: string[] };
+  filtersApplied: Record<string, unknown>;
 }
 

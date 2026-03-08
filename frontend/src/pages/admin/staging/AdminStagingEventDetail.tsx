@@ -193,7 +193,7 @@ export const AdminStagingEventDetail: React.FC = () => {
             <dl className="space-y-2 text-sm">
               <div>
                 <dt className="text-slate-500">Title</dt>
-                <dd className="font-medium">{candidate.title ?? '-'}</dd>
+                <dd className="font-medium">{String(candidate.title ?? '-')}</dd>
               </div>
               <div>
                 <dt className="text-slate-500">Description</dt>
@@ -204,15 +204,15 @@ export const AdminStagingEventDetail: React.FC = () => {
               <div className="flex gap-4 flex-wrap">
                 <div>
                   <dt className="text-slate-500">Event type</dt>
-                  <dd>{candidate.event_type ?? '-'}</dd>
+                  <dd>{String(candidate.event_type ?? '-')}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Venue</dt>
-                  <dd>{candidate.venue_name ?? '-'}</dd>
+                  <dd>{String(candidate.venue_name ?? '-')}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Address</dt>
-                  <dd>{candidate.address ?? '-'}</dd>
+                  <dd>{String(candidate.address ?? '-')}</dd>
                 </div>
               </div>
               <div className="flex gap-4 flex-wrap">
@@ -237,7 +237,7 @@ export const AdminStagingEventDetail: React.FC = () => {
                 <div>
                   <dt className="text-slate-500">Price</dt>
                   <dd>
-                    {candidate.is_free ? 'Free' : candidate.price_text ?? '-'}
+                    {candidate.is_free ? 'Free' : String(candidate.price_text ?? '-')}
                   </dd>
                 </div>
                 <div>
@@ -254,7 +254,7 @@ export const AdminStagingEventDetail: React.FC = () => {
                     rel="noopener noreferrer"
                     className="text-[#0b2b43] hover:underline"
                   >
-                    {candidate.source_url || '-'}
+                    {String(candidate.source_url ?? '-')}
                   </a>
                 </dd>
               </div>
@@ -266,11 +266,11 @@ export const AdminStagingEventDetail: React.FC = () => {
             <dl className="space-y-1 text-sm text-slate-600">
               <div>
                 <dt className="inline font-medium">Source:</dt>{' '}
-                <dd className="inline">{candidate.source_name ?? '-'}</dd>
+                <dd className="inline">{String(candidate.source_name ?? '-')}</dd>
               </div>
               <div>
                 <dt className="inline font-medium">Trust tier:</dt>{' '}
-                <dd className="inline">{candidate.trust_tier ?? '-'}</dd>
+                <dd className="inline">{String(candidate.trust_tier ?? '-')}</dd>
               </div>
               <div>
                 <dt className="inline font-medium">Confidence:</dt>{' '}
@@ -282,7 +282,7 @@ export const AdminStagingEventDetail: React.FC = () => {
               </div>
               <div>
                 <dt className="inline font-medium">Extraction method:</dt>{' '}
-                <dd className="inline">{candidate.extraction_method ?? '-'}</dd>
+                <dd className="inline">{String(candidate.extraction_method ?? '-')}</dd>
               </div>
               <div>
                 <dt className="inline font-medium">Fetched:</dt>{' '}
@@ -292,11 +292,11 @@ export const AdminStagingEventDetail: React.FC = () => {
                     : '-'}
                 </dd>
               </div>
-              {prov.snippet && (
+              {Boolean((prov as Record<string, unknown>)?.snippet) && (
                 <div>
                   <dt className="block font-medium">Snippet</dt>
                   <dd className="mt-1 rounded bg-white p-2 text-xs">
-                    {String(prov.snippet).slice(0, 300)}...
+                    {String((prov as Record<string, unknown>)?.snippet ?? '').slice(0, 300)}...
                   </dd>
                 </div>
               )}
@@ -317,12 +317,12 @@ export const AdminStagingEventDetail: React.FC = () => {
                       : 'bg-amber-100 text-amber-800'
                 }`}
               >
-                {status}
+                {String(status)}
               </span>
             </p>
-            {candidate.review_reason && (
+            {Boolean((candidate as Record<string, unknown>).review_reason) && (
               <p className="mt-2 text-sm text-slate-600">
-                <strong>Review note:</strong> {String(candidate.review_reason)}
+                <strong>Review note:</strong> {String((candidate as Record<string, unknown>).review_reason ?? '')}
               </p>
             )}
           </div>
@@ -412,7 +412,7 @@ export const AdminStagingEventDetail: React.FC = () => {
 
           <InternalThreadPanel
             targetType="staged_event_candidate"
-            targetId={id}
+            targetId={id ?? ''}
             title="Internal discussion"
           />
 
@@ -425,12 +425,12 @@ export const AdminStagingEventDetail: React.FC = () => {
                 {matches.map((m) => (
                   <li key={m.id} className="text-sm">
                     <Link
-                      to={`/admin/events/${m.id}`}
+                      to={`/admin/events/${m.id ?? ''}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[#0b2b43] hover:underline"
                     >
-                      {m.title}
+                      {String(m.title ?? '')}
                     </Link>
                     <span className="ml-1 text-slate-500">
                       {m.city_name} —{' '}

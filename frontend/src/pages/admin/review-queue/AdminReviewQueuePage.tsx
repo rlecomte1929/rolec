@@ -89,7 +89,7 @@ export const AdminReviewQueuePage: React.FC = () => {
       setTotal(list.total ?? 0);
       if (listItems.length > 0) {
         adminCollaborationAPI.getSummariesBatch(
-          listItems.map((i) => ({ target_type: 'review_queue_item', target_id: i.id }))
+          listItems.map((i: { id: string }) => ({ target_type: 'review_queue_item', target_id: i.id }))
         ).then((r) => setThreadSummaries(r.summaries || {})).catch(() => {});
       } else {
         setThreadSummaries({});
@@ -178,42 +178,42 @@ export const AdminReviewQueuePage: React.FC = () => {
         {/* KPI cards */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="text-xl font-semibold text-[#0b2b43]">{stats?.open_items_count ?? 0}</div>
+            <div className="text-xl font-semibold text-[#0b2b43]">{Number(stats?.open_items_count) ?? 0}</div>
             <div className="text-xs text-slate-600">Open</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="text-xl font-semibold text-amber-700">{stats?.unassigned_count ?? 0}</div>
+            <div className="text-xl font-semibold text-amber-700">{Number(stats?.unassigned_count) ?? 0}</div>
             <div className="text-xs text-slate-600">Unassigned</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="text-xl font-semibold text-blue-700">{stats?.in_progress_count ?? 0}</div>
+            <div className="text-xl font-semibold text-blue-700">{Number(stats?.in_progress_count) ?? 0}</div>
             <div className="text-xs text-slate-600">In progress</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="text-xl font-semibold text-red-700">{stats?.overdue_count ?? 0}</div>
+            <div className="text-xl font-semibold text-red-700">{Number(stats?.overdue_count) ?? 0}</div>
             <div className="text-xs text-slate-600">Overdue</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="text-lg font-semibold text-slate-700">
-              {(stats?.by_priority_band as Record<string, number>)?.['critical'] ?? 0}
+              {Number((stats?.by_priority_band as Record<string, number>)?.['critical']) || 0}
             </div>
             <div className="text-xs text-slate-600">Critical</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="text-lg font-semibold text-slate-700">
-              {(stats?.by_priority_band as Record<string, number>)?.['high'] ?? 0}
+              {Number((stats?.by_priority_band as Record<string, number>)?.['high']) || 0}
             </div>
             <div className="text-xs text-slate-600">High</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="text-lg font-semibold text-slate-700">
-              {(stats?.by_queue_item_type as Record<string, number>)?.['stale_live_resource_review'] ?? 0}
+              {Number((stats?.by_queue_item_type as Record<string, number>)?.['stale_live_resource_review']) || 0}
             </div>
             <div className="text-xs text-slate-600">Stale resources</div>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="text-lg font-semibold text-slate-700">
-              {(stats?.by_queue_item_type as Record<string, number>)?.['source_change_review'] ?? 0}
+              {Number((stats?.by_queue_item_type as Record<string, number>)?.['source_change_review']) || 0}
             </div>
             <div className="text-xs text-slate-600">Source changes</div>
           </div>

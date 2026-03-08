@@ -70,7 +70,7 @@ export const AdminNotificationsPage: React.FC = () => {
       setStats(st);
       if (listItems.length > 0) {
         adminCollaborationAPI.getSummariesBatch(
-          listItems.map((i) => ({ target_type: 'ops_notification', target_id: i.id }))
+          listItems.map((i: { id: string }) => ({ target_type: 'ops_notification', target_id: i.id }))
         ).then((r) => setThreadSummaries(r.summaries || {})).catch(() => {});
       } else {
         setThreadSummaries({});

@@ -18,7 +18,6 @@ interface Props {
 }
 
 export const ThreadSummaryBadge: React.FC<Props> = ({
-  targetType,
   targetId,
   summary,
   linkRoute,

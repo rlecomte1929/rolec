@@ -1088,7 +1088,7 @@ export const resourcesAPI = {
     filters?: Record<string, string | number | boolean | null>,
     page = 1,
     limit = 50
-  ): Promise<{ resources: import('../types').PublicResource[] }> => {
+  ): Promise<{ resources: Record<string, unknown>[] }> => {
     const params: Record<string, string | number> = {
       assignment_id: assignmentOrCaseId,
       page,

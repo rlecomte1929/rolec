@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Card, Button, Input, Select, Alert } from '../components/antigravity';
+import { Card, Input, Select, Alert, LoadingButton } from '../components/antigravity';
 import { AppShell } from '../components/AppShell';
 import type { UserRole } from '../types';
 import { clearAuthItems } from '../utils/demo';
@@ -166,9 +166,15 @@ export const Auth: React.FC = () => {
                   autoComplete="current-password"
                   fullWidth
                 />
-                <Button type="submit" fullWidth disabled={!identifier || !password || isLoading}>
-                  {isLoading ? 'Signing in...' : 'Sign In'}
-                </Button>
+                <LoadingButton
+                  type="submit"
+                  fullWidth
+                  loading={isLoading}
+                  loadingLabel="Signing in…"
+                  disabled={!identifier || !password}
+                >
+                  Sign In
+                </LoadingButton>
               </form>
             )}
 
@@ -218,9 +224,14 @@ export const Auth: React.FC = () => {
                   ]}
                   fullWidth
                 />
-                <Button type="submit" fullWidth disabled={isLoading}>
-                  {isLoading ? 'Creating account...' : 'Create Account'}
-                </Button>
+                <LoadingButton
+                  type="submit"
+                  fullWidth
+                  loading={isLoading}
+                  loadingLabel="Creating account…"
+                >
+                  Create Account
+                </LoadingButton>
               </form>
             )}
           </div>

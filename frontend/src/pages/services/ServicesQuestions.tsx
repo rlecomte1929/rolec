@@ -86,9 +86,9 @@ export const ServicesQuestions: React.FC = () => {
           originCity: caseData.originCity,
           originCountry: caseData.originCountry,
         };
-        const fromCase = caseToInitialAnswers(caseData.draft || null, topLevel);
-        setInitialAnswers((prev) => ({ ...prev, ...fromCase }));
-        setAnswers((prev) => ({ ...prev, ...fromCase }));
+        const fromCase = caseToInitialAnswers((caseData.draft as unknown as Record<string, unknown>) || null, topLevel);
+        setInitialAnswers((prev: Record<string, unknown>) => ({ ...prev, ...fromCase }));
+        setAnswers((prev: Record<string, unknown>) => ({ ...prev, ...fromCase }));
       })
       .catch(() => {});
     return () => { cancelled = true; };
