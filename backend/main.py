@@ -1646,8 +1646,10 @@ def assign_case(
         if not employee_identifier:
             raise HTTPException(status_code=400, detail="Employee identifier required")
 
-        employee_first_name = (request.employeeFirstName or "").strip() or None
-        employee_last_name = (request.employeeLastName or "").strip() or None
+        fn = getattr(request, "employeeFirstName", None) or getattr(request, "employee_first_name", None)
+        ln = getattr(request, "employeeLastName", None) or getattr(request, "employee_last_name", None)
+        employee_first_name = (fn or "").strip() or None
+        employee_last_name = (ln or "").strip() or None
         display_name_from_hr = (
             " ".join(filter(None, [employee_first_name, employee_last_name])).strip() or None
         )
