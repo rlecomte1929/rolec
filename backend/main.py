@@ -874,72 +874,78 @@ def root():
 @app.post("/api/auth/register", response_model=LoginResponse)
 def register(request: RegisterRequest):
     """Register a new user with username or email and role."""
-    username = request.username.strip() if request.username else None
-    email_raw = request.email.strip() if request.email else None
-    email = email_raw.lower() if email_raw else None
+    try:
+        username = request.username.strip() if request.username else None
+        email_raw = request.email.strip() if request.email else None
+        email = email_raw.lower() if email_raw else None
 
-    if not username and not email:
-        raise HTTPException(status_code=400, detail="Provide a username or email")
+        if not username and not email:
+            raise HTTPException(status_code=400, detail="Provide a username or email")
 
-    if username:
-        if not re.match(r"^[A-Za-z0-9_]{3,30}$", username):
-            raise HTTPException(status_code=400, detail="Username must be 3-30 chars, alphanumeric or underscore")
-        if db.get_user_by_username(username):
-            raise HTTPException(status_code=400, detail="Username already in use")
+        if username:
+            if not re.match(r"^[A-Za-z0-9_]{3,30}$", username):
+                raise HTTPException(status_code=400, detail="Username must be 3-30 chars, alphanumeric or underscore")
+            if db.get_user_by_username(username):
+                raise HTTPException(status_code=400, detail="Username already in use")
 
-    if email:
-        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-            raise HTTPException(status_code=400, detail="Invalid email format")
-        if db.get_user_by_email(email):
-            raise HTTPException(status_code=400, detail="Email already in use")
+        if email:
+            if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+                raise HTTPException(status_code=400, detail="Invalid email format")
+            if db.get_user_by_email(email):
+                raise HTTPException(status_code=400, detail="Email already in use")
 
-    if not request.password:
-        raise HTTPException(status_code=400, detail="Password required")
+        if not request.password:
+            raise HTTPException(status_code=400, detail="Password required")
 
-    # Password hashing (placeholder for stronger policy/verification)
-    from passlib.context import CryptContext
-    # Use PBKDF2 to avoid bcrypt backend issues on Windows.
-    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-    password_hash = pwd_context.hash(request.password)
+        # Password hashing (placeholder for stronger policy/verification)
+        from passlib.context import CryptContext
+        # Use PBKDF2 to avoid bcrypt backend issues on Windows.
+        pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+        password_hash = pwd_context.hash(request.password)
 
-    role = request.role
-    if role == UserRole.ADMIN and (not email or not email.endswith("@relopass.com") or not db.is_admin_allowlisted(email)):
-        role = UserRole.EMPLOYEE
+        role = request.role
+        if role == UserRole.ADMIN and (not email or not email.endswith("@relopass.com") or not db.is_admin_allowlisted(email)):
+            role = UserRole.EMPLOYEE
 
-    user_id = str(uuid.uuid4())
-    created = db.create_user(
-        user_id=user_id,
-        username=username,
-        email=email,
-        password_hash=password_hash,
-        role=role.value,
-        name=request.name,
-    )
-    if not created:
-        raise HTTPException(status_code=400, detail="Unable to create user")
-
-    token = str(uuid.uuid4())
-    db.create_session(token, user_id)
-    db.ensure_profile_record(
-        user_id=user_id,
-        email=email,
-        role=role.value,
-        full_name=request.name,
-        company_id=None,
-    )
-
-    log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
-    return LoginResponse(
-        token=token,
-        user=UserResponse(
-            id=user_id,
+        user_id = str(uuid.uuid4())
+        created = db.create_user(
+            user_id=user_id,
             username=username,
             email=email,
-            role=role,
+            password_hash=password_hash,
+            role=role.value,
             name=request.name,
-            company=None,
         )
-    )
+        if not created:
+            raise HTTPException(status_code=400, detail="Unable to create user (username or email may already exist)")
+
+        token = str(uuid.uuid4())
+        db.create_session(token, user_id)
+        db.ensure_profile_record(
+            user_id=user_id,
+            email=email,
+            role=role.value,
+            full_name=request.name,
+            company_id=None,
+        )
+
+        log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
+        return LoginResponse(
+            token=token,
+            user=UserResponse(
+                id=user_id,
+                username=username,
+                email=email,
+                role=role,
+                name=request.name,
+                company=None,
+            )
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("auth_register unexpected error email=%s", getattr(request, "email", ""))
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 
 @app.post("/api/auth/logout")
@@ -1692,6 +1698,28 @@ def assign_case(
                 employee_first_name=employee_first_name,
                 employee_last_name=employee_last_name,
             )
+        event_type = "assignment.created"
+        log.info("assign_flow before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+        try:
+            db.insert_case_event(
+                case_id=case_id,
+                assignment_id=assignment_id,
+                actor_principal_id=effective["id"],
+                event_type=event_type,
+                payload={"employee_identifier": employee_identifier},
+                request_id=request_id,
+            )
+            log.info("assign_flow after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+        except Exception as exc:
+            log.error(
+                "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+                assignment_id,
+                case_id,
+                event_type,
+                str(exc),
+                exc_info=True,
+            )
+            raise
 
         if not employee_user:
             invite_token = str(uuid.uuid4())
@@ -1765,11 +1793,36 @@ def get_employee_assignment(
                 identifier, request_id=request.state.request_id
             )
             if assignment and not user.get("impersonation"):
+                assignment_id = assignment["id"]
+                case_id = assignment.get("case_id", "")
+                log.info("claim_flow_entered assignment_id=%s case_id=%s route=GET/assignments/current", assignment_id, case_id)
                 db.attach_employee_to_assignment(
                     assignment["id"], effective["id"], request_id=request.state.request_id
                 )
                 db.mark_invites_claimed(identifier)
                 assignment = db.get_assignment_by_id(assignment["id"], request_id=request.state.request_id)
+                event_type = "assignment.claimed"
+                log.info("before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+                try:
+                    db.insert_case_event(
+                        case_id=assignment["case_id"],
+                        assignment_id=assignment["id"],
+                        actor_principal_id=effective["id"],
+                        event_type=event_type,
+                        payload={},
+                        request_id=getattr(request.state, "request_id", None),
+                    )
+                    log.info("after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+                except Exception as exc:
+                    log.error(
+                        "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+                        assignment_id,
+                        case_id,
+                        event_type,
+                        str(exc),
+                        exc_info=True,
+                    )
+                    raise
 
     if not assignment:
         return {"assignment": None}
@@ -1818,8 +1871,31 @@ def claim_assignment(
     if assignment.get("employee_user_id") and assignment["employee_user_id"] != effective["id"]:
         raise HTTPException(status_code=403, detail="Assignment already claimed")
 
+    case_id = assignment.get("case_id", "")
+    log.info("claim_flow_entered assignment_id=%s case_id=%s route=POST/claim", assignment_id, case_id)
     db.attach_employee_to_assignment(assignment_id, effective["id"])
     db.mark_invites_claimed(assignment["employee_identifier"])
+    event_type = "assignment.claimed"
+    log.info("before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+    try:
+        db.insert_case_event(
+            case_id=assignment["case_id"],
+            assignment_id=assignment_id,
+            actor_principal_id=effective["id"],
+            event_type=event_type,
+            payload={},
+        )
+        log.info("after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+    except Exception as exc:
+        log.error(
+            "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+            assignment_id,
+            case_id,
+            event_type,
+            str(exc),
+            exc_info=True,
+        )
+        raise
     return {"success": True, "assignmentId": assignment_id}
 
 
@@ -1971,7 +2047,38 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             detail="Profile is not complete. Please fill in all required fields in the wizard steps (Relocation Basics, Employee Profile, Family, Assignment Context).",
         )
 
+    log.info(
+        "employee_submit_flow_entered assignment_id=%s case_id=%s",
+        assignment_id,
+        assignment.get("case_id", ""),
+    )
+    log.info("before_set_assignment_submitted assignment_id=%s", assignment_id)
     db.set_assignment_submitted(assignment_id)
+    log.info("after_set_assignment_submitted assignment_id=%s", assignment_id)
+
+    case_id = assignment.get("case_id") or ""
+    event_type = "assignment.submitted"
+    log.info("before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+    try:
+        db.insert_case_event(
+            case_id=case_id,
+            assignment_id=assignment_id,
+            actor_principal_id=effective["id"],
+            event_type=event_type,
+            payload={},
+        )
+        log.info("after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+    except Exception as exc:
+        log.error(
+            "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+            assignment_id,
+            case_id,
+            event_type,
+            str(exc),
+            exc_info=True,
+        )
+        raise
+
     return {"success": True}
 
 
@@ -3251,6 +3358,16 @@ def notify_hr_employee_saved(
     return {"ok": True}
 
 
+@app.get("/api/debug/cases/{case_id}/events")
+def debug_case_events(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Dev/admin: list case_events for a case to verify event emission."""
+    events = db.list_case_events(case_id)
+    return {"case_id": case_id, "events": events, "count": len(events)}
+
+
 @app.get("/api/debug/assignment-check")
 def debug_assignment_check(
     assignment_id: str = Query(...),
@@ -3331,10 +3448,23 @@ def run_compliance(assignment_id: str, user: Dict[str, Any] = Depends(require_ro
 
 @app.post("/api/hr/assignments/{assignment_id}/decision")
 def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    log.info(
+        "approval_flow_entered assignment_id=%s decision=%s",
+        assignment_id,
+        getattr(request.decision, "value", request.decision),
+    )
     _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    case_id = assignment.get("case_id") or ""
+    log.info(
+        "approval_flow assignment_id=%s case_id=%s decision=%s",
+        assignment_id,
+        case_id,
+        getattr(request.decision, "value", request.decision),
+    )
 
     if request.decision not in [AssignmentStatus.APPROVED, AssignmentStatus.REJECTED]:
         raise HTTPException(status_code=400, detail="Invalid decision")
@@ -3342,7 +3472,32 @@ def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[st
     notes_payload = request.notes
     # For the simplified canonical lifecycle we treat decisions as final approved / rejected.
     assert_canonical_status(request.decision.value)
+    log.info("before_set_assignment_decision assignment_id=%s", assignment_id)
     db.set_assignment_decision(assignment_id, request.decision.value, notes_payload)
+    log.info("after_set_assignment_decision assignment_id=%s", assignment_id)
+
+    event_type = "assignment.approved" if request.decision == AssignmentStatus.APPROVED else "assignment.rejected"
+    log.info("before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+    try:
+        db.insert_case_event(
+            case_id=case_id,
+            assignment_id=assignment_id,
+            actor_principal_id=effective["id"],
+            event_type=event_type,
+            payload={"notes": notes_payload} if notes_payload else {},
+        )
+        log.info("after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
+    except Exception as exc:
+        log.error(
+            "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+            assignment_id,
+            case_id,
+            event_type,
+            str(exc),
+            exc_info=True,
+        )
+        raise
+
     return {"success": True}
 
 
