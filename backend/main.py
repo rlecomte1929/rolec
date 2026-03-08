@@ -40,6 +40,13 @@ from .services.country_resources import (
     RESOURCE_SECTIONS,
     SECTION_LABELS,
 )
+from .services.rkg_resources import (
+    get_resource_context,
+    get_country_resources as rkg_get_country_resources,
+    get_country_events as rkg_get_country_events,
+    get_recommended_resources,
+    resources_to_sections,
+)
 from .services.supabase_client import get_supabase_admin_client
 from .app.services.requirements_sufficiency import compute_requirements_sufficiency
 # Import db_config first and log before any DB connection attempt
@@ -55,9 +62,17 @@ from .app import crud as app_crud
 from .app.seed import seed_demo_cases
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
+from .app.routers import admin_resources as admin_resources_router
+from .app.routers import admin_staging as admin_staging_router
+from .app.routers import admin_freshness as admin_freshness_router
+from .app.routers import admin_review_queue as admin_review_queue_router
+from .app.routers import admin_notifications as admin_notifications_router
+from .app.routers import admin_ops_analytics as admin_ops_analytics_router
+from .app.routers import admin_collaboration as admin_collaboration_router
 from .routes import relocation as relocation_router
 from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
+from .routes import resources as resources_router
 from .app.recommendations.router import router as recommendations_router
 from pydantic import BaseModel as _BaseModel
 from contextlib import contextmanager
@@ -156,6 +171,16 @@ async def request_id_and_timing_middleware(request: Request, call_next):
 app.include_router(compat_router.router)
 app.include_router(cases_router.router)
 app.include_router(admin_router.router)
+app.include_router(admin_resources_router.router, prefix="/api/admin")
+app.include_router(admin_staging_router.router, prefix="/api/admin")
+app.include_router(admin_freshness_router.router, prefix="/api/admin")
+app.include_router(admin_freshness_router.crawl_router, prefix="/api/admin")
+app.include_router(admin_freshness_router.changes_router, prefix="/api/admin")
+app.include_router(admin_review_queue_router.router, prefix="/api/admin")
+app.include_router(admin_notifications_router.router, prefix="/api/admin")
+app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
+app.include_router(admin_collaboration_router.router, prefix="/api/admin")
+app.include_router(resources_router.router)
 app.include_router(recommendations_router)
 app.include_router(relocation_router.router)
 app.include_router(relocation_router.api_router)
@@ -1615,6 +1640,13 @@ def assign_case(
         if not employee_identifier:
             raise HTTPException(status_code=400, detail="Employee identifier required")
 
+        employee_first_name = (request.employeeFirstName or "").strip() or None
+        employee_last_name = (request.employeeLastName or "").strip() or None
+        display_name_from_hr = (
+            " ".join(filter(None, [employee_first_name, employee_last_name])).strip() or None
+        )
+        fallback_name = employee_identifier.split("@")[0] if "@" in employee_identifier else employee_identifier
+
         employee_user = db.get_user_by_identifier(employee_identifier)
         created_new_employee = False
         if not employee_user and "@" in employee_identifier:
@@ -1624,13 +1656,14 @@ def assign_case(
             pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
             temp_password = "Passw0rd!"
             employee_user_id = str(uuid.uuid4())
+            initial_name = display_name_from_hr or fallback_name
             created = db.create_user(
                 user_id=employee_user_id,
                 username=None,
                 email=employee_identifier.lower(),
                 password_hash=pwd_context.hash(temp_password),
                 role=UserRole.EMPLOYEE.value,
-                name=employee_identifier.split("@")[0],
+                name=initial_name,
             )
             if created:
                 employee_user = db.get_user_by_id(employee_user_id)
@@ -1638,7 +1671,7 @@ def assign_case(
                     employee_user_id,
                     employee_identifier,
                     UserRole.EMPLOYEE.value,
-                    employee_identifier.split("@")[0],
+                    initial_name,
                     None,
                 )
                 created_new_employee = True
@@ -1656,6 +1689,8 @@ def assign_case(
                 employee_identifier=employee_identifier,
                 status=AssignmentStatus.ASSIGNED.value,
                 request_id=request_id,
+                employee_first_name=employee_first_name,
+                employee_last_name=employee_last_name,
             )
 
         if not employee_user:
@@ -2039,6 +2074,8 @@ def list_hr_assignments(
                 status=AssignmentStatus(normalize_status(assignment["status"])),
                 submittedAt=submitted_at_str,
                 complianceStatus=report["overallStatus"] if report else None,
+                employeeFirstName=assignment.get("employee_first_name"),
+                employeeLastName=assignment.get("employee_last_name"),
                 case=case_meta,
             ))
         return summaries
@@ -2262,7 +2299,9 @@ def get_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
         hrNotes=assignment.get("hr_notes"),
         profile=RelocationProfile(**profile) if profile else None,
         completeness=completeness,
-        complianceReport=report
+        complianceReport=report,
+        employeeFirstName=assignment.get("employee_first_name"),
+        employeeLastName=assignment.get("employee_last_name"),
     )
 
 
@@ -2375,6 +2414,22 @@ def get_case_details_by_assignment(
     case_id = assignment.get("case_id")
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case_id")
+
+    # Prefill employer name/country from company profile (source of truth for HR)
+    company = None
+    employer_name = None
+    employer_country = None
+    if hr_id:
+        company = db.get_company_for_user(hr_id)
+    if not company and case_id:
+        case_row = db.get_case_by_id(case_id)
+        cid = case_row.get("company_id") if case_row else None
+        if cid:
+            company = db.get_company(cid)
+    if company:
+        employer_name = company.get("name") or company.get("legal_name")
+        employer_country = company.get("country")
+
     with SessionLocal() as session:
         case = app_crud.get_case(session, case_id)
         if not case:
@@ -2385,6 +2440,12 @@ def get_case_details_by_assignment(
                 "assignmentContext": {},
             })
         draft = json.loads(case.draft_json or "{}")
+        ac = draft.get("assignmentContext") or {}
+        # Employer name/country are source-of-truth from company profile; always override when available
+        if company:
+            ac["employerName"] = employer_name or ""
+            ac["employerCountry"] = employer_country or ""
+        draft["assignmentContext"] = ac
         case_dto = cases_router._case_dto(case, draft)
     return {
         "assignment": {
@@ -2432,7 +2493,7 @@ def get_country_resources(
     filters: Optional[str] = Query(None, description="JSON filters: city, family_type, budget, category, etc."),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    """Return profile context and section content for the country Resources page."""
+    """Return profile context, sections, events, and recommended resources for the country Resources page."""
     assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found or not visible under RLS")
@@ -2457,17 +2518,8 @@ def get_country_resources(
 
     profile = build_profile_context(draft)
     hints = get_personalization_hints(profile)
-    country_code = profile.get("country_code") or "NO"
-    city = profile.get("destination_city") or ""
-
-    sections = []
-    for key in RESOURCE_SECTIONS:
-        content = _get_section_content(country_code, city, key)
-        sections.append({
-            "key": key,
-            "title": SECTION_LABELS.get(key, key.replace("_", " ").title()),
-            "content": content,
-        })
+    country_code = (profile.get("country_code") or "NO").upper()
+    city = (profile.get("destination_city") or "").strip()
 
     filter_dict = {}
     if filters:
@@ -2476,10 +2528,94 @@ def get_country_resources(
         except json.JSONDecodeError:
             pass
 
+    # Resource context for personalization
+    resource_ctx = get_resource_context(draft)
+
+    # Try RKG structured resources first (when destination is set)
+    try:
+        rkg_resources = []
+        if country_code:
+            ff = filter_dict.get("family_friendly")
+            if isinstance(ff, str):
+                ff = ff.lower() in ("true", "1", "yes") if ff else None
+            child_age = filter_dict.get("child_age", "")
+            child_age_min = child_age_max = None
+            if isinstance(child_age, str) and "-" in child_age:
+                try:
+                    a, b = child_age.split("-", 1)
+                    child_age_min = int(a.strip())
+                    child_age_max = int(b.strip())
+                except (ValueError, TypeError):
+                    pass
+            rkg_resources = rkg_get_country_resources(
+                country_code=country_code,
+                city=city or None,
+                category=filter_dict.get("category"),
+                audience=filter_dict.get("family_type"),
+                budget=filter_dict.get("budget"),
+                family_friendly=ff,
+                child_age_min=child_age_min,
+                child_age_max=child_age_max,
+                published_only=True,
+            )
+        if rkg_resources:
+            sections = resources_to_sections(country_code, city, rkg_resources, resource_ctx)
+        else:
+            # Fallback to legacy section content
+            sections = []
+            for key in RESOURCE_SECTIONS:
+                content = _get_section_content(country_code, city, key)
+                sections.append({
+                    "key": key,
+                    "title": SECTION_LABELS.get(key, key.replace("_", " ").title()),
+                    "content": content,
+                })
+    except Exception as e:
+        log.warning("RKG resources fetch failed, using fallback: %s", e, exc_info=True)
+        sections = []
+        for key in RESOURCE_SECTIONS:
+            content = _get_section_content(country_code, city, key)
+            sections.append({
+                "key": key,
+                "title": SECTION_LABELS.get(key, key.replace("_", " ").title()),
+                "content": content,
+            })
+
+    # Events from RKG
+    events = []
+    try:
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        ev_ff = filter_dict.get("family_friendly")
+        if isinstance(ev_ff, str):
+            ev_ff = ev_ff.lower() in ("true", "1", "yes") if ev_ff else None
+        events = rkg_get_country_events(
+            country_code=country_code,
+            city=city or None,
+            event_type=filter_dict.get("event_type"),
+            date_from=now,
+            date_to=now + timedelta(days=14),
+            family_friendly=ev_ff,
+            limit=20,
+            published_only=True,
+        )
+    except Exception as e:
+        log.debug("RKG events fetch failed: %s", e)
+
+    # Recommended resources for hero
+    recommended = []
+    try:
+        recommended = get_recommended_resources(resource_ctx, limit=5)
+    except Exception as e:
+        log.debug("RKG recommended fetch failed: %s", e)
+
     return {
         "profile": profile,
+        "context": resource_ctx,
         "hints": hints,
         "sections": sections,
+        "events": events,
+        "recommended": recommended,
         "filters_applied": filter_dict,
     }
 

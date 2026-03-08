@@ -270,8 +270,16 @@ export const hrAPI = {
     const response = await api.post('/api/hr/cases');
     return response.data;
   },
-  assignCase: async (caseId: string, employeeIdentifier: string): Promise<AssignCaseResponse> => {
-    const response = await api.post(`/api/hr/cases/${caseId}/assign`, { employeeIdentifier });
+  assignCase: async (
+    caseId: string,
+    employeeIdentifier: string,
+    options?: { firstName?: string; lastName?: string }
+  ): Promise<AssignCaseResponse> => {
+    const response = await api.post(`/api/hr/cases/${caseId}/assign`, {
+      employeeIdentifier,
+      employeeFirstName: options?.firstName?.trim() || undefined,
+      employeeLastName: options?.lastName?.trim() || undefined,
+    });
     return response.data;
   },
   listAssignments: async (): Promise<AssignmentSummary[]> => {
@@ -503,6 +511,337 @@ export const adminAPI = {
   },
 };
 
+// Admin Resources CMS API
+export const adminResourcesAPI = {
+  getCounts: async () => api.get('/api/admin/resources/counts').then((r) => r.data),
+  listResources: async (params?: {
+    country_code?: string;
+    city?: string;
+    category_id?: string;
+    status?: string;
+    audience?: string;
+    featured?: boolean;
+    family_friendly?: boolean;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) => api.get('/api/admin/resources', { params }).then((r) => r.data),
+  getResource: async (id: string) => api.get(`/api/admin/resources/${id}`).then((r) => r.data),
+  createResource: async (payload: Record<string, unknown>) =>
+    api.post('/api/admin/resources', payload).then((r) => r.data),
+  updateResource: async (id: string, payload: Record<string, unknown>) =>
+    api.put(`/api/admin/resources/${id}`, payload).then((r) => r.data),
+  submitForReview: async (id: string) =>
+    api.post(`/api/admin/resources/${id}/submit-for-review`).then((r) => r.data),
+  approveResource: async (id: string, notes?: string) =>
+    api.post(`/api/admin/resources/${id}/approve`, { notes }).then((r) => r.data),
+  publishResource: async (id: string) =>
+    api.post(`/api/admin/resources/${id}/publish`).then((r) => r.data),
+  unpublishResource: async (id: string) =>
+    api.post(`/api/admin/resources/${id}/unpublish`).then((r) => r.data),
+  archiveResource: async (id: string) =>
+    api.post(`/api/admin/resources/${id}/archive`).then((r) => r.data),
+  restoreResource: async (id: string) =>
+    api.post(`/api/admin/resources/${id}/restore`).then((r) => r.data),
+  getResourceAudit: async (id: string, limit?: number) =>
+    api.get(`/api/admin/resources/${id}/audit`, { params: { limit } }).then((r) => r.data),
+  getGlobalAuditLog: async (params?: { entity_type?: string; limit?: number; offset?: number }) =>
+    api.get('/api/admin/resources/audit-log', { params }).then((r) => r.data),
+  listEvents: async (params?: {
+    country_code?: string;
+    city?: string;
+    event_type?: string;
+    status?: string;
+    family_friendly?: boolean;
+    date_from?: string;
+    date_to?: string;
+    limit?: number;
+    offset?: number;
+  }) => api.get('/api/admin/resources/events', { params }).then((r) => r.data),
+  getEvent: async (id: string) => api.get(`/api/admin/resources/events/${id}`).then((r) => r.data),
+  createEvent: async (payload: Record<string, unknown>) =>
+    api.post('/api/admin/resources/events', payload).then((r) => r.data),
+  updateEvent: async (id: string, payload: Record<string, unknown>) =>
+    api.put(`/api/admin/resources/events/${id}`, payload).then((r) => r.data),
+  publishEvent: async (id: string) =>
+    api.post(`/api/admin/resources/events/${id}/publish`).then((r) => r.data),
+  archiveEvent: async (id: string) =>
+    api.post(`/api/admin/resources/events/${id}/archive`).then((r) => r.data),
+  submitEventForReview: async (id: string) =>
+    api.post(`/api/admin/resources/events/${id}/submit-for-review`).then((r) => r.data),
+  approveEvent: async (id: string, notes?: string) =>
+    api.post(`/api/admin/resources/events/${id}/approve`, { notes }).then((r) => r.data),
+  unpublishEvent: async (id: string) =>
+    api.post(`/api/admin/resources/events/${id}/unpublish`).then((r) => r.data),
+  restoreEvent: async (id: string) =>
+    api.post(`/api/admin/resources/events/${id}/restore`).then((r) => r.data),
+  getEventAudit: async (id: string, limit?: number) =>
+    api.get(`/api/admin/resources/events/${id}/audit`, { params: { limit } }).then((r) => r.data),
+  listCategories: async () => api.get('/api/admin/resources/taxonomy/categories').then((r) => r.data),
+  createCategory: async (payload: Record<string, unknown>) =>
+    api.post('/api/admin/resources/taxonomy/categories', payload).then((r) => r.data),
+  updateCategory: async (id: string, payload: Record<string, unknown>) =>
+    api.put(`/api/admin/resources/taxonomy/categories/${id}`, payload).then((r) => r.data),
+  deactivateCategory: async (id: string) =>
+    api.delete(`/api/admin/resources/taxonomy/categories/${id}`).then((r) => r.data),
+  listTags: async (tag_group?: string) =>
+    api.get('/api/admin/resources/taxonomy/tags', { params: { tag_group } }).then((r) => r.data),
+  createTag: async (payload: Record<string, unknown>) =>
+    api.post('/api/admin/resources/taxonomy/tags', payload).then((r) => r.data),
+  updateTag: async (id: string, payload: Record<string, unknown>) =>
+    api.put(`/api/admin/resources/taxonomy/tags/${id}`, payload).then((r) => r.data),
+  listSources: async () => api.get('/api/admin/resources/taxonomy/sources').then((r) => r.data),
+  createSource: async (payload: Record<string, unknown>) =>
+    api.post('/api/admin/resources/taxonomy/sources', payload).then((r) => r.data),
+  updateSource: async (id: string, payload: Record<string, unknown>) =>
+    api.put(`/api/admin/resources/taxonomy/sources/${id}`, payload).then((r) => r.data),
+};
+
+// Admin Staging Review API (admin-only)
+export const adminStagingAPI = {
+  getDashboard: () => api.get('/api/admin/staging/dashboard').then((r) => r.data),
+  listResourceCandidates: (params?: {
+    status?: string;
+    country_code?: string;
+    city_name?: string;
+    category_key?: string;
+    resource_type?: string;
+    trust_tier?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) => api.get('/api/admin/staging/resources', { params }).then((r) => r.data),
+  getResourceCandidate: (id: string) =>
+    api.get(`/api/admin/staging/resources/${id}`).then((r) => r.data),
+  getResourceCandidateMatches: (id: string) =>
+    api.get(`/api/admin/staging/resources/${id}/matches`).then((r) => r.data),
+  approveResourceAsNew: (id: string, reason?: string) =>
+    api.post(`/api/admin/staging/resources/${id}/approve-new`, { reason }).then((r) => r.data),
+  mergeResource: (
+    id: string,
+    payload: {
+      target_resource_id: string;
+      merge_mode?: string;
+      fields_to_merge?: string[];
+      reason?: string;
+    }
+  ) => api.post(`/api/admin/staging/resources/${id}/merge`, payload).then((r) => r.data),
+  rejectResource: (id: string, reason?: string) =>
+    api.post(`/api/admin/staging/resources/${id}/reject`, { reason }).then((r) => r.data),
+  markResourceDuplicate: (
+    id: string,
+    payload: {
+      duplicate_of_candidate_id?: string;
+      duplicate_of_live_resource_id?: string;
+      reason?: string;
+    }
+  ) => api.post(`/api/admin/staging/resources/${id}/mark-duplicate`, payload).then((r) => r.data),
+  ignoreResource: (id: string, reason?: string) =>
+    api.post(`/api/admin/staging/resources/${id}/ignore`, { reason }).then((r) => r.data),
+  restoreResourceToReview: (id: string) =>
+    api.post(`/api/admin/staging/resources/${id}/restore-review`).then((r) => r.data),
+  listEventCandidates: (params?: {
+    status?: string;
+    country_code?: string;
+    city_name?: string;
+    event_type?: string;
+    trust_tier?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) => api.get('/api/admin/staging/events', { params }).then((r) => r.data),
+  getEventCandidate: (id: string) =>
+    api.get(`/api/admin/staging/events/${id}`).then((r) => r.data),
+  getEventCandidateMatches: (id: string) =>
+    api.get(`/api/admin/staging/events/${id}/matches`).then((r) => r.data),
+  approveEventAsNew: (id: string, reason?: string) =>
+    api.post(`/api/admin/staging/events/${id}/approve-new`, { reason }).then((r) => r.data),
+  mergeEvent: (
+    id: string,
+    payload: {
+      target_event_id: string;
+      merge_mode?: string;
+      fields_to_merge?: string[];
+      reason?: string;
+    }
+  ) => api.post(`/api/admin/staging/events/${id}/merge`, payload).then((r) => r.data),
+  rejectEvent: (id: string, reason?: string) =>
+    api.post(`/api/admin/staging/events/${id}/reject`, { reason }).then((r) => r.data),
+  markEventDuplicate: (
+    id: string,
+    payload: {
+      duplicate_of_candidate_id?: string;
+      duplicate_of_live_event_id?: string;
+      reason?: string;
+    }
+  ) => api.post(`/api/admin/staging/events/${id}/mark-duplicate`, payload).then((r) => r.data),
+  ignoreEvent: (id: string, reason?: string) =>
+    api.post(`/api/admin/staging/events/${id}/ignore`, { reason }).then((r) => r.data),
+  restoreEventToReview: (id: string) =>
+    api.post(`/api/admin/staging/events/${id}/restore-review`).then((r) => r.data),
+};
+
+// Admin Freshness & Crawl API (admin-only)
+export const adminFreshnessAPI = {
+  getOverview: () => api.get('/api/admin/freshness/overview').then((r) => r.data),
+  getCountries: () => api.get('/api/admin/freshness/countries').then((r) => r.data),
+  getCities: (params?: { country_code?: string }) =>
+    api.get('/api/admin/freshness/cities', { params }).then((r) => r.data),
+  getSources: () => api.get('/api/admin/freshness/sources').then((r) => r.data),
+  refreshFreshness: () => api.post('/api/admin/freshness/refresh').then((r) => r.data),
+  listSchedules: (params?: { is_active?: boolean; limit?: number }) =>
+    api.get('/api/admin/crawl/schedules', { params }).then((r) => r.data),
+  getDueSchedules: () => api.get('/api/admin/crawl/schedules/due').then((r) => r.data),
+  getSchedule: (id: string) => api.get(`/api/admin/crawl/schedules/${id}`).then((r) => r.data),
+  createSchedule: (payload: Record<string, unknown>) =>
+    api.post('/api/admin/crawl/schedules', payload).then((r) => r.data),
+  updateSchedule: (id: string, payload: Record<string, unknown>) =>
+    api.put(`/api/admin/crawl/schedules/${id}`, payload).then((r) => r.data),
+  pauseSchedule: (id: string) => api.post(`/api/admin/crawl/schedules/${id}/pause`).then((r) => r.data),
+  resumeSchedule: (id: string) => api.post(`/api/admin/crawl/schedules/${id}/resume`).then((r) => r.data),
+  triggerSchedule: (id: string) => api.post(`/api/admin/crawl/schedules/${id}/trigger`).then((r) => r.data),
+  processDueSchedules: () => api.post('/api/admin/crawl/process-due').then((r) => r.data),
+  triggerCrawl: (payload: { source_name?: string; country_code?: string; city_name?: string; content_domain?: string }) =>
+    api.post('/api/admin/crawl/trigger', payload).then((r) => r.data),
+  listJobRuns: (params?: { schedule_id?: string; status?: string; limit?: number; offset?: number }) =>
+    api.get('/api/admin/crawl/job-runs', { params }).then((r) => r.data),
+  getJobRun: (id: string) => api.get(`/api/admin/crawl/job-runs/${id}`).then((r) => r.data),
+  listDocumentChanges: (params?: {
+    job_run_id?: string;
+    source_name?: string;
+    change_type?: string;
+    since?: string;
+    limit?: number;
+    offset?: number;
+  }) => api.get('/api/admin/changes/documents', { params }).then((r) => r.data),
+  getDocumentChange: (id: string) => api.get(`/api/admin/changes/documents/${id}`).then((r) => r.data),
+  getStaleResources: (params?: { country_code?: string; city_name?: string; limit?: number }) =>
+    api.get('/api/admin/changes/live-stale-resources', { params }).then((r) => r.data),
+  getStaleEvents: (params?: { country_code?: string; city_name?: string; limit?: number }) =>
+    api.get('/api/admin/changes/live-stale-events', { params }).then((r) => r.data),
+};
+
+// Admin Review Queue API (admin-only)
+export const adminReviewQueueAPI = {
+  list: (params?: {
+    status?: string;
+    priority_band?: string;
+    assignee_id?: string;
+    country_code?: string;
+    city_name?: string;
+    queue_item_type?: string;
+    overdue_only?: boolean;
+    unassigned_only?: boolean;
+    search?: string;
+    limit?: number;
+    offset?: number;
+    sort?: 'priority' | 'created' | 'due' | 'age';
+  }) => api.get('/api/admin/review-queue', { params }).then((r) => r.data),
+  getStats: () => api.get('/api/admin/review-queue/stats').then((r) => r.data),
+  getAssignees: (limit?: number) =>
+    api.get('/api/admin/review-queue/assignees', { params: { limit } }).then((r) => r.data),
+  getItem: (id: string) => api.get(`/api/admin/review-queue/${id}`).then((r) => r.data),
+  getActivity: (id: string, limit?: number) =>
+    api.get(`/api/admin/review-queue/${id}/activity`, { params: { limit } }).then((r) => r.data),
+  assign: (id: string, assigneeUserId: string) =>
+    api.post(`/api/admin/review-queue/${id}/assign`, { assignee_user_id: assigneeUserId }).then((r) => r.data),
+  claim: (id: string) => api.post(`/api/admin/review-queue/${id}/claim`).then((r) => r.data),
+  unassign: (id: string) => api.post(`/api/admin/review-queue/${id}/unassign`).then((r) => r.data),
+  setStatus: (id: string, status: string, note?: string) =>
+    api.post(`/api/admin/review-queue/${id}/status`, { status, note }).then((r) => r.data),
+  defer: (id: string, dueAt?: string, note?: string) =>
+    api.post(`/api/admin/review-queue/${id}/defer`, { due_at: dueAt, note }).then((r) => r.data),
+  resolve: (id: string, resolutionSummary?: string) =>
+    api.post(`/api/admin/review-queue/${id}/resolve`, { resolution_summary: resolutionSummary }).then((r) => r.data),
+  reopen: (id: string, note?: string) =>
+    api.post(`/api/admin/review-queue/${id}/reopen`, { note }).then((r) => r.data),
+  updateNotes: (id: string, notes: string) =>
+    api.patch(`/api/admin/review-queue/${id}/notes`, { notes }).then((r) => r.data),
+  bulkAssign: (itemIds: string[], assigneeUserId: string) =>
+    api.post('/api/admin/review-queue/bulk-assign', { item_ids: itemIds, assignee_user_id: assigneeUserId }).then((r) => r.data),
+  bulkStatus: (itemIds: string[], status: string, note?: string) =>
+    api.post('/api/admin/review-queue/bulk-status', { item_ids: itemIds, status, note }).then((r) => r.data),
+  backfill: () => api.post('/api/admin/review-queue/backfill').then((r) => r.data),
+};
+
+// Admin Ops Notifications API (admin-only)
+export const adminNotificationsAPI = {
+  list: (params?: {
+    status?: string;
+    severity?: string;
+    notification_type?: string;
+    country_code?: string;
+    escalation_only?: boolean;
+    open_only?: boolean;
+    limit?: number;
+    offset?: number;
+  }) => api.get('/api/admin/notifications', { params }).then((r) => r.data),
+  getStats: () => api.get('/api/admin/notifications/stats').then((r) => r.data),
+  getFeed: (params?: { limit?: number; critical_first?: boolean }) =>
+    api.get('/api/admin/notifications/feed', { params }).then((r) => r.data),
+  getOne: (id: string) => api.get(`/api/admin/notifications/${id}`).then((r) => r.data),
+  getEvents: (id: string, limit?: number) =>
+    api.get(`/api/admin/notifications/${id}/events`, { params: { limit } }).then((r) => r.data),
+  acknowledge: (id: string) => api.post(`/api/admin/notifications/${id}/acknowledge`).then((r) => r.data),
+  resolve: (id: string, reason?: string) =>
+    api.post(`/api/admin/notifications/${id}/resolve`, null, { params: { reason } }).then((r) => r.data),
+  suppress: (id: string, until?: string) =>
+    api.post(`/api/admin/notifications/${id}/suppress`, null, { params: { until } }).then((r) => r.data),
+  reopen: (id: string, reason?: string) =>
+    api.post(`/api/admin/notifications/${id}/reopen`, null, { params: { reason } }).then((r) => r.data),
+  recompute: () => api.post('/api/admin/notifications/recompute').then((r) => r.data),
+  sync: () => api.post('/api/admin/notifications/sync').then((r) => r.data),
+};
+
+// Admin Ops Analytics API (admin-only)
+export const adminOpsAnalyticsAPI = {
+  getSlaOverview: (params?: { country_code?: string; days?: number }) =>
+    api.get('/api/admin/ops/sla/overview', { params }).then((r) => r.data),
+  getQueueBacklog: (params?: { country_code?: string }) =>
+    api.get('/api/admin/ops/queue/backlog', { params }).then((r) => r.data),
+  getQueueBreaches: (params?: { country_code?: string; limit?: number }) =>
+    api.get('/api/admin/ops/queue/breaches', { params }).then((r) => r.data),
+  getReviewerWorkload: () => api.get('/api/admin/ops/reviewers/workload').then((r) => r.data),
+  getDestinations: () => api.get('/api/admin/ops/destinations').then((r) => r.data),
+  getNotificationMetrics: (params?: { days?: number }) =>
+    api.get('/api/admin/ops/notifications', { params }).then((r) => r.data),
+  getBottlenecks: () => api.get('/api/admin/ops/bottlenecks').then((r) => r.data),
+};
+
+// Admin Collaboration API (admin-only, internal threads)
+export const adminCollaborationAPI = {
+  getThread: (targetType: string, targetId: string) =>
+    api.get('/api/admin/collaboration/threads/by-target', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
+  getOrCreateThread: (targetType: string, targetId: string, title?: string) =>
+    api.post('/api/admin/collaboration/threads/by-target', null, {
+      params: { target_type: targetType, target_id: targetId, title: title || undefined },
+    }).then((r) => r.data),
+  getSummary: (targetType: string, targetId: string) =>
+    api.get('/api/admin/collaboration/threads/summary', { params: { target_type: targetType, target_id: targetId } }).then((r) => r.data),
+  getSummariesBatch: (targets: { target_type: string; target_id: string }[]) =>
+    api.post('/api/admin/collaboration/threads/summaries', { targets }).then((r) => r.data),
+  getThreadById: (threadId: string) =>
+    api.get(`/api/admin/collaboration/threads/${threadId}`).then((r) => r.data),
+  getComments: (threadId: string) =>
+    api.get(`/api/admin/collaboration/threads/${threadId}/comments`).then((r) => r.data),
+  createComment: (threadId: string, body: string, parentCommentId?: string) =>
+    api.post(`/api/admin/collaboration/threads/${threadId}/comments`, { body, parent_comment_id: parentCommentId }).then((r) => r.data),
+  editComment: (commentId: string, body: string) =>
+    api.patch(`/api/admin/collaboration/comments/${commentId}`, { body }).then((r) => r.data),
+  deleteComment: (commentId: string) =>
+    api.delete(`/api/admin/collaboration/comments/${commentId}`).then((r) => r.data),
+  resolveThread: (threadId: string, note?: string) =>
+    api.post(`/api/admin/collaboration/threads/${threadId}/resolve`, null, { params: { note } }).then((r) => r.data),
+  reopenThread: (threadId: string) =>
+    api.post(`/api/admin/collaboration/threads/${threadId}/reopen`).then((r) => r.data),
+  closeThread: (threadId: string) =>
+    api.post(`/api/admin/collaboration/threads/${threadId}/close`).then((r) => r.data),
+  markRead: (threadId: string, lastCommentId?: string) =>
+    api.post(`/api/admin/collaboration/threads/${threadId}/read`, null, { params: { last_comment_id: lastCommentId } }).then((r) => r.data),
+  getUnreadCount: () =>
+    api.get('/api/admin/collaboration/notifications/unread-count').then((r) => r.data),
+};
+
 export const requirementsAPI = {
   getSufficiency: async (caseId: string): Promise<any> => {
     const response = await api.get('/api/requirements/sufficiency', { params: { case_id: caseId } });
@@ -669,7 +1008,7 @@ export const companyPolicyAPI = {
     const response = await api.get('/api/company-policies');
     return response.data;
   },
-  getLatest: async (): Promise<{ policy: any; benefits: any[] }> => {
+  getLatest: async (): Promise<{ policy: any; benefits: any[]; company_name?: string }> => {
     const response = await api.get('/api/company-policies/latest');
     return response.data;
   },
@@ -703,13 +1042,17 @@ export const companyPolicyAPI = {
 };
 
 export const resourcesAPI = {
+  /** Legacy: uses /api/resources/country (rkg_resources). Kept for backward compatibility. */
   getCountryResources: async (
     assignmentId: string,
     filters?: Record<string, string | number | boolean | null>
   ): Promise<{
     profile: Record<string, any>;
+    context?: Record<string, any>;
     hints: { priorities: string[]; recommendations: string[] };
     sections: Array<{ key: string; title: string; content: any }>;
+    events?: any[];
+    recommended?: any[];
     filters_applied: Record<string, any>;
   }> => {
     const params: Record<string, string> = { assignment_id: assignmentId };
@@ -717,6 +1060,72 @@ export const resourcesAPI = {
       params.filters = JSON.stringify(filters);
     }
     const response = await api.get('/api/resources/country', { params });
+    return response.data;
+  },
+
+  /** New: composite page data from published views. Use assignmentId or caseId (backend resolves both). */
+  getPage: async (
+    assignmentOrCaseId: string,
+    filters?: Record<string, string | number | boolean | null>
+  ): Promise<import('../types').ResourcesPagePayload> => {
+    const params: Record<string, string> = { assignment_id: assignmentOrCaseId };
+    if (filters && Object.keys(filters).length) {
+      params.filters = JSON.stringify(filters);
+    }
+    const response = await api.get('/api/resources/page', { params });
+    return response.data;
+  },
+
+  getContext: async (assignmentOrCaseId: string): Promise<import('../types').ResourceContext> => {
+    const response = await api.get('/api/resources/context', {
+      params: { assignment_id: assignmentOrCaseId },
+    });
+    return response.data;
+  },
+
+  getResources: async (
+    assignmentOrCaseId: string,
+    filters?: Record<string, string | number | boolean | null>,
+    page = 1,
+    limit = 50
+  ): Promise<{ resources: import('../types').PublicResource[] }> => {
+    const params: Record<string, string | number> = {
+      assignment_id: assignmentOrCaseId,
+      page,
+      limit,
+    };
+    if (filters && Object.keys(filters).length) {
+      params.filters = JSON.stringify(filters);
+    }
+    const response = await api.get('/api/resources', { params });
+    return response.data;
+  },
+
+  getEvents: async (
+    assignmentOrCaseId: string,
+    filters?: Record<string, string | number | boolean | null>,
+    page = 1,
+    limit = 50
+  ): Promise<{ events: import('../types').PublicEvent[] }> => {
+    const params: Record<string, string | number> = {
+      assignment_id: assignmentOrCaseId,
+      page,
+      limit,
+    };
+    if (filters && Object.keys(filters).length) {
+      params.filters = JSON.stringify(filters);
+    }
+    const response = await api.get('/api/resources/events', { params });
+    return response.data;
+  },
+
+  getRecommended: async (
+    assignmentOrCaseId: string,
+    limit = 10
+  ): Promise<import('../types').RecommendationGroup> => {
+    const response = await api.get('/api/resources/recommended', {
+      params: { assignment_id: assignmentOrCaseId, limit },
+    });
     return response.data;
   },
 };
