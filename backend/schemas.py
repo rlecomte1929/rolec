@@ -316,6 +316,8 @@ class AssignmentSummary(BaseModel):
     status: AssignmentStatus
     submittedAt: Optional[str] = None
     complianceStatus: Optional[str] = None
+    employeeFirstName: Optional[str] = None
+    employeeLastName: Optional[str] = None
     # 6B/6C: Optional relocation case summary attached to assignment
     # Contains a safe subset of fields from relocation_cases.
     case: Optional[Dict[str, Any]] = None
@@ -331,6 +333,8 @@ class AssignmentDetail(BaseModel):
     profile: Optional[RelocationProfile] = None
     completeness: Optional[int] = None
     complianceReport: Optional[Dict[str, Any]] = None
+    employeeFirstName: Optional[str] = None
+    employeeLastName: Optional[str] = None
 
 
 class HRAssignmentDecision(BaseModel):
@@ -345,6 +349,8 @@ class CreateCaseResponse(BaseModel):
 
 class AssignCaseRequest(BaseModel):
     employeeIdentifier: str
+    employeeFirstName: Optional[str] = None
+    employeeLastName: Optional[str] = None
 
 
 class AssignCaseResponse(BaseModel):
@@ -391,3 +397,15 @@ class ComplianceActionRequest(BaseModel):
     checkId: str
     notes: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
+
+
+class AddEvidenceRequest(BaseModel):
+    evidenceType: str
+    participantId: Optional[str] = None
+    requirementId: Optional[str] = None
+    fileUrl: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class AddEvidenceResponse(BaseModel):
+    evidenceId: str

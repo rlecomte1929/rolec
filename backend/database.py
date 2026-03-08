@@ -981,6 +981,26 @@ class Database:
                     """))
                 except Exception:
                     pass
+            # Phase 1 Step 3: case_evidence (SQLite only; Postgres uses migration)
+            if _is_sqlite:
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS case_evidence (
+                            id TEXT PRIMARY KEY,
+                            case_id TEXT NOT NULL,
+                            assignment_id TEXT,
+                            participant_id TEXT,
+                            requirement_id TEXT,
+                            evidence_type TEXT NOT NULL,
+                            file_url TEXT,
+                            metadata TEXT NOT NULL DEFAULT '{}',
+                            status TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted','verified','rejected')),
+                            submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+                            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                        )
+                    """))
+                except Exception:
+                    pass
 
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
@@ -1418,6 +1438,79 @@ class Database:
                 "FROM case_participants WHERE case_id = :cid ORDER BY created_at ASC",
                 {"cid": case_id},
                 op_name="list_case_participants",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def insert_case_evidence(
+        self,
+        case_id: str,
+        assignment_id: Optional[str],
+        participant_id: Optional[str],
+        requirement_id: Optional[str],
+        evidence_type: str,
+        file_url: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        status: str = "submitted",
+        request_id: Optional[str] = None,
+    ) -> str:
+        """Insert a case_evidence row. Returns the new evidence id."""
+        evidence_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        pl = json.dumps(metadata or {})
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                "INSERT INTO case_evidence "
+                "(id, case_id, assignment_id, participant_id, requirement_id, evidence_type, "
+                "file_url, metadata, status, submitted_at, created_at) "
+                "VALUES (:id, :cid, :aid, :pid, :rid, :et, :url, :meta, :status, :sub, :ca)",
+                {
+                    "id": evidence_id,
+                    "cid": case_id,
+                    "aid": assignment_id,
+                    "pid": participant_id,
+                    "rid": requirement_id,
+                    "et": evidence_type,
+                    "url": file_url,
+                    "meta": pl,
+                    "status": status,
+                    "sub": now,
+                    "ca": now,
+                },
+                op_name="insert_case_evidence",
+                request_id=request_id,
+            )
+        return evidence_id
+
+    def list_case_evidence(
+        self, case_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List case_evidence for a case, newest first."""
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT id, case_id, assignment_id, participant_id, requirement_id, evidence_type, "
+                "file_url, metadata, status, submitted_at, created_at "
+                "FROM case_evidence WHERE case_id = :cid ORDER BY created_at DESC",
+                {"cid": case_id},
+                op_name="list_case_evidence",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_assignment_evidence(
+        self, assignment_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List case_evidence for an assignment, newest first."""
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT id, case_id, assignment_id, participant_id, requirement_id, evidence_type, "
+                "file_url, metadata, status, submitted_at, created_at "
+                "FROM case_evidence WHERE assignment_id = :aid ORDER BY created_at DESC",
+                {"aid": assignment_id},
+                op_name="list_assignment_evidence",
                 request_id=request_id,
             ).fetchall()
         return self._rows_to_list(rows)

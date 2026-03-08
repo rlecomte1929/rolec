@@ -18,6 +18,8 @@ export const HrDashboard: React.FC = () => {
   const [error, setError] = useState('');
   const [caseId, setCaseId] = useState<string | null>(null);
   const [employeeIdentifier, setEmployeeIdentifier] = useState('');
+  const [employeeFirstName, setEmployeeFirstName] = useState('');
+  const [employeeLastName, setEmployeeLastName] = useState('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const [assignmentDetails, setAssignmentDetails] = useState<Record<string, AssignmentDetail>>({});
@@ -109,6 +111,9 @@ export const HrDashboard: React.FC = () => {
     setError('');
     setInviteToken(null);
     setAssignmentId(null);
+    setEmployeeIdentifier('');
+    setEmployeeFirstName('');
+    setEmployeeLastName('');
     try {
       const response = await hrAPI.createCase();
       setCaseId(response.caseId);
@@ -127,14 +132,21 @@ export const HrDashboard: React.FC = () => {
     setAssignmentId(null);
     const interaction = startInteraction('HR_ASSIGN_CLICK');
     try {
-      const response = await hrAPI.assignCase(caseId, employeeIdentifier.trim());
+      const response = await hrAPI.assignCase(caseId, employeeIdentifier.trim(), {
+        firstName: employeeFirstName || undefined,
+        lastName: employeeLastName || undefined,
+      });
       setAssignmentId(response.assignmentId);
       if (response.inviteToken) {
         setInviteToken(response.inviteToken);
       }
       await loadAssignments();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Unable to assign case.');
+      const data = err.response?.data;
+      const msg = data?.detail || data?.error || 'Unable to assign case.';
+      setError(msg);
+      // Log full error to console for debugging (see docs/DEBUG_ASSIGN_ERROR.md)
+      console.error('[Assign failed]', msg, data || err);
     } finally {
       // Measure click -> UI render (best-effort).
       void endInteraction(interaction);
@@ -210,8 +222,18 @@ export const HrDashboard: React.FC = () => {
 
   const displayName = (assignment: AssignmentSummary) => {
     const detail = assignmentDetails[assignment.id];
-    const name = detail?.profile?.primaryApplicant?.fullName;
-    return name || assignment.employeeIdentifier;
+    const fromProfile = detail?.profile?.primaryApplicant?.fullName;
+    const fromHr =
+      [assignment.employeeFirstName, assignment.employeeLastName].filter(Boolean).join(' ') ||
+      (detail
+        ? [detail.employeeFirstName, detail.employeeLastName].filter(Boolean).join(' ')
+        : '');
+    return fromProfile || fromHr || assignment.employeeIdentifier;
+  };
+
+  const displayDestination = (assignment: AssignmentSummary) => {
+    const detail = assignmentDetails[assignment.id];
+    return detail?.profile?.movePlan?.destination || '—';
   };
 
   const filteredAssignments = assignments.filter((assignment) => {
@@ -240,7 +262,7 @@ export const HrDashboard: React.FC = () => {
   });
 
   return (
-    <AppShell title="HR Dashboard" subtitle="Monitor relocations, readiness, and approvals.">
+    <AppShell title="Assignments" subtitle="Create cases, assign employees, and monitor relocations.">
       <div className="space-y-6">
         {error && <Alert variant="error">{error}</Alert>}
 
@@ -255,6 +277,71 @@ export const HrDashboard: React.FC = () => {
           <Button variant="outline" onClick={() => setIsFilterOpen(true)}>Filter</Button>
           <Button onClick={handleCreateCase}>New Case</Button>
         </div>
+
+        {caseId && (
+          <Card padding="lg">
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  value={employeeFirstName}
+                  onChange={setEmployeeFirstName}
+                  label="First name"
+                  placeholder="Jane"
+                  fullWidth
+                />
+                <Input
+                  value={employeeLastName}
+                  onChange={setEmployeeLastName}
+                  label="Last name"
+                  placeholder="Doe"
+                  fullWidth
+                />
+              </div>
+              <Input
+                value={employeeIdentifier}
+                onChange={setEmployeeIdentifier}
+                label="Employee username or email"
+                placeholder="jane_doe or jane@company.com"
+                fullWidth
+              />
+              <Button onClick={handleAssign}>Assign</Button>
+              {assignmentId && (
+                <Alert variant="info" title="Assignment created">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span>Assignment ID: <strong>{assignmentId}</strong></span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(assignmentId);
+                          setCopyFeedback(true);
+                          setTimeout(() => setCopyFeedback(false), 2000);
+                        } catch {
+                          const el = document.createElement('input');
+                          el.value = assignmentId;
+                          document.body.appendChild(el);
+                          el.select();
+                          document.execCommand('copy');
+                          document.body.removeChild(el);
+                          setCopyFeedback(true);
+                          setTimeout(() => setCopyFeedback(false), 2000);
+                        }
+                      }}
+                    >
+                      {copyFeedback ? 'Copied!' : 'Copy Assignment ID'}
+                    </Button>
+                  </div>
+                </Alert>
+              )}
+              {inviteToken && (
+                <Alert variant="info" title="Invite created">
+                  Share this invite token with the employee: <strong>{inviteToken}</strong>
+                </Alert>
+              )}
+            </div>
+          </Card>
+        )}
 
         <Card padding="lg">
           <div className="flex items-center justify-between mb-4">
@@ -331,9 +418,10 @@ export const HrDashboard: React.FC = () => {
 
           {!isLoading && filteredAssignments.length > 0 && (
             <div className="border border-[#e2e8f0] rounded-xl overflow-hidden">
-              <div className={`grid gap-4 bg-[#f8fafc] px-4 py-3 text-[11px] uppercase tracking-wide text-[#6b7280] ${isManageMode ? 'grid-cols-[2rem,1.6fr,1.6fr,1fr,1fr,0.3fr]' : 'grid-cols-[1.6fr,1.6fr,1fr,1fr,0.3fr]'}`}>
+              <div className={`grid gap-4 bg-[#f8fafc] px-4 py-3 text-[11px] uppercase tracking-wide text-[#6b7280] ${isManageMode ? 'grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,0.3fr]' : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr]'}`}>
                 {isManageMode && <div></div>}
                 <div>Employee name</div>
+                <div>Destination</div>
                 <div>Route (origin → dest)</div>
                 <div>Status</div>
                 <div>Next deadline</div>
@@ -356,8 +444,8 @@ export const HrDashboard: React.FC = () => {
                     }}
                     className={`grid gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer ${
                       isManageMode
-                        ? `grid-cols-[2rem,1.6fr,1.6fr,1fr,1fr,0.3fr] ${isSelected ? 'bg-red-50' : 'hover:bg-[#f8fafc]'}`
-                        : 'grid-cols-[1.6fr,1.6fr,1fr,1fr,0.3fr] hover:bg-[#f8fafc]'
+                        ? `grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] ${isSelected ? 'bg-red-50' : 'hover:bg-[#f8fafc]'}`
+                        : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] hover:bg-[#f8fafc]'
                     }`}
                   >
                     {isManageMode && (
@@ -373,8 +461,10 @@ export const HrDashboard: React.FC = () => {
                     )}
                     <div>
                       <div className="text-sm font-semibold text-[#0b2b43]">{displayName(assignment)}</div>
-                      <div className="text-xs text-[#6b7280]">{assignment.employeeIdentifier}</div>
-                      <div className="text-xs text-[#94a3b8]">Assignment ID: {assignment.id}</div>
+                      <div className="text-xs font-semibold text-[#0b2b43]">{assignment.employeeIdentifier}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-[#0b2b43]">{displayDestination(assignment)}</div>
                     </div>
                     <div>
                       <div className="text-sm text-[#0b2b43]">{formatRoute(detail)}</div>
@@ -401,55 +491,6 @@ export const HrDashboard: React.FC = () => {
             </div>
           )}
         </Card>
-
-        {caseId && (
-          <Card padding="lg">
-            <div className="space-y-3">
-              <Input
-                value={employeeIdentifier}
-                onChange={setEmployeeIdentifier}
-                label="Employee username or email"
-                placeholder="jane_doe or jane@company.com"
-                fullWidth
-              />
-              <Button onClick={handleAssign}>Assign</Button>
-              {assignmentId && (
-                <Alert variant="info" title="Assignment created">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span>Assignment ID: <strong>{assignmentId}</strong></span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(assignmentId);
-                          setCopyFeedback(true);
-                          setTimeout(() => setCopyFeedback(false), 2000);
-                        } catch {
-                          const el = document.createElement('input');
-                          el.value = assignmentId;
-                          document.body.appendChild(el);
-                          el.select();
-                          document.execCommand('copy');
-                          document.body.removeChild(el);
-                          setCopyFeedback(true);
-                          setTimeout(() => setCopyFeedback(false), 2000);
-                        }
-                      }}
-                    >
-                      {copyFeedback ? 'Copied!' : 'Copy Assignment ID'}
-                    </Button>
-                  </div>
-                </Alert>
-              )}
-              {inviteToken && (
-                <Alert variant="info" title="Invite created">
-                  Share this invite token with the employee: <strong>{inviteToken}</strong>
-                </Alert>
-              )}
-            </div>
-          </Card>
-        )}
       </div>
 
       {isFilterOpen && (

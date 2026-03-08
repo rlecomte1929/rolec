@@ -18,6 +18,7 @@ import re
 import json
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from .schemas import (
     RegisterRequest, LoginRequest, LoginResponse, AnswerRequest, NextQuestionResponse,
@@ -27,7 +28,8 @@ from .schemas import (
     AssignCaseResponse, CreateCaseResponse, AssignmentSummary, AssignmentDetail,
     EmployeeJourneyRequest, EmployeeJourneyNextQuestion, HRAssignmentDecision,
     UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
-    UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest
+    UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest,
+    AddEvidenceRequest, AddEvidenceResponse,
 )
 from .services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
 from .services.guidance_pack_service import generate_guidance_pack
@@ -2893,6 +2895,52 @@ def get_assignment_policy_budget(
     _ = _require_assignment_visibility(assignment_id, user)
     policy = policy_engine.load_policy()
     return normalize_policy_caps(policy)
+
+
+@app.post("/api/assignments/{assignment_id}/evidence", response_model=AddEvidenceResponse)
+def add_assignment_evidence(
+    assignment_id: str,
+    request: AddEvidenceRequest,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Phase 1 Step 3: Insert case_evidence for an assignment. Controlled insertion."""
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=400, detail="Assignment missing case_id")
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    try:
+        evidence_id = db.insert_case_evidence(
+            case_id=case_id,
+            assignment_id=assignment_id,
+            participant_id=getattr(request, "participantId", None),
+            requirement_id=getattr(request, "requirementId", None),
+            evidence_type=request.evidenceType,
+            file_url=request.fileUrl,
+            metadata=request.metadata,
+            status="submitted",
+            request_id=request_id,
+        )
+        return AddEvidenceResponse(evidenceId=evidence_id)
+    except IntegrityError:
+        raise HTTPException(
+            status_code=400,
+            detail="Evidence requires case_id in wizard_cases. HR-created cases use relocation_cases.",
+        )
+
+
+@app.get("/api/cases/{case_id}/evidence")
+def get_case_evidence(
+    case_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Phase 1 Step 3: List case_evidence for a case. For verification and debugging."""
+    _ = _require_case_access(case_id, user)
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    items = db.list_case_evidence(case_id, request_id=request_id)
+    return {"case_id": case_id, "evidence": items}
 
 
 @app.get("/api/dossier/questions", response_model=DossierQuestionsResponse)
