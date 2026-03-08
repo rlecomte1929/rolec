@@ -2,6 +2,7 @@
 // Simplified modern UI components
 
 export { Button } from './Button';
+export { LoadingButton } from './LoadingButton';
 export { Card } from './Card';
 export { Input } from './Input';
 export { Select } from './Select';
