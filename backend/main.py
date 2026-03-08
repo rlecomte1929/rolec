@@ -1699,13 +1699,19 @@ def assign_case(
                 employee_last_name=employee_last_name,
             )
         now_iso = datetime.utcnow().isoformat()
-        db.ensure_case_participant(
-            case_id=case_id,
-            person_id=effective["id"],
-            role="hr_owner",
-            joined_at=now_iso,
-            request_id=request_id,
-        )
+        try:
+            db.ensure_case_participant(
+                case_id=case_id,
+                person_id=effective["id"],
+                role="hr_owner",
+                joined_at=now_iso,
+                request_id=request_id,
+            )
+        except Exception as exc:
+            log.warning(
+                "ensure_case_participant skipped assignment_id=%s case_id=%s role=hr_owner error=%s",
+                assignment_id, case_id, str(exc),
+            )
         event_type = "assignment.created"
         try:
             db.insert_case_event(
@@ -1807,13 +1813,19 @@ def get_employee_assignment(
                 assignment = db.get_assignment_by_id(assignment["id"], request_id=request.state.request_id)
                 case_id = assignment.get("case_id", "")
                 now_iso = datetime.utcnow().isoformat()
-                db.ensure_case_participant(
-                    case_id=case_id,
-                    person_id=effective["id"],
-                    role="relocatee",
-                    joined_at=now_iso,
-                    request_id=getattr(request.state, "request_id", None),
-                )
+                try:
+                    db.ensure_case_participant(
+                        case_id=case_id,
+                        person_id=effective["id"],
+                        role="relocatee",
+                        joined_at=now_iso,
+                        request_id=getattr(request.state, "request_id", None),
+                    )
+                except Exception as exc:
+                    log.warning(
+                        "ensure_case_participant skipped assignment_id=%s case_id=%s role=relocatee error=%s",
+                        assignment_id, case_id, str(exc),
+                    )
                 event_type = "assignment.claimed"
                 try:
                     db.insert_case_event(
@@ -1886,12 +1898,18 @@ def claim_assignment(
     db.attach_employee_to_assignment(assignment_id, effective["id"])
     db.mark_invites_claimed(assignment["employee_identifier"])
     now_iso = datetime.utcnow().isoformat()
-    db.ensure_case_participant(
-        case_id=case_id,
-        person_id=effective["id"],
-        role="relocatee",
-        joined_at=now_iso,
-    )
+    try:
+        db.ensure_case_participant(
+            case_id=case_id,
+            person_id=effective["id"],
+            role="relocatee",
+            joined_at=now_iso,
+        )
+    except Exception as exc:
+        log.warning(
+            "ensure_case_participant skipped assignment_id=%s case_id=%s role=relocatee error=%s",
+            assignment_id, case_id, str(exc),
+        )
     event_type = "assignment.claimed"
     try:
         db.insert_case_event(
