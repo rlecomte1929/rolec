@@ -1733,13 +1733,20 @@ def assign_case(
 
         if not employee_user:
             invite_token = str(uuid.uuid4())
-            db.create_assignment_invite(
-                invite_id=str(uuid.uuid4()),
-                case_id=case_id,
-                hr_user_id=user["id"],
-                employee_identifier=employee_identifier,
-                token=invite_token,
-            )
+            try:
+                db.create_assignment_invite(
+                    invite_id=str(uuid.uuid4()),
+                    case_id=case_id,
+                    hr_user_id=effective["id"],
+                    employee_identifier=employee_identifier,
+                    token=invite_token,
+                )
+            except Exception as exc:
+                log.warning(
+                    "create_assignment_invite skipped assignment_id=%s case_id=%s error=%s",
+                    assignment_id, case_id, str(exc),
+                )
+                invite_token = None
 
         # Prefill invitation message in Messages
         invite_line = (
@@ -1758,21 +1765,28 @@ def assign_case(
             f"{temp_line}"
             f"Once logged in, go to My Case to start your intake.\n"
         )
-        db.create_message(
-            message_id=str(uuid.uuid4()),
-            assignment_id=assignment_id,
-            hr_user_id=effective["id"],
-            employee_identifier=employee_identifier,
-            subject="Your relocation case is ready",
-            body=message_body,
-            status="draft",
-        )
+        try:
+            db.create_message(
+                message_id=str(uuid.uuid4()),
+                assignment_id=assignment_id,
+                hr_user_id=effective["id"],
+                employee_identifier=employee_identifier,
+                subject="Your relocation case is ready",
+                body=message_body,
+                status="draft",
+            )
+        except Exception as exc:
+            log.warning(
+                "create_message skipped assignment_id=%s case_id=%s error=%s",
+                assignment_id, case_id, str(exc),
+            )
 
         return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
     except HTTPException:
         # Let explicit 4xx/404 propagate as-is.
         raise
     except Exception as e:
+        err_msg = str(e)
         log.error(
             "request_id=%s method=POST route=/api/hr/cases/%s/assign user_id=%s email=%s employee_identifier=%s error=%s",
             request_id,
@@ -1785,7 +1799,11 @@ def assign_case(
         )
         return JSONResponse(
             status_code=500,
-            content={"error": "Unable to assign case", "request_id": request_id},
+            content={
+                "error": "Unable to assign case",
+                "detail": err_msg,
+                "request_id": request_id,
+            },
         )
 
 
