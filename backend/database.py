@@ -964,6 +964,23 @@ class Database:
                             pass
             except Exception:
                 pass
+            # Phase 1 Step 2: case_participants (SQLite only; Postgres uses migration)
+            if _is_sqlite:
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS case_participants (
+                            id TEXT PRIMARY KEY,
+                            case_id TEXT NOT NULL,
+                            person_id TEXT NOT NULL,
+                            role TEXT NOT NULL CHECK (role IN ('relocatee','hr_owner','hr_reviewer','observer')),
+                            invited_at TEXT,
+                            joined_at TEXT,
+                            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                            UNIQUE(case_id, person_id, role)
+                        )
+                    """))
+                except Exception:
+                    pass
 
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
@@ -1337,6 +1354,70 @@ class Database:
                 "FROM case_events WHERE case_id = :cid ORDER BY created_at DESC LIMIT 200",
                 {"cid": case_id},
                 op_name="list_case_events",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def ensure_case_participant(
+        self,
+        case_id: str,
+        person_id: str,
+        role: str,
+        invited_at: Optional[str] = None,
+        joined_at: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> None:
+        """Insert or update case_participants. Idempotent on (case_id, person_id, role)."""
+        part_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        inv = invited_at or now
+        jnd = joined_at
+        params = {
+            "id": part_id,
+            "cid": case_id,
+            "pid": person_id,
+            "role": role,
+            "inv": inv,
+            "jnd": jnd,
+            "ca": now,
+        }
+        with self.engine.begin() as conn:
+            if _is_sqlite:
+                self._exec(
+                    conn,
+                    "INSERT INTO case_participants (id, case_id, person_id, role, invited_at, joined_at, created_at) "
+                    "VALUES (:id, :cid, :pid, :role, :inv, :jnd, :ca) "
+                    "ON CONFLICT (case_id, person_id, role) DO UPDATE SET "
+                    "invited_at = COALESCE(excluded.invited_at, case_participants.invited_at), "
+                    "joined_at = COALESCE(excluded.joined_at, case_participants.joined_at)",
+                    params,
+                    op_name="ensure_case_participant",
+                    request_id=request_id,
+                )
+            else:
+                self._exec(
+                    conn,
+                    "INSERT INTO case_participants (id, case_id, person_id, role, invited_at, joined_at, created_at) "
+                    "VALUES (:id, :cid, :pid, :role, :inv, :jnd, :ca) "
+                    "ON CONFLICT (case_id, person_id, role) DO UPDATE SET "
+                    "invited_at = COALESCE(EXCLUDED.invited_at, case_participants.invited_at), "
+                    "joined_at = COALESCE(EXCLUDED.joined_at, case_participants.joined_at)",
+                    params,
+                    op_name="ensure_case_participant",
+                    request_id=request_id,
+                )
+
+    def list_case_participants(
+        self, case_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List case_participants for a case."""
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT id, case_id, person_id, role, invited_at, joined_at, created_at "
+                "FROM case_participants WHERE case_id = :cid ORDER BY created_at ASC",
+                {"cid": case_id},
+                op_name="list_case_participants",
                 request_id=request_id,
             ).fetchall()
         return self._rows_to_list(rows)

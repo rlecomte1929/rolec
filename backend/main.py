@@ -1698,8 +1698,15 @@ def assign_case(
                 employee_first_name=employee_first_name,
                 employee_last_name=employee_last_name,
             )
+        now_iso = datetime.utcnow().isoformat()
+        db.ensure_case_participant(
+            case_id=case_id,
+            person_id=effective["id"],
+            role="hr_owner",
+            joined_at=now_iso,
+            request_id=request_id,
+        )
         event_type = "assignment.created"
-        log.info("assign_flow before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
         try:
             db.insert_case_event(
                 case_id=case_id,
@@ -1709,7 +1716,6 @@ def assign_case(
                 payload={"employee_identifier": employee_identifier},
                 request_id=request_id,
             )
-            log.info("assign_flow after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
         except Exception as exc:
             log.error(
                 "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
@@ -1794,15 +1800,21 @@ def get_employee_assignment(
             )
             if assignment and not user.get("impersonation"):
                 assignment_id = assignment["id"]
-                case_id = assignment.get("case_id", "")
-                log.info("claim_flow_entered assignment_id=%s case_id=%s route=GET/assignments/current", assignment_id, case_id)
                 db.attach_employee_to_assignment(
                     assignment["id"], effective["id"], request_id=request.state.request_id
                 )
                 db.mark_invites_claimed(identifier)
                 assignment = db.get_assignment_by_id(assignment["id"], request_id=request.state.request_id)
+                case_id = assignment.get("case_id", "")
+                now_iso = datetime.utcnow().isoformat()
+                db.ensure_case_participant(
+                    case_id=case_id,
+                    person_id=effective["id"],
+                    role="relocatee",
+                    joined_at=now_iso,
+                    request_id=getattr(request.state, "request_id", None),
+                )
                 event_type = "assignment.claimed"
-                log.info("before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
                 try:
                     db.insert_case_event(
                         case_id=assignment["case_id"],
@@ -1812,7 +1824,6 @@ def get_employee_assignment(
                         payload={},
                         request_id=getattr(request.state, "request_id", None),
                     )
-                    log.info("after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
                 except Exception as exc:
                     log.error(
                         "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
@@ -1872,11 +1883,16 @@ def claim_assignment(
         raise HTTPException(status_code=403, detail="Assignment already claimed")
 
     case_id = assignment.get("case_id", "")
-    log.info("claim_flow_entered assignment_id=%s case_id=%s route=POST/claim", assignment_id, case_id)
     db.attach_employee_to_assignment(assignment_id, effective["id"])
     db.mark_invites_claimed(assignment["employee_identifier"])
+    now_iso = datetime.utcnow().isoformat()
+    db.ensure_case_participant(
+        case_id=case_id,
+        person_id=effective["id"],
+        role="relocatee",
+        joined_at=now_iso,
+    )
     event_type = "assignment.claimed"
-    log.info("before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
     try:
         db.insert_case_event(
             case_id=assignment["case_id"],
@@ -1885,7 +1901,6 @@ def claim_assignment(
             event_type=event_type,
             payload={},
         )
-        log.info("after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
     except Exception as exc:
         log.error(
             "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
@@ -2047,18 +2062,10 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             detail="Profile is not complete. Please fill in all required fields in the wizard steps (Relocation Basics, Employee Profile, Family, Assignment Context).",
         )
 
-    log.info(
-        "employee_submit_flow_entered assignment_id=%s case_id=%s",
-        assignment_id,
-        assignment.get("case_id", ""),
-    )
-    log.info("before_set_assignment_submitted assignment_id=%s", assignment_id)
     db.set_assignment_submitted(assignment_id)
-    log.info("after_set_assignment_submitted assignment_id=%s", assignment_id)
 
     case_id = assignment.get("case_id") or ""
     event_type = "assignment.submitted"
-    log.info("before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
     try:
         db.insert_case_event(
             case_id=case_id,
@@ -2067,7 +2074,6 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             event_type=event_type,
             payload={},
         )
-        log.info("after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
     except Exception as exc:
         log.error(
             "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
@@ -3448,24 +3454,12 @@ def run_compliance(assignment_id: str, user: Dict[str, Any] = Depends(require_ro
 
 @app.post("/api/hr/assignments/{assignment_id}/decision")
 def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    log.warning("HR_DECISION_EVENT_BUILD_V2 assignment_id=%s decision=%s", assignment_id, request.decision.value)
-    log.info(
-        "approval_flow_entered assignment_id=%s decision=%s",
-        assignment_id,
-        getattr(request.decision, "value", request.decision),
-    )
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     case_id = assignment.get("case_id") or ""
-    log.info(
-        "approval_flow assignment_id=%s case_id=%s decision=%s",
-        assignment_id,
-        case_id,
-        getattr(request.decision, "value", request.decision),
-    )
 
     if request.decision not in [AssignmentStatus.APPROVED, AssignmentStatus.REJECTED]:
         raise HTTPException(status_code=400, detail="Invalid decision")
@@ -3473,12 +3467,9 @@ def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[st
     notes_payload = request.notes
     # For the simplified canonical lifecycle we treat decisions as final approved / rejected.
     assert_canonical_status(request.decision.value)
-    log.info("before_set_assignment_decision assignment_id=%s", assignment_id)
     db.set_assignment_decision(assignment_id, request.decision.value, notes_payload)
-    log.info("after_set_assignment_decision assignment_id=%s", assignment_id)
 
     event_type = "assignment.approved" if request.decision == AssignmentStatus.APPROVED else "assignment.rejected"
-    log.info("before_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
     try:
         db.insert_case_event(
             case_id=case_id,
@@ -3487,7 +3478,6 @@ def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[st
             event_type=event_type,
             payload={"notes": notes_payload} if notes_payload else {},
         )
-        log.info("after_insert_case_event assignment_id=%s case_id=%s event_type=%s", assignment_id, case_id, event_type)
     except Exception as exc:
         log.error(
             "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
