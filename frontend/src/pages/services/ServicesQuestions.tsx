@@ -94,8 +94,9 @@ export const ServicesQuestions: React.FC = () => {
           originCountry: caseData.originCountry,
         };
         const fromCase = caseToInitialAnswers((caseData.draft as unknown as Record<string, unknown>) || null, topLevel);
-        setInitialAnswers((prev) => mergeRecords(prev, fromCase));
-        setAnswers((prev) => mergeRecords(prev, fromCase));
+        const updater = (prev: Record<string, unknown>) => mergeRecords(prev, fromCase);
+        (setInitialAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)(updater);
+        (setAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)(updater);
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -121,7 +122,8 @@ export const ServicesQuestions: React.FC = () => {
         selectedServices={wizardServices as unknown as Set<any>}
         initialAnswers={Object.keys(initialAnswers).length > 0 ? { ...answers, ...initialAnswers } : answers}
         onAnswersChange={(newAnswers, byCategory) => {
-          setAnswers((prev) => mergeRecords(prev, newAnswers));
+          const updater = (prev: Record<string, unknown>) => mergeRecords(prev, newAnswers);
+          (setAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)(updater);
           if (!caseId) return;
           const items = Object.entries(byCategory).map(([serviceKey, ans]) => ({
             service_key: serviceKey,
