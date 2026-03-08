@@ -1723,15 +1723,13 @@ def assign_case(
                 request_id=request_id,
             )
         except Exception as exc:
-            log.error(
-                "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+            log.warning(
+                "insert_case_event skipped assignment_id=%s case_id=%s event_type=%s error=%s",
                 assignment_id,
                 case_id,
                 event_type,
                 str(exc),
-                exc_info=True,
             )
-            raise
 
         if not employee_user:
             invite_token = str(uuid.uuid4())
@@ -1837,15 +1835,13 @@ def get_employee_assignment(
                         request_id=getattr(request.state, "request_id", None),
                     )
                 except Exception as exc:
-                    log.error(
-                        "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+                    log.warning(
+                        "insert_case_event skipped assignment_id=%s case_id=%s event_type=%s error=%s",
                         assignment_id,
                         case_id,
                         event_type,
                         str(exc),
-                        exc_info=True,
                     )
-                    raise
 
     if not assignment:
         return {"assignment": None}
@@ -1920,15 +1916,13 @@ def claim_assignment(
             payload={},
         )
     except Exception as exc:
-        log.error(
-            "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+        log.warning(
+            "insert_case_event skipped assignment_id=%s case_id=%s event_type=%s error=%s",
             assignment_id,
             case_id,
             event_type,
             str(exc),
-            exc_info=True,
         )
-        raise
     return {"success": True, "assignmentId": assignment_id}
 
 
