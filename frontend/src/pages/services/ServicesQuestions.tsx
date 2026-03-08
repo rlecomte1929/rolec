@@ -9,6 +9,13 @@ import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext'
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 
+function mergeRecords(
+  prev: Record<string, unknown>,
+  next: Record<string, unknown>
+): Record<string, unknown> {
+  return { ...prev, ...next };
+}
+
 /** Build initial answers from case (draft + top-level columns) for consistency. */
 function caseToInitialAnswers(
   draft: Record<string, unknown> | null,
@@ -87,8 +94,8 @@ export const ServicesQuestions: React.FC = () => {
           originCountry: caseData.originCountry,
         };
         const fromCase = caseToInitialAnswers((caseData.draft as unknown as Record<string, unknown>) || null, topLevel);
-        setInitialAnswers((prev: Record<string, unknown>) => ({ ...prev, ...fromCase }));
-        setAnswers((prev: Record<string, unknown>) => ({ ...prev, ...fromCase }));
+        setInitialAnswers((prev) => mergeRecords(prev, fromCase));
+        setAnswers((prev) => mergeRecords(prev, fromCase));
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -114,7 +121,7 @@ export const ServicesQuestions: React.FC = () => {
         selectedServices={wizardServices as unknown as Set<any>}
         initialAnswers={Object.keys(initialAnswers).length > 0 ? { ...answers, ...initialAnswers } : answers}
         onAnswersChange={(newAnswers, byCategory) => {
-          setAnswers((prev) => ({ ...prev, ...newAnswers }));
+          setAnswers((prev) => mergeRecords(prev, newAnswers));
           if (!caseId) return;
           const items = Object.entries(byCategory).map(([serviceKey, ans]) => ({
             service_key: serviceKey,
