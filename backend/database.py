@@ -923,6 +923,8 @@ class Database:
                     ("case_assignments", "budget_limit", "REAL"),
                     ("case_assignments", "budget_estimated", "REAL"),
                     ("case_assignments", "expected_start_date", "TEXT"),
+                    ("case_assignments", "employee_first_name", "TEXT"),
+                    ("case_assignments", "employee_last_name", "TEXT"),
                 ]
                 for tbl, col, typ in cc_cols:
                     try:
@@ -936,6 +938,8 @@ class Database:
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS budget_limit NUMERIC"))
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS budget_estimated NUMERIC"))
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS expected_start_date DATE"))
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_first_name TEXT"))
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_last_name TEXT"))
             try:
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS relocation_tasks (
@@ -949,6 +953,15 @@ class Database:
                         event_type TEXT, description TEXT, created_at TEXT
                     )
                 """))
+                # Phase 1: payload and actor_principal_id for case_events
+                if _is_sqlite:
+                    for col_name, col_type in [("payload", "TEXT DEFAULT '{}'"), ("actor_principal_id", "TEXT")]:
+                        try:
+                            cols = conn.execute(text("PRAGMA table_info(case_events)")).fetchall()
+                            if not any(c[1] == col_name for c in cols):
+                                conn.execute(text(f"ALTER TABLE case_events ADD COLUMN {col_name} {col_type}"))
+                        except Exception:
+                            pass
             except Exception:
                 pass
 
@@ -1175,14 +1188,19 @@ class Database:
         employee_identifier: str,
         status: str,
         request_id: Optional[str] = None,
+        employee_first_name: Optional[str] = None,
+        employee_last_name: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
+        efn = (employee_first_name or "").strip() or None
+        eln = (employee_last_name or "").strip() or None
         with self.engine.begin() as conn:
             self._exec(
                 conn,
                 "INSERT INTO case_assignments "
-                "(id, case_id, hr_user_id, employee_user_id, employee_identifier, status, created_at, updated_at) "
-                "VALUES (:id, :cid, :hr, :emp, :ident, :status, :ca, :ua)",
+                "(id, case_id, hr_user_id, employee_user_id, employee_identifier, status, "
+                "employee_first_name, employee_last_name, created_at, updated_at) "
+                "VALUES (:id, :cid, :hr, :emp, :ident, :status, :efn, :eln, :ca, :ua)",
                 {
                     "id": assignment_id,
                     "cid": case_id,
@@ -1190,6 +1208,8 @@ class Database:
                     "emp": employee_user_id,
                     "ident": employee_identifier,
                     "status": status,
+                    "efn": efn,
+                    "eln": eln,
                     "ca": now,
                     "ua": now,
                 },
@@ -1258,6 +1278,68 @@ class Database:
                 op_name="set_assignment_decision",
                 request_id=request_id,
             )
+
+    def insert_case_event(
+        self,
+        case_id: str,
+        assignment_id: Optional[str],
+        actor_principal_id: str,
+        event_type: str,
+        payload: Optional[Dict[str, Any]] = None,
+        request_id: Optional[str] = None,
+    ) -> None:
+        """Append an immutable event to the case_events spine."""
+        event_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        pl = json.dumps(payload or {})
+        with self.engine.begin() as conn:
+            if _is_sqlite:
+                self._exec(
+                    conn,
+                    "INSERT INTO case_events (id, case_id, assignment_id, actor_principal_id, event_type, payload, created_at) "
+                    "VALUES (:id, :cid, :aid, :actor, :et, :pl, :ca)",
+                    {
+                        "id": event_id,
+                        "cid": case_id,
+                        "aid": assignment_id,
+                        "actor": actor_principal_id,
+                        "et": event_type,
+                        "pl": pl,
+                        "ca": now,
+                    },
+                    op_name="insert_case_event",
+                    request_id=request_id,
+                )
+            else:
+                self._exec(
+                    conn,
+                    "INSERT INTO case_events (id, case_id, assignment_id, actor_principal_id, event_type, payload, created_at) "
+                    "VALUES (:id, :cid, :aid, :actor, :et, :pl, :ca)",
+                    {
+                        "id": event_id,
+                        "cid": case_id,
+                        "aid": assignment_id,
+                        "actor": actor_principal_id,
+                        "et": event_type,
+                        "pl": pl,
+                        "ca": now,
+                    },
+                    op_name="insert_case_event",
+                    request_id=request_id,
+                )
+
+    def list_case_events(self, case_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List case_events for a case, newest first."""
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT id, case_id, assignment_id, actor_principal_id, actor_user_id, event_type, payload, description, created_at "
+                "FROM case_events WHERE case_id = :cid ORDER BY created_at DESC LIMIT 200",
+                {"cid": case_id},
+                op_name="list_case_events",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
 
     def get_assignment_by_id(self, assignment_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
