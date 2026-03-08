@@ -3448,6 +3448,7 @@ def run_compliance(assignment_id: str, user: Dict[str, Any] = Depends(require_ro
 
 @app.post("/api/hr/assignments/{assignment_id}/decision")
 def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    log.warning("HR_DECISION_EVENT_BUILD_V2 assignment_id=%s decision=%s", assignment_id, request.decision.value)
     log.info(
         "approval_flow_entered assignment_id=%s decision=%s",
         assignment_id,
