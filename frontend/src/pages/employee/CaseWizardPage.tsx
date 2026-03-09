@@ -422,11 +422,15 @@ export const CaseWizardPage: React.FC = () => {
     }
   };
 
+  const onSaveForSteps = useCallback(async (draft: CaseDraftDTO): Promise<void> => {
+    await handleSave(draft);
+  }, [handleSave]);
+
   const stepProps = {
     caseId: resolvedCaseId || assignmentId || '',
     draft,
     requiredFields,
-    onSave: (draft: CaseDraftDTO) => handleSave(draft).then(() => {}),
+    onSave: onSaveForSteps,
     onNext: handleNext,
     onBack: handleBack,
     onGoToStep: (stepNumber: number) =>
