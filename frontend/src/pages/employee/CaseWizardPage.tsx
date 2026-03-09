@@ -426,7 +426,7 @@ export const CaseWizardPage: React.FC = () => {
     caseId: resolvedCaseId || assignmentId || '',
     draft,
     requiredFields,
-    onSave: handleSave,
+    onSave: (draft: CaseDraftDTO) => handleSave(draft).then(() => {}),
     onNext: handleNext,
     onBack: handleBack,
     onGoToStep: (stepNumber: number) =>
