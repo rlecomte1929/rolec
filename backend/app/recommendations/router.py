@@ -38,6 +38,9 @@ class RecommendRequest:
         self.top_n = top_n or 10
 
 
+DESTINATION_REQUIRING = ("living_areas", "schools", "movers")
+
+
 @router.post("/{category}", response_model=RecommendationResponse)
 def post_recommend(category: str, body: Dict[str, Any], request: Request):
     """Get recommendations for a category."""
@@ -50,12 +53,23 @@ def post_recommend(category: str, body: Dict[str, Any], request: Request):
     top_n = body.get("top_n", 10)
     if not isinstance(criteria, dict):
         raise HTTPException(status_code=400, detail="criteria must be an object")
+    dest_city = (criteria.get("destination_city") or "").strip()
+    if category in DESTINATION_REQUIRING and not dest_city:
+        log.warning(
+            "request_id=%s category=%s recommendations_load rejected_missing_destination",
+            request_id, category,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="destination_city is required for this category. Please complete your preferences with a destination city.",
+        )
     try:
         result = recommend(category, criteria, top_n=int(top_n))
         dur_ms = (time.perf_counter() - start) * 1000
+        dest = (criteria.get("destination_city") or "").strip()
         log.info(
-            "request_id=%s category=%s recommendations_load succeeded dur_ms=%.2f",
-            request_id, category, dur_ms,
+            "request_id=%s category=%s dest_city=%s recommendations_load succeeded dur_ms=%.2f",
+            request_id, category, dest or "(none)", dur_ms,
         )
         return result
     except Exception as e:

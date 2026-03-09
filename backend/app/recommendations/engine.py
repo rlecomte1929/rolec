@@ -74,7 +74,7 @@ def recommend(
 
     criteria_echo = _sanitize_criteria(criteria)
     # Add office address for map directions (living areas, schools)
-    dest_city = (criteria.get("destination_city") or "Singapore").strip()
+    dest_city = (criteria.get("destination_city") or "").strip()
     office = (criteria.get("office_address") or "").strip()
     criteria_echo["office_address"] = office or _default_office_for_city(dest_city)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

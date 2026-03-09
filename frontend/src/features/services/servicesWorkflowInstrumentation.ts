@@ -3,6 +3,14 @@
  */
 
 type WorkflowEvent =
+  | 'save_answers_started'
+  | 'save_answers_succeeded'
+  | 'save_answers_skipped'
+  | 'save_answers_failed'
+  | 'recommendations_started'
+  | 'recommendations_succeeded'
+  | 'recommendations_failed'
+  | 'resolved_destination_context'
   | 'save_preferences_started'
   | 'save_preferences_succeeded'
   | 'save_preferences_skipped_duplicate'

@@ -27,7 +27,7 @@ function caseToInitialAnswers(
   const destCity = (basics.destCity ?? caseTopLevel?.destCity ?? basics.destCountry ?? caseTopLevel?.destCountry ?? '') as string;
   const destCountry = (basics.destCountry ?? caseTopLevel?.destCountry ?? '') as string;
   const originCity = (basics.originCity ?? caseTopLevel?.originCity ?? basics.originCountry ?? caseTopLevel?.originCountry ?? 'Oslo') as string;
-  const cityForCriteria = (destCity || destCountry || 'Singapore').trim();
+  const cityForCriteria = (destCity || destCountry || '').trim();
   return {
     dest_city: cityForCriteria,
     school_dest_city: cityForCriteria,

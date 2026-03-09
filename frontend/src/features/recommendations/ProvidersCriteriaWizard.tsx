@@ -180,7 +180,7 @@ function buildCriteriaFromAnswers(
   }
 
   if (category === 'housing') {
-    criteria.destination_city = criteria.destination_city || 'Singapore';
+    criteria.destination_city = criteria.destination_city ?? answers.school_dest_city ?? answers.dest_city ?? answers.move_dest ?? '';
     const minB = typeof criteria.budget_min === 'number' ? criteria.budget_min : 2000;
     const maxB = typeof criteria.budget_max === 'number' ? criteria.budget_max : 5000;
     criteria.budget_monthly = { min: minB, max: maxB };
@@ -206,7 +206,7 @@ function buildCriteriaFromAnswers(
     delete criteria.commute_mins;
   }
   if (category === 'schools') {
-    criteria.destination_city = criteria.destination_city || answers.school_dest_city || answers.dest_city || 'Singapore';
+    criteria.destination_city = criteria.destination_city ?? answers.school_dest_city ?? answers.dest_city ?? answers.move_dest ?? '';
   }
   if (category === 'schools' && typeof criteria.child_ages === 'string') {
     criteria.child_ages = (criteria.child_ages as string)
@@ -293,6 +293,7 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
   const onAnswersChangeRef = useRef(onAnswersChange);
   const autosaveEnabledRef = useRef(autosaveEnabled);
   const isMountedRef = useRef(true);
+  const getRecommendationsInProgressRef = useRef(false);
   autosaveEnabledRef.current = autosaveEnabled;
 
   useEffect(() => {
@@ -303,6 +304,7 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      getRecommendationsInProgressRef.current = false;
     };
   }, []);
 
@@ -318,6 +320,7 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
     const qs = questions;
     const handle = window.setTimeout(() => {
       if (!isMountedRef.current || isHydratingRef.current) return;
+      if (!autosaveEnabledRef.current || getRecommendationsInProgressRef.current) return;
       const grouped: Record<string, Record<string, unknown>> = {};
       for (const q of qs) {
         const cat = q.category;
@@ -365,6 +368,14 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
     const busy = isBusy || isSubmitting;
     if (busy) return;
 
+    const destCity = String(answers.dest_city ?? answers.school_dest_city ?? answers.move_dest ?? '').trim();
+    const destRequiring = categories.filter((c) => ['housing', 'schools', 'movers'].includes(c));
+    if (destRequiring.length > 0 && !destCity) {
+      setError('Please enter a destination city. Go back and complete your case details or enter the destination in the preferences above.');
+      return;
+    }
+
+    getRecommendationsInProgressRef.current = true;
     setIsSubmitting(true);
     try {
       const grouped: Record<string, Record<string, unknown>> = {};
@@ -379,6 +390,12 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
       }
 
       onLoadRecommendationsStart?.();
+      const destCtx = {
+        dest_city: destCity,
+        case_id: undefined,
+        assignment_id: undefined,
+      };
+      logServicesWorkflow('resolved_destination_context', destCtx);
       const results: Record<string, RecommendationResponse> = {};
       for (const cat of categories) {
         const backendKey = CATEGORY_MAP[cat];
@@ -397,6 +414,7 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
       logServicesWorkflow('recommendations_load_failed', { error: errStr });
     } finally {
       setIsSubmitting(false);
+      getRecommendationsInProgressRef.current = false;
     }
   };
 
