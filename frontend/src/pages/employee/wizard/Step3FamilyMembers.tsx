@@ -10,11 +10,12 @@ interface StepProps {
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
   onBack: () => void;
+  isSaving?: boolean;
 }
 
 const isRequired = (requiredFields: string[], key: string) => requiredFields.includes(key);
 
-export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack }) => {
+export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack, isSaving }) => {
   const navigate = useNavigate();
   const [local, setLocal] = useState({
     ...draft.familyMembers,
@@ -165,6 +166,7 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
             Save as draft & exit
           </Button>
           <Button
+            disabled={isSaving}
             onClick={() => {
               if (maritalMissing) {
                 setError('Please select a marital status.');
@@ -178,7 +180,7 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
               onNext(nextDraft);
             }}
           >
-            Next
+            {isSaving ? 'Saving…' : 'Next'}
           </Button>
         </div>
       </div>

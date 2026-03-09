@@ -1,0 +1,12 @@
+key,label,description,icon_name,sort_order,is_active
+admin_essentials,Administrative Essentials,Residence registration tax ID bank mobile,admin,1,true
+housing,Housing,Guides neighborhoods rental platforms,housing,2,true
+schools_childcare,Schools & Childcare,Public international kindergartens,schools,3,true
+healthcare,Healthcare,Registration clinics emergency,healthcare,4,true
+transport,Transportation,Public transport apps driving,transport,5,true
+daily_life,Daily Life Essentials,Groceries banks postal,daily_life,6,true
+community,Community & Social Integration,Expat groups language networking,community,7,true
+culture_leisure,Events & Culture,Cinema concerts museums theater,culture,8,true
+nature,Nature & Weekend Activities,Parks hiking skiing,nature,9,true
+cost_of_living,Cost of Living,Rent transport groceries snapshot,cost,10,true
+safety,Safety & Practical Tips,Emergency numbers seasonal advice,safety,11,true

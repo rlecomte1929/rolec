@@ -10,11 +10,12 @@ interface StepProps {
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
   onBack: () => void;
+  isSaving?: boolean;
 }
 
 const isRequired = (requiredFields: string[], key: string) => requiredFields.includes(key);
 
-export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack }) => {
+export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack, isSaving }) => {
   const navigate = useNavigate();
   const [local, setLocal] = useState(draft.assignmentContext);
   const [error, setError] = useState('');
@@ -46,26 +47,24 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
       )}
 
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {local.employerName && (
-          <label className="text-sm text-[#0b2b43]">
-            Employer name (provided by HR)
-            <input
-              value={local.employerName || ''}
-              readOnly
-              className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm bg-[#f8fafc]"
-            />
-          </label>
-        )}
-        {local.employerCountry && (
-          <label className="text-sm text-[#0b2b43]">
-            Employer country (provided by HR)
-            <input
-              value={local.employerCountry || ''}
-              readOnly
-              className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm bg-[#f8fafc]"
-            />
-          </label>
-        )}
+        <label className="text-sm text-[#0b2b43]">
+          Employer name <span className="text-[#6b7280] font-normal">(from company profile)</span>
+          <input
+            value={local.employerName || ''}
+            readOnly
+            placeholder="—"
+            className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm bg-[#f8fafc]"
+          />
+        </label>
+        <label className="text-sm text-[#0b2b43]">
+          Employer country <span className="text-[#6b7280] font-normal">(from company profile)</span>
+          <input
+            value={local.employerCountry || ''}
+            readOnly
+            placeholder="—"
+            className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm bg-[#f8fafc]"
+          />
+        </label>
         <label className="text-sm text-[#0b2b43]">
           Job title
           {(isRequired(requiredFields, 'assignmentContext.jobTitle') || true) && jobTitleMissing && (
@@ -145,6 +144,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
             Save as draft & exit
           </Button>
           <Button
+            disabled={isSaving}
             onClick={() => {
               if (hasMissing) {
                 setError('Please complete all required fields (marked with *).');
@@ -154,7 +154,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
               onNext(nextDraft);
             }}
           >
-            Next
+            {isSaving ? 'Saving…' : 'Next'}
           </Button>
         </div>
       </div>

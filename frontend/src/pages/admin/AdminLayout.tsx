@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { AdminNotificationBadge } from '../../components/admin/AdminNotificationBadge';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 
 interface Props {
@@ -76,6 +77,71 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
           }`}
         >
           Support
+        </Link>
+        <Link
+          to={buildRoute('adminResources')}
+          className={`px-3 py-1 rounded-full border text-sm ${
+            isActive(ROUTE_DEFS.adminResources.path) ||
+            isActive('/admin/resources/') ||
+            isActive('/admin/events')
+              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+              : 'border-transparent hover:text-[#0b2b43]'
+          }`}
+        >
+          Resources CMS
+        </Link>
+        <Link
+          to={buildRoute('adminStagingDashboard')}
+          className={`px-3 py-1 rounded-full border text-sm ${
+            isActive(ROUTE_DEFS.adminStagingDashboard.path) || isActive('/admin/staging/')
+              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+              : 'border-transparent hover:text-[#0b2b43]'
+          }`}
+        >
+          Staging
+        </Link>
+        <Link
+          to={buildRoute('adminFreshness')}
+          className={`px-3 py-1 rounded-full border text-sm ${
+            isActive(ROUTE_DEFS.adminFreshness.path) || isActive('/admin/freshness') || isActive('/admin/crawl')
+              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+              : 'border-transparent hover:text-[#0b2b43]'
+          }`}
+        >
+          Freshness
+        </Link>
+        <Link
+          to={buildRoute('adminReviewQueue')}
+          className={`px-3 py-1 rounded-full border text-sm ${
+            isActive(ROUTE_DEFS.adminReviewQueue.path) || isActive('/admin/review-queue')
+              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+              : 'border-transparent hover:text-[#0b2b43]'
+          }`}
+        >
+          Review Queue
+        </Link>
+        <Link
+          to={buildRoute('adminOpsSla')}
+          className={`px-3 py-1 rounded-full border text-sm ${
+            isActive('/admin/ops')
+              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+              : 'border-transparent hover:text-[#0b2b43]'
+          }`}
+        >
+          Ops
+        </Link>
+        <Link
+          to={buildRoute('adminNotifications')}
+          className={`flex items-center gap-1 px-3 py-1 rounded-full border text-sm ${
+            isActive(ROUTE_DEFS.adminNotifications.path) || isActive('/admin/notifications/')
+              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+              : 'border-transparent hover:text-[#0b2b43]'
+          }`}
+        >
+          Notifications
+          <span className="flex shrink-0">
+            <AdminNotificationBadge />
+          </span>
         </Link>
       </div>
       {children}

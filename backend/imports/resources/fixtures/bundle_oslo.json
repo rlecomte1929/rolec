@@ -1,0 +1,38 @@
+{
+  "categories": [
+    {"key": "admin_essentials", "label": "Administrative Essentials", "description": "Residence registration, tax, ID, bank, mobile", "icon_name": "admin", "sort_order": 1, "is_active": true},
+    {"key": "housing", "label": "Housing", "description": "Guides, neighborhoods, rental platforms", "icon_name": "housing", "sort_order": 2, "is_active": true},
+    {"key": "schools_childcare", "label": "Schools & Childcare", "description": "Public, international, kindergartens", "icon_name": "schools", "sort_order": 3, "is_active": true},
+    {"key": "healthcare", "label": "Healthcare", "description": "Registration, clinics, emergency", "icon_name": "healthcare", "sort_order": 4, "is_active": true},
+    {"key": "transport", "label": "Transportation", "description": "Public transport, apps, driving", "icon_name": "transport", "sort_order": 5, "is_active": true},
+    {"key": "daily_life", "label": "Daily Life Essentials", "description": "Groceries, banks, postal", "icon_name": "daily_life", "sort_order": 6, "is_active": true},
+    {"key": "community", "label": "Community & Social Integration", "description": "Expat groups, language, networking", "icon_name": "community", "sort_order": 7, "is_active": true},
+    {"key": "culture_leisure", "label": "Events & Culture", "description": "Cinema, concerts, museums, theater", "icon_name": "culture", "sort_order": 8, "is_active": true},
+    {"key": "nature", "label": "Nature & Weekend Activities", "description": "Parks, hiking, skiing", "icon_name": "nature", "sort_order": 9, "is_active": true},
+    {"key": "cost_of_living", "label": "Cost of Living", "description": "Rent, transport, groceries snapshot", "icon_name": "cost", "sort_order": 10, "is_active": true},
+    {"key": "safety", "label": "Safety & Practical Tips", "description": "Emergency numbers, seasonal advice", "icon_name": "safety", "sort_order": 11, "is_active": true}
+  ],
+  "tags": [
+    {"key": "family_friendly", "label": "Family-friendly", "tag_group": "family_type"},
+    {"key": "free", "label": "Free", "tag_group": "free_paid"},
+    {"key": "paid", "label": "Paid", "tag_group": "free_paid"},
+    {"key": "indoor", "label": "Indoor", "tag_group": "indoor_outdoor"},
+    {"key": "outdoor", "label": "Outdoor", "tag_group": "indoor_outdoor"},
+    {"key": "weekend", "label": "Weekend", "tag_group": "weekday_weekend"},
+    {"key": "cinema", "label": "Cinema", "tag_group": "interest"},
+    {"key": "concert", "label": "Concert", "tag_group": "interest"},
+    {"key": "museum", "label": "Museum", "tag_group": "interest"},
+    {"key": "networking", "label": "Networking", "tag_group": "interest"},
+    {"key": "family_activity", "label": "Family activity", "tag_group": "interest"}
+  ],
+  "sources": [
+    {"source_name": "Skatteetaten", "publisher": "Norwegian Tax Administration", "source_type": "official", "url": "https://www.skatteetaten.no/", "trust_tier": "T0"},
+    {"source_name": "Helsenorge", "publisher": "Norwegian Health Network", "source_type": "official", "url": "https://helsenorge.no/", "trust_tier": "T0"},
+    {"source_name": "Oslo Kommune", "publisher": "City of Oslo", "source_type": "official", "url": "https://www.oslo.kommune.no/", "trust_tier": "T0"},
+    {"source_name": "Ruter", "publisher": "Oslo Public Transport", "source_type": "institutional", "url": "https://ruter.no/", "trust_tier": "T0"},
+    {"source_name": "Finn.no", "publisher": "Schibsted", "source_type": "commercial", "url": "https://www.finn.no/", "trust_tier": "T2"},
+    {"source_name": "Internations", "publisher": "Internations.org", "source_type": "community", "url": "https://www.internations.org/", "trust_tier": "T3"}
+  ],
+  "resources": [],
+  "events": []
+}

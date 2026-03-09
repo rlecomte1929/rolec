@@ -1,0 +1,18 @@
+country_code,country_name,city_name,category_key,title,summary,resource_type,audience_type,external_url,trust_tier,is_featured,is_family_friendly
+NO,Norway,Oslo,admin_essentials,Residence registration (Folkeregisteret),Register within 7 days of arrival,official_link,all,https://www.skatteetaten.no/en/person/national-registry/,T0,true,false
+NO,Norway,Oslo,admin_essentials,Tax card (Skatt kort),Apply 1-2 weeks after registration,official_link,all,https://www.skatteetaten.no/,T0,true,false
+NO,Norway,Oslo,admin_essentials,Bank account & BankID,Required for salary utilities ID,guide,all,,,true,false
+NO,Norway,Oslo,housing,Finn.no,Main rental and property portal in Norway,provider,all,https://www.finn.no/bolig/,T2,true,false
+NO,Norway,Oslo,housing,Bærum,Family-friendly suburb west of Oslo,place,family,,,true,true
+NO,Norway,Oslo,schools_childcare,Oslo International School,International curriculum English,provider,with_children,,,true,true
+NO,Norway,Oslo,schools_childcare,Barnehage enrollment,Register kindergarten before arrival,official_link,with_children,https://oslo.kommune.no/barn-og-utdanning/,T0,true,true
+NO,Norway,Oslo,healthcare,GP registration (fastlege),Register with a doctor in first month,official_link,all,https://helsenorge.no/,T0,true,false
+NO,Norway,Oslo,healthcare,Emergency 113,Police ambulance fire,tip,all,,,true,false
+NO,Norway,Oslo,transport,Ruter,Oslo public transport app monthly pass ~700-900 NOK,provider,all,https://ruter.no/,T0,true,false
+NO,Norway,Oslo,community,Internations Oslo,Expat meetups and networking,provider,all,https://www.internations.org/oslo-expats,T3,true,false
+NO,Norway,Oslo,culture_leisure,Munch Museum,Art museum Munch collection,place,all,https://www.munchmuseet.no/,,true,true
+NO,Norway,Oslo,culture_leisure,Opera House,Opera and ballet,place,all,https://operaen.no/,,true,true
+NO,Norway,Oslo,nature,Nordmarka,Forest lakes hiking skiing 30 min from city,place,all,,,true,true
+NO,Norway,Oslo,nature,Vigeland Park,Sculpture park free entry,place,all,,,true,true
+NO,Norway,Oslo,safety,Emergency 113,Police ambulance fire keep in phone,tip,all,,,true,false
+NO,Norway,Oslo,safety,Winter tips,Dress in layers watch for ice,tip,all,,,false,false

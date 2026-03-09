@@ -58,6 +58,11 @@ type CacheEntry<T> = {
 
 const apiCache = new Map<string, CacheEntry<any>>();
 
+/** Clear a cached value so the next request fetches fresh. Use after 401 or when user retries. */
+export function invalidateApiCache(key: string): void {
+  apiCache.delete(key);
+}
+
 const cachedRequest = <T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> => {
   const now = Date.now();
   const existing = apiCache.get(key);
@@ -180,6 +185,7 @@ api.interceptors.response.use(
       } catch {
         localStorage.setItem('debug_last_auth_error', '401 Unauthorized');
       }
+      invalidateApiCache('employee:current-assignment');
       clearAuthItems();
       const path = window.location.pathname || '';
       if (!path.startsWith('/auth') && path !== '/' && path !== '') {

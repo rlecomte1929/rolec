@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
-import { Alert, Button, Card, Input } from '../components/antigravity';
+import { Alert, Button, Card, Input, LoadingButton } from '../components/antigravity';
 import { employeeAPI } from '../api/client';
 import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
 import { getRelocationCase } from '../api/relocation';
 import { safeNavigate } from '../navigation/safeNavigate';
-import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../utils/demo';
 
@@ -24,12 +23,16 @@ export const EmployeeJourney: React.FC = () => {
   const [caseId, setCaseId] = useState<string | null>(null);
   const [missingCount, setMissingCount] = useState<number | null>(null);
   const [servicesSelected, setServicesSelected] = useState<number | null>(null);
-  const [budgetStatus, setBudgetStatus] = useState<string>('Policy not provided');
+  const [budgetStatus, setBudgetStatus] = useState<string | null>(null);
+  const [budgetComputed, setBudgetComputed] = useState(false);
   const [error, setError] = useState('');
   const [claimId, setClaimId] = useState('');
   const [claimEmail, setClaimEmail] = useState(
     getAuthItem('relopass_email') || getAuthItem('relopass_username') || ''
   );
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  const caseInitiated = Boolean(assignmentId && caseId);
 
   useEffect(() => {
     if (assignmentLoading) return;
@@ -37,6 +40,8 @@ export const EmployeeJourney: React.FC = () => {
       setCaseId(null);
       setMissingCount(null);
       setServicesSelected(null);
+      setBudgetStatus(null);
+      setBudgetComputed(false);
       return;
     }
     const load = async () => {
@@ -55,26 +60,33 @@ export const EmployeeJourney: React.FC = () => {
         const serviceRes = await employeeAPI.getAssignmentServices(assignmentId);
         const selected = (serviceRes.services || []).filter((svc) => Boolean(svc.selected)).length;
         setServicesSelected(selected);
-        const policyRes = await employeeAPI.getPolicyBudget(assignmentId);
-        const caps = policyRes?.caps || {};
-        const totals: Record<string, number> = {};
-        serviceRes.services?.forEach((svc) => {
-          if (!svc.selected) return;
-          if (svc.estimated_cost === null || svc.estimated_cost === undefined) return;
-          totals[svc.category] = (totals[svc.category] || 0) + Number(svc.estimated_cost);
-        });
-        let exceeding = false;
-        Object.entries(totals).forEach(([category, total]) => {
-          const cap = caps[category];
-          if (cap !== undefined && total > cap) exceeding = true;
-        });
-        if (Object.keys(caps).length === 0) {
-          setBudgetStatus('Policy not provided');
-        } else {
-          setBudgetStatus(exceeding ? 'Exceeding policy' : 'Within policy');
+        try {
+          const policyRes = await employeeAPI.getPolicyBudget(assignmentId);
+          const caps = policyRes?.caps || {};
+          const totals: Record<string, number> = {};
+          serviceRes.services?.forEach((svc) => {
+            if (!svc.selected) return;
+            if (svc.estimated_cost === null || svc.estimated_cost === undefined) return;
+            totals[svc.category] = (totals[svc.category] || 0) + Number(svc.estimated_cost);
+          });
+          let exceeding = false;
+          Object.entries(totals).forEach(([category, total]) => {
+            const cap = caps[category];
+            if (cap !== undefined && total > cap) exceeding = true;
+          });
+          if (Object.keys(caps).length === 0) {
+            setBudgetStatus('Policy not provided');
+          } else {
+            setBudgetStatus(exceeding ? 'Exceeding policy' : 'Within policy');
+          }
+          setBudgetComputed(true);
+        } catch {
+          setBudgetStatus(null);
+          setBudgetComputed(false);
         }
-      } catch (err: any) {
-        if (err?.response?.status === 401) {
+      } catch (err: unknown) {
+        const ax = err as { response?: { status?: number } };
+        if (ax?.response?.status === 401) {
           safeNavigate(navigate, 'landing');
           return;
         }
@@ -83,8 +95,6 @@ export const EmployeeJourney: React.FC = () => {
     };
     load();
   }, [assignmentId, assignmentLoading, navigate]);
-
-  const primaryCtaLabel = assignmentId ? 'Continue My Case' : 'Start My Case';
 
   const handlePrimaryCta = async () => {
     if (assignmentId) {
@@ -96,12 +106,16 @@ export const EmployeeJourney: React.FC = () => {
       return;
     }
     setError('');
+    setIsClaiming(true);
     try {
       const res = await employeeAPI.claimAssignment(claimId.trim(), claimEmail.trim());
       const nextAssignment = res.assignmentId || claimId.trim();
       navigate(`/employee/case/${nextAssignment}/wizard/1`);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Unable to claim assignment.');
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { detail?: string } } };
+      setError(ax?.response?.data?.detail || 'Unable to claim assignment.');
+    } finally {
+      setIsClaiming(false);
     }
   };
 
@@ -118,8 +132,9 @@ export const EmployeeJourney: React.FC = () => {
     );
   }, []);
 
+
   return (
-    <AppShell title="Welcome" subtitle="Here’s what happens next with your relocation case.">
+    <AppShell title="Welcome" subtitle="Here's what happens next with your relocation case.">
       {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
       <Card padding="lg" className="mb-6">
@@ -127,48 +142,8 @@ export const EmployeeJourney: React.FC = () => {
         {flowchart}
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <Card padding="lg">
-          <div className="text-xs uppercase tracking-wide text-[#6b7280]">Case completeness</div>
-          <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
-            {missingCount === null ? '—' : `${missingCount} missing`}
-          </div>
-          <div className="text-sm text-[#6b7280] mt-2">
-            Complete your case to unlock tailored services.
-          </div>
-        </Card>
-        <Card padding="lg">
-          <div className="text-xs uppercase tracking-wide text-[#6b7280]">Services selected</div>
-          <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
-            {servicesSelected === null ? '—' : servicesSelected}
-          </div>
-          <div className="text-sm text-[#6b7280] mt-2">
-            Add or edit services anytime.
-          </div>
-        </Card>
-        <Card padding="lg">
-          <div className="text-xs uppercase tracking-wide text-[#6b7280]">Budget status</div>
-          <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{budgetStatus}</div>
-          <div className="text-sm text-[#6b7280] mt-2">
-            Compare selected services against policy caps.
-          </div>
-        </Card>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 mb-8">
-        <Button onClick={handlePrimaryCta}>{primaryCtaLabel}</Button>
-        <Button
-          variant="outline"
-          onClick={() => navigate(buildRoute('services'))}
-          disabled={!assignmentId}
-        >
-          Go to Services
-        </Button>
-        <Button variant="outline" onClick={() => safeNavigate(navigate, 'messages')}>Messages</Button>
-      </div>
-
       {!assignmentId && (
-        <Card padding="lg">
+        <Card padding="lg" className="mb-6">
           <div className="text-lg font-semibold text-[#0b2b43]">No case assigned yet</div>
           <div className="text-sm text-[#4b5563] mt-2">
             If HR has shared an assignment ID, enter it below to start your case.
@@ -191,10 +166,44 @@ export const EmployeeJourney: React.FC = () => {
             />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={handlePrimaryCta}>Start</Button>
+            <LoadingButton onClick={handlePrimaryCta} loading={isClaiming} loadingLabel="Starting…">
+              Start
+            </LoadingButton>
             <Button variant="outline" onClick={() => window.location.reload()}>Refresh</Button>
           </div>
         </Card>
+      )}
+
+      {caseInitiated && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <Card padding="lg">
+            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Case completeness</div>
+            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
+              {missingCount === null ? 'Coming soon' : missingCount === 0 ? 'Complete' : `${missingCount} missing`}
+            </div>
+            <div className="text-sm text-[#6b7280] mt-2">
+              Complete your case to unlock tailored services.
+            </div>
+          </Card>
+          <Card padding="lg">
+            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Services selected</div>
+            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
+              {servicesSelected === null ? 'Coming soon' : String(servicesSelected)}
+            </div>
+            <div className="text-sm text-[#6b7280] mt-2">
+              Add or edit services anytime.
+            </div>
+          </Card>
+          <Card padding="lg">
+            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Budget status</div>
+            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
+              {!budgetComputed ? 'Coming soon' : (budgetStatus ?? '—')}
+            </div>
+            <div className="text-sm text-[#6b7280] mt-2">
+              Compare selected services against policy caps.
+            </div>
+          </Card>
+        </div>
       )}
 
       {assignmentId && caseId && (

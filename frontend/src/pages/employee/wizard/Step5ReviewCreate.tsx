@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Alert, Input, Select } from '../../../components/antigravity';
+import { buildRoute } from '../../../navigation/routes';
 import type {
   CaseDraftDTO,
   CaseRequirementsDTO,
@@ -81,6 +82,13 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
   const [suggestionSources, setSuggestionSources] = useState<Array<{ title?: string; url: string; snippet?: string }>>([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [approvedMissingFields, setApprovedMissingFields] = useState<string[]>([]);
+  const errorRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [error]);
 
   useEffect(() => {
     if (!caseId) return;
@@ -259,8 +267,10 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
     <Card padding="lg">
       <div className="text-lg font-semibold text-[#0b2b43]">Review & Save</div>
       {error && (
-        <div className="mt-4 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
-          {error}
+        <div ref={errorRef}>
+          <Alert variant="error" className="mt-4">
+            {error}
+          </Alert>
         </div>
       )}
       {saved && (
@@ -501,13 +511,13 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
-            onClick={() => handleSave('/employee/dashboard')}
+            onClick={() => handleSave(buildRoute('employeeDashboard'))}
             disabled={isSaving || dossierSaving}
           >
             {isSaving || dossierSaving ? 'Saving...' : 'Save & Exit'}
           </Button>
           <Button
-            onClick={() => handleSave('/services')}
+            onClick={() => handleSave(buildRoute('services'))}
             disabled={isSaving || dossierSaving}
           >
             {isSaving || dossierSaving ? 'Saving...' : 'Save & go to Services'}

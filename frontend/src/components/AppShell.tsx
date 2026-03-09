@@ -14,6 +14,28 @@ import { CompanyBrand } from './CompanyBrand';
 
 const logoUrl = '/relopass-logo.png?v=1';
 
+const LogoutButton: React.FC = () => {
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+  return (
+    <button
+      onClick={async () => {
+        if (isLoggingOut) return;
+        setIsLoggingOut(true);
+        try {
+          await authAPI.logout();
+          window.location.replace(buildRoute('landing'));
+        } catch {
+          setIsLoggingOut(false);
+        }
+      }}
+      disabled={isLoggingOut}
+      className="text-xs text-[#94a3b8] hover:text-[#0b2b43] disabled:opacity-60"
+    >
+      {isLoggingOut ? 'Logging out…' : 'Logout'}
+    </button>
+  );
+};
+
 interface AppShellProps {
   children: React.ReactNode;
   title?: string;
@@ -106,15 +128,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 </Link>
               </>
             )}
-            <button
-              onClick={async () => {
-                await authAPI.logout();
-                window.location.replace(buildRoute('landing'));
-              }}
-              className="text-xs text-[#94a3b8] hover:text-[#0b2b43]"
-            >
-              Logout
-            </button>
+            <LogoutButton />
             <div className="text-right text-sm text-slate-600">
               {identity && (
                 <Link
@@ -195,7 +209,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 <Link
                   to={buildRoute('resources')}
                   className={`px-3 py-1 rounded-full border ${
-                    isActiveRoute(ROUTE_DEFS.resources.path)
+                    isActiveRoute(ROUTE_DEFS.resources.path) || location.pathname.includes('/resources')
                       ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
                       : 'border-transparent hover:text-[#0b2b43]'
                   }`}
@@ -212,26 +226,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
               <div className="flex flex-wrap items-center gap-4">
                 <nav className="flex flex-wrap items-center gap-2 text-sm text-[#6b7280]">
                   <Link
-                    to={buildRoute('hrDashboard')}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrDashboard.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    HR Dashboard
-                  </Link>
-                  <Link
-                    to={buildRoute('hrCommandCenter')}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrCommandCenter.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    Command Center
-                  </Link>
-                  <Link
                     to={buildRoute('hrCompanyProfile')}
                     className={`px-3 py-1 rounded-full border ${
                       isActiveRoute(ROUTE_DEFS.hrCompanyProfile.path)
@@ -242,6 +236,36 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     Company Profile
                   </Link>
                   <Link
+                    to={policyRoute}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrPolicy.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Policy
+                  </Link>
+                  <Link
+                    to={buildRoute('hrDashboard')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrDashboard.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Assignments
+                  </Link>
+                  <Link
+                    to={buildRoute('hrCommandCenter')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrCommandCenter.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
                     to={buildRoute('hrEmployeeDashboard')}
                     className={`px-3 py-1 rounded-full border ${
                       isActiveRoute(ROUTE_DEFS.hrEmployeeDashboard.path) ||
@@ -250,7 +274,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                         : 'border-transparent hover:text-[#0b2b43]'
                     }`}
                   >
-                    Employee Dashboard
+                    Employee Detail
                   </Link>
                   <Link
                     to={complianceRoute}
@@ -260,27 +284,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                         : 'border-transparent hover:text-[#0b2b43]'
                     }`}
                   >
-                    Compliance Check
-                  </Link>
-                  <Link
-                    to={policyRoute}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrPolicy.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    HR Policy
-                  </Link>
-                  <Link
-                    to={buildRoute('hrPolicyManagement')}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrPolicyManagement.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    Policy Management
+                    Compliance
                   </Link>
                   <Link
                     to={messagesRoute}

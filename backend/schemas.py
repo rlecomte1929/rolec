@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 from typing import Optional, List, Dict, Any
 from datetime import date
 from enum import Enum
@@ -400,10 +400,10 @@ class ComplianceActionRequest(BaseModel):
 
 
 class AddEvidenceRequest(BaseModel):
-    evidenceType: str
-    participantId: Optional[str] = None
-    requirementId: Optional[str] = None
-    fileUrl: Optional[str] = None
+    evidence_type: str = Field(validation_alias=AliasChoices("evidenceType", "evidence_type"))
+    participant_id: Optional[str] = Field(None, validation_alias=AliasChoices("participantId", "participant_id"))
+    requirement_id: Optional[str] = Field(None, validation_alias=AliasChoices("requirementId", "requirement_id"))
+    file_url: Optional[str] = Field(None, validation_alias=AliasChoices("fileUrl", "file_url"))
     metadata: Optional[Dict[str, Any]] = None
 
 

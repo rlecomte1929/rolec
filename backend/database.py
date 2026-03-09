@@ -715,8 +715,17 @@ class Database:
                     conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN pack_hash TEXT"))
                 if "rule_set" not in col_names:
                     conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN rule_set TEXT"))
+                if "canonical_case_id" not in col_names:
+                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN canonical_case_id TEXT"))
             except Exception:
                 pass
+            for tbl in ("dossier_answers", "dossier_case_questions", "dossier_case_answers", "dossier_source_suggestions", "relocation_trace_events"):
+                try:
+                    cols = conn.execute(text(f"PRAGMA table_info({tbl})")).fetchall()
+                    if not any(c[1] == "canonical_case_id" for c in cols):
+                        conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN canonical_case_id TEXT"))
+                except Exception:
+                    pass
             try:
                 cols = conn.execute(text("PRAGMA table_info(knowledge_docs)")).fetchall()
                 col_names = {r[1] for r in cols}
@@ -925,6 +934,10 @@ class Database:
                     ("case_assignments", "expected_start_date", "TEXT"),
                     ("case_assignments", "employee_first_name", "TEXT"),
                     ("case_assignments", "employee_last_name", "TEXT"),
+                    ("case_assignments", "canonical_case_id", "TEXT"),
+                    ("case_services", "canonical_case_id", "TEXT"),
+                    ("case_service_answers", "canonical_case_id", "TEXT"),
+                    ("rfqs", "canonical_case_id", "TEXT"),
                 ]
                 for tbl, col, typ in cc_cols:
                     try:
@@ -940,6 +953,7 @@ class Database:
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS expected_start_date DATE"))
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_first_name TEXT"))
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_last_name TEXT"))
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS canonical_case_id TEXT"))
             try:
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS relocation_tasks (
@@ -953,9 +967,9 @@ class Database:
                         event_type TEXT, description TEXT, created_at TEXT
                     )
                 """))
-                # Phase 1: payload and actor_principal_id for case_events
+                # Phase 1: payload, actor_principal_id, canonical_case_id for case_events
                 if _is_sqlite:
-                    for col_name, col_type in [("payload", "TEXT DEFAULT '{}'"), ("actor_principal_id", "TEXT")]:
+                    for col_name, col_type in [("payload", "TEXT DEFAULT '{}'"), ("actor_principal_id", "TEXT"), ("canonical_case_id", "TEXT")]:
                         try:
                             cols = conn.execute(text("PRAGMA table_info(case_events)")).fetchall()
                             if not any(c[1] == col_name for c in cols):
@@ -971,6 +985,7 @@ class Database:
                         CREATE TABLE IF NOT EXISTS case_participants (
                             id TEXT PRIMARY KEY,
                             case_id TEXT NOT NULL,
+                            canonical_case_id TEXT,
                             person_id TEXT NOT NULL,
                             role TEXT NOT NULL CHECK (role IN ('relocatee','hr_owner','hr_reviewer','observer')),
                             invited_at TEXT,
@@ -979,6 +994,9 @@ class Database:
                             UNIQUE(case_id, person_id, role)
                         )
                     """))
+                    cols = conn.execute(text("PRAGMA table_info(case_participants)")).fetchall()
+                    if not any(c[1] == "canonical_case_id" for c in cols):
+                        conn.execute(text("ALTER TABLE case_participants ADD COLUMN canonical_case_id TEXT"))
                 except Exception:
                     pass
             # Phase 1 Step 3: case_evidence (SQLite only; Postgres uses migration)
@@ -988,6 +1006,7 @@ class Database:
                         CREATE TABLE IF NOT EXISTS case_evidence (
                             id TEXT PRIMARY KEY,
                             case_id TEXT NOT NULL,
+                            canonical_case_id TEXT,
                             assignment_id TEXT,
                             participant_id TEXT,
                             requirement_id TEXT,
@@ -999,6 +1018,9 @@ class Database:
                             created_at TEXT NOT NULL DEFAULT (datetime('now'))
                         )
                     """))
+                    cols = conn.execute(text("PRAGMA table_info(case_evidence)")).fetchall()
+                    if not any(c[1] == "canonical_case_id" for c in cols):
+                        conn.execute(text("ALTER TABLE case_evidence ADD COLUMN canonical_case_id TEXT"))
                 except Exception:
                     pass
 
@@ -1216,6 +1238,25 @@ class Database:
             row = conn.execute(text("SELECT * FROM relocation_cases WHERE id = :id"), {"id": case_id}).fetchone()
         return self._row_to_dict(row)
 
+    def resolve_canonical_case_id(self, case_id: str) -> Optional[str]:
+        """If case_id matches wizard_cases.id, return it (canonical). Else return None."""
+        if not case_id or not case_id.strip():
+            return None
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text("SELECT id FROM wizard_cases WHERE id = :cid LIMIT 1"),
+                    {"cid": case_id.strip()},
+                ).fetchone()
+            return str(row["id"]) if row else None
+        except Exception:
+            return None
+
+    def coalesce_case_lookup_id(self, case_id: str) -> str:
+        """Prefer canonical when resolvable (exists in wizard_cases), else return original."""
+        canonical = self.resolve_canonical_case_id(case_id)
+        return canonical if canonical is not None else (case_id or "")
+
     def create_assignment(
         self,
         assignment_id: str,
@@ -1235,12 +1276,13 @@ class Database:
             self._exec(
                 conn,
                 "INSERT INTO case_assignments "
-                "(id, case_id, hr_user_id, employee_user_id, employee_identifier, status, "
+                "(id, case_id, canonical_case_id, hr_user_id, employee_user_id, employee_identifier, status, "
                 "employee_first_name, employee_last_name, created_at, updated_at) "
-                "VALUES (:id, :cid, :hr, :emp, :ident, :status, :efn, :eln, :ca, :ua)",
+                "VALUES (:id, :cid, :canonical, :hr, :emp, :ident, :status, :efn, :eln, :ca, :ua)",
                 {
                     "id": assignment_id,
                     "cid": case_id,
+                    "canonical": case_id,
                     "hr": hr_user_id,
                     "emp": employee_user_id,
                     "ident": employee_identifier,
@@ -1333,11 +1375,12 @@ class Database:
             if _is_sqlite:
                 self._exec(
                     conn,
-                    "INSERT INTO case_events (id, case_id, assignment_id, actor_principal_id, event_type, payload, created_at) "
-                    "VALUES (:id, :cid, :aid, :actor, :et, :pl, :ca)",
+                    "INSERT INTO case_events (id, case_id, canonical_case_id, assignment_id, actor_principal_id, event_type, payload, created_at) "
+                    "VALUES (:id, :cid, :canonical, :aid, :actor, :et, :pl, :ca)",
                     {
                         "id": event_id,
                         "cid": case_id,
+                        "canonical": case_id,
                         "aid": assignment_id,
                         "actor": actor_principal_id,
                         "et": event_type,
@@ -1350,11 +1393,12 @@ class Database:
             else:
                 self._exec(
                     conn,
-                    "INSERT INTO case_events (id, case_id, assignment_id, actor_principal_id, event_type, payload, created_at) "
-                    "VALUES (:id, :cid, :aid, :actor, :et, :pl, :ca)",
+                    "INSERT INTO case_events (id, case_id, canonical_case_id, assignment_id, actor_principal_id, event_type, payload, created_at) "
+                    "VALUES (:id, :cid, :canonical, :aid, :actor, :et, :pl, :ca)",
                     {
                         "id": event_id,
                         "cid": case_id,
+                        "canonical": case_id,
                         "aid": assignment_id,
                         "actor": actor_principal_id,
                         "et": event_type,
@@ -1366,13 +1410,14 @@ class Database:
                 )
 
     def list_case_events(self, case_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """List case_events for a case, newest first."""
+        """List case_events for a case, newest first. Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = self._exec(
                 conn,
                 "SELECT id, case_id, assignment_id, actor_principal_id, actor_user_id, event_type, payload, description, created_at "
-                "FROM case_events WHERE case_id = :cid ORDER BY created_at DESC LIMIT 200",
-                {"cid": case_id},
+                "FROM case_events WHERE (canonical_case_id = :cid OR case_id = :cid) ORDER BY created_at DESC LIMIT 200",
+                {"cid": cid},
                 op_name="list_case_events",
                 request_id=request_id,
             ).fetchall()
@@ -1395,6 +1440,7 @@ class Database:
         params = {
             "id": part_id,
             "cid": case_id,
+            "canonical": case_id,
             "pid": person_id,
             "role": role,
             "inv": inv,
@@ -1405,11 +1451,12 @@ class Database:
             if _is_sqlite:
                 self._exec(
                     conn,
-                    "INSERT INTO case_participants (id, case_id, person_id, role, invited_at, joined_at, created_at) "
-                    "VALUES (:id, :cid, :pid, :role, :inv, :jnd, :ca) "
+                    "INSERT INTO case_participants (id, case_id, canonical_case_id, person_id, role, invited_at, joined_at, created_at) "
+                    "VALUES (:id, :cid, :canonical, :pid, :role, :inv, :jnd, :ca) "
                     "ON CONFLICT (case_id, person_id, role) DO UPDATE SET "
                     "invited_at = COALESCE(excluded.invited_at, case_participants.invited_at), "
-                    "joined_at = COALESCE(excluded.joined_at, case_participants.joined_at)",
+                    "joined_at = COALESCE(excluded.joined_at, case_participants.joined_at), "
+                    "canonical_case_id = COALESCE(excluded.canonical_case_id, case_participants.canonical_case_id)",
                     params,
                     op_name="ensure_case_participant",
                     request_id=request_id,
@@ -1417,11 +1464,12 @@ class Database:
             else:
                 self._exec(
                     conn,
-                    "INSERT INTO case_participants (id, case_id, person_id, role, invited_at, joined_at, created_at) "
-                    "VALUES (:id, :cid, :pid, :role, :inv, :jnd, :ca) "
+                    "INSERT INTO case_participants (id, case_id, canonical_case_id, person_id, role, invited_at, joined_at, created_at) "
+                    "VALUES (:id, :cid, :canonical, :pid, :role, :inv, :jnd, :ca) "
                     "ON CONFLICT (case_id, person_id, role) DO UPDATE SET "
                     "invited_at = COALESCE(EXCLUDED.invited_at, case_participants.invited_at), "
-                    "joined_at = COALESCE(EXCLUDED.joined_at, case_participants.joined_at)",
+                    "joined_at = COALESCE(EXCLUDED.joined_at, case_participants.joined_at), "
+                    "canonical_case_id = COALESCE(EXCLUDED.canonical_case_id, case_participants.canonical_case_id)",
                     params,
                     op_name="ensure_case_participant",
                     request_id=request_id,
@@ -1430,13 +1478,14 @@ class Database:
     def list_case_participants(
         self, case_id: str, request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """List case_participants for a case."""
+        """List case_participants for a case. Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = self._exec(
                 conn,
                 "SELECT id, case_id, person_id, role, invited_at, joined_at, created_at "
-                "FROM case_participants WHERE case_id = :cid ORDER BY created_at ASC",
-                {"cid": case_id},
+                "FROM case_participants WHERE (canonical_case_id = :cid OR case_id = :cid) ORDER BY created_at ASC",
+                {"cid": cid},
                 op_name="list_case_participants",
                 request_id=request_id,
             ).fetchall()
@@ -1462,12 +1511,13 @@ class Database:
             self._exec(
                 conn,
                 "INSERT INTO case_evidence "
-                "(id, case_id, assignment_id, participant_id, requirement_id, evidence_type, "
+                "(id, case_id, canonical_case_id, assignment_id, participant_id, requirement_id, evidence_type, "
                 "file_url, metadata, status, submitted_at, created_at) "
-                "VALUES (:id, :cid, :aid, :pid, :rid, :et, :url, :meta, :status, :sub, :ca)",
+                "VALUES (:id, :cid, :canonical, :aid, :pid, :rid, :et, :url, :meta, :status, :sub, :ca)",
                 {
                     "id": evidence_id,
                     "cid": case_id,
+                    "canonical": case_id,
                     "aid": assignment_id,
                     "pid": participant_id,
                     "rid": requirement_id,
@@ -1486,14 +1536,15 @@ class Database:
     def list_case_evidence(
         self, case_id: str, request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """List case_evidence for a case, newest first."""
+        """List case_evidence for a case, newest first. Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = self._exec(
                 conn,
                 "SELECT id, case_id, assignment_id, participant_id, requirement_id, evidence_type, "
                 "file_url, metadata, status, submitted_at, created_at "
-                "FROM case_evidence WHERE case_id = :cid ORDER BY created_at DESC",
-                {"cid": case_id},
+                "FROM case_evidence WHERE (canonical_case_id = :cid OR case_id = :cid) ORDER BY created_at DESC",
+                {"cid": cid},
                 op_name="list_case_evidence",
                 request_id=request_id,
             ).fetchall()
@@ -1527,11 +1578,13 @@ class Database:
         return self._row_to_dict(row)
 
     def get_assignment_by_case_id(self, case_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Prefer canonical_case_id when resolving, fall back to case_id for legacy."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             row = self._exec(
                 conn,
-                "SELECT * FROM case_assignments WHERE case_id = :cid",
-                {"cid": case_id},
+                "SELECT * FROM case_assignments WHERE (canonical_case_id = :cid OR case_id = :cid)",
+                {"cid": cid},
                 op_name="get_assignment_by_case_id",
                 request_id=request_id,
             ).fetchone()
@@ -1561,6 +1614,7 @@ class Database:
                 payload = {
                     "id": item.get("id") or str(uuid.uuid4()),
                     "case_id": case_id,
+                    "canonical_case_id": case_id,
                     "assignment_id": assignment_id,
                     "service_key": item.get("service_key"),
                     "category": item.get("category"),
@@ -1593,11 +1647,11 @@ class Database:
                             conn,
                             """
                             INSERT INTO case_services (
-                                id, case_id, assignment_id, service_key, category,
+                                id, case_id, canonical_case_id, assignment_id, service_key, category,
                                 selected, estimated_cost, currency, created_at, updated_at
                             )
                             VALUES (
-                                :id, :case_id, :assignment_id, :service_key, :category,
+                                :id, :case_id, :canonical_case_id, :assignment_id, :service_key, :category,
                                 :selected, :estimated_cost, :currency, :created_at, :updated_at
                             )
                             """,
@@ -1610,15 +1664,16 @@ class Database:
                         conn,
                         """
                         INSERT INTO case_services (
-                            id, case_id, assignment_id, service_key, category,
+                            id, case_id, canonical_case_id, assignment_id, service_key, category,
                             selected, estimated_cost, currency, created_at, updated_at
                         )
                         VALUES (
-                            :id, :case_id, :assignment_id, :service_key, :category,
+                            :id, :case_id, :canonical_case_id, :assignment_id, :service_key, :category,
                             :selected, :estimated_cost, :currency, :created_at, :updated_at
                         )
                         ON CONFLICT(case_id, service_key)
                         DO UPDATE SET
+                            canonical_case_id = COALESCE(excluded.canonical_case_id, case_services.canonical_case_id),
                             assignment_id = excluded.assignment_id,
                             category = excluded.category,
                             selected = excluded.selected,
@@ -1636,11 +1691,13 @@ class Database:
         case_id: str,
         request_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
+        """Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = self._exec(
                 conn,
-                "SELECT * FROM case_service_answers WHERE case_id = :case_id ORDER BY service_key",
-                {"case_id": case_id},
+                "SELECT * FROM case_service_answers WHERE (canonical_case_id = :cid OR case_id = :cid) ORDER BY service_key",
+                {"cid": cid},
                 op_name="list_case_service_answers",
                 request_id=request_id,
             ).fetchall()
@@ -1661,15 +1718,17 @@ class Database:
     ) -> None:
         now = datetime.utcnow().isoformat()
         sql = """
-            INSERT INTO case_service_answers (id, case_id, service_key, answers, updated_at)
-            VALUES (:id, :case_id, :service_key, :answers, :updated_at)
+            INSERT INTO case_service_answers (id, case_id, canonical_case_id, service_key, answers, updated_at)
+            VALUES (:id, :case_id, :canonical_case_id, :service_key, :answers, :updated_at)
             ON CONFLICT(case_id, service_key) DO UPDATE SET
+                canonical_case_id = COALESCE(excluded.canonical_case_id, case_service_answers.canonical_case_id),
                 answers = excluded.answers,
                 updated_at = excluded.updated_at
         """
         params = {
             "id": str(uuid.uuid4()),
             "case_id": case_id,
+            "canonical_case_id": case_id,
             "service_key": service_key,
             "answers": json.dumps(answers),
             "updated_at": now,
@@ -1692,13 +1751,14 @@ class Database:
             self._exec(
                 conn,
                 """
-                INSERT INTO rfqs (id, rfq_ref, case_id, created_by_user_id, status, created_at)
-                VALUES (:id, :rfq_ref, :case_id, :created_by_user_id, :status, :created_at)
+                INSERT INTO rfqs (id, rfq_ref, case_id, canonical_case_id, created_by_user_id, status, created_at)
+                VALUES (:id, :rfq_ref, :case_id, :canonical_case_id, :created_by_user_id, :status, :created_at)
                 """,
                 {
                     "id": rfq_id,
                     "rfq_ref": rfq_ref,
                     "case_id": case_id,
+                    "canonical_case_id": case_id,
                     "created_by_user_id": creator_user_id,
                     "status": "sent",
                     "created_at": now,
@@ -2033,10 +2093,12 @@ class Database:
         return items
 
     def list_dossier_answers(self, case_id: str, user_id: str) -> List[Dict[str, Any]]:
+        """Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = conn.execute(text(
-                "SELECT * FROM dossier_answers WHERE case_id = :cid AND user_id = :uid"
-            ), {"cid": case_id, "uid": user_id}).fetchall()
+                "SELECT * FROM dossier_answers WHERE (canonical_case_id = :cid OR case_id = :cid) AND user_id = :uid"
+            ), {"cid": cid, "uid": user_id}).fetchall()
         items = self._rows_to_list(rows)
         for item in items:
             item["answer"] = self._json_load(item.get("answer_json"))
@@ -2062,10 +2124,12 @@ class Database:
                 ), payload)
 
     def list_dossier_case_questions(self, case_id: str) -> List[Dict[str, Any]]:
+        """Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = conn.execute(text(
-                "SELECT * FROM dossier_case_questions WHERE case_id = :cid ORDER BY created_at ASC"
-            ), {"cid": case_id}).fetchall()
+                "SELECT * FROM dossier_case_questions WHERE (canonical_case_id = :cid OR case_id = :cid) ORDER BY created_at ASC"
+            ), {"cid": cid}).fetchall()
         items = self._rows_to_list(rows)
         for item in items:
             item["options"] = self._json_load(item.get("options"))
@@ -2101,10 +2165,12 @@ class Database:
         return row
 
     def list_dossier_case_answers(self, case_id: str, user_id: str) -> List[Dict[str, Any]]:
+        """Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = conn.execute(text(
-                "SELECT * FROM dossier_case_answers WHERE case_id = :cid AND user_id = :uid"
-            ), {"cid": case_id, "uid": user_id}).fetchall()
+                "SELECT * FROM dossier_case_answers WHERE (canonical_case_id = :cid OR case_id = :cid) AND user_id = :uid"
+            ), {"cid": cid, "uid": user_id}).fetchall()
         items = self._rows_to_list(rows)
         for item in items:
             item["answer"] = self._json_load(item.get("answer_json"))
@@ -2130,10 +2196,12 @@ class Database:
                 ), payload)
 
     def list_dossier_source_suggestions(self, case_id: str) -> List[Dict[str, Any]]:
+        """Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = conn.execute(text(
-                "SELECT * FROM dossier_source_suggestions WHERE case_id = :cid ORDER BY created_at DESC"
-            ), {"cid": case_id}).fetchall()
+                "SELECT * FROM dossier_source_suggestions WHERE (canonical_case_id = :cid OR case_id = :cid) ORDER BY created_at DESC"
+            ), {"cid": cid}).fetchall()
         items = self._rows_to_list(rows)
         for item in items:
             item["results"] = self._json_load(item.get("results"))
@@ -2623,11 +2691,13 @@ class Database:
         return row
 
     def get_latest_guidance_pack(self, case_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             row = conn.execute(text(
                 "SELECT * FROM relocation_guidance_packs "
-                "WHERE case_id = :cid AND user_id = :uid ORDER BY created_at DESC LIMIT 1"
-            ), {"cid": case_id, "uid": user_id}).fetchone()
+                "WHERE (canonical_case_id = :cid OR case_id = :cid) AND user_id = :uid ORDER BY created_at DESC LIMIT 1"
+            ), {"cid": cid, "uid": user_id}).fetchone()
         item = self._row_to_dict(row)
         if not item:
             return None
@@ -2674,11 +2744,13 @@ class Database:
         return items
 
     def list_trace_events(self, case_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Prefers canonical_case_id, falls back to case_id."""
+        cid = self.coalesce_case_lookup_id(case_id)
         with self.engine.connect() as conn:
             rows = conn.execute(text(
-                "SELECT * FROM relocation_trace_events WHERE case_id = :cid "
+                "SELECT * FROM relocation_trace_events WHERE (canonical_case_id = :cid OR case_id = :cid) "
                 "ORDER BY created_at DESC LIMIT :lim"
-            ), {"cid": case_id, "lim": limit}).fetchall()
+            ), {"cid": cid, "lim": limit}).fetchall()
         items = self._rows_to_list(rows)
         for item in items:
             item["input"] = self._json_load(item.get("input_json")) or {}

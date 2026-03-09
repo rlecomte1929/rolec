@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { ProvidersCriteriaWizard } from '../../features/recommendations/ProvidersCriteriaWizard';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
+import { logServicesWorkflow } from '../../features/services/servicesWorkflowInstrumentation';
+import { useServicesWorkflowState } from '../../features/services/useServicesWorkflowState';
 import { employeeAPI, servicesAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
@@ -55,8 +57,10 @@ export const ServicesQuestions: React.FC = () => {
   const navigate = useNavigate();
   const { selectedServices, setRecommendations, setShortlist, answers, setAnswers } = useServicesFlow();
   const { assignmentId } = useEmployeeAssignment();
+  const workflow = useServicesWorkflowState();
   const [caseId, setCaseId] = useState<string | null>(null);
   const [initialAnswers, setInitialAnswers] = useState<Record<string, unknown>>({});
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   const wizardServices = new Set(
     Array.from(selectedServices).filter((k) =>
@@ -102,6 +106,78 @@ export const ServicesQuestions: React.FC = () => {
     return () => { cancelled = true; };
   }, [assignmentId]);
 
+  const lastSavedPayloadRef = useRef<string | null>(null);
+  const saveInFlightRef = useRef(false);
+
+  const onAnswersChange = useCallback(
+    (newAnswers: Record<string, unknown>, byCategory: Record<string, Record<string, unknown>>) => {
+      setAnswers((prev) => mergeRecords(prev, newAnswers));
+      if (!caseId) return;
+      const items = Object.entries(byCategory).map(([serviceKey, ans]) => ({
+        service_key: serviceKey,
+        answers: ans,
+      }));
+      const payloadKey = JSON.stringify(items);
+      if (lastSavedPayloadRef.current === payloadKey) return;
+      if (saveInFlightRef.current) return;
+      lastSavedPayloadRef.current = payloadKey;
+      saveInFlightRef.current = true;
+      logServicesWorkflow('save_preferences_started', { caseId });
+      servicesAPI
+        .saveServiceAnswers(caseId, items)
+        .then(() => {
+          logServicesWorkflow('save_preferences_succeeded', { caseId });
+        })
+        .catch(() => {
+          lastSavedPayloadRef.current = null;
+          logServicesWorkflow('save_preferences_failed', { caseId });
+        })
+        .finally(() => {
+          saveInFlightRef.current = false;
+        });
+    },
+    [caseId, setAnswers]
+  );
+
+  const saveAnswersBeforeLoad = useCallback(
+    async (ans: Record<string, unknown>, byCategory: Record<string, Record<string, unknown>>) => {
+      if (!caseId) throw new Error('Case not ready');
+      setAnswers((prev) => mergeRecords(prev, ans));
+      const items = Object.entries(byCategory).map(([serviceKey, a]) => ({
+        service_key: serviceKey,
+        answers: a,
+      }));
+      const payloadKey = JSON.stringify(items);
+      if (lastSavedPayloadRef.current === payloadKey) {
+        logServicesWorkflow('save_preferences_skipped_duplicate', { caseId });
+        return;
+      }
+      workflow.toSavingAnswers();
+      logServicesWorkflow('save_preferences_started', { caseId });
+      try {
+        const res = await servicesAPI.saveServiceAnswers(caseId, items);
+        lastSavedPayloadRef.current = payloadKey;
+        const skipped = (res as { skipped_duplicate?: boolean })?.skipped_duplicate;
+        if (skipped) {
+          logServicesWorkflow('save_preferences_skipped_duplicate', { caseId });
+        } else {
+          logServicesWorkflow('save_preferences_succeeded', { caseId });
+        }
+        workflow.toAnswersSaved();
+      } catch (err) {
+        lastSavedPayloadRef.current = null;
+        logServicesWorkflow('save_preferences_failed', { caseId });
+        throw err;
+      }
+    },
+    [caseId, setAnswers, workflow]
+  );
+
+  const stableInitialAnswers = useMemo(() => {
+    if (Object.keys(initialAnswers).length === 0) return undefined;
+    return { ...answers, ...initialAnswers };
+  }, [initialAnswers, answers]);
+
   if (wizardServices.size === 0) {
     return (
       <AppShell title="Service questions" subtitle="Answer a few questions so we can personalize providers.">
@@ -115,30 +191,60 @@ export const ServicesQuestions: React.FC = () => {
     );
   }
 
+  const handleComplete = useCallback(
+    (results: Record<string, import('../../features/recommendations/types').RecommendationResponse>) => {
+      logServicesWorkflow('recommendations_load_succeeded', {});
+      setRecommendations(results);
+      setShortlist(new Map());
+      workflow.toRecommendationsReady();
+      navigate('/services/recommendations');
+    },
+    [setRecommendations, setShortlist, workflow, navigate]
+  );
+
+  const submitLabel =
+    workflow.state === 'saving_answers'
+      ? 'Saving preferences...'
+      : workflow.state === 'loading_recommendations'
+        ? 'Loading recommendations...'
+        : undefined;
+
   return (
     <AppShell title="Service questions" subtitle="Help us refine your provider matches.">
       <ServicesNavRibbon />
+      {workflow.errorMessage && (
+        <Alert variant="error" className="mb-4">
+          {workflow.errorMessage}
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-2"
+            onClick={() => {
+              workflow.clearError();
+              setRetryTrigger((c) => c + 1);
+            }}
+          >
+            Retry
+          </Button>
+        </Alert>
+      )}
       <ProvidersCriteriaWizard
         selectedServices={wizardServices as unknown as Set<any>}
-        initialAnswers={Object.keys(initialAnswers).length > 0 ? { ...answers, ...initialAnswers } : answers}
-        onAnswersChange={(newAnswers, byCategory) => {
-          const updater = (prev: Record<string, unknown>) => mergeRecords(prev, newAnswers);
-          (setAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)(updater);
-          if (!caseId) return;
-          const items = Object.entries(byCategory).map(([serviceKey, ans]) => ({
-            service_key: serviceKey,
-            answers: ans,
-          }));
-          servicesAPI.saveServiceAnswers(caseId, items).catch(() => {
-            // best-effort autosave
-          });
-        }}
-        onComplete={(results) => {
-          setRecommendations(results);
-          setShortlist(new Map());
-          navigate('/services/recommendations');
-        }}
+        initialAnswers={stableInitialAnswers ?? answers}
+        onAnswersChange={onAnswersChange}
+        onComplete={handleComplete}
         onBack={() => navigate('/services')}
+        autosaveEnabled={!workflow.isBusy}
+        saveAnswersBeforeLoad={saveAnswersBeforeLoad}
+        isBusy={workflow.isBusy}
+        submitLabel={submitLabel}
+        onEditingStart={workflow.toEditing}
+        onLoadRecommendationsStart={() => {
+          logServicesWorkflow('recommendations_load_started', {});
+          workflow.toLoadingRecommendations();
+        }}
+        onError={workflow.toError}
+        retryTrigger={retryTrigger}
       />
     </AppShell>
   );

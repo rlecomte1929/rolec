@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Input, Alert } from '../../components/antigravity';
+import { logServicesWorkflow } from '../services/servicesWorkflowInstrumentation';
 import { recommendationsEngineAPI } from './api';
 import type { RecommendationResponse } from './types';
 
@@ -241,6 +242,25 @@ interface Props {
     answers: Record<string, unknown>,
     byCategory: Record<string, Record<string, unknown>>
   ) => void;
+  /** When false, autosave debounce does nothing. Use when saving_answers or loading_recommendations. */
+  autosaveEnabled?: boolean;
+  /** Explicit save before loading recommendations. Returns promise; resolves when save done (or skipped). */
+  saveAnswersBeforeLoad?: (
+    answers: Record<string, unknown>,
+    byCategory: Record<string, Record<string, unknown>>
+  ) => Promise<void>;
+  /** Disable "Get recommendations" CTA while true */
+  isBusy?: boolean;
+  /** Override CTA label when busy (e.g. "Saving preferences...", "Loading recommendations...") */
+  submitLabel?: string;
+  /** Callback when user first edits (for workflow: idle -> editing) */
+  onEditingStart?: () => void;
+  /** Callback right before fetching recommendations */
+  onLoadRecommendationsStart?: () => void;
+  /** Callback when save or load fails (for workflow: -> error) */
+  onError?: (message: string) => void;
+  /** When this value changes, wizard clears its local error (e.g. parent Retry clicked) */
+  retryTrigger?: number;
 }
 
 export const ProvidersCriteriaWizard: React.FC<Props> = ({
@@ -249,6 +269,14 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
   onBack,
   initialAnswers,
   onAnswersChange,
+  autosaveEnabled = true,
+  saveAnswersBeforeLoad,
+  isBusy = false,
+  submitLabel,
+  onEditingStart,
+  onLoadRecommendationsStart,
+  onError,
+  retryTrigger,
 }) => {
   const categories = Array.from(selectedServices) as TabKey[];
   const questions = getQuestionsForCategories(categories);
@@ -262,34 +290,65 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
     return a;
   });
 
+  const onAnswersChangeRef = useRef(onAnswersChange);
+  const autosaveEnabledRef = useRef(autosaveEnabled);
+  const isMountedRef = useRef(true);
+  autosaveEnabledRef.current = autosaveEnabled;
+
   useEffect(() => {
-    if (!onAnswersChange) return;
+    onAnswersChangeRef.current = onAnswersChange;
+  }, [onAnswersChange]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const isHydratingRef = useRef(false);
+  const initialSyncDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (!autosaveEnabledRef.current || !onAnswersChangeRef.current) return;
+    if (isHydratingRef.current) {
+      isHydratingRef.current = false;
+      return;
+    }
+    const qs = questions;
     const handle = window.setTimeout(() => {
+      if (!isMountedRef.current || isHydratingRef.current) return;
       const grouped: Record<string, Record<string, unknown>> = {};
-      for (const q of questions) {
+      for (const q of qs) {
         const cat = q.category;
         if (!grouped[cat]) grouped[cat] = {};
         grouped[cat][q.id] = answers[q.id];
       }
-      onAnswersChange(answers, grouped);
+      onAnswersChangeRef.current?.(answers, grouped);
     }, 500);
     return () => window.clearTimeout(handle);
-  }, [answers, onAnswersChange]);
+  }, [answers]);
 
   useEffect(() => {
-    if (initialAnswers && Object.keys(initialAnswers).length > 0) {
-      setAnswers((prev) => {
-        const next = { ...prev };
-        const questionIds = new Set(questions.map((q) => q.id));
-        for (const [id, val] of Object.entries(initialAnswers)) {
-          if (questionIds.has(id) && val !== undefined) next[id] = val;
-        }
-        return next;
-      });
-    }
-  }, [initialAnswers]);
+    if (!initialAnswers || Object.keys(initialAnswers).length === 0) return;
+    if (initialSyncDoneRef.current) return;
+    initialSyncDoneRef.current = true;
+    isHydratingRef.current = true;
+    setAnswers((prev) => {
+      const next = { ...prev };
+      const questionIds = new Set(questions.map((q) => q.id));
+      for (const [id, val] of Object.entries(initialAnswers)) {
+        if (questionIds.has(id) && val !== undefined) next[id] = val;
+      }
+      return next;
+    });
+  }, [initialAnswers, questions]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (retryTrigger != null && retryTrigger > 0) setError('');
+  }, [retryTrigger]);
 
   const STEPS_PER_PAGE = 4;
   const totalSteps = Math.ceil(questions.length / STEPS_PER_PAGE);
@@ -297,13 +356,29 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
   const pageQuestions = questions.slice(start, start + STEPS_PER_PAGE);
 
   const setAnswer = (id: string, value: unknown) => {
+    onEditingStart?.();
     setAnswers((prev) => ({ ...prev, [id]: value }));
   };
 
   const handleSubmit = async () => {
     setError('');
+    const busy = isBusy || isSubmitting;
+    if (busy) return;
+
     setIsSubmitting(true);
     try {
+      const grouped: Record<string, Record<string, unknown>> = {};
+      for (const q of questions) {
+        const cat = q.category;
+        if (!grouped[cat]) grouped[cat] = {};
+        grouped[cat][q.id] = answers[q.id];
+      }
+
+      if (saveAnswersBeforeLoad) {
+        await saveAnswersBeforeLoad(answers, grouped);
+      }
+
+      onLoadRecommendationsStart?.();
       const results: Record<string, RecommendationResponse> = {};
       for (const cat of categories) {
         const backendKey = CATEGORY_MAP[cat];
@@ -316,7 +391,10 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
       const msg = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : (err as Error)?.message;
-      setError(String(msg || 'Failed to load recommendations.'));
+      const errStr = String(msg || 'Failed to load recommendations.');
+      setError(errStr);
+      onError?.(errStr);
+      logServicesWorkflow('recommendations_load_failed', { error: errStr });
     } finally {
       setIsSubmitting(false);
     }
@@ -402,8 +480,8 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
         {!isLastStep ? (
           <Button onClick={() => setStep((s) => s + 1)}>Next</Button>
         ) : (
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? 'Loading recommendations...' : 'Get recommendations'}
+          <Button onClick={handleSubmit} disabled={isSubmitting || isBusy}>
+            {submitLabel ?? (isSubmitting ? 'Loading recommendations...' : 'Get recommendations')}
           </Button>
         )}
       </div>

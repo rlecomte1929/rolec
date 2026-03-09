@@ -6,7 +6,7 @@ interface ServicesFlowState {
   selectedServices: Set<ServiceKey>;
   setSelectedServices: (next: Set<ServiceKey>) => void;
   answers: Record<string, unknown>;
-  setAnswers: (next: Record<string, unknown>) => void;
+  setAnswers: (next: Record<string, unknown> | ((prev: Record<string, unknown>) => Record<string, unknown>)) => void;
   recommendations: Record<string, RecommendationResponse> | null;
   setRecommendations: (next: Record<string, RecommendationResponse> | null) => void;
   shortlist: Map<string, string>;

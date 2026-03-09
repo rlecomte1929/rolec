@@ -133,6 +133,28 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Ensure 500 responses include JSON body and go through normal response path (CORS)."""
+    from fastapi import HTTPException as _HTTPEx
+    if isinstance(exc, _HTTPEx):
+        raise exc
+    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    log.error(
+        "request_id=%s method=%s path=%s unhandled_exception=%s",
+        req_id, request.method, request.url.path, repr(exc),
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "request_id": req_id,
+        },
+        headers={"X-Request-ID": req_id},
+    )
+
+
 @app.middleware("http")
 async def request_id_and_timing_middleware(request: Request, call_next):
     """
@@ -2203,8 +2225,13 @@ def list_hr_assignments(
 
         summaries: List[AssignmentSummary] = []
         for assignment in assignments:
-            report = db.get_latest_compliance_report(assignment["id"])
+            report = None
+            try:
+                report = db.get_latest_compliance_report(assignment["id"])
+            except Exception:
+                pass
             case_meta = cases_by_id.get(assignment.get("case_id"))
+            case_id = assignment.get("case_id") or assignment.get("id") or ""
 
             submitted_at = assignment.get("submitted_at")
             # In SQLite this is stored as text; in Postgres it may be timestamptz.
@@ -2216,7 +2243,7 @@ def list_hr_assignments(
 
             summaries.append(AssignmentSummary(
                 id=assignment["id"],
-                caseId=assignment["case_id"],
+                caseId=case_id,
                 employeeIdentifier=assignment["employee_identifier"],
                 status=AssignmentStatus(normalize_status(assignment["status"])),
                 submittedAt=submitted_at_str,
@@ -2413,43 +2440,103 @@ def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(requ
 
 
 @app.get("/api/hr/assignments/{assignment_id}", response_model=AssignmentDetail)
-def get_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
-    if not assignment:
-        raise HTTPException(status_code=404, detail="Assignment not found")
-    if (not user.get("is_admin")) or user.get("impersonation"):
-        effective = _effective_user(user, UserRole.HR)
-        if assignment.get("hr_user_id") != effective["id"]:
-            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+def get_hr_assignment(
+    request: Request,
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    start = time.perf_counter()
+    try:
+        assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+        if not assignment:
+            raise HTTPException(status_code=404, detail="Assignment not found")
+        if (not user.get("is_admin")) or user.get("impersonation"):
+            effective = _effective_user(user, UserRole.HR)
+            if assignment.get("hr_user_id") != effective["id"]:
+                raise HTTPException(status_code=403, detail="Not authorized for this assignment")
 
-    aid = assignment["id"]
-    profile = db.get_employee_profile(aid)
-    report = db.get_latest_compliance_report(aid)
+        aid = assignment["id"]
+        case_id = assignment.get("case_id") or assignment.get("id") or ""
+        if not case_id:
+            log.warning("request_id=%s assignment_id=%s assignment has no case_id", req_id, assignment_id)
 
-    completeness = None
-    if profile:
-        completion_state = orchestrator.compute_completion_state(profile)
-        completeness = completion_state.get("profileCompleteness", 0)
+        profile = None
+        try:
+            profile = db.get_employee_profile(aid)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s get_employee_profile failed: %s",
+                req_id, assignment_id, e, exc_info=True,
+            )
 
-    submitted_at = assignment.get("submitted_at")
-    if isinstance(submitted_at, datetime):
-        submitted_at_str = submitted_at.isoformat()
-    else:
-        submitted_at_str = submitted_at
+        report = None
+        try:
+            report = db.get_latest_compliance_report(aid)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s get_latest_compliance_report failed: %s",
+                req_id, assignment_id, e, exc_info=True,
+            )
 
-    return AssignmentDetail(
-        id=aid,
-        caseId=assignment["case_id"],
-        employeeIdentifier=assignment["employee_identifier"],
-        status=AssignmentStatus(normalize_status(assignment["status"])),
-        submittedAt=submitted_at_str,
-        hrNotes=assignment.get("hr_notes"),
-        profile=RelocationProfile(**profile) if profile else None,
-        completeness=completeness,
-        complianceReport=report,
-        employeeFirstName=assignment.get("employee_first_name"),
-        employeeLastName=assignment.get("employee_last_name"),
-    )
+        completeness = None
+        if profile:
+            try:
+                completion_state = orchestrator.compute_completion_state(profile)
+                completeness = completion_state.get("profileCompleteness", 0)
+            except Exception as e:
+                log.warning(
+                    "request_id=%s assignment_id=%s compute_completion_state failed: %s",
+                    req_id, assignment_id, e, exc_info=True,
+                )
+
+        parsed_profile = None
+        if profile:
+            try:
+                parsed_profile = RelocationProfile(**profile)
+            except Exception as e:
+                log.warning(
+                    "request_id=%s assignment_id=%s RelocationProfile validation failed: %s",
+                    req_id, assignment_id, e, exc_info=True,
+                )
+
+        submitted_at = assignment.get("submitted_at")
+        if isinstance(submitted_at, datetime):
+            submitted_at_str = submitted_at.isoformat()
+        else:
+            submitted_at_str = str(submitted_at) if submitted_at is not None else None
+
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.info(
+            "request_id=%s assignment_id=%s get_hr_assignment ok dur_ms=%.2f",
+            req_id, assignment_id, dur_ms,
+        )
+        return AssignmentDetail(
+            id=aid,
+            caseId=case_id,
+            employeeIdentifier=assignment.get("employee_identifier") or "",
+            status=AssignmentStatus(normalize_status(assignment.get("status"))),
+            submittedAt=submitted_at_str,
+            hrNotes=assignment.get("hr_notes"),
+            profile=parsed_profile,
+            completeness=completeness,
+            complianceReport=report,
+            employeeFirstName=assignment.get("employee_first_name"),
+            employeeLastName=assignment.get("employee_last_name"),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.error(
+            "request_id=%s assignment_id=%s get_hr_assignment failed dur_ms=%.2f error=%s",
+            req_id, assignment_id, dur_ms, repr(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to load assignment: {str(e)[:200]}",
+        )
 
 
 @app.post("/api/hr/assignments/{assignment_id}/feedback")
@@ -2855,20 +2942,59 @@ def get_service_answers(
     return {"case_id": effective_case_id, "answers": answers}
 
 
+def _normalize_answers_for_compare(answers: Dict[str, Any]) -> str:
+    """Stable JSON for duplicate detection."""
+    if not answers:
+        return "{}"
+    return json.dumps(answers, sort_keys=True)
+
+
 @app.post("/api/services/answers")
 def upsert_service_answers(
     payload: ServiceAnswersUpsert,
+    request: Request,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    start = time.perf_counter()
     assignment = _require_assignment_visibility(payload.case_id, user)
     effective_case_id = assignment.get("case_id") or payload.case_id
-    for item in payload.items:
-        db.upsert_case_service_answers(
-            case_id=effective_case_id,
-            service_key=item.service_key,
-            answers=item.answers,
+    assignment_id = assignment.get("id")
+
+    try:
+        existing = db.list_case_service_answers(effective_case_id, request_id=request_id)
+        existing_by_key = {r["service_key"]: _normalize_answers_for_compare(r.get("answers") or {}) for r in existing}
+        incoming_by_key = {item.service_key: _normalize_answers_for_compare(item.answers) for item in payload.items}
+        if set(existing_by_key.keys()) == set(incoming_by_key.keys()) and all(
+            existing_by_key.get(k) == incoming_by_key.get(k) for k in incoming_by_key
+        ):
+            dur_ms = (time.perf_counter() - start) * 1000
+            log.info(
+                "request_id=%s case_id=%s assignment_id=%s services_answers skipped_duplicate dur_ms=%.2f",
+                request_id, effective_case_id, assignment_id, dur_ms,
+            )
+            return {"ok": True, "skipped_duplicate": True}
+
+        for item in payload.items:
+            db.upsert_case_service_answers(
+                case_id=effective_case_id,
+                service_key=item.service_key,
+                answers=item.answers,
+                request_id=request_id,
+            )
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.info(
+            "request_id=%s case_id=%s assignment_id=%s services_answers saved dur_ms=%.2f",
+            request_id, effective_case_id, assignment_id, dur_ms,
         )
-    return {"ok": True}
+        return {"ok": True}
+    except Exception as e:
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.warning(
+            "request_id=%s case_id=%s assignment_id=%s services_answers failed dur_ms=%.2f error=%s",
+            request_id, effective_case_id, assignment_id, dur_ms, repr(e), exc_info=True,
+        )
+        raise
 
 
 @app.post("/api/rfqs")
@@ -2914,10 +3040,10 @@ def add_assignment_evidence(
         evidence_id = db.insert_case_evidence(
             case_id=case_id,
             assignment_id=assignment_id,
-            participant_id=getattr(request, "participantId", None),
-            requirement_id=getattr(request, "requirementId", None),
-            evidence_type=request.evidenceType,
-            file_url=request.fileUrl,
+            participant_id=request.participant_id,
+            requirement_id=request.requirement_id,
+            evidence_type=request.evidence_type,
+            file_url=request.file_url,
             metadata=request.metadata,
             status="submitted",
             request_id=request_id,

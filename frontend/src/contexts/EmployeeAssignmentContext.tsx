@@ -1,15 +1,21 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { employeeAPI } from '../api/client';
+import { invalidateApiCache } from '../api/client';
 import { getAuthItem } from '../utils/demo';
+
+const CURRENT_ASSIGNMENT_CACHE_KEY = 'employee:current-assignment';
 
 interface EmployeeAssignmentContextValue {
   assignmentId: string | null;
   isLoading: boolean;
+  /** Refetch assignment (clears cache). Call when user retries or returns to Services. */
+  refetch: () => Promise<void>;
 }
 
 const defaultValue: EmployeeAssignmentContextValue = {
   assignmentId: null,
   isLoading: false,
+  refetch: async () => {},
 };
 
 const EmployeeAssignmentContext = createContext<EmployeeAssignmentContextValue>(defaultValue);
@@ -20,30 +26,32 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
   const role = getAuthItem('relopass_role');
   const isEmployee = role === 'EMPLOYEE' || role === 'ADMIN';
 
-  useEffect(() => {
+  const fetchAssignment = useCallback(async (clearCache = false) => {
     if (!isEmployee || !getAuthItem('relopass_token')) return;
-    let cancelled = false;
+    if (clearCache) invalidateApiCache(CURRENT_ASSIGNMENT_CACHE_KEY);
     setIsLoading(true);
-    employeeAPI
-      .getCurrentAssignment()
-      .then((res) => {
-        if (!cancelled && res?.assignment?.id) {
-          setAssignmentId(res.assignment.id);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setAssignmentId(null);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const res = await employeeAPI.getCurrentAssignment();
+      if (res?.assignment?.id) {
+        setAssignmentId(res.assignment.id);
+      } else {
+        setAssignmentId(null);
+      }
+    } catch {
+      setAssignmentId(null);
+    } finally {
+      setIsLoading(false);
+    }
   }, [isEmployee]);
 
+  useEffect(() => {
+    fetchAssignment(false);
+  }, [fetchAssignment]);
+
+  const refetch = useCallback(() => fetchAssignment(true), [fetchAssignment]);
+
   return (
-    <EmployeeAssignmentContext.Provider value={{ assignmentId, isLoading }}>
+    <EmployeeAssignmentContext.Provider value={{ assignmentId, isLoading, refetch }}>
       {children}
     </EmployeeAssignmentContext.Provider>
   );

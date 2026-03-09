@@ -173,6 +173,7 @@ export const CaseWizardPage: React.FC = () => {
   const [hrFeedback, setHrFeedback] = useState<string>('');
   const [hrRequestedSections, setHrRequestedSections] = useState<string[]>([]);
   const [caseFeedback, setCaseFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
+  const [isSaving, setIsSaving] = useState(false);
   const userEmail = getAuthItem('relopass_email') || getAuthItem('relopass_username') || '';
   const enableTestFill =
     import.meta.env.DEV || userEmail.endsWith('@relopass.com');
@@ -338,7 +339,7 @@ export const CaseWizardPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [assignmentId]);
 
-  const handleSave = async (nextDraft: CaseDraftDTO) => {
+  const handleSave = async (nextDraft: CaseDraftDTO): Promise<string> => {
     let caseIdToSave = resolvedCaseId;
     if (!caseIdToSave && assignmentIdFromRoute) {
       const { data, error: loadError } = await getCaseDetailsByAssignmentId(assignmentIdFromRoute);
@@ -359,15 +360,21 @@ export const CaseWizardPage: React.FC = () => {
     if (assignmentId) {
       notifyHrEmployeeSaved(assignmentId).catch(() => {});
     }
+    return caseIdToSave;
   };
 
   const handleNext = async (nextDraft: CaseDraftDTO) => {
-    if (!resolvedCaseId || !assignmentId) return;
+    if (!assignmentId) {
+      setError('Assignment not found. Please refresh and try again.');
+      return;
+    }
+    setIsSaving(true);
+    setError('');
     try {
-      await handleSave(nextDraft);
-      if (currentStep === 1) {
+      const caseIdAfterSave = await handleSave(nextDraft);
+      if (currentStep === 1 && caseIdAfterSave) {
         try {
-          await startResearch(resolvedCaseId);
+          await startResearch(caseIdAfterSave);
           setBanner('Pulling destination requirements—shown in Step 5.');
         } catch {
           // Research is non-blocking; continue to next step
@@ -376,6 +383,9 @@ export const CaseWizardPage: React.FC = () => {
       navigate(`/employee/case/${assignmentId}/wizard/${currentStep + 1}`);
     } catch (err: any) {
       setError(err?.message || 'Unable to save. Please try again.');
+      // Do not navigate on save failure — user stays on current step
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -385,14 +395,17 @@ export const CaseWizardPage: React.FC = () => {
   };
 
   const handleFillForTest = async () => {
-    if (!resolvedCaseId || !assignmentId) return;
+    if (!assignmentId) return;
     setError('');
     const baseDraft = caseToWizardDraft(caseData);
     const nextDraft = buildTestDraft(assignmentId, baseDraft);
+    setIsSaving(true);
     try {
       await handleSave(nextDraft);
     } catch (err: any) {
       setError(err?.message || 'Unable to apply test data.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -418,6 +431,7 @@ export const CaseWizardPage: React.FC = () => {
     onBack: handleBack,
     onGoToStep: (stepNumber: number) =>
       assignmentId && navigate(`/employee/case/${assignmentId}/wizard/${stepNumber}`),
+    isSaving,
   };
 
   const stepNode = useMemo(() => {
@@ -426,7 +440,7 @@ export const CaseWizardPage: React.FC = () => {
     if (currentStep === 3) return <Step3FamilyMembers {...stepProps} />;
     if (currentStep === 4) return <Step4AssignmentContext {...stepProps} />;
     return <Step5ReviewCreate {...stepProps} />;
-  }, [currentStep, draft, requiredFields, banner]);
+  }, [currentStep, draft, requiredFields, banner, isSaving]);
 
   const completedSteps = stepCompletion.completed;
 

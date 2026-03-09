@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card } from '../components/antigravity';
 import { hrAPI } from '../api/client';
@@ -203,6 +203,11 @@ export const HrCaseSummary: React.FC = () => {
                 >
                   {isDecisionOpen ? 'Close decision' : 'Approve / Request changes'}
                 </Button>
+                {caseId && (
+                  <Link to={`/cases/${caseId}/resources`}>
+                    <Button variant="outline">View resources</Button>
+                  </Link>
+                )}
               </div>
             </div>
           </Card>

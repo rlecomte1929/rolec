@@ -11,9 +11,10 @@ interface StepProps {
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
   onBack: () => void;
+  isSaving?: boolean;
 }
 
-export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, onSave, onNext, onBack }) => {
+export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, onSave, onNext, onBack, isSaving }) => {
   const navigate = useNavigate();
   const [local, setLocal] = useState(draft.employeeProfile);
   const [passportFileName, setPassportFileName] = useState('');
@@ -192,6 +193,7 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
             Save as draft & exit
           </Button>
           <Button
+            disabled={isSaving}
             onClick={() => {
               if (hasMissing) {
                 setError('Please complete all required fields (marked with *).');
@@ -201,7 +203,7 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
               onNext(nextDraft);
             }}
           >
-            Next
+            {isSaving ? 'Saving…' : 'Next'}
           </Button>
         </div>
       </div>

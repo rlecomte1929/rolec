@@ -84,7 +84,15 @@ export const Auth: React.FC = () => {
         name: name.trim() || undefined,
       });
     } catch (err: any) {
-      const msg = err.response?.data?.detail || 'Registration failed. Please try again.';
+      const detail = err.response?.data?.detail;
+      let msg: string;
+      if (err.response?.status === 400 && detail) {
+        msg = Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail);
+      } else if (!err.response) {
+        msg = 'Cannot reach server. Is the backend running? Check the console for details.';
+      } else {
+        msg = detail ? (Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail)) : 'Registration failed. Please try again.';
+      }
       try {
         localStorage.setItem('debug_last_auth_error', msg);
       } catch {

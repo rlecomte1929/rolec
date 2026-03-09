@@ -41,7 +41,7 @@ type ServiceState = {
 };
 
 export const ProvidersPage: React.FC = () => {
-  const { assignmentId, isLoading: assignmentLoading } = useEmployeeAssignment();
+  const { assignmentId, isLoading: assignmentLoading, refetch } = useEmployeeAssignment();
   const [services, setServices] = useState<Record<string, ServiceState>>({});
   const [policy, setPolicy] = useState<{ currency: string; caps: Record<string, number>; total_cap?: number | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -177,9 +177,14 @@ export const ProvidersPage: React.FC = () => {
     return (
       <AppShell title="Services" subtitle="Choose the services you need for your relocation.">
         <Alert variant="info" className="mb-6">
-          Complete your case first to unlock services selection.
+          <p className="mb-3">No assignment found. You need an active assignment to use Services. If you completed the intake wizard, try refreshing your assignment.</p>
+          <div className="flex gap-3">
+            <Button onClick={() => refetch()}>Refresh assignment</Button>
+            <Button variant="outline" onClick={() => navigate(buildRoute('employeeDashboard'))}>
+              Back to Dashboard
+            </Button>
+          </div>
         </Alert>
-        <Button onClick={() => navigate(buildRoute('employeeDashboard'))}>Back to Dashboard</Button>
       </AppShell>
     );
   }

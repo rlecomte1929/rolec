@@ -28,6 +28,38 @@ import { AdminRelocations } from './pages/admin/AdminRelocations';
 import { AdminSupport } from './pages/admin/AdminSupport';
 import { AdminCompanyDetail } from './pages/admin/AdminCompanyDetail';
 import { AdminResearch } from './pages/admin/AdminResearch';
+import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
+import { AdminResources } from './pages/admin/AdminResources';
+import { AdminResourceEditor } from './pages/admin/AdminResourceEditor';
+import { AdminEvents } from './pages/admin/AdminEvents';
+import { AdminEventEditor } from './pages/admin/AdminEventEditor';
+import { AdminCategories } from './pages/admin/AdminCategories';
+import { AdminTags } from './pages/admin/AdminTags';
+import { AdminSources } from './pages/admin/AdminSources';
+import { AdminStagingDashboard } from './pages/admin/staging/AdminStagingDashboard';
+import { AdminStagingResources } from './pages/admin/staging/AdminStagingResources';
+import { AdminStagingResourceDetail } from './pages/admin/staging/AdminStagingResourceDetail';
+import { AdminStagingEvents } from './pages/admin/staging/AdminStagingEvents';
+import { AdminStagingEventDetail } from './pages/admin/staging/AdminStagingEventDetail';
+import { AdminFreshnessOverview } from './pages/admin/freshness/AdminFreshnessOverview';
+import { AdminFreshnessCountries } from './pages/admin/freshness/AdminFreshnessCountries';
+import { AdminFreshnessCities } from './pages/admin/freshness/AdminFreshnessCities';
+import { AdminFreshnessSources } from './pages/admin/freshness/AdminFreshnessSources';
+import { AdminFreshnessChanges } from './pages/admin/freshness/AdminFreshnessChanges';
+import { AdminFreshnessStaleContent } from './pages/admin/freshness/AdminFreshnessStaleContent';
+import { AdminCrawlSchedules } from './pages/admin/freshness/AdminCrawlSchedules';
+import { AdminCrawlJobRuns } from './pages/admin/freshness/AdminCrawlJobRuns';
+import { AdminCrawlJobRunDetail } from './pages/admin/freshness/AdminCrawlJobRunDetail';
+import { AdminReviewQueuePage } from './pages/admin/review-queue/AdminReviewQueuePage';
+import { AdminReviewQueueDetailPage } from './pages/admin/review-queue/AdminReviewQueueDetailPage';
+import { AdminReviewQueueWorkloadPage } from './pages/admin/review-queue/AdminReviewQueueWorkloadPage';
+import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage';
+import { AdminNotificationDetailPage } from './pages/admin/AdminNotificationDetailPage';
+import { AdminOpsSlaPage } from './pages/admin/ops/AdminOpsSlaPage';
+import { AdminOpsQueuePage } from './pages/admin/ops/AdminOpsQueuePage';
+import { AdminOpsReviewersPage } from './pages/admin/ops/AdminOpsReviewersPage';
+import { AdminOpsDestinationsPage } from './pages/admin/ops/AdminOpsDestinationsPage';
+import { AdminOpsNotificationsPage } from './pages/admin/ops/AdminOpsNotificationsPage';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
@@ -130,19 +162,55 @@ function App() {
         <Route path={WIZARD_ROUTES.CASE_SUMMARY} element={<EmployeeCaseSummary />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
-        <Route path={ROUTE_DEFS.adminConsole.path} element={<AdminDashboard />} />
-        <Route path={ROUTE_DEFS.adminCompanies.path} element={<AdminCompanies />} />
-        <Route path={ROUTE_DEFS.adminResearch.path} element={<AdminResearch />} />
-        <Route path="/admin/companies/:companyId" element={<AdminCompanyDetail />} />
-        <Route path={ROUTE_DEFS.adminUsers.path} element={<AdminUsers />} />
-        <Route path={ROUTE_DEFS.adminRelocations.path} element={<AdminRelocations />} />
-        <Route path={ROUTE_DEFS.adminSupport.path} element={<AdminSupport />} />
+        <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminDashboard /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCompanies.path} element={<RequireAdminRoute><AdminCompanies /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminResearch.path} element={<RequireAdminRoute><AdminResearch /></RequireAdminRoute>} />
+        <Route path="/admin/companies/:companyId" element={<RequireAdminRoute><AdminCompanyDetail /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminUsers.path} element={<RequireAdminRoute><AdminUsers /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminRelocations.path} element={<RequireAdminRoute><AdminRelocations /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><AdminSupport /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminResources.path} element={<RequireAdminRoute><AdminResources /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminResourcesNew.path} element={<RequireAdminRoute><AdminResourceEditor /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminResourcesEdit.path} element={<RequireAdminRoute><AdminResourceEditor /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminEvents.path} element={<RequireAdminRoute><AdminEvents /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminEventsEdit.path} element={<RequireAdminRoute><AdminEventEditor /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCategories.path} element={<RequireAdminRoute><AdminCategories /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminTags.path} element={<RequireAdminRoute><AdminTags /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminSources.path} element={<RequireAdminRoute><AdminSources /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminStagingDashboard.path} element={<RequireAdminRoute><AdminStagingDashboard /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminStagingResources.path} element={<RequireAdminRoute><AdminStagingResources /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminStagingResourceDetail.path} element={<RequireAdminRoute><AdminStagingResourceDetail /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminStagingEvents.path} element={<RequireAdminRoute><AdminStagingEvents /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminStagingEventDetail.path} element={<RequireAdminRoute><AdminStagingEventDetail /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFreshness.path} element={<RequireAdminRoute><AdminFreshnessOverview /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFreshnessCountries.path} element={<RequireAdminRoute><AdminFreshnessCountries /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFreshnessCities.path} element={<RequireAdminRoute><AdminFreshnessCities /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFreshnessSources.path} element={<RequireAdminRoute><AdminFreshnessSources /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFreshnessChanges.path} element={<RequireAdminRoute><AdminFreshnessChanges /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFreshnessStaleContent.path} element={<RequireAdminRoute><AdminFreshnessStaleContent /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCrawlSchedules.path} element={<RequireAdminRoute><AdminCrawlSchedules /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCrawlJobRuns.path} element={<RequireAdminRoute><AdminCrawlJobRuns /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCrawlJobRunDetail.path} element={<RequireAdminRoute><AdminCrawlJobRunDetail /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminReviewQueue.path} element={<RequireAdminRoute><AdminReviewQueuePage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminReviewQueueWorkload.path} element={<RequireAdminRoute><AdminReviewQueueWorkloadPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminReviewQueueDetail.path} element={<RequireAdminRoute><AdminReviewQueueDetailPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminNotifications.path} element={<RequireAdminRoute><AdminNotificationsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminNotificationDetail.path} element={<RequireAdminRoute><AdminNotificationDetailPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminOpsSla.path} element={<RequireAdminRoute><AdminOpsSlaPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminOpsQueue.path} element={<RequireAdminRoute><AdminOpsQueuePage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminOpsReviewers.path} element={<RequireAdminRoute><AdminOpsReviewersPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminOpsDestinations.path} element={<RequireAdminRoute><AdminOpsDestinationsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminOpsNotifications.path} element={<RequireAdminRoute><AdminOpsNotificationsPage /></RequireAdminRoute>} />
         <Route
           path={ROUTE_DEFS.messages.path}
           element={<Messages />}
         />
         <Route
           path={ROUTE_DEFS.resources.path}
+          element={<Resources />}
+        />
+        <Route
+          path={ROUTE_DEFS.caseResources.path}
           element={<Resources />}
         />
         <Route

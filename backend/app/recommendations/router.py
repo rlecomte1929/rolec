@@ -1,11 +1,16 @@
 """FastAPI router for recommendations API."""
 from __future__ import annotations
 
+import logging
+import time
+import uuid
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from .engine import recommend
+
+log = logging.getLogger(__name__)
 from .registry import get_plugin, list_categories
 from .types import RecommendationResponse
 
@@ -34,8 +39,10 @@ class RecommendRequest:
 
 
 @router.post("/{category}", response_model=RecommendationResponse)
-def post_recommend(category: str, body: Dict[str, Any]):
+def post_recommend(category: str, body: Dict[str, Any], request: Request):
     """Get recommendations for a category."""
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    start = time.perf_counter()
     plugin = get_plugin(category)
     if not plugin:
         raise HTTPException(status_code=404, detail=f"Category not found: {category}")
@@ -44,6 +51,17 @@ def post_recommend(category: str, body: Dict[str, Any]):
     if not isinstance(criteria, dict):
         raise HTTPException(status_code=400, detail="criteria must be an object")
     try:
-        return recommend(category, criteria, top_n=int(top_n))
+        result = recommend(category, criteria, top_n=int(top_n))
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.info(
+            "request_id=%s category=%s recommendations_load succeeded dur_ms=%.2f",
+            request_id, category, dur_ms,
+        )
+        return result
     except Exception as e:
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.warning(
+            "request_id=%s category=%s recommendations_load failed dur_ms=%.2f error=%s",
+            request_id, category, dur_ms, str(e),
+        )
         raise HTTPException(status_code=400, detail=str(e))

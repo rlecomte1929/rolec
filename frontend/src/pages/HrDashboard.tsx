@@ -24,6 +24,7 @@ export const HrDashboard: React.FC = () => {
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const [assignmentDetails, setAssignmentDetails] = useState<Record<string, AssignmentDetail>>({});
   const [detailsLoadedCount, setDetailsLoadedCount] = useState(0);
+  const [detailsErrorCount, setDetailsErrorCount] = useState(0);
   const [search, setSearch] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -56,18 +57,27 @@ export const HrDashboard: React.FC = () => {
     );
 
     const nextDetails: Record<string, AssignmentDetail> = {};
+    let fulfilled = 0;
+    let rejected = 0;
     detailEntries.forEach((entry) => {
       if (entry.status === 'fulfilled') {
         const [id, detail] = entry.value;
-        if (detail) nextDetails[id] = detail;
+        if (detail) {
+          nextDetails[id] = detail;
+          fulfilled += 1;
+        }
+      } else {
+        rejected += 1;
       }
     });
     setAssignmentDetails((prev) => ({ ...prev, ...nextDetails }));
     setDetailsLoadedCount((prev) => prev + targets.length);
+    setDetailsErrorCount((prev) => prev + rejected);
   };
 
   const loadAssignments = async () => {
     setIsLoading(true);
+    setDetailsErrorCount(0);
     try {
       const data = await hrAPI.listAssignments();
       setAssignments(data);
@@ -265,6 +275,11 @@ export const HrDashboard: React.FC = () => {
     <AppShell title="Assignments" subtitle="Create cases, assign employees, and monitor relocations.">
       <div className="space-y-6">
         {error && <Alert variant="error">{error}</Alert>}
+        {detailsErrorCount > 0 && (
+          <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
+            Some case details could not be loaded ({detailsErrorCount} failed). Showing partial data.
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <input
