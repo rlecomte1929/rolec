@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { ProvidersCriteriaWizard } from '../../features/recommendations/ProvidersCriteriaWizard';
@@ -9,7 +9,10 @@ import { useServicesWorkflowState } from '../../features/services/useServicesWor
 import { employeeAPI, servicesAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
+import { ROUTE_DEFS } from '../../navigation/routes';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
+
+const SERVICES_QUESTIONS_PATH = ROUTE_DEFS.servicesQuestions.path;
 
 function mergeRecords(
   prev: Record<string, unknown>,
@@ -55,12 +58,33 @@ function caseToInitialAnswers(
 
 export const ServicesQuestions: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { selectedServices, setRecommendations, setShortlist, answers, setAnswers } = useServicesFlow();
   const { assignmentId } = useEmployeeAssignment();
   const workflow = useServicesWorkflowState();
   const [caseId, setCaseId] = useState<string | null>(null);
   const [initialAnswers, setInitialAnswers] = useState<Record<string, unknown>>({});
   const [retryTrigger, setRetryTrigger] = useState(0);
+
+  const pathnameRef = useRef(location.pathname);
+  pathnameRef.current = location.pathname;
+  const mountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    abortControllerRef.current = new AbortController();
+    return () => {
+      mountedRef.current = false;
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+      const path = pathnameRef.current;
+      logServicesWorkflow('services_autosave_cancelled_unmount', { pathname: path, reason: 'unmount' });
+      if (path !== SERVICES_QUESTIONS_PATH) {
+        logServicesWorkflow('services_autosave_cancelled_route_change', { pathname: path, expected: SERVICES_QUESTIONS_PATH });
+      }
+    };
+  }, []);
 
   const wizardServices = new Set(
     Array.from(selectedServices).filter((k) =>
@@ -113,35 +137,84 @@ export const ServicesQuestions: React.FC = () => {
     (newAnswers: Record<string, unknown>, byCategory: Record<string, Record<string, unknown>>) => {
       setAnswers((prev) => mergeRecords(prev, newAnswers));
       if (!caseId) return;
+      if (!mountedRef.current) {
+        logServicesWorkflow('services_autosave_blocked_wrong_state', {
+          pathname: pathnameRef.current,
+          reason: 'unmounted',
+        });
+        return;
+      }
+      if (pathnameRef.current !== SERVICES_QUESTIONS_PATH) {
+        logServicesWorkflow('services_autosave_blocked_wrong_route', {
+          pathname: pathnameRef.current,
+          expected: SERVICES_QUESTIONS_PATH,
+        });
+        return;
+      }
+      if (workflow.isBusy) {
+        logServicesWorkflow('services_autosave_blocked_wrong_state', {
+          pathname: pathnameRef.current,
+          reason: 'workflow_busy',
+          state: workflow.state,
+        });
+        return;
+      }
+      if (workflow.state !== 'editing' && workflow.state !== 'idle') {
+        logServicesWorkflow('services_autosave_blocked_wrong_state', {
+          pathname: pathnameRef.current,
+          reason: 'workflow_not_editing',
+          state: workflow.state,
+        });
+        return;
+      }
       const items = Object.entries(byCategory).map(([serviceKey, ans]) => ({
         service_key: serviceKey,
         answers: ans,
       }));
       const payloadKey = JSON.stringify(items);
-      if (lastSavedPayloadRef.current === payloadKey) return;
+      if (lastSavedPayloadRef.current === payloadKey) {
+        logServicesWorkflow('services_save_skipped_duplicate', { caseId, pathname: pathnameRef.current });
+        return;
+      }
       if (saveInFlightRef.current) return;
       lastSavedPayloadRef.current = payloadKey;
       saveInFlightRef.current = true;
-      logServicesWorkflow('save_preferences_started', { caseId });
+      const signal = abortControllerRef.current?.signal;
+      logServicesWorkflow('services_save_started', { caseId, pathname: pathnameRef.current, workflowState: workflow.state });
       servicesAPI
-        .saveServiceAnswers(caseId, items)
+        .saveServiceAnswers(caseId, items, signal ? { signal } : undefined)
         .then(() => {
-          logServicesWorkflow('save_preferences_succeeded', { caseId });
+          if (mountedRef.current) {
+            logServicesWorkflow('save_preferences_succeeded', { caseId });
+          }
         })
-        .catch(() => {
-          lastSavedPayloadRef.current = null;
-          logServicesWorkflow('save_preferences_failed', { caseId });
+        .catch((err: unknown) => {
+          const isAbort = err && typeof err === 'object' && ('name' in err || 'code' in err) &&
+            ((err as { name?: string }).name === 'AbortError' || (err as { name?: string }).name === 'CanceledError' || (err as { code?: string }).code === 'ERR_CANCELED');
+          if (isAbort) {
+            logServicesWorkflow('services_save_aborted', { caseId, pathname: pathnameRef.current });
+          } else {
+            lastSavedPayloadRef.current = null;
+            logServicesWorkflow('services_save_failed', { caseId, pathname: pathnameRef.current });
+          }
         })
         .finally(() => {
           saveInFlightRef.current = false;
         });
     },
-    [caseId, setAnswers]
+    [caseId, setAnswers, workflow.isBusy, workflow.state]
   );
 
   const saveAnswersBeforeLoad = useCallback(
     async (ans: Record<string, unknown>, byCategory: Record<string, Record<string, unknown>>) => {
       if (!caseId) throw new Error('Case not ready');
+      if (!mountedRef.current || pathnameRef.current !== SERVICES_QUESTIONS_PATH) {
+        logServicesWorkflow('services_autosave_blocked_wrong_route', {
+          pathname: pathnameRef.current,
+          expected: SERVICES_QUESTIONS_PATH,
+        });
+        return;
+      }
       setAnswers((prev) => mergeRecords(prev, ans));
       const items = Object.entries(byCategory).map(([serviceKey, a]) => ({
         service_key: serviceKey,
@@ -149,24 +222,32 @@ export const ServicesQuestions: React.FC = () => {
       }));
       const payloadKey = JSON.stringify(items);
       if (lastSavedPayloadRef.current === payloadKey) {
-        logServicesWorkflow('save_preferences_skipped_duplicate', { caseId });
+        logServicesWorkflow('services_save_skipped_duplicate', { caseId, pathname: pathnameRef.current });
         return;
       }
       workflow.toSavingAnswers();
-      logServicesWorkflow('save_preferences_started', { caseId });
+      const signal = abortControllerRef.current?.signal;
+      logServicesWorkflow('services_save_started', { caseId, pathname: pathnameRef.current, workflowState: workflow.state });
       try {
-        const res = await servicesAPI.saveServiceAnswers(caseId, items);
+        const res = await servicesAPI.saveServiceAnswers(caseId, items, signal ? { signal } : undefined);
+        if (!mountedRef.current) return;
         lastSavedPayloadRef.current = payloadKey;
         const skipped = (res as { skipped_duplicate?: boolean })?.skipped_duplicate;
         if (skipped) {
-          logServicesWorkflow('save_preferences_skipped_duplicate', { caseId });
+          logServicesWorkflow('services_save_skipped_duplicate', { caseId });
         } else {
           logServicesWorkflow('save_preferences_succeeded', { caseId });
         }
         workflow.toAnswersSaved();
-      } catch (err) {
+      } catch (err: unknown) {
+        const isAbort = err && typeof err === 'object' && ('name' in err || 'code' in err) &&
+          ((err as { name?: string }).name === 'AbortError' || (err as { name?: string }).name === 'CanceledError' || (err as { code?: string }).code === 'ERR_CANCELED');
+        if (isAbort) {
+          logServicesWorkflow('services_save_aborted', { caseId, pathname: pathnameRef.current });
+          return;
+        }
         lastSavedPayloadRef.current = null;
-        logServicesWorkflow('save_preferences_failed', { caseId });
+        logServicesWorkflow('services_save_failed', { caseId, pathname: pathnameRef.current });
         throw err;
       }
     },

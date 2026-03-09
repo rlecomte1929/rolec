@@ -317,6 +317,7 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
       isHydratingRef.current = false;
       return;
     }
+    logServicesWorkflow('services_autosave_scheduled', {});
     const qs = questions;
     const handle = window.setTimeout(() => {
       if (!isMountedRef.current || isHydratingRef.current) return;
@@ -329,7 +330,9 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
       }
       onAnswersChangeRef.current?.(answers, grouped);
     }, 500);
-    return () => window.clearTimeout(handle);
+    return () => {
+      window.clearTimeout(handle);
+    };
   }, [answers]);
 
   useEffect(() => {

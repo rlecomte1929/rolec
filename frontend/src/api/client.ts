@@ -964,9 +964,11 @@ export const servicesAPI = {
   },
   saveServiceAnswers: async (
     caseId: string,
-    items: Array<{ service_key: string; answers: Record<string, any> }>
+    items: Array<{ service_key: string; answers: Record<string, any> }>,
+    options?: { signal?: AbortSignal }
   ): Promise<{ ok: boolean }> => {
-    const response = await api.post('/api/services/answers', { case_id: caseId, items });
+    const config = options?.signal ? { signal: options.signal } : {};
+    const response = await api.post('/api/services/answers', { case_id: caseId, items }, config);
     return response.data;
   },
   createRfq: async (
