@@ -232,7 +232,7 @@ export const AdminResources: React.FC = () => {
               className="rounded border border-slate-200 px-3 py-2 text-sm"
             >
               <option value="">Category</option>
-              {categories.map((c) => (
+              {[...categories].sort((a, b) => (a.label || '').localeCompare(b.label || '')).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.label}
                 </option>
@@ -244,11 +244,11 @@ export const AdminResources: React.FC = () => {
               className="rounded border border-slate-200 px-3 py-2 text-sm"
             >
               <option value="">All statuses</option>
+              <option value="approved">Approved</option>
+              <option value="archived">Archived</option>
               <option value="draft">Draft</option>
               <option value="in_review">In Review</option>
-              <option value="approved">Approved</option>
               <option value="published">Published</option>
-              <option value="archived">Archived</option>
             </select>
             <select
               value={filters.audience}
@@ -257,9 +257,9 @@ export const AdminResources: React.FC = () => {
             >
               <option value="">Audience</option>
               <option value="all">All</option>
-              <option value="single">Single</option>
               <option value="couple">Couple</option>
               <option value="family">Family</option>
+              <option value="single">Single</option>
             </select>
             <select
               value={filters.featured}

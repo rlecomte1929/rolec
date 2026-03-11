@@ -54,11 +54,11 @@ export interface CaseFeedbackRow {
 }
 
 export const FEEDBACK_SECTIONS: { value: FeedbackSection; label: string }[] = [
-  { value: 'RELOCATION_BASICS', label: 'Relocation Basics' },
+  { value: 'ASSIGNMENT_CONTEXT', label: 'Assignment / Context' },
   { value: 'EMPLOYEE_PROFILE', label: 'Employee Profile' },
   { value: 'FAMILY_MEMBERS', label: 'Family Members' },
-  { value: 'ASSIGNMENT_CONTEXT', label: 'Assignment / Context' },
   { value: 'OVERALL', label: 'Overall' },
+  { value: 'RELOCATION_BASICS', label: 'Relocation Basics' },
 ];
 
 /** List feedback for an assignment, newest first */

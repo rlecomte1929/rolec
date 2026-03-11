@@ -6,9 +6,9 @@ import { hrPolicyAPI } from '../api/client';
 import { safeNavigate } from '../navigation/safeNavigate';
 
 const BENEFIT_KEYS = [
-  'preAssignmentVisit', 'travel', 'temporaryHousing', 'houseHunting', 'shipment',
-  'storage', 'rentalAssistance', 'settlingInAllowance', 'visaImmigration',
-  'taxAssistance', 'spousalSupport', 'educationSupport', 'languageTraining', 'repatriation',
+  'educationSupport', 'houseHunting', 'languageTraining', 'preAssignmentVisit',
+  'rentalAssistance', 'repatriation', 'settlingInAllowance', 'shipment',
+  'spousalSupport', 'storage', 'taxAssistance', 'temporaryHousing', 'travel', 'visaImmigration',
 ];
 
 const BENEFIT_LABELS: Record<string, string> = {
@@ -50,7 +50,7 @@ function getDefaultPolicy() {
     expiryDate: null as string | null,
     status: 'draft' as const,
     employeeBands: ['Band1', 'Band2', 'Band3', 'Band4'],
-    assignmentTypes: ['Permanent', 'Long-Term', 'Short-Term'],
+    assignmentTypes: ['Long-Term', 'Permanent', 'Short-Term'],
     benefitCategories,
   };
 }
@@ -302,7 +302,7 @@ export const HrPolicyManagement: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-[#0b2b43] mb-1">Assignment types</label>
                 <div className="flex flex-wrap gap-2">
-                  {['Permanent', 'Long-Term', 'Short-Term'].map((t) => (
+                  {['Long-Term', 'Permanent', 'Short-Term'].map((t) => (
                     <label key={t} className="flex items-center gap-2">
                       <input
                         type="checkbox"

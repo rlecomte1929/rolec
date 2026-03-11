@@ -19,30 +19,30 @@ import type {
   RecommendationGroup,
 } from '../types';
 
-// --- Section config ---
+// --- Section config (alphabetically by label) ---
 const SECTIONS = [
-  { id: 'overview', label: 'Overview', icon: '📋', categoryKeys: ['welcome', 'essentials'] },
   { id: 'admin_essentials', label: 'Admin essentials', icon: '📋', categoryKeys: ['admin_essentials', 'admin', 'registration'] },
-  { id: 'housing', label: 'Housing', icon: '🏠', categoryKeys: ['housing', 'neighborhoods'] },
-  { id: 'schools', label: 'Schools & childcare', icon: '🎓', categoryKeys: ['schools', 'childcare', 'education'] },
-  { id: 'healthcare', label: 'Healthcare', icon: '🏥', categoryKeys: ['healthcare', 'health'] },
-  { id: 'transport', label: 'Transport', icon: '🚇', categoryKeys: ['transport', 'transportation'] },
-  { id: 'daily_life', label: 'Daily life', icon: '🛒', categoryKeys: ['daily_life', 'groceries', 'shopping'] },
   { id: 'community', label: 'Community', icon: '🤝', categoryKeys: ['community', 'social', 'expat'] },
-  { id: 'events', label: 'Events', icon: '🎭', categoryKeys: ['culture_leisure', 'events', 'cinema', 'concerts'] },
-  { id: 'nature', label: 'Nature', icon: '🏔️', categoryKeys: ['nature', 'parks', 'outdoor'] },
   { id: 'cost_of_living', label: 'Cost of living', icon: '💰', categoryKeys: ['cost_of_living', 'cost'] },
+  { id: 'daily_life', label: 'Daily life', icon: '🛒', categoryKeys: ['daily_life', 'groceries', 'shopping'] },
+  { id: 'events', label: 'Events', icon: '🎭', categoryKeys: ['culture_leisure', 'events', 'cinema', 'concerts'] },
+  { id: 'healthcare', label: 'Healthcare', icon: '🏥', categoryKeys: ['healthcare', 'health'] },
+  { id: 'housing', label: 'Housing', icon: '🏠', categoryKeys: ['housing', 'neighborhoods'] },
+  { id: 'nature', label: 'Nature', icon: '🏔️', categoryKeys: ['nature', 'parks', 'outdoor'] },
+  { id: 'overview', label: 'Overview', icon: '📋', categoryKeys: ['welcome', 'essentials'] },
   { id: 'safety', label: 'Safety', icon: '🛡️', categoryKeys: ['safety', 'emergency'] },
+  { id: 'schools', label: 'Schools & childcare', icon: '🎓', categoryKeys: ['schools', 'childcare', 'education'] },
+  { id: 'transport', label: 'Transport', icon: '🚇', categoryKeys: ['transport', 'transportation'] },
 ] as const;
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   cinema: 'Cinema',
   concert: 'Concert',
-  festival: 'Festival',
-  sports: 'Sports',
   family_activity: 'Family',
-  networking: 'Networking',
+  festival: 'Festival',
   museum: 'Museum',
+  networking: 'Networking',
+  sports: 'Sports',
   theater: 'Theater',
 };
 
@@ -519,7 +519,7 @@ export const Resources: React.FC = () => {
             className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
           >
             <option value="">Event type</option>
-            {Object.entries(EVENT_TYPE_LABELS).map(([v, l]) => (
+            {Object.entries(EVENT_TYPE_LABELS).sort(([, a], [, b]) => a.localeCompare(b)).map(([v, l]) => (
               <option key={v} value={v}>
                 {l}
               </option>

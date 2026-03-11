@@ -8,7 +8,7 @@ import { getAuthItem } from '../../utils/demo';
 
 type Tag = { id: string; key: string; label: string; tag_group?: string };
 
-const TAG_GROUPS = ['family_type', 'budget', 'interest', 'age_group', 'indoor_outdoor', 'free_paid', 'weekday_weekend'];
+const TAG_GROUPS = ['age_group', 'budget', 'family_type', 'free_paid', 'indoor_outdoor', 'interest', 'weekday_weekend'];
 
 export const AdminTags: React.FC = () => {
   const [items, setItems] = useState<Tag[]>([]);

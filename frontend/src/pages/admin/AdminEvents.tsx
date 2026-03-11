@@ -8,7 +8,7 @@ import { adminResourcesAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 
-const EVENT_TYPES = ['cinema', 'concert', 'festival', 'sports', 'family_activity', 'networking', 'museum', 'theater'];
+const EVENT_TYPES = ['cinema', 'concert', 'family_activity', 'festival', 'museum', 'networking', 'sports', 'theater'];
 
 type EventItem = {
   id: string;

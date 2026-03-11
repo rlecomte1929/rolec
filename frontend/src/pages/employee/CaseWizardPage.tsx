@@ -68,11 +68,11 @@ function caseToWizardDraft(caseData: CaseDTO | null): CaseDraftDTO {
 }
 
 const COUNTRY_OPTIONS = [
-  { name: 'Norway', cities: ['Oslo', 'Bergen'] },
-  { name: 'Singapore', cities: ['Singapore'] },
-  { name: 'United States', cities: ['New York', 'San Francisco'] },
-  { name: 'United Kingdom', cities: ['London', 'Manchester'] },
   { name: 'Germany', cities: ['Berlin', 'Munich'] },
+  { name: 'Norway', cities: ['Bergen', 'Oslo'] },
+  { name: 'Singapore', cities: ['Singapore'] },
+  { name: 'United Kingdom', cities: ['London', 'Manchester'] },
+  { name: 'United States', cities: ['New York', 'San Francisco'] },
 ];
 
 const seedFromString = (value: string) => {

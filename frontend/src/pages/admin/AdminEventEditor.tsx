@@ -7,7 +7,7 @@ import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { InternalThreadPanel } from '../../components/admin/collaboration/InternalThreadPanel';
 
-const EVENT_TYPES = ['cinema', 'concert', 'festival', 'sports', 'family_activity', 'networking', 'museum', 'theater'];
+const EVENT_TYPES = ['cinema', 'concert', 'family_activity', 'festival', 'museum', 'networking', 'sports', 'theater'];
 
 export const AdminEventEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();

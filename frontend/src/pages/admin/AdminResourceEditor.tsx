@@ -7,9 +7,9 @@ import { buildRoute } from '../../navigation/routes';
 import { getAuthItem } from '../../utils/demo';
 import { InternalThreadPanel } from '../../components/admin/collaboration/InternalThreadPanel';
 
-const AUDIENCE_OPTIONS = ['all', 'single', 'couple', 'family', 'with_children', 'spouse_job_seeker'];
-const RESOURCE_TYPES = ['guide', 'checklist_item', 'provider', 'place', 'event_source', 'tip', 'official_link'];
-const BUDGET_OPTIONS = ['low', 'mid', 'high'];
+const AUDIENCE_OPTIONS = ['all', 'couple', 'family', 'single', 'spouse_job_seeker', 'with_children'];
+const RESOURCE_TYPES = ['checklist_item', 'event_source', 'guide', 'official_link', 'place', 'provider', 'tip'];
+const BUDGET_OPTIONS = ['high', 'low', 'mid'];
 
 export const AdminResourceEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -286,7 +286,7 @@ export const AdminResourceEditor: React.FC = () => {
                 className="w-full rounded border border-slate-200 px-3 py-2"
               >
                 <option value="">—</option>
-                {categories.map((c) => (
+                {[...categories].sort((a, b) => (a.label || a.key).localeCompare(b.label || b.key)).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.label} ({c.key})
                   </option>
@@ -420,7 +420,7 @@ export const AdminResourceEditor: React.FC = () => {
                 className="w-full rounded border border-slate-200 px-3 py-2"
               >
                 <option value="">—</option>
-                {sources.map((s) => (
+                {[...sources].sort((a, b) => (a.source_name || '').localeCompare(b.source_name || '')).map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.source_name}
                   </option>
