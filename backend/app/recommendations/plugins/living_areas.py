@@ -12,6 +12,32 @@ from ..types import RecommendationTier
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "living_areas.json"
 
+# City aliases: user input -> canonical city in dataset
+_CITY_ALIASES: dict[str, str] = {
+    "new york": "New York",
+    "new york city": "New York",
+    "nyc": "New York",
+    "ny": "New York",
+    "united states": "New York",
+    "usa": "New York",
+    "us": "New York",
+    "singapore": "Singapore",
+    "sg": "Singapore",
+    "oslo": "Oslo",
+    "norway": "Oslo",
+    "no": "Oslo",
+    "san francisco": "San Francisco",
+    "sf": "San Francisco",
+}
+
+
+def _resolve_city(user_city: str) -> str:
+    """Map user destination to a city we have data for."""
+    n = (user_city or "").split(",")[0].strip().lower()
+    if not n:
+        return "Singapore"
+    return _CITY_ALIASES.get(n, user_city.split(",")[0].strip() or "Singapore")
+
 
 class CommutePref(BaseModel):
     address: str = ""
@@ -81,8 +107,9 @@ class LivingAreasPlugin(BasePlugin):
         def _norm(s: str) -> str:
             return (s or "").split(",")[0].strip().lower()
 
-        if _norm(item.get("city", "")) != _norm(c.destination_city):
-            return {"score_raw": 0, "breakdown": {}, "summary": "Wrong city", "rationale": f"Area is in {item.get('city')}, not {c.destination_city}.", "pros": [], "cons": ["Wrong city"], "metadata": {}}
+        resolved_dest = _resolve_city(c.destination_city)
+        if _norm(item.get("city", "")) != _norm(resolved_dest):
+            return {"score_raw": 0, "breakdown": {}, "summary": "Wrong city", "rationale": f"Area is in {item.get('city')}, not {resolved_dest}.", "pros": [], "cons": ["Wrong city"], "metadata": {}}
 
         b_min = c.budget_monthly.get("min", 2000)
         b_max = c.budget_monthly.get("max", 5000)

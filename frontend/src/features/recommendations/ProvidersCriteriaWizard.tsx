@@ -98,15 +98,30 @@ export interface WizardQuestion {
   default?: unknown;
 }
 
+/** Common languages for bank preferences, alphabetically ordered */
+const PREFERRED_LANGUAGES_OPTIONS = [
+  { value: 'ar', label: 'Arabic' },
+  { value: 'zh', label: 'Chinese' },
+  { value: 'nl', label: 'Dutch' },
+  { value: 'en', label: 'English' },
+  { value: 'fr', label: 'French' },
+  { value: 'de', label: 'German' },
+  { value: 'hi', label: 'Hindi' },
+  { value: 'it', label: 'Italian' },
+  { value: 'ja', label: 'Japanese' },
+  { value: 'ko', label: 'Korean' },
+  { value: 'pt', label: 'Portuguese' },
+  { value: 'ru', label: 'Russian' },
+  { value: 'es', label: 'Spanish' },
+];
+
 const WIZARD_QUESTIONS: WizardQuestion[] = [
-  { id: 'dest_city', label: 'Destination city', type: 'text', key: 'destination_city', category: 'housing', default: 'Singapore' },
   { id: 'budget_min', label: 'Min monthly budget (SGD)', type: 'number', key: 'budget_min', category: 'housing', default: 2000 },
   { id: 'budget_max', label: 'Max monthly budget (SGD)', type: 'number', key: 'budget_max', category: 'housing', default: 5000 },
   { id: 'bedrooms', label: 'Number of bedrooms', type: 'number', key: 'bedrooms', category: 'housing', default: 2 },
   { id: 'sqm_min', label: 'Minimum sqm', type: 'number', key: 'sqm_min', category: 'housing', default: 65 },
   { id: 'commute_mins', label: 'Max commute to work (minutes)', type: 'number', key: 'commute_mins', category: 'housing', default: 45 },
   { id: 'office_address', label: 'Office/work address (optional, for map directions)', type: 'text', key: 'office_address', category: 'housing', placeholder: 'e.g. Raffles Place MRT, Singapore' },
-  { id: 'school_dest_city', label: 'Destination city', type: 'text', key: 'destination_city', category: 'schools', default: 'Singapore' },
   { id: 'child_ages', label: "Children's ages (comma-separated, e.g. 5,8)", type: 'text', key: 'child_ages', category: 'schools', default: '8' },
   { id: 'school_type', label: 'School type', type: 'select', key: 'school_type', category: 'schools', options: [
     { value: 'american', label: 'American' },
@@ -129,7 +144,6 @@ const WIZARD_QUESTIONS: WizardQuestion[] = [
     { value: 'medium', label: 'Medium' },
   ], default: 'medium' },
   { id: 'origin_city', label: 'Origin city', type: 'text', key: 'origin_city', category: 'movers', default: 'Oslo' },
-  { id: 'move_dest', label: 'Destination city (move)', type: 'text', key: 'destination_city', category: 'movers', default: 'Singapore' },
   { id: 'move_type', label: 'Move type', type: 'select', key: 'move_type', category: 'movers', options: [
     { value: 'domestic', label: 'Domestic' },
     { value: 'international', label: 'International' },
@@ -146,7 +160,7 @@ const WIZARD_QUESTIONS: WizardQuestion[] = [
     { value: 'partial', label: 'Partial' },
     { value: 'self', label: 'Self' },
   ], default: 'partial' },
-  { id: 'bank_lang', label: 'Preferred languages', type: 'text', key: 'preferred_languages', category: 'banks', placeholder: 'en, zh', default: 'en' },
+  { id: 'bank_lang', label: 'Preferred languages', type: 'select', key: 'preferred_languages', category: 'banks', options: PREFERRED_LANGUAGES_OPTIONS, default: 'en' },
   { id: 'bank_fees', label: 'Fee sensitivity', type: 'select', key: 'fee_sensitivity', category: 'banks', options: [
     { value: 'high', label: 'Premium acceptable' },
     { value: 'low', label: 'Low fees important' },
@@ -164,6 +178,23 @@ const WIZARD_QUESTIONS: WizardQuestion[] = [
 
 function getQuestionsForCategories(categories: TabKey[]): WizardQuestion[] {
   return WIZARD_QUESTIONS.filter((q) => categories.includes(q.category));
+}
+
+/** Questions grouped by category for one-page-per-service flow */
+function getQuestionsByCategory(categories: TabKey[]): { category: TabKey; title: string; questions: WizardQuestion[] }[] {
+  const titles: Record<TabKey, string> = {
+    housing: 'Housing preferences',
+    schools: 'Schools preferences',
+    movers: 'Movers preferences',
+    banks: 'Bank preferences',
+    insurances: 'Insurance preferences',
+    electricity: 'Electricity preferences',
+  };
+  return categories.map((cat) => ({
+    category: cat,
+    title: titles[cat] ?? `${cat} preferences`,
+    questions: WIZARD_QUESTIONS.filter((q) => q.category === cat),
+  }));
 }
 
 function buildCriteriaFromAnswers(
@@ -192,6 +223,7 @@ function buildCriteriaFromAnswers(
     }
   }
   if (category === 'movers') {
+    criteria.destination_city = criteria.destination_city ?? answers.dest_city ?? answers.school_dest_city ?? answers.move_dest ?? '';
     criteria.current_accommodation = {
       type: criteria.acc_type || 'apartment',
       bedrooms: typeof criteria.acc_bedrooms === 'number' ? criteria.acc_bedrooms : 2,
@@ -215,12 +247,17 @@ function buildCriteriaFromAnswers(
       .filter((n) => !isNaN(n));
     if ((criteria.child_ages as number[]).length === 0) criteria.child_ages = [8];
   }
-  if (category === 'banks' && typeof criteria.preferred_languages === 'string') {
-    criteria.preferred_languages = (criteria.preferred_languages as string)
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if ((criteria.preferred_languages as string[]).length === 0) criteria.preferred_languages = ['en'];
+  if (category === 'banks') {
+    const pl = criteria.preferred_languages;
+    if (typeof pl === 'string') {
+      criteria.preferred_languages = pl
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+    }
+    if (!Array.isArray(criteria.preferred_languages) || (criteria.preferred_languages as string[]).length === 0) {
+      criteria.preferred_languages = ['en'];
+    }
   }
   if (category === 'insurances' && typeof criteria.coverage_types === 'string') {
     criteria.coverage_types = (criteria.coverage_types as string)
@@ -280,10 +317,15 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
 }) => {
   const categories = Array.from(selectedServices) as TabKey[];
   const questions = getQuestionsForCategories(categories);
+  const pagesByCategory = getQuestionsByCategory(categories);
 
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, unknown>>(() => {
     const a: Record<string, unknown> = {};
+    // Include destination from intake (used by buildCriteriaFromAnswers, not shown as questions)
+    if (initialAnswers?.dest_city !== undefined) a.dest_city = initialAnswers.dest_city;
+    if (initialAnswers?.school_dest_city !== undefined) a.school_dest_city = initialAnswers.school_dest_city;
+    if (initialAnswers?.move_dest !== undefined) a.move_dest = initialAnswers.move_dest;
     for (const q of questions) {
       a[q.id] = initialAnswers?.[q.id] ?? q.default;
     }
@@ -344,7 +386,8 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
       const next = { ...prev };
       const questionIds = new Set(questions.map((q) => q.id));
       for (const [id, val] of Object.entries(initialAnswers)) {
-        if (questionIds.has(id) && val !== undefined) next[id] = val;
+        if (val !== undefined && (questionIds.has(id) || id === 'dest_city' || id === 'school_dest_city' || id === 'move_dest'))
+          next[id] = val;
       }
       return next;
     });
@@ -356,10 +399,9 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
     if (retryTrigger != null && retryTrigger > 0) setError('');
   }, [retryTrigger]);
 
-  const STEPS_PER_PAGE = 4;
-  const totalSteps = Math.ceil(questions.length / STEPS_PER_PAGE);
-  const start = step * STEPS_PER_PAGE;
-  const pageQuestions = questions.slice(start, start + STEPS_PER_PAGE);
+  const totalSteps = pagesByCategory.length;
+  const currentPage = pagesByCategory[step];
+  const pageQuestions = currentPage?.questions ?? [];
 
   const setAnswer = (id: string, value: unknown) => {
     onEditingStart?.();
@@ -371,10 +413,12 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
     const busy = isBusy || isSubmitting;
     if (busy) return;
 
-    const destCity = String(answers.dest_city ?? answers.school_dest_city ?? answers.move_dest ?? '').trim();
+    // Destination comes from intake wizard (case), not from this questionnaire
+    const effectiveAnswers = { ...(initialAnswers ?? {}), ...answers };
+    const destCity = String(effectiveAnswers.dest_city ?? effectiveAnswers.school_dest_city ?? effectiveAnswers.move_dest ?? '').trim();
     const destRequiring = categories.filter((c) => ['housing', 'schools', 'movers'].includes(c));
     if (destRequiring.length > 0 && !destCity) {
-      setError('Please enter a destination city. Go back and complete your case details or enter the destination in the preferences above.');
+      setError('Please complete your relocation case with a destination city in the intake wizard before getting recommendations.');
       return;
     }
 
@@ -385,11 +429,11 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
       for (const q of questions) {
         const cat = q.category;
         if (!grouped[cat]) grouped[cat] = {};
-        grouped[cat][q.id] = answers[q.id];
+        grouped[cat][q.id] = effectiveAnswers[q.id];
       }
 
       if (saveAnswersBeforeLoad) {
-        await saveAnswersBeforeLoad(answers, grouped);
+        await saveAnswersBeforeLoad(effectiveAnswers, grouped);
       }
 
       onLoadRecommendationsStart?.();
@@ -402,7 +446,7 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
       const results: Record<string, RecommendationResponse> = {};
       for (const cat of categories) {
         const backendKey = CATEGORY_MAP[cat];
-        const criteria = buildCriteriaFromAnswers(answers, cat);
+        const criteria = buildCriteriaFromAnswers(effectiveAnswers, cat);
         const res = await recommendationsEngineAPI.recommend(backendKey, criteria, 10);
         results[cat] = res;
       }
@@ -433,9 +477,11 @@ export const ProvidersCriteriaWizard: React.FC<Props> = ({
           Step {step + 1} of {totalSteps}
         </span>
       </div>
-      <h2 className="text-xl font-semibold text-[#0b2b43] mb-2">Tell us your preferences</h2>
+      <h2 className="text-xl font-semibold text-[#0b2b43] mb-2">{currentPage?.title ?? 'Tell us your preferences'}</h2>
       <p className="text-sm text-[#6b7280] mb-6">
-        Answer a few questions so we can tailor recommendations for {categories.join(', ')}.
+        {currentPage
+          ? `These preferences will be used to tailor your ${currentPage.category} recommendations.`
+          : `Answer a few questions so we can tailor recommendations for ${categories.join(', ')}.`}
       </p>
 
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}

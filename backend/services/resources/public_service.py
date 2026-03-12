@@ -1,10 +1,12 @@
 """
 Public resources service: orchestrates public repo + context + personalization.
 Uses ONLY published views. Never exposes internal governance fields.
+Falls back to RKG country_resources, then curated defaults when published view is empty.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import uuid
 from typing import Any, Dict, List, Optional
 
 from . import dto
@@ -150,6 +152,145 @@ def get_recommended_resources(
     }
 
 
+def _merge_context_into_filters(
+    context: Dict[str, Any],
+    user_filters: Dict[str, Any],
+) -> Dict[str, Any]:
+    """When user has not set a filter, pre-fill from context so results match user requirements."""
+    effective = dict(user_filters) if user_filters else {}
+    if not effective.get("city") and context.get("cityName"):
+        effective["city"] = context["cityName"]
+    if not effective.get("audienceType") and not effective.get("familyType") and context.get("familyType"):
+        effective["audienceType"] = context["familyType"]
+    if effective.get("familyFriendly") is None and context.get("hasChildren"):
+        effective["familyFriendly"] = True
+    if not effective.get("childAge") and context.get("childAges"):
+        ages = context["childAges"]
+        if ages:
+            effective["childAge"] = f"{min(ages)}-{max(ages)}"
+    return effective
+
+
+def _get_rkg_resources(
+    country_code: str,
+    filters: Dict[str, Any],
+    context: Dict[str, Any],
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """Fallback: fetch from RKG country_resources when published view is empty."""
+    try:
+        from ..rkg_resources import get_country_resources
+        ff = filters.get("familyFriendly")
+        if isinstance(ff, str):
+            ff = ff.lower() in ("true", "1", "yes") if ff else None
+        child_age = filters.get("childAge", "")
+        child_min = child_max = None
+        if isinstance(child_age, str) and "-" in child_age:
+            try:
+                a, b = child_age.split("-", 1)
+                child_min = int(a.strip())
+                child_max = int(b.strip())
+            except (ValueError, TypeError):
+                pass
+        rows = get_country_resources(
+            country_code=country_code,
+            city=filters.get("city"),
+            category=filters.get("category"),
+            audience=filters.get("audienceType") or filters.get("familyType"),
+            child_age_min=child_min,
+            child_age_max=child_max,
+            budget=filters.get("budgetTier"),
+            language=filters.get("language"),
+            family_friendly=ff,
+            published_only=True,
+        )
+        return [dto._to_public_resource(r) for r in rows[:limit]]
+    except Exception:
+        return []
+
+
+def _get_curated_resources_as_public(
+    country_code: str,
+    city: str,
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Convert curated default section content into PublicResource format when DB is empty."""
+    from ..country_resources import (
+        RESOURCE_SECTIONS,
+        SECTION_LABELS,
+        get_default_section_content,
+    )
+    synthetic_categories = [
+        {"id": f"curated_{k}", "key": k, "label": SECTION_LABELS.get(k, k.replace("_", " ").title())}
+        for k in RESOURCE_SECTIONS
+    ]
+    categories = [dto._to_public_category(c) for c in synthetic_categories]
+    cat_key_to_id = {c["key"]: c["id"] for c in synthetic_categories}
+
+    resources: List[Dict[str, Any]] = []
+    for section_key in RESOURCE_SECTIONS:
+        content = get_default_section_content(country_code, city, section_key)
+        cat_id = cat_key_to_id.get(section_key)
+
+        for item in content.get("platforms", []) or []:
+            resources.append({
+                "id": f"curated_{uuid.uuid4().hex[:12]}",
+                "countryCode": country_code,
+                "cityName": city or None,
+                "categoryId": cat_id,
+                "title": item.get("title", ""),
+                "summary": item.get("description", "") or "",
+                "resourceType": "official_link",
+                "isFamilyFriendly": False,
+                "isFeatured": False,
+                "externalUrl": item.get("url"),
+                "trustTier": "curated",
+            })
+        for item in content.get("topics", []) or []:
+            resources.append({
+                "id": f"curated_{uuid.uuid4().hex[:12]}",
+                "countryCode": country_code,
+                "cityName": city or None,
+                "categoryId": cat_id,
+                "title": item.get("title", ""),
+                "summary": item.get("timeline", "") or "",
+                "resourceType": "checklist_item",
+                "isFamilyFriendly": False,
+                "isFeatured": False,
+                "externalUrl": item.get("link"),
+                "trustTier": "curated",
+            })
+        for item in content.get("groups", []) or []:
+            resources.append({
+                "id": f"curated_{uuid.uuid4().hex[:12]}",
+                "countryCode": country_code,
+                "cityName": city or None,
+                "categoryId": cat_id,
+                "title": item.get("title", ""),
+                "summary": item.get("description", "") or "",
+                "resourceType": "place",
+                "isFamilyFriendly": False,
+                "isFeatured": False,
+                "externalUrl": item.get("url"),
+                "trustTier": "curated",
+            })
+        for item in content.get("items", []) or []:
+            if isinstance(item, dict):
+                resources.append({
+                    "id": f"curated_{uuid.uuid4().hex[:12]}",
+                    "countryCode": country_code,
+                    "cityName": city or None,
+                    "categoryId": cat_id,
+                    "title": item.get("title", "") or item.get("label", ""),
+                    "summary": item.get("description", "") or "",
+                    "resourceType": "guide",
+                    "isFamilyFriendly": False,
+                    "isFeatured": False,
+                    "externalUrl": item.get("url"),
+                    "trustTier": "curated",
+                })
+    return resources, categories
+
+
 def get_resources_page_data(
     case_id: str,
     draft: Dict[str, Any],
@@ -157,16 +298,50 @@ def get_resources_page_data(
 ) -> Dict[str, Any]:
     """
     Composite endpoint: context, categories, filtered resources, events, recommended.
-    All from safe published sources.
+    Uses published views first; falls back to RKG country_resources then curated defaults.
+    Applies context-derived filters so results match user requirements by default.
     """
     context = get_resource_context(case_id, draft)
     cc = context.get("countryCode") or "NO"
     city = context.get("cityName")
 
+    effective_filters = _merge_context_into_filters(context, filters or {})
+    user_filters = filters or {}
+
     categories = [dto._to_public_category(c) for c in find_active_categories()]
-    resources = get_published_resources(cc, filters or {}, page=1, limit=50)
-    events = get_published_events(cc, filters or {}, page=1, limit=20)
+    resources = get_published_resources(cc, effective_filters, page=1, limit=50)
+
+    if not resources:
+        resources = _get_rkg_resources(cc, effective_filters, context, limit=50)
+    if not resources:
+        curated_resources, curated_categories = _get_curated_resources_as_public(cc, city or "")
+        resources = curated_resources
+        if curated_categories:
+            categories = curated_categories
+
+    events = get_published_events(cc, effective_filters, page=1, limit=20)
+    if not events:
+        try:
+            from ..rkg_resources import get_country_events
+            now = datetime.now(timezone.utc)
+            ev_rows = get_country_events(
+                country_code=cc,
+                city=city,
+                date_from=now,
+                date_to=now + timedelta(days=14),
+                published_only=True,
+                limit=20,
+            )
+            events = [dto._to_public_event(e) for e in ev_rows]
+        except Exception:
+            pass
+
     recommended = get_recommended_resources(context, limit=5)
+    if not recommended.get("recommendedForYou") and resources:
+        recommended["recommendedForYou"] = resources[:5]
+        recommended["firstSteps"] = [r for r in resources if r.get("resourceType") in ("checklist_item", "official_link")][:5]
+        if context.get("hasChildren"):
+            recommended["familyEssentials"] = [r for r in resources if r.get("resourceType") in ("guide", "place")][:5]
 
     from ..country_resources import get_personalization_hints
     profile = {
@@ -188,5 +363,5 @@ def get_resources_page_data(
         "events": events,
         "recommended": recommended,
         "hints": hints,
-        "filtersApplied": filters or {},
+        "filtersApplied": user_filters,
     }

@@ -13,6 +13,32 @@ from ..types import RecommendationTier
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "schools.json"
 
+# City aliases: user input -> canonical city in dataset
+_CITY_ALIASES: dict[str, str] = {
+    "new york": "New York",
+    "new york city": "New York",
+    "nyc": "New York",
+    "ny": "New York",
+    "united states": "New York",
+    "usa": "New York",
+    "us": "New York",
+    "singapore": "Singapore",
+    "sg": "Singapore",
+    "oslo": "Oslo",
+    "norway": "Oslo",
+    "no": "Oslo",
+    "san francisco": "San Francisco",
+    "sf": "San Francisco",
+}
+
+
+def _resolve_city(user_city: str) -> str:
+    """Map user destination to a city we have data for."""
+    n = (user_city or "").split(",")[0].strip().lower()
+    if not n:
+        return "Singapore"
+    return _CITY_ALIASES.get(n, user_city.split(",")[0].strip() or "Singapore")
+
 
 def _age_to_grade(age: int) -> int:
     """Approximate grade from age (simplified)."""
@@ -61,7 +87,7 @@ class SchoolsPlugin(BasePlugin):
         def _norm(s: str) -> str:
             return (s or "").split(",")[0].strip().lower()
 
-        dest_city = (getattr(c, "destination_city", None) or "Singapore").strip()
+        dest_city = _resolve_city(getattr(c, "destination_city", None) or "Singapore")
         item_city = (item.get("city") or "Singapore").strip()
         if dest_city and _norm(item_city) != _norm(dest_city):
             return {
