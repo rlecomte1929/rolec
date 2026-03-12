@@ -52,6 +52,7 @@ export const ServicesQuestions: React.FC = () => {
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
   const [caseContext, setCaseContext] = useState<{ destCity?: string; destCountry?: string } | null>(null);
+  const [caseDetailsLoaded, setCaseDetailsLoaded] = useState(false);
   const [isSavingAnswers, setIsSavingAnswers] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
@@ -75,10 +76,19 @@ export const ServicesQuestions: React.FC = () => {
     };
   }, []);
 
-  const wizardServices = new Set(
-    Array.from(selectedServices).filter((k) =>
-      ['housing', 'schools', 'movers', 'banks', 'insurances', 'electricity'].includes(k)
-    )
+  const wizardServices = useMemo(
+    () =>
+      new Set(
+        Array.from(selectedServices).filter((k) =>
+          ['housing', 'schools', 'movers', 'banks', 'insurances', 'electricity'].includes(k)
+        )
+      ),
+    [selectedServices]
+  );
+
+  const questionsFallbackKey = useMemo(
+    () => Array.from(wizardServices).sort().join(','),
+    [wizardServices]
   );
 
   useEffect(() => {
@@ -122,8 +132,11 @@ export const ServicesQuestions: React.FC = () => {
         const fromCase = caseToInitialAnswers((caseData.draft as unknown as Record<string, unknown>) || null, topLevel);
         (setInitialAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)((prev) => mergeRecords(prev, fromCase));
         (setAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)((prev) => mergeRecords(prev, fromCase));
+        if (!cancelled) setCaseDetailsLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setCaseDetailsLoaded(true);
+      });
     return () => { cancelled = true; };
   }, [assignmentId, setAnswers]);
 
@@ -157,8 +170,9 @@ export const ServicesQuestions: React.FC = () => {
     if (!assignmentId) return;
     setQuestionsLoading(true);
     setQuestionsError(null);
+    const fallback = Array.from(wizardServices);
     servicesAPI
-      .getServiceQuestions(assignmentId)
+      .getServiceQuestions(assignmentId, fallback.length ? fallback : undefined)
       .then((res) => {
         if (cancelled) return;
         const qs = (res?.questions || []) as DynamicQuestion[];
@@ -190,7 +204,7 @@ export const ServicesQuestions: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, setAnswers, setSelectedServices]);
+  }, [assignmentId, setAnswers, setSelectedServices, questionsFallbackKey]);
 
   const onAnswersChange = useCallback(
     (next: Record<string, unknown>) => {
@@ -338,7 +352,7 @@ export const ServicesQuestions: React.FC = () => {
 
   const destinationCity = String(initialAnswers.dest_city ?? '').trim();
   const destinationCountry = String(caseContext?.destCountry ?? '').trim();
-  const missingDestination = !destinationCity || !destinationCountry;
+  const missingDestination = caseDetailsLoaded && (!destinationCity || !destinationCountry);
 
   const loadRecommendations = async () => {
     if (missingDestination) {

@@ -75,15 +75,18 @@ function RecCard({
   const tier = item.tier || 'ok';
   const avail = item.metadata?.availability_level || 'high';
   const isScarce = avail === 'low' || avail === 'scarce';
-  const cost = item.metadata?.estimated_cost_usd;
+  const costLocal = item.metadata?.estimated_cost_local;
+  const currency = item.metadata?.currency || 'USD';
+  const costUsd = item.metadata?.estimated_cost_usd;
   const costType = item.metadata?.cost_type;
+  const cost = costLocal ?? costUsd;
   const costLabel =
     cost != null
       ? costType === 'monthly'
-        ? `USD ${cost.toLocaleString()}/mo`
+        ? `${currency} ${cost.toLocaleString()}/mo`
         : costType === 'annual'
-          ? `USD ${cost.toLocaleString()}/yr`
-          : `USD ${cost.toLocaleString()}`
+          ? `${currency} ${cost.toLocaleString()}/yr`
+          : `${currency} ${cost.toLocaleString()}`
       : null;
 
   const mapQuery = item.metadata?.map_query as string | undefined;

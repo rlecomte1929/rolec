@@ -13,6 +13,24 @@ from ..types import RecommendationTier
 
 DATASET_PATH = Path(__file__).resolve().parent.parent / "datasets" / "schools.json"
 
+# Local currency per city (tuition in destination currency)
+_CITY_CURRENCY: dict[str, str] = {
+    "Singapore": "SGD",
+    "Oslo": "NOK",
+    "New York": "USD",
+    "San Francisco": "USD",
+}
+
+# Approx annual tuition in local currency by level and city (for display)
+_TUITION_LOCAL: dict[str, dict[str, int]] = {
+    "Singapore": {"high": 45000, "medium": 28000, "low": 15000},
+    "Oslo": {"high": 333000, "medium": 207000, "low": 111000},
+    "New York": {"high": 45000, "medium": 28000, "low": 15000},
+    "San Francisco": {"high": 45000, "medium": 28000, "low": 15000},
+}
+
+_CURRENCY_TO_USD: dict[str, float] = {"SGD": 0.74, "NOK": 0.09, "USD": 1.0}
+
 # City aliases: user input -> canonical city in dataset
 _CITY_ALIASES: dict[str, str] = {
     "new york": "New York",
@@ -180,6 +198,12 @@ class SchoolsPlugin(BasePlugin):
         if avail in ("low", "scarce"):
             cons.append(f"Waitlist ~{waitlist} weeks")
 
+        item_city = (item.get("city") or "Singapore").strip()
+        currency = _CITY_CURRENCY.get(item_city, "SGD")
+        tuition_map = _TUITION_LOCAL.get(item_city, {"high": 45000, "medium": 28000, "low": 15000})
+        tuition_local = tuition_map.get(item.get("tuition_level", "medium"), 28000)
+        tuition_usd = int(tuition_local * _CURRENCY_TO_USD.get(currency, 1.0))
+
         return {
             "score_raw": score_raw,
             "breakdown": {
@@ -191,7 +215,7 @@ class SchoolsPlugin(BasePlugin):
                 "availability": availability_score,
                 "rating": rating_score,
             },
-            "summary": f"{item.get('name')} — {curr}, {stype}, ~{commute_mins} min, {rating}/5.",
+            "summary": f"{item.get('name')} — {curr}, {stype}, ~{commute_mins} min, {rating}/5. {currency} {tuition_local:,}/yr.",
             "rationale": rationale,
             "pros": pros,
             "cons": cons,
@@ -201,11 +225,9 @@ class SchoolsPlugin(BasePlugin):
                 "availability_level": avail,
                 "waitlist_weeks": waitlist,
                 "confidence": item.get("confidence", 85),
-                "estimated_cost_usd": int(
-                    {"high": 45000, "medium": 28000, "low": 15000}.get(
-                        item.get("tuition_level", "medium"), 28000
-                    ) * 0.74
-                ),
+                "estimated_cost_usd": tuition_usd,
+                "estimated_cost_local": tuition_local,
+                "currency": currency,
                 "cost_type": "annual",
                 "map_query": f"{item.get('name', '')}, {item.get('city', 'Singapore')}",
             },

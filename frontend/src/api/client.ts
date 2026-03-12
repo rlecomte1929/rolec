@@ -963,8 +963,15 @@ export const servicesAPI = {
     const response = await api.get('/api/services/answers', { params: p });
     return response.data;
   },
-  getServiceQuestions: async (assignmentId: string): Promise<{ questions: any[]; selected_services: string[] }> => {
-    const response = await api.get('/api/services/questions', { params: { assignment_id: assignmentId } });
+  getServiceQuestions: async (
+    assignmentId: string,
+    fallbackServices?: string[]
+  ): Promise<{ questions: any[]; selected_services: string[] }> => {
+    const params: Record<string, string> = { assignment_id: assignmentId };
+    if (fallbackServices?.length) {
+      params.fallback_services = fallbackServices.join(',');
+    }
+    const response = await api.get('/api/services/questions', { params });
     return response.data;
   },
   saveServiceAnswers: async (

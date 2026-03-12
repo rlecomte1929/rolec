@@ -20,6 +20,8 @@ export interface RecommendationItem {
     waitlist_weeks?: number;
     confidence?: number;
     estimated_cost_usd?: number;
+    estimated_cost_local?: number;
+    currency?: string;
     cost_type?: 'monthly' | 'annual' | 'one_time';
     map_query?: string;
   };

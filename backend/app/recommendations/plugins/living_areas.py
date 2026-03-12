@@ -212,6 +212,8 @@ class LivingAreasPlugin(BasePlugin):
                 "next_available_days": item.get("next_available_days"),
                 "confidence": item.get("confidence", 80),
                 "estimated_cost_usd": int(rent * _CURRENCY_TO_USD.get(currency, 1.0)),
+                "estimated_cost_local": rent,
+                "currency": currency,
                 "cost_type": "monthly",
                 "map_query": f"{item.get('name', '')}, {item.get('city', 'Singapore')}",
             },

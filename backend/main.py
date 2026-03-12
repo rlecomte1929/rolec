@@ -2963,6 +2963,7 @@ def get_service_answers(
 @app.get("/api/services/questions")
 def get_service_questions(
     assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    fallback_services: Optional[str] = Query(None, description="Comma-separated service keys when DB has none (e.g. housing,schools)"),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     """Return dynamic questions for selected services. Adapts to case context and saved answers."""
@@ -2974,6 +2975,11 @@ def get_service_questions(
     # Selected services (only those with selected=True)
     services = db.list_case_services(assignment["id"])
     selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
+    # Fallback: when DB has none but frontend passed selection (handles save race / direct visit)
+    if not selected_keys and fallback_services:
+        fallback = [k.strip().lower() for k in fallback_services.split(",") if k.strip()]
+        valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+        selected_keys = [k for k in fallback if k in valid]
     if not selected_keys:
         return {"questions": [], "selected_services": []}
 
