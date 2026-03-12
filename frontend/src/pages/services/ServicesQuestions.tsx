@@ -109,10 +109,13 @@ export const ServicesQuestions: React.FC = () => {
       .then(({ data, error }) => {
         if (cancelled || error || !data?.case) return;
         const caseData = data.case;
-        setCaseContext({ destCity: caseData.destCity, destCountry: caseData.destCountry });
+        const basics = (caseData.draft as unknown as Record<string, unknown>)?.relocationBasics as Record<string, unknown> | undefined;
+        const destCity = (caseData.destCity ?? basics?.destCity ?? basics?.destCountry ?? '') as string;
+        const destCountry = (caseData.destCountry ?? basics?.destCountry ?? '') as string;
+        setCaseContext({ destCity: destCity || undefined, destCountry: destCountry || undefined });
         const topLevel = {
-          destCity: caseData.destCity,
-          destCountry: caseData.destCountry,
+          destCity: destCity || caseData.destCity,
+          destCountry: destCountry || caseData.destCountry,
           originCity: caseData.originCity,
           originCountry: caseData.originCountry,
         };

@@ -2682,6 +2682,13 @@ def get_case_details_by_assignment(
             ac["employerCountry"] = employer_country or ""
         draft["assignmentContext"] = ac
         case_dto = cases_router._case_dto(case, draft)
+    # Ensure destCity/destCountry come from draft when case columns are null
+    case_dump = case_dto.model_dump(mode="json")
+    basics = draft.get("relocationBasics") or {}
+    if not case_dump.get("destCity") and basics.get("destCity"):
+        case_dump["destCity"] = basics.get("destCity")
+    if not case_dump.get("destCountry") and basics.get("destCountry"):
+        case_dump["destCountry"] = basics.get("destCountry")
     return {
         "assignment": {
             "id": assignment["id"],
@@ -2691,7 +2698,7 @@ def get_case_details_by_assignment(
             "status": assignment.get("status", ""),
             "employee_identifier": assignment.get("employee_identifier"),
         },
-        "case": case_dto.model_dump(mode="json"),
+        "case": case_dump,
     }
 
 

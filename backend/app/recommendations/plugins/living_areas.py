@@ -39,6 +39,22 @@ def _resolve_city(user_city: str) -> str:
     return _CITY_ALIASES.get(n, user_city.split(",")[0].strip() or "Singapore")
 
 
+# Local currency per city (dataset rent values are in local currency)
+_CITY_CURRENCY: dict[str, str] = {
+    "Singapore": "SGD",
+    "Oslo": "NOK",
+    "New York": "USD",
+    "San Francisco": "USD",
+}
+
+# Approx conversion to USD for metadata (for display/comparison)
+_CURRENCY_TO_USD: dict[str, float] = {
+    "SGD": 0.74,
+    "NOK": 0.09,
+    "USD": 1.0,
+}
+
+
 class CommutePref(BaseModel):
     address: str = ""
     max_minutes: int = 45
@@ -164,9 +180,11 @@ class LivingAreasPlugin(BasePlugin):
             rationale_parts.append(f"⚠ Scarcity: next available in ~{nd} days.")
         rationale = " ".join(rationale_parts)
 
+        item_city = (item.get("city") or "Singapore").strip()
+        currency = _CITY_CURRENCY.get(item_city, "SGD")
         pros = [f"Rating {rating}/5", f"~{commute_mins} min commute"]
         if rent <= b_max:
-            pros.append(f"Within budget (SGD {rent}/mo)")
+            pros.append(f"Within budget ({currency} {rent}/mo)")
         cons = []
         if avail in ("low", "scarce"):
             cons.append("Limited availability")
@@ -183,7 +201,7 @@ class LivingAreasPlugin(BasePlugin):
                 "rating": rating_score,
                 "availability": availability_score,
             },
-            "summary": f"{item.get('name')} — SGD {rent}/mo, ~{commute_mins} min commute, {rating}/5.",
+            "summary": f"{item.get('name')} — {currency} {rent}/mo, ~{commute_mins} min commute, {rating}/5.",
             "rationale": rationale,
             "pros": pros,
             "cons": cons,
@@ -193,7 +211,7 @@ class LivingAreasPlugin(BasePlugin):
                 "availability_level": avail,
                 "next_available_days": item.get("next_available_days"),
                 "confidence": item.get("confidence", 80),
-                "estimated_cost_usd": int(rent * 0.74),
+                "estimated_cost_usd": int(rent * _CURRENCY_TO_USD.get(currency, 1.0)),
                 "cost_type": "monthly",
                 "map_query": f"{item.get('name', '')}, {item.get('city', 'Singapore')}",
             },
