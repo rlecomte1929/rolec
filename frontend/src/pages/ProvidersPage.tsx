@@ -45,6 +45,7 @@ export const ProvidersPage: React.FC = () => {
   const [services, setServices] = useState<Record<string, ServiceState>>({});
   const [policy, setPolicy] = useState<{ currency: string; caps: Record<string, number>; total_cap?: number | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [loadError, setLoadError] = useState('');
   const [loadErrorDetails, setLoadErrorDetails] = useState('');
@@ -75,6 +76,13 @@ export const ProvidersPage: React.FC = () => {
           };
         });
         setServices(baseState);
+        // Sync selected services to context so questions page has correct selection on direct visit
+        const selected = new Set(
+          (serviceRes.services || [])
+            .filter((r) => r.selected)
+            .map((r) => r.service_key as ServiceKey)
+        );
+        setSelectedServices(selected);
         try {
           const policyRes = await employeeAPI.getPolicyBudget(assignmentId);
           setPolicy(policyRes);
@@ -120,8 +128,8 @@ export const ProvidersPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!assignmentId) return;
-    // keep minimal UI state changes
     setMessage('');
+    setIsSaving(true);
     try {
       const payload = ENABLED_SERVICES.map((svc) => {
         const state = services[svc.key] || { selected: false, estimated_cost: '' };
@@ -136,8 +144,9 @@ export const ProvidersPage: React.FC = () => {
       await employeeAPI.saveAssignmentServices(assignmentId, payload);
       setMessage('Saved services successfully.');
       return true;
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message;
+    } catch (err: unknown) {
+      const errAny = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
+      const detail = errAny?.response?.data?.detail || errAny?.response?.data?.message || errAny?.message;
       const friendly = detail === 'Network Error' ? 'Couldn’t save services. Please retry.' : detail;
       setMessage(friendly || 'Unable to save services. Please try again.');
       if (import.meta.env.DEV && detail) {
@@ -146,7 +155,7 @@ export const ProvidersPage: React.FC = () => {
       }
       return false;
     } finally {
-      // no-op
+      setIsSaving(false);
     }
   };
 
@@ -223,6 +232,11 @@ export const ProvidersPage: React.FC = () => {
               <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
             </div>
             <TrustBlock className="mb-8" />
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              <Button variant="outline" onClick={handleSave} disabled={isLoading || isSaving}>
+                {isSaving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
             <ServiceGroupSection
               group="before"
               items={ALL_SERVICES.filter((s) => s.group === 'before')}

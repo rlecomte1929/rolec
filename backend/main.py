@@ -76,6 +76,7 @@ from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
 from .routes import resources as resources_router
 from .app.recommendations.router import router as recommendations_router
+from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import contextmanager
 from .services.supabase_client import get_supabase_admin_client
@@ -2933,13 +2934,87 @@ def upsert_assignment_services(
 
 @app.get("/api/services/answers")
 def get_service_answers(
-    case_id: str,
+    case_id: Optional[str] = Query(None),
+    assignment_id: Optional[str] = Query(None),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    assignment = _require_assignment_visibility(case_id, user)
-    effective_case_id = assignment.get("case_id") or case_id
+    """Load saved service answers. Pass case_id or assignment_id."""
+    if assignment_id:
+        assignment = _require_assignment_visibility(assignment_id, user)
+        effective_case_id = assignment.get("case_id")
+    elif case_id:
+        assignment = _require_assignment_visibility(case_id, user)
+        effective_case_id = assignment.get("case_id") or case_id
+    else:
+        raise HTTPException(status_code=400, detail="case_id or assignment_id required")
+    if not effective_case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
     answers = db.list_case_service_answers(effective_case_id)
     return {"case_id": effective_case_id, "answers": answers}
+
+
+@app.get("/api/services/questions")
+def get_service_questions(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Return dynamic questions for selected services. Adapts to case context and saved answers."""
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+
+    # Selected services (only those with selected=True)
+    services = db.list_case_services(assignment["id"])
+    selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
+    if not selected_keys:
+        return {"questions": [], "selected_services": []}
+
+    # Case context (draft + top-level) via app_crud
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+    draft = {}
+    dest_city = None
+    dest_country = None
+    origin_city = None
+    origin_country = None
+    if case:
+        try:
+            draft = json.loads(case.draft_json or "{}")
+        except Exception:
+            draft = {}
+        dest_city = getattr(case, "dest_city", None)
+        dest_country = getattr(case, "dest_country", None)
+        origin_city = getattr(case, "origin_city", None)
+        origin_country = getattr(case, "origin_country", None)
+    basics = draft.get("relocationBasics") or {}
+    case_context = {
+        "destCity": basics.get("destCity") or dest_city,
+        "destCountry": basics.get("destCountry") or dest_country,
+        "originCity": basics.get("originCity") or origin_city,
+        "originCountry": origin_country or basics.get("originCountry"),
+    }
+
+    # Saved answers (flatten service_key -> answers into one dict)
+    saved_rows = db.list_case_service_answers(case_id)
+    saved_flat: Dict[str, Any] = {}
+    for row in saved_rows:
+        ans = row.get("answers") or {}
+        if isinstance(ans, str):
+            try:
+                ans = json.loads(ans)
+            except Exception:
+                ans = {}
+        for k, v in ans.items():
+            if v is not None:
+                saved_flat[k] = v
+
+    questions = generate_questions(
+        selected_services=selected_keys,
+        case_context=case_context,
+        saved_answers=saved_flat,
+    )
+    return {"questions": questions, "selected_services": selected_keys}
 
 
 def _normalize_answers_for_compare(answers: Dict[str, Any]) -> str:

@@ -43,7 +43,14 @@ def recommend(
 
     # Filter out items that don't match destination (score 0 = wrong city, etc.)
     matching = [s for s in scored_items if s["score_raw"] > 0]
-    matching.sort(key=lambda x: x["norm_score"], reverse=True)
+    # Deterministic ranking: score desc, then item_id/name asc
+    matching.sort(
+        key=lambda x: (
+            -(x.get("norm_score") or 0),
+            str((x.get("item") or {}).get("item_id") or ""),
+            str((x.get("item") or {}).get("name") or ""),
+        )
+    )
     top = matching[:top_n]
 
     items: List[RecommendationItem] = []

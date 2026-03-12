@@ -958,8 +958,13 @@ export const employeeAPI = {
 };
 
 export const servicesAPI = {
-  getServiceAnswers: async (caseId: string): Promise<{ case_id: string; answers: any[] }> => {
-    const response = await api.get('/api/services/answers', { params: { case_id: caseId } });
+  getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: any[] }> => {
+    const p = params.caseId ? { case_id: params.caseId } : { assignment_id: params.assignmentId };
+    const response = await api.get('/api/services/answers', { params: p });
+    return response.data;
+  },
+  getServiceQuestions: async (assignmentId: string): Promise<{ questions: any[]; selected_services: string[] }> => {
+    const response = await api.get('/api/services/questions', { params: { assignment_id: assignmentId } });
     return response.data;
   },
   saveServiceAnswers: async (

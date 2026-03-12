@@ -1,41 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Button, Card } from '../components/antigravity';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
-import { API_BASE_URL } from '../api/client';
 
 export const Landing: React.FC = () => {
   const navigate = useNavigate();
-  const [connStatus, setConnStatus] = useState<{
-    state: 'idle' | 'loading' | 'ok' | 'error';
-    latency?: number;
-    data?: any;
-    error?: string;
-  }>({ state: 'idle' });
-
-  const testConnection = async () => {
-    setConnStatus({ state: 'loading' });
-    const t0 = performance.now();
-    try {
-      const url = `${API_BASE_URL}/health`;
-      const res = await fetch(url);
-      const latency = Math.round(performance.now() - t0);
-      if (!res.ok) {
-        setConnStatus({ state: 'error', latency, error: `HTTP ${res.status} ${res.statusText}` });
-        return;
-      }
-      const data = await res.json();
-      setConnStatus({ state: 'ok', latency, data });
-    } catch (err: any) {
-      const latency = Math.round(performance.now() - t0);
-      const msg = err?.message?.includes('Failed to fetch')
-        ? 'CORS error or backend unreachable — check browser console for details'
-        : err?.message || 'Unknown error';
-      setConnStatus({ state: 'error', latency, error: msg });
-    }
-  };
 
   useRegisterNav('Landing', [
     { label: 'Create account', routeKey: 'auth' },
@@ -175,52 +146,6 @@ export const Landing: React.FC = () => {
           </Card>
         </section>
 
-        <section className="bg-white border border-[#e2e8f0] rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <div className="text-2xl font-semibold text-[#0b2b43]">Ready to see the workflow?</div>
-            <div className="text-sm text-[#4b5563] mt-2">
-              Launch the demo environment or connect to your HR workspace.
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={() => navigate('/auth?mode=register')}>Create account</Button>
-            <Button variant="outline" onClick={() => navigate(`${buildRoute('auth')}?mode=login`)}>
-              Sign in
-            </Button>
-          </div>
-        </section>
-
-        <section className="border border-[#e2e8f0] rounded-2xl p-6 bg-[#f9fafb]">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-wide text-[#6b7280] mb-1">Backend connection</div>
-              <div className="text-sm text-[#4b5563]">
-                API: <code className="bg-[#e2e8f0] px-1.5 py-0.5 rounded text-xs">{API_BASE_URL || '(same-origin)'}</code>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              onClick={testConnection}
-              disabled={connStatus.state === 'loading'}
-            >
-              {connStatus.state === 'loading' ? 'Testing...' : 'Test connection'}
-            </Button>
-          </div>
-          {connStatus.state === 'ok' && (
-            <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
-              <span className="font-medium text-green-800">Connected</span>
-              <span className="text-green-700 ml-2">{connStatus.latency}ms</span>
-              <pre className="mt-1 text-xs text-green-700 overflow-auto">{JSON.stringify(connStatus.data, null, 2)}</pre>
-            </div>
-          )}
-          {connStatus.state === 'error' && (
-            <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
-              <span className="font-medium text-red-800">Failed</span>
-              {connStatus.latency !== undefined && <span className="text-red-600 ml-2">{connStatus.latency}ms</span>}
-              <div className="mt-1 text-xs text-red-700">{connStatus.error}</div>
-            </div>
-          )}
-        </section>
       </div>
     </AppShell>
   );
