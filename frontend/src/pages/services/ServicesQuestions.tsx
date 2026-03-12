@@ -13,7 +13,6 @@ import { ROUTE_DEFS } from '../../navigation/routes';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import type { ServiceKey } from '../../features/services/serviceConfig';
 import { recommendationsEngineAPI } from '../../features/recommendations/api';
-import type { RecommendationResponse } from '../../features/recommendations/types';
 
 const SERVICES_QUESTIONS_PATH = ROUTE_DEFS.servicesQuestions.path;
 
