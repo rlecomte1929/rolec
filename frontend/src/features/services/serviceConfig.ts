@@ -11,6 +11,7 @@ export type ServiceKey =
   | 'schools'
   | 'childcare'
   | 'movers'
+  | 'pets'
   | 'temp_accommodation'
   | 'banks'
   | 'insurances'
@@ -41,12 +42,13 @@ export const SERVICE_CONFIG: ServiceItem[] = [
   { key: 'housing', title: 'Housing', description: 'Recommended neighbourhoods and housing options', icon: '🏠', group: 'before', enabled: true, backendKey: 'living_areas' },
   { key: 'movers', title: 'Movers', description: 'International relocation and moving companies', icon: '📦', group: 'before', enabled: true, backendKey: 'movers' },
   { key: 'schools', title: 'Schools / Childcare', description: 'International and local school recommendations', icon: '🎒', group: 'before', enabled: true, backendKey: 'schools' },
+  { key: 'pets', title: 'Pets', description: 'Pet relocation, travel documents, and quarantine requirements', icon: '🐾', group: 'before', enabled: false },
   { key: 'temp_accommodation', title: 'Temporary accommodation', description: 'Short-term stays before permanent housing', icon: '🏨', group: 'before', enabled: false },
   { key: 'visa', title: 'Visa & permits', description: 'Immigration and work permit support', icon: '📋', group: 'before', enabled: false },
   // Upon arrival
   { key: 'banks', title: 'Banking', description: 'Banking and account setup for expats', icon: '🏦', group: 'arrival', enabled: true, backendKey: 'banks' },
   { key: 'electricity', title: 'Utilities: Electricity', description: 'Utilities and electricity retailers', icon: '⚡', group: 'arrival', enabled: true, backendKey: 'electricity' },
-  { key: 'insurances', title: 'Insurance', description: 'Health, travel, and life insurance providers', icon: '🛡️', group: 'arrival', enabled: true, backendKey: 'insurances' },
+  { key: 'insurances', title: 'Insurance', description: 'Health, travel, and life insurance providers', icon: '🛡️', group: 'arrival', enabled: true, backendKey: 'insurance' },
   { key: 'internet', title: 'Internet', description: 'Home broadband and connectivity', icon: '📶', group: 'arrival', enabled: false },
   { key: 'mobile', title: 'Mobile plan', description: 'Local SIM and mobile services', icon: '📱', group: 'arrival', enabled: false },
   { key: 'registration', title: 'Registration / ID number / municipality', description: 'Local registration and official paperwork', icon: '📄', group: 'arrival', enabled: false },

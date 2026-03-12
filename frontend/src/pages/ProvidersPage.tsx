@@ -21,6 +21,7 @@ const CATEGORY_MAP: Record<ServiceKey, string> = {
   schools: 'schools',
   childcare: 'schools',
   movers: 'moving',
+  pets: 'moving',
   temp_accommodation: 'housing',
   banks: 'settling_in',
   insurances: 'settling_in',

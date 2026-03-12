@@ -11,7 +11,7 @@ import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext'
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { ROUTE_DEFS } from '../../navigation/routes';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
-import { SERVICE_CONFIG, type ServiceKey } from '../../features/services/serviceConfig';
+import type { ServiceKey } from '../../features/services/serviceConfig';
 import { recommendationsEngineAPI } from '../../features/recommendations/api';
 import type { RecommendationResponse } from '../../features/recommendations/types';
 
@@ -233,66 +233,6 @@ export const ServicesQuestions: React.FC = () => {
   const validationErrors = useMemo(() => validateDynamicAnswers(questionsForSelected, answers), [questionsForSelected, answers]);
   const isValid = Object.keys(validationErrors).length === 0;
 
-  const buildCriteriaForService = (serviceKey: ServiceKey, serviceAnswers: Record<string, unknown>): Record<string, unknown> => {
-    // Generic mapping from schema: question_key -> criteria_key (if present)
-    const qs = byService[serviceKey] || [];
-    const criteria: Record<string, unknown> = {};
-    for (const q of qs) {
-      const v = serviceAnswers[q.question_key];
-      if (v === undefined) continue;
-      const ck = q.criteria_key || q.question_key;
-      criteria[ck] = v;
-    }
-
-    // Canonical destination context (fail-fast is handled earlier, but criteria still includes it)
-    const destCity = String(initialAnswers.dest_city ?? '').trim();
-    if (destCity) criteria.destination_city = destCity;
-    const destCountry = String(caseContext?.destCountry ?? '').trim();
-    if (destCountry) criteria.destination_country = destCountry;
-
-    // Minimal service-specific shaping for existing recommendation plugins
-    if (serviceKey === 'housing') {
-      const minB = typeof criteria.budget_min === 'number' ? (criteria.budget_min as number) : 2000;
-      const maxB = typeof criteria.budget_max === 'number' ? (criteria.budget_max as number) : 5000;
-      criteria.budget_monthly = { min: minB, max: maxB };
-      if (typeof criteria.commute_mins === 'number') {
-        criteria.commute_work = { max_minutes: criteria.commute_mins, address: criteria.office_address || '', mode: 'transit' };
-      }
-      delete criteria.budget_min;
-      delete criteria.budget_max;
-      delete criteria.commute_mins;
-    }
-    if (serviceKey === 'schools' && typeof criteria.child_ages === 'string') {
-      criteria.child_ages = (criteria.child_ages as string)
-        .split(',')
-        .map((s) => parseInt(s.trim(), 10))
-        .filter((n) => !Number.isNaN(n));
-      if ((criteria.child_ages as number[]).length === 0) criteria.child_ages = [8];
-    }
-    if (serviceKey === 'banks') {
-      const pl = criteria.preferred_languages;
-      if (typeof pl === 'string') criteria.preferred_languages = [pl];
-      if (!Array.isArray(criteria.preferred_languages)) criteria.preferred_languages = ['en'];
-    }
-    if (serviceKey === 'movers') {
-      criteria.current_accommodation = {
-        type: criteria.acc_type || 'apartment',
-        bedrooms: typeof criteria.acc_bedrooms === 'number' ? criteria.acc_bedrooms : 2,
-        sqm: 80,
-      };
-      delete criteria.acc_type;
-      delete criteria.acc_bedrooms;
-    }
-    if (serviceKey === 'insurances' && typeof criteria.coverage_types === 'string') {
-      criteria.coverage_types = (criteria.coverage_types as string)
-        .split(',')
-        .map((s) => s.trim().toLowerCase())
-        .filter(Boolean);
-      if ((criteria.coverage_types as string[]).length === 0) criteria.coverage_types = ['health'];
-    }
-    return criteria;
-  };
-
   const onExplicitSave = useCallback(async () => {
     if (!caseId) {
       setSaveMessage('Case not ready. Please go back and try again.');
@@ -324,11 +264,6 @@ export const ServicesQuestions: React.FC = () => {
       if (mountedRef.current) setIsSavingAnswers(false);
     }
   }, [answers, byService, caseId]);
-
-  const stableInitialAnswers = useMemo(() => {
-    if (Object.keys(initialAnswers).length === 0) return undefined;
-    return { ...answers, ...initialAnswers };
-  }, [initialAnswers, answers]);
 
   if (wizardServices.size === 0) {
     return (
@@ -363,20 +298,19 @@ export const ServicesQuestions: React.FC = () => {
       workflow.toError('Please complete all required questions before continuing.');
       return;
     }
+    if (!assignmentId) {
+      workflow.toError('Assignment not available. Please go back and try again.');
+      return;
+    }
     const saved = await onExplicitSave();
     if (!saved) return;
 
     workflow.toLoadingRecommendations();
     try {
-      const results: Record<string, RecommendationResponse> = {};
-      for (const serviceKey of selectedServiceKeys) {
-        const svc = SERVICE_CONFIG.find((s) => s.key === serviceKey);
-        const backendKey = svc?.backendKey;
-        if (!backendKey) continue;
-        const criteria = buildCriteriaForService(serviceKey, stableInitialAnswers ?? answers);
-        const res = await recommendationsEngineAPI.recommend(backendKey, criteria, 10);
-        results[backendKey] = res;
-      }
+      const { results } = await recommendationsEngineAPI.recommendBatch(
+        assignmentId,
+        selectedServiceKeys
+      );
       setRecommendations(results);
       setShortlist(new Map());
       workflow.toRecommendationsReady();

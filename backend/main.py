@@ -76,6 +76,8 @@ from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
 from .routes import resources as resources_router
 from .app.recommendations.router import router as recommendations_router
+from .app.recommendations.engine import recommend as recommend_single
+from .app.recommendations.criteria_builder import build_criteria_for_assignment, _flatten_saved_answers
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import contextmanager
@@ -206,6 +208,116 @@ app.include_router(admin_notifications_router.router, prefix="/api/admin")
 app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
 app.include_router(resources_router.router)
+
+# Batch recommendations: must be registered before the generic /{category} route
+# so /api/recommendations/batch matches explicitly
+class RecommendationsBatchRequest(_BaseModel):
+    assignment_id: str
+    selected_services: Optional[List[str]] = None  # defaults to DB selected services
+
+
+@app.post("/api/recommendations/batch")
+def post_recommendations_batch(
+    body: RecommendationsBatchRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Get recommendations for all selected services in one round-trip.
+    Uses canonical criteria builder (assignment, case, saved answers, policy).
+    """
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    start = time.perf_counter()
+    assignment = _require_assignment_visibility(body.assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+
+    # Selected services: from body or DB
+    selected_keys = body.selected_services
+    if not selected_keys:
+        services = db.list_case_services(assignment["id"])
+        selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
+    valid_svc = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+    selected_keys = [k for k in selected_keys if k in valid_svc]
+
+    if not selected_keys:
+        return {"results": {}, "message": "No selected services with recommendation support"}
+
+    # Case context
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+    draft = {}
+    dest_city = None
+    dest_country = None
+    origin_city = None
+    origin_country = None
+    if case:
+        try:
+            draft = json.loads(case.draft_json or "{}")
+        except Exception:
+            draft = {}
+        dest_city = getattr(case, "dest_city", None)
+        dest_country = getattr(case, "dest_country", None)
+        origin_city = getattr(case, "origin_city", None)
+        origin_country = getattr(case, "origin_country", None)
+    basics = draft.get("relocationBasics") or {}
+    case_context = {
+        "destCity": basics.get("destCity") or dest_city,
+        "destCountry": basics.get("destCountry") or dest_country,
+        "originCity": basics.get("originCity") or origin_city,
+        "originCountry": origin_country or basics.get("originCountry"),
+    }
+
+    # Saved answers
+    answer_rows = db.list_case_service_answers(case_id)
+    saved_answers = _flatten_saved_answers(answer_rows)
+
+    # Policy context (optional)
+    policy_context = None
+    try:
+        policy = policy_engine.load_policy()
+        if policy:
+            policy_context = normalize_policy_caps(policy)
+    except Exception:
+        pass
+
+    # Build criteria per service via canonical builder
+    criteria_map = build_criteria_for_assignment(
+        assignment_id=body.assignment_id,
+        case_id=case_id,
+        selected_services=selected_keys,
+        saved_answers=saved_answers,
+        case_context=case_context,
+        policy_context=policy_context,
+    )
+
+    results: Dict[str, Any] = {}
+    for backend_key, criteria in criteria_map.items():
+        dest_city_val = (criteria.get("destination_city") or "").strip()
+        if backend_key in ("living_areas", "schools", "movers") and not dest_city_val:
+            log.warning(
+                "request_id=%s category=%s recommendations_batch skipped_missing_destination",
+                request_id, backend_key,
+            )
+            continue
+        try:
+            rec_result = recommend_single(backend_key, criteria, top_n=10)
+            results[backend_key] = rec_result
+        except Exception as e:
+            log.warning(
+                "request_id=%s category=%s recommendations_batch failed error=%s",
+                request_id, backend_key, str(e),
+            )
+            continue
+
+    dur_ms = (time.perf_counter() - start) * 1000
+    log.info(
+        "request_id=%s assignment_id=%s services=%s recommendations_batch succeeded dur_ms=%.2f",
+        request_id, body.assignment_id, list(results.keys()), dur_ms,
+    )
+    return {"results": results}
+
 app.include_router(recommendations_router)
 app.include_router(relocation_router.router)
 app.include_router(relocation_router.api_router)

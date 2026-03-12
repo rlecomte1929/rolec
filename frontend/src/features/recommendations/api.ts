@@ -25,4 +25,16 @@ export const recommendationsEngineAPI = {
     });
     return res.data;
   },
+
+  /** Batch recommendations for selected services. Backend builds criteria from assignment, case, saved answers, and policy. */
+  recommendBatch: async (
+    assignmentId: string,
+    selectedServices?: string[]
+  ): Promise<{ results: Record<string, RecommendationResponse> }> => {
+    const res = await api.post(`${BASE}/batch`, {
+      assignment_id: assignmentId,
+      selected_services: selectedServices ?? undefined,
+    });
+    return res.data;
+  },
 };
