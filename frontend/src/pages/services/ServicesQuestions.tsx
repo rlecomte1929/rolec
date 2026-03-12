@@ -48,7 +48,6 @@ export const ServicesQuestions: React.FC = () => {
   const workflow = useServicesWorkflowState();
   const [caseId, setCaseId] = useState<string | null>(null);
   const [initialAnswers, setInitialAnswers] = useState<Record<string, unknown>>({});
-  const [retryTrigger, setRetryTrigger] = useState(0);
   const [questions, setQuestions] = useState<DynamicQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
@@ -92,7 +91,7 @@ export const ServicesQuestions: React.FC = () => {
           setCaseId(res.case_id || null);
           // Sync selected services from API (e.g. when visiting /questions directly)
           const selected = new Set(
-            (res.services || []).filter((r) => r.selected).map((r) => r.service_key as import('../features/services/serviceConfig').ServiceKey)
+            (res.services || []).filter((r) => r.selected).map((r) => r.service_key as ServiceKey)
           );
           if (selected.size > 0) setSelectedServices(selected);
         }
@@ -384,10 +383,7 @@ export const ServicesQuestions: React.FC = () => {
             variant="outline"
             size="sm"
             className="ml-2"
-            onClick={() => {
-              workflow.clearError();
-              setRetryTrigger((c) => c + 1);
-            }}
+            onClick={() => workflow.clearError()}
           >
             Retry
           </Button>
