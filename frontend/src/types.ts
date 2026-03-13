@@ -842,3 +842,37 @@ export interface ResourcesPagePayload {
   filtersApplied: Record<string, unknown>;
 }
 
+/** Policy-service comparison: employee request vs resolved policy */
+export type PolicyStatus =
+  | 'included'
+  | 'capped'
+  | 'approval_required'
+  | 'excluded'
+  | 'partial'
+  | 'out_of_scope';
+
+export interface PolicyServiceComparisonItem {
+  service_category: string;
+  benefit_key: string;
+  label: string;
+  requested_value_json: Record<string, unknown>;
+  policy_status: PolicyStatus;
+  explanation: string;
+  variance_json: Record<string, unknown>;
+  approval_required: boolean;
+  evidence_required_json: string[];
+  policy_min_value?: number | null;
+  policy_standard_value?: number | null;
+  policy_max_value?: number | null;
+  currency?: string;
+}
+
+export interface PolicyServiceComparisonResponse {
+  comparisons: PolicyServiceComparisonItem[];
+  resolved_policy: { id: string; policy_version_id: string; resolved_at: string } | null;
+  assignment_id: string;
+  case_id?: string;
+  message?: string;
+  diagnostics?: { benefits_count: number; services_count: number; answers_keys: string[] };
+}
+

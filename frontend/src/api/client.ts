@@ -5,6 +5,7 @@ import { getCurrentInteractionId, recordRequestPerf } from '../perf/perf';
 import type {
   LoginRequest,
   LoginResponse,
+  PolicyServiceComparisonResponse,
   RegisterRequest,
   NextQuestionResponse,
   AnswerRequest,
@@ -294,6 +295,34 @@ export const hrAPI = {
   },
   getAssignment: async (assignmentId: string): Promise<AssignmentDetail> => {
     const response = await api.get(`/api/hr/assignments/${assignmentId}`);
+    return response.data;
+  },
+  getResolvedPolicy: async (assignmentId: string): Promise<{
+    resolved: {
+      id: string;
+      assignment_id: string;
+      benefits: unknown[];
+      exclusions: unknown[];
+      resolution_context?: Record<string, unknown>;
+    } | null;
+    policy_version?: Record<string, unknown>;
+    resolution_context?: Record<string, unknown>;
+    message?: string;
+  }> => {
+    const response = await api.get(`/api/hr/assignments/${assignmentId}/resolved-policy`);
+    return response.data;
+  },
+  recomputeResolvedPolicy: async (assignmentId: string): Promise<{
+    resolved: unknown | null;
+    policy_version?: Record<string, unknown>;
+    message?: string;
+  }> => {
+    const response = await api.post(`/api/hr/assignments/${assignmentId}/resolved-policy/recompute`);
+    return response.data;
+  },
+  /** Compare selected services vs resolved policy (with diagnostics) */
+  getPolicyServiceComparison: async (assignmentId: string): Promise<PolicyServiceComparisonResponse> => {
+    const response = await api.get(`/api/hr/assignments/${assignmentId}/policy-service-comparison`);
     return response.data;
   },
   getPolicy: async (caseId: string): Promise<PolicyResponse> => {
@@ -1024,6 +1053,53 @@ export const employeeAPI = {
     const response = await api.get('/api/employee/policy/applicable', { params });
     return response.data;
   },
+  /** Resolved policy from published company policy (preferred when assignmentId available) */
+  getResolvedPolicy: async (assignmentId: string): Promise<{
+    policy: { id: string; title: string; version: number; effective_date: string } | null;
+    benefits: Array<{
+      benefit_key: string;
+      included: boolean;
+      min_value?: number;
+      standard_value?: number;
+      max_value?: number;
+      currency?: string;
+      approval_required: boolean;
+      evidence_required_json?: string[];
+    }>;
+    exclusions: Array<{ benefit_key?: string; domain: string; description?: string }>;
+    resolved_at?: string;
+    message?: string;
+  }> => {
+    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy`);
+    return response.data;
+  },
+  /** Policy envelope (envelope cards ready) for comparison/budget logic */
+  getPolicyEnvelope: async (assignmentId: string): Promise<{
+    policy: Record<string, unknown> | null;
+    benefits: unknown[];
+    exclusions: unknown[];
+    envelopes: Array<{
+      key: string;
+      label: string;
+      included: boolean;
+      capped: boolean;
+      min_value?: number;
+      standard_value?: number;
+      max_value?: number;
+      currency: string;
+      approval_required: boolean;
+      evidence_required: string[];
+    }>;
+    message?: string;
+  }> => {
+    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-envelope`);
+    return response.data;
+  },
+  /** Compare selected services vs resolved policy (read-only, explanatory) */
+  getPolicyServiceComparison: async (assignmentId: string): Promise<PolicyServiceComparisonResponse> => {
+    const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-service-comparison`);
+    return response.data;
+  },
 };
 
 export const servicesAPI = {
@@ -1284,6 +1360,113 @@ export const companyPolicyAPI = {
   },
   saveBenefits: async (policyId: string, benefits: any[]): Promise<{ policy: any; benefits: any[] }> => {
     const response = await api.put(`/api/company-policies/${policyId}/benefits`, { benefits });
+    return response.data;
+  },
+  getNormalized: async (policyId: string): Promise<{
+    policy: any;
+    version: any;
+    benefit_rules: any[];
+    exclusions: any[];
+    evidence_requirements: any[];
+    conditions: any[];
+    assignment_applicability: any[];
+    family_applicability: any[];
+    source_links: any[];
+  }> => {
+    const response = await api.get(`/api/company-policies/${policyId}/normalized`);
+    return response.data;
+  },
+  patchBenefitRule: async (
+    policyId: string,
+    benefitRuleId: string,
+    body: {
+      amount_value?: number;
+      amount_unit?: string;
+      currency?: string;
+      frequency?: string;
+      description?: string;
+      review_status?: string;
+      benefit_key?: string;
+      metadata_json?: Record<string, any>;
+    }
+  ): Promise<{ benefit_rule: any }> => {
+    const response = await api.patch(`/api/company-policies/${policyId}/benefits/${benefitRuleId}`, body);
+    return response.data;
+  },
+  patchVersionStatus: async (
+    policyId: string,
+    versionId: string,
+    body: { status: string }
+  ): Promise<{ version: any }> => {
+    const response = await api.patch(`/api/company-policies/${policyId}/versions/${versionId}/status`, body);
+    return response.data;
+  },
+  publishVersion: async (policyId: string, versionId: string): Promise<{ version: any }> => {
+    const response = await api.post(`/api/company-policies/${policyId}/versions/${versionId}/publish`);
+    return response.data;
+  },
+  patchExclusion: async (
+    policyId: string,
+    exclId: string,
+    body: { description?: string; review_status?: string }
+  ): Promise<{ exclusion: any }> => {
+    const response = await api.patch(`/api/company-policies/${policyId}/exclusions/${exclId}`, body);
+    return response.data;
+  },
+  patchCondition: async (
+    policyId: string,
+    condId: string,
+    body: { condition_value_json?: Record<string, any>; review_status?: string }
+  ): Promise<{ condition: any }> => {
+    const response = await api.patch(`/api/company-policies/${policyId}/conditions/${condId}`, body);
+    return response.data;
+  },
+};
+
+/** Policy document intake: upload PDF/DOCX, classify before extraction */
+export const policyDocumentsAPI = {
+  list: async (): Promise<{ documents: any[] }> => {
+    const response = await api.get('/api/hr/policy-documents');
+    return response.data;
+  },
+  get: async (docId: string): Promise<{ document: any }> => {
+    const response = await api.get(`/api/hr/policy-documents/${docId}`);
+    return response.data;
+  },
+  upload: async (file: File): Promise<{ document: any }> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await api.post('/api/hr/policy-documents/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  reprocess: async (docId: string): Promise<{ document: any }> => {
+    const response = await api.post(`/api/hr/policy-documents/${docId}/reprocess`);
+    return response.data;
+  },
+  listClauses: async (docId: string, clauseType?: string): Promise<{ clauses: any[] }> => {
+    const params = clauseType ? { clause_type: clauseType } : {};
+    const response = await api.get(`/api/hr/policy-documents/${docId}/clauses`, { params });
+    return response.data;
+  },
+  getClause: async (docId: string, clauseId: string): Promise<{ clause: any }> => {
+    const response = await api.get(`/api/hr/policy-documents/${docId}/clauses/${clauseId}`);
+    return response.data;
+  },
+  patchClause: async (
+    docId: string,
+    clauseId: string,
+    body: { clause_type?: string; title?: string; hr_override_notes?: string }
+  ): Promise<{ clause: any }> => {
+    const response = await api.patch(
+      `/api/hr/policy-documents/${docId}/clauses/${clauseId}`,
+      body
+    );
+    return response.data;
+  },
+  normalize: async (docId: string): Promise<{ policy_id: string; policy_version_id: string; summary: any }> => {
+    const response = await api.post(`/api/hr/policy-documents/${docId}/normalize`);
     return response.data;
   },
 };

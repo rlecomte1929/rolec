@@ -20,6 +20,9 @@ ReloPass uses `DATABASE_URL` as the single source of truth. When deploying to Re
 | supplier_service_capabilities | 20260312000000_supplier_registry | Supplier coverage |
 | supplier_scoring_metadata | 20260312000000_supplier_registry | Supplier scoring |
 | company_preferred_suppliers | 20260328000000_company_preferred_suppliers | HR preferred suppliers |
+| policy_documents | 20260329000000_policy_documents | Policy document intake pipeline |
+| policy_document_clauses | 20260330000000_policy_document_clauses | Clause segmentation with traceability |
+| policy_versions, policy_benefit_rules, policy_rule_conditions, policy_exclusions, policy_evidence_requirements, policy_assignment_type_applicability, policy_family_status_applicability, policy_tier_overrides, policy_source_links | 20260331000000_policy_normalization | Canonical policy normalization |
 
 ## Migrations to Apply Manually
 
@@ -37,6 +40,7 @@ If tables are missing in production:
    20260327000000_quotes_created_by_user.sql
    20260312000000_supplier_registry.sql
    20260328000000_company_preferred_suppliers.sql
+   20260329000000_policy_documents.sql
    ```
 
 3. **Dependencies**  

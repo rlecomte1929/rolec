@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 
+const formatBenefitLabel = (key: string): string =>
+  key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
 const BENEFIT_ICONS: Record<string, React.ReactNode> = {
-  temporaryHousing: (
+  temporary_housing: (
     <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   ),
-  educationSupport: (
+  schooling: (
     <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
       <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
@@ -23,6 +26,53 @@ const BENEFIT_ICONS: Record<string, React.ReactNode> = {
       <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
       <circle cx="5.5" cy="18.5" r="2.5" />
       <circle cx="18.5" cy="18.5" r="2.5" />
+    </svg>
+  ),
+  housing: (
+    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  ),
+  tax: (
+    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  ),
+  spouse_support: (
+    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  language_training: (
+    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  ),
+  transport: (
+    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      <line x1="12" y1="11" x2="12" y2="17" />
+    </svg>
+  ),
+  temporaryHousing: (
+    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  ),
+  educationSupport: (
+    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      <line x1="8" y1="7" x2="16" y2="7" />
+      <line x1="8" y1="11" x2="16" y2="11" />
     </svg>
   ),
   houseHunting: (
@@ -60,7 +110,7 @@ const BENEFIT_ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
-const getBenefitIcon = (key: string) => BENEFIT_ICONS[key] ?? null;
+const getBenefitIcon = (key: string) => BENEFIT_ICONS[key] ?? BENEFIT_ICONS[key.replace(/_/g, '')] ?? null;
 
 interface AllowedBenefit {
   key: string;
@@ -98,20 +148,49 @@ export const EmployeePolicyView: React.FC<{
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    employeeAPI
-      .getApplicablePolicy(assignmentId)
-      .then((res) => {
-        if (!cancelled) setData(res as unknown as ApplicablePolicy);
-      })
-      .catch(() => {
+    const load = async () => {
+      try {
+        if (assignmentId) {
+          const resolved = await employeeAPI.getResolvedPolicy(assignmentId);
+          if (!cancelled && resolved.policy && resolved.benefits?.length) {
+            const allowedBenefits: AllowedBenefit[] = resolved.benefits
+              .filter((b: { included?: boolean }) => b.included)
+              .map((b: { benefit_key: string; min_value?: number; standard_value?: number; max_value?: number; currency?: string; approval_required?: boolean; evidence_required_json?: string[] }) => ({
+                key: b.benefit_key,
+                label: formatBenefitLabel(b.benefit_key),
+                allowed: true,
+                maxAllowed: { min: b.min_value, medium: b.standard_value, premium: b.max_value },
+                currency: b.currency || 'USD',
+                preApprovalRequired: !!b.approval_required,
+                documentationRequired: Array.isArray(b.evidence_required_json) ? b.evidence_required_json : [],
+                explanatoryText: [b.min_value, b.standard_value, b.max_value].filter((v) => v != null).length
+                  ? `Up to ${b.currency || 'USD'} ${(b.max_value ?? b.standard_value ?? 0).toLocaleString()}`
+                  : 'Per policy',
+              }));
+            setData({
+              policy: {
+                policyId: resolved.policy.id,
+                policyName: resolved.policy.title,
+                effectiveDate: resolved.policy.effective_date,
+                employeeBands: [],
+                assignmentTypes: [],
+              },
+              allowedBenefits,
+              wizardCriteria: {},
+            });
+            return;
+          }
+        }
+        const legacy = await employeeAPI.getApplicablePolicy(assignmentId);
+        if (!cancelled) setData(legacy as unknown as ApplicablePolicy);
+      } catch {
         if (!cancelled) setData(null);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
+      }
     };
+    void load();
+    return () => { cancelled = true; };
   }, [assignmentId]);
 
   if (loading) return <div className="text-sm text-[#6b7280] py-8">Loading policy...</div>;
