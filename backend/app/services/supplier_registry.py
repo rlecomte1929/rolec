@@ -194,6 +194,7 @@ def _supplier_to_recommendation_item(
     rating = max(0.0, min(5.0, raw_rating))  # clamp 0-5 to avoid UI crash (Invalid count value)
     review_count = int(meta.review_count) if meta and meta.review_count is not None else 0
     review_count = max(0, review_count)
+    preferred_partner = bool(meta.preferred_partner) if meta else False
     return {
         "item_id": s.id,
         "name": s.name,
@@ -203,6 +204,7 @@ def _supplier_to_recommendation_item(
         "availability_level": "medium",
         "confidence": 85,
         "_source": "supplier_registry",
+        "_preferred_partner": preferred_partner,
     }
 
 

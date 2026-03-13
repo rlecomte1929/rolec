@@ -94,8 +94,11 @@ def recommend(
             preferred_ids.add(str(sid))
 
     def _is_preferred(x: Dict[str, Any]) -> bool:
-        iid = str((x.get("item") or {}).get("item_id") or "")
-        return iid in preferred_ids
+        item = x.get("item") or {}
+        iid = str(item.get("item_id") or "")
+        if iid in preferred_ids:
+            return True
+        return bool(item.get("_preferred_partner"))
 
     # Deterministic ranking: preferred first (boost), then score desc, then item_id/name asc
     PREFERRED_BOOST = 15  # Add to norm_score so preferred rank higher
