@@ -35,7 +35,7 @@ from .services.dossier import evaluate_applies_if, validate_answer, fetch_search
 from .services.guidance_pack_service import generate_guidance_pack
 from .services.policy_adapter import normalize_policy_caps
 from .services.policy_extractor import extract_policy_from_bytes
-from .services.timeline_service import compute_default_milestones
+from .app.services.timeline_service import compute_default_milestones
 from .services.country_resources import (
     build_profile_context,
     get_personalization_hints,
