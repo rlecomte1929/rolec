@@ -245,6 +245,7 @@ interface Props {
   onSelectedPackageChange: (pkg: Map<string, string>) => void;
   onStartOver: () => void;
   onViewSummary: () => void;
+  debugMode?: boolean;
 }
 
 export const RecommendationResults: React.FC<Props> = ({
