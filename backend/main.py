@@ -106,6 +106,7 @@ else:
 app = FastAPI(title="ReloPass API", version="1.0.0")
 log.info("Initializing database schemas...")
 init_db()
+db.log_expected_tables_status()
 log.info("Seeding demo cases...")
 seed_demo_cases()
 try:
@@ -1672,6 +1673,61 @@ def remove_company_logo(user: Dict[str, Any] = Depends(require_role(UserRole.HR)
     db.update_company_logo(company_id, None)
     db.log_audit(effective["id"], "UPDATE", "company", company_id, "HR company logo removed", {})
     return {"ok": True}
+
+
+@app.get("/api/hr/preferred-suppliers")
+def list_hr_preferred_suppliers(
+    service_category: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """List company preferred suppliers for the HR user's company."""
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        return {"preferred": []}
+    items = db.list_company_preferred_suppliers(company_id, service_category)
+    return {"preferred": items}
+
+
+@app.post("/api/hr/preferred-suppliers")
+def add_hr_preferred_supplier(
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Add supplier to company preferred list."""
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    supplier_id = (body.get("supplier_id") or "").strip()
+    if not supplier_id:
+        raise HTTPException(status_code=400, detail="supplier_id required")
+    rec = db.add_company_preferred_supplier(
+        company_id=company_id,
+        supplier_id=supplier_id,
+        service_category=(body.get("service_category") or "").strip() or None,
+        priority_rank=int(body.get("priority_rank", 0) or 0),
+        notes=(body.get("notes") or "").strip() or None,
+    )
+    return rec
+
+
+@app.delete("/api/hr/preferred-suppliers/{supplier_id}")
+def remove_hr_preferred_supplier(
+    supplier_id: str,
+    service_category: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Remove supplier from company preferred list."""
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    n = db.remove_company_preferred_supplier(company_id, supplier_id, service_category)
+    return {"ok": True, "removed": n}
 
 
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
@@ -3308,19 +3364,42 @@ def create_rfq(
     if not vendor_ids:
         raise HTTPException(status_code=400, detail="At least one vendor_id or supplier_id required")
 
-    result = db.create_rfq(
-        case_id=effective_case_id,
-        creator_user_id=user.get("id"),
-        items=[i.model_dump(mode="json") for i in payload.items],
-        vendor_ids=vendor_ids,
-    )
+    req_id = getattr(req.state, "request_id", None)
+    valid_vids, vid_errors = db.validate_vendor_ids(vendor_ids, request_id=req_id)
+    if vid_errors:
+        log.warning(
+            "create_rfq vendor validation failed request_id=%s vendor_ids=%s errors=%s",
+            req_id, vendor_ids, vid_errors,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="; ".join(vid_errors),
+        )
+    if not valid_vids:
+        raise HTTPException(status_code=400, detail="No valid vendor_ids; each must exist in vendors table")
+
+    try:
+        result = db.create_rfq(
+            case_id=effective_case_id,
+            creator_user_id=user.get("id"),
+            items=[i.model_dump(mode="json") for i in payload.items],
+            vendor_ids=valid_vids,
+            request_id=req_id,
+        )
+    except Exception as e:
+        log.error(
+            "create_rfq failed request_id=%s case_id=%s vendor_ids=%s error=%s",
+            req_id, effective_case_id, valid_vids, e,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="RFQ creation failed. Check logs for details.")
+
     try:
         from .services.analytics_service import (
             emit_event,
             EVENT_RFQ_CREATED,
             EVENT_SUPPLIER_SELECTED,
         )
-        req_id = getattr(req.state, "request_id", None)
         emit_event(
             EVENT_RFQ_CREATED,
             request_id=req_id,

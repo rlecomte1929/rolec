@@ -296,16 +296,9 @@ export const AdminSupplierDetail: React.FC = () => {
         <Card padding="lg">
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-lg font-semibold text-[#0b2b43]">Details</h2>
-            <div className="flex gap-2">
-              {hasEdits && (
-                <Button size="sm" onClick={saveSupplier} disabled={saving}>
-                  {saving ? 'Saving...' : 'Save'}
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={() => navigate(ROUTE_DEFS.adminSuppliers.path)}>
-                ← Back
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate(ROUTE_DEFS.adminSuppliers.path)}>
+              ← Back to list
+            </Button>
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4">
@@ -421,6 +414,16 @@ export const AdminSupplierDetail: React.FC = () => {
               </dd>
             </div>
           )}
+          <div className="mt-6 pt-4 border-t border-[#e5e7eb] flex items-center justify-between">
+            <span className="text-sm text-[#6b7280]">
+              {hasEdits && !saving && 'You have unsaved changes'}
+              {saving && 'Saving…'}
+              {!hasEdits && !saving && 'All changes saved'}
+            </span>
+            <Button onClick={saveSupplier} disabled={saving || !hasEdits}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
         </Card>
 
         <Card padding="lg">

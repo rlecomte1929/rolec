@@ -99,16 +99,18 @@ def _apply_service_shaping(
             out.pop(k, None)
 
     elif service_key == "insurances":
+        ins_type = (out.get("insurance_type") or "").strip().lower()
         cov = out.get("coverage_types")
         if isinstance(cov, str):
-            cov_list = [
-                s.strip().lower()
-                for s in cov.split(",")
-                if s.strip()
-            ]
-            out["coverage_types"] = cov_list if cov_list else ["health"]
-        elif not isinstance(out.get("coverage_types"), list):
-            out["coverage_types"] = ["health"]
+            cov_list = [s.strip().lower() for s in cov.split(",") if s.strip()]
+        elif isinstance(cov, list):
+            cov_list = [str(x).strip().lower() for x in cov if x]
+        else:
+            cov_list = []
+        if ins_type and ins_type not in cov_list:
+            cov_list.insert(0, ins_type)
+        out["coverage_types"] = cov_list if cov_list else ["health"]
+        out.pop("insurance_type", None)
 
     return out
 
@@ -120,6 +122,7 @@ def build_criteria_for_assignment(
     saved_answers: Dict[str, Any],
     case_context: Dict[str, Any],
     policy_context: Optional[Dict[str, Any]] = None,
+    company_id: Optional[str] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
     Build recommendation criteria for each selected service.
@@ -159,6 +162,7 @@ def build_criteria_for_assignment(
         "packing": "packing_service",
         "bank_lang": "preferred_languages",
         "bank_fees": "fee_sensitivity",
+        "ins_type": "insurance_type",
         "ins_coverage": "coverage_types",
         "ins_family": "family_coverage",
         "elec_green": "green_preference",
@@ -209,5 +213,20 @@ def build_criteria_for_assignment(
 
         criteria = _apply_service_shaping(svc_key, criteria)
         result[backend_key] = criteria
+
+    # Company preferred suppliers: resolve per service category (includes NULL = all categories)
+    if company_id:
+        try:
+            from ...database import db
+            for svc_key in selected_services:
+                backend_key = SERVICE_KEY_TO_BACKEND.get(svc_key)
+                if not backend_key:
+                    continue
+                prefs = db.list_company_preferred_suppliers(company_id, svc_key)
+                supplier_ids = [str(p.get("supplier_id", "")) for p in prefs if p.get("supplier_id")]
+                if supplier_ids and backend_key in result:
+                    result[backend_key]["_preferred_supplier_ids"] = supplier_ids
+        except Exception:
+            pass
 
     return result

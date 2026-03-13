@@ -35,6 +35,7 @@ export const ROUTE_DEFS = {
   caseResources: { path: '/cases/:caseId/resources', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrMessages: { path: '/hr/messages', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrResources: { path: '/hr/resources', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  hrPreferredSuppliers: { path: '/hr/preferred-suppliers', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrPolicy: { path: '/hr/policy', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeHrPolicy: { path: '/employee/hr-policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrPolicyManagement: { path: '/hr/policy-management', roles: ['HR', 'ADMIN'] as RouteRole[] },

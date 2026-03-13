@@ -103,6 +103,10 @@ def post_recommendations_batch(
     except Exception:
         pass
 
+    company_id = assignment.get("company_id")
+    if not company_id and assignment.get("hr_user_id"):
+        profile = db.get_profile_record(assignment["hr_user_id"])
+        company_id = profile.get("company_id") if profile else None
     criteria_map = build_criteria_for_assignment(
         assignment_id=req.assignment_id,
         case_id=case_id,
@@ -110,6 +114,7 @@ def post_recommendations_batch(
         saved_answers=saved_answers,
         case_context=case_context,
         policy_context=policy_context,
+        company_id=company_id,
     )
 
     def _run_one(backend_key: str, criteria: Dict[str, Any]) -> tuple[str, Any | None]:

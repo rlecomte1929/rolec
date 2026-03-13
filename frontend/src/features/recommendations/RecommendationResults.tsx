@@ -25,15 +25,17 @@ const WARNING_LABELS: Record<string, string> = {
 };
 
 function RatingStars({ rating }: { rating?: number }) {
-  if (rating == null) return null;
-  const full = Math.floor(rating);
-  const half = rating % 1 >= 0.5;
+  if (rating == null || typeof rating !== 'number' || !Number.isFinite(rating)) return null;
+  const clamped = Math.max(0, Math.min(5, rating));
+  const full = Math.floor(clamped);
+  const half = clamped % 1 >= 0.5;
+  const empty = Math.max(0, 5 - full - (half ? 1 : 0));
   return (
     <span className="inline-flex items-center gap-0.5 text-amber-500">
       {'★'.repeat(full)}
       {half && '½'}
-      {'☆'.repeat(5 - full - (half ? 1 : 0))}
-      <span className="ml-1 text-sm text-[#6b7280]">({rating.toFixed(1)})</span>
+      {'☆'.repeat(empty)}
+      <span className="ml-1 text-sm text-[#6b7280]">({clamped.toFixed(1)})</span>
     </span>
   );
 }
@@ -128,6 +130,11 @@ function RecCard({
             {isScarce && (
               <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-800">
                 Limited availability
+              </span>
+            )}
+            {item.metadata?.company_preferred && (
+              <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-800 font-medium">
+                Preferred by your company
               </span>
             )}
           </div>

@@ -190,8 +190,10 @@ def _supplier_to_recommendation_item(
     city_hint: str,
 ) -> Dict[str, Any]:
     """Convert supplier + metadata to recommendation item shape (plugin-compatible)."""
-    rating = float(meta.average_rating) if meta and meta.average_rating else 4.0
-    review_count = meta.review_count if meta else 0
+    raw_rating = float(meta.average_rating) if meta and meta.average_rating is not None else 4.0
+    rating = max(0.0, min(5.0, raw_rating))  # clamp 0-5 to avoid UI crash (Invalid count value)
+    review_count = int(meta.review_count) if meta and meta.review_count is not None else 0
+    review_count = max(0, review_count)
     return {
         "item_id": s.id,
         "name": s.name,

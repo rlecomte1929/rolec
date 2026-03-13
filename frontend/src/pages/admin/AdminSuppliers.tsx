@@ -175,13 +175,42 @@ export const AdminSuppliers: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">{s.verified ? '✓' : '—'}</td>
                     <td className="py-3 px-4" onClick={(ev) => ev.stopPropagation()}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(ROUTE_DEFS.adminSuppliersDetail.path.replace(':id', s.id))}
-                      >
-                        View
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(ROUTE_DEFS.adminSuppliersDetail.path.replace(':id', s.id))}
+                        >
+                          Edit
+                        </Button>
+                        {s.status === 'active' ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-amber-700 border-amber-300"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Deactivate ${s.name}? They will no longer appear in recommendations.`)) {
+                                suppliersAPI.setStatus(s.id, 'inactive').then(load).catch(() => setError('Failed to deactivate'));
+                              }
+                            }}
+                          >
+                            Deactivate
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-green-700 border-green-300"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              suppliersAPI.setStatus(s.id, 'active').then(load).catch(() => setError('Failed to activate'));
+                            }}
+                          >
+                            Activate
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

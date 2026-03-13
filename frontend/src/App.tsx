@@ -15,6 +15,7 @@ import { HrCaseSummary } from './pages/HrCaseSummary';
 import { HrAssignmentReview } from './pages/HrAssignmentReview';
 import { HrComplianceCheck } from './pages/HrComplianceCheck';
 import { HrAssignmentPackageReview } from './pages/HrAssignmentPackageReview';
+import { HrPreferredSuppliers } from './pages/HrPreferredSuppliers';
 import { HrPolicy } from './pages/HrPolicy';
 import { HrPolicyManagement } from './pages/HrPolicyManagement';
 import { CaseWizardPage } from './pages/employee/CaseWizardPage';
@@ -158,6 +159,7 @@ function App() {
         <Route path={ROUTE_DEFS.quoteRfqDetail.path} element={<QuoteRfqDetail />} />
         <Route path={ROUTE_DEFS.vendorInbox.path} element={<VendorInbox />} />
         <Route path={ROUTE_DEFS.vendorRfq.path} element={<VendorRfq />} />
+        <Route path={ROUTE_DEFS.hrPreferredSuppliers.path} element={<HrPreferredSuppliers />} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
         <Route path={ROUTE_DEFS.employeeHrPolicy.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
         <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<HrPolicyManagement />} />

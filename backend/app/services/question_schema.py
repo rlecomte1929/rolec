@@ -243,12 +243,29 @@ def _bank() -> List[ServiceQuestionDef]:
         ),
         # Insurances
         ServiceQuestionDef(
+            question_key="ins_type",
+            label="What type of insurance do you need?",
+            type="select",
+            service_category="insurances",
+            options=[
+                QuestionOption(value="health", label="Health"),
+                QuestionOption(value="travel", label="Travel"),
+                QuestionOption(value="housing", label="Housing / Home"),
+                QuestionOption(value="car", label="Car"),
+                QuestionOption(value="personal", label="Personal"),
+                QuestionOption(value="family", label="Family"),
+                QuestionOption(value="liability", label="Liability"),
+            ],
+            default="health",
+            criteria_key="insurance_type",
+        ),
+        ServiceQuestionDef(
             question_key="ins_coverage",
-            label="Coverage types needed",
+            label="Additional coverage types (optional)",
             type="text",
             service_category="insurances",
-            placeholder="health, travel",
-            default="health",
+            placeholder="e.g. health, travel",
+            default="",
             criteria_key="coverage_types",
         ),
         ServiceQuestionDef(

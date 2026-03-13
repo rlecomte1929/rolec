@@ -15,11 +15,14 @@ from .types import (
 
 
 def _load_dataset_with_registry(category: str, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Load dataset from plugin JSON, optionally merged with Supplier Registry items."""
+    """
+    Load recommendation candidates. Supplier Registry is primary when it has data;
+    static JSON is fallback when registry returns zero items.
+    """
     plugin = get_plugin(category)
-    dataset = plugin.load_dataset() if plugin else []
+    static_dataset = plugin.load_dataset() if plugin else []
 
-    # Optionally merge registry-backed suppliers (when registry has data)
+    registry_items: List[Dict[str, Any]] = []
     try:
         from ..db import SessionLocal
         from ..services.supplier_registry import search_by_service_destination
@@ -35,15 +38,21 @@ def _load_dataset_with_registry(category: str, criteria: Dict[str, Any]) -> List
                     destination_country=dest_country or None,
                     limit=50,
                 )
-                if registry_items:
-                    # Prepend registry items; they will be scored by plugin (minimal shape supported)
-                    existing_ids = {str((d.get("item_id") or "")) for d in dataset}
-                    for r in registry_items:
-                        if str(r.get("item_id", "")) not in existing_ids:
-                            dataset.insert(0, r)
-                            existing_ids.add(str(r.get("item_id", "")))
     except Exception:
-        pass  # Registry optional; fall back to JSON only
+        pass
+
+    if registry_items:
+        # Registry is primary: use registry items, optionally merge non-duplicate static items
+        existing_ids = {str((r.get("item_id") or "")) for r in registry_items}
+        dataset = list(registry_items)
+        for d in static_dataset:
+            iid = str((d.get("item_id") or ""))
+            if iid and iid not in existing_ids:
+                dataset.append(d)
+                existing_ids.add(iid)
+    else:
+        # Fallback: static JSON only when registry has no matching suppliers
+        dataset = list(static_dataset)
 
     return dataset
 
@@ -78,7 +87,26 @@ def recommend(
 
     # Filter out items that don't match destination (score 0 = wrong city, etc.)
     matching = [s for s in scored_items if s["score_raw"] > 0]
-    # Deterministic ranking: score desc, then item_id/name asc
+
+    preferred_ids: set = set()
+    for sid in (criteria.get("_preferred_supplier_ids") or []):
+        if sid:
+            preferred_ids.add(str(sid))
+
+    def _is_preferred(x: Dict[str, Any]) -> bool:
+        iid = str((x.get("item") or {}).get("item_id") or "")
+        return iid in preferred_ids
+
+    # Deterministic ranking: preferred first (boost), then score desc, then item_id/name asc
+    PREFERRED_BOOST = 15  # Add to norm_score so preferred rank higher
+    for s in matching:
+        if _is_preferred(s):
+            s["norm_score"] = (s.get("norm_score") or 0) + PREFERRED_BOOST
+            s["_company_preferred"] = True
+            s["tier"] = plugin.tier(min(100, s["norm_score"]))
+        else:
+            s["_company_preferred"] = False
+
     matching.sort(
         key=lambda x: (
             -(x.get("norm_score") or 0),
@@ -92,6 +120,7 @@ def recommend(
     for t in top:
         item = t["item"]
         avail = t.get("metadata", {}).get("availability_level", "high")
+        company_preferred = t.get("_company_preferred", False)
 
         expl_dict = build_explanation(item, t, criteria, category)
         explanation = RecommendationExplanation(**expl_dict)
@@ -99,7 +128,7 @@ def recommend(
         rec = RecommendationItem(
             item_id=item.get("item_id", ""),
             name=item.get("name", ""),
-            score=round(t["norm_score"], 1),
+            score=round(min(100, t["norm_score"]), 1),  # Cap score display at 100
             tier=t["tier"],
             summary=t.get("summary", ""),
             rationale=t.get("rationale", ""),
@@ -109,6 +138,7 @@ def recommend(
             metadata={
                 **(t.get("metadata") or {}),
                 "availability_level": avail,
+                "company_preferred": company_preferred,
             },
             explanation=explanation,
         )

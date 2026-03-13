@@ -8,7 +8,7 @@ import math
 import uuid
 import logging
 import time
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 
 from sqlalchemy import create_engine, text
@@ -388,6 +388,23 @@ class Database:
                 )
             """))
 
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS company_preferred_suppliers (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    supplier_id TEXT NOT NULL,
+                    service_category TEXT,
+                    priority_rank INTEGER NOT NULL DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    notes TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_company_preferred_suppliers_company
+                ON company_preferred_suppliers(company_id)
+            """))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS rp_debug_kv (
                     id TEXT PRIMARY KEY,
@@ -2292,6 +2309,34 @@ class Database:
                 rfq["items"] = self._list_rfq_items(c, rfq["id"])
                 rfq["recipients"] = self._list_rfq_recipients(c, rfq["id"])
         return rfqs
+
+    def validate_vendor_ids(
+        self, vendor_ids: List[str], request_id: Optional[str] = None
+    ) -> Tuple[List[str], List[str]]:
+        """Check each vendor_id exists in vendors table. Returns (valid_ids, errors)."""
+        valid: List[str] = []
+        errors: List[str] = []
+        for vid in vendor_ids:
+            if not vid or not str(vid).strip():
+                continue
+            vid = str(vid).strip()
+            try:
+                with self.engine.connect() as conn:
+                    row = self._exec(
+                        conn,
+                        "SELECT 1 FROM vendors WHERE id = :vid",
+                        {"vid": vid},
+                        op_name="validate_vendor_id",
+                        request_id=request_id,
+                    ).fetchone()
+                if row:
+                    valid.append(vid)
+                else:
+                    errors.append(f"Vendor {vid} not found in vendors table. Ensure supplier.vendor_id references an existing vendor.")
+            except Exception as e:
+                log.warning("validate_vendor_ids check failed for %s: %s", vid, e)
+                valid.append(vid)  # Best-effort: allow if check fails (e.g. no vendors table)
+        return (valid, errors)
 
     def get_vendor_for_user(
         self, user_id: str, request_id: Optional[str] = None
@@ -4527,6 +4572,64 @@ class Database:
         with self.engine.begin() as conn:
             conn.execute(text(f"UPDATE company_policies SET {', '.join(fields)} WHERE id = :id"), params)
 
+    def list_company_preferred_suppliers(
+        self, company_id: str, service_category: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            sql = "SELECT * FROM company_preferred_suppliers WHERE company_id = :cid AND status = 'active'"
+            params: Dict[str, Any] = {"cid": company_id}
+            if service_category:
+                sql += " AND (service_category = :svc OR service_category IS NULL)"
+                params["svc"] = service_category
+            sql += " ORDER BY priority_rank ASC, created_at ASC"
+            rows = conn.execute(text(sql), params).fetchall()
+        return self._rows_to_list(rows)
+
+    def add_company_preferred_supplier(
+        self,
+        company_id: str,
+        supplier_id: str,
+        service_category: Optional[str] = None,
+        priority_rank: int = 0,
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        now = datetime.utcnow().isoformat()
+        rid = str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO company_preferred_suppliers
+                    (id, company_id, supplier_id, service_category, priority_rank, status, notes, created_at, updated_at)
+                    VALUES (:id, :cid, :sid, :svc, :rank, 'active', :notes, :now, :now)
+                """),
+                {
+                    "id": rid,
+                    "cid": company_id,
+                    "sid": supplier_id,
+                    "svc": service_category,
+                    "rank": priority_rank,
+                    "notes": notes or "",
+                    "now": now,
+                },
+            )
+        return {"id": rid, "company_id": company_id, "supplier_id": supplier_id}
+
+    def remove_company_preferred_supplier(
+        self, company_id: str, supplier_id: str, service_category: Optional[str] = None
+    ) -> int:
+        with self.engine.begin() as conn:
+            if service_category:
+                r = conn.execute(
+                    text("DELETE FROM company_preferred_suppliers WHERE company_id = :cid AND supplier_id = :sid AND service_category = :svc"),
+                    {"cid": company_id, "sid": supplier_id, "svc": service_category},
+                )
+            else:
+                r = conn.execute(
+                    text("DELETE FROM company_preferred_suppliers WHERE company_id = :cid AND supplier_id = :sid AND service_category IS NULL"),
+                    {"cid": company_id, "sid": supplier_id},
+                )
+            return r.rowcount
+
     def list_policy_benefits(self, policy_id: str) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
             rows = conn.execute(
@@ -4636,6 +4739,58 @@ class Database:
             "connectivity": connectivity,
             "server_time": server_time,
         }
+
+    @staticmethod
+    def log_expected_tables_status() -> None:
+        """
+        Log which expected production tables exist. Use at startup to verify
+        migrations have been applied. Expected tables from Supabase migrations.
+        """
+        expected = [
+            "rfqs", "rfq_items", "rfq_recipients", "quotes", "quote_lines",
+            "case_milestones", "analytics_events", "suppliers",
+            "supplier_service_capabilities", "supplier_scoring_metadata",
+            "company_preferred_suppliers",
+        ]
+        if _is_sqlite:
+            try:
+                with _engine.connect() as conn:
+                    present = []
+                    missing = []
+                    for t in expected:
+                        r = conn.execute(text(
+                            "SELECT name FROM sqlite_master WHERE type='table' AND name=:n"
+                        ), {"n": t}).fetchone()
+                        (present if r else missing).append(t)
+                    log.info(
+                        "db_tables: present=%s missing=%s (sqlite)",
+                        present, missing,
+                    )
+            except Exception as e:
+                log.warning("db_tables check failed: %s", e)
+            return
+        try:
+            with _engine.connect() as conn:
+                placeholders = ",".join([f":t{i}" for i in range(len(expected))])
+                params = {f"t{i}": t for i, t in enumerate(expected)}
+                rows = conn.execute(text(f"""
+                    SELECT table_name FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name IN ({placeholders})
+                """), params).fetchall()
+                found = {r[0] for r in rows}
+                present = [t for t in expected if t in found]
+                missing = [t for t in expected if t not in found]
+                log.info(
+                    "db_tables: present=%s missing=%s (postgres). Apply migrations if missing.",
+                    present, missing,
+                )
+                if missing:
+                    log.warning(
+                        "db_tables: Run supabase migrations for: %s. See docs/SUPABASE_MIGRATIONS.md",
+                        missing,
+                    )
+        except Exception as e:
+            log.warning("db_tables check failed: %s", e)
 
 
 # Global database instance
