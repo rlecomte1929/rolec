@@ -63,7 +63,7 @@ from .policy_engine import PolicyEngine
 from .app.db import init_db, SessionLocal
 from .app import crud as app_crud
 from .app.seed import seed_demo_cases
-from .app.seed_suppliers import seed_suppliers_from_movers
+from .app.seed_suppliers import seed_suppliers_from_recommendation_datasets
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
 from .app.routers import admin_resources as admin_resources_router
@@ -109,9 +109,9 @@ init_db()
 log.info("Seeding demo cases...")
 seed_demo_cases()
 try:
-    n = seed_suppliers_from_movers()
+    n = seed_suppliers_from_recommendation_datasets()
     if n:
-        log.info("Seeded %d suppliers from movers dataset.", n)
+        log.info("Seeded %d suppliers from recommendation datasets (living_areas, schools, movers).", n)
 except Exception as e:
     log.warning("Supplier seed skipped or failed: %s", e)
 log.info("Startup complete.")

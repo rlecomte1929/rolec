@@ -205,11 +205,11 @@ def _supplier_to_recommendation_item(
 
 
 def create_supplier(session: Session, data: Dict[str, Any]) -> Dict[str, Any]:
-    """Create supplier with optional capabilities and scoring."""
+    """Create supplier with optional capabilities and scoring. Use data['id'] for explicit id (e.g. when seeding from recommendation datasets)."""
     ok, err = validate_supplier_create(data)
     if not ok:
         raise ValueError(err or "Validation failed")
-    sid = str(uuid.uuid4())
+    sid = (data.get("id") or "").strip() or str(uuid.uuid4())
     s = Supplier(
         id=sid,
         name=data["name"],
