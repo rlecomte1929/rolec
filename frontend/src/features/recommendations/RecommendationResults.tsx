@@ -16,6 +16,14 @@ const TIER_COLORS: Record<string, string> = {
   weak: 'bg-slate-100 text-slate-600',
 };
 
+const WARNING_LABELS: Record<string, string> = {
+  above_budget: 'Above budget',
+  above_policy: 'Above policy limit',
+  low_availability: 'Limited availability',
+  wrong_destination: 'Wrong destination',
+  waitlist: 'Waitlist may apply',
+};
+
 function RatingStars({ rating }: { rating?: number }) {
   if (rating == null) return null;
   const full = Math.floor(rating);
@@ -61,6 +69,7 @@ function RecCard({
   category,
   criteriaEcho,
   defaultExpanded = false,
+  defaultShowDebug = false,
   isInPackage,
   onTogglePackage,
 }: {
@@ -68,12 +77,17 @@ function RecCard({
   category: string;
   criteriaEcho?: Record<string, unknown>;
   defaultExpanded?: boolean;
+  defaultShowDebug?: boolean;
   isInPackage: boolean;
   onTogglePackage: () => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [showDebug, setShowDebug] = useState(defaultShowDebug);
   const tier = item.tier || 'ok';
   const avail = item.metadata?.availability_level || 'high';
+  const expl = item.explanation;
+  const matchReasons = expl?.match_reasons?.length ? expl.match_reasons : item.pros;
+  const warningFlags = expl?.warning_flags ?? [];
   const isScarce = avail === 'low' || avail === 'scarce';
   const costLocal = item.metadata?.estimated_cost_local;
   const currency = item.metadata?.currency || 'USD';
@@ -120,13 +134,27 @@ function RecCard({
           {costLabel && (
             <p className="text-sm font-medium text-[#0b2b43] mt-1">{costLabel}</p>
           )}
-          <p className="text-sm text-[#4b5563] mt-2">{item.summary}</p>
-          {item.pros.length > 0 && (
+          <p className="text-sm text-[#4b5563] mt-2">
+            {expl?.explanation_summary || item.summary}
+          </p>
+          {matchReasons.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
-              {item.pros.map((p) => (
+              {matchReasons.slice(0, 5).map((p) => (
                 <Badge key={p} variant="success" size="sm">
                   {p}
                 </Badge>
+              ))}
+            </div>
+          )}
+          {warningFlags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {warningFlags.map((flag) => (
+                <span
+                  key={flag}
+                  className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200"
+                >
+                  ⚠ {WARNING_LABELS[flag] ?? flag}
+                </span>
               ))}
             </div>
           )}
@@ -176,16 +204,24 @@ function RecCard({
       {expanded && (
         <div className="mt-3 pt-3 border-t border-[#e2e8f0] space-y-2">
           <p className="text-sm text-[#4b5563]">{item.rationale}</p>
-          {Object.keys(item.breakdown || {}).length > 0 && (
+          {(Object.keys(expl?.score_dimensions ?? item.breakdown ?? {}).length > 0) && (
             <div className="space-y-1">
-              <span className="text-xs font-medium text-[#6b7280]">Score breakdown:</span>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(item.breakdown).map(([k, v]) => (
-                  <span key={k} className="text-xs bg-[#f1f5f9] px-2 py-0.5 rounded">
-                    {k}: {typeof v === 'number' ? v.toFixed(0) : v}
-                  </span>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowDebug(!showDebug)}
+                className="text-xs font-medium text-[#6b7280] hover:text-[#0b2b43]"
+              >
+                {showDebug ? 'Hide scoring details' : 'Show scoring details ›'}
+              </button>
+              {showDebug && (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {Object.entries(expl?.score_dimensions ?? item.breakdown ?? {}).map(([k, v]) => (
+                    <span key={k} className="text-xs bg-[#f1f5f9] px-2 py-0.5 rounded">
+                      {k}: {typeof v === 'number' ? v.toFixed(1) : String(v)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {item.cons.length > 0 && (
@@ -218,6 +254,7 @@ export const RecommendationResults: React.FC<Props> = ({
   onSelectedPackageChange,
   onStartOver,
   onViewSummary,
+  debugMode = false,
 }) => {
   const entries = Object.entries(results);
   const [activeTab, setActiveTab] = useState(entries[0]?.[0] ?? '');
@@ -289,6 +326,7 @@ export const RecommendationResults: React.FC<Props> = ({
                   category={category}
                   criteriaEcho={res.criteria_echo}
                   defaultExpanded={idx === 0}
+                  defaultShowDebug={debugMode && idx === 0}
                   isInPackage={selectedPackage.get(category) === item.item_id}
                   onTogglePackage={() => togglePackage(category, item.item_id)}
                 />

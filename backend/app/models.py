@@ -1,6 +1,5 @@
-from sqlalchemy import Column, String, DateTime, Text, Float, Date
+from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey
 from sqlalchemy.sql import func
-
 from .db import Base
 
 
@@ -106,3 +105,59 @@ class CaseRequirementsSnapshot(Base):
     created_at = Column(DateTime, nullable=False)
     snapshot_json = Column(Text, nullable=False)
     sources_json = Column(Text, nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Supplier Registry (source of truth for recommendations + RFQ)
+# ---------------------------------------------------------------------------
+
+class Supplier(Base):
+    __tablename__ = "suppliers"
+
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    legal_name = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="active", index=True)
+    description = Column(Text, nullable=True)
+    website = Column(String, nullable=True)
+    contact_email = Column(String, nullable=True)
+    contact_phone = Column(String, nullable=True)
+    languages_supported = Column(Text, nullable=True)  # JSON array as string
+    verified = Column(Boolean, nullable=False, default=False)
+    vendor_id = Column(String, nullable=True)  # FK to vendors.id for RFQ
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class SupplierServiceCapability(Base):
+    __tablename__ = "supplier_service_capabilities"
+
+    id = Column(String, primary_key=True, index=True)
+    supplier_id = Column(String, ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False, index=True)
+    service_category = Column(String, nullable=False, index=True)
+    coverage_scope_type = Column(String, nullable=False, default="country")
+    country_code = Column(String, nullable=True, index=True)
+    city_name = Column(String, nullable=True, index=True)
+    specialization_tags = Column(Text, nullable=True)  # JSON array
+    min_budget = Column(Numeric, nullable=True)
+    max_budget = Column(Numeric, nullable=True)
+    family_support = Column(Boolean, nullable=False, default=False)
+    corporate_clients = Column(Boolean, nullable=False, default=False)
+    remote_support = Column(Boolean, nullable=False, default=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class SupplierScoringMetadata(Base):
+    __tablename__ = "supplier_scoring_metadata"
+
+    supplier_id = Column(String, ForeignKey("suppliers.id", ondelete="CASCADE"), primary_key=True)
+    average_rating = Column(Float, nullable=True)
+    review_count = Column(Integer, nullable=False, default=0)
+    response_sla_hours = Column(Integer, nullable=True)
+    preferred_partner = Column(Boolean, nullable=False, default=False)
+    premium_partner = Column(Boolean, nullable=False, default=False)
+    last_verified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

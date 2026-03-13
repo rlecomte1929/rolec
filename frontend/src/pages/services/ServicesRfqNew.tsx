@@ -84,8 +84,8 @@ export const ServicesRfqNew: React.FC = () => {
                   service_key: service,
                   requirements: { note: notes[vendor.item_id] || '' },
                 }));
-                const vendorIds = shortlisted.map(({ vendor }) => vendor.item_id);
-                await servicesAPI.createRfq(caseId, items, vendorIds);
+                const supplierIds = shortlisted.map(({ vendor }) => vendor.item_id);
+                await servicesAPI.createRfq(caseId, items, supplierIds);
                 navigate('/quotes');
               } catch (err: any) {
                 setError(err?.response?.data?.detail || err?.message || 'Unable to send RFQ');

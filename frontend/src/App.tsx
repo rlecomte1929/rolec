@@ -26,6 +26,9 @@ import { AdminCompanies } from './pages/admin/AdminCompanies';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminRelocations } from './pages/admin/AdminRelocations';
 import { AdminSupport } from './pages/admin/AdminSupport';
+import { AdminSuppliers } from './pages/admin/AdminSuppliers';
+import { AdminSupplierNew } from './pages/admin/AdminSupplierNew';
+import { AdminSupplierDetail } from './pages/admin/AdminSupplierDetail';
 import { AdminCompanyDetail } from './pages/admin/AdminCompanyDetail';
 import { AdminResearch } from './pages/admin/AdminResearch';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
@@ -74,6 +77,7 @@ import { ServicesEstimate } from './pages/services/ServicesEstimate';
 import { ServicesRfqNew } from './pages/services/ServicesRfqNew';
 import { ServicesConclusion } from './pages/services/ServicesConclusion';
 import { QuotesInbox } from './pages/services/QuotesInbox';
+import { QuoteRfqDetail } from './pages/services/QuoteRfqDetail';
 import { VendorInbox } from './pages/vendor/VendorInbox';
 import { VendorRfq } from './pages/vendor/VendorRfq';
 import { HrCompanyProfile } from './pages/HrCompanyProfile';
@@ -151,6 +155,7 @@ function App() {
         <Route path={ROUTE_DEFS.servicesRfqNew.path} element={<ServicesRfqNew />} />
         <Route path={ROUTE_DEFS.servicesConclusion.path} element={<ServicesConclusion />} />
         <Route path={ROUTE_DEFS.quotesInbox.path} element={<QuotesInbox />} />
+        <Route path={ROUTE_DEFS.quoteRfqDetail.path} element={<QuoteRfqDetail />} />
         <Route path={ROUTE_DEFS.vendorInbox.path} element={<VendorInbox />} />
         <Route path={ROUTE_DEFS.vendorRfq.path} element={<VendorRfq />} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
@@ -169,6 +174,9 @@ function App() {
         <Route path={ROUTE_DEFS.adminUsers.path} element={<RequireAdminRoute><AdminUsers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRelocations.path} element={<RequireAdminRoute><AdminRelocations /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><AdminSupport /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminSuppliersNew.path} element={<RequireAdminRoute><AdminSupplierNew /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminSuppliersDetail.path} element={<RequireAdminRoute><AdminSupplierDetail /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResources.path} element={<RequireAdminRoute><AdminResources /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResourcesNew.path} element={<RequireAdminRoute><AdminResourceEditor /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResourcesEdit.path} element={<RequireAdminRoute><AdminResourceEditor /></RequireAdminRoute>} />

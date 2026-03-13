@@ -6,24 +6,16 @@ import { DynamicServicesQuestionnaire, validateDynamicAnswers, type DynamicQuest
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { logServicesWorkflow } from '../../features/services/servicesWorkflowInstrumentation';
 import { useServicesWorkflowState } from '../../features/services/useServicesWorkflowState';
-import { employeeAPI, servicesAPI } from '../../api/client';
+import { servicesAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { ROUTE_DEFS } from '../../navigation/routes';
-import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import type { ServiceKey } from '../../features/services/serviceConfig';
 import { recommendationsEngineAPI } from '../../features/recommendations/api';
 
 const SERVICES_QUESTIONS_PATH = ROUTE_DEFS.servicesQuestions.path;
 
-function mergeRecords(
-  prev: Record<string, unknown>,
-  next: Record<string, unknown>
-): Record<string, unknown> {
-  return { ...prev, ...next };
-}
-
-/** Build initial answers from case (draft + top-level columns) for consistency. */
+/** Build initial answers from case context for consistency. */
 function caseToInitialAnswers(
   draft: Record<string, unknown> | null,
   caseTopLevel?: { destCity?: string; destCountry?: string; originCity?: string; originCountry?: string }
@@ -90,80 +82,7 @@ export const ServicesQuestions: React.FC = () => {
     [wizardServices]
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!assignmentId) return;
-    employeeAPI
-      .getAssignmentServices(assignmentId)
-      .then((res) => {
-        if (!cancelled) {
-          setCaseId(res.case_id || null);
-          // Sync selected services from API (e.g. when visiting /questions directly)
-          const selected = new Set(
-            (res.services || []).filter((r) => r.selected).map((r) => r.service_key as ServiceKey)
-          );
-          if (selected.size > 0) setSelectedServices(selected);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setCaseId(null);
-      });
-    return () => { cancelled = true; };
-  }, [assignmentId, setSelectedServices]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!assignmentId) return;
-    getCaseDetailsByAssignmentId(assignmentId)
-      .then(({ data, error }) => {
-        if (cancelled || error || !data?.case) return;
-        const caseData = data.case;
-        const basics = (caseData.draft as unknown as Record<string, unknown>)?.relocationBasics as Record<string, unknown> | undefined;
-        const destCity = (caseData.destCity ?? basics?.destCity ?? basics?.destCountry ?? '') as string;
-        const destCountry = (caseData.destCountry ?? basics?.destCountry ?? '') as string;
-        setCaseContext({ destCity: destCity || undefined, destCountry: destCountry || undefined });
-        const topLevel = {
-          destCity: destCity || caseData.destCity,
-          destCountry: destCountry || caseData.destCountry,
-          originCity: caseData.originCity,
-          originCountry: caseData.originCountry,
-        };
-        const fromCase = caseToInitialAnswers((caseData.draft as unknown as Record<string, unknown>) || null, topLevel);
-        (setInitialAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)((prev) => mergeRecords(prev, fromCase));
-        (setAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)((prev) => mergeRecords(prev, fromCase));
-        if (!cancelled) setCaseDetailsLoaded(true);
-      })
-      .catch(() => {
-        if (!cancelled) setCaseDetailsLoaded(true);
-      });
-    return () => { cancelled = true; };
-  }, [assignmentId, setAnswers]);
-
-  // Load saved service answers on mount
-  useEffect(() => {
-    let cancelled = false;
-    if (!assignmentId) return;
-    servicesAPI
-      .getServiceAnswers({ assignmentId })
-      .then((res) => {
-        if (cancelled || !res?.answers?.length) return;
-        const merged: Record<string, unknown> = {};
-        for (const row of res.answers) {
-          const ans = row.answers || {};
-          for (const [k, v] of Object.entries(ans)) {
-            if (v !== undefined) merged[k] = v;
-          }
-        }
-        if (Object.keys(merged).length > 0) {
-          (setInitialAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)((prev) => mergeRecords(prev, merged));
-          (setAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)((prev) => mergeRecords(prev, merged));
-        }
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [assignmentId, setAnswers]);
-
-  // Load dynamic questions from backend (source of truth)
+  // Single combined load: assignment, case, services, answers, questions (replaces 4 separate requests)
   useEffect(() => {
     let cancelled = false;
     if (!assignmentId) return;
@@ -171,23 +90,42 @@ export const ServicesQuestions: React.FC = () => {
     setQuestionsError(null);
     const fallback = Array.from(wizardServices);
     servicesAPI
-      .getServiceQuestions(assignmentId, fallback.length ? fallback : undefined)
+      .getServicesContext(assignmentId, fallback.length ? fallback : undefined)
       .then((res) => {
         if (cancelled) return;
-        const qs = (res?.questions || []) as DynamicQuestion[];
-        setQuestions(qs);
-        const selected = new Set((res?.selected_services || []) as ServiceKey[]);
+        setCaseId(res.case_id || null);
+        const selected = new Set((res.selected_services || []) as ServiceKey[]);
         if (selected.size > 0) setSelectedServices(selected);
-        // Prefill defaults into local draft without overwriting user edits
-        setAnswers((prev) => {
-          const next = { ...prev };
-          for (const q of qs) {
-            if (next[q.question_key] === undefined && q.default !== undefined) {
-              next[q.question_key] = q.default;
-            }
-          }
-          return next;
+
+        const ctx = res.case_context || {};
+        const destCity = (ctx.destCity ?? ctx.destCountry ?? '') as string;
+        const destCountry = (ctx.destCountry ?? '') as string;
+        setCaseContext({ destCity: destCity || undefined, destCountry: destCountry || undefined });
+
+        const fromCase = caseToInitialAnswers(null, {
+          destCity,
+          destCountry,
+          originCity: ctx.originCity,
+          originCountry: ctx.originCountry,
         });
+        const merged: Record<string, unknown> = { ...fromCase };
+        for (const row of res.answers || []) {
+          const ans = row.answers || {};
+          for (const [k, v] of Object.entries(ans)) {
+            if (v !== undefined) merged[k] = v;
+          }
+        }
+        const qs = (res.questions || []) as DynamicQuestion[];
+        const withDefaults = { ...merged };
+        for (const q of qs) {
+          if (withDefaults[q.question_key] === undefined && q.default !== undefined) {
+            withDefaults[q.question_key] = q.default;
+          }
+        }
+        (setInitialAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)(() => merged);
+        (setAnswers as React.Dispatch<React.SetStateAction<Record<string, unknown>>>)(() => withDefaults);
+        setQuestions(qs);
+        setCaseDetailsLoaded(true);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -195,7 +133,7 @@ export const ServicesQuestions: React.FC = () => {
           err && typeof err === 'object' && 'response' in err
             ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
             : (err as Error)?.message;
-        setQuestionsError(String(msg || 'Failed to load questions'));
+        setQuestionsError(String(msg || 'Failed to load services context'));
       })
       .finally(() => {
         if (!cancelled) setQuestionsLoading(false);

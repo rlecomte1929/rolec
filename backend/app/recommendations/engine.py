@@ -4,13 +4,48 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
+from .explanation import build_explanation
 from .registry import get_plugin
 from .types import (
-    AvailabilityLevel,
+    RecommendationExplanation,
     RecommendationItem,
     RecommendationResponse,
     RecommendationTier,
 )
+
+
+def _load_dataset_with_registry(category: str, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Load dataset from plugin JSON, optionally merged with Supplier Registry items."""
+    plugin = get_plugin(category)
+    dataset = plugin.load_dataset() if plugin else []
+
+    # Optionally merge registry-backed suppliers (when registry has data)
+    try:
+        from ..db import SessionLocal
+        from ..services.supplier_registry import search_by_service_destination
+
+        dest_city = (criteria.get("destination_city") or "").strip()
+        dest_country = (criteria.get("destination_country") or "").strip()
+        if dest_city or dest_country:
+            with SessionLocal() as session:
+                registry_items = search_by_service_destination(
+                    session,
+                    service_category=category,
+                    destination_city=dest_city or None,
+                    destination_country=dest_country or None,
+                    limit=50,
+                )
+                if registry_items:
+                    # Prepend registry items; they will be scored by plugin (minimal shape supported)
+                    existing_ids = {str((d.get("item_id") or "")) for d in dataset}
+                    for r in registry_items:
+                        if str(r.get("item_id", "")) not in existing_ids:
+                            dataset.insert(0, r)
+                            existing_ids.add(str(r.get("item_id", "")))
+    except Exception:
+        pass  # Registry optional; fall back to JSON only
+
+    return dataset
 
 
 def recommend(
@@ -24,7 +59,7 @@ def recommend(
         raise ValueError(f"Unknown category: {category}")
 
     criteria_obj = plugin.validate_and_parse(criteria)
-    dataset = plugin.load_dataset()
+    dataset = _load_dataset_with_registry(category, criteria)
 
     scored_items: List[Dict[str, Any]] = []
     for item in dataset:
@@ -57,10 +92,9 @@ def recommend(
     for t in top:
         item = t["item"]
         avail = t.get("metadata", {}).get("availability_level", "high")
-        try:
-            avail_enum = AvailabilityLevel(avail) if avail else AvailabilityLevel.MEDIUM
-        except ValueError:
-            avail_enum = AvailabilityLevel.MEDIUM
+
+        expl_dict = build_explanation(item, t, criteria, category)
+        explanation = RecommendationExplanation(**expl_dict)
 
         rec = RecommendationItem(
             item_id=item.get("item_id", ""),
@@ -76,6 +110,7 @@ def recommend(
                 **(t.get("metadata") or {}),
                 "availability_level": avail,
             },
+            explanation=explanation,
         )
         items.append(rec)
 

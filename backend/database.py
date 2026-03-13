@@ -938,6 +938,7 @@ class Database:
                     ("case_services", "canonical_case_id", "TEXT"),
                     ("case_service_answers", "canonical_case_id", "TEXT"),
                     ("rfqs", "canonical_case_id", "TEXT"),
+                    ("quotes", "created_by_user_id", "TEXT"),
                 ]
                 for tbl, col, typ in cc_cols:
                     try:
@@ -954,6 +955,7 @@ class Database:
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_first_name TEXT"))
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_last_name TEXT"))
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS canonical_case_id TEXT"))
+                conn.execute(text("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS created_by_user_id TEXT"))
             try:
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS relocation_tasks (
@@ -1023,6 +1025,53 @@ class Database:
                         conn.execute(text("ALTER TABLE case_evidence ADD COLUMN canonical_case_id TEXT"))
                 except Exception:
                     pass
+            # Timeline: case_milestones + milestone_links
+            if _is_sqlite:
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS case_milestones (
+                            id TEXT PRIMARY KEY,
+                            case_id TEXT NOT NULL,
+                            canonical_case_id TEXT,
+                            milestone_type TEXT NOT NULL,
+                            title TEXT NOT NULL,
+                            description TEXT,
+                            target_date TEXT,
+                            actual_date TEXT,
+                            status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','in_progress','done','skipped','overdue')),
+                            sort_order INTEGER NOT NULL DEFAULT 0,
+                            created_at TEXT NOT NULL,
+                            updated_at TEXT NOT NULL
+                        )
+                    """))
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS milestone_links (
+                            id TEXT PRIMARY KEY,
+                            milestone_id TEXT NOT NULL,
+                            linked_entity_type TEXT NOT NULL,
+                            linked_entity_id TEXT NOT NULL,
+                            created_at TEXT NOT NULL
+                        )
+                    """))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_case_milestones_case ON case_milestones(case_id)"))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_case_milestones_canonical ON case_milestones(canonical_case_id)"))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_milestone_links_milestone ON milestone_links(milestone_id)"))
+                except Exception:
+                    pass
+            # Analytics: workflow events for observability
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS analytics_events (
+                        id TEXT PRIMARY KEY,
+                        event_name TEXT NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )
+                """))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_analytics_events_name ON analytics_events(event_name)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(created_at)"))
+            except Exception:
+                pass
 
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
@@ -1566,6 +1615,241 @@ class Database:
             ).fetchall()
         return self._rows_to_list(rows)
 
+    # ------------------------------------------------------------------
+    # Case milestones (timeline workflow)
+    # ------------------------------------------------------------------
+    def list_case_milestones(
+        self, case_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List case_milestones for a case, ordered by sort_order then created_at."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                """SELECT id, case_id, canonical_case_id, milestone_type, title, description,
+                   target_date, actual_date, status, sort_order, created_at, updated_at
+                   FROM case_milestones
+                   WHERE (canonical_case_id = :cid OR case_id = :cid)
+                   ORDER BY sort_order ASC, created_at ASC""",
+                {"cid": cid},
+                op_name="list_case_milestones",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def upsert_case_milestone(
+        self,
+        case_id: str,
+        milestone_type: str,
+        title: str,
+        *,
+        description: Optional[str] = None,
+        target_date: Optional[str] = None,
+        actual_date: Optional[str] = None,
+        status: str = "pending",
+        sort_order: int = 0,
+        milestone_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create or update a milestone. If milestone_id given, update; else create."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        now = datetime.utcnow().isoformat()
+        if milestone_id:
+            with self.engine.begin() as conn:
+                self._exec(
+                    conn,
+                    """UPDATE case_milestones SET
+                       title = :title, description = :desc, target_date = :td, actual_date = :ad,
+                       status = :status, sort_order = :so, updated_at = :now
+                       WHERE id = :id AND (canonical_case_id = :cid OR case_id = :cid)""",
+                    {
+                        "id": milestone_id,
+                        "cid": cid,
+                        "title": title,
+                        "desc": description,
+                        "td": target_date,
+                        "ad": actual_date,
+                        "status": status,
+                        "so": sort_order,
+                        "now": now,
+                    },
+                    op_name="update_case_milestone",
+                    request_id=request_id,
+                )
+            with self.engine.connect() as conn:
+                row = self._exec(
+                    conn,
+                    "SELECT * FROM case_milestones WHERE id = :id",
+                    {"id": milestone_id},
+                    op_name="get_milestone",
+                    request_id=request_id,
+                ).fetchone()
+            return self._row_to_dict(row) or {}
+        mid = str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                """INSERT INTO case_milestones
+                   (id, case_id, canonical_case_id, milestone_type, title, description, target_date, actual_date, status, sort_order, created_at, updated_at)
+                   VALUES (:id, :cid, :canonical, :mt, :title, :desc, :td, :ad, :status, :so, :now, :now)""",
+                {
+                    "id": mid,
+                    "cid": case_id,
+                    "canonical": cid,
+                    "mt": milestone_type,
+                    "title": title,
+                    "desc": description,
+                    "td": target_date,
+                    "ad": actual_date,
+                    "status": status,
+                    "so": sort_order,
+                    "now": now,
+                },
+                op_name="insert_case_milestone",
+                request_id=request_id,
+            )
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM case_milestones WHERE id = :id",
+                {"id": mid},
+                op_name="get_milestone",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row) or {}
+
+    def link_milestone_entity(
+        self,
+        milestone_id: str,
+        linked_entity_type: str,
+        linked_entity_id: str,
+        request_id: Optional[str] = None,
+    ) -> None:
+        """Add a link from milestone to an entity (evidence, event, rfq, service, etc.)."""
+        link_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                "INSERT INTO milestone_links (id, milestone_id, linked_entity_type, linked_entity_id, created_at) "
+                "VALUES (:id, :mid, :et, :eid, :now)",
+                {
+                    "id": link_id,
+                    "mid": milestone_id,
+                    "et": linked_entity_type,
+                    "eid": linked_entity_id,
+                    "now": now,
+                },
+                op_name="link_milestone_entity",
+                request_id=request_id,
+            )
+
+    def list_milestone_links(
+        self, milestone_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List links for a milestone."""
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT id, milestone_id, linked_entity_type, linked_entity_id, created_at FROM milestone_links WHERE milestone_id = :mid",
+                {"mid": milestone_id},
+                op_name="list_milestone_links",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    # ------------------------------------------------------------------
+    # Analytics events (observability)
+    # ------------------------------------------------------------------
+    def insert_analytics_event(
+        self, event_name: str, payload: Dict[str, Any], request_id: Optional[str] = None
+    ) -> None:
+        """Insert an analytics event. Table may not exist in Postgres (use migration)."""
+        event_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        payload_json = json.dumps(payload)
+        try:
+            with self.engine.begin() as conn:
+                self._exec(
+                    conn,
+                    """
+                    INSERT INTO analytics_events (id, event_name, payload_json, created_at)
+                    VALUES (:id, :event_name, :payload_json, :created_at)
+                    """,
+                    {
+                        "id": event_id,
+                        "event_name": event_name,
+                        "payload_json": payload_json,
+                        "created_at": now,
+                    },
+                    op_name="insert_analytics_event",
+                    request_id=request_id,
+                )
+        except Exception as e:
+            log.debug("insert_analytics_event failed (table may not exist): %s", e)
+
+    def list_analytics_events(
+        self,
+        event_name: Optional[str] = None,
+        since: Optional[str] = None,
+        limit: int = 1000,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """List analytics events for reporting. Requires analytics_events table."""
+        try:
+            sql = "SELECT id, event_name, payload_json, created_at FROM analytics_events WHERE 1=1"
+            params: Dict[str, Any] = {}
+            if event_name:
+                sql += " AND event_name = :event_name"
+                params["event_name"] = event_name
+            if since:
+                sql += " AND created_at >= :since"
+                params["since"] = since
+            sql += " ORDER BY created_at DESC LIMIT :limit"
+            params["limit"] = limit
+            with self.engine.connect() as conn:
+                rows = self._exec(
+                    conn, sql, params, op_name="list_analytics_events", request_id=request_id
+                ).fetchall()
+            out = []
+            for r in rows:
+                d = self._row_to_dict(r)
+                if d and "payload_json" in d:
+                    raw = d["payload_json"]
+                    if isinstance(raw, dict):
+                        d["payload"] = raw
+                    else:
+                        try:
+                            d["payload"] = json.loads(raw or "{}")
+                        except Exception:
+                            d["payload"] = {}
+                    del d["payload_json"]
+                out.append(d)
+            return out
+        except Exception as e:
+            log.debug("list_analytics_events failed: %s", e)
+            return []
+
+    def count_analytics_events_by_name(
+        self, since: Optional[str] = None, request_id: Optional[str] = None
+    ) -> Dict[str, int]:
+        """Count events by event_name for admin analytics. Returns {event_name: count}."""
+        try:
+            sql = "SELECT event_name, COUNT(*) as cnt FROM analytics_events WHERE 1=1"
+            params: Dict[str, Any] = {}
+            if since:
+                sql += " AND created_at >= :since"
+                params["since"] = since
+            sql += " GROUP BY event_name"
+            with self.engine.connect() as conn:
+                rows = self._exec(
+                    conn, sql, params, op_name="count_analytics_events", request_id=request_id
+                ).fetchall()
+            return {r[0]: r[1] for r in rows}
+        except Exception as e:
+            log.debug("count_analytics_events_by_name failed: %s", e)
+            return {}
+
     def get_assignment_by_id(self, assignment_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
             row = self._exec(
@@ -1817,6 +2101,214 @@ class Database:
                 request_id=request_id,
             )
         return {"id": rfq_id, "rfq_ref": rfq_ref}
+
+    def list_rfqs_for_case(
+        self, case_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List RFQs for a case with items and recipients."""
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                """SELECT * FROM rfqs
+                   WHERE case_id = :cid OR canonical_case_id = :cid
+                   ORDER BY created_at DESC""",
+                {"cid": cid},
+                op_name="list_rfqs_for_case",
+                request_id=request_id,
+            ).fetchall()
+            rfqs = self._rows_to_list(rows)
+            for rfq in rfqs:
+                rfq["items"] = self._list_rfq_items(conn, rfq["id"])
+                rfq["recipients"] = self._list_rfq_recipients(conn, rfq["id"])
+        return rfqs
+
+    def _list_rfq_items(self, conn, rfq_id: str) -> List[Dict[str, Any]]:
+        rows = conn.execute(
+            text("SELECT * FROM rfq_items WHERE rfq_id = :rfq_id ORDER BY created_at"),
+            {"rfq_id": rfq_id},
+        ).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["requirements"] = self._json_load(item.get("requirements")) or {}
+        return items
+
+    def _list_rfq_recipients(self, conn, rfq_id: str) -> List[Dict[str, Any]]:
+        rows = conn.execute(
+            text("SELECT * FROM rfq_recipients WHERE rfq_id = :rfq_id"),
+            {"rfq_id": rfq_id},
+        ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_rfqs_for_assignment(
+        self, assignment_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List RFQs for an assignment via its case_id."""
+        assignment = self.get_assignment_by_id(assignment_id, request_id=request_id)
+        if not assignment:
+            return []
+        case_id = assignment.get("case_id")
+        if not case_id:
+            return []
+        return self.list_rfqs_for_case(case_id, request_id=request_id)
+
+    def get_rfq(
+        self, rfq_id: str, request_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get single RFQ with items and recipients."""
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM rfqs WHERE id = :id",
+                {"id": rfq_id},
+                op_name="get_rfq",
+                request_id=request_id,
+            ).fetchone()
+        if not row:
+            return None
+        rfq = self._row_to_dict(row)
+        with self.engine.connect() as conn:
+            rfq["items"] = self._list_rfq_items(conn, rfq_id)
+            rfq["recipients"] = self._list_rfq_recipients(conn, rfq_id)
+        return rfq
+
+    def list_quotes_for_rfq(
+        self, rfq_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List quotes for an RFQ with quote_lines."""
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM quotes WHERE rfq_id = :rfq_id ORDER BY created_at DESC",
+                {"rfq_id": rfq_id},
+                op_name="list_quotes_for_rfq",
+                request_id=request_id,
+            ).fetchall()
+            quotes = self._rows_to_list(rows)
+            for q in quotes:
+                line_rows = conn.execute(
+                    text("SELECT * FROM quote_lines WHERE quote_id = :quote_id ORDER BY id"),
+                    {"quote_id": q["id"]},
+                ).fetchall()
+                q["quote_lines"] = self._rows_to_list(line_rows)
+        return quotes
+
+    def create_quote(
+        self,
+        rfq_id: str,
+        vendor_id: str,
+        currency: str,
+        total_amount: float,
+        valid_until: Optional[str],
+        quote_lines: List[Dict[str, Any]],
+        created_by_user_id: Optional[str],
+        request_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a quote with line items."""
+        quote_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                """INSERT INTO quotes (id, rfq_id, vendor_id, currency, total_amount, valid_until, status, created_by_user_id, created_at)
+                   VALUES (:id, :rfq_id, :vendor_id, :currency, :total_amount, :valid_until, :status, :created_by_user_id, :created_at)""",
+                {
+                    "id": quote_id,
+                    "rfq_id": rfq_id,
+                    "vendor_id": vendor_id,
+                    "currency": currency,
+                    "total_amount": total_amount,
+                    "valid_until": valid_until,
+                    "status": "proposed",
+                    "created_by_user_id": created_by_user_id,
+                    "created_at": now,
+                },
+                op_name="create_quote",
+                request_id=request_id,
+            )
+            for line in quote_lines:
+                self._exec(
+                    conn,
+                    """INSERT INTO quote_lines (id, quote_id, label, amount)
+                       VALUES (:id, :quote_id, :label, :amount)""",
+                    {
+                        "id": str(uuid.uuid4()),
+                        "quote_id": quote_id,
+                        "label": line.get("label", ""),
+                        "amount": float(line.get("amount", 0)),
+                    },
+                    op_name="create_quote_line",
+                    request_id=request_id,
+                )
+        return {
+            "id": quote_id,
+            "rfq_id": rfq_id,
+            "vendor_id": vendor_id,
+            "currency": currency,
+            "total_amount": total_amount,
+            "valid_until": valid_until,
+            "status": "proposed",
+        }
+
+    def update_quote_status(
+        self,
+        quote_id: str,
+        status: str,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Update quote status (e.g. accepted, rejected)."""
+        with self.engine.connect() as conn:
+            self._exec(
+                conn,
+                "UPDATE quotes SET status = :status WHERE id = :id",
+                {"status": status, "id": quote_id},
+                op_name="update_quote_status",
+                request_id=request_id,
+            )
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM quotes WHERE id = :id"), {"id": quote_id}
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def list_rfqs_for_vendor(
+        self, vendor_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List RFQs where rfq_recipients.vendor_id = vendor_id."""
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                """SELECT r.* FROM rfqs r
+                   INNER JOIN rfq_recipients rr ON rr.rfq_id = r.id
+                   WHERE rr.vendor_id = :vendor_id
+                   ORDER BY r.created_at DESC""",
+                {"vendor_id": vendor_id},
+                op_name="list_rfqs_for_vendor",
+                request_id=request_id,
+            ).fetchall()
+        rfqs = self._rows_to_list(rows)
+        for rfq in rfqs:
+            with self.engine.connect() as c:
+                rfq["items"] = self._list_rfq_items(c, rfq["id"])
+                rfq["recipients"] = self._list_rfq_recipients(c, rfq["id"])
+        return rfqs
+
+    def get_vendor_for_user(
+        self, user_id: str, request_id: Optional[str] = None
+    ) -> Optional[str]:
+        """Get vendor_id from vendor_users for user_id, or None."""
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT vendor_id FROM vendor_users WHERE user_id = :user_id",
+                {"user_id": user_id},
+                op_name="get_vendor_for_user",
+                request_id=request_id,
+            ).fetchone()
+        if not row:
+            return None
+        d = self._row_to_dict(row)
+        return (d or {}).get("vendor_id")
 
     def get_assignment_for_employee(
         self,

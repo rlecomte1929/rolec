@@ -35,6 +35,7 @@ from .services.dossier import evaluate_applies_if, validate_answer, fetch_search
 from .services.guidance_pack_service import generate_guidance_pack
 from .services.policy_adapter import normalize_policy_caps
 from .services.policy_extractor import extract_policy_from_bytes
+from .services.timeline_service import compute_default_milestones
 from .services.country_resources import (
     build_profile_context,
     get_personalization_hints,
@@ -62,6 +63,7 @@ from .policy_engine import PolicyEngine
 from .app.db import init_db, SessionLocal
 from .app import crud as app_crud
 from .app.seed import seed_demo_cases
+from .app.seed_suppliers import seed_suppliers_from_movers
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
 from .app.routers import admin_resources as admin_resources_router
@@ -70,12 +72,14 @@ from .app.routers import admin_freshness as admin_freshness_router
 from .app.routers import admin_review_queue as admin_review_queue_router
 from .app.routers import admin_notifications as admin_notifications_router
 from .app.routers import admin_ops_analytics as admin_ops_analytics_router
+from .app.routers import admin_workflow_analytics as admin_workflow_analytics_router
 from .app.routers import admin_collaboration as admin_collaboration_router
 from .routes import relocation as relocation_router
 from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
 from .routes import resources as resources_router
 from .app.recommendations.router import router as recommendations_router
+from .app.routers import suppliers as suppliers_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import contextmanager
@@ -104,6 +108,12 @@ log.info("Initializing database schemas...")
 init_db()
 log.info("Seeding demo cases...")
 seed_demo_cases()
+try:
+    n = seed_suppliers_from_movers()
+    if n:
+        log.info("Seeded %d suppliers from movers dataset.", n)
+except Exception as e:
+    log.warning("Supplier seed skipped or failed: %s", e)
 log.info("Startup complete.")
 
 # CORS middleware (include Vite fallback ports 3002–3005 for local dev)
@@ -204,7 +214,9 @@ app.include_router(admin_freshness_router.changes_router, prefix="/api/admin")
 app.include_router(admin_review_queue_router.router, prefix="/api/admin")
 app.include_router(admin_notifications_router.router, prefix="/api/admin")
 app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
+app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
+app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
 app.include_router(recommendations_router)
 app.include_router(relocation_router.router)
@@ -727,6 +739,16 @@ def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> 
     if r in (UserRole.HR.value, UserRole.EMPLOYEE.value):
         return user
     raise HTTPException(status_code=403, detail="HR or Employee only")
+
+
+def require_vendor(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Require user to be a vendor. Returns user dict with vendor_id added. 403 if not a vendor."""
+    vendor_id = db.get_vendor_for_user(user.get("id"))
+    if not vendor_id:
+        raise HTTPException(status_code=403, detail="Vendor access only")
+    user = dict(user)
+    user["vendor_id"] = vendor_id
+    return user
 
 
 class AdminImpersonateRequest(BaseModel):
@@ -2387,7 +2409,21 @@ class RfqItemInput(BaseModel):
 class RfqCreatePayload(BaseModel):
     case_id: str
     items: List[RfqItemInput]
-    vendor_ids: List[str]
+    vendor_ids: Optional[List[str]] = None
+    supplier_ids: Optional[List[str]] = None
+
+
+class QuoteLineInput(BaseModel):
+    label: str
+    amount: float
+
+
+class QuoteCreatePayload(BaseModel):
+    total_amount: float
+    currency: str
+    valid_until: Optional[str] = None
+    status: str = "proposed"
+    quote_lines: List[QuoteLineInput]
 
 
 class PolicyBenefitItem(BaseModel):
@@ -2702,6 +2738,57 @@ def get_case_details_by_assignment(
     }
 
 
+@app.get("/api/assignments/{assignment_id}/timeline")
+def get_assignment_timeline(
+    assignment_id: str,
+    ensure_defaults: bool = Query(False, description="Create default milestones if none exist"),
+    req: Request = None,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """List timeline milestones for the case linked to this assignment. Convenience wrapper."""
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+    request_id = getattr(req.state, "request_id", None) if req else None
+    request_id = request_id or str(uuid.uuid4())
+    milestones = db.list_case_milestones(case_id, request_id=request_id)
+    if ensure_defaults and len(milestones) == 0:
+        services = []
+        try:
+            svc_rows = db.list_case_services(assignment_id, request_id=request_id)
+            services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
+        except Exception:
+            pass
+        draft, target_move_date = {}, None
+        with SessionLocal() as session:
+            case = app_crud.get_case(session, case_id)
+            if case:
+                draft = json.loads(getattr(case, "draft_json", None) or "{}")
+                target_move_date = getattr(case, "target_move_date", None)
+        defaults = compute_default_milestones(
+            case_id=case_id,
+            case_draft=draft,
+            selected_services=services,
+            target_move_date=str(target_move_date) if target_move_date else None,
+        )
+        for m in defaults:
+            db.upsert_case_milestone(
+                case_id=case_id,
+                milestone_type=m["milestone_type"],
+                title=m["title"],
+                description=m.get("description"),
+                target_date=m.get("target_date"),
+                status=m.get("status", "pending"),
+                sort_order=m.get("sort_order", 0),
+                request_id=request_id,
+            )
+        milestones = db.list_case_milestones(case_id, request_id=request_id)
+    for m in milestones:
+        m["links"] = db.list_milestone_links(m["id"], request_id=request_id)
+    return {"case_id": case_id, "assignment_id": assignment_id, "milestones": milestones}
+
+
 # ---------------------------------------------------------------------------
 # Country Resources (personalized by wizard profile)
 # ---------------------------------------------------------------------------
@@ -2862,6 +2949,14 @@ def get_country_resources(
     }
 
 
+def _require_case_access(case_id: str, user: Dict[str, Any]):
+    """Validate user can access case. Returns assignment. Use for RFQ/quote endpoints that have case_id from rfq."""
+    assignment = db.get_assignment_by_case_id(case_id) or db.get_assignment_by_id(case_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return _require_assignment_visibility(assignment["id"], user)
+
+
 def _require_assignment_visibility(
     assignment_id: str,
     user: Dict[str, Any],
@@ -2910,10 +3005,86 @@ def get_assignment_services(
     }
 
 
+@app.get("/api/services/context")
+def get_services_context(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    fallback_services: Optional[str] = Query(None, description="Comma-separated service keys when DB has none"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Combined endpoint: assignment, case context, services, answers, and questions in one round-trip.
+    Reduces 4 requests to 1 for the services questions page.
+    """
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+
+    services = db.list_case_services(assignment["id"])
+    selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
+    if not selected_keys and fallback_services:
+        fallback = [k.strip().lower() for k in fallback_services.split(",") if k.strip()]
+        valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+        selected_keys = [k for k in fallback if k in valid]
+
+    draft = {}
+    dest_city = dest_country = origin_city = origin_country = None
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if case:
+            try:
+                draft = json.loads(case.draft_json or "{}")
+            except Exception:
+                draft = {}
+            dest_city = getattr(case, "dest_city", None)
+            dest_country = getattr(case, "dest_country", None)
+            origin_city = getattr(case, "origin_city", None)
+            origin_country = getattr(case, "origin_country", None)
+    basics = draft.get("relocationBasics") or {}
+    case_context = {
+        "destCity": basics.get("destCity") or dest_city,
+        "destCountry": basics.get("destCountry") or dest_country,
+        "originCity": basics.get("originCity") or origin_city,
+        "originCountry": origin_country or basics.get("originCountry"),
+    }
+
+    saved_rows = db.list_case_service_answers(case_id)
+    saved_flat: Dict[str, Any] = {}
+    for row in saved_rows:
+        ans = row.get("answers") or {}
+        if isinstance(ans, str):
+            try:
+                ans = json.loads(ans)
+            except Exception:
+                ans = {}
+        for k, v in ans.items():
+            if v is not None:
+                saved_flat[k] = v
+
+    questions = []
+    if selected_keys:
+        questions = generate_questions(
+            selected_services=selected_keys,
+            case_context=case_context,
+            saved_answers=saved_flat,
+        )
+
+    return {
+        "assignment_id": assignment["id"],
+        "case_id": case_id,
+        "case_context": case_context,
+        "services": services,
+        "answers": saved_rows,
+        "questions": questions,
+        "selected_services": selected_keys,
+    }
+
+
 @app.post("/api/employee/assignments/{assignment_id}/services")
 def upsert_assignment_services(
     assignment_id: str,
     payload: CaseServicesUpsert,
+    req: Request,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     assignment = _require_assignment_visibility(assignment_id, user)
@@ -2933,6 +3104,21 @@ def upsert_assignment_services(
     try:
         db.upsert_case_services(assignment["id"], case_id, items)
         updated = db.list_case_services(assignment["id"])
+        try:
+            from .services.analytics_service import emit_event, EVENT_SERVICES_SELECTED
+            selected = [s["service_key"] for s in items if s.get("selected")]
+            emit_event(
+                EVENT_SERVICES_SELECTED,
+                request_id=getattr(req.state, "request_id", None),
+                assignment_id=assignment_id,
+                case_id=case_id,
+                user_id=user.get("id"),
+                user_role=user.get("role"),
+                service_categories=selected,
+                counts={"selected": len(selected), "total": len(items)},
+            )
+        except Exception:
+            pass
         return {"ok": True, "services": updated}
     except Exception as e:
         log.warning("upsert_case_services failed for assignment %s: %s", assignment["id"], e, exc_info=True)
@@ -3075,6 +3261,21 @@ def upsert_service_answers(
             "request_id=%s case_id=%s assignment_id=%s services_answers saved dur_ms=%.2f",
             request_id, effective_case_id, assignment_id, dur_ms,
         )
+        try:
+            from .services.analytics_service import emit_event, EVENT_SERVICES_ANSWERS_SAVED
+            emit_event(
+                EVENT_SERVICES_ANSWERS_SAVED,
+                request_id=request_id,
+                assignment_id=assignment_id,
+                case_id=effective_case_id,
+                user_id=user.get("id"),
+                user_role=user.get("role"),
+                duration_ms=dur_ms,
+                service_categories=[i.service_key for i in payload.items],
+                counts={"answers_saved": len(payload.items)},
+            )
+        except Exception:
+            pass
         return {"ok": True}
     except Exception as e:
         dur_ms = (time.perf_counter() - start) * 1000
@@ -3088,17 +3289,238 @@ def upsert_service_answers(
 @app.post("/api/rfqs")
 def create_rfq(
     payload: RfqCreatePayload,
+    req: Request,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     assignment = _require_assignment_visibility(payload.case_id, user)
     effective_case_id = assignment.get("case_id") or payload.case_id
+
+    vendor_ids: List[str] = list(payload.vendor_ids or [])
+    if payload.supplier_ids:
+        from .app.services.rfq_recipient_mapping import resolve_recipient_ids
+        resolved, errors = resolve_recipient_ids(payload.supplier_ids)
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail="; ".join(errors),
+            )
+        vendor_ids = list(resolved)
+    if not vendor_ids:
+        raise HTTPException(status_code=400, detail="At least one vendor_id or supplier_id required")
+
     result = db.create_rfq(
         case_id=effective_case_id,
         creator_user_id=user.get("id"),
         items=[i.model_dump(mode="json") for i in payload.items],
-        vendor_ids=payload.vendor_ids,
+        vendor_ids=vendor_ids,
     )
+    try:
+        from .services.analytics_service import (
+            emit_event,
+            EVENT_RFQ_CREATED,
+            EVENT_SUPPLIER_SELECTED,
+        )
+        req_id = getattr(req.state, "request_id", None)
+        emit_event(
+            EVENT_RFQ_CREATED,
+            request_id=req_id,
+            assignment_id=assignment.get("id"),
+            case_id=effective_case_id,
+            user_id=user.get("id"),
+            user_role=user.get("role"),
+            counts={"items": len(payload.items), "vendors": len(vendor_ids)},
+            extra={"rfq_id": result.get("id"), "rfq_ref": result.get("rfq_ref"), "vendor_ids": vendor_ids},
+        )
+        for vid in vendor_ids:
+            emit_event(
+                EVENT_SUPPLIER_SELECTED,
+                request_id=req_id,
+                assignment_id=assignment.get("id"),
+                case_id=effective_case_id,
+                user_id=user.get("id"),
+                user_role=user.get("role"),
+                extra={"vendor_id": vid, "rfq_id": result.get("id")},
+            )
+    except Exception:
+        pass
     return {"ok": True, "rfq": result}
+
+
+@app.get("/api/employee/assignments/{assignment_id}/rfqs")
+def list_rfqs_for_assignment(
+    assignment_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """List RFQs for an assignment (require_assignment_visibility)."""
+    _ = _require_assignment_visibility(assignment_id, user)
+    request_id = getattr(req.state, "request_id", None)
+    rfqs = db.list_rfqs_for_assignment(assignment_id, request_id=request_id)
+    return {"rfqs": rfqs}
+
+
+@app.get("/api/rfqs/{rfq_id}")
+def get_rfq(
+    rfq_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Get RFQ detail (require case access via rfq.case_id)."""
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    _ = _require_case_access(rfq["case_id"], user)
+    return rfq
+
+
+@app.get("/api/rfqs/{rfq_id}/quotes")
+def list_quotes_for_rfq(
+    rfq_id: str,
+    req: Request,
+    comparison: bool = Query(False, description="Opening quote comparison view"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """List quotes for RFQ (require case access). Emits quote_compared when comparison=1 and 2+ quotes."""
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    _ = _require_case_access(rfq["case_id"], user)
+    quotes = db.list_quotes_for_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if comparison and len(quotes) >= 2:
+        try:
+            from .services.analytics_service import emit_event, EVENT_QUOTE_COMPARED
+            emit_event(
+                EVENT_QUOTE_COMPARED,
+                request_id=getattr(req.state, "request_id", None),
+                case_id=rfq.get("case_id"),
+                user_id=user.get("id"),
+                user_role=user.get("role"),
+                counts={"quotes": len(quotes)},
+                extra={"rfq_id": rfq_id},
+            )
+        except Exception:
+            pass
+    return {"rfq_id": rfq_id, "quotes": quotes}
+
+
+@app.patch("/api/rfqs/{rfq_id}/quotes/{quote_id}/accept")
+def accept_quote(
+    rfq_id: str,
+    quote_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Accept a quote (require case access)."""
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    _ = _require_case_access(rfq["case_id"], user)
+    updated = db.update_quote_status(quote_id, "accepted", request_id=getattr(req.state, "request_id", None))
+    if not updated:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    try:
+        from .services.analytics_service import emit_event, EVENT_QUOTE_ACCEPTED
+        emit_event(
+            EVENT_QUOTE_ACCEPTED,
+            request_id=getattr(req.state, "request_id", None),
+            case_id=rfq.get("case_id"),
+            canonical_case_id=rfq.get("canonical_case_id"),
+            user_id=user.get("id"),
+            user_role=user.get("role"),
+            extra={
+                "rfq_id": rfq_id,
+                "quote_id": quote_id,
+                "vendor_id": updated.get("vendor_id"),
+            },
+        )
+    except Exception:
+        pass
+    return {"ok": True, "quote": updated}
+
+
+# ---------------------------------------------------------------------------
+# Vendor API (RFQs and quotes)
+# ---------------------------------------------------------------------------
+@app.get("/api/vendor/rfqs")
+def list_vendor_rfqs(
+    req: Request,
+    user: Dict[str, Any] = Depends(require_vendor),
+):
+    """List RFQs for current vendor (require_vendor)."""
+    vendor_id = user.get("vendor_id")
+    if not vendor_id:
+        raise HTTPException(status_code=403, detail="Vendor access only")
+    request_id = getattr(req.state, "request_id", None)
+    rfqs = db.list_rfqs_for_vendor(vendor_id, request_id=request_id)
+    return {"rfqs": rfqs}
+
+
+@app.get("/api/vendor/rfqs/{rfq_id}")
+def get_vendor_rfq(
+    rfq_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_vendor),
+):
+    """Get RFQ detail for vendor. Ensures vendor is a recipient."""
+    vendor_id = user.get("vendor_id")
+    if not vendor_id:
+        raise HTTPException(status_code=403, detail="Vendor access only")
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    recipient_vendor_ids = [r.get("vendor_id") for r in rfq.get("recipients", []) if r.get("vendor_id")]
+    if vendor_id not in recipient_vendor_ids:
+        raise HTTPException(status_code=403, detail="Not a recipient of this RFQ")
+    return rfq
+
+
+@app.post("/api/vendor/rfqs/{rfq_id}/quotes")
+def submit_vendor_quote(
+    rfq_id: str,
+    payload: QuoteCreatePayload,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_vendor),
+):
+    """Submit a quote for an RFQ (require_vendor)."""
+    vendor_id = user.get("vendor_id")
+    if not vendor_id:
+        raise HTTPException(status_code=403, detail="Vendor access only")
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    recipient_vendor_ids = [r.get("vendor_id") for r in rfq.get("recipients", []) if r.get("vendor_id")]
+    if vendor_id not in recipient_vendor_ids:
+        raise HTTPException(status_code=403, detail="Not a recipient of this RFQ")
+    request_id = getattr(req.state, "request_id", None)
+    quote_lines = [{"label": ln.label, "amount": ln.amount} for ln in payload.quote_lines]
+    quote = db.create_quote(
+        rfq_id=rfq_id,
+        vendor_id=vendor_id,
+        currency=payload.currency,
+        total_amount=payload.total_amount,
+        valid_until=payload.valid_until,
+        quote_lines=quote_lines,
+        created_by_user_id=user.get("id"),
+        request_id=request_id,
+    )
+    try:
+        from .services.analytics_service import emit_event, EVENT_QUOTE_RECEIVED
+        emit_event(
+            EVENT_QUOTE_RECEIVED,
+            request_id=request_id,
+            case_id=rfq.get("case_id"),
+            canonical_case_id=rfq.get("canonical_case_id"),
+            extra={
+                "rfq_id": rfq_id,
+                "vendor_id": vendor_id,
+                "quote_id": quote.get("id"),
+                "total_amount": payload.total_amount,
+                "currency": payload.currency,
+            },
+        )
+    except Exception:
+        pass
+    return {"ok": True, "quote": quote}
 
 
 @app.get("/api/employee/assignments/{assignment_id}/policy-budget")
@@ -3155,6 +3577,127 @@ def get_case_evidence(
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     items = db.list_case_evidence(case_id, request_id=request_id)
     return {"case_id": case_id, "evidence": items}
+
+
+# ---------------------------------------------------------------------------
+# Timeline (case milestones)
+# ---------------------------------------------------------------------------
+@app.get("/api/cases/{case_id}/timeline")
+def get_case_timeline(
+    case_id: str,
+    req: Request,
+    ensure_defaults: bool = Query(False, description="Create default milestones if none exist"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """List case milestones (timeline). Optionally ensure default set exists."""
+    access = _require_case_access(case_id, user)
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    milestones = db.list_case_milestones(case_id, request_id=request_id)
+
+    if ensure_defaults and len(milestones) == 0:
+        # Compute and persist defaults from case context
+        assignment = access.get("assignment", {})
+        assignment_id = assignment.get("id")
+        services = []
+        if assignment_id:
+            try:
+                svc_rows = db.list_case_services(assignment_id, request_id=request_id)
+                services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
+            except Exception:
+                pass
+        draft = {}
+        target_move_date = None
+        with SessionLocal() as session:
+            case = app_crud.get_case(session, case_id)
+            if case:
+                draft = json.loads(getattr(case, "draft_json", None) or "{}")
+                target_move_date = getattr(case, "target_move_date", None)
+        defaults = compute_default_milestones(
+            case_id=case_id,
+            case_draft=draft,
+            selected_services=services,
+            target_move_date=str(target_move_date) if target_move_date else None,
+        )
+        for m in defaults:
+            db.upsert_case_milestone(
+                case_id=case_id,
+                milestone_type=m["milestone_type"],
+                title=m["title"],
+                description=m.get("description"),
+                target_date=m.get("target_date"),
+                status=m.get("status", "pending"),
+                sort_order=m.get("sort_order", 0),
+                request_id=request_id,
+            )
+        milestones = db.list_case_milestones(case_id, request_id=request_id)
+
+    # Enrich with links
+    for m in milestones:
+        links = db.list_milestone_links(m["id"], request_id=request_id)
+        m["links"] = links
+
+    return {"case_id": case_id, "milestones": milestones}
+
+
+@app.patch("/api/cases/{case_id}/timeline/milestones/{milestone_id}")
+def update_case_milestone(
+    case_id: str,
+    milestone_id: str,
+    req: Request,
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Update a milestone (title, description, target_date, actual_date, status, sort_order)."""
+    _ = _require_case_access(case_id, user)
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    existing = next((m for m in db.list_case_milestones(case_id, request_id=request_id) if m.get("id") == milestone_id), None)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    merged = {
+        "milestone_type": body.get("milestone_type") or existing.get("milestone_type", ""),
+        "title": body.get("title") if body.get("title") is not None else existing.get("title", ""),
+        "description": body.get("description") if "description" in body else existing.get("description"),
+        "target_date": body.get("target_date") if "target_date" in body else existing.get("target_date"),
+        "actual_date": body.get("actual_date") if "actual_date" in body else existing.get("actual_date"),
+        "status": body.get("status") if body.get("status") is not None else existing.get("status", "pending"),
+        "sort_order": body.get("sort_order") if body.get("sort_order") is not None else existing.get("sort_order", 0),
+    }
+    updated = db.upsert_case_milestone(
+        case_id=case_id,
+        milestone_type=merged["milestone_type"],
+        title=merged["title"],
+        description=merged["description"],
+        target_date=merged["target_date"],
+        actual_date=merged["actual_date"],
+        status=merged["status"],
+        sort_order=merged["sort_order"],
+        milestone_id=milestone_id,
+        request_id=request_id,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    links = db.list_milestone_links(milestone_id, request_id=request_id)
+    updated["links"] = links
+    return updated
+
+
+@app.post("/api/cases/{case_id}/timeline/milestones/{milestone_id}/links")
+def add_milestone_link(
+    case_id: str,
+    milestone_id: str,
+    req: Request,
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Link milestone to an entity (evidence, event, rfq, service). Body: { linked_entity_type, linked_entity_id }."""
+    _ = _require_case_access(case_id, user)
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    entity_type = body.get("linked_entity_type")
+    entity_id = body.get("linked_entity_id")
+    if not entity_type or not entity_id:
+        raise HTTPException(status_code=400, detail="linked_entity_type and linked_entity_id required")
+    db.link_milestone_entity(milestone_id, entity_type, entity_id, request_id=request_id)
+    return {"ok": True}
 
 
 @app.get("/api/dossier/questions", response_model=DossierQuestionsResponse)

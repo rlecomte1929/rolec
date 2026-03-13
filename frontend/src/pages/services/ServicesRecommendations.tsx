@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card } from '../../components/antigravity';
 import { RecommendationResults } from '../../features/recommendations/RecommendationResults';
@@ -25,7 +25,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export const ServicesRecommendations: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { recommendations, shortlist, setShortlist } = useServicesFlow();
+  const debugMode = new URLSearchParams(location.search).get('debug') === '1';
 
   if (!recommendations || Object.keys(recommendations).length === 0) {
     return (
@@ -55,6 +57,7 @@ export const ServicesRecommendations: React.FC = () => {
         onSelectedPackageChange={setShortlist}
         onStartOver={() => navigate('/services')}
         onViewSummary={() => navigate('/services/estimate')}
+        debugMode={debugMode}
       />
     </AppShell>
   );

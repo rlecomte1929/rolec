@@ -7,6 +7,7 @@ import { hrReopenAssignment } from '../api/rpc';
 import type { AssignmentDetail, AssignmentStatus } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { CaseTimeline } from '../features/timeline/CaseTimeline';
 
 const statusBadge = (status?: AssignmentStatus) => {
   if (!status) return <Badge variant="neutral">Unknown</Badge>;
@@ -328,6 +329,8 @@ export const HrCaseSummary: React.FC = () => {
               </ul>
             )}
           </Card>
+
+          <CaseTimeline assignmentId={assignment.id} ensureDefaults />
 
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => safeNavigate(navigate, 'hrAssignmentReview', { id: assignment.id })}>

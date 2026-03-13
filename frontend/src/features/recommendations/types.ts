@@ -2,6 +2,19 @@
 export type RecommendationTier = 'best_match' | 'good_fit' | 'ok' | 'weak';
 export type AvailabilityLevel = 'high' | 'medium' | 'low' | 'scarce';
 
+export interface RecommendationExplanation {
+  match_reasons: string[];
+  destination_fit: string;
+  service_fit: string;
+  budget_fit: string;
+  family_fit: string;
+  policy_fit: string;
+  coverage_fit: string;
+  warning_flags: string[];
+  explanation_summary: string;
+  score_dimensions: Record<string, number>;
+}
+
 export interface RecommendationItem {
   item_id: string;
   name: string;
@@ -25,6 +38,7 @@ export interface RecommendationItem {
     cost_type?: 'monthly' | 'annual' | 'one_time';
     map_query?: string;
   };
+  explanation?: RecommendationExplanation;
 }
 
 export interface RecommendationResponse {

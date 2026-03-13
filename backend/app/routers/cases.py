@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Any, Dict
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from ..db import SessionLocal
 from .. import crud, schemas
@@ -73,7 +73,7 @@ def get_case_requirements(case_id: str):
 
 
 @router.post("/{case_id}/create")
-def create_case(case_id: str):
+def create_case(case_id: str, request: Request):
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
@@ -114,6 +114,19 @@ def create_case(case_id: str):
         case.status = "CREATED"
         case.requirements_snapshot_id = snapshot_id
         db.commit()
+
+    try:
+        from ...services.analytics_service import emit_event, EVENT_CASE_CREATED
+        req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+        emit_event(
+            EVENT_CASE_CREATED,
+            request_id=req_id,
+            case_id=case_id,
+            canonical_case_id=case_id,
+            extra={"requirementsSnapshotId": snapshot_id},
+        )
+    except Exception:
+        pass
 
     return {"createdCaseId": case_id, "requirementsSnapshotId": snapshot_id}
 

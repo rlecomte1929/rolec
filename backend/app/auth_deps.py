@@ -69,6 +69,13 @@ def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> 
     raise HTTPException(status_code=403, detail="HR or Employee only")
 
 
+def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Admin only."""
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+    return user
+
+
 def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = None) -> Dict[str, Any]:
     imp = user.get("impersonation")
     if not imp:
@@ -79,6 +86,16 @@ def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = No
     if expected_role and target.get("role") != expected_role.value:
         return user
     return target
+
+
+def require_vendor(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Require user to be a vendor. Returns user dict with vendor_id added. 403 if not a vendor."""
+    vendor_id = db.get_vendor_for_user(user.get("id"))
+    if not vendor_id:
+        raise HTTPException(status_code=403, detail="Vendor access only")
+    user = dict(user)
+    user["vendor_id"] = vendor_id
+    return user
 
 
 def require_assignment_visibility(assignment_id: str, user: Dict[str, Any]) -> Dict[str, Any]:

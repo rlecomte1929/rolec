@@ -5,6 +5,7 @@ import json
 import logging
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
@@ -111,30 +112,55 @@ def post_recommendations_batch(
         policy_context=policy_context,
     )
 
-    results: Dict[str, Any] = {}
-    for backend_key, criteria in criteria_map.items():
+    def _run_one(backend_key: str, criteria: Dict[str, Any]) -> tuple[str, Any | None]:
         dest_city_val = (criteria.get("destination_city") or "").strip()
         if backend_key in ("living_areas", "schools", "movers") and not dest_city_val:
             log.warning(
                 "request_id=%s category=%s recommendations_batch skipped_missing_destination",
                 request_id, backend_key,
             )
-            continue
+            return (backend_key, None)
         try:
-            rec_result = recommend(backend_key, criteria, top_n=10)
-            results[backend_key] = rec_result
+            return (backend_key, recommend(backend_key, criteria, top_n=10))
         except Exception as e:
             log.warning(
                 "request_id=%s category=%s recommendations_batch failed error=%s",
                 request_id, backend_key, str(e),
             )
-            continue
+            return (backend_key, None)
+
+    results: Dict[str, Any] = {}
+    with ThreadPoolExecutor(max_workers=min(6, len(criteria_map) or 1)) as ex:
+        futures = {
+            ex.submit(_run_one, backend_key, criteria): backend_key
+            for backend_key, criteria in criteria_map.items()
+        }
+        for future in as_completed(futures):
+            key, rec_result = future.result()
+            if rec_result is not None:
+                results[key] = rec_result
 
     dur_ms = (time.perf_counter() - start) * 1000
     log.info(
         "request_id=%s assignment_id=%s services=%s recommendations_batch succeeded dur_ms=%.2f",
         request_id, req.assignment_id, list(results.keys()), dur_ms,
     )
+    try:
+        from ...services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
+        total_count = sum(len(r.get("items", [])) for r in results.values())
+        emit_event(
+            EVENT_RECOMMENDATIONS_GENERATED,
+            request_id=request_id,
+            assignment_id=req.assignment_id,
+            case_id=case_id,
+            user_id=user.get("id"),
+            user_role=user.get("role"),
+            duration_ms=dur_ms,
+            service_categories=list(results.keys()),
+            counts={"categories": len(results), "items": total_count},
+        )
+    except Exception:
+        pass
     return {"results": results}
 
 
@@ -192,6 +218,19 @@ def post_recommend(category: str, body: Dict[str, Any], request: Request):
             "request_id=%s category=%s dest_city=%s recommendations_load succeeded dur_ms=%.2f",
             request_id, category, dest or "(none)", dur_ms,
         )
+        try:
+            from ...services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
+            items = result.get("items", []) if isinstance(result, dict) else []
+            emit_event(
+                EVENT_RECOMMENDATIONS_GENERATED,
+                request_id=request_id,
+                duration_ms=dur_ms,
+                service_categories=[category],
+                counts={"items": len(items)},
+                extra={"destination_city": dest or None},
+            )
+        except Exception:
+            pass
         return result
     except Exception as e:
         dur_ms = (time.perf_counter() - start) * 1000

@@ -517,6 +517,75 @@ export const adminAPI = {
   },
 };
 
+// Supplier Registry API (admin)
+export const suppliersAPI = {
+  list: async (params?: {
+    status?: string;
+    service_category?: string;
+    country_code?: string;
+    city_name?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const response = await api.get('/api/suppliers', { params: params || {} });
+    return response.data;
+  },
+  get: async (supplierId: string) => {
+    const response = await api.get(`/api/suppliers/${supplierId}`);
+    return response.data;
+  },
+  search: async (params: {
+    service_category: string;
+    destination_country?: string;
+    destination_city?: string;
+    limit?: number;
+  }) => {
+    const response = await api.get('/api/suppliers/search', { params });
+    return response.data;
+  },
+  getCategories: async () => {
+    const response = await api.get('/api/suppliers/categories');
+    return response.data;
+  },
+  create: async (payload: Record<string, unknown>) => {
+    const response = await api.post('/api/suppliers', payload);
+    return response.data;
+  },
+  update: async (supplierId: string, payload: Record<string, unknown>) => {
+    const response = await api.patch(`/api/suppliers/${supplierId}`, payload);
+    return response.data;
+  },
+  setStatus: async (supplierId: string, status: 'active' | 'inactive' | 'draft') => {
+    const response = await api.patch(`/api/suppliers/${supplierId}/status`, { status });
+    return response.data;
+  },
+  addCapability: async (supplierId: string, payload: Record<string, unknown>) => {
+    const response = await api.post(`/api/suppliers/${supplierId}/capabilities`, payload);
+    return response.data;
+  },
+  updateCapability: async (
+    supplierId: string,
+    capabilityId: string,
+    payload: Record<string, unknown>
+  ) => {
+    const response = await api.patch(
+      `/api/suppliers/${supplierId}/capabilities/${capabilityId}`,
+      payload
+    );
+    return response.data;
+  },
+  removeCapability: async (supplierId: string, capabilityId: string) => {
+    const response = await api.delete(
+      `/api/suppliers/${supplierId}/capabilities/${capabilityId}`
+    );
+    return response.data;
+  },
+  updateScoring: async (supplierId: string, payload: Record<string, unknown>) => {
+    const response = await api.patch(`/api/suppliers/${supplierId}/scoring`, payload);
+    return response.data;
+  },
+};
+
 // Admin Resources CMS API
 export const adminResourcesAPI = {
   getCounts: async () => api.get('/api/admin/resources/counts').then((r) => r.data),
@@ -958,6 +1027,26 @@ export const employeeAPI = {
 };
 
 export const servicesAPI = {
+  /** Combined load: assignment, case context, services, answers, questions in one request. Use instead of 4 separate calls. */
+  getServicesContext: async (
+    assignmentId: string,
+    fallbackServices?: string[]
+  ): Promise<{
+    assignment_id: string;
+    case_id: string;
+    case_context: { destCity?: string; destCountry?: string; originCity?: string; originCountry?: string };
+    services: Array<{ service_key: string; selected: boolean | number; [k: string]: any }>;
+    answers: Array<{ service_key: string; answers: Record<string, any> }>;
+    questions: any[];
+    selected_services: string[];
+  }> => {
+    const params: Record<string, string> = { assignment_id: assignmentId };
+    if (fallbackServices?.length) {
+      params.fallback_services = fallbackServices.join(',');
+    }
+    const response = await api.get('/api/services/context', { params });
+    return response.data;
+  },
   getServiceAnswers: async (params: { caseId?: string; assignmentId?: string }): Promise<{ case_id: string; answers: any[] }> => {
     const p = params.caseId ? { case_id: params.caseId } : { assignment_id: params.assignmentId };
     const response = await api.get('/api/services/answers', { params: p });
@@ -986,12 +1075,128 @@ export const servicesAPI = {
   createRfq: async (
     caseId: string,
     items: Array<{ service_key: string; requirements: Record<string, any> }>,
-    vendorIds: string[]
+    supplierIds: string[]
   ): Promise<{ ok: boolean; rfq: { id: string; rfq_ref: string } }> => {
-    const response = await api.post('/api/rfqs', { case_id: caseId, items, vendor_ids: vendorIds });
+    const response = await api.post('/api/rfqs', { case_id: caseId, items, supplier_ids: supplierIds });
     return response.data;
   },
 };
+
+export const rfqAPI = {
+  listByAssignment: async (assignmentId: string): Promise<{ rfqs: RfqSummary[] }> => {
+    const response = await api.get(`/api/employee/assignments/${assignmentId}/rfqs`);
+    return response.data;
+  },
+  get: async (rfqId: string): Promise<RfqDetail> => {
+    const response = await api.get(`/api/rfqs/${rfqId}`);
+    return response.data;
+  },
+  listQuotes: async (
+    rfqId: string,
+    options?: { comparison?: boolean }
+  ): Promise<{ rfq_id: string; quotes: QuoteDetail[] }> => {
+    const params = options?.comparison ? { comparison: '1' } : {};
+    const response = await api.get(`/api/rfqs/${rfqId}/quotes`, { params });
+    return response.data;
+  },
+  acceptQuote: async (rfqId: string, quoteId: string): Promise<{ ok: boolean; quote: QuoteDetail }> => {
+    const response = await api.patch(`/api/rfqs/${rfqId}/quotes/${quoteId}/accept`);
+    return response.data;
+  },
+};
+
+export const vendorAPI = {
+  listRfqs: async (): Promise<{ rfqs: RfqSummary[] }> => {
+    const response = await api.get('/api/vendor/rfqs');
+    return response.data;
+  },
+  getRfq: async (rfqId: string): Promise<RfqDetail> => {
+    const response = await api.get(`/api/vendor/rfqs/${rfqId}`);
+    return response.data;
+  },
+  submitQuote: async (
+    rfqId: string,
+    payload: QuoteCreatePayload
+  ): Promise<{ ok: boolean; quote: QuoteDetail }> => {
+    const response = await api.post(`/api/vendor/rfqs/${rfqId}/quotes`, payload);
+    return response.data;
+  },
+};
+
+export interface RfqSummary {
+  id: string;
+  rfq_ref: string;
+  case_id: string;
+  status: string;
+  created_at: string;
+  items?: Array<{ service_key: string; requirements: Record<string, unknown> }>;
+  recipients?: Array<{ vendor_id: string; status: string }>;
+}
+
+export interface RfqDetail extends RfqSummary {
+  items: Array<{ service_key: string; requirements: Record<string, unknown> }>;
+  recipients: Array<{ vendor_id: string; status: string }>;
+}
+
+export interface QuoteDetail {
+  id: string;
+  rfq_id: string;
+  vendor_id: string;
+  currency: string;
+  total_amount: number;
+  valid_until?: string;
+  status: string;
+  quote_lines?: Array<{ label: string; amount: number }>;
+}
+
+export interface QuoteCreatePayload {
+  total_amount: number;
+  currency: string;
+  valid_until?: string;
+  quote_lines: Array<{ label: string; amount: number }>;
+}
+
+export const timelineAPI = {
+  getByAssignment: async (
+    assignmentId: string,
+    options?: { ensureDefaults?: boolean }
+  ): Promise<{ case_id: string; assignment_id: string; milestones: TimelineMilestone[] }> => {
+    const params = options?.ensureDefaults ? { ensure_defaults: '1' } : {};
+    const response = await api.get(`/api/assignments/${assignmentId}/timeline`, { params });
+    return response.data;
+  },
+  getByCase: async (
+    caseId: string,
+    options?: { ensureDefaults?: boolean }
+  ): Promise<{ case_id: string; milestones: TimelineMilestone[] }> => {
+    const params = options?.ensureDefaults ? { ensure_defaults: '1' } : {};
+    const response = await api.get(`/api/cases/${caseId}/timeline`, { params });
+    return response.data;
+  },
+  updateMilestone: async (
+    caseId: string,
+    milestoneId: string,
+    patch: Partial<{ title: string; description: string; target_date: string; actual_date: string; status: string; sort_order: number }>
+  ): Promise<TimelineMilestone> => {
+    const response = await api.patch(`/api/cases/${caseId}/timeline/milestones/${milestoneId}`, patch);
+    return response.data;
+  },
+};
+
+export interface TimelineMilestone {
+  id: string;
+  case_id: string;
+  milestone_type: string;
+  title: string;
+  description?: string;
+  target_date?: string;
+  actual_date?: string;
+  status: string;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+  links?: Array<{ id: string; linked_entity_type: string; linked_entity_id: string }>;
+}
 
 export const hrPolicyAPI = {
   list: async (params?: { status?: string; companyEntity?: string }): Promise<{ policies: any[] }> => {

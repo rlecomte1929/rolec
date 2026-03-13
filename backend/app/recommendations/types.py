@@ -28,6 +28,20 @@ class AvailabilityMetadata(BaseModel):
     notes: Optional[str] = None
 
 
+class RecommendationExplanation(BaseModel):
+    """Structured explanation metadata for each recommendation."""
+    match_reasons: List[str] = Field(default_factory=list)
+    destination_fit: str = "unknown"
+    service_fit: str = "unknown"
+    budget_fit: str = "unknown"
+    family_fit: str = "unknown"
+    policy_fit: str = "unknown"
+    coverage_fit: str = "unknown"
+    warning_flags: List[str] = Field(default_factory=list)
+    explanation_summary: str = ""
+    score_dimensions: Dict[str, float] = Field(default_factory=dict)
+
+
 class RecommendationItem(BaseModel):
     item_id: str
     name: str
@@ -39,6 +53,7 @@ class RecommendationItem(BaseModel):
     pros: List[str] = Field(default_factory=list)
     cons: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    explanation: Optional[RecommendationExplanation] = None
 
 
 class RecommendationResponse(BaseModel):
