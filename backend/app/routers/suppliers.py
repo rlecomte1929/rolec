@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
-from ..auth_deps import require_admin
+from ..auth_deps import require_admin, require_admin_or_hr
 from ..db import SessionLocal
 from ..services.supplier_registry import (
     add_capability,
@@ -37,7 +37,7 @@ def list_service_categories(user: Dict[str, Any] = Depends(require_admin)):
 
 @router.get("", response_model=Dict[str, Any])
 def list_suppliers_api(
-    user: Dict[str, Any] = Depends(require_admin),
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
     status: Optional[str] = Query(None, description="Filter by status"),
     service_category: Optional[str] = Query(None, description="Filter by service category"),
     country_code: Optional[str] = Query(None, description="Filter by country"),
@@ -97,7 +97,7 @@ def create_supplier_api(
 def get_supplier_api(
     supplier_id: str,
     request: Request,
-    user: Dict[str, Any] = Depends(require_admin),
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
 ):
     """Get supplier detail with capabilities and scoring."""
     with SessionLocal() as session:

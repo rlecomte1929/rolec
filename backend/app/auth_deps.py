@@ -76,6 +76,16 @@ def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str,
     return user
 
 
+def require_admin_or_hr(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Admin or HR. Used for read-only access to suppliers (HR picks from approved list)."""
+    r = user.get("role")
+    if r == UserRole.ADMIN.value or user.get("is_admin"):
+        return user
+    if r == UserRole.HR.value:
+        return user
+    raise HTTPException(status_code=403, detail="Admin or HR only")
+
+
 def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = None) -> Dict[str, Any]:
     imp = user.get("impersonation")
     if not imp:
