@@ -37,6 +37,7 @@ export interface RecommendationItem {
     currency?: string;
     cost_type?: 'monthly' | 'annual' | 'one_time';
     map_query?: string;
+    company_preferred?: boolean;
   };
   explanation?: RecommendationExplanation;
 }
