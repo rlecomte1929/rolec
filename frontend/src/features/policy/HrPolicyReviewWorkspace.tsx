@@ -184,15 +184,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     setStatusBusy(true);
     setMessage('');
     try {
-      // Refetch to ensure we have the latest version_id (avoids 404 from stale state)
-      const fresh = await companyPolicyAPI.getNormalized(selectedPolicyId);
-      const versionId = fresh?.version?.id;
-      if (!versionId) {
-        setMessage('No policy version found. Normalize a document first.');
-        setMessageVariant('error');
-        return;
-      }
-      await companyPolicyAPI.patchVersionStatus(selectedPolicyId, versionId, { status });
+      await companyPolicyAPI.patchLatestVersionStatus(selectedPolicyId, { status });
       const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
       setNormalized(res);
       setMessage(STATUS_SUCCESS_LABELS[status] ?? 'Status updated.');
@@ -224,15 +216,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     setPublishBusy(true);
     setMessage('');
     try {
-      // Refetch to ensure we have the latest version_id (avoids 404 from stale state)
-      const fresh = await companyPolicyAPI.getNormalized(selectedPolicyId);
-      const versionId = fresh?.version?.id;
-      if (!versionId) {
-        setMessage('No policy version found. Normalize a document first.');
-        setMessageVariant('error');
-        return;
-      }
-      await companyPolicyAPI.publishVersion(selectedPolicyId, versionId);
+      await companyPolicyAPI.publishLatestVersion(selectedPolicyId);
       const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
       setNormalized(res);
       setMessage('Version published. Employees will see this policy.');

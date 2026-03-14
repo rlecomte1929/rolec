@@ -5352,6 +5352,66 @@ def patch_benefit_rule(
     return {"benefit_rule": updated}
 
 
+@app.patch("/api/company-policies/{policy_id}/versions/latest/status")
+def patch_policy_version_status_latest(
+    policy_id: str,
+    req: Request,
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Update the latest policy version status. Avoids version_id mismatch."""
+    request_id = getattr(req.state, "request_id", None)
+    profile = _require_company_for_user(user)
+    policy = db.get_company_policy(policy_id)
+    if not policy or policy.get("company_id") != profile["company_id"]:
+        log.warning("request_id=%s patch_version_status_latest policy_id=%s policy_not_found", request_id, policy_id)
+        raise HTTPException(status_code=404, detail="Policy not found")
+    version = db.get_latest_policy_version(policy_id)
+    if not version:
+        log.warning("request_id=%s patch_version_status_latest policy_id=%s no_version", request_id, policy_id)
+        raise HTTPException(status_code=404, detail="No policy version found. Normalize a document first.")
+    version_id = version["id"]
+    status = body.get("status")
+    if status not in ("draft", "review_required", "reviewed", "published", "archived"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+    try:
+        db.update_policy_version_status(version_id, status)
+        updated = db.get_policy_version(version_id)
+        return {"version": updated}
+    except Exception as exc:
+        log.warning("request_id=%s patch_version_status_latest failed policy_id=%s exc=%s", request_id, policy_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Status update failed")
+
+
+@app.post("/api/company-policies/{policy_id}/versions/latest/publish")
+def publish_policy_version_latest(
+    policy_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Publish the latest policy version. Avoids version_id mismatch."""
+    request_id = getattr(req.state, "request_id", None)
+    profile = _require_company_for_user(user)
+    policy = db.get_company_policy(policy_id)
+    if not policy or policy.get("company_id") != profile["company_id"]:
+        log.warning("request_id=%s publish_version_latest policy_id=%s policy_not_found", request_id, policy_id)
+        raise HTTPException(status_code=404, detail="Policy not found")
+    version = db.get_latest_policy_version(policy_id)
+    if not version:
+        log.warning("request_id=%s publish_version_latest policy_id=%s no_version", request_id, policy_id)
+        raise HTTPException(status_code=404, detail="No policy version found. Normalize a document first.")
+    version_id = version["id"]
+    try:
+        db.archive_other_published_versions(policy_id, version_id)
+        db.update_policy_version_status(version_id, "published")
+        updated = db.get_policy_version(version_id)
+        log.info("request_id=%s publish_version_latest ok policy_id=%s version_id=%s", request_id, policy_id, version_id)
+        return {"version": updated}
+    except Exception as exc:
+        log.warning("request_id=%s publish_version_latest failed policy_id=%s exc=%s", request_id, policy_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Publish failed")
+
+
 @app.patch("/api/company-policies/{policy_id}/versions/{version_id}/status")
 def patch_policy_version_status(
     policy_id: str,

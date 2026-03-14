@@ -1399,8 +1399,18 @@ export const companyPolicyAPI = {
     const response = await api.patch(`/api/company-policies/${policyId}/versions/${versionId}/status`, body);
     return response.data;
   },
+  /** Update latest version status - avoids version_id mismatch 404s */
+  patchLatestVersionStatus: async (policyId: string, body: { status: string }): Promise<{ version: any }> => {
+    const response = await api.patch(`/api/company-policies/${policyId}/versions/latest/status`, body);
+    return response.data;
+  },
   publishVersion: async (policyId: string, versionId: string): Promise<{ version: any }> => {
     const response = await api.post(`/api/company-policies/${policyId}/versions/${versionId}/publish`);
+    return response.data;
+  },
+  /** Publish latest version - avoids version_id mismatch 404s */
+  publishLatestVersion: async (policyId: string): Promise<{ version: any }> => {
+    const response = await api.post(`/api/company-policies/${policyId}/versions/latest/publish`);
     return response.data;
   },
   patchExclusion: async (
