@@ -696,17 +696,25 @@ export function NormalizedPolicySectionLegacy() {
 }
 
 const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
+  upload_missing_file: 'Please choose a file first.',
+  upload_invalid_mime_type: 'Only PDF or DOCX files are supported.',
+  upload_empty_file: 'The selected file is empty.',
+  upload_storage_failed: 'The file could not be uploaded to storage.',
+  upload_db_insert_failed: 'The uploaded file could not be registered in the database.',
+  upload_extract_failed: 'The file was uploaded, but extraction failed.',
+  upload_processing_failed: 'The policy document could not be processed.',
+  upload_unexpected_exception: 'An unexpected upload error occurred.',
   storage_missing_service_role: 'Policy upload is not configured correctly. Contact support.',
   storage_missing_url: 'Policy upload is not configured correctly. Contact support.',
   storage_bucket_not_found: 'Policy storage bucket is unavailable.',
-  storage_upload_failed: 'Upload failed. Please try again.',
+  storage_upload_failed: 'The file could not be uploaded to storage.',
   storage_access_denied: 'Policy storage access denied.',
   policy_documents_table_missing: 'Policy database tables are missing.',
   policy_document_clauses_table_missing: 'Policy database tables are missing.',
   policy_versions_table_missing: 'Policy database tables are missing.',
   resolved_assignment_policies_table_missing: 'Policy database tables are missing.',
-  db_insert_failed: 'Policy database tables are missing.',
-  invalid_file_type: 'Only .docx or .pdf supported.',
+  db_insert_failed: 'The uploaded file could not be registered in the database.',
+  invalid_file_type: 'Only PDF or DOCX files are supported.',
 };
 
 function getUploadErrorMessage(err: unknown): string {
@@ -720,11 +728,19 @@ function getUploadErrorMessage(err: unknown): string {
   return 'Upload failed. Please try again.';
 }
 
+function getUploadRequestId(err: unknown): string | null {
+  const data = err && typeof err === 'object' && 'response' in err
+    ? (err as { response?: { data?: { request_id?: string } } }).response?.data
+    : null;
+  return (data?.request_id && typeof data.request_id === 'string') ? data.request_id : null;
+}
+
 function PolicyDocumentIntakeSection() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploadRequestId, setUploadRequestId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedTab, setExpandedTab] = useState<'metadata' | 'structure'>('metadata');
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
@@ -767,14 +783,24 @@ function PolicyDocumentIntakeSection() {
   const handleUpload = async () => {
     if (!uploadFile) return;
     setMessage('');
+    setUploadRequestId(null);
     setUploading(true);
     try {
-      await policyDocumentsAPI.upload(uploadFile);
-      setUploadFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      await loadDocs();
+      const res = await policyDocumentsAPI.upload(uploadFile);
+      setUploadRequestId(res.request_id || null);
+      if (res.ok) {
+        setUploadFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        await loadDocs();
+      } else {
+        setMessage(UPLOAD_ERROR_MESSAGES[res.error_code || ''] || res.message || 'Upload failed.');
+        if (res.document) {
+          await loadDocs();
+        }
+      }
     } catch (err: unknown) {
       setMessage(getUploadErrorMessage(err));
+      setUploadRequestId(getUploadRequestId(err));
     } finally {
       setUploading(false);
     }
@@ -822,7 +848,12 @@ function PolicyDocumentIntakeSection() {
       </div>
 
       {message && (
-        <Alert variant={message.startsWith('Normalized') ? 'success' : message === 'Saved' ? 'success' : 'error'} className="mt-4">{message}</Alert>
+        <div className="mt-4">
+          <Alert variant={message.startsWith('Normalized') ? 'success' : message === 'Saved' ? 'success' : 'error'}>{message}</Alert>
+          {uploadRequestId && (
+            <div className="text-xs text-[#9ca3af] mt-1 font-mono">Request ID: {uploadRequestId}</div>
+          )}
+        </div>
       )}
 
       {health && !uploadReady && (

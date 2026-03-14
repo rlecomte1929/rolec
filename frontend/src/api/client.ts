@@ -1446,12 +1446,11 @@ export const policyDocumentsAPI = {
     const response = await api.get(`/api/hr/policy-documents/${docId}`);
     return response.data;
   },
-  upload: async (file: File): Promise<{ document: any }> => {
+  upload: async (file: File): Promise<{ ok: boolean; document: any; error_code?: string; message?: string; request_id?: string }> => {
     const form = new FormData();
     form.append('file', file);
-    const response = await api.post('/api/hr/policy-documents/upload', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // Do NOT set Content-Type: let the browser set multipart/form-data with boundary
+    const response = await api.post('/api/hr/policy-documents/upload', form);
     return response.data;
   },
   reprocess: async (docId: string): Promise<{ document: any }> => {

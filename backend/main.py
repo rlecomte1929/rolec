@@ -4724,12 +4724,28 @@ def list_company_policies(
 BUCKET_HR_POLICIES = "hr-policies"
 
 
-def _upload_error_response(error_code: str, message: str, status: int = 500) -> JSONResponse:
+# Policy upload error codes (stable, for frontend mapping)
+UPLOAD_MISSING_FILE = "upload_missing_file"
+UPLOAD_INVALID_MIME_TYPE = "upload_invalid_mime_type"
+UPLOAD_EMPTY_FILE = "upload_empty_file"
+UPLOAD_STORAGE_FAILED = "upload_storage_failed"
+UPLOAD_DB_INSERT_FAILED = "upload_db_insert_failed"
+UPLOAD_EXTRACT_FAILED = "upload_extract_failed"
+UPLOAD_PROCESSING_FAILED = "upload_processing_failed"
+UPLOAD_UNEXPECTED_EXCEPTION = "upload_unexpected_exception"
+
+
+def _upload_error_response(
+    error_code: str,
+    message: str,
+    status: int = 500,
+    request_id: Optional[str] = None,
+) -> JSONResponse:
     """Return structured JSON error for policy upload."""
-    return JSONResponse(
-        status_code=status,
-        content={"error_code": error_code, "message": message},
-    )
+    content: Dict[str, Any] = {"ok": False, "error_code": error_code, "message": message}
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status, content=content)
 
 
 @app.get("/api/hr/policy-documents/health")
@@ -4747,84 +4763,193 @@ def policy_documents_health(user: Dict[str, Any] = Depends(require_role(UserRole
 @app.post("/api/hr/policy-documents/upload")
 async def upload_policy_document(
     req: Request,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
-    """Upload policy PDF/DOCX for intake: extract text, classify, extract metadata."""
+    """
+    Upload policy PDF/DOCX for intake: extract text, classify, extract metadata.
+    Stages: A.validate -> B.storage -> C.db_insert -> D.extraction -> E.update_status -> F.return
+    """
     from .services.policy_storage_health import (
         check_policy_storage_health,
         STORAGE_MISSING_SERVICE_ROLE,
         STORAGE_BUCKET_NOT_FOUND,
         POLICY_DOCUMENTS_TABLE_MISSING,
-        DB_INSERT_FAILED,
     )
-    request_id = getattr(req.state, "request_id", None) if req else None
-    profile = _require_company_for_user(user)
-    filename = file.filename or "policy"
-    ext = filename.split(".")[-1].lower()
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    company_id = ""
+    user_id = user.get("id", "")
+    filename = ""
+    mime = ""
+    file_size = 0
+    content: bytes = b""
+
+    # --- Stage A: Validate incoming file ---
+    log.info(
+        "request_id=%s policy_upload started user_id=%s",
+        request_id, user_id[:8] + "…" if user_id and len(user_id) > 8 else user_id,
+    )
+    try:
+        profile = _require_company_for_user(user)
+        company_id = profile.get("company_id", "")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.error("request_id=%s policy_upload company lookup failed: %s", request_id, exc, exc_info=True)
+        return _upload_error_response(
+            UPLOAD_UNEXPECTED_EXCEPTION,
+            "Failed to resolve company for user.",
+            500,
+            request_id=request_id,
+        )
+
+    if not file or not getattr(file, "filename", None) or not str(file.filename).strip():
+        log.warning("request_id=%s policy_upload stage=validate error=upload_missing_file", request_id)
+        return _upload_error_response(
+            UPLOAD_MISSING_FILE,
+            "Please choose a file first.",
+            400,
+            request_id=request_id,
+        )
+
+    filename = str(file.filename).strip()
+    ext = filename.split(".")[-1].lower() if "." in filename else ""
     if ext not in ("docx", "pdf"):
-        return _upload_error_response("invalid_file_type", "Only .docx or .pdf supported", 400)
-    mime = file.content_type or ("application/pdf" if ext == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    content = await file.read()
+        log.warning("request_id=%s policy_upload stage=validate error=upload_invalid_mime_type filename=%s ext=%s", request_id, filename, ext)
+        return _upload_error_response(
+            UPLOAD_INVALID_MIME_TYPE,
+            "Only PDF or DOCX files are supported.",
+            400,
+            request_id=request_id,
+        )
+
+    try:
+        content = await file.read()
+    except Exception as exc:
+        log.error("request_id=%s policy_upload stage=validate read failed: %s", request_id, exc, exc_info=True)
+        return _upload_error_response(
+            UPLOAD_UNEXPECTED_EXCEPTION,
+            "Failed to read uploaded file.",
+            500,
+            request_id=request_id,
+        )
+
+    file_size = len(content)
+    if file_size == 0:
+        log.warning("request_id=%s policy_upload stage=validate error=upload_empty_file filename=%s", request_id, filename)
+        return _upload_error_response(
+            UPLOAD_EMPTY_FILE,
+            "The selected file is empty.",
+            400,
+            request_id=request_id,
+        )
+
+    mime = file.content_type or (
+        "application/pdf" if ext == "pdf"
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    log.info(
+        "request_id=%s policy_upload stage=validate ok filename=%s mime=%s file_size=%d company_id=%s",
+        request_id, filename, mime, file_size, company_id[:8] + "…" if company_id and len(company_id) > 8 else company_id,
+    )
 
     # Validate config before upload
     health = check_policy_storage_health(db)
     if not health["supabase_url_present"] or not health["service_role_present"]:
-        log.error("request_id=%s policy_upload config missing: url=%s service_role=%s", request_id, health["supabase_url_present"], health["service_role_present"])
-        return _upload_error_response(STORAGE_MISSING_SERVICE_ROLE, "Policy upload is not configured correctly. Contact support.")
+        log.error(
+            "request_id=%s policy_upload stage=config error=config_missing url=%s service_role=%s",
+            request_id, health["supabase_url_present"], health["service_role_present"],
+        )
+        return _upload_error_response(
+            STORAGE_MISSING_SERVICE_ROLE,
+            "Policy upload is not configured correctly. Contact support.",
+            503,
+            request_id=request_id,
+        )
     if not health["bucket_access_ok"]:
-        log.error("request_id=%s policy_upload bucket access failed", request_id)
-        return _upload_error_response(STORAGE_BUCKET_NOT_FOUND, "Policy storage bucket is unavailable.")
+        log.error("request_id=%s policy_upload stage=config error=bucket_not_ok", request_id)
+        return _upload_error_response(
+            STORAGE_BUCKET_NOT_FOUND,
+            "Policy storage bucket is unavailable.",
+            503,
+            request_id=request_id,
+        )
     if not health["policy_documents_table_ok"]:
-        log.error("request_id=%s policy_upload policy_documents table missing", request_id)
-        return _upload_error_response(POLICY_DOCUMENTS_TABLE_MISSING, "Policy database tables are missing.")
+        log.error("request_id=%s policy_upload stage=config error=policy_documents_table_missing", request_id)
+        return _upload_error_response(
+            POLICY_DOCUMENTS_TABLE_MISSING,
+            "Policy database tables are missing.",
+            503,
+            request_id=request_id,
+        )
 
     checksum = None
     try:
-        from .services.policy_document_intake import (
-            compute_checksum,
-            process_uploaded_document,
-        )
+        from .services.policy_document_intake import compute_checksum
         checksum = compute_checksum(content)
     except Exception as e:
-        log.warning("request_id=%s policy_document_upload checksum failed: %s", request_id, e)
-    doc_id = str(uuid.uuid4())
-    path = f"companies/{profile['company_id']}/policy-documents/{doc_id}/{filename}"
+        log.warning("request_id=%s policy_upload checksum failed: %s", request_id, e)
 
+    doc_id = str(uuid.uuid4())
+    path = f"companies/{company_id}/policy-documents/{doc_id}/{filename}"
+
+    # --- Stage B: Upload to Supabase Storage ---
     try:
         supabase = get_supabase_admin_client()
         supabase.storage.from_(BUCKET_HR_POLICIES).upload(
             path, content,
             {"content-type": mime, "upsert": True},
         )
+        log.info("request_id=%s policy_upload stage=storage ok path=%s", request_id, path)
     except Exception as exc:
-        log.error("request_id=%s policy_document_upload storage failed: %s", request_id or "?", exc, exc_info=True)
+        log.error(
+            "request_id=%s policy_upload stage=storage failed filename=%s path=%s exc=%s",
+            request_id, filename, path, exc, exc_info=True,
+        )
         code, msg = _map_storage_exception_to_response(exc, BUCKET_HR_POLICIES)
-        return _upload_error_response(code, msg)
+        return _upload_error_response(code, msg, 500, request_id=request_id)
 
+    # --- Stage C: Insert row in policy_documents ---
     try:
         db.create_policy_document(
             doc_id=doc_id,
-            company_id=profile["company_id"],
-            uploaded_by_user_id=user.get("id", ""),
+            company_id=company_id,
+            uploaded_by_user_id=user_id,
             filename=filename,
             mime_type=mime,
             storage_path=path,
             checksum=checksum,
             request_id=request_id,
         )
+        log.info("request_id=%s policy_upload stage=db_insert ok doc_id=%s", request_id, doc_id)
     except Exception as exc:
-        log.error("request_id=%s policy_document_upload db insert failed: %s", request_id, exc, exc_info=True)
+        log.error(
+            "request_id=%s policy_upload stage=db_insert failed doc_id=%s exc=%s",
+            request_id, doc_id, exc, exc_info=True,
+        )
         try:
             supabase = get_supabase_admin_client()
             supabase.storage.from_(BUCKET_HR_POLICIES).remove([path])
+            log.info("request_id=%s policy_upload stage=db_insert cleanup ok removed path=%s", request_id, path)
         except Exception as cleanup_exc:
-            log.warning("request_id=%s policy_document_upload cleanup failed: %s", request_id, cleanup_exc)
-        return _upload_error_response(DB_INSERT_FAILED, "Policy database tables are missing.")
+            log.warning("request_id=%s policy_upload stage=db_insert cleanup failed: %s", request_id, cleanup_exc)
+        return _upload_error_response(
+            UPLOAD_DB_INSERT_FAILED,
+            "Failed to save uploaded policy document.",
+            500,
+            request_id=request_id,
+        )
 
+    # --- Stage D: Run extraction/classification ---
+    extraction_failed = False
     try:
         from .services.policy_document_intake import process_uploaded_document
         result = process_uploaded_document(content, mime, filename, request_id=request_id)
+        log.info(
+            "request_id=%s policy_upload stage=extract ok status=%s",
+            request_id, result.get("processing_status"),
+        )
+        # --- Stage E: Update processing_status ---
         db.update_policy_document(
             doc_id,
             processing_status=result.get("processing_status"),
@@ -4837,6 +4962,12 @@ async def upload_policy_document(
             extracted_metadata=result.get("extracted_metadata"),
             request_id=request_id,
         )
+        if result.get("processing_status") == "failed":
+            extraction_failed = True
+            log.warning(
+                "request_id=%s policy_upload stage=extract failed extraction_error=%s",
+                request_id, (result.get("extraction_error") or "")[:200],
+            )
         # Segment into clauses when we have raw text
         if result.get("raw_text") and result.get("processing_status") != "failed":
             try:
@@ -4846,19 +4977,41 @@ async def upload_policy_document(
                 )
                 if not seg_err and clauses:
                     db.upsert_policy_document_clauses(doc_id, clauses, request_id=request_id)
-                    log.info("request_id=%s policy_document_upload segmented %d clauses", request_id, len(clauses))
+                    log.info("request_id=%s policy_upload stage=segment ok clauses=%d", request_id, len(clauses))
             except Exception as seg_exc:
-                log.warning("request_id=%s policy_document_upload segmentation failed: %s", request_id, seg_exc)
+                log.warning("request_id=%s policy_upload stage=segment failed: %s", request_id, seg_exc)
     except Exception as exc:
-        log.warning("request_id=%s policy_document_upload processing failed: %s", request_id, exc, exc_info=True)
+        log.error(
+            "request_id=%s policy_upload stage=extract failed doc_id=%s exc=%s",
+            request_id, doc_id, exc, exc_info=True,
+        )
+        extraction_failed = True
         db.update_policy_document(
             doc_id,
             processing_status="failed",
             extraction_error=str(exc),
             request_id=request_id,
         )
+
     doc = db.get_policy_document(doc_id, request_id=request_id)
-    return {"document": doc}
+    log.info(
+        "request_id=%s policy_upload stage=complete status=%s extraction_failed=%s",
+        request_id, doc.get("processing_status") if doc else "?", extraction_failed,
+    )
+
+    # --- Stage F: Return ---
+    if extraction_failed:
+        return JSONResponse(
+            status_code=207,
+            content={
+                "ok": False,
+                "error_code": UPLOAD_EXTRACT_FAILED,
+                "message": "The file was uploaded, but extraction failed.",
+                "request_id": request_id,
+                "document": doc,
+            },
+        )
+    return {"ok": True, "document": doc, "request_id": request_id}
 
 
 @app.get("/api/hr/policy-documents")
