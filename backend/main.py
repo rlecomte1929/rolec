@@ -4736,7 +4736,8 @@ def _upload_error_response(error_code: str, message: str, status: int = 500) -> 
 def policy_documents_health(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     """
     Diagnostic endpoint for policy document upload readiness.
-    Returns Supabase storage and policy table health.
+    Returns: supabase_project_ref, database_project_ref, project_refs_match,
+    bucket_probe (list_buckets, list_objects, diagnosis), table checks.
     """
     from .services.policy_storage_health import check_policy_storage_health
     health = check_policy_storage_health(db)
