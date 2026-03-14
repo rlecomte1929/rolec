@@ -1339,7 +1339,7 @@ export const companyPolicyAPI = {
     const response = await api.get(`/api/company-policies/${policyId}`);
     return response.data;
   },
-  getDownloadUrl: async (policyId: string): Promise<{ url: string }> => {
+  getDownloadUrl: async (policyId: string): Promise<{ ok?: boolean; url?: string }> => {
     const response = await api.get(`/api/company-policies/${policyId}/download-url`);
     return response.data;
   },

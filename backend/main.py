@@ -4723,6 +4723,55 @@ def list_company_policies(
 
 BUCKET_HR_POLICIES = "hr-policies"
 
+# Download-url error codes (stable, for frontend mapping)
+POLICY_POLICY_NOT_FOUND = "policy_policy_not_found"
+POLICY_FILE_MISSING = "policy_file_missing"
+POLICY_FILE_PATH_INVALID = "policy_file_path_invalid"
+POLICY_FILE_SIGN_FAILED = "policy_file_sign_failed"
+POLICY_STORAGE_UNEXPECTED_ERROR = "policy_storage_unexpected_error"
+
+
+def resolve_policy_storage_object_key(raw: str) -> str:
+    """
+    Resolve raw file_url / storage_path to object key only for storage.from_(BUCKET_HR_POLICIES).
+    Handles:
+    - legacy bucket-prefixed: hr-policies/companies/...
+    - object-key-only: companies/...
+    - full signed/public URL: extract object key from path
+    Returns empty string if invalid.
+    """
+    if not raw or not isinstance(raw, str):
+        return ""
+    s = raw.strip()
+    if not s:
+        return ""
+    # Full URL: extract path and resolve
+    if s.startswith("http://") or s.startswith("https://"):
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(s)
+            path = parsed.path or ""
+            # Supabase: .../object/public/hr-policies/KEY or .../object/sign/hr-policies/KEY
+            if "/hr-policies/" in path:
+                return path.split("/hr-policies/", 1)[-1].lstrip("/")
+            return ""
+        except Exception:
+            return ""
+    # Strip leading bucket prefix
+    if s.startswith("hr-policies/"):
+        return s[len("hr-policies/"):]
+    if "/hr-policies/" in s:
+        return s.split("/hr-policies/", 1)[-1]
+    # Already object key (companies/...)
+    if s.startswith("companies/"):
+        return s
+    return s
+
+
+def normalize_policy_storage_object_key(path: str) -> str:
+    """Alias for resolve_policy_storage_object_key. Used by extract/reprocess."""
+    return resolve_policy_storage_object_key(path)
+
 
 def _sanitize_storage_filename(name: str) -> str:
     """Make filename S3/storage-safe: replace spaces and problematic chars."""
@@ -5140,12 +5189,14 @@ async def reprocess_policy_document(
     if not doc or doc.get("company_id") != profile["company_id"]:
         raise HTTPException(status_code=404, detail="Document not found")
     file_path = doc.get("storage_path") or ""
+    object_key = normalize_policy_storage_object_key(file_path)
+    log.info("request_id=%s policy_document_reprocess bucket=%s object_key=%s", request_id, BUCKET_HR_POLICIES, object_key)
     try:
         supabase = get_supabase_admin_client()
-        data = supabase.storage.from_("hr-policies").download(file_path)
+        data = supabase.storage.from_(BUCKET_HR_POLICIES).download(object_key)
     except Exception as exc:
         log.warning("request_id=%s policy_document_reprocess download failed: %s", request_id, exc)
-        raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, "hr-policies"))
+        raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, BUCKET_HR_POLICIES))
     try:
         from .services.policy_document_intake import process_uploaded_document
         result = process_uploaded_document(
@@ -5310,19 +5361,29 @@ def patch_policy_version_status(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """Update policy version status: draft, review_required, reviewed, published."""
+    request_id = getattr(req.state, "request_id", None)
     profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
     if not policy or policy.get("company_id") != profile["company_id"]:
+        log.warning("request_id=%s patch_version_status policy_id=%s version_id=%s policy_not_found", request_id, policy_id, version_id)
         raise HTTPException(status_code=404, detail="Policy not found")
     version = db.get_policy_version(version_id)
-    if not version or version.get("policy_id") != policy_id:
+    if not version:
+        log.warning("request_id=%s patch_version_status policy_id=%s version_id=%s version_not_found", request_id, policy_id, version_id)
+        raise HTTPException(status_code=404, detail="Version not found")
+    if version.get("policy_id") != policy_id:
+        log.warning("request_id=%s patch_version_status policy_id=%s version_id=%s version_policy_mismatch version_policy=%s", request_id, policy_id, version_id, version.get("policy_id"))
         raise HTTPException(status_code=404, detail="Version not found")
     status = body.get("status")
     if status not in ("draft", "review_required", "reviewed", "published", "archived"):
         raise HTTPException(status_code=400, detail="Invalid status")
-    db.update_policy_version_status(version_id, status)
-    updated = db.get_policy_version(version_id)
-    return {"version": updated}
+    try:
+        db.update_policy_version_status(version_id, status)
+        updated = db.get_policy_version(version_id)
+        return {"version": updated}
+    except Exception as exc:
+        log.warning("request_id=%s patch_version_status failed policy_id=%s version_id=%s exc=%s", request_id, policy_id, version_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Status update failed")
 
 
 @app.post("/api/company-policies/{policy_id}/versions/{version_id}/publish")
@@ -5333,17 +5394,28 @@ def publish_policy_version(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """Publish this version and archive any previously published version. Employees see only published."""
+    request_id = getattr(req.state, "request_id", None)
     profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
     if not policy or policy.get("company_id") != profile["company_id"]:
+        log.warning("request_id=%s publish_version policy_id=%s version_id=%s policy_not_found", request_id, policy_id, version_id)
         raise HTTPException(status_code=404, detail="Policy not found")
     version = db.get_policy_version(version_id)
-    if not version or version.get("policy_id") != policy_id:
+    if not version:
+        log.warning("request_id=%s publish_version policy_id=%s version_id=%s version_not_found", request_id, policy_id, version_id)
         raise HTTPException(status_code=404, detail="Version not found")
-    db.archive_other_published_versions(policy_id, version_id)
-    db.update_policy_version_status(version_id, "published")
-    updated = db.get_policy_version(version_id)
-    return {"version": updated}
+    if version.get("policy_id") != policy_id:
+        log.warning("request_id=%s publish_version policy_id=%s version_id=%s version_policy_mismatch", request_id, policy_id, version_id)
+        raise HTTPException(status_code=404, detail="Version not found")
+    try:
+        db.archive_other_published_versions(policy_id, version_id)
+        db.update_policy_version_status(version_id, "published")
+        updated = db.get_policy_version(version_id)
+        log.info("request_id=%s publish_version ok policy_id=%s version_id=%s", request_id, policy_id, version_id)
+        return {"version": updated}
+    except Exception as exc:
+        log.warning("request_id=%s publish_version failed policy_id=%s version_id=%s exc=%s", request_id, policy_id, version_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Publish failed")
 
 
 @app.patch("/api/company-policies/{policy_id}/exclusions/{excl_id}")
@@ -5433,24 +5505,116 @@ def get_company_policy(
     return {"policy": policy, "benefits": benefits}
 
 
+def _download_url_error_response(
+    error_code: str,
+    message: str,
+    status: int = 500,
+    request_id: Optional[str] = None,
+) -> JSONResponse:
+    """Return structured JSON error for download-url."""
+    content: Dict[str, Any] = {"ok": False, "error_code": error_code, "message": message}
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status, content=content)
+
+
+def _map_download_storage_exception(exc: Exception) -> tuple[str, str]:
+    """Map storage exception to (error_code, user_safe_message) for download-url."""
+    msg = str(exc).lower()
+    status = None
+    if hasattr(exc, "args") and exc.args and isinstance(exc.args[0], dict):
+        d = exc.args[0]
+        if isinstance(d.get("statusCode"), int):
+            status = d["statusCode"]
+    if status == 404 or "not found" in msg or "does not exist" in msg or "object not found" in msg:
+        return (POLICY_FILE_MISSING, "Policy file not found in storage.")
+    if status == 400 or "bad request" in msg or "invalid" in msg and "path" in msg:
+        return (POLICY_FILE_PATH_INVALID, "Invalid policy file path.")
+    if "sign" in msg or "signed" in msg:
+        return (POLICY_FILE_SIGN_FAILED, "Failed to create signed download URL.")
+    return (POLICY_STORAGE_UNEXPECTED_ERROR, "Policy download failed. Please try again.")
+
+
 @app.get("/api/company-policies/{policy_id}/download-url")
 def get_company_policy_download_url(
     policy_id: str,
+    req: Request,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
+    request_id = getattr(req.state, "request_id", None)
     profile = _require_company_for_user(user)
+    company_id = profile.get("company_id", "")
+
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Policy not found")
-    file_path = policy.get("file_url") or ""
-    if "/hr-policies/" in file_path:
-        file_path = file_path.split("/hr-policies/", 1)[-1]
+    if not policy or policy.get("company_id") != company_id:
+        log.warning(
+            "request_id=%s download-url policy_id=%s company_id=%s policy_not_found",
+            request_id, policy_id, company_id[:8] + "…" if company_id and len(company_id) > 8 else company_id,
+        )
+        return _download_url_error_response(
+            POLICY_POLICY_NOT_FOUND,
+            "Policy not found.",
+            404,
+            request_id=request_id,
+        )
+
+    raw_file_url = policy.get("file_url") or ""
+    raw_storage_path = policy.get("storage_path") or ""
+    object_key = resolve_policy_storage_object_key(raw_file_url or raw_storage_path)
+
+    log.info(
+        "request_id=%s download-url policy_id=%s company_id=%s raw_file_url=%s raw_storage_path=%s object_key=%s bucket=%s",
+        request_id,
+        policy_id,
+        company_id[:8] + "…" if company_id and len(company_id) > 8 else company_id,
+        (raw_file_url[:80] + "…" if raw_file_url and len(raw_file_url) > 80 else raw_file_url) or "(empty)",
+        (raw_storage_path[:80] + "…" if raw_storage_path and len(raw_storage_path) > 80 else raw_storage_path) or "(empty)",
+        (object_key[:80] + "…" if object_key and len(object_key) > 80 else object_key) or "(empty)",
+        BUCKET_HR_POLICIES,
+    )
+
+    if not raw_file_url and not raw_storage_path:
+        return _download_url_error_response(
+            POLICY_FILE_MISSING,
+            "Policy has no file URL.",
+            400,
+            request_id=request_id,
+        )
+
+    if not object_key:
+        return _download_url_error_response(
+            POLICY_FILE_PATH_INVALID,
+            "Invalid policy file path.",
+            400,
+            request_id=request_id,
+        )
+
     try:
         supabase = get_supabase_admin_client()
-        signed = supabase.storage.from_("hr-policies").create_signed_url(file_path, 3600)
-        return {"url": signed.get("signedURL") or signed.get("signed_url")}
+        signed = supabase.storage.from_(BUCKET_HR_POLICIES).create_signed_url(object_key, 3600)
+        url = signed.get("signedURL") or signed.get("signed_url") or ""
+        if not url:
+            return _download_url_error_response(
+                POLICY_FILE_SIGN_FAILED,
+                "Signed URL was not returned.",
+                500,
+                request_id=request_id,
+            )
+        return JSONResponse(status_code=200, content={"ok": True, "url": url})
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to create download url: {str(exc)}")
+        exc_type = type(exc).__name__
+        exc_msg = str(exc)[:300] if str(exc) else "(no message)"
+        log.warning(
+            "request_id=%s download-url policy_id=%s exc_type=%s exc_msg=%s",
+            request_id, policy_id, exc_type, exc_msg,
+        )
+        err_code, err_msg = _map_download_storage_exception(exc)
+        return _download_url_error_response(
+            err_code,
+            err_msg,
+            500,
+            request_id=request_id,
+        )
 
 
 @app.post("/api/company-policies/upload")
@@ -5473,7 +5637,7 @@ async def upload_company_policy(
     content = await file.read()
     try:
         supabase = get_supabase_admin_client()
-        supabase.storage.from_("hr-policies").upload(
+        supabase.storage.from_(BUCKET_HR_POLICIES).upload(
             path,
             content,
             {
@@ -5483,7 +5647,7 @@ async def upload_company_policy(
         )
     except Exception as exc:
         log.error("request_id=%s company_policy_upload storage failed: %s", request_id or "?", exc, exc_info=True)
-        detail = _sanitize_storage_error(exc, "hr-policies")
+        detail = _sanitize_storage_error(exc, BUCKET_HR_POLICIES)
         raise HTTPException(status_code=500, detail=detail)
     db.create_company_policy(
         policy_id=policy_id,
@@ -5521,20 +5685,22 @@ def update_company_policy_benefits(
 @app.post("/api/policies/{policy_id}/extract")
 def extract_company_policy(
     policy_id: str,
+    req: Request,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
+    request_id = getattr(req.state, "request_id", None)
     profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
     if not policy or policy.get("company_id") != profile["company_id"]:
         raise HTTPException(status_code=404, detail="Policy not found")
     file_path = policy.get("file_url") or ""
-    if "/hr-policies/" in file_path:
-        file_path = file_path.split("/hr-policies/", 1)[-1]
+    object_key = normalize_policy_storage_object_key(file_path)
+    log.info("request_id=%s extract bucket=%s object_key=%s", request_id, BUCKET_HR_POLICIES, object_key)
     try:
         supabase = get_supabase_admin_client()
-        data = supabase.storage.from_("hr-policies").download(file_path)
+        data = supabase.storage.from_(BUCKET_HR_POLICIES).download(object_key)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, "hr-policies"))
+        raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, BUCKET_HR_POLICIES))
     try:
         extraction = extract_policy_from_bytes(data, policy.get("file_type") or "docx")
         meta = extraction.get("policy_meta", {})

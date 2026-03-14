@@ -34,57 +34,85 @@ function formatBenefitLabel(r: any): string {
   return (meta(r, 'benefit_label') as string) || r?.benefit_key || '—';
 }
 
-export const HrPolicyReviewWorkspace: React.FC = () => {
+type HrPolicyReviewWorkspaceProps = {
+  refreshTrigger?: number;
+  postNormalizePolicyId?: string | null;
+  onBindComplete?: () => void;
+};
+
+export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = ({
+  refreshTrigger = 0,
+  postNormalizePolicyId = null,
+  onBindComplete,
+}) => {
   const [documents, setDocuments] = useState<any[]>([]);
   const [policies, setPolicies] = useState<any[]>([]);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
   const [normalized, setNormalized] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageVariant, setMessageVariant] = useState<'success' | 'error'>('error');
   const [sourceClause, setSourceClause] = useState<any | null>(null);
   const [editingRule, setEditingRule] = useState<any | null>(null);
   const [savingRule, setSavingRule] = useState<string | null>(null);
   const [publishBusy, setPublishBusy] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [renormalizeBusy, setRenormalizeBusy] = useState(false);
 
-  const loadDocuments = async () => {
-    try {
-      const res = await policyDocumentsAPI.list();
-      setDocuments(res.documents || []);
-    } catch {
-      setDocuments([]);
-    }
-  };
+  const loadWorkspaceData = React.useCallback(async (policyId: string) => {
+    const [normRes, dlRes] = await Promise.all([
+      companyPolicyAPI.getNormalized(policyId).catch(() => null),
+      companyPolicyAPI.getDownloadUrl(policyId).then((r) => r?.url ?? null).catch(() => null),
+    ]);
+    setNormalized(normRes);
+    setDownloadUrl(dlRes || null);
+    setDownloadError(dlRes ? null : 'Download link could not be generated');
+  }, []);
 
-  const loadPolicies = async () => {
-    try {
-      const res = await companyPolicyAPI.list();
-      setPolicies(res.policies || []);
-      if (!selectedPolicyId && res.policies?.length) {
-        setSelectedPolicyId(res.policies[0].id);
-      }
-    } catch {
-      setPolicies([]);
-    }
-  };
+  const loadDocumentsAndPolicies = React.useCallback(async () => {
+    const [docsRes, policiesRes] = await Promise.all([
+      policyDocumentsAPI.list().catch(() => ({ documents: [] })),
+      companyPolicyAPI.list().catch(() => ({ policies: [] })),
+    ]);
+    setDocuments(docsRes.documents || []);
+    const pols = policiesRes.policies || [];
+    setPolicies(pols);
+    return pols;
+  }, []);
 
   useEffect(() => {
-    loadDocuments();
-    loadPolicies();
-  }, []);
+    let cancelled = false;
+    const bindPolicyId = postNormalizePolicyId;
+    loadDocumentsAndPolicies().then((pols) => {
+      if (cancelled) return;
+      setSelectedPolicyId((current) => {
+        if (bindPolicyId && pols.some((p: any) => p.id === bindPolicyId)) {
+          onBindComplete?.();
+          return bindPolicyId;
+        }
+        if (!current && pols.length) return pols[0].id;
+        if (current && !pols.some((p: any) => p.id === current) && pols.length) return pols[0].id;
+        return current;
+      });
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshTrigger drives reload; postNormalizePolicyId/onBindComplete used only in callback
+  }, [refreshTrigger]);
 
   useEffect(() => {
     if (!selectedPolicyId) {
       setNormalized(null);
+      setDownloadUrl(null);
+      setDownloadError(null);
       return;
     }
     setLoading(true);
-    companyPolicyAPI
-      .getNormalized(selectedPolicyId)
-      .then(setNormalized)
-      .catch(() => setNormalized(null))
-      .finally(() => setLoading(false));
-  }, [selectedPolicyId]);
+    setDownloadUrl(null);
+    setDownloadError(null);
+    loadWorkspaceData(selectedPolicyId).finally(() => setLoading(false));
+  }, [selectedPolicyId, loadWorkspaceData]);
 
   const sourceDocId = normalized?.version?.source_policy_document_id;
   const versionStatus = normalized?.version?.status || 'draft';
@@ -115,9 +143,16 @@ export const HrPolicyReviewWorkspace: React.FC = () => {
       setEditingRule(null);
     } catch (err: any) {
       setMessage(err?.response?.data?.detail || 'Update failed');
+      setMessageVariant('error');
     } finally {
       setSavingRule(null);
     }
+  };
+
+  const STATUS_SUCCESS_LABELS: Record<string, string> = {
+    draft: 'Draft saved.',
+    review_required: 'Marked for review.',
+    reviewed: 'Marked as reviewed.',
   };
 
   const handleSaveStatus = async (status: string) => {
@@ -128,8 +163,25 @@ export const HrPolicyReviewWorkspace: React.FC = () => {
       await companyPolicyAPI.patchVersionStatus(selectedPolicyId, normalized.version.id, { status });
       const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
       setNormalized(res);
+      setMessage(STATUS_SUCCESS_LABELS[status] ?? 'Status updated.');
+      setMessageVariant('success');
     } catch (err: any) {
-      setMessage(err?.response?.data?.detail || 'Status update failed');
+      const statusCode = err?.response?.status;
+      if (statusCode === 404) {
+        const res = await companyPolicyAPI.getNormalized(selectedPolicyId).catch(() => null);
+        if (res?.version) {
+          setNormalized(res);
+          setMessage('Switched to latest version.');
+          setMessageVariant('success');
+          return;
+        }
+      }
+      setMessage(
+        statusCode === 404
+          ? 'Version not found. Switched to latest version.'
+          : err?.response?.data?.detail || 'Status update failed'
+      );
+      setMessageVariant('error');
     } finally {
       setStatusBusy(false);
     }
@@ -144,10 +196,46 @@ export const HrPolicyReviewWorkspace: React.FC = () => {
       const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
       setNormalized(res);
       setMessage('Version published. Employees will see this policy.');
+      setMessageVariant('success');
     } catch (err: any) {
-      setMessage(err?.response?.data?.detail || 'Publish failed');
+      const statusCode = err?.response?.status;
+      if (statusCode === 404) {
+        const res = await companyPolicyAPI.getNormalized(selectedPolicyId).catch(() => null);
+        if (res?.version) {
+          setNormalized(res);
+          setMessage('Switched to latest version.');
+          setMessageVariant('success');
+          return;
+        }
+      }
+      setMessage(
+        statusCode === 404
+          ? 'Version not found. Switched to latest version.'
+          : err?.response?.data?.detail || 'Publish failed'
+      );
+      setMessageVariant('error');
     } finally {
       setPublishBusy(false);
+    }
+  };
+
+  const handleRenormalize = async () => {
+    if (!sourceDocId || !selectedPolicyId) return;
+    setRenormalizeBusy(true);
+    setMessage('');
+    try {
+      await policyDocumentsAPI.normalize(sourceDocId);
+      const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
+      setNormalized(res);
+      setMessage('Re-normalization complete. Review the updated benefit matrix.');
+      setMessageVariant('success');
+      loadDocumentsAndPolicies();
+    } catch (err: any) {
+      const data = err?.response?.data;
+      setMessage(data?.message || data?.detail || 'Re-normalization failed');
+      setMessageVariant('error');
+    } finally {
+      setRenormalizeBusy(false);
     }
   };
 
@@ -174,12 +262,15 @@ export const HrPolicyReviewWorkspace: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="text-xl font-semibold text-[#0b2b43]">HR Policy Review Workspace</div>
-      <div className="text-sm text-[#6b7280]">
+      <div className="text-sm text-[#6b7280] mb-2">
         Review extracted policy content, edit benefit rules, and publish for employee visibility.
+      </div>
+      <div className="rounded-lg bg-[#f0fdf4] border border-[#bbf7d0] px-4 py-2 text-xs text-[#166534]">
+        <strong>Workflow:</strong> Upload document → Reprocess (if needed) → Normalize into policy version → Review/edit matrix → Publish version
       </div>
 
       {message && (
-        <Alert variant={message.includes('published') ? 'success' : 'error'}>{message}</Alert>
+        <Alert variant={messageVariant}>{message}</Alert>
       )}
 
       {/* Panel A: Source documents */}
@@ -217,6 +308,14 @@ export const HrPolicyReviewWorkspace: React.FC = () => {
               <option key={p.id} value={p.id}>{p.title || p.id}</option>
             ))}
           </select>
+          {downloadUrl && (
+            <a className="text-sm text-[#0b2b43] underline" href={downloadUrl} target="_blank" rel="noreferrer">
+              Download PDF
+            </a>
+          )}
+          {downloadError && (
+            <span className="text-xs text-red-600">{downloadError}</span>
+          )}
           {normalized?.version && (
             <>
               <span className="text-xs px-2 py-1 rounded bg-[#e2e8f0]">
@@ -230,6 +329,16 @@ export const HrPolicyReviewWorkspace: React.FC = () => {
               <span className="text-xs text-[#6b7280]">
                 {normalized.benefit_rules?.length ?? 0} benefits · {normalized.exclusions?.length ?? 0} exclusions · {normalized.evidence_requirements?.length ?? 0} evidence rules
               </span>
+              {sourceDocId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRenormalize}
+                  disabled={renormalizeBusy}
+                >
+                  {renormalizeBusy ? 'Re-normalizing…' : 'Re-run normalization'}
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -515,15 +624,15 @@ export const HrPolicyReviewWorkspace: React.FC = () => {
           <div className="text-sm font-semibold text-[#0b2b43] mb-2">F. Publish controls</div>
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => handleSaveStatus('draft')} disabled={statusBusy}>
-              Save draft
+              {statusBusy ? 'Saving…' : 'Save draft'}
             </Button>
             <Button variant="outline" size="sm" onClick={() => handleSaveStatus('review_required')} disabled={statusBusy}>
-              Mark for review
+              {statusBusy ? 'Saving…' : 'Mark for review'}
             </Button>
             <Button variant="outline" size="sm" onClick={() => handleSaveStatus('reviewed')} disabled={statusBusy}>
-              Mark reviewed
+              {statusBusy ? 'Saving…' : 'Mark reviewed'}
             </Button>
-            <Button size="sm" onClick={handlePublish} disabled={publishBusy || versionStatus === 'published'}>
+            <Button size="sm" onClick={handlePublish} disabled={publishBusy || statusBusy || versionStatus === 'published'}>
               {publishBusy ? 'Publishing…' : 'Publish version'}
             </Button>
             {versionStatus === 'published' && (

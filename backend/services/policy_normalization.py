@@ -301,9 +301,9 @@ def run_normalization(
     version_label = meta.get("detected_version") or meta.get("version") or policy_document.get("version_label")
     effective_date = meta.get("detected_effective_date") or meta.get("effective_date")
 
-    # Build file_url from storage_path for company_policy
+    # Build file_url from storage_path for company_policy (object key only, no bucket prefix)
     storage_path = policy_document.get("storage_path") or ""
-    file_url = f"hr-policies/{storage_path}" if storage_path else ""
+    file_url = storage_path or ""
 
     # Get or create company_policy
     policies = db.list_company_policies(company_id)
@@ -317,7 +317,7 @@ def run_normalization(
             title=title[:200],
             version=version_label,
             effective_date=effective_date,
-            file_url=file_url or "policy-document",
+            file_url=file_url or "policy-document",  # object key only, e.g. companies/.../policy-documents/.../file.pdf
             file_type=policy_document.get("mime_type", "").split("/")[-1] or "pdf",
             created_by=created_by,
         )

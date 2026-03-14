@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card, Input } from '../components/antigravity';
@@ -47,8 +47,12 @@ function EmployeePolicyContent() {
         setBenefits(res.benefits || []);
         setCompanyName(res.company_name || null);
         if (res.policy?.id) {
-          const dl = await companyPolicyAPI.getDownloadUrl(res.policy.id);
-          setDownloadUrl(dl.url);
+          try {
+            const dl = await companyPolicyAPI.getDownloadUrl(res.policy.id);
+            if (dl?.url) setDownloadUrl(dl.url);
+          } catch {
+            // Download link failed; policy summary still shown
+          }
         }
       })
       .catch(() => {
@@ -144,6 +148,18 @@ function EmployeePolicyContent() {
 
 export const HrPolicy: React.FC = () => {
   const role = getAuthItem('relopass_role');
+  const [workspaceRefreshTrigger, setWorkspaceRefreshTrigger] = useState(0);
+  const [postNormalizePolicyId, setPostNormalizePolicyId] = useState<string | null>(null);
+
+  const handleNormalized = useCallback((policyId: string) => {
+    setPostNormalizePolicyId(policyId);
+    setWorkspaceRefreshTrigger((t) => t + 1);
+  }, []);
+
+  const handleDocumentsChange = useCallback(() => {
+    setWorkspaceRefreshTrigger((t) => t + 1);
+  }, []);
+
   if (role === 'EMPLOYEE') {
     return (
       <AppShell title="Assignment Package & Limits" subtitle="View your applicable policy and benefit limits.">
@@ -154,14 +170,14 @@ export const HrPolicy: React.FC = () => {
   return (
     <AppShell title="Assignment Package & Limits" subtitle="Understand what is covered, what is capped, and what requires HR approval before proceeding.">
       {/* 1. Policy document intake — primary upload path (creates policy_documents) */}
-      <PolicyDocumentIntakeSection />
+      <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} />
       {/* 2. HR Policy Review workspace (clauses, normalize, publish) */}
       <div className="mt-8">
-        <HrPolicyReviewWorkspace />
-      </div>
-      {/* 3. Company policy section — legacy company_policies for backward compat */}
-      <div className="mt-6">
-        <CompanyPolicyDocumentSection />
+        <HrPolicyReviewWorkspace
+          refreshTrigger={workspaceRefreshTrigger}
+          postNormalizePolicyId={postNormalizePolicyId}
+          onBindComplete={() => setPostNormalizePolicyId(null)}
+        />
       </div>
       <div className="mt-8">
         <HrPolicyContent />
@@ -716,6 +732,12 @@ const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
   db_insert_failed: 'The uploaded file could not be registered in the database.',
   invalid_file_type: 'Only PDF or DOCX files are supported.',
   normalization_failed: 'Normalization failed because of an invalid policy_versions payload.',
+  // Download-url and policy errors
+  policy_policy_not_found: 'Policy not found.',
+  policy_file_missing: 'Policy file not found in storage.',
+  policy_file_path_invalid: 'Invalid policy file path.',
+  policy_file_sign_failed: 'Failed to create signed download URL.',
+  policy_storage_unexpected_error: 'Download link could not be generated.',
 };
 
 function getUploadErrorMessage(err: unknown): string {
@@ -726,7 +748,7 @@ function getUploadErrorMessage(err: unknown): string {
   if (code && UPLOAD_ERROR_MESSAGES[code]) return UPLOAD_ERROR_MESSAGES[code];
   if (data?.message && typeof data.message === 'string') return data.message;
   if (data?.detail && typeof data.detail === 'string') return data.detail;
-  return 'Upload failed. Please try again.';
+  return 'An unexpected error occurred. Please try again.';
 }
 
 function getUploadRequestId(err: unknown): string | null {
@@ -736,7 +758,13 @@ function getUploadRequestId(err: unknown): string | null {
   return (data?.request_id && typeof data.request_id === 'string') ? data.request_id : null;
 }
 
-function PolicyDocumentIntakeSection() {
+function PolicyDocumentIntakeSection({
+  onNormalized,
+  onDocumentsChange,
+}: {
+  onNormalized?: (policyId: string) => void;
+  onDocumentsChange?: () => void;
+}) {
   const [documents, setDocuments] = useState<any[]>([]);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -805,6 +833,7 @@ function PolicyDocumentIntakeSection() {
         setUploadFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
         await loadDocs();
+        onDocumentsChange?.();
       } else {
         setMessage(UPLOAD_ERROR_MESSAGES[res.error_code || ''] || res.message || 'Upload failed.');
         if (res.document) {
@@ -825,6 +854,7 @@ function PolicyDocumentIntakeSection() {
     try {
       await policyDocumentsAPI.reprocess(docId);
       await loadDocs();
+      onDocumentsChange?.();
       setExpandedId(docId);
     } catch (err: unknown) {
       const detail = err && typeof err === 'object' && 'response' in err
@@ -841,8 +871,9 @@ function PolicyDocumentIntakeSection() {
     setNormalizingId(docId);
     try {
       const res = await policyDocumentsAPI.normalize(docId);
-      setMessage(`Normalized: ${res.summary?.benefit_rules ?? 0} benefits, ${res.summary?.exclusions ?? 0} exclusions`);
+      setMessage(`Normalization complete. ${res.summary?.benefit_rules ?? 0} benefits, ${res.summary?.exclusions ?? 0} exclusions.`);
       await loadDocs();
+      if (res.policy_id) onNormalized?.(res.policy_id);
     } catch (err: unknown) {
       const data = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { error_code?: string; message?: string; detail?: string } } }).response?.data
@@ -1021,7 +1052,7 @@ function PolicyDocumentIntakeSection() {
   );
 }
 
-function CompanyPolicyDocumentSection() {
+function _UnusedCompanyPolicyDocumentSection() {
   const [policies, setPolicies] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedPolicy, setSelectedPolicy] = useState<any | null>(null);
