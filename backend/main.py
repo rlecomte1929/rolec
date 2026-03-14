@@ -1651,7 +1651,7 @@ async def upload_company_logo(
         supabase.storage.from_("company-logos").upload(
             path,
             content,
-            file_options={"content-type": content_type or "image/png", "upsert": True},
+            file_options={"content-type": content_type or "image/png", "upsert": "true"},
         )
     except Exception as e:
         log.warning("company logo upload failed: %s", e)
@@ -4911,7 +4911,7 @@ async def upload_policy_document(
         supabase = get_supabase_admin_client()
         supabase.storage.from_(BUCKET_HR_POLICIES).upload(
             path, content,
-            {"content-type": mime, "upsert": True},
+            {"content-type": mime, "upsert": "true"},
         )
         log.info("request_id=%s policy_upload stage=storage ok path=%s", request_id, path)
     except Exception as exc:
@@ -5464,7 +5464,7 @@ async def upload_company_policy(
             content,
             {
                 "content-type": file.content_type or "application/octet-stream",
-                "upsert": True,
+                "upsert": "true",
             },
         )
     except Exception as exc:
