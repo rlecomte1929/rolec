@@ -1543,9 +1543,11 @@ def get_dashboard(request: Request, user: Dict[str, Any] = Depends(get_current_u
 def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
+    hr_profile = db.get_profile_record(effective["id"])
+    company_id = hr_profile.get("company_id") if hr_profile else None
     case_id = str(uuid.uuid4())
     profile = RelocationProfile(userId=effective["id"]).model_dump()
-    db.create_case(case_id, effective["id"], profile)
+    db.create_case(case_id, effective["id"], profile, company_id=company_id)
     return CreateCaseResponse(caseId=case_id)
 
 
@@ -1752,6 +1754,19 @@ def assign_case(
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
 
+        hr_profile = db.get_profile_record(effective["id"])
+        hr_company_id = hr_profile.get("company_id") if hr_profile else None
+        if hr_company_id and not case.get("company_id"):
+            db.upsert_relocation_case(
+                case_id=case_id,
+                company_id=hr_company_id,
+                employee_id=case.get("employee_id"),
+                status=case.get("status"),
+                stage=case.get("stage"),
+                host_country=case.get("host_country"),
+                home_country=case.get("home_country"),
+            )
+
         employee_identifier = request.employeeIdentifier.strip()
         if not employee_identifier:
             raise HTTPException(status_code=400, detail="Employee identifier required")
@@ -1767,6 +1782,16 @@ def assign_case(
 
         employee_user = db.get_user_by_identifier(employee_identifier)
         created_new_employee = False
+        if employee_user and hr_company_id:
+            emp_profile = db.get_profile_record(employee_user["id"])
+            if emp_profile and not emp_profile.get("company_id"):
+                db.ensure_profile_record(
+                    employee_user["id"],
+                    emp_profile.get("email") or employee_identifier,
+                    emp_profile.get("role") or UserRole.EMPLOYEE.value,
+                    emp_profile.get("full_name") or employee_identifier.split("@")[0],
+                    hr_company_id,
+                )
         if not employee_user and "@" in employee_identifier:
             # Auto-register employee user with a temporary password
             from passlib.context import CryptContext
@@ -1790,7 +1815,7 @@ def assign_case(
                     employee_identifier,
                     UserRole.EMPLOYEE.value,
                     initial_name,
-                    None,
+                    hr_company_id,
                 )
                 created_new_employee = True
         assignment_id = str(uuid.uuid4())
@@ -3728,6 +3753,38 @@ def get_employee_assignment_policy(
     from .services.policy_resolution import resolve_policy_for_assignment
     case_id = assignment.get("case_id")
     case = db.get_relocation_case(case_id) if case_id else None
+    hr_user_id = assignment.get("hr_user_id")
+    hr_profile = db.get_profile_record(hr_user_id) if hr_user_id else None
+    hr_company_id = hr_profile.get("company_id") if hr_profile else None
+    if hr_company_id:
+        if case and not case.get("company_id"):
+            try:
+                db.upsert_relocation_case(
+                    case_id=case_id,
+                    company_id=hr_company_id,
+                    employee_id=case.get("employee_id"),
+                    status=case.get("status"),
+                    stage=case.get("stage"),
+                    host_country=case.get("host_country"),
+                    home_country=case.get("home_country"),
+                )
+                case = db.get_relocation_case(case_id) or case
+            except Exception:
+                pass
+        emp_user_id = assignment.get("employee_user_id")
+        if emp_user_id:
+            emp_profile = db.get_profile_record(emp_user_id)
+            if emp_profile and not emp_profile.get("company_id"):
+                try:
+                    db.ensure_profile_record(
+                        emp_user_id,
+                        emp_profile.get("email") or "",
+                        emp_profile.get("role") or "EMPLOYEE",
+                        emp_profile.get("full_name"),
+                        hr_company_id,
+                    )
+                except Exception:
+                    pass
     profile = None
     if case and case.get("profile_json"):
         try:

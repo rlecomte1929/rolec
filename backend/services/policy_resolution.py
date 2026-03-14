@@ -279,13 +279,24 @@ def resolve_policy_for_assignment(
         if emp_profile:
             company_id = emp_profile.get("company_id")
     if not company_id:
-        log.warning("policy_resolution: no company_id for assignment %s", assignment_id)
+        log.warning(
+            "policy_resolution: no company_id for assignment %s (case=%s, hr_user=%s, emp_user=%s)",
+            assignment_id,
+            bool(case),
+            assignment.get("hr_user_id"),
+            assignment.get("employee_user_id"),
+        )
         return None
 
     # Get company policy that has a published version (try any policy for this company)
     result = db.get_company_policy_with_published_version(company_id)
     if not result:
-        log.info("policy_resolution: no published policy for company %s", company_id)
+        policies = db.list_company_policies(company_id)
+        log.info(
+            "policy_resolution: no published policy for company %s (company has %s policies, none published)",
+            company_id,
+            len(policies),
+        )
         return None
 
     policy, version = result
