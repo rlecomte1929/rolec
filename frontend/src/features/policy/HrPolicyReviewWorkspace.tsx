@@ -2,15 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
 import { companyPolicyAPI, policyDocumentsAPI } from '../../api/client';
 
-const formatDate = (val: string | null | undefined): string => {
-  if (!val) return '—';
-  try {
-    return new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return val;
-  }
-};
-
 const VERSION_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   review_required: 'Review required',
@@ -33,6 +24,26 @@ const meta = (r: any, key: string, def?: number | string | boolean) => {
 function formatBenefitLabel(r: any): string {
   return (meta(r, 'benefit_label') as string) || r?.benefit_key || '—';
 }
+
+/** Topic labels and display order (backend benefit_category -> label). */
+const TOPIC_ORDER: string[] = [
+  'housing', 'relocation', 'education', 'immigration', 'travel',
+  'compensation', 'setup', 'health', 'family', 'integration', 'tax', 'other',
+];
+const TOPIC_LABELS: Record<string, string> = {
+  housing: 'Housing',
+  relocation: 'Movers / Household goods',
+  education: 'Schooling',
+  immigration: 'Immigration',
+  travel: 'Travel / Transport / Home leave',
+  compensation: 'Compensation / Allowances',
+  setup: 'Banking / Setup',
+  health: 'Medical / Insurance',
+  family: 'Family support',
+  integration: 'Integration / Cultural',
+  tax: 'Tax / Exclusions',
+  other: 'Miscellaneous',
+};
 
 type HrPolicyReviewWorkspaceProps = {
   refreshTrigger?: number;
@@ -60,15 +71,15 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [renormalizeBusy, setRenormalizeBusy] = useState(false);
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
+  const [expandAll, setExpandAll] = useState(false);
 
-  const loadWorkspaceData = React.useCallback(async (policyId: string) => {
+  const loadWorkspaceData = React.useCallback(async (policyId: string): Promise<{ normRes: any; dlRes: string | null }> => {
     const [normRes, dlRes] = await Promise.all([
       companyPolicyAPI.getNormalized(policyId).catch(() => null),
       companyPolicyAPI.getDownloadUrl(policyId).then((r) => r?.url ?? null).catch(() => null),
     ]);
-    setNormalized(normRes);
-    setDownloadUrl(dlRes || null);
-    setDownloadError(dlRes ? null : 'Download link could not be generated');
+    return { normRes, dlRes: dlRes || null };
   }, []);
 
   const loadDocumentsAndPolicies = React.useCallback(async () => {
@@ -108,10 +119,23 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       setDownloadError(null);
       return;
     }
+    let cancelled = false;
     setLoading(true);
     setDownloadUrl(null);
     setDownloadError(null);
-    loadWorkspaceData(selectedPolicyId).finally(() => setLoading(false));
+    loadWorkspaceData(selectedPolicyId)
+      .then(({ normRes, dlRes }) => {
+        if (cancelled) return;
+        setNormalized(normRes);
+        setDownloadUrl(dlRes);
+        setDownloadError(dlRes ? null : 'Download link could not be generated');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedPolicyId, loadWorkspaceData]);
 
   const sourceDocId = normalized?.version?.source_policy_document_id;
@@ -171,14 +195,14 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         const res = await companyPolicyAPI.getNormalized(selectedPolicyId).catch(() => null);
         if (res?.version) {
           setNormalized(res);
-          setMessage('Switched to latest version.');
+          setMessage('This version is no longer current. The page has been refreshed to the latest version.');
           setMessageVariant('success');
           return;
         }
       }
       setMessage(
         statusCode === 404
-          ? 'Version not found. Switched to latest version.'
+          ? 'This version is no longer current. The page has been refreshed to the latest version.'
           : err?.response?.data?.detail || 'Status update failed'
       );
       setMessageVariant('error');
@@ -203,14 +227,14 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         const res = await companyPolicyAPI.getNormalized(selectedPolicyId).catch(() => null);
         if (res?.version) {
           setNormalized(res);
-          setMessage('Switched to latest version.');
+          setMessage('This version is no longer current. The page has been refreshed to the latest version.');
           setMessageVariant('success');
           return;
         }
       }
       setMessage(
         statusCode === 404
-          ? 'Version not found. Switched to latest version.'
+          ? 'This version is no longer current. The page has been refreshed to the latest version.'
           : err?.response?.data?.detail || 'Publish failed'
       );
       setMessageVariant('error');
@@ -241,7 +265,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
 
   const groupedBenefits = useMemo(() => {
     const rules = normalized?.benefit_rules || [];
-    return rules.reduce(
+    const byCat = rules.reduce(
       (acc: Record<string, any[]>, r: any) => {
         const cat = r.benefit_category || 'other';
         if (!acc[cat]) acc[cat] = [];
@@ -250,7 +274,45 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       },
       {} as Record<string, any[]>
     );
+    // Return in display order, only topics that have rules
+    const ordered: [string, any[]][] = [];
+    for (const cat of TOPIC_ORDER) {
+      if (byCat[cat]?.length) ordered.push([cat, byCat[cat]]);
+    }
+    const others = Object.keys(byCat).filter((c) => !TOPIC_ORDER.includes(c));
+    for (const c of others) ordered.push([c, byCat[c]]);
+    return ordered;
   }, [normalized?.benefit_rules]);
+
+  // Expand first topic when normalized data first loads
+  const prevRulesRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    const key = normalized?.benefit_rules?.length != null ? String(normalized.benefit_rules.length) : null;
+    if (key && key !== prevRulesRef.current && groupedBenefits.length > 0) {
+      prevRulesRef.current = key;
+      setExpandedTopics(new Set([groupedBenefits[0][0]]));
+      setExpandAll(false);
+    }
+    if (!normalized) prevRulesRef.current = null;
+  }, [normalized, groupedBenefits]);
+
+  const toggleTopic = (cat: string) => {
+    setExpandedTopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  const handleExpandAll = () => {
+    if (expandAll) {
+      setExpandedTopics(new Set());
+    } else {
+      setExpandedTopics(new Set(groupedBenefits.map(([c]) => c)));
+    }
+    setExpandAll(!expandAll);
+  };
 
   const avgConfidence = useMemo(() => {
     const rules = normalized?.benefit_rules || [];
@@ -273,29 +335,9 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         <Alert variant={messageVariant}>{message}</Alert>
       )}
 
-      {/* Panel A: Source documents */}
+      {/* Compact: Policy selector + actions */}
       <Card padding="lg">
-        <div className="text-sm font-semibold text-[#0b2b43] mb-2">A. Source documents</div>
-        <div className="text-xs text-[#6b7280] mb-3">Uploaded policy documents used for extraction</div>
-        {documents.length === 0 ? (
-          <div className="text-sm text-[#6b7280] py-2">No documents uploaded. Upload in the Policy document intake section above.</div>
-        ) : (
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {documents.map((d) => (
-              <div key={d.id} className="flex items-center justify-between py-1.5 text-sm border-b border-[#e2e8f0] last:border-0">
-                <span className="text-[#0b2b43]">{d.filename}</span>
-                <span className="text-xs text-[#6b7280]">
-                  {d.processing_status} · {formatDate(d.uploaded_at)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Panel B: Extraction status and confidence */}
-      <Card padding="lg">
-        <div className="text-sm font-semibold text-[#0b2b43] mb-2">B. Extraction status and confidence</div>
+        <div className="text-sm font-semibold text-[#0b2b43] mb-2">Policy & version</div>
         <div className="flex flex-wrap gap-3 items-center">
           <label className="text-sm text-[#6b7280]">Policy:</label>
           <select
@@ -343,25 +385,50 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           )}
         </div>
         {loading && <div className="text-sm text-[#6b7280] mt-2">Loading…</div>}
+        {documents.length > 0 && (
+          <div className="text-xs text-[#6b7280] mt-2">
+            Source: {documents.length} document{documents.length !== 1 ? 's' : ''}
+          </div>
+        )}
       </Card>
 
-      {/* Panel C: Canonical policy matrix */}
+      {/* Grouped policy matrix by topic */}
       {normalized?.version && (
         <Card padding="lg">
-          <div className="text-sm font-semibold text-[#0b2b43] mb-2">C. Canonical policy matrix</div>
-          <div className="text-xs text-[#6b7280] mb-3">
-            Editable benefit rules. Toggle allowed, set min/standard/max, add approval and evidence requirements.
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-[#0b2b43]">Benefit rules by topic</div>
+            <button type="button" onClick={handleExpandAll} className="text-xs text-[#059669] hover:underline">
+              {expandAll ? 'Collapse all' : 'Expand all'}
+            </button>
           </div>
+          {groupedBenefits.length === 0 ? (
+            <div className="text-sm text-[#6b7280] py-4">No benefit rules. Upload a document, Reprocess, then Normalize.</div>
+          ) : (
+          <div className="space-y-2">
+            {groupedBenefits.map(([cat, rules]) => {
+              const isExpanded = expandedTopics.has(cat);
+              const label = TOPIC_LABELS[cat] ?? cat;
+              const autoCount = (rules as any[]).filter((r: any) => r.auto_generated).length;
+              const manualCount = rules.length - autoCount;
+              return (
+                <div key={cat} className="border border-[#e2e8f0] rounded-lg overflow-hidden">
+                  <button type="button" onClick={() => toggleTopic(cat)} className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-[#f8fafc]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#6b7280]">{isExpanded ? '▼' : '▶'}</span>
+                      <span className="font-medium text-[#0b2b43]">{label}</span>
+                      <span className="text-xs text-[#6b7280]">{rules.length} rule{rules.length !== 1 ? 's' : ''}{autoCount > 0 ? ` · ${autoCount} auto` : ''}{manualCount > 0 ? ` · ${manualCount} manual` : ''}</span>
+                    </div>
+                  </button>
+                  {isExpanded && (
+                  <div className="border-t border-[#e2e8f0] bg-white">
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-[#e2e8f0] bg-[#f8fafc]">
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Benefit</th>
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Allowed</th>
-                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Min</th>
-                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Standard</th>
-                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Max</th>
-                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Currency / Unit</th>
+                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Value</th>
+                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Unit</th>
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Approval</th>
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Evidence</th>
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Notes</th>
@@ -370,17 +437,18 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                 </tr>
               </thead>
               <tbody>
-                {(normalized.benefit_rules || []).map((r: any) => {
+                {(rules as any[]).map((r: any) => {
                   const link = getSourceLink('benefit_rule', r.id);
                   const isEditing = editingRule?.id === r.id;
                   const metaVal = (k: string, def?: any) => meta(r, k, def);
                   const allowed = metaVal('allowed', true);
-                  const minVal = metaVal('min_value') ?? r.amount_value;
-                  const standardVal = r.amount_value ?? metaVal('standard_value');
-                  const maxVal = metaVal('max_value');
+                  const primaryVal = r.amount_value ?? metaVal('standard_value') ?? metaVal('max_value') ?? metaVal('min_value');
+                  const capVal = metaVal('max_value') ?? r.amount_value;
                   const approvalReq = metaVal('approval_required', false);
                   const evidenceReq = metaVal('evidence_required', false);
                   const notes = metaVal('hr_notes') ?? r.description ?? '';
+                  const unitStr = [r.currency, r.amount_unit].filter(Boolean).join(' ') || '—';
+                  const hasNumericCap = typeof capVal === 'number' && capVal > 0;
 
                   return (
                     <tr key={r.id} className="border-b border-[#e2e8f0] hover:bg-[#f8fafc]">
@@ -414,44 +482,16 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                       </td>
                       <td className="py-2 px-2">
                         {isEditing ? (
-                          <Input
-                            type="number"
-                            value={editingRule?.metadata_json ? String(meta(editingRule, 'min_value') ?? '') : String(minVal ?? '')}
-                            onChange={(val) => {
-                              const m = editingRule?.metadata_json || r?.metadata_json || {};
-                              setEditingRule({ ...editingRule, metadata_json: { ...m, min_value: val ? Number(val) : null } });
-                            }}
-                            placeholder="—"
-                          />
+                          <div className="space-y-1">
+                            {hasNumericCap && (
+                              <div className="h-2 w-24 bg-[#e2e8f0] rounded-full overflow-hidden">
+                                <div className="h-full bg-[#1f8e8b]" style={{ width: `${Math.min(100, ((editingRule?.amount_value ?? primaryVal ?? 0) / (typeof capVal === 'number' ? capVal : 1)) * 100)}%` }} />
+                              </div>
+                            )}
+                            <Input type="number" value={String(editingRule?.amount_value ?? primaryVal ?? '')} onChange={(val) => setEditingRule({ ...editingRule, amount_value: val ? Number(val) : null })} placeholder="—" />
+                          </div>
                         ) : (
-                          <>{minVal != null ? minVal : '—'}</>
-                        )}
-                      </td>
-                      <td className="py-2 px-2">
-                        {isEditing ? (
-                          <Input
-                            type="number"
-                            value={String(editingRule?.amount_value ?? standardVal ?? '')}
-                            onChange={(val) => setEditingRule({ ...editingRule, amount_value: val ? Number(val) : null })}
-                            placeholder="—"
-                          />
-                        ) : (
-                          <>{typeof standardVal === 'number' || typeof standardVal === 'string' ? standardVal : '—'}</>
-                        )}
-                      </td>
-                      <td className="py-2 px-2">
-                        {isEditing ? (
-                          <Input
-                            type="number"
-                            value={editingRule?.metadata_json ? String(meta(editingRule, 'max_value') ?? '') : String(maxVal ?? '')}
-                            onChange={(val) => {
-                              const m = editingRule?.metadata_json || r?.metadata_json || {};
-                              setEditingRule({ ...editingRule, metadata_json: { ...m, max_value: val ? Number(val) : null } });
-                            }}
-                            placeholder="—"
-                          />
-                        ) : (
-                          <>{typeof maxVal === 'number' || typeof maxVal === 'string' ? maxVal : '—'}</>
+                          primaryVal != null ? primaryVal : '—'
                         )}
                       </td>
                       <td className="py-2 px-2">
@@ -461,7 +501,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                             <Input value={editingRule?.amount_unit ?? r.amount_unit ?? ''} onChange={(val) => setEditingRule({ ...editingRule, amount_unit: val })} placeholder="Unit" />
                           </div>
                         ) : (
-                          <span>{[r.currency, r.amount_unit].filter(Boolean).join(' / ') || '—'}</span>
+                          <span>{unitStr}</span>
                         )}
                       </td>
                       <td className="py-2 px-2">
@@ -548,74 +588,48 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               </tbody>
             </table>
           </div>
-          {(normalized.benefit_rules?.length ?? 0) === 0 && (
-            <div className="text-sm text-[#6b7280] py-4">No benefit rules. Upload a document, Reprocess, then Normalize.</div>
+                  </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
           )}
         </Card>
       )}
 
-      {/* Panel D & E: Benefit cards, Exclusions, Evidence */}
-      {normalized?.version && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card padding="lg">
-            <div className="text-sm font-semibold text-[#0b2b43] mb-2">D. Benefit cards by category</div>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {Object.entries(groupedBenefits).map(([cat, rules]) => (
-                <div key={cat} className="border border-[#e2e8f0] rounded p-2">
-                  <div className="text-xs font-medium text-[#6b7280]">{cat}</div>
-                  {(rules as any[]).map((r: any) => (
-                    <div key={r.id} className="text-sm text-[#0b2b43] mt-1">
-                      {formatBenefitLabel(r)}: {r.amount_value != null ? r.amount_value : '—'} {r.currency || ''} {r.amount_unit || ''}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </Card>
-          <Card padding="lg">
-            <div className="text-sm font-semibold text-[#0b2b43] mb-2">E. Exclusions and evidence rules</div>
-            <div className="space-y-3 max-h-48 overflow-y-auto">
-              {normalized.exclusions?.length > 0 && (
-                <div>
-                  <div className="text-xs font-medium text-[#6b7280]">Exclusions</div>
+      {/* Exclusions & evidence summary */}
+      {normalized?.version && (normalized.exclusions?.length > 0 || normalized.evidence_requirements?.length > 0) && (
+        <Card padding="lg">
+          <div className="text-sm font-semibold text-[#0b2b43] mb-2">Exclusions & evidence</div>
+          <div className="space-y-3 text-sm">
+            {normalized.exclusions?.length > 0 && (
+              <div>
+                <div className="text-xs font-medium text-[#6b7280] mb-1">Exclusions</div>
+                <div className="flex flex-wrap gap-2">
                   {normalized.exclusions.map((e: any) => (
-                    <div key={e.id} className="text-sm py-1 border-b border-[#e2e8f0]">
-                      <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-xs">{e.domain}</span>
-                      {e.benefit_key && <span className="ml-1 text-[#6b7280]">{e.benefit_key}</span>}
-                      <div className="text-[#4b5563] truncate">{e.description || e.raw_text?.slice(0, 80)}</div>
+                    <div key={e.id} className="px-2 py-1 rounded bg-amber-50 border border-amber-200 text-xs">
+                      {e.benefit_key && <span className="font-medium">{e.benefit_key}</span>}
+                      <span className="text-[#4b5563]"> — {(e.description || e.raw_text || '').slice(0, 60)}{(e.description || e.raw_text || '').length > 60 ? '…' : ''}</span>
                     </div>
                   ))}
                 </div>
-              )}
-              {normalized.evidence_requirements?.length > 0 && (
-                <div>
-                  <div className="text-xs font-medium text-[#6b7280]">Evidence</div>
+              </div>
+            )}
+            {normalized.evidence_requirements?.length > 0 && (
+              <div>
+                <div className="text-xs font-medium text-[#6b7280] mb-1">Required evidence</div>
+                <div className="flex flex-wrap gap-1">
                   {normalized.evidence_requirements.map((ev: any) => (
-                    <div key={ev.id} className="text-sm py-1 border-b border-[#e2e8f0]">
+                    <span key={ev.id} className="px-2 py-0.5 rounded bg-[#f0fdf4] text-[#166534] text-xs">
                       {(Array.isArray(ev.evidence_items_json) ? ev.evidence_items_json : []).join(', ')}
-                      {ev.description && <div className="text-[#6b7280]">{ev.description}</div>}
-                    </div>
+                    </span>
                   ))}
                 </div>
-              )}
-              {normalized.conditions?.length > 0 && (
-                <div>
-                  <div className="text-xs font-medium text-[#6b7280]">Conditions</div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {normalized.conditions.map((c: any) => (
-                      <span key={c.id} className="px-2 py-0.5 rounded bg-[#f0fdf4] text-xs text-[#166534]">
-                        {c.condition_type}: {JSON.stringify(c.condition_value_json || {}).slice(0, 40)}…
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {(!normalized.exclusions?.length && !normalized.evidence_requirements?.length && !normalized.conditions?.length) && (
-                <div className="text-sm text-[#6b7280]">None</div>
-              )}
-            </div>
-          </Card>
-        </div>
+              </div>
+            )}
+          </div>
+        </Card>
       )}
 
       {/* Panel F: Publish controls */}
