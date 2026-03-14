@@ -781,12 +781,24 @@ function PolicyDocumentIntakeSection() {
   }, []);
 
   const handleUpload = async () => {
-    if (!uploadFile) return;
+    const fileToUpload = uploadFile;
+    if (!fileToUpload || !(fileToUpload instanceof File)) {
+      setMessage('Please choose a file first.');
+      return;
+    }
     setMessage('');
     setUploadRequestId(null);
     setUploading(true);
     try {
-      const res = await policyDocumentsAPI.upload(uploadFile);
+      if (import.meta.env.DEV) {
+        console.info('policy upload handleUpload', {
+          name: fileToUpload.name,
+          size: fileToUpload.size,
+          type: fileToUpload.type,
+          isFile: fileToUpload instanceof File,
+        });
+      }
+      const res = await policyDocumentsAPI.upload(fileToUpload);
       setUploadRequestId(res.request_id || null);
       if (res.ok) {
         setUploadFile(null);
@@ -890,7 +902,7 @@ function PolicyDocumentIntakeSection() {
         </span>
         <Button
           onClick={handleUpload}
-          disabled={!uploadFile || uploading || !uploadReady}
+          disabled={!uploadFile || !(uploadFile instanceof File) || uploading || !uploadReady}
         >
           {uploading ? 'Uploading…' : 'Upload & classify'}
         </Button>

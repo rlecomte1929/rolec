@@ -92,6 +92,10 @@ const cachedRequest = <T>(key: string, ttlMs: number, fetcher: () => Promise<T>)
 api.interceptors.request.use((config) => {
   const token = getAuthItem('relopass_token');
   if (!config.headers) (config as { headers?: Record<string, string> }).headers = {};
+  // FormData: must NOT set Content-Type so browser sets multipart/form-data with boundary
+  if (config.data instanceof FormData) {
+    delete (config.headers as Record<string, unknown>)['Content-Type'];
+  }
   if (token) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (config.headers as any).Authorization = `Bearer ${token}`;
@@ -347,9 +351,7 @@ export const hrAPI = {
   uploadCompanyLogo: async (file: File): Promise<{ ok: boolean; logo_url: string }> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/api/hr/company-profile/logo', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post('/api/hr/company-profile/logo', formData);
     return response.data;
   },
   removeCompanyLogo: async (): Promise<{ ok: boolean }> => {
@@ -1316,9 +1318,7 @@ export const hrPolicyAPI = {
   upload: async (file: File): Promise<{ policyId: string; policy: any }> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/api/hr/policies/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post('/api/hr/policies/upload', formData);
     return response.data;
   },
   delete: async (policyId: string): Promise<void> => {
@@ -1349,9 +1349,7 @@ export const companyPolicyAPI = {
     form.append('title', meta.title);
     if (meta.version) form.append('version', meta.version);
     if (meta.effective_date) form.append('effective_date', meta.effective_date);
-    const response = await api.post('/api/company-policies/upload', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post('/api/company-policies/upload', form);
     return response.data;
   },
   extract: async (policyId: string): Promise<{ policy: any; benefits: any[] }> => {
@@ -1447,9 +1445,18 @@ export const policyDocumentsAPI = {
     return response.data;
   },
   upload: async (file: File): Promise<{ ok: boolean; document: any; error_code?: string; message?: string; request_id?: string }> => {
+    // Backend expects field name "file"
     const form = new FormData();
     form.append('file', file);
-    // Do NOT set Content-Type: let the browser set multipart/form-data with boundary
+    if (import.meta.env.DEV) {
+      console.info('policy upload selected file', {
+        name: file?.name,
+        size: file?.size,
+        type: file?.type,
+        isFile: file instanceof File,
+      });
+      console.info('policy upload form keys', [...form.keys()]);
+    }
     const response = await api.post('/api/hr/policy-documents/upload', form);
     return response.data;
   },
