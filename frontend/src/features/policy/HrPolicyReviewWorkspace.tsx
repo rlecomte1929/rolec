@@ -180,11 +180,19 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   };
 
   const handleSaveStatus = async (status: string) => {
-    if (!selectedPolicyId || !normalized?.version?.id) return;
+    if (!selectedPolicyId) return;
     setStatusBusy(true);
     setMessage('');
     try {
-      await companyPolicyAPI.patchVersionStatus(selectedPolicyId, normalized.version.id, { status });
+      // Refetch to ensure we have the latest version_id (avoids 404 from stale state)
+      const fresh = await companyPolicyAPI.getNormalized(selectedPolicyId);
+      const versionId = fresh?.version?.id;
+      if (!versionId) {
+        setMessage('No policy version found. Normalize a document first.');
+        setMessageVariant('error');
+        return;
+      }
+      await companyPolicyAPI.patchVersionStatus(selectedPolicyId, versionId, { status });
       const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
       setNormalized(res);
       setMessage(STATUS_SUCCESS_LABELS[status] ?? 'Status updated.');
@@ -212,11 +220,19 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   };
 
   const handlePublish = async () => {
-    if (!selectedPolicyId || !normalized?.version?.id) return;
+    if (!selectedPolicyId) return;
     setPublishBusy(true);
     setMessage('');
     try {
-      await companyPolicyAPI.publishVersion(selectedPolicyId, normalized.version.id);
+      // Refetch to ensure we have the latest version_id (avoids 404 from stale state)
+      const fresh = await companyPolicyAPI.getNormalized(selectedPolicyId);
+      const versionId = fresh?.version?.id;
+      if (!versionId) {
+        setMessage('No policy version found. Normalize a document first.');
+        setMessageVariant('error');
+        return;
+      }
+      await companyPolicyAPI.publishVersion(selectedPolicyId, versionId);
       const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
       setNormalized(res);
       setMessage('Version published. Employees will see this policy.');
