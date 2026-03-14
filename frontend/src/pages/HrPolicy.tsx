@@ -715,6 +715,7 @@ const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
   resolved_assignment_policies_table_missing: 'Policy database tables are missing.',
   db_insert_failed: 'The uploaded file could not be registered in the database.',
   invalid_file_type: 'Only PDF or DOCX files are supported.',
+  normalization_failed: 'Normalization failed because of an invalid policy_versions payload.',
 };
 
 function getUploadErrorMessage(err: unknown): string {
@@ -843,10 +844,12 @@ function PolicyDocumentIntakeSection() {
       setMessage(`Normalized: ${res.summary?.benefit_rules ?? 0} benefits, ${res.summary?.exclusions ?? 0} exclusions`);
       await loadDocs();
     } catch (err: unknown) {
-      const detail = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+      const data = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { error_code?: string; message?: string; detail?: string } } }).response?.data
         : null;
-      setMessage(String(detail || 'Normalize failed'));
+      const code = data?.error_code;
+      const msg = (code && UPLOAD_ERROR_MESSAGES[code]) || data?.message || data?.detail;
+      setMessage(String(msg || 'Normalize failed'));
     } finally {
       setNormalizingId(null);
     }

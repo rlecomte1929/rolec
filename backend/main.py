@@ -5204,12 +5204,26 @@ def normalize_policy_document(
         raise HTTPException(status_code=400, detail="No clauses. Run Reprocess to segment the document first.")
     try:
         from .services.policy_normalization import run_normalization
-        result = run_normalization(db, doc, clauses, created_by=user.get("id"))
+        result = run_normalization(db, doc, clauses, created_by=user.get("id"), request_id=request_id)
         log.info("request_id=%s normalize policy_document=%s -> policy=%s version=%s", request_id, doc_id, result["policy_id"], result["policy_version_id"])
         return {"policy_id": result["policy_id"], "policy_version_id": result["policy_version_id"], "summary": result["summary"]}
     except Exception as exc:
         log.warning("request_id=%s normalize failed: %s", request_id, exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Normalization failed: {str(exc)}")
+        err_str = str(exc)
+        if "DatatypeMismatch" in err_str or "auto_generated" in err_str or "boolean" in err_str:
+            msg = "Normalization failed because of an invalid policy_versions payload."
+        else:
+            msg = f"Normalization failed: {err_str[:500]}"
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error_code": "normalization_failed",
+                "message": msg,
+                "request_id": request_id,
+                "detail": err_str[:300],
+            },
+        )
 
 
 # ---------------------------------------------------------------------------

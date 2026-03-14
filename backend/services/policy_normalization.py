@@ -288,6 +288,7 @@ def run_normalization(
     policy_document: Dict[str, Any],
     clauses: List[Dict[str, Any]],
     created_by: Optional[str] = None,
+    request_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run full normalization: create/attach company_policy, create policy_version,
@@ -340,6 +341,7 @@ def run_normalization(
         review_status="pending",
         confidence=0.7,
         created_by=created_by,
+        request_id=request_id,
     )
 
     benefit_idx_to_id: Dict[int, str] = {}

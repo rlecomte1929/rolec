@@ -30,6 +30,29 @@ _engine = create_engine(_raw_url, connect_args=_connect_args)
 _is_sqlite = _raw_url.startswith("sqlite")
 
 
+def normalize_policy_boolean_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Coerce known boolean keys to Python bool before DB write.
+    Postgres boolean columns require True/False, not 1/0.
+    """
+    BOOLEAN_KEYS = ("auto_generated", "ag")
+    out = dict(payload)
+    for k in BOOLEAN_KEYS:
+        if k not in out:
+            continue
+        v = out[k]
+        if v is None:
+            continue
+        if isinstance(v, int):
+            out[k] = bool(v)
+        elif not isinstance(v, bool):
+            try:
+                out[k] = bool(v)
+            except (TypeError, ValueError):
+                out[k] = True
+    return out
+
+
 def _auto_id_col() -> str:
     """Return the DDL fragment for an auto-incrementing integer PK."""
     if _is_sqlite:
@@ -5130,6 +5153,19 @@ class Database:
     # Policy normalization (canonical policy objects)
     # ==================================================================
 
+    @staticmethod
+    def _coerce_policy_boolean_fields(payload: Dict[str, Any], boolean_keys: List[str]) -> Dict[str, Any]:
+        """Ensure boolean DB columns receive Python bool, not int. Safe for Postgres."""
+        out = dict(payload)
+        for k in boolean_keys:
+            if k in out and out[k] is not None:
+                v = out[k]
+                if isinstance(v, int):
+                    out[k] = bool(v)
+                elif not isinstance(v, bool):
+                    out[k] = bool(v)
+        return out
+
     def create_policy_version(
         self,
         version_id: str,
@@ -5141,8 +5177,28 @@ class Database:
         review_status: str = "pending",
         confidence: Optional[float] = None,
         created_by: Optional[str] = None,
+        request_id: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
+        params = {
+            "id": version_id,
+            "pid": policy_id,
+            "doc_id": source_policy_document_id,
+            "vn": version_number,
+            "status": status,
+            "ag": True if auto_generated else False,
+            "rs": review_status,
+            "conf": confidence,
+            "cb": created_by,
+            "now": now,
+        }
+        params = normalize_policy_boolean_fields(params)
+        if request_id:
+            log.info(
+                "request_id=%s policy_versions insert payload keys=%s status=%s auto_generated=%s review_status=%s ag_type=%s",
+                request_id, list(params.keys()), params.get("status"), params.get("ag"),
+                params.get("rs"), type(params.get("ag")).__name__,
+            )
         with self.engine.begin() as conn:
             conn.execute(
                 text("""
@@ -5151,18 +5207,7 @@ class Database:
                      auto_generated, review_status, confidence, created_by, created_at, updated_at)
                     VALUES (:id, :pid, :doc_id, :vn, :status, :ag, :rs, :conf, :cb, :now, :now)
                 """),
-                {
-                    "id": version_id,
-                    "pid": policy_id,
-                    "doc_id": source_policy_document_id,
-                    "vn": version_number,
-                    "status": status,
-                    "ag": 1 if auto_generated else 0,
-                    "rs": review_status,
-                    "conf": confidence,
-                    "cb": created_by,
-                    "now": now,
-                },
+                params,
             )
 
     def get_latest_policy_version(self, policy_id: str) -> Optional[Dict[str, Any]]:
@@ -5324,7 +5369,7 @@ class Database:
                     "freq": rule.get("frequency"),
                     "desc": rule.get("description"),
                     "meta": json.dumps(rule.get("metadata_json")) if rule.get("metadata_json") else None,
-                    "ag": 1 if rule.get("auto_generated", True) else 0,
+                    "ag": bool(rule.get("auto_generated", True)),
                     "rs": rule.get("review_status", "pending"),
                     "conf": rule.get("confidence"),
                     "raw": rule.get("raw_text"),
@@ -5350,7 +5395,7 @@ class Database:
                     "bk": excl.get("benefit_key"),
                     "dom": excl["domain"],
                     "desc": excl.get("description"),
-                    "ag": 1 if excl.get("auto_generated", True) else 0,
+                    "ag": bool(excl.get("auto_generated", True)),
                     "rs": excl.get("review_status", "pending"),
                     "conf": excl.get("confidence"),
                     "raw": excl.get("raw_text"),
@@ -5376,7 +5421,7 @@ class Database:
                     "brid": ev.get("benefit_rule_id"),
                     "items": json.dumps(ev.get("evidence_items_json") or []),
                     "desc": ev.get("description"),
-                    "ag": 1 if ev.get("auto_generated", True) else 0,
+                    "ag": bool(ev.get("auto_generated", True)),
                     "rs": ev.get("review_status", "pending"),
                     "conf": ev.get("confidence"),
                     "raw": ev.get("raw_text"),
@@ -5403,7 +5448,7 @@ class Database:
                     "oid": cond["object_id"],
                     "ct": cond["condition_type"],
                     "val": json.dumps(cond.get("condition_value_json") or {}),
-                    "ag": 1 if cond.get("auto_generated", True) else 0,
+                    "ag": bool(cond.get("auto_generated", True)),
                     "rs": cond.get("review_status", "pending"),
                     "conf": cond.get("confidence"),
                     "now": now,
