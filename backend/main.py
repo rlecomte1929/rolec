@@ -4724,6 +4724,18 @@ def list_company_policies(
 BUCKET_HR_POLICIES = "hr-policies"
 
 
+def _sanitize_storage_filename(name: str) -> str:
+    """Make filename S3/storage-safe: replace spaces and problematic chars."""
+    import re
+    import unicodedata
+    base, _, ext = name.rpartition(".")
+    safe = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode()
+    safe = re.sub(r"[^a-zA-Z0-9._-]", "-", safe).strip("-._") or "file"
+    safe = re.sub(r"-+", "-", safe)
+    ext = (ext or "").lower()
+    return f"{safe}.{ext}" if ext else safe
+
+
 # Policy upload error codes (stable, for frontend mapping)
 UPLOAD_MISSING_FILE = "upload_missing_file"
 UPLOAD_INVALID_MIME_TYPE = "upload_invalid_mime_type"
@@ -4891,7 +4903,8 @@ async def upload_policy_document(
         log.warning("request_id=%s policy_upload checksum failed: %s", request_id, e)
 
     doc_id = str(uuid.uuid4())
-    path = f"companies/{company_id}/policy-documents/{doc_id}/{filename}"
+    storage_filename = _sanitize_storage_filename(filename)
+    path = f"companies/{company_id}/policy-documents/{doc_id}/{storage_filename}"
 
     # --- Stage B: Upload to Supabase Storage ---
     try:
@@ -4902,9 +4915,18 @@ async def upload_policy_document(
         )
         log.info("request_id=%s policy_upload stage=storage ok path=%s", request_id, path)
     except Exception as exc:
+        # Extract StorageException details for logging (storage3 passes dict as exc.args)
+        exc_detail = {}
+        if hasattr(exc, "args") and exc.args and isinstance(exc.args[0], dict):
+            d = exc.args[0]
+            exc_detail = {
+                "status_code": d.get("statusCode") or d.get("status_code"),
+                "error_code": d.get("error") or d.get("code"),
+                "message": (d.get("message") or str(d))[:200],
+            }
         log.error(
-            "request_id=%s policy_upload stage=storage failed filename=%s path=%s exc=%s",
-            request_id, filename, path, exc, exc_info=True,
+            "request_id=%s policy_upload stage=storage failed filename=%s path=%s exc=%s exc_detail=%s",
+            request_id, filename, path, exc, exc_detail, exc_info=True,
         )
         code, msg = _map_storage_exception_to_response(exc, BUCKET_HR_POLICIES)
         return _upload_error_response(code, msg, 500, request_id=request_id)
