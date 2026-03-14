@@ -107,6 +107,11 @@ app = FastAPI(title="ReloPass API", version="1.0.0")
 log.info("Initializing database schemas...")
 init_db()
 db.log_expected_tables_status()
+try:
+    from .services.policy_storage_health import log_startup_storage_diagnostic
+    log_startup_storage_diagnostic(db)
+except Exception as e:
+    log.warning("policy_storage startup diagnostic skipped: %s", e)
 log.info("Seeding demo cases...")
 seed_demo_cases()
 try:
@@ -3128,18 +3133,28 @@ def _require_company_for_user(user: Dict[str, Any]) -> Dict[str, Any]:
     return profile
 
 
+def _map_storage_exception_to_response(exc: Exception, bucket: str) -> tuple[str, str]:
+    """Return (error_code, user_safe_message). No secrets."""
+    from .services.policy_storage_health import (
+        STORAGE_MISSING_SERVICE_ROLE,
+        STORAGE_BUCKET_NOT_FOUND,
+        STORAGE_ACCESS_DENIED,
+        get_storage_error_code,
+    )
+    code = get_storage_error_code(exc)
+    if code == STORAGE_MISSING_SERVICE_ROLE:
+        return (code, "Policy upload is not configured correctly. Contact support.")
+    if code == STORAGE_BUCKET_NOT_FOUND:
+        return (code, "Policy storage bucket is unavailable.")
+    if code == STORAGE_ACCESS_DENIED:
+        return (code, "Policy storage access denied.")
+    return (code, "Upload failed. Please try again.")
+
+
 def _sanitize_storage_error(exc: Exception, bucket: str) -> str:
-    """Return safe user-facing message; avoid leaking API keys or internal details."""
-    msg = str(exc).lower()
-    if "invalid" in msg and ("api" in msg or "key" in msg or "jwt" in msg):
-        return f"Storage configuration error. Check SUPABASE_SERVICE_ROLE_KEY and {bucket} bucket."
-    if "bucket" in msg and "not found" in msg:
-        return f"Storage bucket '{bucket}' not found. Ensure the bucket exists in Supabase."
-    if "permission" in msg or "forbidden" in msg:
-        return f"Storage permission denied. Check RLS and service role access for {bucket} bucket."
-    # Generic fallback - truncate and avoid raw exception strings
-    safe = re.sub(r"[a-f0-9]{32,}", "[redacted]", str(exc))[:200]
-    return f"Storage upload failed: {safe}. Check SUPABASE_SERVICE_ROLE_KEY and {bucket} bucket."
+    """Return safe user-facing message for HTTPException detail. Used by non-upload routes."""
+    _, msg = _map_storage_exception_to_response(exc, bucket)
+    return msg
 
 
 @app.get("/api/employee/assignments/{assignment_id}/services")
@@ -4706,6 +4721,28 @@ def list_company_policies(
 # Policy Document Intake (staging layer before company_policies)
 # ---------------------------------------------------------------------------
 
+BUCKET_HR_POLICIES = "hr-policies"
+
+
+def _upload_error_response(error_code: str, message: str, status: int = 500) -> JSONResponse:
+    """Return structured JSON error for policy upload."""
+    return JSONResponse(
+        status_code=status,
+        content={"error_code": error_code, "message": message},
+    )
+
+
+@app.get("/api/hr/policy-documents/health")
+def policy_documents_health(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    """
+    Diagnostic endpoint for policy document upload readiness.
+    Returns Supabase storage and policy table health.
+    """
+    from .services.policy_storage_health import check_policy_storage_health
+    health = check_policy_storage_health(db)
+    return health
+
+
 @app.post("/api/hr/policy-documents/upload")
 async def upload_policy_document(
     req: Request,
@@ -4713,14 +4750,34 @@ async def upload_policy_document(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """Upload policy PDF/DOCX for intake: extract text, classify, extract metadata."""
+    from .services.policy_storage_health import (
+        check_policy_storage_health,
+        STORAGE_MISSING_SERVICE_ROLE,
+        STORAGE_BUCKET_NOT_FOUND,
+        POLICY_DOCUMENTS_TABLE_MISSING,
+        DB_INSERT_FAILED,
+    )
     request_id = getattr(req.state, "request_id", None) if req else None
     profile = _require_company_for_user(user)
     filename = file.filename or "policy"
     ext = filename.split(".")[-1].lower()
     if ext not in ("docx", "pdf"):
-        raise HTTPException(status_code=400, detail="Only .docx or .pdf supported")
+        return _upload_error_response("invalid_file_type", "Only .docx or .pdf supported", 400)
     mime = file.content_type or ("application/pdf" if ext == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     content = await file.read()
+
+    # Validate config before upload
+    health = check_policy_storage_health(db)
+    if not health["supabase_url_present"] or not health["service_role_present"]:
+        log.error("request_id=%s policy_upload config missing: url=%s service_role=%s", request_id, health["supabase_url_present"], health["service_role_present"])
+        return _upload_error_response(STORAGE_MISSING_SERVICE_ROLE, "Policy upload is not configured correctly. Contact support.")
+    if not health["bucket_access_ok"]:
+        log.error("request_id=%s policy_upload bucket access failed", request_id)
+        return _upload_error_response(STORAGE_BUCKET_NOT_FOUND, "Policy storage bucket is unavailable.")
+    if not health["policy_documents_table_ok"]:
+        log.error("request_id=%s policy_upload policy_documents table missing", request_id)
+        return _upload_error_response(POLICY_DOCUMENTS_TABLE_MISSING, "Policy database tables are missing.")
+
     checksum = None
     try:
         from .services.policy_document_intake import (
@@ -4732,26 +4789,38 @@ async def upload_policy_document(
         log.warning("request_id=%s policy_document_upload checksum failed: %s", request_id, e)
     doc_id = str(uuid.uuid4())
     path = f"companies/{profile['company_id']}/policy-documents/{doc_id}/{filename}"
+
     try:
         supabase = get_supabase_admin_client()
-        supabase.storage.from_("hr-policies").upload(
+        supabase.storage.from_(BUCKET_HR_POLICIES).upload(
             path, content,
             {"content-type": mime, "upsert": True},
         )
     except Exception as exc:
         log.error("request_id=%s policy_document_upload storage failed: %s", request_id or "?", exc, exc_info=True)
-        detail = _sanitize_storage_error(exc, "hr-policies")
-        raise HTTPException(status_code=500, detail=detail)
-    db.create_policy_document(
-        doc_id=doc_id,
-        company_id=profile["company_id"],
-        uploaded_by_user_id=user.get("id", ""),
-        filename=filename,
-        mime_type=mime,
-        storage_path=path,
-        checksum=checksum,
-        request_id=request_id,
-    )
+        code, msg = _map_storage_exception_to_response(exc, BUCKET_HR_POLICIES)
+        return _upload_error_response(code, msg)
+
+    try:
+        db.create_policy_document(
+            doc_id=doc_id,
+            company_id=profile["company_id"],
+            uploaded_by_user_id=user.get("id", ""),
+            filename=filename,
+            mime_type=mime,
+            storage_path=path,
+            checksum=checksum,
+            request_id=request_id,
+        )
+    except Exception as exc:
+        log.error("request_id=%s policy_document_upload db insert failed: %s", request_id, exc, exc_info=True)
+        try:
+            supabase = get_supabase_admin_client()
+            supabase.storage.from_(BUCKET_HR_POLICIES).remove([path])
+        except Exception as cleanup_exc:
+            log.warning("request_id=%s policy_document_upload cleanup failed: %s", request_id, cleanup_exc)
+        return _upload_error_response(DB_INSERT_FAILED, "Policy database tables are missing.")
+
     try:
         from .services.policy_document_intake import process_uploaded_document
         result = process_uploaded_document(content, mime, filename, request_id=request_id)

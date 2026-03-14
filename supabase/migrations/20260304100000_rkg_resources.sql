@@ -151,12 +151,19 @@ alter table public.country_resource_tags enable row level security;
 alter table public.rkg_country_events enable row level security;
 alter table public.case_resource_preferences enable row level security;
 
+drop policy if exists "resource_categories_read" on public.resource_categories;
 create policy "resource_categories_read" on public.resource_categories for select using (true);
+drop policy if exists "resource_sources_read" on public.resource_sources;
 create policy "resource_sources_read" on public.resource_sources for select using (true);
+drop policy if exists "resource_tags_read" on public.resource_tags;
 create policy "resource_tags_read" on public.resource_tags for select using (true);
+drop policy if exists "country_resources_read" on public.country_resources;
 create policy "country_resources_read" on public.country_resources for select using (true);
+drop policy if exists "country_resource_tags_read" on public.country_resource_tags;
 create policy "country_resource_tags_read" on public.country_resource_tags for select using (true);
+drop policy if exists "rkg_country_events_read" on public.rkg_country_events;
 create policy "rkg_country_events_read" on public.rkg_country_events for select using (true);
+drop policy if exists "case_resource_preferences_all" on public.case_resource_preferences;
 create policy "case_resource_preferences_all" on public.case_resource_preferences for all using (true);
 
 commit;

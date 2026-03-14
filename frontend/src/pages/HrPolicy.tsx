@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card, Input } from '../components/antigravity';
@@ -695,6 +695,31 @@ export function NormalizedPolicySectionLegacy() {
   );
 }
 
+const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
+  storage_missing_service_role: 'Policy upload is not configured correctly. Contact support.',
+  storage_missing_url: 'Policy upload is not configured correctly. Contact support.',
+  storage_bucket_not_found: 'Policy storage bucket is unavailable.',
+  storage_upload_failed: 'Upload failed. Please try again.',
+  storage_access_denied: 'Policy storage access denied.',
+  policy_documents_table_missing: 'Policy database tables are missing.',
+  policy_document_clauses_table_missing: 'Policy database tables are missing.',
+  policy_versions_table_missing: 'Policy database tables are missing.',
+  resolved_assignment_policies_table_missing: 'Policy database tables are missing.',
+  db_insert_failed: 'Policy database tables are missing.',
+  invalid_file_type: 'Only .docx or .pdf supported.',
+};
+
+function getUploadErrorMessage(err: unknown): string {
+  const data = err && typeof err === 'object' && 'response' in err
+    ? (err as { response?: { data?: { error_code?: string; message?: string; detail?: string } } }).response?.data
+    : null;
+  const code = data?.error_code;
+  if (code && UPLOAD_ERROR_MESSAGES[code]) return UPLOAD_ERROR_MESSAGES[code];
+  if (data?.message && typeof data.message === 'string') return data.message;
+  if (data?.detail && typeof data.detail === 'string') return data.detail;
+  return 'Upload failed. Please try again.';
+}
+
 function PolicyDocumentIntakeSection() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -704,6 +729,13 @@ function PolicyDocumentIntakeSection() {
   const [expandedTab, setExpandedTab] = useState<'metadata' | 'structure'>('metadata');
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
   const [normalizingId, setNormalizingId] = useState<string | null>(null);
+  const [health, setHealth] = useState<{
+    bucket_access_ok: boolean;
+    policy_documents_table_ok: boolean;
+    supabase_url_present?: boolean;
+    service_role_present?: boolean;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadDocs = async () => {
     try {
@@ -711,16 +743,25 @@ function PolicyDocumentIntakeSection() {
       setDocuments(res.documents || []);
       setMessage('');
     } catch (err: unknown) {
-      const detail = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : null;
-      setMessage(String(detail || 'Unable to load documents'));
+      setMessage('Unable to load documents');
       setDocuments([]);
     }
   };
 
+  const loadHealth = async () => {
+    try {
+      const h = await policyDocumentsAPI.health();
+      setHealth(h);
+    } catch {
+      setHealth(null);
+    }
+  };
+
+  const uploadReady = health === null || (health.bucket_access_ok && health.policy_documents_table_ok);
+
   useEffect(() => {
     loadDocs();
+    loadHealth();
   }, []);
 
   const handleUpload = async () => {
@@ -730,12 +771,10 @@ function PolicyDocumentIntakeSection() {
     try {
       await policyDocumentsAPI.upload(uploadFile);
       setUploadFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       await loadDocs();
     } catch (err: unknown) {
-      const detail = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : null;
-      setMessage(String(detail || 'Upload failed'));
+      setMessage(getUploadErrorMessage(err));
     } finally {
       setUploading(false);
     }
@@ -783,18 +822,44 @@ function PolicyDocumentIntakeSection() {
       </div>
 
       {message && (
-        <Alert variant={message === 'Saved' ? 'success' : 'error'} className="mt-4">{message}</Alert>
+        <Alert variant={message.startsWith('Normalized') ? 'success' : message === 'Saved' ? 'success' : 'error'} className="mt-4">{message}</Alert>
       )}
 
-      <div className="flex items-center gap-3 mt-4">
+      {health && !uploadReady && (
+        <Alert variant="error" className="mt-4">
+          {!health.supabase_url_present || !health.service_role_present
+            ? 'Policy upload is not configured correctly. Contact support.'
+            : !health.bucket_access_ok
+            ? 'Policy storage bucket is unavailable.'
+            : !health.policy_documents_table_ok
+            ? 'Policy database tables are missing.'
+            : 'Policy upload is not ready.'}
+        </Alert>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3 mt-4">
         <input
+          ref={fileInputRef}
           type="file"
           accept=".docx,.pdf"
           onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+          className="sr-only"
+          aria-label="Choose policy document file"
         />
         <Button
+          type="button"
+          variant="outline"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!uploadReady}
+        >
+          Choose file
+        </Button>
+        <span className="text-sm text-[#6b7280] min-w-[8rem]">
+          {uploadFile ? uploadFile.name : 'No file selected'}
+        </span>
+        <Button
           onClick={handleUpload}
-          disabled={!uploadFile || uploading}
+          disabled={!uploadFile || uploading || !uploadReady}
         >
           {uploading ? 'Uploading…' : 'Upload & classify'}
         </Button>

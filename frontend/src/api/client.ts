@@ -1425,6 +1425,19 @@ export const companyPolicyAPI = {
 
 /** Policy document intake: upload PDF/DOCX, classify before extraction */
 export const policyDocumentsAPI = {
+  health: async (): Promise<{
+    supabase_url_present: boolean;
+    service_role_present: boolean;
+    bucket_name: string;
+    bucket_access_ok: boolean;
+    policy_documents_table_ok: boolean;
+    policy_document_clauses_table_ok: boolean;
+    policy_versions_table_ok: boolean;
+    resolved_assignment_policies_table_ok: boolean;
+  }> => {
+    const response = await api.get('/api/hr/policy-documents/health');
+    return response.data;
+  },
   list: async (): Promise<{ documents: any[] }> => {
     const response = await api.get('/api/hr/policy-documents');
     return response.data;
