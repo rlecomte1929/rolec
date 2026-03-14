@@ -128,7 +128,7 @@ export const AdminMessages: React.FC = () => {
         const res = await adminAPI.getHrThreadDetail(t.assignment_id);
         setThreadDetail(res);
       } else if (t.thread_type === 'collaboration') {
-        const [threadRes, commentsRes] = await Promise.all([
+        const [, commentsRes] = await Promise.all([
           adminCollaborationAPI.getThreadById(t.thread_id),
           adminCollaborationAPI.getComments(t.thread_id),
         ]);

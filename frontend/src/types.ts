@@ -785,6 +785,11 @@ export interface AdminAssignmentDetail extends AdminAssignment {
   company_has_published_policy?: boolean;
   hr_profile_id?: string;
   emp_profile_id?: string;
+  employee_email?: string;
+  hr_email?: string;
+  employee_profile_company_id?: string;
+  hr_profile_company_id?: string;
+  company_id?: string;
 }
 
 export interface AdminSupportCase {

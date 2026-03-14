@@ -4,7 +4,7 @@ import { AdminLayout } from './AdminLayout';
 import { adminAPI } from '../../api/client';
 import type { AdminAssignment, AdminAssignmentDetail, AdminCompany } from '../../types';
 import { buildRoute } from '../../navigation/routes';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -24,7 +24,6 @@ const destination = (a: AdminAssignment) =>
 const origin = (a: AdminAssignment) => a.home_country || '—';
 
 export const AdminAssignments: React.FC = () => {
-  const navigate = useNavigate();
   const [assignments, setAssignments] = useState<AdminAssignment[]>([]);
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [filters, setFilters] = useState({
@@ -36,7 +35,6 @@ export const AdminAssignments: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminAssignmentDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
 
   const loadAssignments = useCallback(async () => {
     setLoading(true);
@@ -83,9 +81,9 @@ export const AdminAssignments: React.FC = () => {
   const isLinkageConsistent = (d: AdminAssignmentDetail | null): { ok: boolean; issues: string[] } => {
     if (!d) return { ok: true, issues: [] };
     const issues: string[] = [];
-    const caseCo = d.case_company_id || d.company_id;
-    const empCo = d.employee_company_id || d.employee_profile_company_id;
-    const hrCo = d.hr_company_id || d.hr_profile_company_id;
+    const caseCo = d.case_company_id || (d as { company_id?: string }).company_id;
+    const empCo = d.employee_company_id || (d as { employee_profile_company_id?: string }).employee_profile_company_id;
+    const hrCo = d.hr_company_id || (d as { hr_profile_company_id?: string }).hr_profile_company_id;
     if (caseCo && empCo && caseCo !== empCo) issues.push('Employee company differs from assignment company');
     if (caseCo && hrCo && caseCo !== hrCo) issues.push('HR company differs from assignment company');
     if (empCo && hrCo && empCo !== hrCo) issues.push('Employee and HR belong to different companies');
@@ -200,14 +198,6 @@ export const AdminAssignments: React.FC = () => {
             loadAssignments();
             loadDetail(selectedId);
           }}
-          onNavigateEmployee={(id) => {
-            setSelectedId(null);
-            navigate(buildRoute('employeeJourney') + `?assignment=${id}`);
-          }}
-          onNavigateHr={() => {
-            setSelectedId(null);
-            navigate(buildRoute('hrDashboard'));
-          }}
         />
       )}
     </AdminLayout>
@@ -220,8 +210,6 @@ interface AdminAssignmentDetailDrawerProps {
   linkage: { ok: boolean; issues: string[] };
   onClose: () => void;
   onRefresh: () => void;
-  onNavigateEmployee: (id: string) => void;
-  onNavigateHr: () => void;
 }
 
 const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = ({
@@ -230,8 +218,6 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
   linkage,
   onClose,
   onRefresh,
-  onNavigateEmployee,
-  onNavigateHr,
 }) => {
   const [reason, setReason] = useState('');
   const [reassignCompanyId, setReassignCompanyId] = useState('');
