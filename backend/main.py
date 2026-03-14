@@ -1179,6 +1179,112 @@ def list_relocations(
     return {"relocations": items}
 
 
+@app.get("/api/admin/assignments")
+def list_admin_assignments(
+    company_id: Optional[str] = Query(None),
+    employee_user_id: Optional[str] = Query(None),
+    employee_search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    destination_country: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    items = db.list_admin_assignments(
+        company_id=company_id,
+        employee_user_id=employee_user_id,
+        employee_search=employee_search,
+        status=status,
+        destination_country=destination_country,
+    )
+    db.log_audit(
+        user["id"], "READ", "admin_assignments", None, None,
+        {"company_id": company_id, "status": status, "destination": destination_country},
+    )
+    return {"assignments": items}
+
+
+@app.get("/api/admin/assignments/{assignment_id}")
+def get_admin_assignment_detail(assignment_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    detail = db.get_admin_assignment_detail(assignment_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.log_audit(user["id"], "READ", "admin_assignment_detail", assignment_id, None, {})
+    return {"assignment": detail}
+
+
+class AdminReassignEmployeeCompanyRequest(BaseModel):
+    reason: str
+    company_id: str
+
+
+class AdminReassignHrOwnerRequest(BaseModel):
+    reason: str
+    hr_user_id: str
+
+
+class AdminFixCompanyLinkageRequest(BaseModel):
+    reason: str
+    company_id: str
+
+
+@app.patch("/api/admin/assignments/{assignment_id}/reassign-employee-company")
+def admin_reassign_employee_company(
+    assignment_id: str,
+    request: AdminReassignEmployeeCompanyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    _require_reason(request.reason)
+    detail = db.get_admin_assignment_detail(assignment_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    emp_id = detail.get("employee_user_id")
+    if not emp_id:
+        raise HTTPException(status_code=400, detail="Assignment has no linked employee")
+    db.admin_reassign_employee_company(emp_id, request.company_id)
+    db.log_audit(user["id"], "REASSIGN_EMPLOYEE_COMPANY", "assignment", assignment_id, request.reason, {"company_id": request.company_id})
+    return {"ok": True}
+
+
+@app.patch("/api/admin/assignments/{assignment_id}/reassign-hr-owner")
+def admin_reassign_hr_owner(
+    assignment_id: str,
+    request: AdminReassignHrOwnerRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    _require_reason(request.reason)
+    detail = db.get_admin_assignment_detail(assignment_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.admin_reassign_hr_owner(assignment_id, request.hr_user_id)
+    db.log_audit(user["id"], "REASSIGN_HR_OWNER", "assignment", assignment_id, request.reason, {"hr_user_id": request.hr_user_id})
+    return {"ok": True}
+
+
+@app.patch("/api/admin/assignments/{assignment_id}/fix-company-linkage")
+def admin_fix_assignment_company_linkage(
+    assignment_id: str,
+    request: AdminFixCompanyLinkageRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    _require_reason(request.reason)
+    detail = db.get_admin_assignment_detail(assignment_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.admin_fix_assignment_company_linkage(assignment_id, request.company_id)
+    db.log_audit(user["id"], "FIX_COMPANY_LINKAGE", "assignment", assignment_id, request.reason, {"company_id": request.company_id})
+    return {"ok": True}
+
+
+@app.get("/api/admin/policies/overview")
+def list_admin_policy_overview(
+    company_id: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: per-company policy status for overview."""
+    items = db.list_admin_policy_overview(company_id=company_id)
+    db.log_audit(user["id"], "READ", "admin_policy_overview", None, None, {"company_id": company_id})
+    return {"companies": items}
+
+
 @app.get("/api/admin/support-cases")
 def list_support_cases(
     status: Optional[str] = Query(None),
@@ -1211,6 +1317,64 @@ def add_support_note(case_id: str, request: AdminSupportNoteRequest, user: Dict[
         {"note": request.note},
     )
     return {"ok": True}
+
+
+# Admin Messages - HR/employee threads + internal collaboration
+@app.get("/api/admin/messages/threads")
+def list_admin_message_threads(
+    company_id: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None),
+    thread_type: Optional[str] = Query(None, description="hr_employee | collaboration"),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """List message threads: HR-employee (legacy messages) and/or collaboration (internal admin)."""
+    hr_threads = []
+    collab_threads = []
+    if not thread_type or thread_type == "hr_employee":
+        hr_threads = db.list_admin_message_threads(
+            company_id=company_id, user_id=user_id, limit=limit, offset=offset
+        )
+    if not thread_type or thread_type == "collaboration":
+        try:
+            from .services.collaboration_service import list_all_threads
+            collab_threads = list_all_threads(
+                user.get("id", ""),
+                target_type=None,
+                participant_user_id=user_id,
+                status=None,
+                limit=limit,
+                offset=offset,
+            )
+        except Exception as e:
+            log.warning("list_all_threads failed: %s", e)
+    combined = hr_threads + collab_threads
+    combined.sort(key=lambda t: (t.get("last_message_at") or t.get("created_at") or ""), reverse=True)
+    return {"threads": combined[:limit], "total": len(combined)}
+
+
+@app.get("/api/admin/messages/threads/hr-employee/{assignment_id}")
+def get_admin_hr_thread_detail(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Get HR-employee thread messages and context."""
+    assign = db.get_admin_assignment_detail(assignment_id)
+    if not assign:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    messages = db.list_messages_by_assignment(assignment_id)
+    return {
+        "thread_type": "hr_employee",
+        "assignment_id": assignment_id,
+        "company_id": assign.get("case_company_id") or assign.get("hr_company_id"),
+        "company_name": assign.get("company_name"),
+        "employee_name": assign.get("employee_full_name") or assign.get("employee_identifier"),
+        "hr_name": assign.get("hr_full_name"),
+        "participants": [p for p in [assign.get("hr_full_name"), assign.get("employee_full_name") or assign.get("employee_identifier")] if p],
+        "messages": messages,
+        "status": assign.get("status"),
+    }
 
 
 @app.post("/api/admin/actions/resend-invite")
@@ -1554,7 +1718,8 @@ def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
 @app.get("/api/hr/company-profile")
 def get_company_profile(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     effective = _effective_user(user, UserRole.HR)
-    company = db.get_company_for_user(effective["id"])
+    cid = _get_hr_company_id(effective)
+    company = db.get_company(cid) if cid else db.get_company_for_user(effective["id"])
     return {"company": company}
 
 
@@ -1570,7 +1735,7 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
     profile = db.get_profile_record(effective["id"])
-    company_id = profile.get("company_id") if profile else None
+    company_id = (profile.get("company_id") if profile else None) or _get_hr_company_id(effective)
     if not company_id:
         company_id = str(uuid.uuid4())
         db.set_profile_company(effective["id"], company_id)
@@ -1606,6 +1771,75 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
         "default_working_location": request.default_working_location,
     })
     return {"ok": True, "company_id": company_id}
+
+
+# ---------------------------------------------------------------------------
+# HR company-scoped employees
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/hr/employees")
+def list_hr_company_employees(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    """List employees for the HR user's company. Company-scoped only."""
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    items = db.list_employees_with_profiles(company_id)
+    db.log_audit(effective["id"], "READ", "employee", None, None, {"company_id": company_id})
+    return {"employees": items}
+
+
+@app.get("/api/hr/employees/{employee_id}")
+def get_hr_company_employee(
+    employee_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Get employee detail for HR's company. 404 if not in company."""
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    employee = db.get_employee_for_company(employee_id, company_id)
+    if not employee:
+        emp_by_profile = db.get_employee_by_profile_for_company(employee_id, company_id)
+        employee = emp_by_profile
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    db.log_audit(effective["id"], "READ", "employee", employee_id, None, {"company_id": company_id})
+    return {"employee": employee}
+
+
+class HrEmployeeUpdateRequest(BaseModel):
+    band: Optional[str] = None
+    assignment_type: Optional[str] = None
+    status: Optional[str] = None
+
+
+@app.patch("/api/hr/employees/{employee_id}")
+def update_hr_company_employee(
+    employee_id: str,
+    request: HrEmployeeUpdateRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Update employee (band, assignment_type, status) within company boundary."""
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    updated = db.update_employee_limited(
+        employee_id,
+        company_id,
+        band=request.band,
+        assignment_type=request.assignment_type,
+        status=request.status,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    db.log_audit(effective["id"], "UPDATE", "employee", employee_id, "HR update", {"company_id": company_id})
+    employee = db.get_employee_for_company(employee_id, company_id)
+    return {"employee": employee or db.get_employee_by_profile_for_company(employee_id, company_id)}
 
 
 ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "svg"}
@@ -2298,8 +2532,13 @@ def list_hr_assignments(
                 assignments = db.list_all_assignments()
         else:
             effective = _effective_user(user, UserRole.HR)
-            with timed("db.list_assignments_for_hr", request_id):
-                assignments = db.list_assignments_for_hr(effective["id"], request_id=request_id)
+            company_id = _get_hr_company_id(effective)
+            if company_id:
+                with timed("db.list_assignments_for_company", request_id):
+                    assignments = db.list_assignments_for_company(company_id, request_id=request_id)
+            else:
+                with timed("db.list_assignments_for_hr", request_id):
+                    assignments = db.list_assignments_for_hr(effective["id"], request_id=request_id)
 
         if not assignments:
             return []
@@ -2576,10 +2815,8 @@ def get_hr_assignment(
         assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
         if not assignment:
             raise HTTPException(status_code=404, detail="Assignment not found")
-        if (not user.get("is_admin")) or user.get("impersonation"):
-            effective = _effective_user(user, UserRole.HR)
-            if assignment.get("hr_user_id") != effective["id"]:
-                raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+        if not _hr_can_access_assignment(assignment, user):
+            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
 
         aid = assignment["id"]
         case_id = assignment.get("case_id") or assignment.get("id") or ""
@@ -2674,8 +2911,7 @@ def get_hr_resolved_policy(
     assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    effective = _effective_user(user, UserRole.HR)
-    if assignment.get("hr_user_id") != effective["id"] and not effective.get("is_admin"):
+    if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
 
     from .services.policy_resolution import resolve_policy_for_assignment
@@ -2721,8 +2957,7 @@ def recompute_resolved_policy(
     assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    effective = _effective_user(user, UserRole.HR)
-    if assignment.get("hr_user_id") != effective["id"] and not effective.get("is_admin"):
+    if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
 
     from .services.policy_resolution import resolve_policy_for_assignment
@@ -2758,9 +2993,9 @@ def post_hr_feedback(
     assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    effective = _effective_user(user, UserRole.HR)
-    if assignment.get("hr_user_id") != effective["id"]:
+    if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    effective = _effective_user(user, UserRole.HR)
     message = (request.message or "").strip()
     if not message:
         raise HTTPException(status_code=400, detail="Message cannot be empty")
@@ -2805,8 +3040,7 @@ def get_hr_feedback(assignment_id: str, user: Dict[str, Any] = Depends(require_r
     assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    effective = _effective_user(user, UserRole.HR)
-    if assignment.get("hr_user_id") != effective["id"]:
+    if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
     rows = db.list_hr_feedback(assignment_id)
     return [
@@ -3134,6 +3368,7 @@ def _require_assignment_visibility(
     assignment_id: str,
     user: Dict[str, Any],
 ):
+    """Validate user can access assignment. HR: admin, owner, or assignment in their company."""
     assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -3146,18 +3381,79 @@ def _require_assignment_visibility(
     visible = False
     if is_employee and emp_id == effective["id"]:
         visible = True
-    if is_hr and (effective.get("is_admin") or hr_id == effective["id"]):
-        visible = True
+    elif is_hr:
+        visible = effective.get("is_admin") or hr_id == effective["id"]
+        if not visible and effective.get("role") == UserRole.HR.value:
+            hr_company = _get_hr_company_id(effective)
+            if hr_company and db.assignment_belongs_to_company(assignment_id, hr_company):
+                visible = True
     if not visible:
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
     return assignment
 
 
+def _get_hr_company_id(user: Dict[str, Any]) -> Optional[str]:
+    """Resolve company_id for HR user. Uses hr_users first, then profile."""
+    uid = user.get("id")
+    if not uid:
+        return None
+    cid = db.get_hr_company_id(uid)
+    if cid:
+        return cid
+    profile = db.get_profile_record(uid)
+    return profile.get("company_id") if profile else None
+
+
+def _hr_can_access_assignment(assignment: Dict[str, Any], user: Dict[str, Any]) -> bool:
+    """True if HR user can access this assignment (admin, owner, or company match)."""
+    effective = _effective_user(user, UserRole.HR)
+    if effective.get("is_admin"):
+        return True
+    if assignment.get("hr_user_id") == effective["id"]:
+        return True
+    hr_company = _get_hr_company_id(effective)
+    return bool(hr_company and db.assignment_belongs_to_company(assignment.get("id", ""), hr_company))
+
+
 def _require_company_for_user(user: Dict[str, Any]) -> Dict[str, Any]:
-    profile = db.get_profile_record(user.get("id"))
-    if not profile or not profile.get("company_id"):
+    profile = db.get_profile_record(user.get("id")) or {}
+    company_id = _get_hr_company_id(user) if user.get("role") == UserRole.HR.value else profile.get("company_id")
+    if not company_id:
         raise HTTPException(status_code=400, detail="User missing company association")
+    profile["company_id"] = company_id
     return profile
+
+
+def _resolve_company_for_policy(
+    user: Dict[str, Any], company_id_override: Optional[str] = None
+) -> str:
+    """Resolve company_id for policy access. Admin may override with company_id_override."""
+    if user.get("is_admin") and company_id_override:
+        return company_id_override
+    profile = _require_company_for_user(user)
+    return profile.get("company_id") or ""
+
+
+def _require_policy_access(user: Dict[str, Any], policy: Optional[Dict[str, Any]]) -> None:
+    """Raise 404 if policy missing or user lacks access. Admin can access any policy."""
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    if user.get("is_admin"):
+        return
+    profile = _require_company_for_user(user)
+    if policy.get("company_id") != profile.get("company_id"):
+        raise HTTPException(status_code=404, detail="Policy not found")
+
+
+def _require_document_access(user: Dict[str, Any], doc: Optional[Dict[str, Any]]) -> None:
+    """Raise 404 if doc missing or user lacks access. Admin can access any document."""
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if user.get("is_admin"):
+        return
+    profile = _require_company_for_user(user)
+    if doc.get("company_id") != profile.get("company_id"):
+        raise HTTPException(status_code=404, detail="Document not found")
 
 
 def _map_storage_exception_to_response(exc: Exception, bucket: str) -> tuple[str, str]:
@@ -3872,8 +4168,7 @@ def get_hr_policy_service_comparison(
     assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    effective = _effective_user(user, UserRole.HR)
-    if assignment.get("hr_user_id") != effective["id"] and not effective.get("is_admin"):
+    if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
     from .services.policy_service_comparison import compute_policy_service_comparison
     return compute_policy_service_comparison(db, assignment_id, assignment=assignment, include_diagnostics=True)
@@ -4771,10 +5066,11 @@ async def upload_hr_policy(
 # ---------------------------------------------------------------------------
 @app.get("/api/company-policies")
 def list_company_policies(
+    company_id: Optional[str] = Query(None, description="Admin override: scope to this company"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
-    profile = _require_company_for_user(user)
-    policies = db.list_company_policies(profile["company_id"])
+    cid = _resolve_company_for_policy(user, company_id)
+    policies = db.list_company_policies(cid)
     return {"policies": policies}
 
 
@@ -5149,12 +5445,13 @@ async def upload_policy_document(
 @app.get("/api/hr/policy-documents")
 def list_policy_documents(
     req: Request,
+    company_id: Optional[str] = Query(None, description="Admin override: scope to this company"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """List policy documents for company."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
-    docs = db.list_policy_documents(profile["company_id"], request_id=request_id)
+    cid = _resolve_company_for_policy(user, company_id)
+    docs = db.list_policy_documents(cid, request_id=request_id)
     return {"documents": docs}
 
 
@@ -5166,10 +5463,8 @@ def get_policy_document(
 ):
     """Get policy document by id."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     doc = db.get_policy_document(doc_id, request_id=request_id)
-    if not doc or doc.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Document not found")
+    _require_document_access(user, doc)
     return {"document": doc}
 
 
@@ -5182,10 +5477,8 @@ def list_policy_document_clauses(
 ):
     """List clauses for a policy document. Optional filter by clause_type."""
     request_id = getattr(req.state, "request_id", None) if req else None
-    profile = _require_company_for_user(user)
     doc = db.get_policy_document(doc_id, request_id=request_id)
-    if not doc or doc.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Document not found")
+    _require_document_access(user, doc)
     clauses = db.list_policy_document_clauses(doc_id, clause_type=clause_type, request_id=request_id)
     return {"clauses": clauses}
 
@@ -5199,10 +5492,8 @@ def get_policy_document_clause(
 ):
     """Get a single clause for source comparison / view source."""
     request_id = getattr(req.state, "request_id", None) if req else None
-    profile = _require_company_for_user(user)
     doc = db.get_policy_document(doc_id, request_id=request_id)
-    if not doc or doc.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Document not found")
+    _require_document_access(user, doc)
     clause = db.get_policy_document_clause(clause_id, request_id=request_id)
     if not clause or clause.get("policy_document_id") != doc_id:
         raise HTTPException(status_code=404, detail="Clause not found")
@@ -5219,10 +5510,8 @@ def patch_policy_document_clause(
 ):
     """HR override: update clause_type, title, or hr_override_notes."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     doc = db.get_policy_document(doc_id, request_id=request_id)
-    if not doc or doc.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Document not found")
+    _require_document_access(user, doc)
     clause = db.get_policy_document_clause(clause_id, request_id=request_id)
     if not clause or clause.get("policy_document_id") != doc_id:
         raise HTTPException(status_code=404, detail="Clause not found")
@@ -5245,10 +5534,8 @@ async def reprocess_policy_document(
 ):
     """Re-run text extraction, classification, and metadata extraction."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     doc = db.get_policy_document(doc_id, request_id=request_id)
-    if not doc or doc.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Document not found")
+    _require_document_access(user, doc)
     file_path = doc.get("storage_path") or ""
     object_key = normalize_policy_storage_object_key(file_path)
     log.info("request_id=%s policy_document_reprocess bucket=%s object_key=%s", request_id, BUCKET_HR_POLICIES, object_key)
@@ -5305,10 +5592,8 @@ def normalize_policy_document(
 ):
     """Normalize policy document clauses into canonical policy objects."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     doc = db.get_policy_document(doc_id, request_id=request_id)
-    if not doc or doc.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Document not found")
+    _require_document_access(user, doc)
     if not doc.get("raw_text"):
         raise HTTPException(status_code=400, detail="Document has no extracted text. Run Reprocess first.")
     clauses = db.list_policy_document_clauses(doc_id, request_id=request_id)
@@ -5350,10 +5635,8 @@ def get_normalized_policy(
 ):
     """Get normalized policy version with benefits, exclusions, evidence, conditions, source links."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     version = db.get_latest_policy_version(policy_id)
     if not version:
         return {"policy": policy, "version": None, "benefit_rules": [], "exclusions": [], "evidence_requirements": [], "conditions": [], "source_links": []}
@@ -5388,10 +5671,8 @@ def patch_benefit_rule(
 ):
     """HR override: update benefit rule fields."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     rule = db.get_policy_benefit_rule(benefit_rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Benefit rule not found")
@@ -5422,11 +5703,8 @@ def patch_policy_version_status_latest(
 ):
     """Update the latest policy version status. Avoids version_id mismatch."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        log.warning("request_id=%s patch_version_status_latest policy_id=%s policy_not_found", request_id, policy_id)
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     version = db.get_latest_policy_version(policy_id)
     if not version:
         log.warning("request_id=%s patch_version_status_latest policy_id=%s no_version", request_id, policy_id)
@@ -5452,11 +5730,8 @@ def publish_policy_version_latest(
 ):
     """Publish the latest policy version. Avoids version_id mismatch."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        log.warning("request_id=%s publish_version_latest policy_id=%s policy_not_found", request_id, policy_id)
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     version = db.get_latest_policy_version(policy_id)
     if not version:
         log.warning("request_id=%s publish_version_latest policy_id=%s no_version", request_id, policy_id)
@@ -5483,11 +5758,8 @@ def patch_policy_version_status(
 ):
     """Update policy version status: draft, review_required, reviewed, published."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        log.warning("request_id=%s patch_version_status policy_id=%s version_id=%s policy_not_found", request_id, policy_id, version_id)
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     version = db.get_policy_version(version_id)
     if not version:
         log.warning("request_id=%s patch_version_status policy_id=%s version_id=%s version_not_found", request_id, policy_id, version_id)
@@ -5516,11 +5788,8 @@ def publish_policy_version(
 ):
     """Publish this version and archive any previously published version. Employees see only published."""
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        log.warning("request_id=%s publish_version policy_id=%s version_id=%s policy_not_found", request_id, policy_id, version_id)
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     version = db.get_policy_version(version_id)
     if not version:
         log.warning("request_id=%s publish_version policy_id=%s version_id=%s version_not_found", request_id, policy_id, version_id)
@@ -5548,10 +5817,8 @@ def patch_exclusion(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """HR override: update exclusion."""
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     with db.engine.connect() as conn:
         row = conn.execute(text("SELECT * FROM policy_exclusions WHERE id = :id"), {"id": excl_id}).fetchone()
     excl = db._row_to_dict(row) if row else None
@@ -5575,10 +5842,8 @@ def patch_condition(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """HR override: update condition."""
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     with db.engine.connect() as conn:
         row = conn.execute(text("SELECT * FROM policy_rule_conditions WHERE id = :id"), {"id": cond_id}).fetchone()
     cond = db._row_to_dict(row) if row else None
@@ -5618,10 +5883,8 @@ def get_company_policy(
     policy_id: str,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     benefits = db.list_policy_benefits(policy_id)
     return {"policy": policy, "benefits": benefits}
 
@@ -5790,10 +6053,8 @@ def update_company_policy_benefits(
     payload: PolicyBenefitsUpsert,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     db.replace_policy_benefits(
         policy_id,
         [b.model_dump(mode="json") for b in payload.benefits],
@@ -5810,10 +6071,8 @@ def extract_company_policy(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     request_id = getattr(req.state, "request_id", None)
-    profile = _require_company_for_user(user)
     policy = db.get_company_policy(policy_id)
-    if not policy or policy.get("company_id") != profile["company_id"]:
-        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, policy)
     file_path = policy.get("file_url") or ""
     object_key = normalize_policy_storage_object_key(file_path)
     log.info("request_id=%s extract bucket=%s object_key=%s", request_id, BUCKET_HR_POLICIES, object_key)

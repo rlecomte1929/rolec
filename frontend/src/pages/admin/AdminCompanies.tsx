@@ -19,16 +19,16 @@ export const AdminCompanies: React.FC = () => {
   }, []);
 
   return (
-    <AdminLayout title="Companies" subtitle="Search and inspect company accounts">
+    <AdminLayout title="Companies" subtitle="Company accounts — search and inspect">
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search company name"
-            className="w-64 rounded-full border border-[#e2e8f0] px-4 py-2 text-sm"
+            placeholder="Search by company name"
+            className="w-64 rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
           />
-          <Button onClick={() => load()}>Search</Button>
+          <Button onClick={() => load()}>Apply</Button>
         </div>
       </Card>
       <Card padding="lg">
@@ -46,7 +46,10 @@ export const AdminCompanies: React.FC = () => {
             </div>
           ))}
           {companies.length === 0 && (
-            <div className="text-sm text-[#6b7280]">No companies found.</div>
+            <div className="py-8 text-center text-[#6b7280]">
+              <div className="text-sm font-medium">No companies found</div>
+              <div className="text-xs mt-1">Companies are created when HR users set up their company profile.</div>
+            </div>
           )}
         </div>
       </Card>

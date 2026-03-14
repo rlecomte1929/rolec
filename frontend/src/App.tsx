@@ -22,16 +22,18 @@ import { CaseWizardPage } from './pages/employee/CaseWizardPage';
 import { EmployeeCaseSummary } from './pages/employee/EmployeeCaseSummary';
 import { CountriesPage } from './pages/admin/CountriesPage';
 import { CountryDetailPage } from './pages/admin/CountryDetailPage';
-import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
+import { AdminPoliciesPage } from './pages/admin/AdminPoliciesPage';
 import { AdminCompanies } from './pages/admin/AdminCompanies';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminRelocations } from './pages/admin/AdminRelocations';
+import { AdminAssignments } from './pages/admin/AdminAssignments';
 import { AdminSupport } from './pages/admin/AdminSupport';
+import { AdminMessages } from './pages/admin/AdminMessages';
 import { AdminSuppliers } from './pages/admin/AdminSuppliers';
 import { AdminSupplierNew } from './pages/admin/AdminSupplierNew';
 import { AdminSupplierDetail } from './pages/admin/AdminSupplierDetail';
 import { AdminCompanyDetail } from './pages/admin/AdminCompanyDetail';
-import { AdminResearch } from './pages/admin/AdminResearch';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
 import { AdminResources } from './pages/admin/AdminResources';
 import { AdminResourceEditor } from './pages/admin/AdminResourceEditor';
@@ -82,6 +84,8 @@ import { QuoteRfqDetail } from './pages/services/QuoteRfqDetail';
 import { VendorInbox } from './pages/vendor/VendorInbox';
 import { VendorRfq } from './pages/vendor/VendorRfq';
 import { HrCompanyProfile } from './pages/HrCompanyProfile';
+import { HrEmployees } from './pages/HrEmployees';
+import { HrEmployeeDetail } from './pages/HrEmployeeDetail';
 import { HrCommandCenter } from './pages/HrCommandCenter';
 import { HrCommandCenterCaseDetail } from './pages/HrCommandCenterCaseDetail';
 import { NotificationSettings } from './pages/NotificationSettings';
@@ -169,13 +173,17 @@ function App() {
         <Route path={WIZARD_ROUTES.CASE_SUMMARY} element={<EmployeeCaseSummary />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
-        <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminDashboard /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCompanies.path} element={<RequireAdminRoute><AdminCompanies /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminResearch.path} element={<RequireAdminRoute><AdminResearch /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminPeople.path} element={<RequireAdminRoute><AdminUsers /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminAssignments.path} element={<RequireAdminRoute><AdminAssignments /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminPolicies.path} element={<RequireAdminRoute><AdminPoliciesPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminMessages.path} element={<RequireAdminRoute><AdminMessages /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminResearch.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminOverview.path} replace /></RequireAdminRoute>} />
         <Route path="/admin/companies/:companyId" element={<RequireAdminRoute><AdminCompanyDetail /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminUsers.path} element={<RequireAdminRoute><AdminUsers /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminRelocations.path} element={<RequireAdminRoute><AdminRelocations /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><AdminSupport /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminUsers.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminPeople.path} replace /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminRelocations.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminAssignments.path} replace /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminMessages.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliersNew.path} element={<RequireAdminRoute><AdminSupplierNew /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliersDetail.path} element={<RequireAdminRoute><AdminSupplierDetail /></RequireAdminRoute>} />
@@ -232,6 +240,8 @@ function App() {
           element={<PlaceholderPage title="Resources" description="Access HR relocation resources and guides." />}
         />
         <Route path={ROUTE_DEFS.hrCompanyProfile.path} element={<HrCompanyProfile />} />
+        <Route path={ROUTE_DEFS.hrEmployees.path} element={<HrEmployees />} />
+        <Route path={ROUTE_DEFS.hrEmployeeDetail.path} element={<HrEmployeeDetail />} />
         <Route path={ROUTE_DEFS.notificationSettings.path} element={<NotificationSettings />} />
         <Route
           path={ROUTE_DEFS.submissionCenter.path}

@@ -256,6 +256,26 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     Assignments
                   </Link>
                   <Link
+                    to={buildRoute('hrEmployees')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrEmployees.path) || isActiveRoute(ROUTE_DEFS.hrEmployeeDetail.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Employees
+                  </Link>
+                  <Link
+                    to={buildRoute('hrPolicyManagement')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrPolicyManagement.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Policy Management
+                  </Link>
+                  <Link
                     to={buildRoute('hrCommandCenter')}
                     className={`px-3 py-1 rounded-full border ${
                       isActiveRoute(ROUTE_DEFS.hrCommandCenter.path)

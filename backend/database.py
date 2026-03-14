@@ -2662,6 +2662,36 @@ class Database:
             ).fetchall()
         return self._rows_to_list(rows)
 
+    def list_assignments_for_company(
+        self, company_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """List assignments belonging to a company (via case or HR ownership). Used for HR company-scoped view."""
+        sql = """
+            SELECT a.* FROM case_assignments a
+            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            WHERE (rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))
+            ORDER BY a.created_at DESC
+        """
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn, sql, {"cid": company_id}, op_name="list_assignments_for_company", request_id=request_id
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def assignment_belongs_to_company(self, assignment_id: str, company_id: str) -> bool:
+        """Check if assignment belongs to the given company (via case or HR)."""
+        sql = """
+            SELECT 1 FROM case_assignments a
+            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            WHERE a.id = :aid AND (rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))
+            LIMIT 1
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(text(sql), {"aid": assignment_id, "cid": company_id}).fetchone()
+        return row is not None
+
     def insert_hr_feedback(
         self,
         feedback_id: str,
@@ -2866,6 +2896,169 @@ class Database:
         with self.engine.connect() as conn:
             rows = conn.execute(text("SELECT * FROM case_assignments ORDER BY created_at DESC")).fetchall()
         return self._rows_to_list(rows)
+
+    def list_admin_assignments(
+        self,
+        company_id: Optional[str] = None,
+        employee_user_id: Optional[str] = None,
+        employee_search: Optional[str] = None,
+        status: Optional[str] = None,
+        destination_country: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """List assignments for admin with filters. Joins case_assignments, relocation_cases, profiles, companies."""
+        clauses = []
+        params: Dict[str, Any] = {}
+        if company_id:
+            clauses.append("(rc.company_id = :company_id OR (rc.company_id IS NULL AND EXISTS (SELECT 1 FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id AND hu2.company_id = :company_id)))")
+            params["company_id"] = company_id
+        if employee_user_id:
+            clauses.append("a.employee_user_id = :employee_user_id")
+            params["employee_user_id"] = employee_user_id
+        if status:
+            clauses.append("a.status = :status")
+            params["status"] = status
+        if destination_country:
+            clauses.append("LOWER(TRIM(COALESCE(rc.host_country, ''))) = LOWER(TRIM(:dest_country))")
+            params["dest_country"] = destination_country
+        if employee_search:
+            esc = (employee_search or "").strip()
+            pattern = f"%{esc}%"
+            if _is_sqlite:
+                clauses.append(
+                    "(LOWER(COALESCE(a.employee_identifier, '')) LIKE LOWER(:emp_search) OR "
+                    "LOWER(COALESCE(emp_p.full_name, '')) LIKE LOWER(:emp_search) OR "
+                    "LOWER(COALESCE(a.employee_first_name, '')) LIKE LOWER(:emp_search) OR "
+                    "LOWER(COALESCE(a.employee_last_name, '')) LIKE LOWER(:emp_search))"
+                )
+            else:
+                clauses.append(
+                    "(a.employee_identifier ILIKE :emp_search OR emp_p.full_name ILIKE :emp_search OR "
+                    "a.employee_first_name ILIKE :emp_search OR a.employee_last_name ILIKE :emp_search)"
+                )
+            params["emp_search"] = pattern
+
+        where_sql = "AND " + " AND ".join(clauses) if clauses else ""
+
+        sql = f"""
+            SELECT
+                a.id, a.case_id, a.canonical_case_id, a.hr_user_id, a.employee_user_id, a.employee_identifier,
+                a.status, a.employee_first_name, a.employee_last_name, a.expected_start_date, a.submitted_at,
+                a.created_at, a.updated_at,
+                rc.id AS case_pk, rc.company_id AS case_company_id, rc.host_country, rc.home_country,
+                rc.status AS case_status, rc.stage,
+                c.name AS company_name,
+                emp_p.full_name AS employee_full_name, emp_p.company_id AS employee_profile_company_id,
+                hr_p.full_name AS hr_full_name, hr_p.company_id AS hr_profile_company_id,
+                hu.company_id AS hr_company_id,
+                COALESCE(emp.company_id, emp_p.company_id) AS employee_company_id,
+                ep.profile_json,
+                rap.id AS resolved_policy_id,
+                (SELECT COUNT(*) FROM company_policies cp WHERE cp.company_id = COALESCE(rc.company_id, hu.company_id) AND cp.extraction_status = 'extracted') AS company_policy_count
+            FROM case_assignments a
+            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
+            LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
+            LEFT JOIN profiles hr_p ON hr_p.id = a.hr_user_id
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            LEFT JOIN employees emp ON emp.profile_id = a.employee_user_id
+            LEFT JOIN employee_profiles ep ON ep.assignment_id = a.id
+            LEFT JOIN resolved_assignment_policies rap ON rap.assignment_id = a.id
+            WHERE 1=1 {where_sql}
+            ORDER BY a.updated_at DESC, a.created_at DESC
+        """
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+
+        result = []
+        for row in rows:
+            m = row._mapping
+            r = dict(m)
+            profile_json = r.get("profile_json")
+            profile = self._json_load(profile_json) if profile_json else {}
+            mp = profile.get("movePlan") or {}
+            pa = profile.get("primaryApplicant") or {}
+            assign = pa.get("assignment") or {}
+            r["assignment_type"] = assign.get("type") or assign.get("assignmentType")
+            r["move_date"] = mp.get("targetArrivalDate") or r.get("expected_start_date")
+            dep = profile.get("dependents") or []
+            has_spouse = bool(profile.get("spouse", {}).get("fullName"))
+            r["family_status"] = "family" if (has_spouse or dep) else "single"
+            r["destination_from_profile"] = mp.get("destination") if isinstance(mp.get("destination"), str) else None
+            r["policy_resolved"] = bool(r.get("resolved_policy_id"))
+            r["company_has_policy"] = (r.get("company_policy_count") or 0) > 0
+            result.append(r)
+        return result
+
+    def get_admin_assignment_detail(self, assignment_id: str) -> Optional[Dict[str, Any]]:
+        """Full assignment context for admin detail: assignment, case, employee, HR, services, policy."""
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT a.*, rc.id AS case_pk, rc.company_id AS case_company_id, rc.hr_user_id AS case_hr_user_id,
+                        rc.host_country, rc.home_country, rc.status AS case_status, rc.stage, rc.profile_json AS case_profile_json,
+                        c.name AS company_name,
+                        emp_p.id AS emp_profile_id, emp_p.full_name AS employee_full_name, emp_p.email AS employee_email, emp_p.company_id AS employee_profile_company_id,
+                        hr_p.id AS hr_profile_id, hr_p.full_name AS hr_full_name, hr_p.email AS hr_email, hr_p.company_id AS hr_profile_company_id,
+                        hu.company_id AS hr_company_id, emp.company_id AS employee_company_id
+                    FROM case_assignments a
+                    LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                    LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
+                    LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
+                    LEFT JOIN profiles hr_p ON hr_p.id = a.hr_user_id
+                    LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                    LEFT JOIN employees emp ON emp.profile_id = a.employee_user_id
+                    WHERE a.id = :aid
+                """),
+                {"aid": assignment_id},
+            ).fetchone()
+        if not row:
+            return None
+        out = dict(row._mapping)
+        ep = self.get_employee_profile(assignment_id)
+        out["employee_profile"] = ep
+        out["case_services"] = self.list_case_services(assignment_id)
+        out["resolved_policy"] = self.get_resolved_assignment_policy(assignment_id)
+        comp_id = out.get("case_company_id") or out.get("hr_company_id")
+        policies = self.list_company_policies(comp_id) if comp_id else []
+        out["company_policies"] = [p for p in policies if (p.get("extraction_status") or "") == "extracted"]
+        out["company_has_published_policy"] = len(out["company_policies"]) > 0
+        return out
+
+    def admin_reassign_employee_company(self, employee_user_id: str, company_id: str) -> None:
+        """Reassign employee profile to a company (profiles.company_id)."""
+        with self.engine.begin() as conn:
+            conn.execute(text("UPDATE profiles SET company_id = :cid WHERE id = :id"), {"cid": company_id, "id": employee_user_id})
+            conn.execute(text("UPDATE employees SET company_id = :cid WHERE profile_id = :pid"), {"cid": company_id, "pid": employee_user_id})
+
+    def admin_reassign_hr_owner(self, assignment_id: str, new_hr_user_id: str) -> None:
+        """Reassign assignment and case to new HR owner."""
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT case_id FROM case_assignments WHERE id = :aid"), {"aid": assignment_id}).fetchone()
+        case_id = row[0] if row and row[0] else None
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE case_assignments SET hr_user_id = :hr, updated_at = :ua WHERE id = :aid"),
+                {"hr": new_hr_user_id, "ua": datetime.utcnow().isoformat(), "aid": assignment_id},
+            )
+            if case_id:
+                conn.execute(
+                    text("UPDATE relocation_cases SET hr_user_id = :hr, updated_at = :ua WHERE id = :cid"),
+                    {"hr": new_hr_user_id, "ua": datetime.utcnow().isoformat(), "cid": case_id},
+                )
+
+    def admin_fix_assignment_company_linkage(self, assignment_id: str, company_id: str) -> None:
+        """Set relocation_case.company_id to match; ensures assignment-company consistency."""
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT case_id FROM case_assignments WHERE id = :aid"), {"aid": assignment_id}).fetchone()
+        if not row or not row[0]:
+            return
+        case_id = row[0]
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE relocation_cases SET company_id = :cid, updated_at = :ua WHERE id = :case_id"),
+                {"cid": company_id, "ua": datetime.utcnow().isoformat(), "case_id": case_id},
+            )
 
     # ------------------------------------------------------------------
     # Dynamic dossier (Phase 1)
@@ -4056,6 +4249,18 @@ class Database:
             return None
         return self.get_company(profile["company_id"])
 
+    def get_hr_company_id(self, profile_id: str) -> Optional[str]:
+        """Resolve company_id for HR user. Prefers hr_users.company_id, falls back to profile.company_id."""
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT company_id FROM hr_users WHERE profile_id = :pid LIMIT 1"),
+                {"pid": profile_id},
+            ).fetchone()
+        if row:
+            return row._mapping.get("company_id")
+        profile = self.get_profile_record(profile_id)
+        return profile.get("company_id") if profile else None
+
     def list_profiles(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
         q = (query or "").strip().lower()
         with self.engine.connect() as conn:
@@ -4323,6 +4528,82 @@ class Database:
                 rows = conn.execute(text("SELECT * FROM employees ORDER BY created_at DESC")).fetchall()
         return self._rows_to_list(rows)
 
+    def list_employees_with_profiles(
+        self, company_id: str
+    ) -> List[Dict[str, Any]]:
+        """List employees with profile (full_name, email) for HR company-scoped view."""
+        sql = """
+            SELECT e.id, e.company_id, e.profile_id, e.band, e.assignment_type, e.relocation_case_id, e.status, e.created_at,
+                   p.full_name, p.email
+            FROM employees e
+            LEFT JOIN profiles p ON p.id = e.profile_id
+            WHERE e.company_id = :cid
+            ORDER BY p.full_name ASC NULLS LAST, e.created_at DESC
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), {"cid": company_id}).fetchall()
+        return self._rows_to_list(rows)
+
+    def get_employee_for_company(
+        self, employee_id: str, company_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get employee with profile if they belong to the given company. Returns None if not found or wrong company."""
+        sql = """
+            SELECT e.id, e.company_id, e.profile_id, e.band, e.assignment_type, e.relocation_case_id, e.status, e.created_at,
+                   p.full_name, p.email, p.role
+            FROM employees e
+            LEFT JOIN profiles p ON p.id = e.profile_id
+            WHERE e.id = :eid AND e.company_id = :cid
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(text(sql), {"eid": employee_id, "cid": company_id}).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def get_employee_by_profile_for_company(
+        self, profile_id: str, company_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get employee by profile_id if they belong to the given company."""
+        sql = """
+            SELECT e.id, e.company_id, e.profile_id, e.band, e.assignment_type, e.relocation_case_id, e.status, e.created_at,
+                   p.full_name, p.email, p.role
+            FROM employees e
+            LEFT JOIN profiles p ON p.id = e.profile_id
+            WHERE e.profile_id = :pid AND e.company_id = :cid
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(text(sql), {"pid": profile_id, "cid": company_id}).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def update_employee_limited(
+        self,
+        employee_id: str,
+        company_id: str,
+        *,
+        band: Optional[str] = None,
+        assignment_type: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> bool:
+        """Update employee fields (band, assignment_type, status). Returns False if not in company."""
+        updates = []
+        params: Dict[str, Any] = {"eid": employee_id, "cid": company_id}
+        if band is not None:
+            updates.append("band = :band")
+            params["band"] = band
+        if assignment_type is not None:
+            updates.append("assignment_type = :assignment_type")
+            params["assignment_type"] = assignment_type
+        if status is not None:
+            updates.append("status = :status")
+            params["status"] = status
+        if not updates:
+            return True
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(f"UPDATE employees SET {', '.join(updates)} WHERE id = :eid AND company_id = :cid"),
+                params,
+            )
+        return result.rowcount > 0 if hasattr(result, "rowcount") else True
+
     def list_hr_users(self, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
             if company_id:
@@ -4483,6 +4764,91 @@ class Database:
                 "WHERE recipient_user_id = :uid AND read_at IS NULL AND dismissed_at IS NULL"
             ), {"uid": recipient_user_id}).fetchone()
         return row[0] if row else 0
+
+    def list_admin_message_threads(
+        self,
+        company_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Admin: list message threads (assignment-based) with company/participant context."""
+        clauses = ["m.assignment_id IS NOT NULL"]
+        params: Dict[str, Any] = {"lim": limit, "off": offset}
+        if company_id:
+            clauses.append("(rc.company_id = :company_id OR hu.company_id = :company_id)")
+            params["company_id"] = company_id
+        if user_id:
+            clauses.append("(a.hr_user_id = :user_id OR a.employee_user_id = :user_id)")
+            params["user_id"] = user_id
+        where_sql = " AND " + " AND ".join(clauses)
+        order_clause = "ORDER BY last_message_at DESC NULLS LAST" if not _is_sqlite else "ORDER BY last_message_at DESC"
+        sql = f"""
+            SELECT
+                m.assignment_id,
+                MAX(m.created_at) AS last_message_at,
+                COUNT(*) AS message_count,
+                (SELECT body FROM messages m2 WHERE m2.assignment_id = m.assignment_id ORDER BY m2.created_at DESC LIMIT 1) AS last_body,
+                MAX(c.name) AS company_name,
+                MAX(rc.company_id) AS case_company_id,
+                MAX(hu.company_id) AS hr_company_id,
+                MAX(emp_p.full_name) AS employee_full_name,
+                MAX(a.employee_identifier) AS employee_identifier,
+                MAX(hr_p.full_name) AS hr_full_name,
+                MAX(a.status) AS assignment_status
+            FROM messages m
+            LEFT JOIN case_assignments a ON a.id = m.assignment_id
+            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, hu.company_id)
+            LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
+            LEFT JOIN profiles hr_p ON hr_p.id = a.hr_user_id
+            WHERE {where_sql}
+            GROUP BY m.assignment_id
+            {order_clause}
+            LIMIT :lim OFFSET :off
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+        out = []
+        for row in rows:
+            r = dict(row._mapping)
+            aid = r.get("assignment_id")
+            if not aid:
+                continue
+            last_body = (r.get("last_body") or "")[:100]
+            if len((r.get("last_body") or "")) > 100:
+                last_body = last_body.rstrip() + "…"
+            emp_name = r.get("employee_full_name") or r.get("employee_identifier") or "—"
+            hr_name = r.get("hr_full_name") or "—"
+            parts = [p for p in [hr_name, emp_name] if p and p != "—"]
+            out.append({
+                "thread_id": aid,
+                "thread_type": "hr_employee",
+                "assignment_id": aid,
+                "company_id": r.get("case_company_id") or r.get("hr_company_id"),
+                "company_name": r.get("company_name") or "—",
+                "employee_name": emp_name,
+                "hr_name": hr_name,
+                "participants": parts or ["—"],
+                "last_message_preview": last_body,
+                "last_message_at": r.get("last_message_at"),
+                "message_count": r.get("message_count", 0),
+                "status": r.get("assignment_status"),
+            })
+        return out
+
+    def list_messages_by_assignment(self, assignment_id: str) -> List[Dict[str, Any]]:
+        """List all messages for an assignment (admin or HR/employee context)."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT m.*, COALESCE(u.name, u.email, u.username) as sender_display_name
+                FROM messages m
+                LEFT JOIN users u ON u.id = COALESCE(m.sender_user_id, m.hr_user_id)
+                WHERE m.assignment_id = :aid
+                ORDER BY m.created_at ASC
+            """), {"aid": assignment_id}).fetchall()
+        return self._rows_to_list(rows)
 
     def list_unread_message_notifications(
         self, recipient_user_id: str, limit: int = 20
@@ -4786,6 +5152,66 @@ class Database:
                 {"cid": company_id},
             ).fetchall()
         return self._rows_to_list(rows)
+
+    def list_admin_policy_overview(
+        self, company_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Per-company policy status for admin overview."""
+        params: Dict[str, Any] = {}
+        where = "WHERE c.id = :cid" if company_id else ""
+        if company_id:
+            params["cid"] = company_id
+        sql = f"""
+            SELECT
+                c.id AS company_id,
+                c.name AS company_name,
+                (SELECT cp.id FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_id,
+                (SELECT cp.title FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_title,
+                (SELECT cp.extraction_status FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS extraction_status,
+                (SELECT cp.updated_at FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_updated_at,
+                (SELECT COUNT(*) FROM policy_documents pd WHERE pd.company_id = c.id) AS doc_count,
+                (SELECT COUNT(*) FROM policy_versions pv
+                 JOIN company_policies cp2 ON cp2.id = pv.policy_id WHERE cp2.company_id = c.id) AS version_count,
+                (SELECT pv2.status FROM policy_versions pv2
+                 JOIN company_policies cp3 ON cp3.id = pv2.policy_id
+                 WHERE cp3.company_id = c.id
+                 ORDER BY pv2.version_number DESC, pv2.created_at DESC LIMIT 1) AS latest_version_status,
+                (SELECT pv2.version_number FROM policy_versions pv2
+                 JOIN company_policies cp3 ON cp3.id = pv2.policy_id
+                 WHERE cp3.company_id = c.id
+                 ORDER BY pv2.version_number DESC, pv2.created_at DESC LIMIT 1) AS latest_version_number,
+                (SELECT pv2.updated_at FROM policy_versions pv2
+                 JOIN company_policies cp3 ON cp3.id = pv2.policy_id
+                 WHERE cp3.company_id = c.id
+                 ORDER BY pv2.version_number DESC, pv2.created_at DESC LIMIT 1) AS latest_version_updated_at,
+                (SELECT COUNT(*) FROM resolved_assignment_policies rap
+                 JOIN case_assignments ca ON ca.id = rap.assignment_id
+                 LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), ca.case_id)
+                 WHERE rc.company_id = c.id) AS resolved_count
+            FROM companies c
+            {where}
+            ORDER BY c.name ASC
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+        result = []
+        for row in rows:
+            m = row._mapping
+            status = "no_policy"
+            if m.get("policy_id"):
+                vs = m.get("latest_version_status")
+                if vs == "published":
+                    status = "published"
+                elif vs == "reviewed":
+                    status = "reviewed"
+                elif vs == "review_required":
+                    status = "review_required"
+                elif vs:
+                    status = "draft"
+            r = dict(m)
+            r["policy_status"] = status
+            result.append(r)
+        return result
 
     def get_company_policy(self, policy_id: str) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:

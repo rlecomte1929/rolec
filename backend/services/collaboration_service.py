@@ -550,6 +550,80 @@ def get_collaboration_unread_count(user_id: str) -> int:
         return 0
 
 
+def list_all_threads(
+    actor_user_id: str,
+    *,
+    target_type: Optional[str] = None,
+    participant_user_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
+    """List all collaboration threads for admin. Optional filters: target_type, participant, status."""
+    supabase = _get_supabase()
+    q = supabase.table("collaboration_threads").select("*")
+    if target_type:
+        q = q.eq("thread_target_type", target_type)
+    if status:
+        q = q.eq("status", status)
+    q = q.order("last_comment_at", desc=True, nullsfirst=False)
+    q = q.range(offset, offset + limit - 1)
+    rows = q.execute().data or []
+    out = []
+    for t in rows:
+        # Resolve participants
+        part_rows = (
+            supabase.table("collaboration_thread_participants")
+            .select("user_id, role_in_thread")
+            .eq("thread_id", t["id"])
+            .execute()
+        ).data or []
+        if participant_user_id and not any(p.get("user_id") == participant_user_id for p in part_rows):
+            continue
+        participant_ids = [p["user_id"] for p in part_rows]
+        participant_names = []
+        for pid in participant_ids[:5]:
+            try:
+                from ..database import db
+                prof = db.get_profile_record(pid)
+                if prof:
+                    participant_names.append(prof.get("full_name") or prof.get("email") or pid[:8] + "…")
+                else:
+                    u = db.get_user_by_id(pid)
+                    participant_names.append((u and (u.get("email") or u.get("name"))) or pid[:8] + "…")
+            except Exception:
+                participant_names.append(pid[:8] + "…")
+        last_body = None
+        if t.get("last_comment_at"):
+            comm = (
+                supabase.table("collaboration_comments")
+                .select("body")
+                .eq("thread_id", t["id"])
+                .is_("deleted_at", "null")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            ).data
+            if comm:
+                last_body = (comm[0].get("body") or "")[:100]
+                if len((comm[0].get("body") or "")) > 100:
+                    last_body = last_body.rstrip() + "…"
+        out.append({
+            "thread_id": t["id"],
+            "thread_type": "collaboration",
+            "target_type": t.get("thread_target_type"),
+            "target_id": t.get("thread_target_id"),
+            "title": t.get("title"),
+            "status": t.get("status"),
+            "participants": participant_names or ["—"],
+            "last_message_preview": last_body or "—",
+            "last_message_at": t.get("last_comment_at"),
+            "message_count": t.get("comment_count", 0),
+            "created_at": t.get("created_at"),
+        })
+    return out
+
+
 def get_thread_summaries_batch(
     targets: List[Dict[str, str]],
     actor_user_id: str,

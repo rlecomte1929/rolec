@@ -35,7 +35,7 @@ export const AdminSupport: React.FC = () => {
   };
 
   return (
-    <AdminLayout title="Support Center" subtitle="Queue of customer support cases">
+    <AdminLayout title="Messages" subtitle="Support cases and customer messages">
       <Card padding="lg">
         <div className="text-sm text-[#6b7280] mb-2">Support cases ({cases.length})</div>
         <div className="space-y-3">

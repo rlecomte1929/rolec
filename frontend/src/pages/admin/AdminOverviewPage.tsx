@@ -1,0 +1,245 @@
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Card, Button } from '../../components/antigravity';
+import { AdminLayout } from './AdminLayout';
+import { adminAPI, suppliersAPI } from '../../api/client';
+import { buildRoute } from '../../navigation/routes';
+import { getAuthItem } from '../../utils/demo';
+
+type OverviewStats = {
+  companies: number;
+  hrUsers: number;
+  employees: number;
+  assignments: number;
+  companiesWithPolicy: number;
+  activeSuppliers: number;
+  supportOpen: number;
+  relocationsBlocked: number;
+};
+
+export const AdminOverviewPage: React.FC = () => {
+  const role = getAuthItem('relopass_role');
+  const [stats, setStats] = useState<OverviewStats>({
+    companies: 0,
+    hrUsers: 0,
+    employees: 0,
+    assignments: 0,
+    companiesWithPolicy: 0,
+    activeSuppliers: 0,
+    supportOpen: 0,
+    relocationsBlocked: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [purging, setPurging] = useState(false);
+
+  useEffect(() => {
+    if (role !== 'ADMIN') return;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [
+          companiesRes,
+          hrUsersRes,
+          employeesRes,
+          assignmentsRes,
+          policyRes,
+          supportRes,
+          relocationsRes,
+        ] = await Promise.all([
+          adminAPI.listCompanies(),
+          adminAPI.listHrUsers(),
+          adminAPI.listEmployees(),
+          adminAPI.listAssignments(),
+          adminAPI.listPolicyOverview(),
+          adminAPI.listSupportCases({ status: 'open' }),
+          adminAPI.listRelocations({ status: 'blocked' }),
+        ]);
+        let activeSuppliers = 0;
+        try {
+          const suppliersRes = await suppliersAPI.list({ status: 'active' });
+          activeSuppliers = (suppliersRes.suppliers || []).length;
+        } catch {
+          // ignore
+        }
+        const companiesWithPolicy = (policyRes.companies || []).filter(
+          (c: { policy_status?: string }) => c.policy_status === 'published'
+        ).length;
+        setStats({
+          companies: (companiesRes.companies || []).length,
+          hrUsers: (hrUsersRes.hr_users || []).length,
+          employees: (employeesRes.employees || []).length,
+          assignments: (assignmentsRes.assignments || []).length,
+          companiesWithPolicy,
+          activeSuppliers,
+          supportOpen: (supportRes.support_cases || []).length,
+          relocationsBlocked: (relocationsRes.relocations || []).length,
+        });
+      } catch {
+        // keep defaults
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [role]);
+
+  if (role !== 'ADMIN') {
+    return (
+      <AdminLayout title="Admin Console" subtitle="Restricted">
+        <Card padding="lg">You do not have access to the Admin Console.</Card>
+      </AdminLayout>
+    );
+  }
+
+  const cardClass =
+    'hover:border-[#0b2b43]/40 transition-colors cursor-pointer block';
+  const cardInner = (label: string, value: number, linkLabel: string) => (
+    <>
+      <div className="text-sm text-[#6b7280]">{label}</div>
+      <div className="text-2xl font-semibold text-[#0b2b43]">
+        {loading ? '…' : value}
+      </div>
+      <div className="text-xs text-[#6b7280] mt-1">{linkLabel} →</div>
+    </>
+  );
+
+  return (
+    <AdminLayout
+      title="Overview"
+      subtitle="B2B relocation operations — company-first control plane"
+    >
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <Link to={buildRoute('adminCompanies')}>
+            <Card padding="lg" className={cardClass}>
+              {cardInner('Companies', stats.companies, 'View companies')}
+            </Card>
+          </Link>
+          <Link to={buildRoute('adminPeople')}>
+            <Card padding="lg" className={cardClass}>
+              {cardInner('HR users', stats.hrUsers, 'View people')}
+            </Card>
+          </Link>
+          <Link to={buildRoute('adminPeople')}>
+            <Card padding="lg" className={cardClass}>
+              {cardInner('Employees', stats.employees, 'View people')}
+            </Card>
+          </Link>
+          <Link to={buildRoute('adminAssignments')}>
+            <Card padding="lg" className={cardClass}>
+              {cardInner('Assignments', stats.assignments, 'View assignments')}
+            </Card>
+          </Link>
+          <Link to={buildRoute('adminPolicies')}>
+            <Card padding="lg" className={cardClass}>
+              {cardInner(
+                'Companies with policy',
+                stats.companiesWithPolicy,
+                'View policies'
+              )}
+            </Card>
+          </Link>
+          <Link to={buildRoute('adminSuppliers')}>
+            <Card padding="lg" className={cardClass}>
+              {cardInner('Active suppliers', stats.activeSuppliers, 'View suppliers')}
+            </Card>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link to={buildRoute('adminMessages')}>
+            <Card padding="lg" className={cardClass}>
+              <div className="text-sm text-[#6b7280]">Open support cases</div>
+              <div className="text-2xl font-semibold text-[#0b2b43]">
+                {loading ? '…' : stats.supportOpen}
+              </div>
+              <div className="text-xs text-[#6b7280] mt-1">View messages →</div>
+            </Card>
+          </Link>
+          <Link to={buildRoute('adminAssignments')}>
+            <Card padding="lg" className={cardClass}>
+              <div className="text-sm text-[#6b7280]">Blocked relocations</div>
+              <div className="text-2xl font-semibold text-[#0b2b43]">
+                {loading ? '…' : stats.relocationsBlocked}
+              </div>
+              <div className="text-xs text-[#6b7280] mt-1">View assignments →</div>
+            </Card>
+          </Link>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link to={buildRoute('adminCompanies')}>
+            <Button variant="outline" size="sm">
+              Companies
+            </Button>
+          </Link>
+          <Link to={buildRoute('adminPeople')}>
+            <Button variant="outline" size="sm">
+              People
+            </Button>
+          </Link>
+          <Link to={buildRoute('adminAssignments')}>
+            <Button variant="outline" size="sm">
+              Assignments
+            </Button>
+          </Link>
+          <Link to={buildRoute('adminPolicies')}>
+            <Button variant="outline" size="sm">
+              Policies
+            </Button>
+          </Link>
+          <Link to={buildRoute('adminSuppliers')}>
+            <Button variant="outline" size="sm">
+              Suppliers
+            </Button>
+          </Link>
+          <Link to={buildRoute('adminMessages')}>
+            <Button variant="outline" size="sm">
+              Messages
+            </Button>
+          </Link>
+          <Link to={buildRoute('adminResources')}>
+            <Button variant="outline" size="sm">
+              Resources
+            </Button>
+          </Link>
+        </div>
+
+        <Card padding="lg" className="border-amber-200 bg-amber-50/50">
+          <div className="text-sm font-semibold text-amber-900 mb-2">Operations</div>
+          <div className="text-sm text-amber-900 mb-4">
+            Purge inactive cases and related data. Keeps only active, registered
+            cases.
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={purging}
+            onClick={async () => {
+              const confirmText = window.prompt('Type PURGE to confirm:');
+              if (confirmText !== 'PURGE') return;
+              const reason = window.prompt('Reason for purge (required):');
+              if (!reason) return;
+              setPurging(true);
+              try {
+                const res = await adminAPI.adminAction('purge-cases', {
+                  reason,
+                  payload: {
+                    active_statuses: ['assigned', 'awaiting_intake', 'submitted'],
+                  },
+                });
+                alert(
+                  `Purge complete. Assignments: ${res.stats?.assignments_deleted ?? 0}, Cases: ${res.stats?.relocation_cases_deleted ?? 0}`
+                );
+              } finally {
+                setPurging(false);
+              }
+            }}
+          >
+            {purging ? 'Purging…' : 'Purge inactive cases'}
+          </Button>
+        </Card>
+      </div>
+    </AdminLayout>
+  );
+};

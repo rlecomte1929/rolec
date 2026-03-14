@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card, Input } from '../components/antigravity';
 import { employeeAPI, companyPolicyAPI, policyDocumentsAPI } from '../api/client';
@@ -56,6 +56,8 @@ function EmployeePolicyContent() {
 
 export const HrPolicy: React.FC = () => {
   const role = getAuthItem('relopass_role');
+  const [searchParams] = useSearchParams();
+  const adminCompanyId = searchParams.get('adminCompanyId') || null;
   const [workspaceRefreshTrigger, setWorkspaceRefreshTrigger] = useState(0);
   const [postNormalizePolicyId, setPostNormalizePolicyId] = useState<string | null>(null);
 
@@ -76,15 +78,22 @@ export const HrPolicy: React.FC = () => {
     );
   }
   return (
-    <AppShell title="HR Policy Management" subtitle="Ingest, structure, edit, and publish assignment policies.">
+    <AppShell title={adminCompanyId ? 'Admin: Policy workspace' : 'HR Policy Management'} subtitle={adminCompanyId ? 'Inspect and assist with company policy' : 'Ingest, structure, edit, and publish assignment policies.'}>
+      {adminCompanyId && (
+        <p className="text-sm text-[#6b7280] mb-4">
+          Admin mode: viewing policy for company <code className="bg-[#f1f5f9] px-1 rounded">{adminCompanyId}</code>.{' '}
+          <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policies overview</Link>
+        </p>
+      )}
       {/* 1. Policy document intake — primary upload path (creates policy_documents) */}
-      <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} />
+      <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} adminCompanyId={adminCompanyId} />
       {/* 2. HR Policy Review workspace (clauses, normalize, publish) */}
       <div className="mt-8">
         <HrPolicyReviewWorkspace
           refreshTrigger={workspaceRefreshTrigger}
           postNormalizePolicyId={postNormalizePolicyId}
           onBindComplete={() => setPostNormalizePolicyId(null)}
+          adminCompanyId={adminCompanyId}
         />
       </div>
     </AppShell>
@@ -666,9 +675,11 @@ function getUploadRequestId(err: unknown): string | null {
 function PolicyDocumentIntakeSection({
   onNormalized,
   onDocumentsChange,
+  adminCompanyId = null,
 }: {
   onNormalized?: (policyId: string) => void;
   onDocumentsChange?: () => void;
+  adminCompanyId?: string | null;
 }) {
   const [documents, setDocuments] = useState<any[]>([]);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -689,7 +700,8 @@ function PolicyDocumentIntakeSection({
 
   const loadDocs = async () => {
     try {
-      const res = await policyDocumentsAPI.list();
+      const params = adminCompanyId ? { company_id: adminCompanyId } : undefined;
+      const res = await policyDocumentsAPI.list(params);
       setDocuments(res.documents || []);
       setMessage('');
     } catch (err: unknown) {
@@ -712,7 +724,8 @@ function PolicyDocumentIntakeSection({
   useEffect(() => {
     loadDocs();
     loadHealth();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadDocs uses adminCompanyId from closure
+  }, [adminCompanyId]);
 
   const handleUpload = async () => {
     const fileToUpload = uploadFile;

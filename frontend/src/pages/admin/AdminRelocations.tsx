@@ -34,7 +34,7 @@ export const AdminRelocations: React.FC = () => {
   };
 
   return (
-    <AdminLayout title="Relocation Case Inspector" subtitle="Monitor and unblock cases">
+    <AdminLayout title="Assignments" subtitle="View all assignments by company, monitor and unblock">
       <Card padding="lg">
         <div className="text-sm text-[#6b7280] mb-2">Cases ({cases.length})</div>
         <div className="space-y-3">

@@ -25,7 +25,11 @@ import type {
   AdminProfile,
   AdminEmployee,
   AdminHrUser,
+  HrCompanyEmployee,
   AdminRelocationCase,
+  AdminAssignment,
+  AdminAssignmentDetail,
+  AdminPolicyCompany,
   AdminSupportCase,
   AdminSupportNote,
   CompanyProfilePayload,
@@ -344,6 +348,22 @@ export const hrAPI = {
     const response = await api.get('/api/hr/company-profile');
     return response.data;
   },
+  /** Company-scoped employees for HR */
+  listCompanyEmployees: async (): Promise<{ employees: HrCompanyEmployee[] }> => {
+    const response = await api.get('/api/hr/employees');
+    return response.data;
+  },
+  getEmployee: async (employeeId: string): Promise<{ employee: HrCompanyEmployee }> => {
+    const response = await api.get(`/api/hr/employees/${employeeId}`);
+    return response.data;
+  },
+  updateEmployee: async (
+    employeeId: string,
+    payload: { band?: string; assignment_type?: string; status?: string }
+  ): Promise<{ employee: HrCompanyEmployee }> => {
+    const response = await api.patch(`/api/hr/employees/${employeeId}`, payload);
+    return response.data;
+  },
   saveCompanyProfile: async (payload: CompanyProfilePayload): Promise<any> => {
     const response = await api.post('/api/hr/company-profile', payload);
     return response.data;
@@ -482,8 +502,52 @@ export const adminAPI = {
     const response = await api.get('/api/admin/relocations', { params });
     return response.data;
   },
+  listAssignments: async (params?: {
+    company_id?: string;
+    employee_user_id?: string;
+    employee_search?: string;
+    status?: string;
+    destination_country?: string;
+  }): Promise<{ assignments: AdminAssignment[] }> => {
+    const response = await api.get('/api/admin/assignments', { params });
+    return response.data;
+  },
+  getAssignmentDetail: async (assignmentId: string): Promise<{ assignment: AdminAssignmentDetail }> => {
+    const response = await api.get(`/api/admin/assignments/${assignmentId}`);
+    return response.data;
+  },
+  reassignEmployeeCompany: async (assignmentId: string, payload: { reason: string; company_id: string }) => {
+    const response = await api.patch(`/api/admin/assignments/${assignmentId}/reassign-employee-company`, payload);
+    return response.data;
+  },
+  reassignHrOwner: async (assignmentId: string, payload: { reason: string; hr_user_id: string }) => {
+    const response = await api.patch(`/api/admin/assignments/${assignmentId}/reassign-hr-owner`, payload);
+    return response.data;
+  },
+  fixAssignmentCompanyLinkage: async (assignmentId: string, payload: { reason: string; company_id: string }) => {
+    const response = await api.patch(`/api/admin/assignments/${assignmentId}/fix-company-linkage`, payload);
+    return response.data;
+  },
+  listPolicyOverview: async (params?: { company_id?: string }): Promise<{ companies: AdminPolicyCompany[] }> => {
+    const response = await api.get('/api/admin/policies/overview', { params });
+    return response.data;
+  },
   listSupportCases: async (params?: { status?: string; severity?: string; company_id?: string }): Promise<{ support_cases: AdminSupportCase[] }> => {
     const response = await api.get('/api/admin/support-cases', { params });
+    return response.data;
+  },
+  listMessageThreads: async (params?: {
+    company_id?: string;
+    user_id?: string;
+    thread_type?: 'hr_employee' | 'collaboration';
+    limit?: number;
+    offset?: number;
+  }) => {
+    const response = await api.get('/api/admin/messages/threads', { params });
+    return response.data;
+  },
+  getHrThreadDetail: async (assignmentId: string) => {
+    const response = await api.get(`/api/admin/messages/threads/hr-employee/${assignmentId}`);
     return response.data;
   },
   listSupportNotes: async (caseId: string): Promise<{ notes: AdminSupportNote[] }> => {
@@ -576,6 +640,10 @@ export const suppliersAPI = {
   },
   getCategories: async () => {
     const response = await api.get('/api/suppliers/categories');
+    return response.data;
+  },
+  getCountries: async () => {
+    const response = await api.get('/api/suppliers/countries');
     return response.data;
   },
   create: async (payload: Record<string, unknown>) => {
@@ -1330,8 +1398,8 @@ export const hrPolicyAPI = {
 };
 
 export const companyPolicyAPI = {
-  list: async (): Promise<{ policies: any[] }> => {
-    const response = await api.get('/api/company-policies');
+  list: async (params?: { company_id?: string }): Promise<{ policies: any[] }> => {
+    const response = await api.get('/api/company-policies', { params });
     return response.data;
   },
   getLatest: async (): Promise<{ policy: any; benefits: any[]; company_name?: string }> => {
@@ -1449,8 +1517,8 @@ export const policyDocumentsAPI = {
     const response = await api.get('/api/hr/policy-documents/health');
     return response.data;
   },
-  list: async (): Promise<{ documents: any[] }> => {
-    const response = await api.get('/api/hr/policy-documents');
+  list: async (params?: { company_id?: string }): Promise<{ documents: any[] }> => {
+    const response = await api.get('/api/hr/policy-documents', { params });
     return response.data;
   },
   get: async (docId: string): Promise<{ document: any }> => {

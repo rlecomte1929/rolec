@@ -49,12 +49,15 @@ type HrPolicyReviewWorkspaceProps = {
   refreshTrigger?: number;
   postNormalizePolicyId?: string | null;
   onBindComplete?: () => void;
+  /** Admin context: scope to this company */
+  adminCompanyId?: string | null;
 };
 
 export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = ({
   refreshTrigger = 0,
   postNormalizePolicyId = null,
   onBindComplete,
+  adminCompanyId = null,
 }) => {
   const [documents, setDocuments] = useState<any[]>([]);
   const [policies, setPolicies] = useState<any[]>([]);
@@ -83,15 +86,16 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   }, []);
 
   const loadDocumentsAndPolicies = React.useCallback(async () => {
+    const params = adminCompanyId ? { company_id: adminCompanyId } : undefined;
     const [docsRes, policiesRes] = await Promise.all([
-      policyDocumentsAPI.list().catch(() => ({ documents: [] })),
-      companyPolicyAPI.list().catch(() => ({ policies: [] })),
+      policyDocumentsAPI.list(params).catch(() => ({ documents: [] })),
+      companyPolicyAPI.list(params).catch(() => ({ policies: [] })),
     ]);
     setDocuments(docsRes.documents || []);
     const pols = policiesRes.policies || [];
     setPolicies(pols);
     return pols;
-  }, []);
+  }, [adminCompanyId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,8 +113,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       });
     });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshTrigger drives reload; postNormalizePolicyId/onBindComplete used only in callback
-  }, [refreshTrigger]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshTrigger/adminCompanyId drive reload
+  }, [refreshTrigger, adminCompanyId]);
 
   useEffect(() => {
     if (!selectedPolicyId) {

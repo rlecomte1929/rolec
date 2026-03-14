@@ -109,7 +109,9 @@ def require_vendor(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str
 
 
 def require_assignment_visibility(assignment_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate user can access assignment; return assignment."""
+    """Validate user can access assignment; return assignment.
+    HR: allowed if admin, or owns assignment (hr_user_id), or assignment belongs to their company.
+    """
     assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -119,9 +121,14 @@ def require_assignment_visibility(assignment_id: str, user: Dict[str, Any]) -> D
     hr_id = assignment.get("hr_user_id")
     is_employee = effective.get("role") == UserRole.EMPLOYEE.value
     is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
-    visible = (is_employee and emp_id == effective["id"]) or (
-        is_hr and (effective.get("is_admin") or hr_id == effective["id"])
-    )
+    if is_employee:
+        visible = emp_id == effective["id"]
+    else:
+        visible = effective.get("is_admin") or hr_id == effective["id"]
+        if not visible and effective.get("role") == UserRole.HR.value:
+            hr_company = db.get_hr_company_id(effective["id"])
+            if hr_company and db.assignment_belongs_to_company(assignment_id, hr_company):
+                visible = True
     if not visible:
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
     return assignment

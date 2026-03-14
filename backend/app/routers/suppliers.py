@@ -11,6 +11,7 @@ from ..services.supplier_registry import (
     add_capability,
     create_supplier,
     get_supplier,
+    list_supplier_countries,
     list_suppliers,
     remove_capability,
     search_by_service_destination,
@@ -33,6 +34,14 @@ def get_session():
 def list_service_categories(user: Dict[str, Any] = Depends(require_admin)):
     """List valid service categories for capability assignment."""
     return {"categories": get_valid_service_categories()}
+
+
+@router.get("/countries")
+def list_countries_api(user: Dict[str, Any] = Depends(require_admin_or_hr)):
+    """List country codes from supplier capabilities (for filter dropdown)."""
+    with SessionLocal() as session:
+        codes = list_supplier_countries(session)
+        return {"countries": codes}
 
 
 @router.get("", response_model=Dict[str, Any])

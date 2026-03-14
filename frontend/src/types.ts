@@ -694,6 +694,21 @@ export interface AdminEmployee {
   created_at: string;
 }
 
+/** HR company-scoped employee (with profile display fields) */
+export interface HrCompanyEmployee {
+  id: string;
+  company_id: string;
+  profile_id: string;
+  band?: string;
+  assignment_type?: string;
+  relocation_case_id?: string;
+  status?: string;
+  created_at: string;
+  full_name?: string;
+  email?: string;
+  role?: string;
+}
+
 export interface AdminHrUser {
   id: string;
   company_id: string;
@@ -712,6 +727,64 @@ export interface AdminRelocationCase {
   home_country?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface AdminAssignment {
+  id: string;
+  case_id?: string;
+  canonical_case_id?: string;
+  hr_user_id?: string;
+  employee_user_id?: string;
+  employee_identifier?: string;
+  status?: string;
+  employee_first_name?: string;
+  employee_last_name?: string;
+  expected_start_date?: string;
+  submitted_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  case_company_id?: string;
+  host_country?: string;
+  home_country?: string;
+  case_status?: string;
+  stage?: string;
+  company_name?: string;
+  employee_full_name?: string;
+  hr_full_name?: string;
+  employee_company_id?: string;
+  hr_company_id?: string;
+  assignment_type?: string;
+  move_date?: string;
+  family_status?: string;
+  destination_from_profile?: string;
+  policy_resolved?: boolean;
+  company_has_policy?: boolean;
+}
+
+export interface AdminPolicyCompany {
+  company_id: string;
+  company_name?: string;
+  policy_id?: string;
+  policy_title?: string;
+  extraction_status?: string;
+  policy_updated_at?: string;
+  doc_count?: number;
+  version_count?: number;
+  latest_version_status?: string;
+  latest_version_number?: number;
+  latest_version_updated_at?: string;
+  resolved_count?: number;
+  policy_status: 'no_policy' | 'draft' | 'review_required' | 'reviewed' | 'published';
+}
+
+export interface AdminAssignmentDetail extends AdminAssignment {
+  employee_profile?: Record<string, unknown>;
+  case_services?: Array<{ service_key: string; category: string; selected?: number }>;
+  resolved_policy?: Record<string, unknown>;
+  company_policies?: Array<{ id: string; title: string; extraction_status?: string }>;
+  company_has_published_policy?: boolean;
+  hr_profile_id?: string;
+  emp_profile_id?: string;
 }
 
 export interface AdminSupportCase {

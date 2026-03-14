@@ -25,7 +25,7 @@ export const AdminUsers: React.FC = () => {
   };
 
   return (
-    <AdminLayout title="User Lookup" subtitle="Search profiles and start view-as sessions">
+    <AdminLayout title="People" subtitle="HR and employee accounts — view-as and manage">
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -34,7 +34,7 @@ export const AdminUsers: React.FC = () => {
             placeholder="Search by email or name"
             className="w-64 rounded-full border border-[#e2e8f0] px-4 py-2 text-sm"
           />
-          <Button onClick={() => load()}>Search</Button>
+          <Button onClick={() => load()}>Apply</Button>
         </div>
       </Card>
       <Card padding="lg">
@@ -58,7 +58,10 @@ export const AdminUsers: React.FC = () => {
             </div>
           ))}
           {profiles.length === 0 && (
-            <div className="text-sm text-[#6b7280]">No profiles found.</div>
+            <div className="py-8 text-center text-[#6b7280]">
+              <div className="text-sm font-medium">No profiles found</div>
+              <div className="text-xs mt-1">Profiles appear when users register or are provisioned.</div>
+            </div>
           )}
         </div>
       </Card>

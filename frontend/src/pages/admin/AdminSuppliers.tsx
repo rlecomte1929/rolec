@@ -19,23 +19,15 @@ type Supplier = {
   vendor_id?: string;
   created_at?: string;
   updated_at?: string;
+  service_categories?: string[];
+  coverage_summary?: string;
 };
-
-const SERVICE_CATEGORIES = [
-  'living_areas',
-  'schools',
-  'movers',
-  'banks',
-  'insurance',
-  'electricity',
-  'childcare',
-  'medical',
-  'telecom',
-] as const;
 
 export const AdminSuppliers: React.FC = () => {
   const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [countries, setCountries] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -67,9 +59,14 @@ export const AdminSuppliers: React.FC = () => {
     load();
   }, [load]);
 
+  useEffect(() => {
+    suppliersAPI.getCategories().then((r) => r.categories && setCategories(r.categories)).catch(() => {});
+    suppliersAPI.getCountries().then((r) => r.countries && setCountries(r.countries || [])).catch(() => {});
+  }, []);
+
   return (
-    <AdminLayout title="Supplier Registry" subtitle="Source of truth for recommendation matching and RFQ">
-      <Card padding="lg">
+    <AdminLayout title="Suppliers" subtitle="Supplier registry — recommendation matching and RFQ">
+      <Card padding="lg" className="mb-4">
         {error && (
           <Alert variant="error" className="mb-4">
             {error}
@@ -81,10 +78,10 @@ export const AdminSuppliers: React.FC = () => {
 
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <Button onClick={() => navigate(ROUTE_DEFS.adminSuppliersNew.path)}>
-            + Create supplier
+            Add supplier
           </Button>
         </div>
-        <div className="flex flex-wrap gap-4 mb-6">
+        <div className="flex flex-wrap gap-4">
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Status</label>
             <select
@@ -99,14 +96,14 @@ export const AdminSuppliers: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#374151] mb-1">Service</label>
+            <label className="block text-sm font-medium text-[#374151] mb-1">Service category</label>
             <select
               value={serviceFilter}
               onChange={(e) => setServiceFilter(e.target.value)}
               className="border border-[#d1d5db] rounded px-3 py-2 text-sm"
             >
               <option value="">All</option>
-              {SERVICE_CATEGORIES.map((s) => (
+              {categories.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -115,33 +112,42 @@ export const AdminSuppliers: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-[#374151] mb-1">Country</label>
-            <input
-              type="text"
+            <select
               value={countryFilter}
               onChange={(e) => setCountryFilter(e.target.value)}
-              placeholder="e.g. SG"
-              className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-24"
-            />
+              className="border border-[#d1d5db] rounded px-3 py-2 text-sm"
+            >
+              <option value="">All</option>
+              {countries.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="self-end">
             <Button onClick={load} disabled={loading}>
-              {loading ? 'Loading...' : 'Refresh'}
+              {loading ? 'Loading…' : 'Apply'}
             </Button>
           </div>
         </div>
-
+      </Card>
+      <Card padding="lg">
         <div className="border border-[#e5e7eb] rounded-lg overflow-hidden">
           {loading && suppliers.length === 0 ? (
             <div className="p-8 text-center text-[#6b7280]">Loading suppliers...</div>
           ) : suppliers.length === 0 ? (
             <div className="p-8 text-center text-[#6b7280]">
-              No suppliers found. Add suppliers via seed or API to see them here.
+              <div className="text-sm font-medium">No suppliers found</div>
+              <div className="text-xs mt-1">Add suppliers via Add supplier or seed data.</div>
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#f9fafb] border-b border-[#e5e7eb]">
                   <th className="text-left py-3 px-4 font-medium text-[#374151]">Name</th>
+                  <th className="text-left py-3 px-4 font-medium text-[#374151]">Service categories</th>
+                  <th className="text-left py-3 px-4 font-medium text-[#374151]">Coverage</th>
                   <th className="text-left py-3 px-4 font-medium text-[#374151]">Status</th>
                   <th className="text-left py-3 px-4 font-medium text-[#374151]">Verified</th>
                   <th className="text-left py-3 px-4 font-medium text-[#374151]">Actions</th>
@@ -159,6 +165,16 @@ export const AdminSuppliers: React.FC = () => {
                       {s.legal_name && (
                         <span className="block text-xs text-[#6b7280]">{s.legal_name}</span>
                       )}
+                    </td>
+                    <td className="py-3 px-4 text-[#4b5563]">
+                      {(s.service_categories || []).length
+                        ? (s.service_categories || []).join(', ')
+                        : '—'}
+                    </td>
+                    <td className="py-3 px-4 text-[#4b5563] max-w-[220px]">
+                      <span className="block truncate" title={s.coverage_summary || ''}>
+                        {s.coverage_summary || '—'}
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       <span

@@ -63,6 +63,31 @@ const SERVICE_CATEGORIES = [
 
 const COVERAGE_TYPES = ['global', 'country', 'city'] as const;
 
+function CoverageSummary({ capabilities }: { capabilities: Capability[] }) {
+  const hasGlobal = capabilities.some((c) => c.coverage_scope_type === 'global');
+  const countries = [...new Set(capabilities.filter((c) => c.country_code).map((c) => c.country_code))].sort();
+  const cityCaps = capabilities.filter((c) => c.coverage_scope_type === 'city' && c.city_name && c.country_code);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <dt className="text-[#6b7280] text-sm mb-1">Countries covered</dt>
+        <dd className="text-sm text-[#0b2b43]">
+          {hasGlobal ? 'Global (all countries)' : countries.length ? countries.join(', ') : '—'}
+        </dd>
+      </div>
+      {cityCaps.length > 0 && (
+        <div>
+          <dt className="text-[#6b7280] text-sm mb-1">City-specific coverage</dt>
+          <dd className="text-sm text-[#0b2b43]">
+            {cityCaps.map((c) => `${c.city_name} (${c.country_code})`).join('; ')}
+          </dd>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const AdminSupplierDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -293,9 +318,53 @@ export const AdminSupplierDetail: React.FC = () => {
           </Alert>
         )}
 
+        {supplier.capabilities && supplier.capabilities.length > 0 && (
+          <Card padding="lg">
+            <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Coverage</h2>
+            <CoverageSummary capabilities={supplier.capabilities} />
+          </Card>
+        )}
+
+        <Card padding="lg">
+          <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Contact & notes</h2>
+          <dl className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt className="text-[#6b7280]">Website</dt>
+              <dd>
+                {display.website ? (
+                  <a
+                    href={display.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#0b2b43] underline"
+                  >
+                    {display.website}
+                  </a>
+                ) : (
+                  <span className="text-[#9ca3af]">—</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[#6b7280]">Email</dt>
+              <dd>{display.contact_email || <span className="text-[#9ca3af]">—</span>}</dd>
+            </div>
+            <div>
+              <dt className="text-[#6b7280]">Phone</dt>
+              <dd>{display.contact_phone || <span className="text-[#9ca3af]">—</span>}</dd>
+            </div>
+          </dl>
+          {display.description && (
+            <div className="mt-4 pt-4 border-t border-[#e5e7eb]">
+              <dt className="text-[#6b7280] text-sm mb-1">Notes</dt>
+              <dd className="text-sm text-[#4b5563]">{display.description}</dd>
+            </div>
+          )}
+        </Card>
+
         <Card padding="lg">
           <div className="flex justify-between items-start mb-4">
-            <h2 className="text-lg font-semibold text-[#0b2b43]">Details</h2>
+            <h2 className="text-lg font-semibold text-[#0b2b43]">Edit details</h2>
             <Button variant="outline" size="sm" onClick={() => navigate(ROUTE_DEFS.adminSuppliers.path)}>
               ← Back to list
             </Button>

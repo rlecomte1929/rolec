@@ -50,7 +50,9 @@ def list_suppliers(
     limit: int = 100,
     offset: int = 0,
 ) -> List[Dict[str, Any]]:
-    """List suppliers with optional filters."""
+    """List suppliers with optional filters.
+    Country filter: show supplier if any capability covers the country (country_code match) or is global.
+    """
     q = session.query(Supplier)
     if status:
         q = q.filter(Supplier.status == status)
@@ -59,8 +61,9 @@ def list_suppliers(
         if service_category:
             q = q.filter(SupplierServiceCapability.service_category == service_category)
         if country_code:
+            cc_upper = country_code.strip().upper()[:2]
             q = q.filter(
-                (SupplierServiceCapability.country_code == country_code.upper())
+                (SupplierServiceCapability.country_code == cc_upper)
                 | (SupplierServiceCapability.coverage_scope_type == "global")
             )
         if city_name:
@@ -71,7 +74,27 @@ def list_suppliers(
         q = q.distinct()
     q = q.order_by(Supplier.name)
     rows = q.offset(offset).limit(limit).all()
-    return [_supplier_to_dict(r, session) for r in rows]
+    return [_supplier_to_dict(r, session, include_list_summary=True) for r in rows]
+
+
+def list_supplier_countries(session: Session) -> List[str]:
+    """Distinct country codes from supplier capabilities, for admin filter dropdown."""
+    from sqlalchemy import distinct
+    rows = (
+        session.query(distinct(SupplierServiceCapability.country_code))
+        .filter(SupplierServiceCapability.country_code.isnot(None))
+        .filter(SupplierServiceCapability.country_code != "")
+        .order_by(SupplierServiceCapability.country_code)
+        .all()
+    )
+    codes = [r[0] for r in rows if r[0]]
+    # Merge with common relocation destinations so dropdown is useful even with empty DB
+    common = ["SG", "US", "GB", "DE", "FR", "NL", "AU", "JP", "HK", "NO", "CH"]
+    seen = set(codes)
+    for c in common:
+        if c not in seen:
+            codes.append(c)
+    return sorted(set(codes))
 
 
 def get_supplier(session: Session, supplier_id: str) -> Optional[Dict[str, Any]]:
@@ -82,12 +105,32 @@ def get_supplier(session: Session, supplier_id: str) -> Optional[Dict[str, Any]]
     return _supplier_to_dict(s, session, include_capabilities=True, include_scoring=True)
 
 
+def _build_coverage_summary(caps: List[Any]) -> str:
+    """Build coverage summary from capabilities: Global, country codes, city-specific."""
+    if not caps:
+        return "—"
+    has_global = any(getattr(c, "coverage_scope_type", "") == "global" for c in caps)
+    countries = sorted({c.country_code for c in caps if getattr(c, "country_code", None)})
+    cities = [(c.country_code, c.city_name) for c in caps if getattr(c, "city_name", None)]
+    parts = []
+    if has_global:
+        parts.append("Global")
+    if countries:
+        parts.append(", ".join(countries))
+    if cities:
+        city_strs = [f"{cn} ({cc})" for cc, cn in cities if cc and cn]
+        if city_strs:
+            parts.append("; ".join(city_strs))
+    return " | ".join(parts) if parts else "—"
+
+
 def _supplier_to_dict(
     s: Supplier,
     session: Session,
     *,
     include_capabilities: bool = False,
     include_scoring: bool = False,
+    include_list_summary: bool = False,
 ) -> Dict[str, Any]:
     out = {
         "id": s.id,
@@ -104,27 +147,31 @@ def _supplier_to_dict(
         "created_at": s.created_at.isoformat() if s.created_at else None,
         "updated_at": s.updated_at.isoformat() if s.updated_at else None,
     }
-    if include_capabilities:
+    if include_list_summary or include_capabilities:
         caps = session.query(SupplierServiceCapability).filter(
             SupplierServiceCapability.supplier_id == s.id
         ).all()
-        out["capabilities"] = [
-            {
-                "id": c.id,
-                "service_category": c.service_category,
-                "coverage_scope_type": c.coverage_scope_type,
-                "country_code": c.country_code,
-                "city_name": c.city_name,
-                "specialization_tags": _parse_json_array(c.specialization_tags),
-                "min_budget": float(c.min_budget) if c.min_budget is not None else None,
-                "max_budget": float(c.max_budget) if c.max_budget is not None else None,
-                "family_support": c.family_support,
-                "corporate_clients": c.corporate_clients,
-                "remote_support": c.remote_support,
-                "notes": c.notes,
-            }
-            for c in caps
-        ]
+        if include_list_summary:
+            out["service_categories"] = sorted({c.service_category for c in caps})
+            out["coverage_summary"] = _build_coverage_summary(caps)
+        if include_capabilities:
+            out["capabilities"] = [
+                {
+                    "id": c.id,
+                    "service_category": c.service_category,
+                    "coverage_scope_type": c.coverage_scope_type,
+                    "country_code": c.country_code,
+                    "city_name": c.city_name,
+                    "specialization_tags": _parse_json_array(c.specialization_tags),
+                    "min_budget": float(c.min_budget) if c.min_budget is not None else None,
+                    "max_budget": float(c.max_budget) if c.max_budget is not None else None,
+                    "family_support": c.family_support,
+                    "corporate_clients": c.corporate_clients,
+                    "remote_support": c.remote_support,
+                    "notes": c.notes,
+                }
+                for c in caps
+            ]
     if include_scoring:
         meta = session.query(SupplierScoringMetadata).filter(
             SupplierScoringMetadata.supplier_id == s.id

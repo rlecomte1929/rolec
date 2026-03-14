@@ -4,155 +4,67 @@ import { AppShell } from '../../components/AppShell';
 import { AdminNotificationBadge } from '../../components/admin/AdminNotificationBadge';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 
+const SHOW_RESOURCES_NAV = true;
+
 interface Props {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
 }
 
+const navLinkClass = (active: boolean) =>
+  `px-3 py-1 rounded-full border text-sm ${
+    active ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]' : 'border-transparent hover:text-[#0b2b43]'
+  }`;
+
 export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
   const location = useLocation();
-  const isActive = (path: string) =>
-    location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const isActive = (path: string, exact?: boolean) =>
+    exact ? location.pathname === path : location.pathname === path || location.pathname.startsWith(`${path}/`);
+
+  const navItems: { to: string; label: string; path?: string }[] = [
+    { to: buildRoute('adminOverview'), label: 'Overview', path: ROUTE_DEFS.adminOverview.path },
+    { to: buildRoute('adminCompanies'), label: 'Companies', path: ROUTE_DEFS.adminCompanies.path },
+    { to: buildRoute('adminPeople'), label: 'People', path: ROUTE_DEFS.adminPeople.path },
+    { to: buildRoute('adminAssignments'), label: 'Assignments', path: ROUTE_DEFS.adminAssignments.path },
+    { to: buildRoute('adminPolicies'), label: 'Policies', path: ROUTE_DEFS.adminPolicies.path },
+    { to: buildRoute('adminSuppliers'), label: 'Suppliers', path: ROUTE_DEFS.adminSuppliers.path },
+    { to: buildRoute('adminMessages'), label: 'Messages', path: ROUTE_DEFS.adminMessages.path },
+  ];
+  if (SHOW_RESOURCES_NAV) {
+    navItems.push({ to: buildRoute('adminResources'), label: 'Resources', path: ROUTE_DEFS.adminResources.path });
+  }
+  navItems.push({
+    to: buildRoute('adminNotifications'),
+    label: 'Notifications',
+    path: ROUTE_DEFS.adminNotifications.path,
+  });
 
   return (
     <AppShell title={title} subtitle={subtitle}>
       <div className="mb-6 flex flex-wrap gap-2 border-b border-[#e2e8f0] pb-4">
-        <Link
-          to={buildRoute('adminConsole')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminConsole.path)
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Dashboard
-        </Link>
-        <Link
-          to={buildRoute('adminCompanies')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminCompanies.path)
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Companies
-        </Link>
-        <Link
-          to={buildRoute('adminResearch')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminResearch.path)
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Research
-        </Link>
-        <Link
-          to={buildRoute('adminUsers')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminUsers.path)
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Users
-        </Link>
-        <Link
-          to={buildRoute('adminRelocations')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminRelocations.path)
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Relocations
-        </Link>
-        <Link
-          to={buildRoute('adminSupport')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminSupport.path)
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Support
-        </Link>
-        <Link
-          to={buildRoute('adminSuppliers')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminSuppliers.path) || isActive('/admin/suppliers/')
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Suppliers
-        </Link>
-        <Link
-          to={buildRoute('adminResources')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminResources.path) ||
-            isActive('/admin/resources/') ||
-            isActive('/admin/events')
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Resources CMS
-        </Link>
-        <Link
-          to={buildRoute('adminStagingDashboard')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminStagingDashboard.path) || isActive('/admin/staging/')
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Staging
-        </Link>
-        <Link
-          to={buildRoute('adminFreshness')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminFreshness.path) || isActive('/admin/freshness') || isActive('/admin/crawl')
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Freshness
-        </Link>
-        <Link
-          to={buildRoute('adminReviewQueue')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminReviewQueue.path) || isActive('/admin/review-queue')
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Review Queue
-        </Link>
-        <Link
-          to={buildRoute('adminOpsSla')}
-          className={`px-3 py-1 rounded-full border text-sm ${
-            isActive('/admin/ops')
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Ops
-        </Link>
-        <Link
-          to={buildRoute('adminNotifications')}
-          className={`flex items-center gap-1 px-3 py-1 rounded-full border text-sm ${
-            isActive(ROUTE_DEFS.adminNotifications.path) || isActive('/admin/notifications/')
-              ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-              : 'border-transparent hover:text-[#0b2b43]'
-          }`}
-        >
-          Notifications
-          <span className="flex shrink-0">
-            <AdminNotificationBadge />
-          </span>
-        </Link>
+        {navItems.map(({ to, label, path }) => {
+          const pathToCheck = path ?? to;
+          const active =
+            (pathToCheck === '/admin' ? isActive('/admin', true) : isActive(pathToCheck)) ||
+            (pathToCheck === '/admin/suppliers' && isActive('/admin/suppliers/')) ||
+            (pathToCheck === '/admin/resources' && (isActive('/admin/resources/') || isActive('/admin/events')));
+          const isNotifications = label === 'Notifications';
+          return (
+            <Link key={label} to={to} className={navLinkClass(active)}>
+              {isNotifications ? (
+                <span className="flex items-center gap-1">
+                  {label}
+                  <span className="flex shrink-0">
+                    <AdminNotificationBadge />
+                  </span>
+                </span>
+              ) : (
+                label
+              )}
+            </Link>
+          );
+        })}
       </div>
       {children}
     </AppShell>
