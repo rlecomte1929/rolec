@@ -268,28 +268,28 @@ def resolve_policy_for_assignment(
     case_id = assignment.get("case_id")
     canonical_case_id = assignment.get("canonical_case_id") or case_id
 
-    # Get company_id from case or HR user's profile
+    # Get company_id from case, HR user's profile, or employee's profile
     company_id = case.get("company_id") if case else None
     if not company_id and assignment.get("hr_user_id"):
         profile_rec = db.get_profile_record(assignment["hr_user_id"])
         if profile_rec:
             company_id = profile_rec.get("company_id")
+    if not company_id and assignment.get("employee_user_id"):
+        emp_profile = db.get_profile_record(assignment["employee_user_id"])
+        if emp_profile:
+            company_id = emp_profile.get("company_id")
     if not company_id:
         log.warning("policy_resolution: no company_id for assignment %s", assignment_id)
         return None
 
-    # Get published policy version for company
-    policy = db.get_latest_company_policy(company_id)
-    if not policy:
-        log.info("policy_resolution: no company policy for company %s", company_id)
+    # Get company policy that has a published version (try any policy for this company)
+    result = db.get_company_policy_with_published_version(company_id)
+    if not result:
+        log.info("policy_resolution: no published policy for company %s", company_id)
         return None
 
+    policy, version = result
     policy_id = policy["id"]
-    version = db.get_published_policy_version(policy_id)
-    if not version:
-        log.info("policy_resolution: no published policy version for policy %s", policy_id)
-        return None
-
     vid = version["id"]
     benefit_rules = db.list_policy_benefit_rules(vid)
     exclusions = db.list_policy_exclusions(vid)

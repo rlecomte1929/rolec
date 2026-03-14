@@ -1547,13 +1547,21 @@ class Database:
     # ==================================================================
     # HR cases and assignments
     # ==================================================================
-    def create_case(self, case_id: str, hr_user_id: str, profile: Dict[str, Any]) -> None:
+    def create_case(
+        self, case_id: str, hr_user_id: str, profile: Dict[str, Any], company_id: Optional[str] = None
+    ) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
-            conn.execute(text(
-                "INSERT INTO relocation_cases (id, hr_user_id, profile_json, created_at, updated_at) "
-                "VALUES (:id, :hr, :pj, :ca, :ua)"
-            ), {"id": case_id, "hr": hr_user_id, "pj": json.dumps(profile), "ca": now, "ua": now})
+            if company_id is not None:
+                conn.execute(text(
+                    "INSERT INTO relocation_cases (id, hr_user_id, profile_json, company_id, created_at, updated_at) "
+                    "VALUES (:id, :hr, :pj, :cid, :ca, :ua)"
+                ), {"id": case_id, "hr": hr_user_id, "pj": json.dumps(profile), "cid": company_id, "ca": now, "ua": now})
+            else:
+                conn.execute(text(
+                    "INSERT INTO relocation_cases (id, hr_user_id, profile_json, created_at, updated_at) "
+                    "VALUES (:id, :hr, :pj, :ca, :ua)"
+                ), {"id": case_id, "hr": hr_user_id, "pj": json.dumps(profile), "ca": now, "ua": now})
 
     def get_case_by_id(self, case_id: str) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
@@ -4797,6 +4805,17 @@ class Database:
                 {"cid": company_id},
             ).fetchone()
         return self._row_to_dict(row)
+
+    def get_company_policy_with_published_version(
+        self, company_id: str
+    ) -> Optional[Tuple[Dict[str, Any], Dict[str, Any]]]:
+        """Return (policy, version) for the first company policy that has a published version."""
+        policies = self.list_company_policies(company_id)
+        for policy in policies:
+            version = self.get_published_policy_version(policy["id"])
+            if version:
+                return (policy, version)
+        return None
 
     def update_company_policy_status(
         self,

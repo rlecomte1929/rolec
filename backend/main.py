@@ -511,6 +511,8 @@ def _seed_demo_cases() -> None:
         },
     ]
 
+    hr_profile = db.get_profile_record(hr_user_id)
+    hr_company_id = hr_profile.get("company_id") if hr_profile else None
     for scenario in scenarios:
         if not db.get_assignment_by_id(scenario["assignment_id"]):
             case_profile = {
@@ -518,7 +520,7 @@ def _seed_demo_cases() -> None:
                 "destination": scenario["profile"]["movePlan"]["destination"],
             }
             if not db.get_case_by_id(scenario["case_id"]):
-                db.create_case(scenario["case_id"], hr_user_id, case_profile)
+                db.create_case(scenario["case_id"], hr_user_id, case_profile, company_id=hr_company_id)
             db.create_assignment(
                 assignment_id=scenario["assignment_id"],
                 case_id=scenario["case_id"],
