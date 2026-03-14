@@ -1067,9 +1067,12 @@ export const employeeAPI = {
       currency?: string;
       approval_required: boolean;
       evidence_required_json?: string[];
+      condition_summary?: string;
+      exclusions_json?: Array<{ domain?: string; description?: string }>;
     }>;
     exclusions: Array<{ benefit_key?: string; domain: string; description?: string }>;
     resolved_at?: string;
+    resolution_context?: { assignment_type?: string; family_status?: string; tier?: string };
     message?: string;
   }> => {
     const response = await api.get(`/api/employee/assignments/${assignmentId}/policy`);

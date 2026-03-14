@@ -3740,11 +3740,12 @@ def get_employee_assignment_policy(
             db, assignment_id, assignment, case, profile, employee_profile
         )
     if not resolved:
-        return {"policy": None, "benefits": [], "exclusions": [], "message": "No published policy for your assignment."}
+        return {"policy": None, "benefits": [], "exclusions": [], "resolution_context": None, "message": "No published policy for your assignment."}
     benefits = db.list_resolved_policy_benefits(resolved["id"])
     exclusions = db.list_resolved_policy_exclusions(resolved["id"])
     policy = resolved.get("policy") or {}
     version = resolved.get("version") or {}
+    ctx = resolved.get("resolution_context") or resolved.get("resolution_context_json") or {}
     return {
         "policy": {
             "id": policy.get("id"),
@@ -3755,6 +3756,7 @@ def get_employee_assignment_policy(
         "benefits": benefits,
         "exclusions": exclusions,
         "resolved_at": resolved.get("resolved_at"),
+        "resolution_context": ctx,
     }
 
 

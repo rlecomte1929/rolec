@@ -3,10 +3,7 @@ import { Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card, Input } from '../components/antigravity';
 import { employeeAPI, companyPolicyAPI, policyDocumentsAPI } from '../api/client';
-import type { PolicyServiceComparisonResponse } from '../types';
-import { EmployeePolicyView } from '../features/policy/EmployeePolicyView';
-import { PolicyServiceComparisonView } from '../features/policy/PolicyServiceComparisonView';
-import { PolicyBenefitsTable, type PolicyBenefitRow } from '../features/policy/PolicyBenefitsTable';
+import { EmployeeResolvedPolicyView } from '../features/policy/EmployeeResolvedPolicyView';
 import { HrPolicyReviewWorkspace } from '../features/policy/HrPolicyReviewWorkspace';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
@@ -15,45 +12,20 @@ function EmployeePolicyContent() {
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [policyDoc, setPolicyDoc] = useState<any | null>(null);
-  const [benefits, setBenefits] = useState<PolicyBenefitRow[]>([]);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState<string | null>(null);
-  const [comparison, setComparison] = useState<PolicyServiceComparisonResponse | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError('');
-    companyPolicyAPI
-      .getLatest()
-      .then(async (res) => {
-        if (cancelled) return;
-        setPolicyDoc(res.policy || null);
-        setBenefits(res.benefits || []);
-        setCompanyName(res.company_name || null);
-        if (res.policy?.id) {
-          try {
-            const dl = await companyPolicyAPI.getDownloadUrl(res.policy.id);
-            if (dl?.url) setDownloadUrl(dl.url);
-          } catch {
-            // Download link failed; policy summary still shown
-          }
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPolicyDoc(null);
-          setBenefits([]);
-        }
-      });
     employeeAPI
       .getCurrentAssignment()
       .then((res) => {
         if (!cancelled && res?.assignment?.id) setAssignmentId(res.assignment.id);
       })
-      .catch((err: any) => {
-        if (!cancelled && err?.response?.status !== 401) setError('Unable to load your assignment.');
+      .catch((err: unknown) => {
+        if (!cancelled && (err as { response?: { status?: number } })?.response?.status !== 401) {
+          setError('Unable to load your assignment.');
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -61,70 +33,20 @@ function EmployeePolicyContent() {
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!assignmentId) {
-      setComparison(null);
-      return;
-    }
-    employeeAPI
-      .getPolicyServiceComparison(assignmentId)
-      .then((res) => {
-        if (!cancelled) setComparison(res);
-      })
-      .catch(() => {
-        if (!cancelled) setComparison(null);
-      });
-    return () => { cancelled = true; };
-  }, [assignmentId]);
-
-  if (loading) return <div className="text-sm text-[#6b7280] py-8">Loading your policy...</div>;
+  if (loading) return <div className="text-sm text-[#6b7280] py-8">Loading your policy…</div>;
   if (error) return <Alert variant="error">{error}</Alert>;
-  if (!assignmentId && !policyDoc) {
+  if (!assignmentId) {
     return (
       <Card padding="lg">
-        <p className="text-[#4b5563]">You don't have an active assignment yet. Once your case is assigned, your applicable policy and benefit limits will appear here.</p>
+        <p className="text-[#4b5563]">
+          You don&apos;t have an active assignment yet. Once your case is assigned, your applicable policy and benefit limits will appear here.
+        </p>
       </Card>
     );
   }
   return (
     <div className="space-y-4">
-      {policyDoc && (
-        <Card padding="lg">
-          <div className="text-lg font-semibold text-[#0b2b43] mb-2">HR Policy summary</div>
-          {companyName && (
-            <div className="text-sm text-[#4b5563] mb-2">Company: {companyName}</div>
-          )}
-          <div className="text-sm text-[#6b7280] mb-4">
-            Version {policyDoc.version || '—'} • Effective {policyDoc.effective_date ? formatDate(policyDoc.effective_date) : '—'}
-          </div>
-          {downloadUrl && (
-            <a className="text-sm text-[#0b2b43] underline" href={downloadUrl} target="_blank" rel="noreferrer">
-              Download policy document
-            </a>
-          )}
-          <div className="mt-4">
-            <PolicyBenefitsTable benefits={benefits} />
-          </div>
-          <div className="text-xs text-[#6b7280] mt-4">
-            Informational summary — the policy document remains the source of truth.
-          </div>
-        </Card>
-      )}
-      {!policyDoc && assignmentId && <EmployeePolicyView assignmentId={assignmentId} compact={false} />}
-      {assignmentId && (
-        <Card padding="lg">
-          <div className="text-sm font-semibold text-[#0b2b43] mb-2">Your services vs policy</div>
-          <div className="text-xs text-[#6b7280] mb-3">
-            How your selected services compare to your resolved assignment policy.
-          </div>
-          <PolicyServiceComparisonView
-            comparisons={comparison?.comparisons ?? []}
-            resolvedAt={comparison?.resolved_policy?.resolved_at}
-            emptyMessage={comparison?.message ?? undefined}
-          />
-        </Card>
-      )}
+      <EmployeeResolvedPolicyView assignmentId={assignmentId} />
       <Link to={buildRoute('services')}>
         <Button variant="outline">Back to Services</Button>
       </Link>
