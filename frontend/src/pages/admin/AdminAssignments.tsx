@@ -290,9 +290,8 @@ export const AdminAssignments: React.FC = () => {
                 label="HR owner"
                 value={addForm.hr_user_id}
                 onChange={(v) => setAddForm((f) => ({ ...f, hr_user_id: v }))}
-                options={[{ value: '', label: 'Select HR user' }, ...hrUsersForAdd.map((h) => ({ value: h.id, label: h.label }))]}
+                options={[{ value: '', label: addForm.company_id ? 'Select HR user' : 'Select company first' }, ...hrUsersForAdd.map((h) => ({ value: h.id, label: h.label }))]}
                 placeholder="Select HR user"
-                disabled={!addForm.company_id}
               />
               <Input
                 label="Employee identifier (optional)"

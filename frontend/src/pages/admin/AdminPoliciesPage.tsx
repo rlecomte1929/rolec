@@ -257,7 +257,7 @@ export const AdminPoliciesPage: React.FC = () => {
                   <span className="font-medium">{t.template_name}</span>
                   {' '}({t.version})
                   {t.is_default_template && (
-                    <Badge variant="neutral" size="sm" className="ml-1">Default</Badge>
+                    <span className="ml-1"><Badge variant="neutral" size="sm">Default</Badge></span>
                   )}
                 </li>
               ))}
