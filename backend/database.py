@@ -6838,6 +6838,23 @@ class Database:
             else:
                 clauses.append("(p.email ILIKE :q OR p.full_name ILIKE :q)")
             params["q"] = pattern
+        # Exclude deactivated (inactive) profiles when status column exists
+        with self.engine.connect() as conn:
+            has_status = False
+            try:
+                if _is_sqlite:
+                    cur = conn.execute(text("PRAGMA table_info(profiles)"))
+                    cols = [r[1] for r in cur.fetchall()]
+                    has_status = "status" in cols
+                else:
+                    r = conn.execute(text(
+                        "SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'status' LIMIT 1"
+                    )).fetchone()
+                    has_status = r is not None
+            except Exception:
+                pass
+            if has_status:
+                clauses.append("(COALESCE(TRIM(LOWER(p.status)), 'active') <> 'inactive')")
         where = " AND " + " AND ".join(clauses) if clauses else ""
         sql = f"""
             SELECT p.id, p.role, p.email, p.full_name, p.company_id,

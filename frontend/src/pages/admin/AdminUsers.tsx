@@ -21,6 +21,7 @@ export const AdminUsers: React.FC = () => {
   const [editOpen, setEditOpen] = useState<AdminProfile | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
 
   const loadPeople = async () => {
@@ -94,48 +95,69 @@ export const AdminUsers: React.FC = () => {
               {loading ? 'Loading…' : 'Apply'}
             </Button>
           </div>
-          <div className="self-end ml-auto flex items-center gap-2">
-            {deleteFeedback === 'done' && (
-              <span className="text-sm text-green-600">Deleted. List updated.</span>
+          <div className="self-end ml-auto flex items-center gap-2 flex-wrap">
+            {!selectionMode ? (
+              <>
+                <Button variant="outline" onClick={() => setSelectionMode(true)}>
+                  Edit
+                </Button>
+                <Button variant="primary" onClick={() => setAddOpen(true)}>
+                  Add person
+                </Button>
+              </>
+            ) : (
+              <>
+                {deleteFeedback === 'done' && (
+                  <span className="text-sm text-green-600">Deleted. List updated.</span>
+                )}
+                {deleteFeedback === 'error' && (
+                  <span className="text-sm text-red-600">Delete failed or list could not refresh.</span>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectionMode(false);
+                    setSelectedIds(new Set());
+                    setDeleteFeedback('idle');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={selectedIds.size === 0 || deleteFeedback === 'deleting'}
+                  onClick={async () => {
+                    if (selectedIds.size === 0) return;
+                    if (!window.confirm(`Delete ${selectedIds.size} selected people?`)) return;
+                    if (!window.confirm('Are you sure? This action cannot be undone.')) return;
+                    const ids = Array.from(selectedIds);
+                    setDeleteFeedback('deleting');
+                    setSelectedIds(new Set());
+                    try {
+                      const results = await Promise.allSettled(
+                        ids.map((id) => adminAPI.deactivatePerson(id)),
+                      );
+                      const failed = results.filter((r) => r.status === 'rejected').length;
+                      const nextPeople = await loadPeople();
+                      setDeleteFeedback(failed > 0 ? 'error' : 'done');
+                      if (failed === 0 && nextPeople) {
+                        setSelectionMode(false);
+                        setTimeout(() => setDeleteFeedback('idle'), 3000);
+                      } else if (failed > 0) {
+                        setTimeout(() => setDeleteFeedback('idle'), 5000);
+                      }
+                    } catch (e) {
+                      console.error(e);
+                      await loadPeople();
+                      setDeleteFeedback('error');
+                      setTimeout(() => setDeleteFeedback('idle'), 5000);
+                    }
+                  }}
+                >
+                  {deleteFeedback === 'deleting' ? 'Deleting…' : 'Delete selected'}
+                </Button>
+              </>
             )}
-            {deleteFeedback === 'error' && (
-              <span className="text-sm text-red-600">Delete failed or list could not refresh.</span>
-            )}
-            <Button
-              variant="outline"
-              disabled={selectedIds.size === 0 || deleteFeedback === 'deleting'}
-              onClick={async () => {
-                if (selectedIds.size === 0) return;
-                if (!window.confirm(`Delete ${selectedIds.size} selected people?`)) return;
-                if (!window.confirm('Are you sure? This action cannot be undone.')) return;
-                const ids = Array.from(selectedIds);
-                setDeleteFeedback('deleting');
-                setSelectedIds(new Set());
-                try {
-                  const results = await Promise.allSettled(
-                    ids.map((id) => adminAPI.deactivatePerson(id)),
-                  );
-                  const failed = results.filter((r) => r.status === 'rejected').length;
-                  const nextPeople = await loadPeople();
-                  setDeleteFeedback(failed > 0 ? 'error' : 'done');
-                  if (failed === 0 && nextPeople) {
-                    setTimeout(() => setDeleteFeedback('idle'), 3000);
-                  } else if (failed > 0) {
-                    setTimeout(() => setDeleteFeedback('idle'), 5000);
-                  }
-                } catch (e) {
-                  console.error(e);
-                  await loadPeople();
-                  setDeleteFeedback('error');
-                  setTimeout(() => setDeleteFeedback('idle'), 5000);
-                }
-              }}
-            >
-              {deleteFeedback === 'deleting' ? 'Deleting…' : 'Delete selected'}
-            </Button>
-            <Button variant="primary" onClick={() => setAddOpen(true)}>
-              Add person
-            </Button>
           </div>
         </div>
       </Card>
@@ -158,19 +180,21 @@ export const AdminUsers: React.FC = () => {
             return (
             <div key={p.id} className="flex flex-wrap items-center justify-between border-b border-[#e2e8f0] py-3 gap-3">
               <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-[#cbd5e1]"
-                  checked={checked}
-                  onChange={(e) => {
-                    setSelectedIds((prev) => {
-                      const next = new Set(prev);
-                      if (e.target.checked) next.add(p.id);
-                      else next.delete(p.id);
-                      return next;
-                    });
-                  }}
-                />
+                {selectionMode && (
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 rounded border-[#cbd5e1]"
+                    checked={checked}
+                    onChange={(e) => {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(p.id);
+                        else next.delete(p.id);
+                        return next;
+                      });
+                    }}
+                  />
+                )}
               <div>
                 <div className="font-medium text-[#0b2b43]">{p.name || p.full_name || p.email || p.id}</div>
                 <div className="text-xs text-[#6b7280]">{p.email || '—'} · {p.id}</div>

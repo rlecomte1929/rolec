@@ -385,6 +385,13 @@ export const AdminAssignments: React.FC = () => {
                 options={[{ value: '', label: 'Select destination' }, ...COUNTRY_OPTIONS.map((c) => ({ value: c.name, label: c.name }))]}
               />
             </div>
+            {addForm.company_id && !addForm.hr_user_id && (
+              <p className="text-sm text-amber-600 mt-2">
+                {hrUsersForAdd.length === 0
+                  ? 'No HR users for this company. Add an HR person in the People tab first.'
+                  : 'Select an HR owner above to enable Create.'}
+              </p>
+            )}
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowAddModal(false)}>Cancel</Button>
               <Button size="sm" onClick={createAssignment} disabled={addSaving || !addForm.company_id || !addForm.hr_user_id}>
