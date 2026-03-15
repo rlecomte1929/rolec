@@ -1667,11 +1667,15 @@ def admin_update_assignment_status(
     status = (body.status or "").strip()
     if not status:
         raise HTTPException(status_code=400, detail="status is required")
-    db.update_assignment_status(assignment_id, status, request_id=None)
     try:
-        db.log_audit(user["id"], "UPDATE_STATUS", "assignment", assignment_id, None, {"status": status})
+        db.update_assignment_status(assignment_id, status, request_id=None)
     except Exception as e:
-        log.warning("admin_update_assignment_status audit log failed: %s", e)
+        log.exception("admin_update_assignment_status: update_assignment_status failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update assignment status. Please try again or contact support.",
+        ) from e
+    db.log_audit(user["id"], "UPDATE_STATUS", "assignment", assignment_id, None, {"status": status})
     return {"ok": True, "status": status}
 
 
@@ -6159,10 +6163,12 @@ def policy_documents_health(user: Dict[str, Any] = Depends(require_role(UserRole
 async def upload_policy_document(
     req: Request,
     file: Optional[UploadFile] = File(None),
+    company_id: Optional[str] = Query(None, description="Admin override: scope upload to this company"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """
     Upload policy PDF/DOCX for intake: extract text, classify, extract metadata.
+    When admin is viewing a company's policy workspace, pass company_id so the document is stored for that company.
     Stages: A.validate -> B.storage -> C.db_insert -> D.extraction -> E.update_status -> F.return
     """
     from .services.policy_storage_health import (
@@ -6172,21 +6178,27 @@ async def upload_policy_document(
         POLICY_DOCUMENTS_TABLE_MISSING,
     )
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
-    company_id = ""
     user_id = user.get("id", "")
     filename = ""
     mime = ""
     file_size = 0
     content: bytes = b""
 
-    # --- Stage A: Validate incoming file ---
+    # --- Stage A: Resolve company (admin may override with company_id) ---
     log.info(
         "request_id=%s policy_upload started user_id=%s",
         request_id, user_id[:8] + "…" if user_id and len(user_id) > 8 else user_id,
     )
     try:
-        profile = _require_company_for_user(user)
-        company_id = profile.get("company_id", "")
+        cid = _resolve_company_for_policy(user, company_id)
+        if not cid or not str(cid).strip():
+            return _upload_error_response(
+                "upload_company_required",
+                "Company is required for upload. When viewing a company's policy workspace, uploads are scoped to that company.",
+                400,
+                request_id=request_id,
+            )
+        company_id = cid.strip()
     except HTTPException:
         raise
     except Exception as exc:

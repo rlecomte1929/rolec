@@ -644,6 +644,7 @@ const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
   policy_versions_table_missing: 'Policy database tables are missing.',
   resolved_assignment_policies_table_missing: 'Policy database tables are missing.',
   db_insert_failed: 'The uploaded file could not be registered in the database.',
+  upload_company_required: 'Company is required for upload. When viewing a company\'s policy workspace, uploads are scoped to that company.',
   invalid_file_type: 'Only PDF or DOCX files are supported.',
   normalization_failed: 'Normalization failed because of an invalid policy_versions payload.',
   // Download-url and policy errors
@@ -745,17 +746,19 @@ function PolicyDocumentIntakeSection({
           isFile: fileToUpload instanceof File,
         });
       }
-      const res = await policyDocumentsAPI.upload(fileToUpload);
+      const res = await policyDocumentsAPI.upload(fileToUpload, adminCompanyId);
       setUploadRequestId(res.request_id || null);
       if (res.ok) {
         setUploadFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
+        setMessage('Document uploaded and classified. Review the entry below, then normalize to create a policy version.');
         await loadDocs();
         onDocumentsChange?.();
       } else {
         setMessage(UPLOAD_ERROR_MESSAGES[res.error_code || ''] || res.message || 'Upload failed.');
         if (res.document) {
           await loadDocs();
+          setMessage((m) => m + ' Document is in the list below; you can reprocess or normalize.');
         }
       }
     } catch (err: unknown) {
@@ -813,7 +816,7 @@ function PolicyDocumentIntakeSection({
 
       {message && (
         <div className="mt-4">
-          <Alert variant={message.startsWith('Normalized') ? 'success' : message === 'Saved' ? 'success' : 'error'}>{message}</Alert>
+          <Alert variant={message.startsWith('Normalized') || message.startsWith('Document uploaded') || message === 'Saved' ? 'success' : 'error'}>{message}</Alert>
           {uploadRequestId && (
             <div className="text-xs text-[#9ca3af] mt-1 font-mono">Request ID: {uploadRequestId}</div>
           )}

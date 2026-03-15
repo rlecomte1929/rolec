@@ -4988,21 +4988,25 @@ class Database:
         reason: Optional[str],
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
+        """Append-only audit log. Never raises: failures are logged and ignored so callers are not broken."""
         now = datetime.utcnow().isoformat()
-        with self.engine.begin() as conn:
-            conn.execute(text(
-                "INSERT INTO audit_log (id, actor_user_id, action_type, target_type, target_id, reason, metadata_json, created_at) "
-                "VALUES (:id, :actor, :action, :target_type, :target_id, :reason, :meta, :created_at)"
-            ), {
-                "id": str(uuid.uuid4()),
-                "actor": actor_user_id,
-                "action": action_type,
-                "target_type": target_type,
-                "target_id": target_id,
-                "reason": reason,
-                "meta": json.dumps(metadata or {}),
-                "created_at": now,
-            })
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(text(
+                    "INSERT INTO audit_log (id, actor_user_id, action_type, target_type, target_id, reason, metadata_json, created_at) "
+                    "VALUES (:id, :actor, :action, :target_type, :target_id, :reason, :meta, :created_at)"
+                ), {
+                    "id": str(uuid.uuid4()),
+                    "actor": actor_user_id,
+                    "action": action_type,
+                    "target_type": target_type,
+                    "target_id": target_id,
+                    "reason": reason,
+                    "meta": json.dumps(metadata or {}),
+                    "created_at": now,
+                })
+        except Exception as e:
+            log.warning("log_audit failed (non-fatal): %s", e)
 
     def list_companies(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
         q = (query or "").strip().lower()
