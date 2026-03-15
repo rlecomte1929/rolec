@@ -5137,55 +5137,116 @@ class Database:
         plan_val = (plan_tier or "low").lower() if plan_tier else "low"
         if plan_val not in ("low", "medium", "premium"):
             plan_val = "low"
+        params = {
+            "id": company_id,
+            "name": name,
+            "country": country,
+            "size_band": size_band,
+            "address": address,
+            "phone": phone,
+            "hr_contact": hr_contact,
+            "created_at": now,
+            "legal_name": legal_name,
+            "website": website,
+            "hq_city": hq_city,
+            "industry": industry,
+            "logo_url": logo_url,
+            "brand_color": brand_color,
+            "updated_at": now,
+            "default_destination_country": default_destination_country,
+            "support_email": support_email,
+            "default_working_location": default_working_location,
+            "status": status_val,
+            "plan_tier": plan_val,
+            "hr_seat_limit": hr_seat_limit,
+            "employee_seat_limit": employee_seat_limit,
+        }
+
         with self.engine.begin() as conn:
-            conn.execute(text(
-                "INSERT INTO companies (id, name, country, size_band, address, phone, hr_contact, created_at, "
-                "legal_name, website, hq_city, industry, logo_url, brand_color, updated_at, "
-                "default_destination_country, support_email, default_working_location, status, plan_tier, hr_seat_limit, employee_seat_limit) "
-                "VALUES (:id, :name, :country, :size_band, :address, :phone, :hr_contact, :created_at, "
-                ":legal_name, :website, :hq_city, :industry, :logo_url, :brand_color, :updated_at, "
-                ":default_destination_country, :support_email, :default_working_location, :status, :plan_tier, :hr_seat_limit, :employee_seat_limit) "
-                "ON CONFLICT(id) DO UPDATE SET "
-                "name = excluded.name, country = excluded.country, size_band = excluded.size_band, "
-                "address = excluded.address, phone = excluded.phone, hr_contact = excluded.hr_contact, "
-                "legal_name = COALESCE(excluded.legal_name, companies.legal_name), "
-                "website = COALESCE(excluded.website, companies.website), "
-                "hq_city = COALESCE(excluded.hq_city, companies.hq_city), "
-                "industry = COALESCE(excluded.industry, companies.industry), "
-                "logo_url = COALESCE(excluded.logo_url, companies.logo_url), "
-                "brand_color = COALESCE(excluded.brand_color, companies.brand_color), "
-                "updated_at = excluded.updated_at, "
-                "default_destination_country = COALESCE(excluded.default_destination_country, companies.default_destination_country), "
-                "support_email = COALESCE(excluded.support_email, companies.support_email), "
-                "default_working_location = COALESCE(excluded.default_working_location, companies.default_working_location), "
-                "status = COALESCE(excluded.status, companies.status), "
-                "plan_tier = COALESCE(excluded.plan_tier, companies.plan_tier), "
-                "hr_seat_limit = COALESCE(excluded.hr_seat_limit, companies.hr_seat_limit), "
-                "employee_seat_limit = COALESCE(excluded.employee_seat_limit, companies.employee_seat_limit)"
-            ), {
-                "id": company_id,
-                "name": name,
-                "country": country,
-                "size_band": size_band,
-                "address": address,
-                "phone": phone,
-                "hr_contact": hr_contact,
-                "created_at": now,
-                "legal_name": legal_name,
-                "website": website,
-                "hq_city": hq_city,
-                "industry": industry,
-                "logo_url": logo_url,
-                "brand_color": brand_color,
-                "updated_at": now,
-                "default_destination_country": default_destination_country,
-                "support_email": support_email,
-                "default_working_location": default_working_location,
-                "status": status_val,
-                "plan_tier": plan_val,
-                "hr_seat_limit": hr_seat_limit,
-                "employee_seat_limit": employee_seat_limit,
-            })
+            # Production Postgres may not yet have the newer columns (status, plan_tier, hr_seat_limit, employee_seat_limit).
+            # Build the INSERT/UPSERT dynamically based on actual columns to avoid UndefinedColumn errors.
+            company_cols = {
+                row._mapping["column_name"]
+                for row in conn.execute(
+                    text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_name = 'companies'"
+                    )
+                ).fetchall()
+            }
+
+            base_cols = [
+                "id",
+                "name",
+                "country",
+                "size_band",
+                "address",
+                "phone",
+                "hr_contact",
+                "created_at",
+                "legal_name",
+                "website",
+                "hq_city",
+                "industry",
+                "logo_url",
+                "brand_color",
+                "updated_at",
+                "default_destination_country",
+                "support_email",
+                "default_working_location",
+            ]
+            optional_cols = [
+                "status",
+                "plan_tier",
+                "hr_seat_limit",
+                "employee_seat_limit",
+            ]
+
+            insert_cols = [c for c in base_cols if c in company_cols] + [
+                c for c in optional_cols if c in company_cols
+            ]
+            values_clause = ", ".join(f":{c}" for c in insert_cols)
+            columns_clause = ", ".join(insert_cols)
+
+            # Build ON CONFLICT update set only for columns that actually exist
+            update_sets = [
+                "name = excluded.name",
+                "country = excluded.country",
+                "size_band = excluded.size_band",
+                "address = excluded.address",
+                "phone = excluded.phone",
+                "hr_contact = excluded.hr_contact",
+                "legal_name = COALESCE(excluded.legal_name, companies.legal_name)",
+                "website = COALESCE(excluded.website, companies.website)",
+                "hq_city = COALESCE(excluded.hq_city, companies.hq_city)",
+                "industry = COALESCE(excluded.industry, companies.industry)",
+                "logo_url = COALESCE(excluded.logo_url, companies.logo_url)",
+                "brand_color = COALESCE(excluded.brand_color, companies.brand_color)",
+                "updated_at = excluded.updated_at",
+                "default_destination_country = COALESCE(excluded.default_destination_country, companies.default_destination_country)",
+                "support_email = COALESCE(excluded.support_email, companies.support_email)",
+                "default_working_location = COALESCE(excluded.default_working_location, companies.default_working_location)",
+            ]
+            if "status" in company_cols:
+                update_sets.append("status = COALESCE(excluded.status, companies.status)")
+            if "plan_tier" in company_cols:
+                update_sets.append("plan_tier = COALESCE(excluded.plan_tier, companies.plan_tier)")
+            if "hr_seat_limit" in company_cols:
+                update_sets.append(
+                    "hr_seat_limit = COALESCE(excluded.hr_seat_limit, companies.hr_seat_limit)"
+                )
+            if "employee_seat_limit" in company_cols:
+                update_sets.append(
+                    "employee_seat_limit = COALESCE(excluded.employee_seat_limit, companies.employee_seat_limit)"
+                )
+
+            sql = f"""
+                INSERT INTO companies ({columns_clause})
+                VALUES ({values_clause})
+                ON CONFLICT(id) DO UPDATE SET
+                {", ".join(update_sets)}
+            """
+            conn.execute(text(sql), params)
 
     def update_company(
         self,
