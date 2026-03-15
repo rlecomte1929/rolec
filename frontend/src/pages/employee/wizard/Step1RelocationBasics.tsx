@@ -107,6 +107,9 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
           </label>
           <label className="text-sm text-[#0b2b43]">
             Destination Country{missing.destCountry && <span className="text-red-600"> *</span>}
+            {local.destCountry && (
+              <span className="ml-2 text-xs text-[#1f8e8b]">(Set by HR — you can change if needed)</span>
+            )}
             <select
               value={local.destCountry || ''}
               onChange={(event) => update('destCountry', event.target.value)}

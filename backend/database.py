@@ -3137,6 +3137,8 @@ class Database:
         if status:
             clauses.append("a.status = :status")
             params["status"] = status
+        else:
+            clauses.append("(COALESCE(TRIM(LOWER(a.status)), '') NOT IN ('archived', 'closed'))")
         if destination_country:
             clauses.append("LOWER(TRIM(COALESCE(rc.host_country, ''))) = LOWER(TRIM(:dest_country))")
             params["dest_country"] = destination_country

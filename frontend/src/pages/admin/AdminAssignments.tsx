@@ -41,6 +41,17 @@ const destination = (a: AdminAssignment) =>
 
 const origin = (a: AdminAssignment) => a.home_country || '—';
 
+const formatCreated = (a: AdminAssignment) => {
+  const raw = a.created_at;
+  if (!raw) return '—';
+  try {
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? raw : d.toLocaleDateString(undefined, { dateStyle: 'short' });
+  } catch {
+    return raw;
+  }
+};
+
 export const AdminAssignments: React.FC = () => {
   const [assignments, setAssignments] = useState<AdminAssignment[]>([]);
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
@@ -67,6 +78,9 @@ export const AdminAssignments: React.FC = () => {
   const [hrUsersForAdd, setHrUsersForAdd] = useState<Array<{ id: string; label: string }>>([]);
   const [employeesForAdd, setEmployeesForAdd] = useState<Array<{ id: string; label: string }>>([]);
   const [createSuccess, setCreateSuccess] = useState<{ assignmentId: string } | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
 
   const loadAssignments = useCallback(async () => {
     setLoading(true);
@@ -249,17 +263,82 @@ export const AdminAssignments: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
               <span className="text-sm text-[#6b7280]">Assignments ({assignments.length})</span>
-              <Button size="sm" variant="outline" onClick={openAddModal}>
-                Add assignment
-              </Button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {!selectionMode ? (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => setSelectionMode(true)}>
+                      Edit
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={openAddModal}>
+                      Add assignment
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {deleteFeedback === 'done' && (
+                      <span className="text-sm text-green-600">Deleted. List updated.</span>
+                    )}
+                    {deleteFeedback === 'error' && (
+                      <span className="text-sm text-red-600">Delete failed or list could not refresh.</span>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectionMode(false);
+                        setSelectedIds(new Set());
+                        setDeleteFeedback('idle');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={selectedIds.size === 0 || deleteFeedback === 'deleting'}
+                      onClick={async () => {
+                        if (selectedIds.size === 0) return;
+                        if (!window.confirm(`Delete ${selectedIds.size} selected assignment(s)? They will be archived.`)) return;
+                        if (!window.confirm('Are you sure? This action cannot be undone.')) return;
+                        const ids = Array.from(selectedIds);
+                        setDeleteFeedback('deleting');
+                        setSelectedIds(new Set());
+                        try {
+                          const results = await Promise.allSettled(
+                            ids.map((id) => adminAPI.updateAssignmentStatus(id, { status: 'archived' })),
+                          );
+                          const failed = results.filter((r) => r.status === 'rejected').length;
+                          await loadAssignments();
+                          setDeleteFeedback(failed > 0 ? 'error' : 'done');
+                          if (failed === 0) {
+                            setSelectionMode(false);
+                            setTimeout(() => setDeleteFeedback('idle'), 3000);
+                          } else {
+                            setTimeout(() => setDeleteFeedback('idle'), 5000);
+                          }
+                        } catch (e) {
+                          console.error(e);
+                          await loadAssignments();
+                          setDeleteFeedback('error');
+                          setTimeout(() => setDeleteFeedback('idle'), 5000);
+                        }
+                      }}
+                    >
+                      {deleteFeedback === 'deleting' ? 'Deleting…' : 'Delete selected'}
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280]">
+                    {selectionMode && <th className="py-2 pr-2 w-8" />}
                     <th className="py-2 pr-2">Assignment ID</th>
+                    <th className="py-2 pr-2">Created</th>
                     <th className="py-2 pr-2">Employee</th>
                     <th className="py-2 pr-2">Company</th>
                     <th className="py-2 pr-2">Destination</th>
@@ -269,7 +348,7 @@ export const AdminAssignments: React.FC = () => {
                     <th className="py-2 pr-2">Move date</th>
                     <th className="py-2 pr-2">Policy</th>
                     <th className="py-2 pr-2">Status</th>
-                    <th className="py-2 pr-2">Actions</th>
+                    {!selectionMode && <th className="py-2 pr-2">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -278,6 +357,23 @@ export const AdminAssignments: React.FC = () => {
                       key={a.id}
                       className="border-b border-[#e2e8f0] hover:bg-[#f8fafc]"
                     >
+                      {selectionMode && (
+                        <td className="py-2 pr-2">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-[#cbd5e1]"
+                            checked={selectedIds.has(a.id)}
+                            onChange={(e) => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(a.id);
+                                else next.delete(a.id);
+                                return next;
+                              });
+                            }}
+                          />
+                        </td>
+                      )}
                       <td className="py-2 pr-2">
                         <span className="font-mono text-xs text-[#6b7280]">{a.id}</span>
                         <Button
@@ -291,6 +387,7 @@ export const AdminAssignments: React.FC = () => {
                           Copy ID
                         </Button>
                       </td>
+                      <td className="py-2 pr-2 text-[#6b7280]">{formatCreated(a)}</td>
                       <td className="py-2 pr-2 font-medium text-[#0b2b43]">
                         {employeeName(a)}
                         {a.orphan_employee && (
@@ -315,16 +412,18 @@ export const AdminAssignments: React.FC = () => {
                       <td className="py-2 pr-2">
                         <Badge variant="neutral" size="sm">{(a.status || '—').replace(/_/g, ' ')}</Badge>
                       </td>
-                      <td className="py-2 pr-2">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <Button size="sm" variant="outline" onClick={() => setSelectedId(a.id)}>
-                            Edit
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setSelectedId(a.id)}>
-                            Reassign
-                          </Button>
-                        </div>
-                      </td>
+                      {!selectionMode && (
+                        <td className="py-2 pr-2">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Button size="sm" variant="outline" onClick={() => setSelectedId(a.id)}>
+                              Edit
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setSelectedId(a.id)}>
+                              Reassign
+                            </Button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

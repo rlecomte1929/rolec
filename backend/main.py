@@ -3186,12 +3186,22 @@ def claim_assignment(
     emp_uid = assignment.get("employee_user_id")
     effective_id = str(effective["id"]).strip()
     emp_uid_str = str(emp_uid).strip() if emp_uid else ""
+    ident_match = assignment_identifier in user_identifiers
+    # #region agent log
+    _debug_log(
+        "main.py:claim_assignment",
+        "claim ids and branch",
+        {"assignment_id": assignment_id, "emp_uid_str": emp_uid_str or None, "effective_id": effective_id, "ids_equal": emp_uid_str == effective_id, "ident_match": ident_match},
+        hypothesis_id="H-claim",
+    )
+    # #endregion
     # Already linked to this user (same id) -> success
     if emp_uid_str and emp_uid_str == effective_id:
         return {"success": True, "assignmentId": assignment_id}
     # Linked to another id but assignment is for this person (identifier match) -> allow claim and attach this user
     if emp_uid_str and emp_uid_str != effective_id:
         if assignment_identifier not in user_identifiers:
+            _debug_log("main.py:claim_assignment", "403 branch", {"reason": "emp_uid != effective_id and ident no match"}, hypothesis_id="H-claim")
             raise HTTPException(status_code=403, detail="Assignment already claimed")
         # Same person (e.g. assignment has profile id, user logged in with user id): attach and proceed
 
@@ -4058,6 +4068,13 @@ def get_case_details_by_assignment(
         case_row = db.get_case_by_id(case_id)
         if case_row and case_row.get("host_country"):
             case_dump["destCountry"] = case_row["host_country"]
+    employee_full_name = None
+    if emp_id:
+        emp_profile = db.get_profile_record(emp_id)
+        if emp_profile:
+            employee_full_name = emp_profile.get("full_name") or emp_profile.get("email")
+    if not employee_full_name and assignment.get("employee_identifier"):
+        employee_full_name = assignment["employee_identifier"]
     return {
         "assignment": {
             "id": assignment["id"],
@@ -4066,6 +4083,7 @@ def get_case_details_by_assignment(
             "hr_user_id": hr_id,
             "status": assignment.get("status", ""),
             "employee_identifier": assignment.get("employee_identifier"),
+            "employee_full_name": employee_full_name,
         },
         "case": case_dump,
     }

@@ -13,6 +13,8 @@ export interface CaseAssignment {
   hr_user_id: string;
   status: string;
   employee_identifier?: string;
+  /** Set by HR/Admin; used to pre-fill employee name in wizard */
+  employee_full_name?: string | null;
 }
 
 export interface CaseDetailsResult {

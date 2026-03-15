@@ -33,7 +33,7 @@ function buildDefaultDraft(): CaseDraftDTO {
   };
 }
 
-function caseToWizardDraft(caseData: CaseDTO | null): CaseDraftDTO {
+function caseToWizardDraft(caseData: CaseDTO | null, assignment?: { employee_full_name?: string | null } | null): CaseDraftDTO {
   const base = buildDefaultDraft();
   if (!caseData) return base;
 
@@ -46,6 +46,13 @@ function caseToWizardDraft(caseData: CaseDTO | null): CaseDraftDTO {
     targetMoveDate: caseData.targetMoveDate,
   };
 
+  const assignmentEmployeeName = assignment?.employee_full_name?.trim() || undefined;
+  const baseEmployeeProfile = base.employeeProfile || {};
+  const draftEmployeeProfile = caseData.draft?.employeeProfile || {};
+  const seededEmployeeProfile = assignmentEmployeeName && !draftEmployeeProfile.fullName
+    ? { ...baseEmployeeProfile, fullName: assignmentEmployeeName }
+    : baseEmployeeProfile;
+
   return {
     relocationBasics: {
       ...base.relocationBasics,
@@ -53,8 +60,8 @@ function caseToWizardDraft(caseData: CaseDTO | null): CaseDraftDTO {
       ...(caseData.draft?.relocationBasics || {}),
     },
     employeeProfile: {
-      ...base.employeeProfile,
-      ...(caseData.draft?.employeeProfile || {}),
+      ...seededEmployeeProfile,
+      ...draftEmployeeProfile,
     },
     familyMembers: {
       ...base.familyMembers,
@@ -234,7 +241,7 @@ export const CaseWizardPage: React.FC = () => {
         if (loadError) setError(loadError.includes('Case row missing') ? loadError : 'Assignment not found or not visible under RLS.');
       } else {
         setCaseData(data.case);
-        setDraft(caseToWizardDraft(data.case));
+        setDraft(caseToWizardDraft(data.case, data.assignment));
         setResolvedCaseId(data.case.id);
       }
     } catch {
