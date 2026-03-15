@@ -174,6 +174,19 @@ export const AdminUsers: React.FC = () => {
                 <Button size="sm" variant="outline" onClick={() => setEditOpen(p)}>
                   Edit
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!window.confirm(`Delete ${p.name || p.email}?`)) return;
+                    adminAPI
+                      .deactivatePerson(p.id)
+                      .then(() => loadPeople())
+                      .catch(console.error);
+                  }}
+                >
+                  Delete
+                </Button>
               </div>
             </div>
           )})}

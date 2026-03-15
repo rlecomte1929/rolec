@@ -3244,8 +3244,9 @@ class Database:
     def get_admin_assignment_detail(self, assignment_id: str) -> Optional[Dict[str, Any]]:
         """Full assignment context for admin detail: assignment, case, employee, HR, services, policy."""
         with self.engine.connect() as conn:
+            join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)" if _is_sqlite else "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
             row = conn.execute(
-                text("""
+                text(f"""
                     SELECT a.*, rc.id AS case_pk, rc.company_id AS case_company_id, rc.hr_user_id AS case_hr_user_id,
                         rc.host_country, rc.home_country, rc.status AS case_status, rc.stage, rc.profile_json AS case_profile_json,
                         c.name AS company_name,
@@ -3253,7 +3254,7 @@ class Database:
                         hr_p.id AS hr_profile_id, hr_p.full_name AS hr_full_name, hr_p.email AS hr_email, hr_p.company_id AS hr_profile_company_id,
                         hu.company_id AS hr_company_id, emp.company_id AS employee_company_id
                     FROM case_assignments a
-                    LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                    LEFT JOIN relocation_cases rc ON {join_on_cases}
                     LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
                     LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
                     LEFT JOIN profiles hr_p ON hr_p.id = a.hr_user_id
@@ -5437,8 +5438,27 @@ class Database:
         return result.rowcount > 0
 
     def deactivate_company(self, company_id: str) -> bool:
-        """Set company status to inactive. Returns True if updated."""
-        return self.update_company(company_id, status="inactive")
+        """
+        Delete/deactivate a company.
+        - If companies.status column exists, mark it inactive.
+        - Otherwise, hard delete the row.
+        """
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.columns "
+                        "WHERE table_name = 'companies' AND column_name = 'status'"
+                    )
+                ).fetchone()
+            if row:
+                return self.update_company(company_id, status="inactive")
+        except Exception:
+            pass
+        # Fallback: hard delete.
+        with self.engine.begin() as conn:
+            conn.execute(text("DELETE FROM companies WHERE id = :id"), {"id": company_id})
+        return True
 
     def update_company_logo(self, company_id: str, logo_url: Optional[str]) -> None:
         with self.engine.begin() as conn:

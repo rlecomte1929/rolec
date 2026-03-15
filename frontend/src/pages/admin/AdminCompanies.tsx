@@ -72,6 +72,7 @@ export const AdminCompanies: React.FC = () => {
 
   const handleDeactivate = async (c: AdminCompany) => {
     if (!window.confirm(`Delete "${c.name}"? Existing assignments and policies will keep their company id, but this company will no longer be editable.`)) return;
+    if (!window.confirm('Are you sure? This action cannot be undone.')) return;
     try {
       await adminAPI.deactivateCompany(c.id);
       await load();
