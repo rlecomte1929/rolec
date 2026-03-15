@@ -19,6 +19,39 @@ from .db_config import DATABASE_URL as _raw_url
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Debug-mode instrumentation for admin company/people/assignment flows
+# ---------------------------------------------------------------------------
+#region agent log
+def _agent_debug_log(
+    hypothesis_id: str,
+    location: str,
+    message: str,
+    data: Dict[str, Any],
+    run_id: str = "pre-fix",
+) -> None:
+    """
+    Lightweight NDJSON logger for this debug session.
+    Writes to .cursor/debug-2c6040.log; failures are swallowed.
+    """
+    try:
+        payload = {
+            "sessionId": "2c6040",
+            "runId": run_id,
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(datetime.utcnow().timestamp() * 1000),
+        }
+        log_path = "/Users/Rom/Documents/GitHub/rolec/.cursor/debug-2c6040.log"
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload) + "\n")
+    except Exception:
+        # Never let debug logging break the app.
+        return
+#endregion
+
+# ---------------------------------------------------------------------------
 # Engine setup (shared logic with backend/app/db.py)
 # ---------------------------------------------------------------------------
 _connect_args: dict = {}
@@ -28,6 +61,21 @@ if _raw_url.startswith("sqlite"):
 _engine = create_engine(_raw_url, connect_args=_connect_args)
 
 _is_sqlite = _raw_url.startswith("sqlite")
+
+# Detect presence of optional columns that may not exist in all runtimes.
+_profiles_has_status_column = False
+if not _is_sqlite:
+    try:
+        with _engine.connect() as _conn:
+            _row = _conn.execute(
+                text(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name = 'profiles' AND column_name = 'status'"
+                )
+            ).fetchone()
+            _profiles_has_status_column = bool(_row)
+    except Exception:
+        _profiles_has_status_column = False
 
 
 def _seed_default_policy_template_sqlite(conn: Any) -> None:
@@ -2779,9 +2827,14 @@ class Database:
         self, company_id: str, request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List assignments belonging to a company (via case or HR ownership). Used for HR company-scoped view."""
-        sql = """
+        if _is_sqlite:
+            join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+        else:
+            join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+
+        sql = f"""
             SELECT a.* FROM case_assignments a
-            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN relocation_cases rc ON {join_on_cases}
             LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
             WHERE (rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))
             ORDER BY a.created_at DESC
@@ -2796,14 +2849,19 @@ class Database:
         self, company_id: str, request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Assignments for company with employee_name, destination, status for admin company detail."""
-        sql = """
+        if _is_sqlite:
+            join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+        else:
+            join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+
+        sql = f"""
             SELECT a.id, a.status,
                    COALESCE(TRIM(emp_p.full_name),
                             NULLIF(TRIM(COALESCE(a.employee_first_name, '') || ' ' || COALESCE(a.employee_last_name, '')), ''),
                             a.employee_identifier, a.employee_user_id, '—') AS employee_name,
                    COALESCE(rc.host_country, rc.home_country, '—') AS destination
             FROM case_assignments a
-            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN relocation_cases rc ON {join_on_cases}
             LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
             LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
             WHERE (rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))
@@ -2822,7 +2880,7 @@ class Database:
             row = conn.execute(
                 text("""
                     SELECT COUNT(*) AS n FROM case_assignments a
-                    LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                    LEFT JOIN relocation_cases rc ON rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
                     LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
                     WHERE hu.company_id = :cid AND (rc.company_id IS NULL OR TRIM(COALESCE(rc.company_id, '')) = '')
                 """),
@@ -3112,6 +3170,29 @@ class Database:
 
         where_sql = "AND " + " AND ".join(clauses) if clauses else ""
 
+        if _is_sqlite:
+            join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+        else:
+            # Postgres: relocation_cases.id is uuid, case_assignments.case_id / canonical_case_id are text UUIDs.
+            # Cast uuid to text for a safe, index-friendly join.
+            join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+
+        _agent_debug_log(
+            hypothesis_id="H1",
+            location="database.list_admin_assignments",
+            message="list_admin_assignments SQL prepared",
+            data={
+                "is_sqlite": _is_sqlite,
+                "company_id": company_id,
+                "employee_user_id": employee_user_id,
+                "status": status,
+                "destination_country": destination_country,
+                "employee_search_present": bool(employee_search),
+                "join_on_cases": join_on_cases,
+                "where_sql": where_sql,
+            },
+        )
+
         sql = f"""
             SELECT
                 a.id, a.case_id, a.canonical_case_id, a.hr_user_id, a.employee_user_id, a.employee_identifier,
@@ -3128,7 +3209,7 @@ class Database:
                 rap.id AS resolved_policy_id,
                 (SELECT COUNT(*) FROM company_policies cp WHERE cp.company_id = COALESCE(rc.company_id, hu.company_id) AND cp.extraction_status = 'extracted') AS company_policy_count
             FROM case_assignments a
-            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN relocation_cases rc ON {join_on_cases}
             LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
             LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
             LEFT JOIN profiles hr_p ON hr_p.id = a.hr_user_id
@@ -6492,12 +6573,17 @@ class Database:
                 ids = [r["id"] for r in result]
                 unions = " UNION ALL ".join([f"SELECT :id{i} AS id" for i in range(len(ids))])
                 params_agg = {f"id{i}": ids[i] for i in range(len(ids))}
+                if _is_sqlite:
+                    join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+                else:
+                    # Postgres: relocation_cases.id is uuid, case_assignments.case_id / canonical_case_id are text UUIDs.
+                    join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
                 agg_sql = f"""
                 SELECT v.id,
                     (SELECT COUNT(*) FROM hr_users hu WHERE hu.company_id = v.id) AS hr_users_count,
                     (SELECT COUNT(*) FROM employees e WHERE e.company_id = v.id) AS employee_count,
                     (SELECT COUNT(*) FROM case_assignments a
-                     LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                     LEFT JOIN relocation_cases rc ON {join_on_cases}
                      LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
                      WHERE (rc.company_id = v.id OR (rc.company_id IS NULL AND hu.company_id = v.id))) AS assignments_count,
                     COALESCE(
@@ -6510,6 +6596,16 @@ class Database:
                     ) AS primary_contact_name
                 FROM ({unions}) v
                 """
+                _agent_debug_log(
+                    hypothesis_id="H1",
+                    location="database.get_admin_company_index",
+                    message="admin_company_index aggregation SQL prepared",
+                    data={
+                        "is_sqlite": _is_sqlite,
+                        "company_ids_count": len(ids),
+                        "join_on_cases": join_on_cases,
+                    },
+                )
                 try:
                     agg_rows = conn.execute(text(agg_sql), params_agg).fetchall()
                     by_id = {row._mapping["id"]: dict(row._mapping) for row in agg_rows}
@@ -6563,9 +6659,23 @@ class Database:
                 clauses.append("(p.email ILIKE :q OR p.full_name ILIKE :q)")
             params["q"] = pattern
         where = " AND " + " AND ".join(clauses) if clauses else ""
+        status_expr = "COALESCE(p.status, 'active')" if _profiles_has_status_column else "'active'"
+        _agent_debug_log(
+            hypothesis_id="H2",
+            location="database.get_admin_people_index",
+            message="admin_people_index SQL prepared",
+            data={
+                "is_sqlite": _is_sqlite,
+                "profiles_has_status": _profiles_has_status_column,
+                "company_id": company_id,
+                "query_present": bool(query),
+                "role": role,
+                "status_expr": status_expr,
+            },
+        )
         sql = f"""
             SELECT p.id, p.role, p.email, p.full_name, p.company_id,
-                   COALESCE(p.status, 'active') AS status,
+                   {status_expr} AS status,
                    p.created_at,
                    c.name AS company_name,
                    (SELECT COUNT(*) FROM hr_users hu WHERE hu.profile_id = p.id) AS hr_link_count,
