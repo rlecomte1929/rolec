@@ -1388,10 +1388,15 @@ class AdminSetRoleRequest(BaseModel):
 
 
 @app.post("/api/admin/people", status_code=201)
-def create_person(body: AdminCreatePersonRequest, user: Dict[str, Any] = Depends(require_admin)):
+def create_person(
+    body: AdminCreatePersonRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_admin),
+):
     email = (body.email or "").strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="email required")
+    request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
     person_id = str(uuid.uuid4())
     try:
         db.create_profile(
@@ -1401,11 +1406,42 @@ def create_person(body: AdminCreatePersonRequest, user: Dict[str, Any] = Depends
             role=body.role or "EMPLOYEE",
             company_id=body.company_id,
         )
-    except IntegrityError:
-        # Likely duplicate email or primary key; surface as a 409 for the admin UI.
-        raise HTTPException(status_code=409, detail="A person with this email already exists.")
+    except IntegrityError as e:
+        log.warning(
+            "admin_create_person conflict request_id=%s email=%s company_id=%s error=%r",
+            request_id,
+            email,
+            body.company_id,
+            e,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "A person with this email already exists.", "request_id": request_id},
+        )
+    except Exception as e:
+        log.error(
+            "admin_create_person failed request_id=%s email=%s full_name=%s role=%s company_id=%s error=%r",
+            request_id,
+            email,
+            body.full_name,
+            body.role,
+            body.company_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Failed to create person", "request_id": request_id},
+        )
     profile = db.get_profile_record(person_id)
-    log.info("admin person created id=%s email=%s by=%s", person_id, email, user.get("id"))
+    log.info(
+        "admin_create_person success request_id=%s id=%s email=%s company_id=%s by=%s",
+        request_id,
+        person_id,
+        email,
+        body.company_id,
+        user.get("id"),
+    )
     db.log_audit(user["id"], "CREATE", "profile", person_id, None, {"email": email})
     return {"person": profile}
 

@@ -318,6 +318,7 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onC
   const [company_id, setCompanyId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -327,6 +328,7 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onC
       return;
     }
     setError(null);
+    setSuccess(null);
     setSubmitting(true);
     try {
       await adminAPI.createPerson({
@@ -335,9 +337,17 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onC
         role,
         company_id: company_id || undefined,
       });
+      setSuccess('Person created successfully.');
       onCreated();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'Failed to create person');
+      const detail = err?.response?.data;
+      let message = err?.message || 'Failed to create person';
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (detail?.message) {
+        message = detail.message;
+      }
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -374,6 +384,7 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onC
             </select>
           </div>
           {error && <div className="text-sm text-red-600">{error}</div>}
+          {success && <div className="text-sm text-green-600">{success}</div>}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Creating…' : 'Create'}</Button>

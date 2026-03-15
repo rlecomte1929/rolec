@@ -4670,13 +4670,64 @@ class Database:
         company_id: Optional[str] = None,
     ) -> None:
         """Insert a new profile (admin provisioning). Idempotent: uses upsert if exists."""
-        self.upsert_profile(
-            person_id,
-            email=(email or "").strip().lower(),
-            role=(role or "EMPLOYEE").strip().upper(),
-            full_name=full_name,
-            company_id=company_id,
-        )
+        now = datetime.utcnow().isoformat()
+        email_clean = (email or "").strip().lower()
+        role_clean = (role or "EMPLOYEE").strip().upper()
+        if _is_sqlite:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO profiles (id, email, full_name, role, company_id)
+                        VALUES (:id, :email, :full_name, :role, :company_id)
+                        ON CONFLICT(id) DO UPDATE SET
+                            email = excluded.email,
+                            full_name = excluded.full_name,
+                            role = excluded.role,
+                            company_id = excluded.company_id
+                        """
+                    ),
+                    {
+                        "id": person_id,
+                        "email": email_clean,
+                        "full_name": full_name,
+                        "role": role_clean,
+                        "company_id": company_id,
+                    },
+                )
+        else:
+            # Postgres: profiles schema may differ between environments; generate columns dynamically.
+            with self.engine.begin() as conn:
+                cols = conn.execute(
+                    text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_name = 'profiles'"
+                    )
+                ).fetchall()
+                existing = {r._mapping["column_name"] for r in cols}
+                base_cols = ["id", "email", "full_name", "role", "company_id", "created_at", "updated_at"]
+                insert_cols = [c for c in base_cols if c in existing]
+                params: Dict[str, Any] = {
+                    "id": person_id,
+                    "email": email_clean,
+                    "full_name": full_name,
+                    "role": role_clean,
+                    "company_id": company_id,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                values_clause = ", ".join(f":{c}" for c in insert_cols)
+                update_sets = []
+                for c in insert_cols:
+                    if c in ("id", "created_at"):
+                        continue
+                    update_sets.append(f"{c} = EXCLUDED.{c}")
+                sql = (
+                    f"INSERT INTO profiles ({', '.join(insert_cols)}) "
+                    f"VALUES ({values_clause}) "
+                    f"ON CONFLICT(id) DO UPDATE SET {', '.join(update_sets)}"
+                )
+                conn.execute(text(sql), params)
 
     def get_company_for_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         profile = self.get_profile_record(user_id)
