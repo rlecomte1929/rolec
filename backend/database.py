@@ -6595,9 +6595,8 @@ class Database:
 
     def get_admin_company_index(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        List all companies for admin. Includes rows from companies table and any
-        distinct company_id from hr_users, profiles, company_policies, relocation_cases
-        that are not yet in companies (so admin sees every company identity in the system).
+        List all companies for admin from the canonical companies table only.
+        Orphan company_ids (referenced elsewhere but not in companies) are logged, not shown.
         """
         q = (query or "").strip().lower()
         with self.engine.connect() as conn:
@@ -6617,7 +6616,8 @@ class Database:
                 d["missing_from_companies_table"] = 0
                 result.append(d)
             seen = {r["id"] for r in result}
-            # Orphan company_ids from other tables (not in companies)
+            # Collect orphan company_ids for logging only; do not add them to the visible list.
+            orphan_ids: set = set()
             for table, col in [("hr_users", "company_id"), ("profiles", "company_id"),
                               ("company_policies", "company_id"), ("relocation_cases", "company_id")]:
                 try:
@@ -6637,18 +6637,11 @@ class Database:
                     for o in orows:
                         cid = (o._mapping.get("id") or "").strip()
                         if cid and cid not in seen:
-                            seen.add(cid)
-                            result.append({
-                                "id": cid, "name": cid, "country": None, "size_band": None,
-                                "created_at": None, "address": None, "phone": None, "hr_contact": None,
-                                "legal_name": None, "website": None, "hq_city": None, "industry": None,
-                                "logo_url": None, "brand_color": None, "updated_at": None,
-                                "default_destination_country": None, "support_email": None,
-                                "default_working_location": None,
-                                "missing_from_companies_table": 1,
-                            })
+                            orphan_ids.add(cid)
                 except Exception as e:
                     log.warning("admin_company_index: orphan lookup %s.%s failed: %s", table, col, e)
+            if orphan_ids:
+                log.warning("admin_company_index: orphan company_ids (not in registry): %s", sorted(orphan_ids))
 
             # Enrich each row with hr_users_count, employee_count, assignments_count, primary_contact_name
             if result:

@@ -96,20 +96,20 @@ export const AdminUsers: React.FC = () => {
             <Button
               variant="outline"
               disabled={selectedIds.size === 0}
-              onClick={() => {
+              onClick={async () => {
                 if (selectedIds.size === 0) return;
                 if (!window.confirm(`Delete ${selectedIds.size} selected people?`)) return;
+                if (!window.confirm('Are you sure? This action cannot be undone.')) return;
                 const ids = Array.from(selectedIds);
-                Promise.all(
-                  ids.map((id) =>
-                    adminAPI.deactivatePerson(id).catch((err) => {
-                      console.error(err);
-                    }),
-                  ),
-                ).then(() => {
+                try {
+                  await Promise.all(
+                    ids.map((id) => adminAPI.deactivatePerson(id).catch((err) => { console.error(err); })),
+                  );
                   setSelectedIds(new Set());
-                  loadPeople();
-                });
+                  await loadPeople();
+                } catch (e) {
+                  console.error(e);
+                }
               }}
             >
               Delete selected
@@ -173,19 +173,6 @@ export const AdminUsers: React.FC = () => {
               <div className="flex items-center gap-2 flex-wrap">
                 <Button size="sm" variant="outline" onClick={() => setEditOpen(p)}>
                   Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (!window.confirm(`Delete ${p.name || p.email}?`)) return;
-                    adminAPI
-                      .deactivatePerson(p.id)
-                      .then(() => loadPeople())
-                      .catch(console.error);
-                  }}
-                >
-                  Delete
                 </Button>
               </div>
             </div>
