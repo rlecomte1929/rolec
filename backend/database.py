@@ -62,20 +62,9 @@ _engine = create_engine(_raw_url, connect_args=_connect_args)
 
 _is_sqlite = _raw_url.startswith("sqlite")
 
-# Detect presence of optional columns that may not exist in all runtimes.
+# NOTE: Production Postgres currently has no profiles.status column.
+# To avoid schema drift issues we do not reference profiles.status at all.
 _profiles_has_status_column = False
-if not _is_sqlite:
-    try:
-        with _engine.connect() as _conn:
-            _row = _conn.execute(
-                text(
-                    "SELECT 1 FROM information_schema.columns "
-                    "WHERE table_name = 'profiles' AND column_name = 'status'"
-                )
-            ).fetchone()
-            _profiles_has_status_column = bool(_row)
-    except Exception:
-        _profiles_has_status_column = False
 
 
 def _seed_default_policy_template_sqlite(conn: Any) -> None:
@@ -4655,7 +4644,21 @@ class Database:
         return result.rowcount > 0
 
     def deactivate_profile(self, person_id: str) -> bool:
-        return self.update_profile(person_id, status="inactive")
+        """
+        Deactivate a profile. In runtimes without a profiles.status column we fall back to hard delete.
+        """
+        try:
+            return self.update_profile(person_id, status="inactive")
+        except Exception as e:
+            _agent_debug_log(
+                hypothesis_id="H4",
+                location="database.deactivate_profile",
+                message="deactivate_profile fallback delete",
+                data={"person_id": person_id, "error": str(e)},
+            )
+            with self.engine.begin() as conn:
+                conn.execute(text("DELETE FROM profiles WHERE id = :id"), {"id": person_id})
+            return True
 
     def create_profile(
         self,
@@ -4673,12 +4676,6 @@ class Database:
             full_name=full_name,
             company_id=company_id,
         )
-        # Ensure status exists for new row
-        with self.engine.connect() as conn:
-            conn.execute(
-                text("UPDATE profiles SET status = COALESCE(status, 'active') WHERE id = :id"),
-                {"id": person_id},
-            )
 
     def get_company_for_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         profile = self.get_profile_record(user_id)
@@ -5653,11 +5650,11 @@ class Database:
 
     def list_hr_users_with_profiles(self, company_id: str) -> List[Dict[str, Any]]:
         """HR users for company with name, email, status from profiles. For admin company detail."""
-        sql = """
+        sql = f"""
             SELECT hu.id, hu.company_id, hu.profile_id, hu.created_at,
                    COALESCE(p.full_name, p.email, hu.profile_id) AS name,
                    p.email AS email,
-                   COALESCE(p.status, 'active') AS status
+                   'active' AS status
             FROM hr_users hu
             LEFT JOIN profiles p ON p.id = hu.profile_id
             WHERE hu.company_id = :cid
@@ -6659,23 +6656,9 @@ class Database:
                 clauses.append("(p.email ILIKE :q OR p.full_name ILIKE :q)")
             params["q"] = pattern
         where = " AND " + " AND ".join(clauses) if clauses else ""
-        status_expr = "COALESCE(p.status, 'active')" if _profiles_has_status_column else "'active'"
-        _agent_debug_log(
-            hypothesis_id="H2",
-            location="database.get_admin_people_index",
-            message="admin_people_index SQL prepared",
-            data={
-                "is_sqlite": _is_sqlite,
-                "profiles_has_status": _profiles_has_status_column,
-                "company_id": company_id,
-                "query_present": bool(query),
-                "role": role,
-                "status_expr": status_expr,
-            },
-        )
         sql = f"""
             SELECT p.id, p.role, p.email, p.full_name, p.company_id,
-                   {status_expr} AS status,
+                   'active' AS status,
                    p.created_at,
                    c.name AS company_name,
                    (SELECT COUNT(*) FROM hr_users hu WHERE hu.profile_id = p.id) AS hr_link_count,

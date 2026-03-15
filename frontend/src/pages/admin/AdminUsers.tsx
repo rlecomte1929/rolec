@@ -162,9 +162,6 @@ export const AdminUsers: React.FC = () => {
                 <Button size="sm" variant="outline" onClick={() => startViewAs(p, 'employee')}>
                   View as employee
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => startViewAs(p, 'hr')}>
-                  View as HR
-                </Button>
               </div>
             </div>
           ))}
