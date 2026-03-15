@@ -823,8 +823,6 @@ function ScoringEditor({
 
 function RankingDebugCard({
   supplierId,
-  supplierName,
-  capabilities,
 }: {
   supplierId: string;
   supplierName: string;

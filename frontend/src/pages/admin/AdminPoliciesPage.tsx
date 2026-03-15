@@ -339,9 +339,11 @@ export const AdminPoliciesPage: React.FC = () => {
                     <ul className="list-disc list-inside space-y-1">
                       {(inspectDetail.versions as AdminPolicyVersion[] | undefined)?.map((v) => (
                         <li key={v.id}>
-                          <Badge variant={VERSION_STATUS_VARIANTS[v.status] || 'neutral'} size="sm" className="mr-1">
-                            {v.version_number} · {VERSION_STATUS_LABELS[v.status] ?? v.status}
-                          </Badge>
+                          <span className="mr-1">
+                            <Badge variant={VERSION_STATUS_VARIANTS[v.status] || 'neutral'} size="sm">
+                              {v.version_number} · {VERSION_STATUS_LABELS[v.status] ?? v.status}
+                            </Badge>
+                          </span>
                           {v.id === inspectDetail.published_version_id && ' (published)'}
                           {v.status !== 'published' && (
                             <Button

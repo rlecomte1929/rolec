@@ -674,6 +674,7 @@ export interface AdminCompany {
   address?: string;
   phone?: string;
   hr_contact?: string;
+  support_email?: string | null;
   created_at: string;
   updated_at?: string;
   status?: CompanyStatus | string;

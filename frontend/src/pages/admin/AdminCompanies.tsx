@@ -47,7 +47,19 @@ export const AdminCompanies: React.FC = () => {
     }
     setSavingId(companyId);
     try {
-      await adminAPI.updateCompany(companyId, draft);
+      const payload: Parameters<typeof adminAPI.updateCompany>[1] = {};
+      if (draft.name !== undefined) payload.name = draft.name;
+      if (draft.country !== undefined) payload.country = draft.country;
+      if (draft.size_band !== undefined) payload.size_band = draft.size_band;
+      if (draft.status !== undefined) payload.status = draft.status;
+      if (draft.plan_tier !== undefined) payload.plan_tier = draft.plan_tier;
+      if (draft.hr_seat_limit !== undefined && draft.hr_seat_limit !== null) payload.hr_seat_limit = draft.hr_seat_limit;
+      if (draft.employee_seat_limit !== undefined && draft.employee_seat_limit !== null) payload.employee_seat_limit = draft.employee_seat_limit;
+      if (draft.address !== undefined) payload.address = draft.address;
+      if (draft.phone !== undefined) payload.phone = draft.phone;
+      if (draft.hr_contact !== undefined) payload.hr_contact = draft.hr_contact;
+      if (draft.support_email !== undefined && draft.support_email !== null) payload.support_email = draft.support_email;
+      await adminAPI.updateCompany(companyId, payload);
       setEditingId(null);
       setEditDraft({});
       await load();
