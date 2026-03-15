@@ -3185,10 +3185,15 @@ def claim_assignment(
 
     emp_uid = assignment.get("employee_user_id")
     effective_id = str(effective["id"]).strip()
-    if emp_uid and str(emp_uid).strip() != effective_id:
-        raise HTTPException(status_code=403, detail="Assignment already claimed")
-    if emp_uid and str(emp_uid).strip() == effective_id:
+    emp_uid_str = str(emp_uid).strip() if emp_uid else ""
+    # Already linked to this user (same id) -> success
+    if emp_uid_str and emp_uid_str == effective_id:
         return {"success": True, "assignmentId": assignment_id}
+    # Linked to another id but assignment is for this person (identifier match) -> allow claim and attach this user
+    if emp_uid_str and emp_uid_str != effective_id:
+        if assignment_identifier not in user_identifiers:
+            raise HTTPException(status_code=403, detail="Assignment already claimed")
+        # Same person (e.g. assignment has profile id, user logged in with user id): attach and proceed
 
     case_id = assignment.get("case_id", "")
     db.attach_employee_to_assignment(assignment_id, effective["id"])
