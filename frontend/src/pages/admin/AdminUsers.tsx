@@ -110,8 +110,8 @@ export const AdminUsers: React.FC = () => {
       <Card padding="lg">
         {(() => {
           const total = people.length;
-          const hrCount = people.filter((p) => p.role === 'HR' || (p as { hr_link_count?: number }).hr_link_count > 0).length;
-          const employeeCount = people.filter((p) => ['EMPLOYEE', 'EMPLOYEE_USER'].includes(p.role || '') || (p as { employee_link_count?: number }).employee_link_count > 0).length;
+          const hrCount = people.filter((p) => p.role === 'HR' || ((p as { hr_link_count?: number }).hr_link_count ?? 0) > 0).length;
+          const employeeCount = people.filter((p) => ['EMPLOYEE', 'EMPLOYEE_USER'].includes(p.role || '') || ((p as { employee_link_count?: number }).employee_link_count ?? 0) > 0).length;
           return (
             <div className="text-sm text-[#6b7280] mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
               <span className="font-medium text-[#0b2b43]">People ({total})</span>
