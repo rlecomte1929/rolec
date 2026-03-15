@@ -93,6 +93,10 @@ _db_info = Database.get_db_info()
 _db_scheme = _db_info["db_url_scheme"]
 _db_host = _db_info["db_host"] or "(local file)"
 
+# Legacy demo seed flags (used in startup logs and runtime diagnostics)
+ALLOW_LEGACY_DEMO_SEED = os.getenv("ALLOW_LEGACY_DEMO_SEED", "").lower() in ("1", "true", "yes")
+DISABLE_DEMO_RESEED = os.getenv("DISABLE_DEMO_RESEED", "").lower() in ("1", "true", "yes")
+
 log.info("DB engine: %s | host: %s", _db_scheme, _db_host)
 
 if any(p in _db_url for p in ["YOUR_PASSWORD", "YOUR_HOST", "<password>", "placeholder"]):
@@ -593,8 +597,6 @@ def _seed_default_hr_policy() -> None:
 
 # Only run legacy demo seed (relocation_cases with string IDs) on SQLite, and only when explicitly allowed.
 # Production Supabase uses UUID for relocation_cases.id; seeding would crash.
-ALLOW_LEGACY_DEMO_SEED = os.getenv("ALLOW_LEGACY_DEMO_SEED", "").lower() in ("1", "true", "yes")
-DISABLE_DEMO_RESEED = os.getenv("DISABLE_DEMO_RESEED", "").lower() in ("1", "true", "yes")
 if _db_scheme == "sqlite" and ALLOW_LEGACY_DEMO_SEED and not DISABLE_DEMO_RESEED:
     try:
         _seed_demo_cases()

@@ -21,20 +21,6 @@ export const AdminCompanies: React.FC = () => {
   const [editDraft, setEditDraft] = useState<Partial<AdminCompany>>({});
   const [backfillRunning, setBackfillRunning] = useState(false);
   const [backfillResult, setBackfillResult] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<{
-    db_scheme?: string;
-    disable_demo_reseed?: boolean;
-    allow_legacy_demo_seed?: boolean;
-    seed_guard_active?: boolean;
-    counts?: {
-      profiles: number;
-      hr_users: number;
-      employees: number;
-      relocation_cases: number;
-      case_assignments: number;
-      policies: number;
-    };
-  } | null>(null);
 
   const runBackfill = async () => {
     if (!window.confirm('Rebuild the Test company graph? This links demo/test data to the fixed Test company without overwriting non-demo companies.')) return;
@@ -51,8 +37,6 @@ export const AdminCompanies: React.FC = () => {
             `${s.case_assignments_repaired} assignments repaired, ${s.policies_linked} policies.`
         );
         await load();
-      } else {
-        setBackfillResult(res.error || 'Backfill failed.');
       }
     } catch (e) {
       setBackfillResult((e as Error)?.message || 'Request failed.');
