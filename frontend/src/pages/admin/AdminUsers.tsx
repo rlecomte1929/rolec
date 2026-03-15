@@ -19,6 +19,8 @@ export const AdminUsers: React.FC = () => {
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [loading, setLoading] = useState(false);
   const [editOpen, setEditOpen] = useState<AdminProfile | null>(null);
+  const [reassignOpen, setReassignOpen] = useState<AdminProfile | null>(null);
+  const [changeRoleOpen, setChangeRoleOpen] = useState<AdminProfile | null>(null);
   const [addOpen, setAddOpen] = useState(false);
 
   const loadPeople = async () => {
@@ -124,15 +126,15 @@ export const AdminUsers: React.FC = () => {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button size="sm" variant="outline" onClick={() => setEditOpen(p)}>
                   Edit
                 </Button>
-                <Button size="sm" onClick={() => startViewAs(p, 'employee')}>
-                  View as employee
+                <Button size="sm" variant="outline" onClick={() => setReassignOpen(p)}>
+                  Reassign company
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => startViewAs(p, 'hr')}>
-                  View as HR
+                <Button size="sm" variant="outline" onClick={() => setChangeRoleOpen(p)}>
+                  Change role
                 </Button>
                 {(p.status || 'active').toLowerCase() === 'active' && (
                   <Button size="sm" variant="outline" onClick={() => {
@@ -143,6 +145,12 @@ export const AdminUsers: React.FC = () => {
                     Deactivate
                   </Button>
                 )}
+                <Button size="sm" variant="outline" onClick={() => startViewAs(p, 'employee')}>
+                  View as employee
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => startViewAs(p, 'hr')}>
+                  View as HR
+                </Button>
               </div>
             </div>
           ))}
@@ -150,13 +158,8 @@ export const AdminUsers: React.FC = () => {
             <div className="py-12 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
               <div className="text-sm font-medium">No people found</div>
               <div className="text-xs mt-1">
-                {companyId || roleFilter || query ? 'Try changing filters or search.' : 'Profiles appear when users register or are provisioned. Use Add person to provision.'}
+                {companyId || roleFilter || query ? 'Try changing filters or search.' : 'Profiles appear when users register or are provisioned. Use Add person above to provision.'}
               </div>
-              {!companyId && !roleFilter && !query && (
-                <Button className="mt-4" variant="primary" onClick={() => setAddOpen(true)}>
-                  Add person
-                </Button>
-              )}
             </div>
           )}
         </div>
@@ -169,6 +172,27 @@ export const AdminUsers: React.FC = () => {
           onClose={() => setEditOpen(null)}
           onSaved={() => {
             setEditOpen(null);
+            loadPeople();
+          }}
+        />
+      )}
+      {reassignOpen && (
+        <ReassignCompanyModal
+          person={reassignOpen}
+          companies={companies}
+          onClose={() => setReassignOpen(null)}
+          onSaved={() => {
+            setReassignOpen(null);
+            loadPeople();
+          }}
+        />
+      )}
+      {changeRoleOpen && (
+        <ChangeRoleModal
+          person={changeRoleOpen}
+          onClose={() => setChangeRoleOpen(null)}
+          onSaved={() => {
+            setChangeRoleOpen(null);
             loadPeople();
           }}
         />
@@ -262,6 +286,127 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm">
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          {error && <div className="text-sm text-red-600">{error}</div>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+interface ReassignCompanyModalProps {
+  person: AdminProfile;
+  companies: AdminCompany[];
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+const ReassignCompanyModal: React.FC<ReassignCompanyModalProps> = ({ person, companies, onClose, onSaved }) => {
+  const [company_id, setCompanyId] = useState(person.company_id ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!company_id.trim()) {
+      setError('Select a company');
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      await adminAPI.assignPersonCompany(person.id, company_id.trim());
+      onSaved();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Failed to reassign');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Reassign company</h2>
+        <p className="text-sm text-[#6b7280] mb-3">{person.name || person.email} → assign to company</p>
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[#374151] mb-1">Company</label>
+            <select
+              value={company_id}
+              onChange={(e) => setCompanyId(e.target.value)}
+              className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
+            >
+              <option value="">Unassigned</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          {error && <div className="text-sm text-red-600">{error}</div>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+interface ChangeRoleModalProps {
+  person: AdminProfile;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+const ROLE_OPTIONS_UPDATE = [
+  { value: 'ADMIN', label: 'Admin' },
+  { value: 'HR', label: 'HR' },
+  { value: 'EMPLOYEE', label: 'Employee' },
+  { value: 'EMPLOYEE_USER', label: 'Employee (user)' },
+];
+
+const ChangeRoleModal: React.FC<ChangeRoleModalProps> = ({ person, onClose, onSaved }) => {
+  const [role, setRole] = useState((person.role || 'EMPLOYEE').toUpperCase());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      await adminAPI.setPersonRole(person.id, role);
+      onSaved();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Failed to update role');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Change role</h2>
+        <p className="text-sm text-[#6b7280] mb-3">{person.name || person.email}</p>
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[#374151] mb-1">Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
+            >
+              {ROLE_OPTIONS_UPDATE.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
             </select>
           </div>
           {error && <div className="text-sm text-red-600">{error}</div>}

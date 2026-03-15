@@ -778,6 +778,13 @@ class AdminSupportNoteRequest(BaseModel):
     reason: str
 
 
+class AdminSupportCasePatchRequest(BaseModel):
+    priority: Optional[str] = None  # low | medium | high | urgent
+    status: Optional[str] = None   # open | investigating | blocked | resolved
+    assignee_id: Optional[str] = None
+    category: Optional[str] = None  # bug | feature request | onboarding | policy question | supplier issue | other
+
+
 class CompanyProfileRequest(BaseModel):
     name: str
     country: Optional[str] = None
@@ -1139,16 +1146,76 @@ def list_companies(q: Optional[str] = Query(None), user: Dict[str, Any] = Depend
 def get_company_detail(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
     company = db.get_company(company_id)
     if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-    hr_users = db.list_hr_users(company_id)
-    employees = db.list_employees(company_id)
-    policies = db.list_hr_policies_by_company(company_id)
+        # Orphan: company_id not in companies table but may appear in hr_users/relocation_cases
+        with db.engine.connect() as conn:
+            has_hr = conn.execute(
+                text("SELECT 1 FROM hr_users WHERE company_id = :cid LIMIT 1"), {"cid": company_id}
+            ).fetchone()
+            has_case = conn.execute(
+                text("SELECT 1 FROM relocation_cases WHERE company_id = :cid LIMIT 1"), {"cid": company_id}
+            ).fetchone()
+        if has_hr or has_case:
+            company = {
+                "id": company_id,
+                "name": company_id,
+                "country": None,
+                "size_band": None,
+                "address": None,
+                "phone": None,
+                "hr_contact": None,
+                "created_at": None,
+                "updated_at": None,
+                "status": None,
+                "plan_tier": None,
+                "missing_from_registry": True,
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Company not found")
+    hr_users = db.list_hr_users_with_profiles(company_id)
+    employees_raw = db.list_employees_with_profiles(company_id)
+    employees = [
+        {
+            "id": e["id"],
+            "company_id": e["company_id"],
+            "profile_id": e["profile_id"],
+            "name": e.get("full_name") or e.get("email") or e.get("profile_id"),
+            "email": e.get("email"),
+            "status": e.get("status") or "active",
+            "created_at": e.get("created_at"),
+        }
+        for e in employees_raw
+    ]
+    assignments = db.list_assignments_for_company_with_details(company_id)
+    policies_data = db.get_admin_policies_by_company(company_id)
+    if policies_data and policies_data.get("policies"):
+        policies = [
+            {
+                "policy_id": p["policy_id"],
+                "title": p.get("title"),
+                "latest_version": p.get("latest_version_number"),
+                "status": p.get("latest_version_status") or p.get("extraction_status") or "draft",
+                "published": bool(p.get("published_version_id")),
+            }
+            for p in policies_data["policies"]
+        ]
+    else:
+        policies = []
+    counts_summary = {
+        "hr_users_count": len(hr_users),
+        "employees_count": len(employees),
+        "assignments_count": len(assignments),
+        "policies_count": len(policies),
+    }
+    orphan_diagnostics = db.get_company_detail_orphan_diagnostics(company_id)
     db.log_audit(user["id"], "READ", "company", company_id, None, {"detail": True})
     return {
         "company": company,
         "hr_users": hr_users,
         "employees": employees,
+        "assignments": assignments,
         "policies": policies,
+        "counts_summary": counts_summary,
+        "orphan_diagnostics": orphan_diagnostics,
     }
 
 
@@ -1470,6 +1537,63 @@ def admin_fix_assignment_company_linkage(
     return {"ok": True}
 
 
+class AdminAssignmentStatusRequest(BaseModel):
+    status: str
+
+
+@app.patch("/api/admin/assignments/{assignment_id}/status")
+def admin_update_assignment_status(
+    assignment_id: str,
+    body: AdminAssignmentStatusRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: set assignment status (e.g. Save status change or Archive)."""
+    if not db.get_assignment_by_id(assignment_id):
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    status = (body.status or "").strip()
+    if not status:
+        raise HTTPException(status_code=400, detail="status is required")
+    db.update_assignment_status(assignment_id, status, request_id=None)
+    db.log_audit(user["id"], "UPDATE_STATUS", "assignment", assignment_id, None, {"status": status})
+    return {"ok": True, "status": status}
+
+
+class AdminCreateAssignmentRequest(BaseModel):
+    company_id: str
+    hr_user_id: str
+    employee_identifier: Optional[str] = None
+
+
+@app.post("/api/admin/assignments")
+def admin_create_assignment(
+    body: AdminCreateAssignmentRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: create a new case and assignment for a company (minimal case, assigned status)."""
+    if not db.get_company(body.company_id):
+        raise HTTPException(status_code=404, detail="Company not found")
+    if not db.get_profile_record(body.hr_user_id):
+        raise HTTPException(status_code=404, detail="HR profile not found")
+    hr_users = db.list_hr_users(body.company_id)
+    if not any(h.get("profile_id") == body.hr_user_id for h in hr_users):
+        raise HTTPException(status_code=400, detail="HR user is not in the selected company")
+    case_id = str(uuid.uuid4())
+    assignment_id = str(uuid.uuid4())
+    employee_identifier = (body.employee_identifier or "").strip() or "admin-created"
+    db.create_case(case_id, body.hr_user_id, {}, company_id=body.company_id)
+    db.create_assignment(
+        assignment_id=assignment_id,
+        case_id=case_id,
+        hr_user_id=body.hr_user_id,
+        employee_user_id=None,
+        employee_identifier=employee_identifier,
+        status=AssignmentStatus.ASSIGNED.value,
+        request_id=None,
+    )
+    db.log_audit(user["id"], "CREATE", "assignment", assignment_id, None, {"case_id": case_id, "company_id": body.company_id, "hr_user_id": body.hr_user_id})
+    return {"ok": True, "assignment_id": assignment_id, "case_id": case_id}
+
+
 @app.get("/api/admin/data-integrity/overview")
 def get_data_integrity_overview(user: Dict[str, Any] = Depends(require_admin)):
     """Admin: entity counts and orphan flags for data-integrity dashboard."""
@@ -1580,6 +1704,12 @@ class AdminPatchPolicyRequest(BaseModel):
     unpublish: Optional[bool] = None
 
 
+class AdminApplyDefaultTemplateRequest(BaseModel):
+    company_id: str
+    template_id: Optional[str] = None
+    overwrite_existing: Optional[bool] = False
+
+
 @app.get("/api/admin/policies/overview")
 def list_admin_policy_overview(
     company_id: Optional[str] = Query(None),
@@ -1665,16 +1795,85 @@ def patch_admin_policy(
     return updated
 
 
+@app.get("/api/admin/policies/templates")
+def list_admin_policy_templates(user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: list default platform policy templates."""
+    templates = db.list_default_policy_templates()
+    db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {})
+    return {"templates": templates}
+
+
+@app.post("/api/admin/policies/apply-default-template")
+def apply_default_template_to_company(
+    body: AdminApplyDefaultTemplateRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: apply a default policy template to a company. Creates a new company policy from the template."""
+    template_id = body.template_id
+    if not template_id:
+        templates = db.list_default_policy_templates()
+        default_one = next((t for t in templates if t.get("is_default_template")), templates[0] if templates else None)
+        if not default_one:
+            raise HTTPException(status_code=404, detail="No default template found")
+        template_id = default_one["id"]
+    result = db.apply_default_template_to_company(
+        company_id=body.company_id,
+        template_id=template_id,
+        overwrite_existing=body.overwrite_existing or False,
+        created_by=user.get("id"),
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Apply failed"))
+    db.log_audit(
+        user["id"], "APPLY_DEFAULT_TEMPLATE", "admin_policy",
+        result.get("policy_id"), None,
+        {"company_id": body.company_id, "template_id": template_id},
+    )
+    return result
+
+
 @app.get("/api/admin/support-cases")
 def list_support_cases(
     status: Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
     company_id: Optional[str] = Query(None),
+    priority: Optional[str] = Query(None, description="low | medium | high | urgent"),
     user: Dict[str, Any] = Depends(require_admin),
 ):
-    items = db.list_support_cases(status=status, severity=severity, company_id=company_id)
-    db.log_audit(user["id"], "READ", "support_case", None, None, {"status": status, "severity": severity, "company_id": company_id})
+    """List support cases (tickets) with optional company, status, severity, priority filters."""
+    items = db.list_support_cases(status=status, severity=severity, company_id=company_id, priority=priority)
+    db.log_audit(user["id"], "READ", "support_case", None, None, {"status": status, "severity": severity, "company_id": company_id, "priority": priority})
     return {"support_cases": items}
+
+
+@app.patch("/api/admin/support-cases/{case_id}")
+def patch_support_case(
+    case_id: str,
+    body: AdminSupportCasePatchRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Update ticket: priority, status, assignee_id, category."""
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        out = db.get_support_case(case_id)
+        if not out:
+            raise HTTPException(status_code=404, detail="Support case not found")
+        return out
+    if body.priority is not None and body.priority not in ("low", "medium", "high", "urgent"):
+        raise HTTPException(status_code=400, detail="priority must be low, medium, high, or urgent")
+    if body.status is not None and body.status not in ("open", "investigating", "blocked", "resolved"):
+        raise HTTPException(status_code=400, detail="status must be open, investigating, blocked, or resolved")
+    out = db.update_support_case(
+        case_id,
+        priority=body.priority,
+        status=body.status,
+        assignee_id=body.assignee_id,
+        category=body.category,
+    )
+    if not out:
+        raise HTTPException(status_code=404, detail="Support case not found")
+    db.log_audit(user["id"], "UPDATE", "support_case", case_id, None, payload)
+    return out
 
 
 @app.get("/api/admin/support-cases/{case_id}/notes")

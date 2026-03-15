@@ -30,6 +30,65 @@ _engine = create_engine(_raw_url, connect_args=_connect_args)
 _is_sqlite = _raw_url.startswith("sqlite")
 
 
+def _seed_default_policy_template_sqlite(conn: Any) -> None:
+    """Insert one platform default policy template for SQLite when none exists."""
+    from sqlalchemy import text
+    now = datetime.utcnow().isoformat()
+    template_id = str(uuid.uuid4())
+    snapshot = {
+        "policyVersion": "v2.1",
+        "effectiveDate": "2024-10-01",
+        "jurisdictionNotes": "Base policy for global assignments. Local counsel required for exceptions.",
+        "caps": {
+            "housing": {"amount": 5000, "currency": "USD", "durationMonths": 12},
+            "movers": {"amount": 10000, "currency": "USD"},
+            "schools": {"amount": 20000, "currency": "USD"},
+            "immigration": {"amount": 4000, "currency": "USD"},
+        },
+        "approvalRules": {"nearLimit": "Manager", "overLimit": "HR"},
+        "exceptionWorkflow": {"states": ["PENDING", "APPROVED", "REJECTED"], "requiredFields": ["category", "reason", "amount"]},
+        "requiredEvidence": {
+            "housing": ["Lease estimate", "Budget approval"],
+            "movers": ["Vendor quote", "Inventory list"],
+            "schools": ["School invoice", "Enrollment confirmation"],
+            "immigration": ["Legal engagement letter", "Filing receipt"],
+        },
+        "leadTimeRules": {"minDays": 30},
+        "riskThresholds": {"low": 80, "moderate": 60},
+        "documentRequirements": {
+            "base": ["Passport scans", "Employment letter"],
+            "married": ["Marriage certificate"],
+            "children": ["Birth certificates"],
+            "spouseWork": ["Spouse resume"],
+        },
+        "approvalThresholds": {
+            "housing": {"jobLevelCapOverrides": {"L1": 5000, "L2": 7000, "L3": 10000}},
+            "movers": {"storageWeeksIncluded": 4},
+        },
+        "benefit_rules": [
+            {"benefit_key": "housing", "benefit_category": "housing", "calc_type": "unit_cap", "amount_value": 5000, "amount_unit": "month", "currency": "USD"},
+            {"benefit_key": "movers", "benefit_category": "movers", "calc_type": "flat_amount", "amount_value": 10000, "currency": "USD"},
+            {"benefit_key": "schools", "benefit_category": "schools", "calc_type": "flat_amount", "amount_value": 20000, "currency": "USD"},
+            {"benefit_key": "immigration", "benefit_category": "immigration", "calc_type": "flat_amount", "amount_value": 4000, "currency": "USD"},
+        ],
+    }
+    conn.execute(
+        text("""
+            INSERT INTO default_policy_templates (id, template_name, version, status, is_default_template, snapshot_json, created_at, updated_at)
+            VALUES (:id, :name, :ver, :status, 1, :snapshot, :ca, :ua)
+        """),
+        {
+            "id": template_id,
+            "name": "Platform default relocation policy",
+            "ver": "v2.1",
+            "status": "active",
+            "snapshot": json.dumps(snapshot),
+            "ca": now,
+            "ua": now,
+        },
+    )
+
+
 def normalize_policy_boolean_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Coerce known boolean keys to Python bool before DB write.
@@ -608,6 +667,37 @@ class Database:
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_policy_benefit_rules_version ON policy_benefit_rules(policy_version_id)
             """))
+            # Policy template source columns (company_policies) + default_policy_templates
+            try:
+                cols = conn.execute(text("PRAGMA table_info(company_policies)")).fetchall()
+                col_names = {r[1] for r in cols}
+                for col, ctype in [
+                    ("template_source", "TEXT NOT NULL DEFAULT 'company_uploaded'"),
+                    ("template_name", "TEXT"),
+                    ("is_default_template", "INTEGER NOT NULL DEFAULT 0"),
+                ]:
+                    if col not in col_names:
+                        conn.execute(text(f"ALTER TABLE company_policies ADD COLUMN {col} {ctype}"))
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS default_policy_templates (
+                        id TEXT PRIMARY KEY,
+                        template_name TEXT NOT NULL,
+                        version TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'active',
+                        is_default_template INTEGER NOT NULL DEFAULT 0,
+                        snapshot_json TEXT NOT NULL DEFAULT '{}',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """))
+                # Seed one default template if none
+                row = conn.execute(text(
+                    "SELECT id FROM default_policy_templates WHERE is_default_template = 1 LIMIT 1"
+                )).fetchone()
+                if not row:
+                    _seed_default_policy_template_sqlite(conn)
+            except Exception:
+                pass
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS resolved_assignment_policies (
                     id TEXT PRIMARY KEY,
@@ -1210,6 +1300,15 @@ class Database:
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_status ON support_cases(status)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_severity ON support_cases(severity)"))
+            try:
+                cols = conn.execute(text("PRAGMA table_info(support_cases)")).fetchall()
+                col_names = {r[1] for r in cols}
+                if "priority" not in col_names:
+                    conn.execute(text("ALTER TABLE support_cases ADD COLUMN priority TEXT DEFAULT 'medium'"))
+                if "assignee_id" not in col_names:
+                    conn.execute(text("ALTER TABLE support_cases ADD COLUMN assignee_id TEXT"))
+            except Exception:
+                pass
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_relocation_cases_status ON relocation_cases(status)"))
 
             # HR Command Center: risk/budget columns, tasks, case_events
@@ -2693,6 +2792,66 @@ class Database:
             ).fetchall()
         return self._rows_to_list(rows)
 
+    def list_assignments_for_company_with_details(
+        self, company_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Assignments for company with employee_name, destination, status for admin company detail."""
+        sql = """
+            SELECT a.id, a.status,
+                   COALESCE(TRIM(emp_p.full_name),
+                            NULLIF(TRIM(COALESCE(a.employee_first_name, '') || ' ' || COALESCE(a.employee_last_name, '')), ''),
+                            a.employee_identifier, a.employee_user_id, '—') AS employee_name,
+                   COALESCE(rc.host_country, rc.home_country, '—') AS destination
+            FROM case_assignments a
+            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
+            WHERE (rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))
+            ORDER BY a.created_at DESC
+        """
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn, sql, {"cid": company_id}, op_name="list_assignments_for_company_with_details", request_id=request_id
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def get_company_detail_orphan_diagnostics(self, company_id: str) -> Dict[str, Any]:
+        """Counts of legacy records missing company_id linkage. For admin company detail."""
+        with self.engine.connect() as conn:
+            # Assignments where case has null company_id but HR belongs to this company
+            row = conn.execute(
+                text("""
+                    SELECT COUNT(*) AS n FROM case_assignments a
+                    LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                    LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                    WHERE hu.company_id = :cid AND (rc.company_id IS NULL OR TRIM(COALESCE(rc.company_id, '')) = '')
+                """),
+                {"cid": company_id},
+            ).fetchone()
+            assignments_case_missing_company_id = row._mapping["n"] if row else 0
+            # HR users with no profile (would show as missing name/email)
+            row2 = conn.execute(
+                text(
+                    "SELECT COUNT(*) AS n FROM hr_users hu "
+                    "LEFT JOIN profiles p ON p.id = hu.profile_id WHERE hu.company_id = :cid AND p.id IS NULL"
+                ),
+                {"cid": company_id},
+            ).fetchone()
+            hr_users_missing_profile = row2._mapping["n"] if row2 else 0
+            row3 = conn.execute(
+                text(
+                    "SELECT COUNT(*) AS n FROM employees e "
+                    "LEFT JOIN profiles p ON p.id = e.profile_id WHERE e.company_id = :cid AND p.id IS NULL"
+                ),
+                {"cid": company_id},
+            ).fetchone()
+            employees_missing_profile = row3._mapping["n"] if row3 else 0
+        return {
+            "assignments_case_missing_company_id": assignments_case_missing_company_id,
+            "hr_users_missing_profile": hr_users_missing_profile,
+            "employees_missing_profile": employees_missing_profile,
+        }
+
     def assignment_belongs_to_company(self, assignment_id: str, company_id: str) -> bool:
         """Check if assignment belongs to the given company (via case or HR)."""
         sql = """
@@ -3001,6 +3160,14 @@ class Database:
             r["destination_from_profile"] = mp.get("destination") if isinstance(mp.get("destination"), str) else None
             r["policy_resolved"] = bool(r.get("resolved_policy_id"))
             r["company_has_policy"] = (r.get("company_policy_count") or 0) > 0
+            # Normalized fields for admin list
+            r["assignment_id"] = r.get("id")
+            r["company_id"] = r.get("case_company_id") or r.get("hr_company_id")
+            r["destination_country"] = r.get("host_country") or r.get("destination_from_profile")
+            r["orphan_employee"] = not (
+                (r.get("employee_user_id") and str(r.get("employee_user_id")).strip())
+                or (r.get("employee_identifier") and str(r.get("employee_identifier")).strip())
+            )
             result.append(r)
         return result
 
@@ -3081,6 +3248,38 @@ class Database:
                 text("UPDATE company_policies SET company_id = :cid WHERE id = :id"),
                 {"cid": company_id, "id": policy_id},
             )
+
+    def backfill_link_latest_policy_to_test_company(self, company_name: str = "Test company") -> Dict[str, Any]:
+        """
+        Link the most recently created company_policy (by created_at) to the company named company_name.
+        Use to surface the policy worked on in the HR workflow under Test company in Admin Policies.
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id FROM companies WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) LIMIT 1"),
+                {"name": company_name},
+            ).fetchone()
+        if not row:
+            return {"ok": False, "error": f"Company '{company_name}' not found", "policy_id": None}
+        test_company_id = row._mapping["id"]
+        with self.engine.connect() as conn:
+            policy_row = conn.execute(
+                text(
+                    "SELECT id FROM company_policies ORDER BY created_at DESC LIMIT 1"
+                ),
+                {},
+            ).fetchone()
+        if not policy_row:
+            return {"ok": True, "company_id": test_company_id, "company_name": company_name, "policy_id": None, "linked": False}
+        policy_id = policy_row._mapping["id"]
+        self.admin_link_policy_company(policy_id, test_company_id)
+        log.info(
+            "backfill_link_latest_policy_to_test_company: company=%s company_id=%s policy_id=%s",
+            company_name,
+            test_company_id,
+            policy_id,
+        )
+        return {"ok": True, "company_id": test_company_id, "company_name": company_name, "policy_id": policy_id, "linked": True}
 
     def get_reconciliation_report(self) -> Dict[str, Any]:
         """Report for admin data reconciliation: entities and missing links. No destructive changes."""
@@ -4315,9 +4514,16 @@ class Database:
         return self._row_to_dict(row)
 
     def set_profile_company(self, user_id: str, company_id: str) -> None:
+        """Set profile company and keep hr_users/employees in sync."""
         with self.engine.begin() as conn:
             conn.execute(text(
                 "UPDATE profiles SET company_id = :cid WHERE id = :id"
+            ), {"cid": company_id, "id": user_id})
+            conn.execute(text(
+                "UPDATE hr_users SET company_id = :cid WHERE profile_id = :id"
+            ), {"cid": company_id, "id": user_id})
+            conn.execute(text(
+                "UPDATE employees SET company_id = :cid WHERE profile_id = :id"
             ), {"cid": company_id, "id": user_id})
 
     def update_profile(
@@ -4421,6 +4627,183 @@ class Database:
             else:
                 rows = conn.execute(text("SELECT * FROM profiles ORDER BY created_at DESC")).fetchall()
         return self._rows_to_list(rows)
+
+    def backfill_profiles_to_test_company(self, company_name: str = "Test company") -> Dict[str, Any]:
+        """
+        Assign all profiles that have no company to the company named company_name.
+        Default role to EMPLOYEE; use ADMIN if in admin_allowlist, HR if in hr_users.
+        Syncs hr_users and employees company_id. Returns counts and log info.
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id FROM companies WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) LIMIT 1"),
+                {"name": company_name},
+            ).fetchone()
+        if not row:
+            return {"ok": False, "error": f"Company '{company_name}' not found", "profiles_updated": 0}
+        test_company_id = row._mapping["id"]
+        with self.engine.connect() as conn:
+            profiles = conn.execute(
+                text(
+                    "SELECT id, email, full_name, role, company_id FROM profiles "
+                    "WHERE (company_id IS NULL OR TRIM(COALESCE(company_id, '')) = '')"
+                ),
+                {},
+            ).fetchall()
+        updated = 0
+        role_defaulted = 0
+        for p in profiles:
+            pid = p._mapping["id"]
+            email = (p._mapping.get("email") or "").strip().lower()
+            current_role = (p._mapping.get("role") or "").strip()
+            new_company = test_company_id
+            new_role = current_role
+            if not new_role or new_role not in ("ADMIN", "HR", "EMPLOYEE", "EMPLOYEE_USER"):
+                if self.is_admin_allowlisted(email):
+                    new_role = "ADMIN"
+                else:
+                    with self.engine.connect() as conn:
+                        hr_row = conn.execute(
+                            text("SELECT 1 FROM hr_users WHERE profile_id = :pid LIMIT 1"), {"pid": pid}
+                        ).fetchone()
+                    if hr_row:
+                        new_role = "HR"
+                    else:
+                        new_role = "EMPLOYEE"
+                role_defaulted += 1
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE profiles SET company_id = :cid, role = :role WHERE id = :id"
+                    ),
+                    {"cid": new_company, "role": new_role, "id": pid},
+                )
+                conn.execute(
+                    text(
+                        "UPDATE hr_users SET company_id = :cid WHERE profile_id = :id AND (company_id IS NULL OR TRIM(COALESCE(company_id, '')) = '')"
+                    ),
+                    {"cid": new_company, "id": pid},
+                )
+                conn.execute(
+                    text(
+                        "UPDATE employees SET company_id = :cid WHERE profile_id = :id AND (company_id IS NULL OR TRIM(COALESCE(company_id, '')) = '')"
+                    ),
+                    {"cid": new_company, "id": pid},
+                )
+            updated += 1
+        log.info(
+            "backfill_profiles_to_test_company: company=%s company_id=%s profiles_updated=%s role_defaulted=%s",
+            company_name,
+            test_company_id,
+            updated,
+            role_defaulted,
+        )
+        return {
+            "ok": True,
+            "company_id": test_company_id,
+            "company_name": company_name,
+            "profiles_updated": updated,
+            "role_defaulted": role_defaulted,
+        }
+
+    def backfill_assignments_to_test_company(self, company_name: str = "Test company") -> Dict[str, Any]:
+        """
+        Set relocation_cases.company_id to the given company for all cases that have no company.
+        This makes assignments show under that company in the admin list (company filter).
+        Does not duplicate records; only updates existing relocation_cases rows.
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id FROM companies WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) LIMIT 1"),
+                {"name": company_name},
+            ).fetchone()
+        if not row:
+            return {"ok": False, "error": f"Company '{company_name}' not found", "cases_updated": 0}
+        test_company_id = row._mapping["id"]
+        with self.engine.begin() as conn:
+            if _is_sqlite:
+                result = conn.execute(
+                    text(
+                        "UPDATE relocation_cases SET company_id = :cid "
+                        "WHERE company_id IS NULL OR TRIM(COALESCE(company_id, '')) = ''"
+                    ),
+                    {"cid": test_company_id},
+                )
+            else:
+                result = conn.execute(
+                    text(
+                        "UPDATE relocation_cases SET company_id = :cid "
+                        "WHERE company_id IS NULL OR TRIM(COALESCE(company_id, '')) = ''"
+                    ),
+                    {"cid": test_company_id},
+                )
+        updated = result.rowcount if hasattr(result, "rowcount") else 0
+        log.info(
+            "backfill_assignments_to_test_company: company=%s company_id=%s cases_updated=%s",
+            company_name,
+            test_company_id,
+            updated,
+        )
+        return {
+            "ok": True,
+            "company_id": test_company_id,
+            "company_name": company_name,
+            "cases_updated": updated,
+        }
+
+    def ensure_test_company_has_hr_user(self, company_name: str = "Test company") -> Dict[str, Any]:
+        """
+        Ensure the Test company has at least one HR user so the admin console is usable.
+        Only adds an hr_users row when inferable: pick one profile linked to Test company with role ADMIN.
+        Non-destructive: does not overwrite or remove existing hr_users.
+        Returns: ok, hr_added, profile_id, ambiguous_reason.
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id FROM companies WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) LIMIT 1"),
+                {"name": company_name},
+            ).fetchone()
+        if not row:
+            return {"ok": False, "hr_added": False, "ambiguous_reason": f"Company '{company_name}' not found"}
+        test_company_id = row._mapping["id"]
+        with self.engine.connect() as conn:
+            count = conn.execute(
+                text("SELECT COUNT(*) AS n FROM hr_users WHERE company_id = :cid"),
+                {"cid": test_company_id},
+            ).fetchone()
+        hr_count = count._mapping["n"] if count else 0
+        if hr_count >= 1:
+            return {"ok": True, "hr_added": False, "profile_id": None, "ambiguous_reason": None}
+        with self.engine.connect() as conn:
+            candidates = conn.execute(
+                text(
+                    "SELECT id, email, full_name FROM profiles "
+                    "WHERE company_id = :cid AND TRIM(COALESCE(role, '')) = 'ADMIN' "
+                    "ORDER BY email ASC LIMIT 2"
+                ),
+                {"cid": test_company_id},
+            ).fetchall()
+        if not candidates:
+            return {
+                "ok": False,
+                "hr_added": False,
+                "profile_id": None,
+                "ambiguous_reason": "No ADMIN profile linked to Test company; cannot infer HR user",
+            }
+        profile_id = candidates[0]._mapping["id"]
+        hr_id = str(uuid.uuid4())
+        self.create_hr_user(hr_id, test_company_id, profile_id, None)
+        log.info(
+            "ensure_test_company_has_hr_user: company=%s profile_id=%s (inferred from ADMIN)",
+            company_name,
+            profile_id,
+        )
+        return {
+            "ok": True,
+            "hr_added": True,
+            "profile_id": profile_id,
+            "ambiguous_reason": None,
+        }
 
     def add_admin_allowlist(self, email: str, added_by_user_id: Optional[str]) -> None:
         now = datetime.utcnow().isoformat()
@@ -4759,15 +5142,18 @@ class Database:
         hr_profile_id: Optional[str] = None,
         last_error_code: Optional[str] = None,
         last_error_context: Optional[Dict[str, Any]] = None,
+        priority: Optional[str] = None,
+        assignee_id: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
+        prio = (priority or "medium").lower() if priority else "medium"
         with self.engine.begin() as conn:
             conn.execute(text(
                 "INSERT INTO support_cases "
-                "(id, company_id, created_by_profile_id, employee_id, hr_profile_id, category, severity, status, summary, last_error_code, last_error_context_json, created_at, updated_at) "
-                "VALUES (:id, :cid, :cbp, :eid, :hid, :cat, :sev, :status, :summary, :err, :ctx, :created_at, :updated_at) "
+                "(id, company_id, created_by_profile_id, employee_id, hr_profile_id, category, severity, status, summary, last_error_code, last_error_context_json, created_at, updated_at, priority, assignee_id) "
+                "VALUES (:id, :cid, :cbp, :eid, :hid, :cat, :sev, :status, :summary, :err, :ctx, :created_at, :updated_at, :priority, :assignee_id) "
                 "ON CONFLICT(id) DO UPDATE SET company_id = excluded.company_id, status = excluded.status, summary = excluded.summary, "
-                "last_error_code = excluded.last_error_code, last_error_context_json = excluded.last_error_context_json, updated_at = excluded.updated_at"
+                "last_error_code = excluded.last_error_code, last_error_context_json = excluded.last_error_context_json, updated_at = excluded.updated_at, priority = excluded.priority, assignee_id = excluded.assignee_id"
             ), {
                 "id": support_case_id,
                 "cid": company_id,
@@ -4782,6 +5168,8 @@ class Database:
                 "ctx": json.dumps(last_error_context or {}),
                 "created_at": now,
                 "updated_at": now,
+                "priority": prio,
+                "assignee_id": assignee_id,
             })
 
     def list_employees(self, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -4880,6 +5268,22 @@ class Database:
                 rows = conn.execute(text("SELECT * FROM hr_users ORDER BY created_at DESC")).fetchall()
         return self._rows_to_list(rows)
 
+    def list_hr_users_with_profiles(self, company_id: str) -> List[Dict[str, Any]]:
+        """HR users for company with name, email, status from profiles. For admin company detail."""
+        sql = """
+            SELECT hu.id, hu.company_id, hu.profile_id, hu.created_at,
+                   COALESCE(p.full_name, p.email, hu.profile_id) AS name,
+                   p.email AS email,
+                   COALESCE(p.status, 'active') AS status
+            FROM hr_users hu
+            LEFT JOIN profiles p ON p.id = hu.profile_id
+            WHERE hu.company_id = :cid
+            ORDER BY hu.created_at DESC
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), {"cid": company_id}).fetchall()
+        return self._rows_to_list(rows)
+
     def list_relocation_cases(self, company_id: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
         params: Dict[str, Any] = {}
         clauses = []
@@ -4909,6 +5313,7 @@ class Database:
         status: Optional[str] = None,
         severity: Optional[str] = None,
         company_id: Optional[str] = None,
+        priority: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         params: Dict[str, Any] = {}
         clauses = []
@@ -4921,12 +5326,58 @@ class Database:
         if company_id:
             clauses.append("company_id = :cid")
             params["cid"] = company_id
+        if priority:
+            clauses.append("priority = :priority")
+            params["priority"] = priority
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         with self.engine.connect() as conn:
             rows = conn.execute(text(
                 f"SELECT * FROM support_cases {where} ORDER BY updated_at DESC"
             ), params).fetchall()
         return self._rows_to_list(rows)
+
+    def update_support_case(
+        self,
+        support_case_id: str,
+        *,
+        priority: Optional[str] = None,
+        status: Optional[str] = None,
+        assignee_id: Optional[str] = None,
+        category: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Update ticket fields: priority (low|medium|high|urgent), status (open|investigating|blocked|resolved), assignee_id, category."""
+        updates = []
+        params: Dict[str, Any] = {"id": support_case_id, "now": datetime.utcnow().isoformat()}
+        if priority is not None:
+            updates.append("priority = :priority")
+            params["priority"] = priority
+        if status is not None:
+            updates.append("status = :status")
+            params["status"] = status
+        if assignee_id is not None:
+            updates.append("assignee_id = :assignee_id")
+            params["assignee_id"] = assignee_id
+        if category is not None:
+            updates.append("category = :category")
+            params["category"] = category
+        if not updates:
+            return self.get_support_case(support_case_id)
+        updates.append("updated_at = :now")
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE support_cases SET {', '.join(updates)} WHERE id = :id"),
+                params,
+            )
+        return self.get_support_case(support_case_id)
+
+    def get_support_case(self, support_case_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single support case by id."""
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM support_cases WHERE id = :id"),
+                {"id": support_case_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
 
     def add_support_note(self, support_case_id: str, author_user_id: str, note: str) -> None:
         now = datetime.utcnow().isoformat()
@@ -5055,6 +5506,7 @@ class Database:
                 MAX(m.created_at) AS last_message_at,
                 COUNT(*) AS message_count,
                 (SELECT body FROM messages m2 WHERE m2.assignment_id = m.assignment_id ORDER BY m2.created_at DESC LIMIT 1) AS last_body,
+                (SELECT COUNT(*) FROM messages m3 WHERE m3.assignment_id = m.assignment_id AND m3.read_at IS NULL) AS unread_count,
                 MAX(c.name) AS company_name,
                 MAX(rc.company_id) AS case_company_id,
                 MAX(hu.company_id) AS hr_company_id,
@@ -5090,6 +5542,7 @@ class Database:
             emp_name = r.get("employee_full_name") or r.get("employee_identifier") or "—"
             hr_name = r.get("hr_full_name") or "—"
             parts = [p for p in [hr_name, emp_name] if p and p != "—"]
+            unread = int(r.get("unread_count") or 0)
             out.append({
                 "thread_id": aid,
                 "thread_type": "hr_employee",
@@ -5107,6 +5560,8 @@ class Database:
                 "last_message_preview": last_body,
                 "last_message_at": r.get("last_message_at"),
                 "message_count": r.get("message_count", 0),
+                "unread_count": unread,
+                "has_unread": unread > 0,
                 "status": r.get("assignment_status"),
             })
         return out
@@ -5392,14 +5847,17 @@ class Database:
         file_url: str,
         file_type: str,
         created_by: Optional[str],
+        template_source: str = "company_uploaded",
+        template_name: Optional[str] = None,
+        is_default_template: bool = False,
     ) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             conn.execute(
                 text(
                     "INSERT INTO company_policies "
-                    "(id, company_id, title, version, effective_date, file_url, file_type, extraction_status, created_by, created_at) "
-                    "VALUES (:id, :cid, :title, :ver, :ed, :url, :ft, :status, :cb, :ca)"
+                    "(id, company_id, title, version, effective_date, file_url, file_type, extraction_status, created_by, created_at, template_source, template_name, is_default_template) "
+                    "VALUES (:id, :cid, :title, :ver, :ed, :url, :ft, :status, :cb, :ca, :tsrc, :tname, :isdef)"
                 ),
                 {
                     "id": policy_id,
@@ -5412,6 +5870,9 @@ class Database:
                     "status": "pending",
                     "cb": created_by,
                     "ca": now,
+                    "tsrc": template_source,
+                    "tname": template_name,
+                    "isdef": 1 if is_default_template else 0,
                 },
             )
 
@@ -5441,7 +5902,7 @@ class Database:
                 (SELECT cp.id FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_id,
                 (SELECT cp.title FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_title,
                 (SELECT cp.extraction_status FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS extraction_status,
-                (SELECT cp.updated_at FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_updated_at,
+                (SELECT cp.created_at FROM company_policies cp WHERE cp.company_id = c.id ORDER BY cp.created_at DESC LIMIT 1) AS policy_updated_at,
                 (SELECT COUNT(*) FROM policy_documents pd WHERE pd.company_id = c.id) AS doc_count,
                 (SELECT COUNT(*) FROM policy_versions pv
                  JOIN company_policies cp2 ON cp2.id = pv.policy_id WHERE cp2.company_id = c.id) AS version_count,
@@ -5514,6 +5975,9 @@ class Database:
                 "published_at": published.get("updated_at") if published else None,
                 "latest_version_status": latest.get("status") if latest else None,
                 "latest_version_number": latest.get("version_number") if latest else None,
+                "template_source": cp.get("template_source") or "company_uploaded",
+                "template_name": cp.get("template_name"),
+                "is_default_template": bool(cp.get("is_default_template")),
             })
         return {
             "company_id": company_id,
@@ -5540,6 +6004,125 @@ class Database:
         out["published_version_id"] = published.get("id") if published else None
         out["published_at"] = published.get("updated_at") if published else None
         return out
+
+    def list_default_policy_templates(self) -> List[Dict[str, Any]]:
+        """List platform default policy templates (for admin UI)."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT id, template_name, version, status, is_default_template, snapshot_json, created_at, updated_at "
+                    "FROM default_policy_templates ORDER BY is_default_template DESC, created_at ASC"
+                ),
+                {},
+            ).fetchall()
+        items = self._rows_to_list(rows)
+        for d in items:
+            self._parse_json_col(d, "snapshot_json")
+            if d.get("is_default_template") is not None and not isinstance(d["is_default_template"], bool):
+                d["is_default_template"] = bool(d["is_default_template"])
+        return items
+
+    def get_default_policy_template(self, template_id: str) -> Optional[Dict[str, Any]]:
+        """Get one default policy template by id."""
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM default_policy_templates WHERE id = :id"),
+                {"id": template_id},
+            ).fetchone()
+        if not row:
+            return None
+        d = self._row_to_dict(row)
+        self._parse_json_col(d, "snapshot_json")
+        if d.get("is_default_template") is not None and not isinstance(d["is_default_template"], bool):
+            d["is_default_template"] = bool(d["is_default_template"])
+        return d
+
+    def apply_default_template_to_company(
+        self,
+        company_id: str,
+        template_id: str,
+        overwrite_existing: bool = False,
+        created_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a company policy from a default template and one policy_version + benefit_rules.
+        Does not overwrite existing company policies unless overwrite_existing=True (then we still only add, never delete).
+        Returns the new policy_id and version_id.
+        """
+        template = self.get_default_policy_template(template_id)
+        if not template:
+            return {"ok": False, "error": "Template not found", "policy_id": None}
+        snapshot = template.get("snapshot_json") or {}
+        if isinstance(snapshot, str):
+            try:
+                snapshot = json.loads(snapshot)
+            except Exception:
+                snapshot = {}
+        template_name = template.get("template_name") or "Platform default"
+        version_label = template.get("version") or "1.0"
+        effective_date = (snapshot.get("effectiveDate") or "")[:10] if isinstance(snapshot.get("effectiveDate"), str) else None
+        if not overwrite_existing:
+            existing = self.list_company_policies(company_id)
+            if existing:
+                has_custom = any((p.get("template_source") or "company_uploaded") == "company_uploaded" for p in existing)
+                if has_custom:
+                    return {"ok": False, "error": "Company already has a custom uploaded policy; use overwrite_existing to add template anyway", "policy_id": None}
+        policy_id = str(uuid.uuid4())
+        file_url = ""
+        file_type = "application/json"
+        self.create_company_policy(
+            policy_id=policy_id,
+            company_id=company_id,
+            title=template_name,
+            version=version_label,
+            effective_date=effective_date,
+            file_url=file_url,
+            file_type=file_type,
+            created_by=created_by,
+            template_source="default_platform_template",
+            template_name=template_name,
+            is_default_template=False,
+        )
+        self.update_company_policy_status(policy_id, "extracted", datetime.utcnow().isoformat())
+        version_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO policy_versions
+                    (id, policy_id, source_policy_document_id, version_number, status,
+                     auto_generated, review_status, confidence, created_by, created_at, updated_at)
+                    VALUES (:id, :pid, NULL, 1, 'draft', 1, 'accepted', NULL, :cb, :now, :now)
+                """),
+                {"id": version_id, "pid": policy_id, "cb": created_by, "now": now},
+            )
+        benefit_rules = snapshot.get("benefit_rules") or []
+        for br in benefit_rules:
+            if not isinstance(br, dict):
+                continue
+            rule_id = str(uuid.uuid4())
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO policy_benefit_rules
+                        (id, policy_version_id, benefit_key, benefit_category, calc_type, amount_value, amount_unit, currency,
+                         description, metadata_json, auto_generated, review_status, created_at, updated_at)
+                        VALUES (:id, :vid, :bk, :cat, :ct, :av, :au, :cur, :desc, '{}', 1, 'accepted', :now, :now)
+                    """),
+                    {
+                        "id": rule_id,
+                        "vid": version_id,
+                        "bk": br.get("benefit_key") or "",
+                        "cat": br.get("benefit_category") or "",
+                        "ct": br.get("calc_type"),
+                        "av": br.get("amount_value"),
+                        "au": br.get("amount_unit"),
+                        "cur": br.get("currency"),
+                        "desc": br.get("description"),
+                        "now": now,
+                    },
+                )
+        return {"ok": True, "policy_id": policy_id, "version_id": version_id}
 
     # -------------------------------------------------------------------------
     # Admin read model: normalized indexes and data-integrity
@@ -5601,6 +6184,46 @@ class Database:
                             })
                 except Exception as e:
                     log.warning("admin_company_index: orphan lookup %s.%s failed: %s", table, col, e)
+
+            # Enrich each row with hr_users_count, employee_count, assignments_count, primary_contact_name
+            if result:
+                ids = [r["id"] for r in result]
+                unions = " UNION ALL ".join([f"SELECT :id{i} AS id" for i in range(len(ids))])
+                params_agg = {f"id{i}": ids[i] for i in range(len(ids))}
+                agg_sql = f"""
+                SELECT v.id,
+                    (SELECT COUNT(*) FROM hr_users hu WHERE hu.company_id = v.id) AS hr_users_count,
+                    (SELECT COUNT(*) FROM employees e WHERE e.company_id = v.id) AS employee_count,
+                    (SELECT COUNT(*) FROM case_assignments a
+                     LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                     LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                     WHERE (rc.company_id = v.id OR (rc.company_id IS NULL AND hu.company_id = v.id))) AS assignments_count,
+                    COALESCE(
+                        (SELECT TRIM(c.hr_contact) FROM companies c WHERE c.id = v.id AND c.hr_contact IS NOT NULL AND TRIM(c.hr_contact) <> ''),
+                        (SELECT COALESCE(p.full_name, p.email) FROM hr_users hu2
+                         JOIN profiles p ON p.id = hu2.profile_id
+                         WHERE hu2.company_id = v.id
+                         ORDER BY hu2.created_at
+                         LIMIT 1)
+                    ) AS primary_contact_name
+                FROM ({unions}) v
+                """
+                try:
+                    agg_rows = conn.execute(text(agg_sql), params_agg).fetchall()
+                    by_id = {row._mapping["id"]: dict(row._mapping) for row in agg_rows}
+                    for r in result:
+                        agg = by_id.get(r["id"]) or {}
+                        r["hr_users_count"] = agg.get("hr_users_count") or 0
+                        r["employee_count"] = agg.get("employee_count") or 0
+                        r["assignments_count"] = agg.get("assignments_count") or 0
+                        r["primary_contact_name"] = agg.get("primary_contact_name")
+                except Exception as e:
+                    log.warning("admin_company_index: enrich counts failed: %s", e)
+                    for r in result:
+                        r["hr_users_count"] = 0
+                        r["employee_count"] = 0
+                        r["assignments_count"] = 0
+                        r["primary_contact_name"] = None
         return result
 
     def get_admin_people_index(

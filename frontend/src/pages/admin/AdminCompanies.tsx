@@ -115,93 +115,120 @@ export const AdminCompanies: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="space-y-2">
-            {companies.map((c) => (
-              <div
-                key={c.id}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e2e8f0] py-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {canEdit(c) && editingId === c.id ? (
-                      <input
-                        value={editDraft.name !== undefined ? editDraft.name : c.name}
-                        onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
-                        className="rounded border border-[#d1d5db] px-2 py-1 text-sm font-medium w-48"
-                        placeholder="Company name"
-                      />
-                    ) : canEdit(c) ? (
-                      <Link to={`/admin/companies/${c.id}`} className="font-medium text-[#0b2b43] hover:underline">
-                        {c.name}
-                      </Link>
-                    ) : (
-                      <span className="font-medium text-[#0b2b43]">{c.name}</span>
-                    )}
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        statusLabel(c) === 'inactive' || statusLabel(c) === 'archived'
-                          ? 'bg-gray-100 text-gray-700'
-                          : 'bg-green-100 text-green-800'
-                      }`}
-                    >
-                      {statusLabel(c)}
-                    </span>
-                    {c.missing_from_companies_table ? (
-                      <span className="text-xs text-amber-600">Not in registry</span>
-                    ) : null}
-                  </div>
-                  <div className="text-xs text-[#6b7280] mt-0.5">
-                    {editingId === c.id ? (
-                      <input
-                        value={editDraft.country !== undefined ? editDraft.country : (c.country || '')}
-                        onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
-                        className="rounded border border-[#d1d5db] px-2 py-0.5 text-xs w-32"
-                        placeholder="Country"
-                      />
-                    ) : (
-                      <>{c.country || '—'} · {c.size_band || '—'}</>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {canEdit(c) && (
-                    <>
-                      <select
-                        value={editingId === c.id && editDraft.plan_tier !== undefined ? editDraft.plan_tier : planTier(c)}
-                        onChange={(e) => {
-                          if (editingId !== c.id) setEditingId(c.id);
-                          setEditDraft((d) => ({ ...d, plan_tier: e.target.value as CompanyPlanTier }));
-                        }}
-                        className="rounded border border-[#d1d5db] px-2 py-1 text-sm"
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280] font-medium">
+                  <th className="py-2 pr-4">Company name</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Plan</th>
+                  <th className="py-2 pr-4">Country</th>
+                  <th className="py-2 pr-4">Size band</th>
+                  <th className="py-2 pr-4 text-right">HR users</th>
+                  <th className="py-2 pr-4 text-right">Employees</th>
+                  <th className="py-2 pr-4 text-right">Cases</th>
+                  <th className="py-2 pr-4">Contact person</th>
+                  <th className="py-2 pl-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {companies.map((c) => (
+                  <tr key={c.id} className="border-b border-[#e2e8f0]">
+                    <td className="py-3 pr-4">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {canEdit(c) && editingId === c.id ? (
+                          <input
+                            value={editDraft.name !== undefined ? editDraft.name : c.name}
+                            onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                            className="rounded border border-[#d1d5db] px-2 py-1 text-sm font-medium w-48"
+                            placeholder="Company name"
+                          />
+                        ) : canEdit(c) ? (
+                          <Link to={`/admin/companies/${c.id}`} className="font-medium text-[#0b2b43] hover:underline">
+                            {c.name}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-[#0b2b43]">{c.name}</span>
+                        )}
+                        {c.missing_from_companies_table ? (
+                          <span className="text-xs text-amber-600">Not in registry</span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          statusLabel(c) === 'inactive' || statusLabel(c) === 'archived'
+                            ? 'bg-gray-100 text-gray-700'
+                            : 'bg-green-100 text-green-800'
+                        }`}
                       >
-                        {PLAN_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
+                        {statusLabel(c)}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4">
+                      {canEdit(c) && (
+                        <select
+                          value={editingId === c.id && editDraft.plan_tier !== undefined ? editDraft.plan_tier : planTier(c)}
+                          onChange={(e) => {
+                            if (editingId !== c.id) setEditingId(c.id);
+                            setEditDraft((d) => ({ ...d, plan_tier: e.target.value as CompanyPlanTier }));
+                          }}
+                          className="rounded border border-[#d1d5db] px-2 py-1 text-sm"
+                        >
+                          {PLAN_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      )}
+                      {!canEdit(c) && <span className="text-[#374151]">{planTier(c)}</span>}
+                    </td>
+                    <td className="py-3 pr-4 text-[#374151]">
                       {editingId === c.id ? (
-                        <>
-                          <Button size="sm" onClick={() => handleSave(c.id)} disabled={savingId === c.id}>
-                            {savingId === c.id ? 'Saving…' : 'Save'}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditDraft({}); }}>
-                            Cancel
-                          </Button>
-                        </>
+                        <input
+                          value={editDraft.country !== undefined ? editDraft.country : (c.country || '')}
+                          onChange={(e) => setEditDraft((d) => ({ ...d, country: e.target.value }))}
+                          className="rounded border border-[#d1d5db] px-2 py-0.5 text-xs w-28"
+                          placeholder="Country"
+                        />
                       ) : (
-                        <Button size="sm" variant="outline" onClick={() => setEditingId(c.id)}>
-                          Edit
-                        </Button>
+                        c.country || '—'
                       )}
-                      {(c.status || 'active').toLowerCase() === 'active' && (
-                        <Button size="sm" variant="outline" onClick={() => handleDeactivate(c)}>
-                          Deactivate
-                        </Button>
+                    </td>
+                    <td className="py-3 pr-4 text-[#374151]">{c.size_band || '—'}</td>
+                    <td className="py-3 pr-4 text-right text-[#374151] tabular-nums">{c.hr_users_count ?? 0}</td>
+                    <td className="py-3 pr-4 text-right text-[#374151] tabular-nums">{c.employee_count ?? 0}</td>
+                    <td className="py-3 pr-4 text-right text-[#374151] tabular-nums">{c.assignments_count ?? 0}</td>
+                    <td className="py-3 pr-4 text-[#374151]">{c.primary_contact_name ?? '—'}</td>
+                    <td className="py-3 pl-2">
+                      {canEdit(c) && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {editingId === c.id ? (
+                            <>
+                              <Button size="sm" onClick={() => handleSave(c.id)} disabled={savingId === c.id}>
+                                {savingId === c.id ? 'Saving…' : 'Save'}
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditDraft({}); }}>
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => setEditingId(c.id)}>
+                              Edit
+                            </Button>
+                          )}
+                          {(c.status || 'active').toLowerCase() === 'active' && (
+                            <Button size="sm" variant="outline" onClick={() => handleDeactivate(c)}>
+                              Deactivate
+                            </Button>
+                          )}
+                        </div>
                       )}
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>

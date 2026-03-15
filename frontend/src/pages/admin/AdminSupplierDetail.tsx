@@ -321,10 +321,12 @@ export const AdminSupplierDetail: React.FC = () => {
         )}
 
         {supplier.capabilities && supplier.capabilities.length > 0 && (
-          <Card padding="lg">
-            <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Coverage</h2>
-            <CoverageSummary capabilities={supplier.capabilities} />
-          </Card>
+          <div id="coverage">
+            <Card padding="lg">
+              <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Coverage</h2>
+              <CoverageSummary capabilities={supplier.capabilities} />
+            </Card>
+          </div>
         )}
 
         <Card padding="lg">

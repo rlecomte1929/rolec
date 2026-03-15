@@ -28,7 +28,6 @@ import { AdminCompanies } from './pages/admin/AdminCompanies';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminAssignments } from './pages/admin/AdminAssignments';
 import { AdminMessages } from './pages/admin/AdminMessages';
-import { AdminReconciliation } from './pages/admin/AdminReconciliation';
 import { AdminSuppliers } from './pages/admin/AdminSuppliers';
 import { AdminSupplierNew } from './pages/admin/AdminSupplierNew';
 import { AdminSupplierDetail } from './pages/admin/AdminSupplierDetail';
@@ -58,8 +57,6 @@ import { AdminCrawlJobRunDetail } from './pages/admin/freshness/AdminCrawlJobRun
 import { AdminReviewQueuePage } from './pages/admin/review-queue/AdminReviewQueuePage';
 import { AdminReviewQueueDetailPage } from './pages/admin/review-queue/AdminReviewQueueDetailPage';
 import { AdminReviewQueueWorkloadPage } from './pages/admin/review-queue/AdminReviewQueueWorkloadPage';
-import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage';
-import { AdminNotificationDetailPage } from './pages/admin/AdminNotificationDetailPage';
 import { AdminOpsSlaPage } from './pages/admin/ops/AdminOpsSlaPage';
 import { AdminOpsQueuePage } from './pages/admin/ops/AdminOpsQueuePage';
 import { AdminOpsReviewersPage } from './pages/admin/ops/AdminOpsReviewersPage';
@@ -178,7 +175,6 @@ function App() {
         <Route path={ROUTE_DEFS.adminAssignments.path} element={<RequireAdminRoute><AdminAssignments /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPolicies.path} element={<RequireAdminRoute><AdminPoliciesPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminMessages.path} element={<RequireAdminRoute><AdminMessages /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminReconciliation.path} element={<RequireAdminRoute><AdminReconciliation /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResearch.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminOverview.path} replace /></RequireAdminRoute>} />
         <Route path="/admin/companies/:companyId" element={<RequireAdminRoute><AdminCompanyDetail /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminUsers.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminPeople.path} replace /></RequireAdminRoute>} />
@@ -212,8 +208,6 @@ function App() {
         <Route path={ROUTE_DEFS.adminReviewQueue.path} element={<RequireAdminRoute><AdminReviewQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueWorkload.path} element={<RequireAdminRoute><AdminReviewQueueWorkloadPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueDetail.path} element={<RequireAdminRoute><AdminReviewQueueDetailPage /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminNotifications.path} element={<RequireAdminRoute><AdminNotificationsPage /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminNotificationDetail.path} element={<RequireAdminRoute><AdminNotificationDetailPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsSla.path} element={<RequireAdminRoute><AdminOpsSlaPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsQueue.path} element={<RequireAdminRoute><AdminOpsQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsReviewers.path} element={<RequireAdminRoute><AdminOpsReviewersPage /></RequireAdminRoute>} />

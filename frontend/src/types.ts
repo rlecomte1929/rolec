@@ -682,6 +682,16 @@ export interface AdminCompany {
   hr_seat_limit?: number | null;
   employee_seat_limit?: number | null;
   missing_from_companies_table?: number;
+  /** Company id exists in hr_users/relocation_cases but not in companies table (detail endpoint) */
+  missing_from_registry?: boolean;
+  /** From admin companies list: number of people linked with role HR */
+  hr_users_count?: number;
+  /** From admin companies list: number of people linked as employees */
+  employee_count?: number;
+  /** From admin companies list: number of assignments/cases linked to company */
+  assignments_count?: number;
+  /** Primary HR contact name, or first HR user, or null */
+  primary_contact_name?: string | null;
 }
 
 export interface AdminProfile {
@@ -708,6 +718,9 @@ export interface AdminEmployee {
   relocation_case_id?: string;
   status?: string;
   created_at: string;
+  /** Resolved from profile (company detail endpoint) */
+  name?: string;
+  email?: string;
 }
 
 /** HR company-scoped employee (with profile display fields) */
@@ -731,6 +744,10 @@ export interface AdminHrUser {
   profile_id: string;
   permissions_json?: string;
   created_at: string;
+  /** Resolved from profile (company detail endpoint) */
+  name?: string;
+  email?: string;
+  status?: string;
 }
 
 export interface AdminRelocationCase {
@@ -743,6 +760,36 @@ export interface AdminRelocationCase {
   home_country?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+/** Assignment row for admin company detail (with employee_name, destination) */
+export interface AdminCompanyDetailAssignment {
+  id: string;
+  employee_name?: string;
+  destination?: string;
+  status?: string;
+}
+
+/** Policy row for admin company detail */
+export interface AdminCompanyDetailPolicy {
+  policy_id: string;
+  title?: string;
+  latest_version?: number;
+  status?: string;
+  published: boolean;
+}
+
+export interface AdminCompanyDetailCounts {
+  hr_users_count: number;
+  employees_count: number;
+  assignments_count: number;
+  policies_count: number;
+}
+
+export interface AdminCompanyDetailOrphanDiagnostics {
+  assignments_case_missing_company_id?: number;
+  hr_users_missing_profile?: number;
+  employees_missing_profile?: number;
 }
 
 export interface AdminAssignment {
@@ -780,6 +827,11 @@ export interface AdminAssignment {
   destination_from_profile?: string;
   policy_resolved?: boolean;
   company_has_policy?: boolean;
+  /** Normalized from backend list */
+  assignment_id?: string;
+  destination_country?: string;
+  /** True when assignment has no employee_user_id and no employee_identifier */
+  orphan_employee?: boolean;
 }
 
 export interface AdminPolicyCompany {
@@ -808,6 +860,10 @@ export interface AdminPolicySummary {
   published_at?: string | null;
   latest_version_status?: string | null;
   latest_version_number?: number | null;
+  /** 'default_platform_template' | 'company_uploaded' */
+  template_source?: string;
+  template_name?: string | null;
+  is_default_template?: boolean;
 }
 
 /** Response from GET /api/admin/policies?company_id= */
@@ -816,6 +872,23 @@ export interface AdminPoliciesByCompany {
   company_name?: string;
   source_document_count: number;
   policies: AdminPolicySummary[];
+}
+
+/** Default platform policy template (admin) */
+export interface AdminPolicyTemplate {
+  id: string;
+  template_name: string;
+  version: string;
+  status: string;
+  is_default_template?: boolean;
+  snapshot_json?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Response from GET /api/admin/policies/templates */
+export interface AdminPolicyTemplatesResponse {
+  templates: AdminPolicyTemplate[];
 }
 
 /** Policy version from admin versions list */
@@ -872,6 +945,10 @@ export interface AdminSupportCase {
   last_error_context_json?: string;
   created_at: string;
   updated_at: string;
+  /** Ticket priority: low | medium | high | urgent */
+  priority?: string;
+  /** Profile ID of assigned admin/HR */
+  assignee_id?: string | null;
 }
 
 export interface AdminSupportNote {

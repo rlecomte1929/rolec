@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { AdminNotificationBadge } from '../../components/admin/AdminNotificationBadge';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 
 const SHOW_RESOURCES_NAV = true;
@@ -30,16 +29,10 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
     { to: buildRoute('adminPolicies'), label: 'Policies', path: ROUTE_DEFS.adminPolicies.path },
     { to: buildRoute('adminSuppliers'), label: 'Suppliers', path: ROUTE_DEFS.adminSuppliers.path },
     { to: buildRoute('adminMessages'), label: 'Messages', path: ROUTE_DEFS.adminMessages.path },
-    { to: buildRoute('adminReconciliation'), label: 'Reconciliation', path: ROUTE_DEFS.adminReconciliation.path },
   ];
   if (SHOW_RESOURCES_NAV) {
     navItems.push({ to: buildRoute('adminResources'), label: 'Resources', path: ROUTE_DEFS.adminResources.path });
   }
-  navItems.push({
-    to: buildRoute('adminNotifications'),
-    label: 'Notifications',
-    path: ROUTE_DEFS.adminNotifications.path,
-  });
 
   return (
     <AppShell>
@@ -50,19 +43,9 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
             (pathToCheck === '/admin' ? isActive('/admin', true) : isActive(pathToCheck)) ||
             (pathToCheck === '/admin/suppliers' && isActive('/admin/suppliers/')) ||
             (pathToCheck === '/admin/resources' && (isActive('/admin/resources/') || isActive('/admin/events')));
-          const isNotifications = label === 'Notifications';
           return (
             <Link key={label} to={to} className={navLinkClass(active)}>
-              {isNotifications ? (
-                <span className="flex items-center gap-1">
-                  {label}
-                  <span className="flex shrink-0">
-                    <AdminNotificationBadge />
-                  </span>
-                </span>
-              ) : (
-                label
-              )}
+              {label}
             </Link>
           );
         })}

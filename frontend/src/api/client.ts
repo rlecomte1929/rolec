@@ -28,11 +28,16 @@ import type {
   HrCompanyEmployee,
   AdminRelocationCase,
   AdminAssignment,
+  AdminCompanyDetailAssignment,
+  AdminCompanyDetailPolicy,
+  AdminCompanyDetailCounts,
+  AdminCompanyDetailOrphanDiagnostics,
   AdminAssignmentDetail,
   AdminPolicyCompany,
   AdminPoliciesByCompany,
   AdminPolicyDetail,
   AdminPolicyVersion,
+  AdminPolicyTemplatesResponse,
   AdminSupportCase,
   AdminSupportNote,
   CompanyProfilePayload,
@@ -485,7 +490,15 @@ export const adminAPI = {
     const response = await api.get('/api/admin/companies', { params: { q } });
     return response.data;
   },
-  getCompanyDetail: async (companyId: string): Promise<{ company: AdminCompany | null; hr_users: AdminHrUser[]; employees: AdminEmployee[]; policies: any[] }> => {
+  getCompanyDetail: async (companyId: string): Promise<{
+    company: AdminCompany | null;
+    hr_users: AdminHrUser[];
+    employees: AdminEmployee[];
+    assignments: AdminCompanyDetailAssignment[];
+    policies: AdminCompanyDetailPolicy[];
+    counts_summary: AdminCompanyDetailCounts;
+    orphan_diagnostics: AdminCompanyDetailOrphanDiagnostics;
+  }> => {
     const response = await api.get(`/api/admin/companies/${companyId}`);
     return response.data;
   },
@@ -594,6 +607,14 @@ export const adminAPI = {
     const response = await api.patch(`/api/admin/assignments/${assignmentId}/fix-company-linkage`, payload);
     return response.data;
   },
+  updateAssignmentStatus: async (assignmentId: string, payload: { status: string }) => {
+    const response = await api.patch(`/api/admin/assignments/${assignmentId}/status`, payload);
+    return response.data;
+  },
+  createAssignment: async (payload: { company_id: string; hr_user_id: string; employee_identifier?: string }) => {
+    const response = await api.post('/api/admin/assignments', payload);
+    return response.data;
+  },
   listPolicyOverview: async (params?: { company_id?: string }): Promise<{ companies: AdminPolicyCompany[] }> => {
     const response = await api.get('/api/admin/policies/overview', { params });
     return response.data;
@@ -617,8 +638,30 @@ export const adminAPI = {
     const response = await api.patch(`/api/admin/policies/${policyId}`, payload);
     return response.data;
   },
-  listSupportCases: async (params?: { status?: string; severity?: string; company_id?: string }): Promise<{ support_cases: AdminSupportCase[] }> => {
+  listAdminPolicyTemplates: async (): Promise<AdminPolicyTemplatesResponse> => {
+    const response = await api.get('/api/admin/policies/templates');
+    return response.data;
+  },
+  applyDefaultTemplateToCompany: async (
+    companyId: string,
+    opts?: { template_id?: string; overwrite_existing?: boolean }
+  ): Promise<{ ok: boolean; policy_id?: string; version_id?: string; error?: string }> => {
+    const response = await api.post('/api/admin/policies/apply-default-template', {
+      company_id: companyId,
+      template_id: opts?.template_id,
+      overwrite_existing: opts?.overwrite_existing ?? false,
+    });
+    return response.data;
+  },
+  listSupportCases: async (params?: { status?: string; severity?: string; company_id?: string; priority?: string }): Promise<{ support_cases: AdminSupportCase[] }> => {
     const response = await api.get('/api/admin/support-cases', { params });
+    return response.data;
+  },
+  patchSupportCase: async (
+    caseId: string,
+    payload: { priority?: string; status?: string; assignee_id?: string | null; category?: string }
+  ): Promise<AdminSupportCase> => {
+    const response = await api.patch(`/api/admin/support-cases/${caseId}`, payload);
     return response.data;
   },
   listMessageThreads: async (params?: {

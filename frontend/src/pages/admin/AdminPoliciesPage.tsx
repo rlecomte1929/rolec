@@ -9,6 +9,7 @@ import type {
   AdminPolicySummary,
   AdminPolicyDetail,
   AdminPolicyVersion,
+  AdminPolicyTemplate,
 } from '../../types';
 import { buildRoute } from '../../navigation/routes';
 
@@ -51,6 +52,8 @@ export const AdminPoliciesPage: React.FC = () => {
   const [editDetail, setEditDetail] = useState<AdminPolicyDetail | null>(null);
   const [editForm, setEditForm] = useState<{ title: string; version: string; effective_date: string }>({ title: '', version: '', effective_date: '' });
   const [saving, setSaving] = useState(false);
+  const [templates, setTemplates] = useState<AdminPolicyTemplate[]>([]);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
 
   const loadCompanies = useCallback(async () => {
     const res = await adminAPI.listCompanies();
@@ -79,12 +82,41 @@ export const AdminPoliciesPage: React.FC = () => {
     loadCompanies().catch(() => undefined);
   }, [loadCompanies]);
 
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await adminAPI.listAdminPolicyTemplates();
+      setTemplates(res.templates ?? []);
+    } catch {
+      setTemplates([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTemplates().catch(() => undefined);
+  }, [loadTemplates]);
+
   useEffect(() => {
     if (selectedCompanyId) {
       loadPolicies(selectedCompanyId).catch(() => undefined);
     } else {
       setData(null);
       setError(null);
+    }
+  }, [selectedCompanyId, loadPolicies]);
+
+  const applyDefaultTemplate = useCallback(async () => {
+    if (!selectedCompanyId) return;
+    setApplyingTemplate(true);
+    try {
+      await adminAPI.applyDefaultTemplateToCompany(selectedCompanyId);
+      await loadPolicies(selectedCompanyId);
+    } catch (e: unknown) {
+      const msg = e && typeof e === 'object' && 'response' in e && typeof (e as { response?: { data?: { detail?: string } } }).response?.data?.detail === 'string'
+        ? (e as { response: { data: { detail: string } } }).response.data.detail
+        : 'Failed to apply template';
+      setError(msg);
+    } finally {
+      setApplyingTemplate(false);
     }
   }, [selectedCompanyId, loadPolicies]);
 
@@ -211,6 +243,39 @@ export const AdminPoliciesPage: React.FC = () => {
         </div>
       </Card>
 
+      {/* Default platform template section */}
+      <Card padding="lg" className="mb-4">
+        <h2 className="text-lg font-semibold text-[#0b2b43] mb-2">Default platform template</h2>
+        <p className="text-sm text-[#6b7280] mb-3">
+          Apply the platform default relocation policy to a company when they have not uploaded their own. This creates a new policy from the template without overwriting existing custom policies.
+        </p>
+        {templates.length > 0 ? (
+          <div className="space-y-2">
+            <ul className="text-sm text-[#374151] list-disc list-inside">
+              {templates.map((t) => (
+                <li key={t.id}>
+                  <span className="font-medium">{t.template_name}</span>
+                  {' '}({t.version})
+                  {t.is_default_template && (
+                    <Badge variant="neutral" size="sm" className="ml-1">Default</Badge>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {selectedCompanyId && (
+              <Button
+                onClick={applyDefaultTemplate}
+                disabled={applyingTemplate || loading}
+              >
+                {applyingTemplate ? 'Applying…' : 'Apply default template to company'}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-[#6b7280]">No default templates configured.</p>
+        )}
+      </Card>
+
       {!selectedCompanyId && (
         <Card padding="lg" className="text-center py-12">
           <p className="text-[#374151] font-medium">Select a company to view policies</p>
@@ -258,6 +323,7 @@ export const AdminPoliciesPage: React.FC = () => {
                   <thead>
                     <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280]">
                       <th className="py-2 pr-2">Policy title</th>
+                      <th className="py-2 pr-2">Source</th>
                       <th className="py-2 pr-2">Latest version</th>
                       <th className="py-2 pr-2">Published</th>
                       <th className="py-2 pr-2">Source docs</th>
@@ -269,6 +335,13 @@ export const AdminPoliciesPage: React.FC = () => {
                     {policies.map((p) => (
                       <tr key={p.policy_id} className="border-b border-[#e2e8f0] hover:bg-[#f8fafc]">
                         <td className="py-2 pr-2 font-medium text-[#0b2b43]">{p.title || '—'}</td>
+                        <td className="py-2 pr-2">
+                          {(p.template_source ?? 'company_uploaded') === 'default_platform_template' ? (
+                            <Badge variant="neutral" size="sm">Default template</Badge>
+                          ) : (
+                            <Badge variant="neutral" size="sm">Custom uploaded</Badge>
+                          )}
+                        </td>
                         <td className="py-2 pr-2">
                           <Badge variant={VERSION_STATUS_VARIANTS[p.latest_version_status ?? ''] || 'neutral'} size="sm">
                             {p.latest_version_number ?? '—'} ({VERSION_STATUS_LABELS[p.latest_version_status ?? ''] ?? p.latest_version_status ?? '—'})
@@ -324,6 +397,12 @@ export const AdminPoliciesPage: React.FC = () => {
                   <div>
                     <span className="text-[#6b7280]">Title:</span>{' '}
                     {inspectDetail.title ?? '—'}
+                  </div>
+                  <div>
+                    <span className="text-[#6b7280]">Source:</span>{' '}
+                    {(inspectDetail.template_source as string) === 'default_platform_template'
+                      ? 'Default template'
+                      : 'Custom uploaded'}
                   </div>
                   <div>
                     <span className="text-[#6b7280]">Source documents:</span> {inspectDetail.source_document_count}

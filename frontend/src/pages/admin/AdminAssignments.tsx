@@ -13,13 +13,25 @@ const STATUS_OPTIONS = [
   { value: 'submitted', label: 'Submitted' },
   { value: 'approved', label: 'Approved' },
   { value: 'completed', label: 'Completed' },
+  { value: 'archived', label: 'Archived' },
+  { value: 'closed', label: 'Closed' },
+];
+
+const ASSIGNMENT_STATUS_OPTIONS = [
+  { value: 'assigned', label: 'Assigned' },
+  { value: 'awaiting_intake', label: 'Awaiting intake' },
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'archived', label: 'Archived' },
+  { value: 'closed', label: 'Closed' },
 ];
 
 const employeeName = (a: AdminAssignment) =>
   a.employee_full_name || [a.employee_first_name, a.employee_last_name].filter(Boolean).join(' ') || a.employee_identifier || '—';
 
 const destination = (a: AdminAssignment) =>
-  a.host_country || a.destination_from_profile || '—';
+  a.destination_country || a.host_country || a.destination_from_profile || '—';
 
 const origin = (a: AdminAssignment) => a.home_country || '—';
 
@@ -35,6 +47,10 @@ export const AdminAssignments: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminAssignmentDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ company_id: '', hr_user_id: '', employee_identifier: '' });
+  const [addSaving, setAddSaving] = useState(false);
+  const [hrUsersForAdd, setHrUsersForAdd] = useState<Array<{ id: string; label: string }>>([]);
 
   const loadAssignments = useCallback(async () => {
     setLoading(true);
@@ -99,6 +115,43 @@ export const AdminAssignments: React.FC = () => {
 
   const linkage = isLinkageConsistent(detail);
 
+  useEffect(() => {
+    if (showAddModal && addForm.company_id) {
+      adminAPI.listHrUsers(addForm.company_id).then((r) => {
+        setHrUsersForAdd(
+          r.hr_users.map((h) => ({
+            id: (h as { profile_id?: string }).profile_id ?? h.id,
+            label: (h as { full_name?: string }).full_name ?? (h as { email?: string }).email ?? h.id,
+          }))
+        );
+      }).catch(() => setHrUsersForAdd([]));
+    } else {
+      setHrUsersForAdd([]);
+    }
+  }, [showAddModal, addForm.company_id]);
+
+  const openAddModal = () => {
+    setAddForm({ company_id: filters.company_id || '', hr_user_id: '', employee_identifier: '' });
+    setShowAddModal(true);
+  };
+
+  const createAssignment = async () => {
+    if (!addForm.company_id || !addForm.hr_user_id) return;
+    setAddSaving(true);
+    try {
+      await adminAPI.createAssignment({
+        company_id: addForm.company_id,
+        hr_user_id: addForm.hr_user_id,
+        employee_identifier: addForm.employee_identifier.trim() || undefined,
+      });
+      setShowAddModal(false);
+      setFilters((f) => ({ ...f, company_id: addForm.company_id }));
+      loadAssignments().catch(() => undefined);
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
   return (
     <AdminLayout
       title="Assignments"
@@ -144,7 +197,12 @@ export const AdminAssignments: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="text-sm text-[#6b7280] mb-2">Assignments ({assignments.length})</div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-[#6b7280]">Assignments ({assignments.length})</span>
+              <Button size="sm" variant="outline" onClick={openAddModal}>
+                Add assignment
+              </Button>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -167,7 +225,12 @@ export const AdminAssignments: React.FC = () => {
                       key={a.id}
                       className="border-b border-[#e2e8f0] hover:bg-[#f8fafc]"
                     >
-                      <td className="py-2 pr-2 font-medium text-[#0b2b43]">{employeeName(a)}</td>
+                      <td className="py-2 pr-2 font-medium text-[#0b2b43]">
+                        {employeeName(a)}
+                        {a.orphan_employee && (
+                          <span className="ml-1"><Badge variant="warning" size="sm">No person</Badge></span>
+                        )}
+                      </td>
                       <td className="py-2 pr-2">{a.company_name || '—'}</td>
                       <td className="py-2 pr-2">{destination(a)}</td>
                       <td className="py-2 pr-2">{origin(a)}</td>
@@ -187,21 +250,66 @@ export const AdminAssignments: React.FC = () => {
                         <Badge variant="neutral" size="sm">{(a.status || '—').replace(/_/g, ' ')}</Badge>
                       </td>
                       <td className="py-2 pr-2">
-                        <Button size="sm" onClick={() => setSelectedId(a.id)}>
-                          Detail
-                        </Button>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Button size="sm" variant="outline" onClick={() => setSelectedId(a.id)}>
+                            Edit
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setSelectedId(a.id)}>
+                            Reassign
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {assignments.length === 0 && (
-              <div className="text-sm text-[#6b7280] py-6 text-center">No assignments found for this company.</div>
+            {assignments.length === 0 && !loading && (
+              <div className="py-12 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
+                <div className="text-sm font-medium">No assignments for selected company</div>
+                <div className="text-xs mt-1">There are no assignments linked to this company. Try another company or create assignments from the HR flow.</div>
+              </div>
             )}
           </>
         )}
       </Card>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Add assignment</h3>
+            <div className="space-y-3 text-sm">
+              <Select
+                label="Company"
+                value={addForm.company_id}
+                onChange={(v) => setAddForm((f) => ({ ...f, company_id: v, hr_user_id: '' }))}
+                options={[{ value: '', label: 'Select company' }, ...companies.map((c) => ({ value: c.id, label: c.name }))]}
+                placeholder="Select company"
+              />
+              <Select
+                label="HR owner"
+                value={addForm.hr_user_id}
+                onChange={(v) => setAddForm((f) => ({ ...f, hr_user_id: v }))}
+                options={[{ value: '', label: 'Select HR user' }, ...hrUsersForAdd.map((h) => ({ value: h.id, label: h.label }))]}
+                placeholder="Select HR user"
+                disabled={!addForm.company_id}
+              />
+              <Input
+                label="Employee identifier (optional)"
+                value={addForm.employee_identifier}
+                onChange={(v) => setAddForm((f) => ({ ...f, employee_identifier: v }))}
+                placeholder="e.g. email or placeholder"
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowAddModal(false)}>Cancel</Button>
+              <Button size="sm" onClick={createAssignment} disabled={addSaving || !addForm.company_id || !addForm.hr_user_id}>
+                {addSaving ? 'Creating…' : 'Create'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedId && (
         <AdminAssignmentDetailDrawer
@@ -241,16 +349,22 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [hrUsers, setHrUsers] = useState<Array<{ id: string; label: string }>>([]);
   const [fixCompanyId, setFixCompanyId] = useState('');
+  const [editStatus, setEditStatus] = useState<string>('');
+  const [statusSaving, setStatusSaving] = useState(false);
 
   useEffect(() => {
     adminAPI.listCompanies().then((r) => setCompanies(r.companies)).catch(() => {});
   }, []);
 
   useEffect(() => {
+    if (detail?.status != null) setEditStatus(detail.status);
+  }, [detail?.status]);
+
+  useEffect(() => {
     const cid = detail?.case_company_id || detail?.hr_company_id;
     if (cid) {
       adminAPI.listHrUsers(cid).then((r) => {
-        setHrUsers(r.hr_users.map((h) => ({ id: h.profile_id, label: (h as { full_name?: string }).full_name || h.profile_id })));
+        setHrUsers(r.hr_users.map((h) => ({ id: (h as { profile_id?: string }).profile_id ?? h.id, label: (h as { full_name?: string }).full_name || (h as { profile_id?: string }).profile_id || h.id })));
       }).catch(() => setHrUsers([]));
     } else {
       setHrUsers([]);
@@ -293,6 +407,28 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
       setFixCompanyId('');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const saveStatus = async () => {
+    const status = (editStatus || detail?.status || '').trim();
+    if (!status) return;
+    setStatusSaving(true);
+    try {
+      await adminAPI.updateAssignmentStatus(assignmentId, { status });
+      onRefresh();
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
+  const archiveAssignment = async () => {
+    setStatusSaving(true);
+    try {
+      await adminAPI.updateAssignmentStatus(assignmentId, { status: 'archived' });
+      onRefresh();
+    } finally {
+      setStatusSaving(false);
     }
   };
 
@@ -363,6 +499,26 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
                 <h3 className="text-sm font-medium text-[#374151] mb-2">Policy linkage</h3>
                 <div className="text-sm">
                   Resolved: {detail.resolved_policy ? 'Yes' : 'No'} · Company policy: {detail.company_has_published_policy ? 'Yes' : 'No'}
+                </div>
+              </section>
+
+              <section className="border-t border-[#e2e8f0] pt-4">
+                <h3 className="text-sm font-medium text-[#374151] mb-2">Status</h3>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Select
+                    value={editStatus || detail?.status || ''}
+                    onChange={setEditStatus}
+                    options={[{ value: '', label: 'Select status' }, ...ASSIGNMENT_STATUS_OPTIONS]}
+                    placeholder="Status"
+                  />
+                  <Button size="sm" onClick={saveStatus} disabled={statusSaving || !(editStatus || detail?.status)}>
+                    {statusSaving ? 'Saving…' : 'Save'}
+                  </Button>
+                  {detail?.status !== 'archived' && (
+                    <Button size="sm" variant="outline" onClick={archiveAssignment} disabled={statusSaving}>
+                      Archive assignment
+                    </Button>
+                  )}
                 </div>
               </section>
 

@@ -4,6 +4,7 @@ import { AdminLayout } from './AdminLayout';
 import { Card, Button, Badge, Alert } from '../../components/antigravity';
 import { adminAPI, adminCollaborationAPI } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
+import type { AdminSupportCase } from '../../types';
 
 type Thread = {
   thread_id: string;
@@ -20,6 +21,8 @@ type Thread = {
   last_message_preview?: string;
   last_message_at?: string;
   message_count?: number;
+  unread_count?: number;
+  has_unread?: boolean;
   status?: string;
   target_type?: string;
   target_id?: string;
@@ -48,12 +51,6 @@ type HrThreadDetail = {
   status?: string;
 };
 
-const THREAD_TYPES = [
-  { value: '', label: 'All' },
-  { value: 'hr_employee', label: 'HR–Employee' },
-  { value: 'collaboration', label: 'Internal collaboration' },
-];
-
 function ThreadRow({
   thread,
   isSelected,
@@ -68,6 +65,7 @@ function ThreadRow({
   const participants = thread.participants?.join(', ') || thread.participant_name || thread.company_name || '—';
   const raw = thread.last_message_preview || '—';
   const previewText = raw.length > 60 ? raw.slice(0, 60).trimEnd() + '…' : raw;
+  const roleLabel = thread.participant_role === 'employee' ? 'Employee' : thread.thread_type === 'hr_employee' ? 'HR' : 'Collab';
   return (
     <div
       role="button"
@@ -79,11 +77,16 @@ function ThreadRow({
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-[#0b2b43] text-sm truncate">{participants}</span>
+        <span className="font-medium text-[#0b2b43] text-sm truncate flex items-center gap-1.5">
+          {thread.has_unread && (
+            <span className="w-2 h-2 rounded-full bg-[#0b2b43] shrink-0" title="Unread" aria-label="Unread" />
+          )}
+          {participants}
+        </span>
         <span className="text-xs text-[#6b7280] shrink-0">{formatTimeAgo(thread.last_message_at)}</span>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
-        <Badge variant="neutral" size="sm">{thread.thread_type === 'hr_employee' ? 'HR' : 'Collab'}</Badge>
+        <Badge variant="neutral" size="sm">{roleLabel}</Badge>
         {thread.status && (
           <span
             className={`inline-block px-1.5 py-0.5 rounded text-xs ${
@@ -110,25 +113,24 @@ export const AdminMessages: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [companyFilter, setCompanyFilter] = useState('');
-  const [userFilter, setUserFilter] = useState('');
-  const [threadTypeFilter, setThreadTypeFilter] = useState('');
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
   const [threadDetail, setThreadDetail] = useState<HrThreadDetail | null>(null);
   const [collabComments, setCollabComments] = useState<Array<{ id: string; body: string; created_at: string; author_display_name?: string }>>([]);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'threads' | 'support'>('threads');
-  const [supportCases, setSupportCases] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'conversations' | 'tickets'>('conversations');
+  const [supportCases, setSupportCases] = useState<AdminSupportCase[]>([]);
+  const [editingTicket, setEditingTicket] = useState<AdminSupportCase | null>(null);
+  const [ticketPatchForm, setTicketPatchForm] = useState<{ priority: string; status: string; assignee_id: string; category: string }>({ priority: 'medium', status: 'open', assignee_id: '', category: 'other' });
   const [groupBy, setGroupBy] = useState<GroupBy>('person');
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
   const loadThreads = useCallback(async () => {
+    if (!companyFilter) return;
     setLoading(true);
     setError(null);
     try {
       const res = await adminAPI.listMessageThreads({
-        company_id: companyFilter || undefined,
-        user_id: userFilter || undefined,
-        thread_type: (threadTypeFilter as 'hr_employee' | 'collaboration') || undefined,
+        company_id: companyFilter,
         limit: 100,
         offset: 0,
       });
@@ -142,7 +144,7 @@ export const AdminMessages: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyFilter, userFilter, threadTypeFilter]);
+  }, [companyFilter]);
 
   const loadCompanies = useCallback(async () => {
     try {
@@ -155,24 +157,26 @@ export const AdminMessages: React.FC = () => {
 
   const loadSupportCases = useCallback(async () => {
     try {
-      const res = await adminAPI.listSupportCases();
+      const res = await adminAPI.listSupportCases({
+        company_id: companyFilter || undefined,
+      });
       setSupportCases(res.support_cases || []);
     } catch {
       setSupportCases([]);
     }
-  }, []);
+  }, [companyFilter]);
 
   useEffect(() => {
-    if (companyFilter) loadThreads();
-    else setThreads([]);
-  }, [companyFilter, loadThreads]);
+    if (companyFilter && activeTab === 'conversations') loadThreads();
+    else if (activeTab === 'conversations') setThreads([]);
+  }, [companyFilter, activeTab, loadThreads]);
 
   useEffect(() => {
     loadCompanies();
   }, [loadCompanies]);
 
   useEffect(() => {
-    if (activeTab === 'support') loadSupportCases();
+    if (activeTab === 'tickets') loadSupportCases();
   }, [activeTab, loadSupportCases]);
 
   const loadThreadDetail = useCallback(async (t: Thread) => {
@@ -262,116 +266,222 @@ export const AdminMessages: React.FC = () => {
   };
   const isGroupExpanded = (key: string) => groupBy === 'thread' || expandedKeys.has(key);
 
-  return (
-    <AdminLayout title="Messages" subtitle="Message threads and support cases — select a company to view threads">
-      <div className="flex gap-2 mb-4">
-        <button
-          type="button"
-          onClick={() => setActiveTab('threads')}
-          className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'threads' ? 'bg-[#0b2b43] text-white' : 'bg-[#f1f5f9] text-[#4b5563] hover:bg-[#e2e8f0]'}`}
-        >
-          Threads
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('support')}
-          className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'support' ? 'bg-[#0b2b43] text-white' : 'bg-[#f1f5f9] text-[#4b5563] hover:bg-[#e2e8f0]'}`}
-        >
-          Support cases
-        </button>
-      </div>
+  const openEditTicket = (c: AdminSupportCase) => {
+    setEditingTicket(c);
+    setTicketPatchForm({
+      priority: c.priority || 'medium',
+      status: c.status || 'open',
+      assignee_id: c.assignee_id || '',
+      category: c.category || 'other',
+    });
+  };
 
-      {activeTab === 'support' && (
+  const saveTicketPatch = async () => {
+    if (!editingTicket) return;
+    try {
+      await adminAPI.patchSupportCase(editingTicket.id, {
+        priority: ticketPatchForm.priority,
+        status: ticketPatchForm.status,
+        assignee_id: ticketPatchForm.assignee_id || undefined,
+        category: ticketPatchForm.category,
+      });
+      setEditingTicket(null);
+      loadSupportCases();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'urgent'] as const;
+  const STATUS_OPTIONS = ['open', 'investigating', 'blocked', 'resolved'] as const;
+  const CATEGORY_OPTIONS = ['bug', 'feature request', 'onboarding', 'policy question', 'supplier issue', 'other'] as const;
+
+  return (
+    <AdminLayout title="Messages" subtitle="Unified operations inbox — conversations and support tickets">
+      {/* Company filter at top (shared) */}
+      <Card padding="lg" className="mb-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div>
+            <label className="block text-sm font-medium text-[#374151] mb-1">Company</label>
+            <select
+              value={companyFilter}
+              onChange={(e) => setCompanyFilter(e.target.value)}
+              className="border border-[#d1d5db] rounded px-3 py-2 text-sm min-w-[200px]"
+            >
+              <option value="">Select company</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2 pt-6">
+            <button
+              type="button"
+              onClick={() => setActiveTab('conversations')}
+              className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'conversations' ? 'bg-[#0b2b43] text-white' : 'bg-[#f1f5f9] text-[#4b5563] hover:bg-[#e2e8f0]'}`}
+            >
+              Conversations
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('tickets')}
+              className={`px-3 py-1.5 rounded text-sm font-medium ${activeTab === 'tickets' ? 'bg-[#0b2b43] text-white' : 'bg-[#f1f5f9] text-[#4b5563] hover:bg-[#e2e8f0]'}`}
+            >
+              Tickets
+            </button>
+          </div>
+        </div>
+      </Card>
+
+      {activeTab === 'tickets' && (
         <Card padding="lg">
-          <div className="text-sm text-[#6b7280] mb-2">Support cases ({supportCases.length})</div>
-          <div className="space-y-3">
-            {supportCases.map((c) => (
-              <div key={c.id} className="flex flex-wrap items-center justify-between border-b border-[#e2e8f0] py-2 gap-3">
-                <div>
-                  <div className="font-medium text-[#0b2b43]">{c.summary || c.id}</div>
-                  <div className="text-xs text-[#6b7280]">
-                    {c.category} · {c.severity} · {c.status} · Error: {c.last_error_code || '—'}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="neutral" size="sm">{c.status?.toUpperCase?.()}</Badge>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const note = window.prompt('Internal note:');
-                      if (note) {
-                        const reason = window.prompt('Reason for note (required):');
-                        if (reason) adminAPI.addSupportNote(c.id, { note, reason }).then(loadSupportCases).catch(console.error);
-                      }
-                    }}
-                  >
-                    Add note
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const reason = window.prompt('Reason for export (required):');
-                      if (reason) {
-                        adminAPI.adminAction('export-support-bundle', { reason, payload: { support_case_id: c.id } }).then(() => alert('Export requested.')).catch(console.error);
-                      }
-                    }}
-                  >
-                    Export bundle
-                  </Button>
-                </div>
-              </div>
-            ))}
-            {supportCases.length === 0 && <div className="text-sm text-[#6b7280]">No support cases found.</div>}
+          <h2 className="text-lg font-semibold text-[#0b2b43] mb-3">Support tickets</h2>
+          <p className="text-sm text-[#6b7280] mb-4">
+            {companyFilter ? `Showing tickets for selected company.` : 'Select a company to filter tickets, or view all.'}
+          </p>
+          <div className="border border-[#e5e7eb] rounded-lg overflow-hidden">
+            {supportCases.length === 0 ? (
+              <div className="p-8 text-center text-[#6b7280]">No tickets found.</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#f9fafb] border-b border-[#e5e7eb]">
+                    <th className="text-left py-3 px-4 font-medium text-[#374151]">Summary</th>
+                    <th className="text-left py-3 px-4 font-medium text-[#374151]">Priority</th>
+                    <th className="text-left py-3 px-4 font-medium text-[#374151]">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-[#374151]">Category</th>
+                    <th className="text-left py-3 px-4 font-medium text-[#374151]">Assignee</th>
+                    <th className="text-left py-3 px-4 font-medium text-[#374151]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {supportCases.map((c) => (
+                    <tr key={c.id} className="border-b border-[#e5e7eb] hover:bg-[#f9fafb]">
+                      <td className="py-3 px-4">
+                        <span className="font-medium text-[#0b2b43]">{c.summary || c.id}</span>
+                        {c.last_error_code && (
+                          <span className="block text-xs text-[#6b7280]">Error: {c.last_error_code}</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge
+                          variant={c.priority === 'urgent' ? 'warning' : c.priority === 'high' ? 'warning' : 'neutral'}
+                          size="sm"
+                        >
+                          {(c.priority || 'medium').toLowerCase()}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant="neutral" size="sm">
+                          {(c.status || 'open').toLowerCase()}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-[#4b5563]">{(c.category || '—').replace(/_/g, ' ')}</td>
+                      <td className="py-3 px-4 text-[#4b5563]">{c.assignee_id ? String(c.assignee_id).slice(0, 8) + '…' : '—'}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap gap-1">
+                          <Button size="sm" variant="outline" onClick={() => openEditTicket(c)}>
+                            Update
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const note = window.prompt('Internal note:');
+                              if (note) {
+                                const reason = window.prompt('Reason for note (required):');
+                                if (reason) adminAPI.addSupportNote(c.id, { note, reason }).then(loadSupportCases).catch(console.error);
+                              }
+                            }}
+                          >
+                            Add note
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const reason = window.prompt('Reason for export (required):');
+                              if (reason) {
+                                adminAPI.adminAction('export-support-bundle', { reason, payload: { support_case_id: c.id } }).then(() => alert('Export requested.')).catch(console.error);
+                              }
+                            }}
+                          >
+                            Export
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </Card>
       )}
 
-      {activeTab === 'threads' && (
-        <>
-          <Card padding="lg" className="mb-4">
-          <div className="flex flex-wrap gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Company</label>
-              <select
-                value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
-                className="border border-[#d1d5db] rounded px-3 py-2 text-sm"
-              >
-                <option value="">Select company</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+      {/* Update ticket modal */}
+      {editingTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditingTicket(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Update ticket</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#374151] mb-1">Priority</label>
+                <select
+                  value={ticketPatchForm.priority}
+                  onChange={(e) => setTicketPatchForm((f) => ({ ...f, priority: e.target.value }))}
+                  className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-full"
+                >
+                  {PRIORITY_OPTIONS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#374151] mb-1">Status</label>
+                <select
+                  value={ticketPatchForm.status}
+                  onChange={(e) => setTicketPatchForm((f) => ({ ...f, status: e.target.value }))}
+                  className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-full"
+                >
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#374151] mb-1">Category</label>
+                <select
+                  value={ticketPatchForm.category}
+                  onChange={(e) => setTicketPatchForm((f) => ({ ...f, category: e.target.value }))}
+                  className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-full"
+                >
+                  {CATEGORY_OPTIONS.map((cat) => (
+                    <option key={cat} value={cat}>{cat.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#374151] mb-1">Assignee (profile ID)</label>
+                <input
+                  type="text"
+                  value={ticketPatchForm.assignee_id}
+                  onChange={(e) => setTicketPatchForm((f) => ({ ...f, assignee_id: e.target.value }))}
+                  placeholder="Leave empty to unassign"
+                  className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-full"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">User (HR or Employee ID)</label>
-              <input
-                type="text"
-                value={userFilter}
-                onChange={(e) => setUserFilter(e.target.value)}
-                placeholder="User ID"
-                className="border border-[#d1d5db] rounded px-3 py-2 text-sm w-40"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#374151] mb-1">Thread type</label>
-              <select
-                value={threadTypeFilter}
-                onChange={(e) => setThreadTypeFilter(e.target.value)}
-                className="border border-[#d1d5db] rounded px-3 py-2 text-sm"
-              >
-                {THREAD_TYPES.map((o) => (
-                  <option key={o.value || 'all'} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="self-end">
-              <Button onClick={loadThreads} disabled={loading}>{loading ? 'Loading…' : 'Apply'}</Button>
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="outline" onClick={() => setEditingTicket(null)}>Cancel</Button>
+              <Button onClick={saveTicketPatch}>Save</Button>
             </div>
           </div>
-          </Card>
+        </div>
+      )}
 
+      {activeTab === 'conversations' && (
+        <>
           {error && (
             <Alert variant="error" className="mb-4">
               {error}
@@ -406,12 +516,12 @@ export const AdminMessages: React.FC = () => {
               </div>
               {!companyFilter ? (
                 <div className="p-8 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
-                  Select a company above to view message threads.
+                  Select a company above to view conversations.
                 </div>
               ) : loading && threads.length === 0 ? (
-                <div className="p-8 text-center text-[#6b7280]">Loading...</div>
+                <div className="p-8 text-center text-[#6b7280]">Loading…</div>
               ) : threads.length === 0 ? (
-                <div className="p-8 text-center text-[#6b7280]">No threads found for this company.</div>
+                <div className="p-8 text-center text-[#6b7280]">No conversations found for this company.</div>
               ) : (
                 <div className="space-y-1 max-h-[480px] overflow-y-auto">
                   {groupBy === 'thread' ? (
@@ -471,9 +581,9 @@ export const AdminMessages: React.FC = () => {
             </Card>
 
             <Card padding="lg">
-              <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Thread detail</h2>
+              <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Conversation</h2>
               {!selectedThread && (
-                <div className="p-8 text-center text-[#6b7280]">Select a thread to view details.</div>
+                <div className="p-8 text-center text-[#6b7280]">Select a conversation to view details.</div>
               )}
               {selectedThread && detailLoading && (
                 <div className="p-8 text-center text-[#6b7280]">Loading...</div>

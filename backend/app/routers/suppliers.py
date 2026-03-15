@@ -48,13 +48,13 @@ def list_countries_api(user: Dict[str, Any] = Depends(require_admin_or_hr)):
 def list_suppliers_api(
     user: Dict[str, Any] = Depends(require_admin_or_hr),
     status: Optional[str] = Query(None, description="Filter by status"),
-    service_category: Optional[str] = Query(None, description="Filter by service category"),
+    service_category: Optional[str] = Query(None, description="Filter by service category (admin UI is category-first)"),
     country_code: Optional[str] = Query(None, description="Filter by country"),
     city_name: Optional[str] = Query(None, description="Filter by city"),
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
-    """List suppliers with optional filters."""
+    """List suppliers with optional filters. Accepts service_category and country for category-filtered loading."""
     with SessionLocal() as session:
         items = list_suppliers(
             session,
