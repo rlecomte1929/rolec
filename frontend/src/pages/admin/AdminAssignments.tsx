@@ -5,6 +5,7 @@ import { adminAPI } from '../../api/client';
 import type { AdminAssignment, AdminAssignmentDetail, AdminCompany } from '../../types';
 import { buildRoute } from '../../navigation/routes';
 import { Link } from 'react-router-dom';
+import { COUNTRY_OPTIONS } from '../../utils/countries';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -27,6 +28,11 @@ const ASSIGNMENT_STATUS_OPTIONS = [
   { value: 'closed', label: 'Closed' },
 ];
 
+const DESTINATION_COUNTRY_OPTIONS = [
+  { value: '', label: 'All destinations' },
+  ...COUNTRY_OPTIONS.map((c) => ({ value: c.name, label: c.name })),
+];
+
 const employeeName = (a: AdminAssignment) =>
   a.employee_full_name || [a.employee_first_name, a.employee_last_name].filter(Boolean).join(' ') || a.employee_identifier || '—';
 
@@ -46,11 +52,21 @@ export const AdminAssignments: React.FC = () => {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminAssignmentDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ company_id: '', hr_user_id: '', employee_identifier: '' });
+  const [addForm, setAddForm] = useState({
+    company_id: '',
+    hr_user_id: '',
+    employee_user_id: '',
+    employee_identifier: '',
+    destination_country: '',
+  });
   const [addSaving, setAddSaving] = useState(false);
   const [hrUsersForAdd, setHrUsersForAdd] = useState<Array<{ id: string; label: string }>>([]);
+  const [employeesForAdd, setEmployeesForAdd] = useState<Array<{ id: string; label: string }>>([]);
+  const [createSuccess, setCreateSuccess] = useState<{ assignmentId: string } | null>(null);
 
   const loadAssignments = useCallback(async () => {
     setLoading(true);
@@ -73,8 +89,18 @@ export const AdminAssignments: React.FC = () => {
   }, []);
 
   const loadDetail = useCallback(async (id: string) => {
-    const res = await adminAPI.getAssignmentDetail(id);
-    setDetail(res.assignment);
+    setDetailLoading(true);
+    setDetailError(false);
+    try {
+      const res = await adminAPI.getAssignmentDetail(id);
+      setDetail(res?.assignment ?? null);
+      if (!res?.assignment) setDetailError(true);
+    } catch {
+      setDetail(null);
+      setDetailError(true);
+    } finally {
+      setDetailLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -91,9 +117,10 @@ export const AdminAssignments: React.FC = () => {
 
   useEffect(() => {
     if (selectedId) {
-      loadDetail(selectedId).catch(() => setDetail(null));
+      loadDetail(selectedId);
     } else {
       setDetail(null);
+      setDetailError(false);
     }
   }, [selectedId, loadDetail]);
 
@@ -121,32 +148,58 @@ export const AdminAssignments: React.FC = () => {
         setHrUsersForAdd(
           r.hr_users.map((h) => ({
             id: (h as { profile_id?: string }).profile_id ?? h.id,
-            label: (h as { full_name?: string }).full_name ?? (h as { email?: string }).email ?? h.id,
+            label: (h as { name?: string }).name ?? (h as { email?: string }).email ?? h.id,
           }))
         );
       }).catch(() => setHrUsersForAdd([]));
+      adminAPI.listEmployees(addForm.company_id).then((r) => {
+        setEmployeesForAdd(
+          (r.employees || []).map((e) => ({
+            id: (e as { profile_id?: string }).profile_id ?? e.id,
+            label: (e as { full_name?: string }).full_name ?? (e as { name?: string }).name ?? (e as { email?: string }).email ?? e.id,
+          }))
+        );
+      }).catch(() => setEmployeesForAdd([]));
     } else {
       setHrUsersForAdd([]);
+      setEmployeesForAdd([]);
     }
   }, [showAddModal, addForm.company_id]);
 
   const openAddModal = () => {
-    setAddForm({ company_id: filters.company_id || '', hr_user_id: '', employee_identifier: '' });
+    setAddForm({
+      company_id: filters.company_id || '',
+      hr_user_id: '',
+      employee_user_id: '',
+      employee_identifier: '',
+      destination_country: '',
+    });
+    setCreateSuccess(null);
     setShowAddModal(true);
   };
 
   const createAssignment = async () => {
     if (!addForm.company_id || !addForm.hr_user_id) return;
     setAddSaving(true);
+    setCreateSuccess(null);
     try {
-      await adminAPI.createAssignment({
+      const res = await adminAPI.createAssignment({
         company_id: addForm.company_id,
         hr_user_id: addForm.hr_user_id,
+        employee_user_id: addForm.employee_user_id.trim() || undefined,
         employee_identifier: addForm.employee_identifier.trim() || undefined,
+        destination_country: addForm.destination_country.trim() || undefined,
       });
-      setShowAddModal(false);
+      const assignmentId = (res as { assignment_id?: string }).assignment_id;
+      setCreateSuccess(assignmentId ? { assignmentId } : null);
       setFilters((f) => ({ ...f, company_id: addForm.company_id }));
-      loadAssignments().catch(() => undefined);
+      await loadAssignments();
+      if (assignmentId) {
+        setTimeout(() => {
+          setShowAddModal(false);
+          setCreateSuccess(null);
+        }, 2500);
+      }
     } finally {
       setAddSaving(false);
     }
@@ -163,8 +216,7 @@ export const AdminAssignments: React.FC = () => {
             label="Company"
             value={filters.company_id}
             onChange={(v) => setFilters((f) => ({ ...f, company_id: v }))}
-            options={[{ value: '', label: 'Select company' }, ...companies.map((c) => ({ value: c.id, label: c.name }))]}
-            placeholder="Select company"
+            options={[{ value: '', label: 'Select company' }, ...companies.map((c) => ({ value: c.id, label: c.name ?? c.id }))]}
           />
           <Input
             label="Employee search"
@@ -178,11 +230,11 @@ export const AdminAssignments: React.FC = () => {
             onChange={(v) => setFilters((f) => ({ ...f, status: v }))}
             options={STATUS_OPTIONS}
           />
-          <Input
+          <Select
             label="Destination country"
             value={filters.destination_country}
             onChange={(v) => setFilters((f) => ({ ...f, destination_country: v }))}
-            placeholder="e.g. Singapore"
+            options={DESTINATION_COUNTRY_OPTIONS}
           />
           <Button onClick={applyFilters} disabled={loading}>
             {loading ? 'Loading…' : 'Apply'}
@@ -207,6 +259,7 @@ export const AdminAssignments: React.FC = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280]">
+                    <th className="py-2 pr-2">Assignment ID</th>
                     <th className="py-2 pr-2">Employee</th>
                     <th className="py-2 pr-2">Company</th>
                     <th className="py-2 pr-2">Destination</th>
@@ -225,6 +278,19 @@ export const AdminAssignments: React.FC = () => {
                       key={a.id}
                       className="border-b border-[#e2e8f0] hover:bg-[#f8fafc]"
                     >
+                      <td className="py-2 pr-2">
+                        <span className="font-mono text-xs text-[#6b7280]">{a.id}</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="ml-1"
+                          onClick={() => {
+                            navigator.clipboard.writeText(a.id).catch(() => {});
+                          }}
+                        >
+                          Copy ID
+                        </Button>
+                      </td>
                       <td className="py-2 pr-2 font-medium text-[#0b2b43]">
                         {employeeName(a)}
                         {a.orphan_employee && (
@@ -278,26 +344,45 @@ export const AdminAssignments: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Add assignment</h3>
+            {createSuccess && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                Assignment created. ID: <span className="font-mono">{createSuccess.assignmentId}</span>
+                <Button size="sm" variant="outline" className="ml-2" onClick={() => navigator.clipboard.writeText(createSuccess.assignmentId).catch(() => {})}>
+                  Copy ID
+                </Button>
+              </div>
+            )}
             <div className="space-y-3 text-sm">
               <Select
                 label="Company"
                 value={addForm.company_id}
-                onChange={(v) => setAddForm((f) => ({ ...f, company_id: v, hr_user_id: '' }))}
-                options={[{ value: '', label: 'Select company' }, ...companies.map((c) => ({ value: c.id, label: c.name }))]}
-                placeholder="Select company"
+                onChange={(v) => setAddForm((f) => ({ ...f, company_id: v, hr_user_id: '', employee_user_id: '' }))}
+                options={[{ value: '', label: 'Select company' }, ...companies.map((c) => ({ value: c.id, label: c.name ?? c.id }))]}
               />
               <Select
                 label="HR owner"
                 value={addForm.hr_user_id}
                 onChange={(v) => setAddForm((f) => ({ ...f, hr_user_id: v }))}
-                options={[{ value: '', label: addForm.company_id ? 'Select HR user' : 'Select company first' }, ...hrUsersForAdd.map((h) => ({ value: h.id, label: h.label }))]}
-                placeholder="Select HR user"
+                options={[{ value: '', label: addForm.company_id ? 'Select HR owner' : 'Select company first' }, ...hrUsersForAdd.map((h) => ({ value: h.id, label: h.label }))]}
+              />
+              <Select
+                label="Employee (optional)"
+                value={addForm.employee_user_id}
+                onChange={(v) => setAddForm((f) => ({ ...f, employee_user_id: v || '', employee_identifier: v ? '' : f.employee_identifier }))}
+                options={[{ value: '', label: addForm.company_id ? 'Select employee or type below' : 'Select company first' }, ...employeesForAdd.map((e) => ({ value: e.id, label: e.label }))]}
               />
               <Input
-                label="Employee identifier (optional)"
+                label="Employee identifier (if not selected above)"
                 value={addForm.employee_identifier}
                 onChange={(v) => setAddForm((f) => ({ ...f, employee_identifier: v }))}
                 placeholder="e.g. email or placeholder"
+                disabled={!!addForm.employee_user_id}
+              />
+              <Select
+                label="Destination country"
+                value={addForm.destination_country}
+                onChange={(v) => setAddForm((f) => ({ ...f, destination_country: v }))}
+                options={[{ value: '', label: 'Select destination' }, ...COUNTRY_OPTIONS.map((c) => ({ value: c.name, label: c.name }))]}
               />
             </div>
             <div className="mt-4 flex justify-end gap-2">
@@ -314,6 +399,8 @@ export const AdminAssignments: React.FC = () => {
         <AdminAssignmentDetailDrawer
           assignmentId={selectedId}
           detail={detail}
+          loading={detailLoading}
+          error={detailError}
           linkage={linkage}
           onClose={() => setSelectedId(null)}
           onRefresh={() => {
@@ -329,6 +416,8 @@ export const AdminAssignments: React.FC = () => {
 interface AdminAssignmentDetailDrawerProps {
   assignmentId: string;
   detail: AdminAssignmentDetail | null;
+  loading: boolean;
+  error: boolean;
   linkage: { ok: boolean; issues: string[] };
   onClose: () => void;
   onRefresh: () => void;
@@ -337,6 +426,8 @@ interface AdminAssignmentDetailDrawerProps {
 const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = ({
   assignmentId,
   detail,
+  loading,
+  error,
   linkage,
   onClose,
   onRefresh,
@@ -352,7 +443,7 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
   const [statusSaving, setStatusSaving] = useState(false);
 
   useEffect(() => {
-    adminAPI.listCompanies().then((r) => setCompanies(r.companies)).catch(() => {});
+    adminAPI.listCompanies().then((r) => setCompanies(r.companies ?? [])).catch(() => setCompanies([]));
   }, []);
 
   useEffect(() => {
@@ -363,7 +454,10 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
     const cid = detail?.case_company_id || detail?.hr_company_id;
     if (cid) {
       adminAPI.listHrUsers(cid).then((r) => {
-        setHrUsers(r.hr_users.map((h) => ({ id: (h as { profile_id?: string }).profile_id ?? h.id, label: (h as { full_name?: string }).full_name || (h as { profile_id?: string }).profile_id || h.id })));
+        setHrUsers((r.hr_users ?? []).map((h) => ({
+          id: (h as { profile_id?: string }).profile_id ?? h.id,
+          label: (h as { name?: string }).name ?? (h as { email?: string }).email ?? h.id,
+        })));
       }).catch(() => setHrUsers([]));
     } else {
       setHrUsers([]);
@@ -443,10 +537,34 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
           <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
         </div>
         <div className="p-4 space-y-4">
-          {!detail ? (
+          {loading && !detail && (
             <div className="text-sm text-[#6b7280]">Loading…</div>
-          ) : (
+          )}
+          {error && !detail && !loading && (
+            <div className="text-sm text-red-600">Failed to load assignment. It may have been deleted or you may not have access.</div>
+          )}
+          {detail && (
             <>
+              <section>
+                <h3 className="text-sm font-medium text-[#374151] mb-2">Assignment ID</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-xs text-[#0b2b43]">{detail.id ?? assignmentId}</span>
+                  <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(detail.id ?? assignmentId).catch(() => {})}>
+                    Copy ID
+                  </Button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-3 text-sm text-[#6b7280]">
+                  <span>Status: <strong className="text-[#374151]">{(detail.status ?? '—').replace(/_/g, ' ')}</strong></span>
+                  {detail.created_at && <span>Created: {detail.created_at}</span>}
+                  {detail.updated_at && <span>Updated: {detail.updated_at}</span>}
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-medium text-[#374151] mb-2">History</h3>
+                <div className="text-sm text-[#6b7280]">No status or linkage history available.</div>
+              </section>
+
               <section>
                 <h3 className="text-sm font-medium text-[#374151] mb-2">Employee</h3>
                 <div className="text-sm text-[#0b2b43]">
@@ -462,8 +580,8 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
 
               <section>
                 <h3 className="text-sm font-medium text-[#374151] mb-2">Company & HR</h3>
-                <div className="text-sm">Company: {detail.company_name || '—'}</div>
-                <div className="text-sm">Assigned HR: {detail.hr_full_name || '—'} {detail.hr_email && `(${detail.hr_email})`}</div>
+                <div className="text-sm">Company: {detail.company_name ?? '—'}</div>
+                <div className="text-sm">Assigned HR: {detail.hr_full_name ?? '—'} {detail.hr_email ? `(${detail.hr_email})` : ''}</div>
                 {hrId && (
                   <Link to={buildRoute('hrDashboard')} className="text-xs text-[#0b2b43] hover:underline mt-1 inline-block">
                     Open HR dashboard →
@@ -474,10 +592,10 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
               <section>
                 <h3 className="text-sm font-medium text-[#374151] mb-2">Relocation</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <span className="text-[#6b7280]">Destination:</span><span>{detail.host_country || detail.destination_from_profile || '—'}</span>
-                  <span className="text-[#6b7280]">Origin:</span><span>{detail.home_country || '—'}</span>
-                  <span className="text-[#6b7280]">Type:</span><span>{detail.assignment_type || '—'}</span>
-                  <span className="text-[#6b7280]">Move date:</span><span>{detail.move_date || '—'}</span>
+                  <span className="text-[#6b7280]">Destination:</span><span>{detail.host_country ?? detail.destination_from_profile ?? '—'}</span>
+                  <span className="text-[#6b7280]">Origin:</span><span>{detail.home_country ?? '—'}</span>
+                  <span className="text-[#6b7280]">Type:</span><span>{detail.assignment_type ?? '—'}</span>
+                  <span className="text-[#6b7280]">Move date:</span><span>{detail.move_date ?? '—'}</span>
                 </div>
               </section>
 

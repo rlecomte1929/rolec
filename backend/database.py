@@ -3312,6 +3312,14 @@ class Database:
                 {"cid": company_id, "ua": datetime.utcnow().isoformat(), "case_id": case_id},
             )
 
+    def update_relocation_case_host_country(self, case_id: str, host_country: str) -> None:
+        """Set destination (host_country) on a relocation case (e.g. after admin create)."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE relocation_cases SET host_country = :host, updated_at = :ua WHERE id = :cid"),
+                {"host": host_country, "ua": datetime.utcnow().isoformat(), "cid": case_id},
+            )
+
     def admin_link_policy_company(self, policy_id: str, company_id: str) -> None:
         """Reassign a company_policy to a company (for reconciliation)."""
         with self.engine.begin() as conn:
@@ -5566,6 +5574,48 @@ class Database:
                 "perm": json.dumps(permissions or {}),
                 "created_at": now,
             })
+
+    def ensure_hr_user_for_profile(self, profile_id: str, company_id: str) -> None:
+        """
+        Ensure an hr_users row exists for this profile and company (so they appear in
+        assignment creation HR dropdown). If a row exists, update company_id; else insert.
+        """
+        if not profile_id or not company_id:
+            return
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id FROM hr_users WHERE profile_id = :pid LIMIT 1"),
+                {"pid": profile_id},
+            ).fetchone()
+        if row:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text("UPDATE hr_users SET company_id = :cid WHERE profile_id = :pid"),
+                    {"cid": company_id, "pid": profile_id},
+                )
+        else:
+            self.create_hr_user(
+                hr_id=str(uuid.uuid4()),
+                company_id=company_id,
+                profile_id=profile_id,
+                permissions={"can_manage_policy": True},
+            )
+
+    def ensure_hr_users_for_company(self, company_id: str) -> None:
+        """
+        Ensure hr_users rows exist for all profiles with role=HR and company_id=company_id
+        (backfill so existing HR people appear in assignment creation dropdown).
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT id FROM profiles WHERE role = 'HR' AND company_id = :cid"
+                ),
+                {"cid": company_id},
+            ).fetchall()
+        for row in rows:
+            pid = row._mapping["id"] if hasattr(row, "_mapping") else row[0]
+            self.ensure_hr_user_for_profile(pid, company_id)
 
     def upsert_relocation_case(
         self,

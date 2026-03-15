@@ -1399,13 +1399,16 @@ def create_person(
     request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
     person_id = str(uuid.uuid4())
     try:
+        role = (body.role or "EMPLOYEE").strip().upper()
         db.create_profile(
             person_id=person_id,
             email=email,
             full_name=body.full_name,
-            role=body.role or "EMPLOYEE",
+            role=role,
             company_id=body.company_id,
         )
+        if role == "HR" and body.company_id:
+            db.ensure_hr_user_for_profile(person_id, body.company_id)
     except IntegrityError as e:
         log.warning(
             "admin_create_person conflict request_id=%s email=%s company_id=%s error=%r",
@@ -1468,6 +1471,8 @@ def assign_person_company(person_id: str, body: AdminAssignCompanyRequest, user:
     if not existing:
         raise HTTPException(status_code=404, detail="Person not found")
     db.set_profile_company(person_id, body.company_id)
+    if (existing.get("role") or "").upper() == "HR":
+        db.ensure_hr_user_for_profile(person_id, body.company_id)
     profile = db.get_profile_record(person_id)
     db.log_audit(user["id"], "ASSIGN_COMPANY", "profile", person_id, None, {"company_id": body.company_id})
     return {"person": profile}
@@ -1479,6 +1484,8 @@ def set_person_role(person_id: str, body: AdminSetRoleRequest, user: Dict[str, A
     if not existing:
         raise HTTPException(status_code=404, detail="Person not found")
     db.set_profile_role(person_id, body.role)
+    if (body.role or "").strip().upper() == "HR" and existing.get("company_id"):
+        db.ensure_hr_user_for_profile(person_id, existing["company_id"])
     profile = db.get_profile_record(person_id)
     db.log_audit(user["id"], "SET_ROLE", "profile", person_id, None, {"role": body.role})
     return {"person": profile}
@@ -1497,14 +1504,21 @@ def deactivate_person(person_id: str, user: Dict[str, Any] = Depends(require_adm
 
 @app.get("/api/admin/employees")
 def list_employees(company_id: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
-    items = db.list_employees(company_id)
+    if company_id:
+        items = db.list_employees_with_profiles(company_id)
+    else:
+        items = db.list_employees(company_id)
     db.log_audit(user["id"], "READ", "employee", None, None, {"company_id": company_id})
     return {"employees": items}
 
 
 @app.get("/api/admin/hr-users")
 def list_hr_users(company_id: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
-    items = db.list_hr_users(company_id)
+    if company_id:
+        db.ensure_hr_users_for_company(company_id)
+        items = db.list_hr_users_with_profiles(company_id)
+    else:
+        items = db.list_hr_users(company_id)
     db.log_audit(user["id"], "READ", "hr_user", None, None, {"company_id": company_id})
     return {"hr_users": items}
 
@@ -1639,7 +1653,9 @@ def admin_update_assignment_status(
 class AdminCreateAssignmentRequest(BaseModel):
     company_id: str
     hr_user_id: str
+    employee_user_id: Optional[str] = None
     employee_identifier: Optional[str] = None
+    destination_country: Optional[str] = None
 
 
 @app.post("/api/admin/assignments")
@@ -1655,19 +1671,30 @@ def admin_create_assignment(
     hr_users = db.list_hr_users(body.company_id)
     if not any(h.get("profile_id") == body.hr_user_id for h in hr_users):
         raise HTTPException(status_code=400, detail="HR user is not in the selected company")
+    employee_user_id: Optional[str] = None
+    employee_identifier = (body.employee_identifier or "").strip() or None
+    if body.employee_user_id:
+        emp = db.get_employee_by_profile_for_company(body.employee_user_id, body.company_id)
+        if not emp:
+            raise HTTPException(status_code=400, detail="Employee is not in the selected company")
+        employee_user_id = body.employee_user_id
+        employee_identifier = (emp.get("email") or emp.get("full_name") or employee_identifier or "admin-created")
+    if not employee_identifier:
+        employee_identifier = "admin-created"
     case_id = str(uuid.uuid4())
     assignment_id = str(uuid.uuid4())
-    employee_identifier = (body.employee_identifier or "").strip() or "admin-created"
     db.create_case(case_id, body.hr_user_id, {}, company_id=body.company_id)
     db.create_assignment(
         assignment_id=assignment_id,
         case_id=case_id,
         hr_user_id=body.hr_user_id,
-        employee_user_id=None,
+        employee_user_id=employee_user_id,
         employee_identifier=employee_identifier,
         status=AssignmentStatus.ASSIGNED.value,
         request_id=None,
     )
+    if body.destination_country:
+        db.update_relocation_case_host_country(case_id, body.destination_country)
     db.log_audit(user["id"], "CREATE", "assignment", assignment_id, None, {"case_id": case_id, "company_id": body.company_id, "hr_user_id": body.hr_user_id})
     return {"ok": True, "assignment_id": assignment_id, "case_id": case_id}
 

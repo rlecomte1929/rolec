@@ -21,6 +21,7 @@ export const AdminUsers: React.FC = () => {
   const [editOpen, setEditOpen] = useState<AdminProfile | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
 
   const loadPeople = async () => {
     setLoading(true);
@@ -31,6 +32,7 @@ export const AdminUsers: React.FC = () => {
         role: roleFilter || undefined,
       });
       setPeople(res.people ?? []);
+      return res.people ?? [];
     } finally {
       setLoading(false);
     }
@@ -93,26 +95,43 @@ export const AdminUsers: React.FC = () => {
             </Button>
           </div>
           <div className="self-end ml-auto flex items-center gap-2">
+            {deleteFeedback === 'done' && (
+              <span className="text-sm text-green-600">Deleted. List updated.</span>
+            )}
+            {deleteFeedback === 'error' && (
+              <span className="text-sm text-red-600">Delete failed or list could not refresh.</span>
+            )}
             <Button
               variant="outline"
-              disabled={selectedIds.size === 0}
+              disabled={selectedIds.size === 0 || deleteFeedback === 'deleting'}
               onClick={async () => {
                 if (selectedIds.size === 0) return;
                 if (!window.confirm(`Delete ${selectedIds.size} selected people?`)) return;
                 if (!window.confirm('Are you sure? This action cannot be undone.')) return;
                 const ids = Array.from(selectedIds);
+                setDeleteFeedback('deleting');
+                setSelectedIds(new Set());
                 try {
-                  await Promise.all(
-                    ids.map((id) => adminAPI.deactivatePerson(id).catch((err) => { console.error(err); })),
+                  const results = await Promise.allSettled(
+                    ids.map((id) => adminAPI.deactivatePerson(id)),
                   );
-                  setSelectedIds(new Set());
-                  await loadPeople();
+                  const failed = results.filter((r) => r.status === 'rejected').length;
+                  const nextPeople = await loadPeople();
+                  setDeleteFeedback(failed > 0 ? 'error' : 'done');
+                  if (failed === 0 && nextPeople) {
+                    setTimeout(() => setDeleteFeedback('idle'), 3000);
+                  } else if (failed > 0) {
+                    setTimeout(() => setDeleteFeedback('idle'), 5000);
+                  }
                 } catch (e) {
                   console.error(e);
+                  await loadPeople();
+                  setDeleteFeedback('error');
+                  setTimeout(() => setDeleteFeedback('idle'), 5000);
                 }
               }}
             >
-              Delete selected
+              {deleteFeedback === 'deleting' ? 'Deleting…' : 'Delete selected'}
             </Button>
             <Button variant="primary" onClick={() => setAddOpen(true)}>
               Add person

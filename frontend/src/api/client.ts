@@ -633,7 +633,13 @@ export const adminAPI = {
     const response = await api.patch(`/api/admin/assignments/${assignmentId}/status`, payload);
     return response.data;
   },
-  createAssignment: async (payload: { company_id: string; hr_user_id: string; employee_identifier?: string }) => {
+  createAssignment: async (payload: {
+    company_id: string;
+    hr_user_id: string;
+    employee_user_id?: string;
+    employee_identifier?: string;
+    destination_country?: string;
+  }): Promise<{ ok: boolean; assignment_id: string; case_id: string }> => {
     const response = await api.post('/api/admin/assignments', payload);
     return response.data;
   },
