@@ -584,7 +584,9 @@ def _seed_default_hr_policy() -> None:
 
 # Only run legacy demo seed (relocation_cases with string IDs) on SQLite.
 # Production Supabase uses UUID for relocation_cases.id; seeding would crash.
-if _db_scheme == "sqlite":
+# Allow disabling this seed (e.g. for admin data reconciliation / verification)
+# by setting DISABLE_DEMO_RESEED=true in the environment.
+if _db_scheme == "sqlite" and os.getenv("DISABLE_DEMO_RESEED", "").lower() not in ("1", "true", "yes"):
     try:
         _seed_demo_cases()
     except Exception as e:

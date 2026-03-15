@@ -4917,13 +4917,13 @@ class Database:
             "relocation_cases_linked": 0,
         }
         with self.engine.begin() as conn:
-            # Profiles: set company_id where null or empty
+            # Profiles: set company_id where null or empty (profiles table may not have updated_at in SQLite)
             r = conn.execute(
                 text(
-                    "UPDATE profiles SET company_id = :tid, updated_at = COALESCE(updated_at, :now) "
+                    "UPDATE profiles SET company_id = :tid "
                     "WHERE (company_id IS NULL OR TRIM(COALESCE(company_id, '')) = '')"
                 ),
-                {"tid": test_id, "now": datetime.utcnow().isoformat()},
+                {"tid": test_id},
             )
             summary["profiles_linked"] = r.rowcount
             # hr_users
@@ -5582,7 +5582,7 @@ class Database:
         if user_id:
             clauses.append("(a.hr_user_id = :user_id OR a.employee_user_id = :user_id)")
             params["user_id"] = user_id
-        where_sql = " AND " + " AND ".join(clauses)
+        where_sql = " AND ".join(clauses)
         order_clause = "ORDER BY last_message_at DESC NULLS LAST" if not _is_sqlite else "ORDER BY last_message_at DESC"
         sql = f"""
             SELECT
