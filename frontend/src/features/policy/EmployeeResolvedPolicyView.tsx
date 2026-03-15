@@ -33,7 +33,7 @@ interface ResolvedExclusion {
 }
 
 interface ResolvedPolicyResponse {
-  policy: { id: string; title: string; version: number; effective_date: string } | null;
+  policy: { id: string; title: string; version: number; effective_date: string; company_name?: string | null } | null;
   benefits: ResolvedBenefit[];
   exclusions: ResolvedExclusion[];
   resolved_at?: string;
@@ -263,16 +263,19 @@ export const EmployeeResolvedPolicyView: React.FC<{ assignmentId: string }> = ({
 
   return (
     <div className="space-y-6">
-      {/* Summary banner */}
+      {/* Summary banner — read-only; company name + contact HR */}
       <Card padding="lg" className="bg-[#eef4f8] border border-[#0b2b43]/20">
         <div className="text-sm font-semibold text-[#0b2b43] mb-2">{policy.title}</div>
+        {policy.company_name && (
+          <div className="text-sm text-[#6b7280] mb-1">Company: {policy.company_name}</div>
+        )}
         <div className="text-sm text-[#6b7280] flex flex-wrap gap-x-3 gap-y-1">
           {assignmentType && <span>Assignment type: {assignmentType}</span>}
           <span>Effective: {formatDate(policy.effective_date)}</span>
           {policy.version != null && <span>Version {policy.version}</span>}
         </div>
         <p className="text-sm text-[#4b5563] mt-3">
-          This is the policy currently applied to your assignment.
+          This is the policy currently applied to your assignment. For questions or exceptions, please contact your company HR.
         </p>
       </Card>
 

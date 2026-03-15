@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card } from '../components/antigravity';
 import { API_BASE_URL, employeeAPI } from '../api/client';
@@ -231,6 +231,14 @@ export const ProvidersPage: React.FC = () => {
                 Select the areas where you need support — we’ll build a clear plan so nothing falls through the cracks.
               </p>
               <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
+              <div className="mt-4 p-3 bg-[#eef4f8] border border-[#0b2b43]/20 rounded-lg">
+                <p className="text-sm text-[#4b5563] mb-2">
+                  Policy details and benefit limits for your assignment are available on the HR Policy page. For questions, please contact your company HR.
+                </p>
+                <Link to={buildRoute('hrPolicy')}>
+                  <Button variant="outline" className="mt-1">View HR Policy &amp; limits</Button>
+                </Link>
+              </div>
             </div>
             <TrustBlock className="mb-8" />
             <div className="flex flex-wrap items-center gap-3 mb-6">

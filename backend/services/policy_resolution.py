@@ -268,12 +268,10 @@ def resolve_policy_for_assignment(
     case_id = assignment.get("case_id")
     canonical_case_id = assignment.get("canonical_case_id") or case_id
 
-    # Get company_id from case, HR user's profile, or employee's profile
-    company_id = case.get("company_id") if case else None
+    # Use same company resolution as admin: case.company_id, then hr_users.company_id (not profile)
+    company_id = (case or {}).get("company_id")
     if not company_id and assignment.get("hr_user_id"):
-        profile_rec = db.get_profile_record(assignment["hr_user_id"])
-        if profile_rec:
-            company_id = profile_rec.get("company_id")
+        company_id = db.get_hr_company_id(assignment["hr_user_id"])
     if not company_id and assignment.get("employee_user_id"):
         emp_profile = db.get_profile_record(assignment["employee_user_id"])
         if emp_profile:

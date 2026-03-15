@@ -1668,7 +1668,10 @@ def admin_update_assignment_status(
     if not status:
         raise HTTPException(status_code=400, detail="status is required")
     db.update_assignment_status(assignment_id, status, request_id=None)
-    db.log_audit(user["id"], "UPDATE_STATUS", "assignment", assignment_id, None, {"status": status})
+    try:
+        db.log_audit(user["id"], "UPDATE_STATUS", "assignment", assignment_id, None, {"status": status})
+    except Exception as e:
+        log.warning("admin_update_assignment_status audit log failed: %s", e)
     return {"ok": True, "status": status}
 
 
@@ -4994,10 +4997,10 @@ def get_employee_assignment_policy(
     case_id = assignment.get("case_id")
     case = db.get_relocation_case(case_id) if case_id else None
     hr_user_id = assignment.get("hr_user_id")
-    hr_profile = db.get_profile_record(hr_user_id) if hr_user_id else None
-    hr_company_id = hr_profile.get("company_id") if hr_profile else None
-    # #region agent log
+    # Align with admin: company from case then hr_users.company_id (get_hr_company_id)
     case_company_id = (case or {}).get("company_id") if case else None
+    hr_company_id = db.get_hr_company_id(hr_user_id) if hr_user_id else None
+    # #region agent log
     _debug_log(
         "main.get_employee_assignment_policy",
         "employee policy request",
@@ -5005,12 +5008,13 @@ def get_employee_assignment_policy(
         "H2",
     )
     # #endregion
-    if hr_company_id:
+    company_id_for_resolution = case_company_id or hr_company_id
+    if company_id_for_resolution:
         if case and not case.get("company_id"):
             try:
                 db.upsert_relocation_case(
                     case_id=case_id,
-                    company_id=hr_company_id,
+                    company_id=company_id_for_resolution,
                     employee_id=case.get("employee_id"),
                     status=case.get("status"),
                     stage=case.get("stage"),
@@ -5030,7 +5034,7 @@ def get_employee_assignment_policy(
                         emp_profile.get("email") or "",
                         emp_profile.get("role") or "EMPLOYEE",
                         emp_profile.get("full_name"),
-                        hr_company_id,
+                        company_id_for_resolution,
                     )
                 except Exception:
                     pass
@@ -5043,10 +5047,8 @@ def get_employee_assignment_policy(
     employee_profile = db.get_employee_profile(assignment_id)
 
     resolved = db.get_resolved_assignment_policy(assignment_id)
-    # #region agent log
-    company_id_used = (case or {}).get("company_id") if case else None
-    if not company_id_used and hr_profile:
-        company_id_used = hr_profile.get("company_id")
+    # #region agent log — same company as resolution: case then hr_users
+    company_id_used = case_company_id or hr_company_id
     if not company_id_used and assignment.get("employee_user_id"):
         emp_profile = db.get_profile_record(assignment["employee_user_id"])
         if emp_profile:
@@ -5073,12 +5075,15 @@ def get_employee_assignment_policy(
     policy = resolved.get("policy") or {}
     version = resolved.get("version") or {}
     ctx = resolved.get("resolution_context") or resolved.get("resolution_context_json") or {}
+    company = db.get_company(company_id_used) if company_id_used else None
+    company_name = (company or {}).get("name") if company else None
     return {
         "policy": {
             "id": policy.get("id"),
             "title": policy.get("title"),
             "version": version.get("version_number"),
             "effective_date": policy.get("effective_date"),
+            "company_name": company_name,
         },
         "benefits": benefits,
         "exclusions": exclusions,
