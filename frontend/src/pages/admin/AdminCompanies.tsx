@@ -19,31 +19,6 @@ export const AdminCompanies: React.FC = () => {
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Partial<AdminCompany>>({});
-  const [backfillRunning, setBackfillRunning] = useState(false);
-  const [backfillResult, setBackfillResult] = useState<string | null>(null);
-
-  const runBackfill = async () => {
-    if (!window.confirm('Rebuild the Test company graph? This links demo/test data to the fixed Test company without overwriting non-demo companies.')) return;
-    setBackfillRunning(true);
-    setBackfillResult(null);
-    try {
-      const res = await adminAPI.rebuildTestCompanyGraph();
-      if (res.ok && res.summary) {
-        const s = res.summary;
-        setBackfillResult(
-          `Rebuilt graph for ${s.test_company_id}: ` +
-            `${s.profiles_linked} profiles, ${s.hr_users_linked} HR users, ` +
-            `${s.employees_linked} employees, ${s.relocation_cases_linked} cases, ` +
-            `${s.case_assignments_repaired} assignments repaired, ${s.policies_linked} policies.`
-        );
-        await load();
-      }
-    } catch (e) {
-      setBackfillResult((e as Error)?.message || 'Request failed.');
-    } finally {
-      setBackfillRunning(false);
-    }
-  };
 
   const load = async () => {
     setLoading(true);
