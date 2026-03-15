@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
+import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import type { RecommendationResponse, RecommendationItem } from './types';
 
-/** Category key to policy cap key */
+/** Category key to policy-budget cap key (from resolved HR policy) */
 const CATEGORY_TO_CAP: Record<string, string> = {
   housing: 'housing_monthly_usd',
   schools: 'schools_usd',
@@ -46,13 +47,32 @@ export const PackageSummary: React.FC<Props> = ({
   onStartOver,
 }) => {
   const [policyCaps, setPolicyCaps] = useState<PolicyCaps | null>(null);
+  const { assignmentId } = useEmployeeAssignment();
 
   useEffect(() => {
-    employeeAPI
-      .getPolicyCaps()
-      .then(setPolicyCaps)
-      .catch(() => setPolicyCaps(null));
-  }, []);
+    if (assignmentId) {
+      employeeAPI
+        .getPolicyBudget(assignmentId)
+        .then((res) => {
+          const caps = res?.caps || {};
+          if (Object.keys(caps).length > 0) {
+            setPolicyCaps({
+              housing_monthly_usd: caps.housing ?? 0,
+              movers_usd: caps.movers ?? 0,
+              schools_usd: caps.schools ?? 0,
+            });
+            return;
+          }
+          return employeeAPI.getPolicyCaps().then(setPolicyCaps);
+        })
+        .catch(() => employeeAPI.getPolicyCaps().then(setPolicyCaps).catch(() => setPolicyCaps(null)));
+    } else {
+      employeeAPI
+        .getPolicyCaps()
+        .then(setPolicyCaps)
+        .catch(() => setPolicyCaps(null));
+    }
+  }, [assignmentId]);
 
   const packageItems: { category: string; item: RecommendationItem }[] = [];
   for (const [category, res] of Object.entries(results)) {
@@ -151,8 +171,11 @@ export const PackageSummary: React.FC<Props> = ({
           {policyCaps && comparison.length > 0 && (
             <Card padding="lg">
               <h3 className="font-semibold text-[#0b2b43] mb-2">HR Policy Comparison</h3>
+              <p className="text-sm text-[#6b7280] mb-2">
+                Caps below are from your company&apos;s published policy. See how much your company covers vs. what you may pay out of pocket.
+              </p>
               <p className="text-sm text-[#6b7280] mb-6">
-                See how much your company covers vs. what you may pay out of pocket.
+                For full policy details, go to <strong>Assignment Package &amp; Limits</strong> in the menu.
               </p>
 
               <div className="space-y-6 mb-8">
@@ -226,7 +249,7 @@ export const PackageSummary: React.FC<Props> = ({
 
           {!policyCaps && (
             <p className="text-sm text-[#6b7280]">
-              Policy caps could not be loaded. Cost comparison is based on estimated values from recommendations.
+              Policy caps could not be loaded. Cost comparison is based on estimated values from recommendations. View &quot;Assignment Package &amp; Limits&quot; for your company&apos;s policy summary.
             </p>
           )}
         </>

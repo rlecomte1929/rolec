@@ -126,10 +126,23 @@ def _seed_default_policy_template_sqlite(conn: Any) -> None:
     )
 
 
+def _policy_bool_for_db(value: Any) -> int:
+    """Return 1 or 0 for policy_* boolean columns. Use with _policy_ag_sql() in INSERTs for dialect-safe behavior."""
+    b = bool(value) if value is not None else True
+    return 1 if b else 0
+
+
+def _policy_ag_sql() -> str:
+    """SQL fragment for auto_generated column: plain :ag for SQLite (INTEGER), CASE for Postgres (boolean)."""
+    if _is_sqlite:
+        return ":ag"
+    return "(CASE WHEN :ag = 1 THEN true ELSE false END)"
+
+
 def normalize_policy_boolean_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Coerce known boolean keys to Python bool before DB write.
-    Postgres boolean columns require True/False, not 1/0.
+    Coerce known boolean keys for DB write.
+    SQLite policy_* tables use INTEGER (0/1); Postgres uses boolean (True/False).
     """
     BOOLEAN_KEYS = ("auto_generated", "ag")
     out = dict(payload)
@@ -139,13 +152,7 @@ def normalize_policy_boolean_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
         v = out[k]
         if v is None:
             continue
-        if isinstance(v, int):
-            out[k] = bool(v)
-        elif not isinstance(v, bool):
-            try:
-                out[k] = bool(v)
-            except (TypeError, ValueError):
-                out[k] = True
+        out[k] = _policy_bool_for_db(v)
     return out
 
 
@@ -6664,32 +6671,35 @@ class Database:
         self.update_company_policy_status(policy_id, "extracted", datetime.utcnow().isoformat())
         version_id = str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
+        ag_sql = _policy_ag_sql()
         with self.engine.begin() as conn:
             conn.execute(
-                text("""
+                text(f"""
                     INSERT INTO policy_versions
                     (id, policy_id, source_policy_document_id, version_number, status,
                      auto_generated, review_status, confidence, created_by, created_at, updated_at)
-                    VALUES (:id, :pid, NULL, 1, 'draft', 1, 'accepted', NULL, :cb, :now, :now)
+                    VALUES (:id, :pid, NULL, 1, 'draft', {ag_sql}, 'accepted', NULL, :cb, :now, :now)
                 """),
-                {"id": version_id, "pid": policy_id, "cb": created_by, "now": now},
+                {"id": version_id, "pid": policy_id, "ag": 1, "cb": created_by, "now": now},
             )
         benefit_rules = snapshot.get("benefit_rules") or []
         for br in benefit_rules:
             if not isinstance(br, dict):
                 continue
             rule_id = str(uuid.uuid4())
+            ag_sql = _policy_ag_sql()
             with self.engine.begin() as conn:
                 conn.execute(
-                    text("""
+                    text(f"""
                         INSERT INTO policy_benefit_rules
                         (id, policy_version_id, benefit_key, benefit_category, calc_type, amount_value, amount_unit, currency,
                          description, metadata_json, auto_generated, review_status, created_at, updated_at)
-                        VALUES (:id, :vid, :bk, :cat, :ct, :av, :au, :cur, :desc, '{}', 1, 'accepted', :now, :now)
+                        VALUES (:id, :vid, :bk, :cat, :ct, :av, :au, :cur, :desc, '{{}}', {ag_sql}, 'accepted', :now, :now)
                     """),
                     {
                         "id": rule_id,
                         "vid": version_id,
+                        "ag": 1,
                         "bk": br.get("benefit_key") or "",
                         "cat": br.get("benefit_category") or "",
                         "ct": br.get("calc_type"),
@@ -7456,13 +7466,14 @@ class Database:
                 request_id, list(params.keys()), params.get("status"), params.get("ag"),
                 params.get("rs"), type(params.get("ag")).__name__,
             )
+        ag_sql = _policy_ag_sql()
         with self.engine.begin() as conn:
             conn.execute(
-                text("""
+                text(f"""
                     INSERT INTO policy_versions
                     (id, policy_id, source_policy_document_id, version_number, status,
                      auto_generated, review_status, confidence, created_by, created_at, updated_at)
-                    VALUES (:id, :pid, :doc_id, :vn, :status, :ag, :rs, :conf, :cb, :now, :now)
+                    VALUES (:id, :pid, :doc_id, :vn, :status, {ag_sql}, :rs, :conf, :cb, :now, :now)
                 """),
                 params,
             )
@@ -7638,7 +7649,7 @@ class Database:
                     "freq": rule.get("frequency"),
                     "desc": rule.get("description"),
                     "meta": json.dumps(rule.get("metadata_json")) if rule.get("metadata_json") else None,
-                    "ag": bool(rule.get("auto_generated", True)),
+                    "ag": _policy_bool_for_db(rule.get("auto_generated", True)),
                     "rs": rule.get("review_status", "pending"),
                     "conf": rule.get("confidence"),
                     "raw": rule.get("raw_text"),
@@ -7664,7 +7675,7 @@ class Database:
                     "bk": excl.get("benefit_key"),
                     "dom": excl["domain"],
                     "desc": excl.get("description"),
-                    "ag": bool(excl.get("auto_generated", True)),
+                    "ag": _policy_bool_for_db(excl.get("auto_generated", True)),
                     "rs": excl.get("review_status", "pending"),
                     "conf": excl.get("confidence"),
                     "raw": excl.get("raw_text"),
@@ -7690,7 +7701,7 @@ class Database:
                     "brid": ev.get("benefit_rule_id"),
                     "items": json.dumps(ev.get("evidence_items_json") or []),
                     "desc": ev.get("description"),
-                    "ag": bool(ev.get("auto_generated", True)),
+                    "ag": _policy_bool_for_db(ev.get("auto_generated", True)),
                     "rs": ev.get("review_status", "pending"),
                     "conf": ev.get("confidence"),
                     "raw": ev.get("raw_text"),
@@ -7717,7 +7728,7 @@ class Database:
                     "oid": cond["object_id"],
                     "ct": cond["condition_type"],
                     "val": json.dumps(cond.get("condition_value_json") or {}),
-                    "ag": bool(cond.get("auto_generated", True)),
+                    "ag": _policy_bool_for_db(cond.get("auto_generated", True)),
                     "rs": cond.get("review_status", "pending"),
                     "conf": cond.get("confidence"),
                     "now": now,

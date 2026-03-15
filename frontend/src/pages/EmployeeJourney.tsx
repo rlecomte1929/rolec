@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { buildRoute } from '../navigation/routes';
 import { Alert, Button, Card, Input, LoadingButton } from '../components/antigravity';
 import { employeeAPI } from '../api/client';
 import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
@@ -201,7 +202,8 @@ export const EmployeeJourney: React.FC = () => {
               {!budgetComputed ? 'Coming soon' : (budgetStatus ?? '—')}
             </div>
             <div className="text-sm text-[#6b7280] mt-2">
-              Compare selected services against policy caps.
+              Compared to your company&apos;s published policy.{' '}
+              <Link to={buildRoute('hrPolicy')} className="text-[#0b2b43] hover:underline">Assignment Package &amp; Limits</Link>
             </div>
           </Card>
         </div>

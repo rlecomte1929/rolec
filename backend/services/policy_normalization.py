@@ -294,7 +294,9 @@ def run_normalization(
     Run full normalization: create/attach company_policy, create policy_version,
     persist all normalized objects. Returns {policy_id, policy_version_id, summary}.
     """
-    company_id = policy_document.get("company_id")
+    company_id = (policy_document.get("company_id") or "").strip() or None
+    if not company_id:
+        raise ValueError("Policy document has no company_id. Re-upload the document from the company's policy workspace.")
     doc_id = policy_document.get("id")
     meta = policy_document.get("extracted_metadata") or {}
     title = meta.get("detected_title") or meta.get("policy_title") or policy_document.get("filename", "Policy")

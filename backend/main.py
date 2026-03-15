@@ -5160,7 +5160,28 @@ def get_assignment_policy_budget(
     assignment_id: str,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    _ = _require_assignment_visibility(assignment_id, user)
+    """Employee: Get policy caps for this assignment. Uses same resolved HR policy as Assignment Package & Limits so Services are comparable to benefits."""
+    assignment = _require_assignment_visibility(assignment_id, user)
+    from .services.policy_adapter import caps_from_resolved_benefits
+
+    resolved = db.get_resolved_assignment_policy(assignment_id)
+    if not resolved:
+        from .services.policy_resolution import resolve_policy_for_assignment
+        case_id = assignment.get("case_id")
+        case = db.get_relocation_case(case_id) if case_id else None
+        profile = None
+        if case and case.get("profile_json"):
+            try:
+                profile = json.loads(case["profile_json"]) if isinstance(case["profile_json"], str) else case["profile_json"]
+            except Exception:
+                profile = None
+        employee_profile = db.get_employee_profile(assignment_id)
+        resolved = resolve_policy_for_assignment(db, assignment_id, assignment, case, profile, employee_profile)
+
+    if resolved:
+        benefits = db.list_resolved_policy_benefits(resolved["id"])
+        return caps_from_resolved_benefits(benefits)
+
     policy = policy_engine.load_policy()
     return normalize_policy_caps(policy)
 
@@ -6593,6 +6614,10 @@ def normalize_policy_document(
         result = run_normalization(db, doc, clauses, created_by=user.get("id"), request_id=request_id)
         log.info("request_id=%s normalize policy_document=%s -> policy=%s version=%s", request_id, doc_id, result["policy_id"], result["policy_version_id"])
         return {"policy_id": result["policy_id"], "policy_version_id": result["policy_version_id"], "summary": result["summary"]}
+    except ValueError as exc:
+        err_str = str(exc)
+        log.warning("request_id=%s normalize validation: %s", request_id, err_str)
+        raise HTTPException(status_code=400, detail=err_str)
     except Exception as exc:
         log.warning("request_id=%s normalize failed: %s", request_id, exc, exc_info=True)
         err_str = str(exc)

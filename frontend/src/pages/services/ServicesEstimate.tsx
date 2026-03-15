@@ -33,7 +33,7 @@ export const ServicesEstimate: React.FC = () => {
   const hasShortlist = shortlist.size > 0;
 
   return (
-    <AppShell title="Estimate review" subtitle="Compare your shortlist with HR policy caps.">
+    <AppShell title="Estimate review" subtitle="Compare your shortlist with your company's HR policy caps.">
       <ServicesNavRibbon />
       <Card padding="lg" className="mb-6">
         <div className="text-sm text-[#4b5563]">
