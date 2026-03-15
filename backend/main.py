@@ -1424,6 +1424,8 @@ def create_person(
         )
         if role == "HR" and body.company_id:
             db.ensure_hr_user_for_profile(person_id, body.company_id)
+        if role in ("EMPLOYEE", "EMPLOYEE_USER") and body.company_id:
+            db.ensure_employee_for_profile(person_id, body.company_id)
     except IntegrityError as e:
         log.warning(
             "admin_create_person conflict request_id=%s email=%s company_id=%s error=%r",
@@ -1488,6 +1490,8 @@ def assign_person_company(person_id: str, body: AdminAssignCompanyRequest, user:
     db.set_profile_company(person_id, body.company_id)
     if (existing.get("role") or "").upper() == "HR":
         db.ensure_hr_user_for_profile(person_id, body.company_id)
+    if (existing.get("role") or "").upper() in ("EMPLOYEE", "EMPLOYEE_USER"):
+        db.ensure_employee_for_profile(person_id, body.company_id)
     profile = db.get_profile_record(person_id)
     db.log_audit(user["id"], "ASSIGN_COMPANY", "profile", person_id, None, {"company_id": body.company_id})
     return {"person": profile}
@@ -1501,6 +1505,8 @@ def set_person_role(person_id: str, body: AdminSetRoleRequest, user: Dict[str, A
     db.set_profile_role(person_id, body.role)
     if (body.role or "").strip().upper() == "HR" and existing.get("company_id"):
         db.ensure_hr_user_for_profile(person_id, existing["company_id"])
+    if (body.role or "").strip().upper() in ("EMPLOYEE", "EMPLOYEE_USER") and existing.get("company_id"):
+        db.ensure_employee_for_profile(person_id, existing["company_id"])
     profile = db.get_profile_record(person_id)
     db.log_audit(user["id"], "SET_ROLE", "profile", person_id, None, {"role": body.role})
     return {"person": profile}
@@ -1520,6 +1526,7 @@ def deactivate_person(person_id: str, user: Dict[str, Any] = Depends(require_adm
 @app.get("/api/admin/employees")
 def list_employees(company_id: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
     if company_id:
+        db.ensure_employees_for_company(company_id)
         items = db.list_employees_with_profiles(company_id)
     else:
         items = db.list_employees(company_id)

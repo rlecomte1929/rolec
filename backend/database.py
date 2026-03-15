@@ -5627,6 +5627,51 @@ class Database:
             pid = row._mapping["id"] if hasattr(row, "_mapping") else row[0]
             self.ensure_hr_user_for_profile(pid, company_id)
 
+    def ensure_employee_for_profile(self, profile_id: str, company_id: str) -> None:
+        """
+        Ensure an employees row exists for this profile and company (so they appear in
+        assignment creation employee dropdown). If a row exists, update company_id; else insert.
+        """
+        if not profile_id or not company_id:
+            return
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id FROM employees WHERE profile_id = :pid LIMIT 1"),
+                {"pid": profile_id},
+            ).fetchone()
+        if row:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text("UPDATE employees SET company_id = :cid WHERE profile_id = :pid"),
+                    {"cid": company_id, "pid": profile_id},
+                )
+        else:
+            self.create_employee(
+                employee_id=str(uuid.uuid4()),
+                company_id=company_id,
+                profile_id=profile_id,
+                band=None,
+                assignment_type=None,
+                relocation_case_id=None,
+                status="active",
+            )
+
+    def ensure_employees_for_company(self, company_id: str) -> None:
+        """
+        Ensure employees rows exist for all profiles with role EMPLOYEE/EMPLOYEE_USER and
+        company_id=company_id (backfill so they appear in assignment creation dropdown).
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT id FROM profiles WHERE role IN ('EMPLOYEE', 'EMPLOYEE_USER') AND company_id = :cid"
+                ),
+                {"cid": company_id},
+            ).fetchall()
+        for row in rows:
+            pid = row._mapping["id"] if hasattr(row, "_mapping") else row[0]
+            self.ensure_employee_for_profile(pid, company_id)
+
     def upsert_relocation_case(
         self,
         case_id: str,
