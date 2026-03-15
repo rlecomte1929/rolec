@@ -3,9 +3,24 @@ FastAPI main application for ReloPass backend.
 """
 import logging
 import time
+import os
+import json as _json
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
+
+# #region agent log
+def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = ""):
+    try:
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".cursor", "debug-2c6040.log")
+        payload = {"sessionId": "2c6040", "location": location, "message": message, "data": data, "timestamp": int(time.time() * 1000)}
+        if hypothesis_id:
+            payload["hypothesisId"] = hypothesis_id
+        with open(path, "a") as f:
+            f.write(_json.dumps(payload) + "\n")
+    except Exception:
+        pass
+# #endregion
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -4937,6 +4952,15 @@ def get_employee_assignment_policy(
     hr_user_id = assignment.get("hr_user_id")
     hr_profile = db.get_profile_record(hr_user_id) if hr_user_id else None
     hr_company_id = hr_profile.get("company_id") if hr_profile else None
+    # #region agent log
+    case_company_id = (case or {}).get("company_id") if case else None
+    _debug_log(
+        "main.get_employee_assignment_policy",
+        "employee policy request",
+        {"assignment_id": assignment_id, "case_id": case_id, "case_found": case is not None, "case_company_id": case_company_id, "hr_company_id": hr_company_id},
+        "H2",
+    )
+    # #endregion
     if hr_company_id:
         if case and not case.get("company_id"):
             try:
@@ -4975,10 +4999,29 @@ def get_employee_assignment_policy(
     employee_profile = db.get_employee_profile(assignment_id)
 
     resolved = db.get_resolved_assignment_policy(assignment_id)
+    # #region agent log
+    company_id_used = (case or {}).get("company_id") if case else None
+    if not company_id_used and hr_profile:
+        company_id_used = hr_profile.get("company_id")
+    if not company_id_used and assignment.get("employee_user_id"):
+        emp_profile = db.get_profile_record(assignment["employee_user_id"])
+        if emp_profile:
+            company_id_used = emp_profile.get("company_id")
+    has_published = bool(db.get_company_policy_with_published_version(company_id_used)) if company_id_used else False
+    _debug_log(
+        "main.get_employee_assignment_policy",
+        "resolution check",
+        {"assignment_id": assignment_id, "company_id_used": company_id_used, "resolved_cached": resolved is not None, "has_published_version_for_company": has_published},
+        "H1",
+    )
+    # #endregion
     if not resolved:
         resolved = resolve_policy_for_assignment(
             db, assignment_id, assignment, case, profile, employee_profile
         )
+    # #region agent log
+    _debug_log("main.get_employee_assignment_policy", "after resolve", {"assignment_id": assignment_id, "resolve_returned_policy": resolved is not None}, "H3")
+    # #endregion
     if not resolved:
         return {"policy": None, "benefits": [], "exclusions": [], "resolution_context": None, "message": "No published policy for your assignment."}
     benefits = db.list_resolved_policy_benefits(resolved["id"])

@@ -3275,6 +3275,16 @@ class Database:
         policies = self.list_company_policies(comp_id) if comp_id else []
         out["company_policies"] = [p for p in policies if (p.get("extraction_status") or "") == "extracted"]
         out["company_has_published_policy"] = len(out["company_policies"]) > 0
+        # #region agent log
+        try:
+            import os as _os, json as _json
+            _path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), ".cursor", "debug-2c6040.log")
+            _has_pub = bool(self.get_company_policy_with_published_version(comp_id)) if comp_id else False
+            with open(_path, "a") as _f:
+                _f.write(_json.dumps({"sessionId": "2c6040", "hypothesisId": "H1", "location": "database.get_admin_assignment_detail", "message": "admin policy flags", "data": {"assignment_id": assignment_id, "comp_id": comp_id, "extracted_count": len(out["company_policies"]), "company_has_published_policy": out["company_has_published_policy"], "has_actual_published_version": _has_pub}, "timestamp": int(datetime.utcnow().timestamp() * 1000)}) + "\n")
+        except Exception:
+            pass
+        # #endregion
         return out
 
     def admin_reassign_employee_company(self, employee_user_id: str, company_id: str) -> None:

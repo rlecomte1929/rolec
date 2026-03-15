@@ -286,10 +286,28 @@ def resolve_policy_for_assignment(
             assignment.get("hr_user_id"),
             assignment.get("employee_user_id"),
         )
+        # #region agent log
+        try:
+            import os, json as _json, time
+            path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug-2c6040.log")
+            with open(path, "a") as f:
+                f.write(_json.dumps({"sessionId": "2c6040", "hypothesisId": "H2", "location": "policy_resolution.resolve_policy_for_assignment", "message": "company_id is None", "data": {"assignment_id": assignment_id}, "timestamp": int(time.time() * 1000)}) + "\n")
+        except Exception:
+            pass
+        # #endregion
         return None
 
     # Get company policy that has a published version (try any policy for this company)
     result = db.get_company_policy_with_published_version(company_id)
+    # #region agent log
+    try:
+        import os, json as _json, time
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug-2c6040.log")
+        with open(path, "a") as f:
+            f.write(_json.dumps({"sessionId": "2c6040", "hypothesisId": "H3", "location": "policy_resolution.resolve_policy_for_assignment", "message": "get_company_policy_with_published_version", "data": {"company_id": company_id, "has_published_version": result is not None}, "timestamp": int(time.time() * 1000)}) + "\n")
+    except Exception:
+        pass
+    # #endregion
     if not result:
         policies = db.list_company_policies(company_id)
         log.info(
