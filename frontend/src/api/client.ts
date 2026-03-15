@@ -492,12 +492,13 @@ export const adminAPI = {
   },
   getCompanyDetail: async (companyId: string): Promise<{
     company: AdminCompany | null;
+    summary?: { hr_users_count: number; employee_count: number; assignments_count: number; policies_count: number };
+    counts_summary?: AdminCompanyDetailCounts;
     hr_users: AdminHrUser[];
     employees: AdminEmployee[];
     assignments: AdminCompanyDetailAssignment[];
     policies: AdminCompanyDetailPolicy[];
-    counts_summary: AdminCompanyDetailCounts;
-    orphan_diagnostics: AdminCompanyDetailOrphanDiagnostics;
+    orphan_diagnostics?: AdminCompanyDetailOrphanDiagnostics;
   }> => {
     const response = await api.get(`/api/admin/companies/${companyId}`);
     return response.data;
@@ -539,6 +540,10 @@ export const adminAPI = {
   },
   deactivateCompany: async (companyId: string): Promise<{ company: AdminCompany; message?: string }> => {
     const response = await api.post(`/api/admin/companies/${companyId}/deactivate`);
+    return response.data;
+  },
+  runReconciliationBackfillTestCompany: async (): Promise<{ ok: boolean; summary?: { test_company_id: string; profiles_linked: number; hr_users_linked: number; relocation_cases_linked: number }; error?: string }> => {
+    const response = await api.post('/api/admin/reconciliation/backfill-test-company');
     return response.data;
   },
   listProfiles: async (params?: { q?: string; company_id?: string; role?: string }): Promise<{ profiles: AdminProfile[]; summary?: { count: number; orphans_without_company?: number } }> => {

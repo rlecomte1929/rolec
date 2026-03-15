@@ -43,9 +43,12 @@ export const AdminUsers: React.FC = () => {
   };
 
   useEffect(() => {
-    loadPeople().catch(() => undefined);
     loadCompanies().catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    loadPeople().catch(() => undefined);
+  }, [companyId, roleFilter]);
 
   const startViewAs = async (profile: AdminProfile, mode: 'hr' | 'employee') => {
     const reason = window.prompt('Reason for view-as (required):');
@@ -105,7 +108,18 @@ export const AdminUsers: React.FC = () => {
         </div>
       </Card>
       <Card padding="lg">
-        <div className="text-sm text-[#6b7280] mb-2">People ({people.length})</div>
+        {(() => {
+          const total = people.length;
+          const hrCount = people.filter((p) => p.role === 'HR' || (p as { hr_link_count?: number }).hr_link_count > 0).length;
+          const employeeCount = people.filter((p) => ['EMPLOYEE', 'EMPLOYEE_USER'].includes(p.role || '') || (p as { employee_link_count?: number }).employee_link_count > 0).length;
+          return (
+            <div className="text-sm text-[#6b7280] mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="font-medium text-[#0b2b43]">People ({total})</span>
+              <span>HR: {hrCount}</span>
+              <span>Employees: {employeeCount}</span>
+            </div>
+          );
+        })()}
         <div className="space-y-3">
           {people.map((p) => (
             <div key={p.id} className="flex flex-wrap items-center justify-between border-b border-[#e2e8f0] py-3 gap-3">

@@ -123,11 +123,11 @@ export const AdminSupplierDetail: React.FC = () => {
       setSupplier(s);
       setEditForm({});
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-          : (err as Error)?.message;
-      setError(String(msg || 'Failed to load supplier'));
+      const ex = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+      const detail = ex?.response?.data?.detail;
+      const status = ex?.response?.status;
+      const msg = typeof detail === 'string' ? detail : ex?.message || 'Failed to load supplier';
+      setError(status ? `[${status}] ${msg}` : msg);
     } finally {
       setLoading(false);
     }
@@ -295,9 +295,17 @@ export const AdminSupplierDetail: React.FC = () => {
       <AdminLayout title="Supplier" subtitle="Error">
         <Card padding="lg">
           <Alert variant="error">{error}</Alert>
-          <Button className="mt-4" onClick={() => navigate(ROUTE_DEFS.adminSuppliers.path)}>
-            Back to list
-          </Button>
+          <p className="text-sm text-[#6b7280] mt-2">
+            Retry or return to the list. If the problem persists, check that the supplier exists and you have access.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Button variant="outline" size="sm" onClick={() => load()}>
+              Retry
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(ROUTE_DEFS.adminSuppliers.path)}>
+              Back to list
+            </Button>
+          </div>
         </Card>
       </AdminLayout>
     );

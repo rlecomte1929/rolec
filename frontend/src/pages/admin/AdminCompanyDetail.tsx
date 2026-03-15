@@ -38,10 +38,18 @@ export const AdminCompanyDetail: React.FC = () => {
         setEmployees(res.employees ?? []);
         setAssignments(res.assignments ?? []);
         setPolicies(res.policies ?? []);
-        setCounts(res.counts_summary ?? null);
+        const summary = (res as { summary?: AdminCompanyDetailCounts; counts_summary?: AdminCompanyDetailCounts }).summary
+          ?? (res as { counts_summary?: AdminCompanyDetailCounts }).counts_summary ?? null;
+        setCounts(summary);
         setOrphanDiagnostics(res.orphan_diagnostics ?? null);
       })
-      .catch((e) => setError((e as Error)?.message || 'Failed to load'))
+      .catch((e: unknown) => {
+        const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+        const detail = err?.response?.data?.detail;
+        const status = err?.response?.status;
+        const msg = typeof detail === 'string' ? detail : err?.message || 'Failed to load company';
+        setError(status ? `[${status}] ${msg}` : msg);
+      })
       .finally(() => setLoading(false));
   }, [companyId]);
 
@@ -63,17 +71,30 @@ export const AdminCompanyDetail: React.FC = () => {
     return (
       <AdminLayout title="Company Detail" subtitle="—">
         <Card padding="lg">
-          <div className="text-red-600">{error || 'Company not found.'}</div>
-          <Link to={buildRoute('adminCompanies')} className="mt-2 inline-block text-sm text-[#0b2b43] underline">
-            ← Back to Companies
-          </Link>
+          <div className="text-[#7a2a2a] font-medium">{error || 'Company not found.'}</div>
+          <p className="text-sm text-[#6b7280] mt-1">
+            If the problem persists, check that the company exists and you have access. Retry or return to the list.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+            <Link to={buildRoute('adminCompanies')}>
+              <Button variant="outline" size="sm">← Back to Companies</Button>
+            </Link>
+          </div>
         </Card>
       </AdminLayout>
     );
   }
 
   const hrCount = counts?.hr_users_count ?? hrUsers.length;
-  const empCount = counts?.employees_count ?? employees.length;
+  const empCount = (counts as { employee_count?: number; employees_count?: number })?.employee_count
+    ?? (counts as { employees_count?: number })?.employees_count ?? employees.length;
   const assignCount = counts?.assignments_count ?? assignments.length;
   const policyCount = counts?.policies_count ?? policies.length;
 
@@ -95,10 +116,13 @@ export const AdminCompanyDetail: React.FC = () => {
               )}
             </div>
             <div className="text-sm text-[#6b7280] mt-1">
-              {company.country ?? '—'} · {company.size_band ?? '—'}
+              Plan: {(company as { plan_tier?: string }).plan_tier ?? '—'} · {company.country ?? '—'} · {company.size_band ?? '—'}
             </div>
             <div className="text-xs text-[#6b7280] mt-1">
-              {company.address ?? '—'} · {company.phone ?? '—'} · {company.hr_contact ?? '—'}
+              Primary contact: {company.hr_contact ?? (hrUsers[0]?.name || hrUsers[0]?.email) ?? '—'}
+            </div>
+            <div className="text-xs text-[#6b7280] mt-0.5">
+              {company.address ?? '—'} · {company.phone ?? '—'}
             </div>
           </div>
           <Link to={buildRoute('adminCompanies')} className="text-sm text-[#0b2b43] underline">

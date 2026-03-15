@@ -19,6 +19,27 @@ export const AdminCompanies: React.FC = () => {
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Partial<AdminCompany>>({});
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<string | null>(null);
+
+  const runBackfill = async () => {
+    if (!window.confirm('Link all orphan profiles, HR users, and assignments to "Test company"? This does not overwrite existing company links.')) return;
+    setBackfillRunning(true);
+    setBackfillResult(null);
+    try {
+      const res = await adminAPI.runReconciliationBackfillTestCompany();
+      if (res.ok && res.summary) {
+        setBackfillResult(`Linked: ${res.summary.profiles_linked} profiles, ${res.summary.hr_users_linked} HR users, ${res.summary.relocation_cases_linked} cases.`);
+        await load();
+      } else {
+        setBackfillResult(res.error || 'Backfill failed.');
+      }
+    } catch (e) {
+      setBackfillResult((e as Error)?.message || 'Request failed.');
+    } finally {
+      setBackfillRunning(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -96,6 +117,12 @@ export const AdminCompanies: React.FC = () => {
           <Button variant="primary" onClick={() => setAddOpen(true)}>
             Add company
           </Button>
+          <Button variant="outline" onClick={runBackfill} disabled={backfillRunning}>
+            {backfillRunning ? 'Running…' : 'Link orphans to Test company'}
+          </Button>
+          {backfillResult && (
+            <span className="text-sm text-[#6b7280] self-center">{backfillResult}</span>
+          )}
         </div>
       </Card>
       <Card padding="lg">

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Container } from './antigravity';
 import { getAuthItem } from '../utils/demo';
 import { authAPI } from '../api/client';
@@ -50,10 +50,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const [navError, setNavError] = useState<string | null>(getNavigationError());
   const isHrRole = role === 'HR' || role === 'ADMIN';
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
+  const [searchParams] = useSearchParams();
   const isOnEmployeeRoute = location.pathname.startsWith('/employee/');
   const isOnAdminRoute = location.pathname.startsWith('/admin');
+  const isAdminPolicyWorkspace = location.pathname.startsWith('/hr/policy') && searchParams.get('adminCompanyId') != null;
+  const showAdminContextOnly = isOnAdminRoute || isAdminPolicyWorkspace;
   const showEmployeeNav = (isEmployeeRole && !isHrRole) || (role === 'ADMIN' && isOnEmployeeRoute);
-  const showHrNav = isHrRole && !(role === 'ADMIN' && isOnEmployeeRoute) && !isOnAdminRoute;
+  const showHrNav = isHrRole && !(role === 'ADMIN' && isOnEmployeeRoute) && !showAdminContextOnly;
   const { selectedCaseId } = useSelectedCase();
   const { assignmentId: assignmentIdFromContext } = useEmployeeAssignment();
   const assignmentIdFromPath = location.pathname.match(/^\/employee\/case\/([^/]+)/)?.[1] ?? null;
@@ -104,7 +107,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             />
           </Link>
           <div className="flex items-center gap-2">
-            {(isHrRole || isEmployeeRole) && (
+            {(isHrRole || isEmployeeRole) && !showAdminContextOnly && (
               <>
                 <CompanyBrand />
                 <Link

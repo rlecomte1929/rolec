@@ -4868,6 +4868,90 @@ class Database:
             row = conn.execute(text("SELECT * FROM companies WHERE id = :id"), {"id": company_id}).fetchone()
         return self._row_to_dict(row)
 
+    def get_company_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Find company by exact name match (case-sensitive)."""
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM companies WHERE TRIM(name) = :name LIMIT 1"),
+                {"name": (name or "").strip()},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    TEST_COMPANY_FIXED_ID = "110854ad-3c85-4291-a484-0b43effb680e"
+
+    def run_admin_reconciliation_backfill_test_company(
+        self, test_company_name: str = "Test company"
+    ) -> Dict[str, Any]:
+        """
+        One-time non-destructive backfill: link orphan profiles, hr_users, and relocation_cases
+        to Test company. Uses fixed company_id 110854ad-3c85-4291-a484-0b43effb680e when that
+        company exists; otherwise falls back to lookup by exact name and creates if missing.
+        Does not overwrite existing non-null linkage.
+        Returns summary counts.
+        """
+        name = (test_company_name or "").strip()
+        if not name:
+            return {"ok": False, "error": "test_company_name is required", "summary": {}}
+        test_id = self.TEST_COMPANY_FIXED_ID
+        with self.engine.connect() as conn:
+            by_id = conn.execute(
+                text("SELECT id, name FROM companies WHERE id = :id LIMIT 1"),
+                {"id": test_id},
+            ).fetchone()
+            if by_id:
+                log.info("admin_reconciliation: using existing Test company id=%s name=%s", test_id, by_id._mapping.get("name"))
+            else:
+                # Create Test company with fixed ID so all backfill targets this UUID
+                self.create_company(
+                    company_id=test_id,
+                    name=name,
+                    country=None,
+                    status="active",
+                    plan_tier="low",
+                )
+                log.info("admin_reconciliation: created Test company id=%s name=%s", test_id, name)
+        summary: Dict[str, Any] = {
+            "test_company_id": test_id,
+            "profiles_linked": 0,
+            "hr_users_linked": 0,
+            "relocation_cases_linked": 0,
+        }
+        with self.engine.begin() as conn:
+            # Profiles: set company_id where null or empty
+            r = conn.execute(
+                text(
+                    "UPDATE profiles SET company_id = :tid, updated_at = COALESCE(updated_at, :now) "
+                    "WHERE (company_id IS NULL OR TRIM(COALESCE(company_id, '')) = '')"
+                ),
+                {"tid": test_id, "now": datetime.utcnow().isoformat()},
+            )
+            summary["profiles_linked"] = r.rowcount
+            # hr_users
+            r = conn.execute(
+                text(
+                    "UPDATE hr_users SET company_id = :tid "
+                    "WHERE (company_id IS NULL OR TRIM(COALESCE(company_id, '')) = '')"
+                ),
+                {"tid": test_id},
+            )
+            summary["hr_users_linked"] = r.rowcount
+            # relocation_cases
+            r = conn.execute(
+                text(
+                    "UPDATE relocation_cases SET company_id = :tid, updated_at = COALESCE(updated_at, :now) "
+                    "WHERE (company_id IS NULL OR TRIM(COALESCE(company_id, '')) = '')"
+                ),
+                {"tid": test_id, "now": datetime.utcnow().isoformat()},
+            )
+            summary["relocation_cases_linked"] = r.rowcount
+        log.info(
+            "admin_reconciliation backfill test_company: profiles_linked=%s hr_users_linked=%s cases_linked=%s",
+            summary["profiles_linked"],
+            summary["hr_users_linked"],
+            summary["relocation_cases_linked"],
+        )
+        return {"ok": True, "summary": summary}
+
     def create_company(
         self,
         company_id: str,

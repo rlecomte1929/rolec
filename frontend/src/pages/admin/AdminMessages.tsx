@@ -136,10 +136,11 @@ export const AdminMessages: React.FC = () => {
       });
       setThreads(res.threads || []);
     } catch (err: unknown) {
-      const msg = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : (err as Error)?.message;
-      setError(String(msg || 'Failed to load threads'));
+      const ex = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+      const detail = ex?.response?.data?.detail;
+      const status = ex?.response?.status;
+      const msg = typeof detail === 'string' ? detail : ex?.message || 'Failed to load threads';
+      setError(status ? `[${status}] ${msg}` : msg);
       setThreads([]);
     } finally {
       setLoading(false);
@@ -485,7 +486,10 @@ export const AdminMessages: React.FC = () => {
           {error && (
             <Alert variant="error" className="mb-4">
               {error}
-              <Button variant="outline" size="sm" className="ml-2" onClick={() => setError(null)}>Dismiss</Button>
+              <div className="flex gap-2 mt-2">
+                <Button variant="outline" size="sm" onClick={() => { setError(null); loadThreads(); }}>Retry</Button>
+                <Button variant="outline" size="sm" onClick={() => setError(null)}>Dismiss</Button>
+              </div>
             </Alert>
           )}
 

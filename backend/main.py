@@ -1143,9 +1143,19 @@ def list_companies(q: Optional[str] = Query(None), user: Dict[str, Any] = Depend
 
 
 @app.get("/api/admin/companies/{company_id}")
-def get_company_detail(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
+def get_company_detail(
+    company_id: str,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
+    log.info(
+        "admin_company_detail company_id=%s user_id=%s request_id=%s",
+        company_id, user.get("id"), request_id,
+    )
     company = db.get_company(company_id)
     if not company:
+        log.info("admin_company_detail company_id=%s found=0 checking orphan request_id=%s", company_id, request_id)
         # Orphan: company_id not in companies table but may appear in hr_users/relocation_cases
         with db.engine.connect() as conn:
             has_hr = conn.execute(
@@ -1170,53 +1180,68 @@ def get_company_detail(company_id: str, user: Dict[str, Any] = Depends(require_a
                 "missing_from_registry": True,
             }
         else:
+            log.warning("admin_company_detail company_id=%s not_found request_id=%s", company_id, request_id)
             raise HTTPException(status_code=404, detail="Company not found")
-    hr_users = db.list_hr_users_with_profiles(company_id)
-    employees_raw = db.list_employees_with_profiles(company_id)
-    employees = [
-        {
-            "id": e["id"],
-            "company_id": e["company_id"],
-            "profile_id": e["profile_id"],
-            "name": e.get("full_name") or e.get("email") or e.get("profile_id"),
-            "email": e.get("email"),
-            "status": e.get("status") or "active",
-            "created_at": e.get("created_at"),
-        }
-        for e in employees_raw
-    ]
-    assignments = db.list_assignments_for_company_with_details(company_id)
-    policies_data = db.get_admin_policies_by_company(company_id)
-    if policies_data and policies_data.get("policies"):
-        policies = [
+    try:
+        hr_users = db.list_hr_users_with_profiles(company_id)
+        employees_raw = db.list_employees_with_profiles(company_id)
+        employees = [
             {
-                "policy_id": p["policy_id"],
-                "title": p.get("title"),
-                "latest_version": p.get("latest_version_number"),
-                "status": p.get("latest_version_status") or p.get("extraction_status") or "draft",
-                "published": bool(p.get("published_version_id")),
+                "id": e["id"],
+                "company_id": e["company_id"],
+                "profile_id": e["profile_id"],
+                "name": e.get("full_name") or e.get("email") or e.get("profile_id"),
+                "email": e.get("email"),
+                "status": e.get("status") or "active",
+                "created_at": e.get("created_at"),
             }
-            for p in policies_data["policies"]
+            for e in employees_raw
         ]
-    else:
-        policies = []
-    counts_summary = {
-        "hr_users_count": len(hr_users),
-        "employees_count": len(employees),
-        "assignments_count": len(assignments),
-        "policies_count": len(policies),
-    }
-    orphan_diagnostics = db.get_company_detail_orphan_diagnostics(company_id)
-    db.log_audit(user["id"], "READ", "company", company_id, None, {"detail": True})
-    return {
-        "company": company,
-        "hr_users": hr_users,
-        "employees": employees,
-        "assignments": assignments,
-        "policies": policies,
-        "counts_summary": counts_summary,
-        "orphan_diagnostics": orphan_diagnostics,
-    }
+        assignments = db.list_assignments_for_company_with_details(company_id)
+        policies_data = db.get_admin_policies_by_company(company_id)
+        if policies_data and policies_data.get("policies"):
+            policies = [
+                {
+                    "policy_id": p["policy_id"],
+                    "title": p.get("title"),
+                    "latest_version": p.get("latest_version_number"),
+                    "status": p.get("latest_version_status") or p.get("extraction_status") or "draft",
+                    "published": bool(p.get("published_version_id")),
+                }
+                for p in policies_data["policies"]
+            ]
+        else:
+            policies = []
+        summary = {
+            "hr_users_count": len(hr_users),
+            "employee_count": len(employees),
+            "assignments_count": len(assignments),
+            "policies_count": len(policies),
+        }
+        orphan_diagnostics = db.get_company_detail_orphan_diagnostics(company_id)
+        log.info(
+            "admin_company_detail company_id=%s found=1 hr=%s employees=%s assignments=%s policies=%s request_id=%s",
+            company_id, len(hr_users), len(employees), len(assignments), len(policies), request_id,
+        )
+        db.log_audit(user["id"], "READ", "company", company_id, None, {"detail": True})
+        return {
+            "company": company,
+            "summary": summary,
+            "hr_users": hr_users,
+            "employees": employees,
+            "assignments": assignments,
+            "policies": policies,
+            "counts_summary": summary,
+            "orphan_diagnostics": orphan_diagnostics,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception(
+            "admin_company_detail company_id=%s error=%s request_id=%s",
+            company_id, type(e).__name__, request_id,
+        )
+        raise
 
 
 class AdminCreateCompanyRequest(BaseModel):
@@ -1635,6 +1660,26 @@ def get_reconciliation_report(user: Dict[str, Any] = Depends(require_admin)):
     return data
 
 
+@app.post("/api/admin/reconciliation/backfill-test-company")
+def admin_backfill_test_company(
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """
+    One-time non-destructive backfill: link orphan profiles, hr_users, and relocation_cases
+    to the company named exactly 'Test company'. Does not overwrite existing linkage.
+    """
+    result = db.run_admin_reconciliation_backfill_test_company("Test company")
+    db.log_audit(
+        user["id"],
+        "RECONCILIATION_BACKFILL",
+        "reconciliation",
+        None,
+        None,
+        result.get("summary") or {},
+    )
+    return result
+
+
 @app.post("/api/admin/reconciliation/link-person-company")
 def reconciliation_link_person_company(
     body: ReconciliationLinkPersonCompanyRequest,
@@ -1911,10 +1956,14 @@ def list_admin_message_threads(
     """List message threads: HR-employee (legacy messages) and/or collaboration (internal admin)."""
     hr_threads = []
     collab_threads = []
-    if not thread_type or thread_type == "hr_employee":
-        hr_threads = db.list_admin_message_threads(
-            company_id=company_id, user_id=user_id, limit=limit, offset=offset
-        )
+    try:
+        if not thread_type or thread_type == "hr_employee":
+            hr_threads = db.list_admin_message_threads(
+                company_id=company_id, user_id=user_id, limit=limit, offset=offset
+            )
+    except Exception as e:
+        log.warning("list_admin_message_threads failed: %s", e)
+        hr_threads = []
     if not thread_type or thread_type == "collaboration":
         try:
             from .services.collaboration_service import list_all_threads
