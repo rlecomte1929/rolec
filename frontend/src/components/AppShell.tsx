@@ -51,8 +51,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const isHrRole = role === 'HR' || role === 'ADMIN';
   const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
   const isOnEmployeeRoute = location.pathname.startsWith('/employee/');
+  const isOnAdminRoute = location.pathname.startsWith('/admin');
   const showEmployeeNav = (isEmployeeRole && !isHrRole) || (role === 'ADMIN' && isOnEmployeeRoute);
-  const showHrNav = isHrRole && !(role === 'ADMIN' && isOnEmployeeRoute);
+  const showHrNav = isHrRole && !(role === 'ADMIN' && isOnEmployeeRoute) && !isOnAdminRoute;
   const { selectedCaseId } = useSelectedCase();
   const { assignmentId: assignmentIdFromContext } = useEmployeeAssignment();
   const assignmentIdFromPath = location.pathname.match(/^\/employee\/case\/([^/]+)/)?.[1] ?? null;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Button } from '../../components/antigravity';
+import { Card } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { adminAPI, suppliersAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
@@ -30,7 +30,6 @@ export const AdminOverviewPage: React.FC = () => {
     relocationsBlocked: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [purging, setPurging] = useState(false);
 
   useEffect(() => {
     if (role !== 'ADMIN') return;
@@ -105,7 +104,7 @@ export const AdminOverviewPage: React.FC = () => {
 
   return (
     <AdminLayout
-      title="Overview"
+      title="Dashboard"
       subtitle="B2B relocation operations — company-first control plane"
     >
       <div className="space-y-6">
@@ -166,79 +165,6 @@ export const AdminOverviewPage: React.FC = () => {
             </Card>
           </Link>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Link to={buildRoute('adminCompanies')}>
-            <Button variant="outline" size="sm">
-              Companies
-            </Button>
-          </Link>
-          <Link to={buildRoute('adminPeople')}>
-            <Button variant="outline" size="sm">
-              People
-            </Button>
-          </Link>
-          <Link to={buildRoute('adminAssignments')}>
-            <Button variant="outline" size="sm">
-              Assignments
-            </Button>
-          </Link>
-          <Link to={buildRoute('adminPolicies')}>
-            <Button variant="outline" size="sm">
-              Policies
-            </Button>
-          </Link>
-          <Link to={buildRoute('adminSuppliers')}>
-            <Button variant="outline" size="sm">
-              Suppliers
-            </Button>
-          </Link>
-          <Link to={buildRoute('adminMessages')}>
-            <Button variant="outline" size="sm">
-              Messages
-            </Button>
-          </Link>
-          <Link to={buildRoute('adminResources')}>
-            <Button variant="outline" size="sm">
-              Resources
-            </Button>
-          </Link>
-        </div>
-
-        <Card padding="lg" className="border-amber-200 bg-amber-50/50">
-          <div className="text-sm font-semibold text-amber-900 mb-2">Operations</div>
-          <div className="text-sm text-amber-900 mb-4">
-            Purge inactive cases and related data. Keeps only active, registered
-            cases.
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={purging}
-            onClick={async () => {
-              const confirmText = window.prompt('Type PURGE to confirm:');
-              if (confirmText !== 'PURGE') return;
-              const reason = window.prompt('Reason for purge (required):');
-              if (!reason) return;
-              setPurging(true);
-              try {
-                const res = await adminAPI.adminAction('purge-cases', {
-                  reason,
-                  payload: {
-                    active_statuses: ['assigned', 'awaiting_intake', 'submitted'],
-                  },
-                });
-                alert(
-                  `Purge complete. Assignments: ${res.stats?.assignments_deleted ?? 0}, Cases: ${res.stats?.relocation_cases_deleted ?? 0}`
-                );
-              } finally {
-                setPurging(false);
-              }
-            }}
-          >
-            {purging ? 'Purging…' : 'Purge inactive cases'}
-          </Button>
-        </Card>
       </div>
     </AdminLayout>
   );

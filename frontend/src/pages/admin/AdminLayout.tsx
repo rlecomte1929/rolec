@@ -23,7 +23,7 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
     exact ? location.pathname === path : location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   const navItems: { to: string; label: string; path?: string }[] = [
-    { to: buildRoute('adminOverview'), label: 'Overview', path: ROUTE_DEFS.adminOverview.path },
+    { to: buildRoute('adminOverview'), label: 'Dashboard', path: ROUTE_DEFS.adminOverview.path },
     { to: buildRoute('adminCompanies'), label: 'Companies', path: ROUTE_DEFS.adminCompanies.path },
     { to: buildRoute('adminPeople'), label: 'People', path: ROUTE_DEFS.adminPeople.path },
     { to: buildRoute('adminAssignments'), label: 'Assignments', path: ROUTE_DEFS.adminAssignments.path },
@@ -41,8 +41,8 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
   });
 
   return (
-    <AppShell title={title} subtitle={subtitle}>
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-[#e2e8f0] pb-4">
+    <AppShell>
+      <div className="flex flex-wrap gap-2 border-b border-[#e2e8f0] pb-4 mb-4">
         {navItems.map(({ to, label, path }) => {
           const pathToCheck = path ?? to;
           const active =
@@ -66,7 +66,15 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
           );
         })}
       </div>
-      {children}
+      <div>
+        {title && (
+          <div className="mb-4">
+            <h1 className="text-2xl font-semibold text-[#0b2b43]">{title}</h1>
+            {subtitle && <p className="text-sm text-[#4b5563] mt-1">{subtitle}</p>}
+          </div>
+        )}
+        {children}
+      </div>
     </AppShell>
   );
 };

@@ -107,8 +107,9 @@ export const AdminMessages: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadThreads();
-  }, [loadThreads]);
+    if (companyFilter) loadThreads();
+    else setThreads([]);
+  }, [companyFilter, loadThreads]);
 
   useEffect(() => {
     loadCompanies();
@@ -150,7 +151,7 @@ export const AdminMessages: React.FC = () => {
   const formatDate = (s?: string) => (s ? new Date(s).toLocaleString() : '—');
 
   return (
-    <AdminLayout title="Messages" subtitle="Message threads and support cases — company-filtered">
+    <AdminLayout title="Messages" subtitle="Message threads and support cases — select a company to view threads">
       <div className="flex gap-2 mb-4">
         <button
           type="button"
@@ -225,7 +226,7 @@ export const AdminMessages: React.FC = () => {
                 onChange={(e) => setCompanyFilter(e.target.value)}
                 className="border border-[#d1d5db] rounded px-3 py-2 text-sm"
               >
-                <option value="">All</option>
+                <option value="">Select company</option>
                 {companies.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
@@ -269,10 +270,14 @@ export const AdminMessages: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card padding="lg">
               <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Thread list</h2>
-              {loading && threads.length === 0 ? (
+              {!companyFilter ? (
+                <div className="p-8 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
+                  Select a company above to view message threads.
+                </div>
+              ) : loading && threads.length === 0 ? (
                 <div className="p-8 text-center text-[#6b7280]">Loading...</div>
               ) : threads.length === 0 ? (
-                <div className="p-8 text-center text-[#6b7280]">No threads found.</div>
+                <div className="p-8 text-center text-[#6b7280]">No threads found for this company.</div>
               ) : (
                 <div className="space-y-2 max-h-[480px] overflow-y-auto">
                   {threads.map((t) => (

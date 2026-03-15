@@ -62,9 +62,16 @@ export const AdminAssignments: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadAssignments().catch(() => undefined);
     loadCompanies().catch(() => undefined);
-  }, [loadAssignments, loadCompanies]);
+  }, [loadCompanies]);
+
+  useEffect(() => {
+    if (filters.company_id) {
+      loadAssignments().catch(() => undefined);
+    } else {
+      setAssignments([]);
+    }
+  }, [filters.company_id, loadAssignments]);
 
   useEffect(() => {
     if (selectedId) {
@@ -95,7 +102,7 @@ export const AdminAssignments: React.FC = () => {
   return (
     <AdminLayout
       title="Assignments"
-      subtitle="Relocation assignments — company filter, linkage checks, admin corrections"
+      subtitle="Select a company to view and manage assignments"
     >
       <Card padding="lg" className="mb-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
@@ -103,8 +110,8 @@ export const AdminAssignments: React.FC = () => {
             label="Company"
             value={filters.company_id}
             onChange={(v) => setFilters((f) => ({ ...f, company_id: v }))}
-            options={[{ value: '', label: 'All companies' }, ...companies.map((c) => ({ value: c.id, label: c.name }))]}
-            placeholder="All companies"
+            options={[{ value: '', label: 'Select company' }, ...companies.map((c) => ({ value: c.id, label: c.name }))]}
+            placeholder="Select company"
           />
           <Input
             label="Employee search"
@@ -131,60 +138,68 @@ export const AdminAssignments: React.FC = () => {
       </Card>
 
       <Card padding="lg">
-        <div className="text-sm text-[#6b7280] mb-2">Assignments ({assignments.length})</div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280]">
-                <th className="py-2 pr-2">Employee</th>
-                <th className="py-2 pr-2">Company</th>
-                <th className="py-2 pr-2">Destination</th>
-                <th className="py-2 pr-2">Origin</th>
-                <th className="py-2 pr-2">Type</th>
-                <th className="py-2 pr-2">Family</th>
-                <th className="py-2 pr-2">Move date</th>
-                <th className="py-2 pr-2">Policy</th>
-                <th className="py-2 pr-2">Status</th>
-                <th className="py-2 pr-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assignments.map((a) => (
-                <tr
-                  key={a.id}
-                  className="border-b border-[#e2e8f0] hover:bg-[#f8fafc]"
-                >
-                  <td className="py-2 pr-2 font-medium text-[#0b2b43]">{employeeName(a)}</td>
-                  <td className="py-2 pr-2">{a.company_name || '—'}</td>
-                  <td className="py-2 pr-2">{destination(a)}</td>
-                  <td className="py-2 pr-2">{origin(a)}</td>
-                  <td className="py-2 pr-2">{a.assignment_type || '—'}</td>
-                  <td className="py-2 pr-2">{a.family_status || '—'}</td>
-                  <td className="py-2 pr-2">{a.move_date || '—'}</td>
-                  <td className="py-2 pr-2">
-                    {a.policy_resolved ? (
-                      <Badge variant="success" size="sm">Resolved</Badge>
-                    ) : a.company_has_policy ? (
-                      <Badge variant="neutral" size="sm">Available</Badge>
-                    ) : (
-                      <Badge variant="neutral" size="sm">None</Badge>
-                    )}
-                  </td>
-                  <td className="py-2 pr-2">
-                    <Badge variant="neutral" size="sm">{(a.status || '—').replace(/_/g, ' ')}</Badge>
-                  </td>
-                  <td className="py-2 pr-2">
-                    <Button size="sm" onClick={() => setSelectedId(a.id)}>
-                      Detail
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {assignments.length === 0 && (
-          <div className="text-sm text-[#6b7280] py-6 text-center">No assignments found.</div>
+        {!filters.company_id ? (
+          <div className="py-12 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
+            Select a company above to view and manage assignments.
+          </div>
+        ) : (
+          <>
+            <div className="text-sm text-[#6b7280] mb-2">Assignments ({assignments.length})</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280]">
+                    <th className="py-2 pr-2">Employee</th>
+                    <th className="py-2 pr-2">Company</th>
+                    <th className="py-2 pr-2">Destination</th>
+                    <th className="py-2 pr-2">Origin</th>
+                    <th className="py-2 pr-2">Type</th>
+                    <th className="py-2 pr-2">Family</th>
+                    <th className="py-2 pr-2">Move date</th>
+                    <th className="py-2 pr-2">Policy</th>
+                    <th className="py-2 pr-2">Status</th>
+                    <th className="py-2 pr-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assignments.map((a) => (
+                    <tr
+                      key={a.id}
+                      className="border-b border-[#e2e8f0] hover:bg-[#f8fafc]"
+                    >
+                      <td className="py-2 pr-2 font-medium text-[#0b2b43]">{employeeName(a)}</td>
+                      <td className="py-2 pr-2">{a.company_name || '—'}</td>
+                      <td className="py-2 pr-2">{destination(a)}</td>
+                      <td className="py-2 pr-2">{origin(a)}</td>
+                      <td className="py-2 pr-2">{a.assignment_type || '—'}</td>
+                      <td className="py-2 pr-2">{a.family_status || '—'}</td>
+                      <td className="py-2 pr-2">{a.move_date || '—'}</td>
+                      <td className="py-2 pr-2">
+                        {a.policy_resolved ? (
+                          <Badge variant="success" size="sm">Resolved</Badge>
+                        ) : a.company_has_policy ? (
+                          <Badge variant="neutral" size="sm">Available</Badge>
+                        ) : (
+                          <Badge variant="neutral" size="sm">None</Badge>
+                        )}
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Badge variant="neutral" size="sm">{(a.status || '—').replace(/_/g, ' ')}</Badge>
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Button size="sm" onClick={() => setSelectedId(a.id)}>
+                          Detail
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {assignments.length === 0 && (
+              <div className="text-sm text-[#6b7280] py-6 text-center">No assignments found for this company.</div>
+            )}
+          </>
         )}
       </Card>
 
