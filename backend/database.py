@@ -4664,10 +4664,12 @@ class Database:
 
     def deactivate_profile(self, person_id: str) -> bool:
         """
-        Deactivate a profile. In runtimes without a profiles.status column we fall back to hard delete.
+        Deactivate a profile. Uses status='inactive' when profiles.status exists; otherwise hard delete.
         """
         try:
-            return self.update_profile(person_id, status="inactive")
+            updated = self.update_profile(person_id, status="inactive")
+            if updated:
+                return True
         except Exception as e:
             _agent_debug_log(
                 hypothesis_id="H4",
@@ -4675,9 +4677,9 @@ class Database:
                 message="deactivate_profile fallback delete",
                 data={"person_id": person_id, "error": str(e)},
             )
-            with self.engine.begin() as conn:
-                conn.execute(text("DELETE FROM profiles WHERE id = :id"), {"id": person_id})
-            return True
+        with self.engine.begin() as conn:
+            conn.execute(text("DELETE FROM profiles WHERE id = :id"), {"id": person_id})
+        return True
 
     def create_profile(
         self,

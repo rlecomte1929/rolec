@@ -3183,8 +3183,12 @@ def claim_assignment(
             detail="This assignment was created for a different employee. HR must have entered your exact email or username (e.g. jane@relopass.com or janedoe) when assigning the case."
         )
 
-    if assignment.get("employee_user_id") and assignment["employee_user_id"] != effective["id"]:
+    emp_uid = assignment.get("employee_user_id")
+    effective_id = str(effective["id"]).strip()
+    if emp_uid and str(emp_uid).strip() != effective_id:
         raise HTTPException(status_code=403, detail="Assignment already claimed")
+    if emp_uid and str(emp_uid).strip() == effective_id:
+        return {"success": True, "assignmentId": assignment_id}
 
     case_id = assignment.get("case_id", "")
     db.attach_employee_to_assignment(assignment_id, effective["id"])
@@ -3987,12 +3991,18 @@ def get_case_details_by_assignment(
     effective = _effective_user(user, role)
     emp_id = assignment.get("employee_user_id")
     hr_id = assignment.get("hr_user_id")
+    effective_id = str(effective["id"]).strip()
     is_employee = effective.get("role") == UserRole.EMPLOYEE.value
     is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
     visible = False
-    if is_employee and emp_id == effective["id"]:
+    if is_employee and emp_id and str(emp_id).strip() == effective_id:
         visible = True
-    if is_hr and (effective.get("is_admin") or hr_id == effective["id"]):
+    if is_employee and not emp_id:
+        ident = (assignment.get("employee_identifier") or "").strip().lower()
+        user_ids = [x.lower() for x in [effective.get("email"), effective.get("username")] if x]
+        if ident and user_ids and ident in user_ids:
+            visible = True
+    if is_hr and (effective.get("is_admin") or (hr_id and str(hr_id).strip() == effective_id)):
         visible = True
     if not visible:
         raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
@@ -4032,13 +4042,17 @@ def get_case_details_by_assignment(
             ac["employerCountry"] = employer_country or ""
         draft["assignmentContext"] = ac
         case_dto = cases_router._case_dto(case, draft)
-    # Ensure destCity/destCountry come from draft when case columns are null
+    # Ensure destCity/destCountry come from draft, then from relocation_cases.host_country (assignment destination)
     case_dump = case_dto.model_dump(mode="json")
     basics = draft.get("relocationBasics") or {}
     if not case_dump.get("destCity") and basics.get("destCity"):
         case_dump["destCity"] = basics.get("destCity")
     if not case_dump.get("destCountry") and basics.get("destCountry"):
         case_dump["destCountry"] = basics.get("destCountry")
+    if not case_dump.get("destCountry"):
+        case_row = db.get_case_by_id(case_id)
+        if case_row and case_row.get("host_country"):
+            case_dump["destCountry"] = case_row["host_country"]
     return {
         "assignment": {
             "id": assignment["id"],

@@ -19,7 +19,7 @@ const FLOW_STEPS = [
 
 export const EmployeeJourney: React.FC = () => {
   const navigate = useNavigate();
-  const { assignmentId, isLoading: assignmentLoading } = useEmployeeAssignment();
+  const { assignmentId, isLoading: assignmentLoading, refetch: refetchAssignment } = useEmployeeAssignment();
   const [caseId, setCaseId] = useState<string | null>(null);
   const [missingCount, setMissingCount] = useState<number | null>(null);
   const [servicesSelected, setServicesSelected] = useState<number | null>(null);
@@ -110,6 +110,7 @@ export const EmployeeJourney: React.FC = () => {
     try {
       const res = await employeeAPI.claimAssignment(claimId.trim(), claimEmail.trim());
       const nextAssignment = res.assignmentId || claimId.trim();
+      await refetchAssignment();
       navigate(`/employee/case/${nextAssignment}/wizard/1`);
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: string } } };
