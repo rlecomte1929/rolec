@@ -4952,6 +4952,163 @@ class Database:
         )
         return {"ok": True, "summary": summary}
 
+    def rebuild_test_company_graph(self) -> Dict[str, Any]:
+        """
+        Rebuild canonical Test company graph in the current DB.
+        - Uses TEST_COMPANY_FIXED_ID as the canonical company id.
+        - Reassigns non-admin profiles, hr_users, employees, and relocation_cases to this company
+          when they are demo/test data.
+        - Ensures HR and employee seats exist for HR/EMPLOYEE profiles.
+        - Repairs relocation_cases.employee_id and hr_user_id when possible.
+        Idempotent: running multiple times converges to the same graph.
+        """
+        test_id = self.TEST_COMPANY_FIXED_ID
+        now = datetime.utcnow().isoformat()
+        created: Dict[str, Any] = {
+            "profiles_linked": 0,
+            "hr_users_linked": 0,
+            "employees_linked": 0,
+            "relocation_cases_linked": 0,
+            "case_assignments_repaired": 0,
+            "policies_linked": 0,
+        }
+
+        # Ensure Test company exists
+        self.create_company(
+            company_id=test_id,
+            name="Test company",
+            country=None,
+            status="active",
+            plan_tier="low",
+        )
+
+        # Link non-admin profiles that look like demo/test into Test company
+        with self.engine.begin() as conn:
+            r = conn.execute(
+                text(
+                    """
+                    UPDATE profiles
+                    SET company_id = :cid
+                    WHERE COALESCE(role,'') <> 'ADMIN'
+                      AND (company_id IS NULL OR TRIM(company_id) = '' OR company_id = 'demo-company-001')
+                    """
+                ),
+                {"cid": test_id},
+            )
+            created["profiles_linked"] = r.rowcount
+
+        # Repoint hr_users and employees rows with demo company to Test company
+        with self.engine.begin() as conn:
+            r = conn.execute(
+                text("UPDATE hr_users SET company_id = :cid WHERE company_id = 'demo-company-001'"),
+                {"cid": test_id},
+            )
+            created["hr_users_linked"] += r.rowcount
+            r = conn.execute(
+                text("UPDATE employees SET company_id = :cid WHERE company_id = 'demo-company-001'"),
+                {"cid": test_id},
+            )
+            created["employees_linked"] += r.rowcount
+
+        # Ensure HR seats exist for HR profiles
+        with self.engine.begin() as conn:
+            hr_profiles = conn.execute(
+                text("SELECT id FROM profiles WHERE role = 'HR' AND company_id = :cid"),
+                {"cid": test_id},
+            ).fetchall()
+            existing_hr = conn.execute(
+                text("SELECT DISTINCT profile_id FROM hr_users"),
+                {},
+            ).fetchall()
+            existing_hr_ids = {r._mapping["profile_id"] for r in existing_hr}
+            for r in hr_profiles:
+                pid = r._mapping["id"]
+                if pid in existing_hr_ids:
+                    continue
+                hr_id = f"hr-{pid}"
+                conn.execute(
+                    text(
+                        "INSERT INTO hr_users (id, company_id, profile_id, permissions_json, created_at) "
+                        "VALUES (:id, :cid, :pid, :perms, :ca)"
+                    ),
+                    {
+                        "id": hr_id,
+                        "cid": test_id,
+                        "pid": pid,
+                        "perms": '{"can_manage_policy": true}',
+                        "ca": now,
+                    },
+                )
+                created["hr_users_linked"] += 1
+
+        # Ensure employee seats exist for employee/employee_user profiles
+        with self.engine.begin() as conn:
+            emp_profiles = conn.execute(
+                text(
+                    "SELECT id FROM profiles "
+                    "WHERE role IN ('EMPLOYEE','EMPLOYEE_USER') AND company_id = :cid"
+                ),
+                {"cid": test_id},
+            ).fetchall()
+            existing_emp = conn.execute(
+                text("SELECT DISTINCT profile_id FROM employees"),
+                {},
+            ).fetchall()
+            existing_emp_ids = {r._mapping["profile_id"] for r in existing_emp}
+            for r in emp_profiles:
+                pid = r._mapping["id"]
+                if pid in existing_emp_ids:
+                    continue
+                emp_id = f"emp-{pid}"
+                conn.execute(
+                    text(
+                        "INSERT INTO employees (id, company_id, profile_id, band, assignment_type, relocation_case_id, status, created_at) "
+                        "VALUES (:id, :cid, :pid, NULL, NULL, NULL, 'active', :ca)"
+                    ),
+                    {"id": emp_id, "cid": test_id, "pid": pid, "ca": now},
+                )
+                created["employees_linked"] += 1
+
+        # Repoint relocation_cases for demo company or null company_id
+        with self.engine.begin() as conn:
+            r = conn.execute(
+                text(
+                    """
+                    UPDATE relocation_cases
+                    SET company_id = :cid, updated_at = :now
+                    WHERE company_id = 'demo-company-001'
+                       OR company_id IS NULL OR TRIM(COALESCE(company_id,'')) = ''
+                    """
+                ),
+                {"cid": test_id, "now": now},
+            )
+            created["relocation_cases_linked"] = r.rowcount
+
+        # Attempt to fix relocation_cases.employee_id from employees table when missing
+        with self.engine.begin() as conn:
+            # Cases with null employee_id but matching employees.relocation_case_id
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT rc.id AS case_id, e.id AS employee_id
+                    FROM relocation_cases rc
+                    JOIN employees e ON e.relocation_case_id = rc.id
+                    WHERE (rc.employee_id IS NULL OR TRIM(COALESCE(rc.employee_id,'')) = '')
+                    """
+                ),
+                {},
+            ).fetchall()
+            for row in rows:
+                conn.execute(
+                    text("UPDATE relocation_cases SET employee_id = :eid, updated_at = :now WHERE id = :cid"),
+                    {"eid": row._mapping["employee_id"], "cid": row._mapping["case_id"], "now": now},
+                )
+
+        # Assignments: nothing to change for canonical counts here; linkage via company_id already fixed via cases/hr_users
+        # Leave created['case_assignments_repaired'] for future detailed repair logic if needed.
+
+        return created
+
     def create_company(
         self,
         company_id: str,

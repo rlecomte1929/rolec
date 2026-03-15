@@ -546,6 +546,23 @@ export const adminAPI = {
     const response = await api.post('/api/admin/reconciliation/backfill-test-company');
     return response.data;
   },
+  rebuildTestCompanyGraph: async (): Promise<{
+    ok: boolean;
+    summary: {
+      test_company_id: string;
+      profiles_linked: number;
+      hr_users_linked: number;
+      employees_linked: number;
+      relocation_cases_linked: number;
+      case_assignments_repaired: number;
+      policies_linked: number;
+    };
+    before: Record<string, number>;
+    after: Record<string, number>;
+  }> => {
+    const response = await api.post('/api/admin/reconciliation/rebuild-test-company-graph');
+    return response.data;
+  },
   listProfiles: async (params?: { q?: string; company_id?: string; role?: string }): Promise<{ profiles: AdminProfile[]; summary?: { count: number; orphans_without_company?: number } }> => {
     const response = await api.get('/api/admin/users', { params: params || {} });
     return response.data;

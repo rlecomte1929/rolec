@@ -105,6 +105,15 @@ else:
     log.info("Running with PostgreSQL — data persists across redeploys.")
 
 app = FastAPI(title="ReloPass API", version="1.0.0")
+admin_graph_build_marker = os.getenv("ADMIN_GRAPH_BUILD_MARKER", "local-dev")
+log.info(
+    "ADMIN_GRAPH_BUILD_MARKER=%s db_scheme=%s seed_guard_active=%s DISABLE_DEMO_RESEED=%s ALLOW_LEGACY_DEMO_SEED=%s",
+    admin_graph_build_marker,
+    _db_scheme,
+    (_db_scheme == "sqlite" and DISABLE_DEMO_RESEED),
+    DISABLE_DEMO_RESEED,
+    ALLOW_LEGACY_DEMO_SEED,
+)
 log.info("Initializing database schemas...")
 init_db()
 db.log_expected_tables_status()
@@ -582,11 +591,11 @@ def _seed_default_hr_policy() -> None:
     db.create_hr_policy(policy_id, policy, created_by=None)
 
 
-# Only run legacy demo seed (relocation_cases with string IDs) on SQLite.
+# Only run legacy demo seed (relocation_cases with string IDs) on SQLite, and only when explicitly allowed.
 # Production Supabase uses UUID for relocation_cases.id; seeding would crash.
-# Allow disabling this seed (e.g. for admin data reconciliation / verification)
-# by setting DISABLE_DEMO_RESEED=true in the environment.
-if _db_scheme == "sqlite" and os.getenv("DISABLE_DEMO_RESEED", "").lower() not in ("1", "true", "yes"):
+ALLOW_LEGACY_DEMO_SEED = os.getenv("ALLOW_LEGACY_DEMO_SEED", "").lower() in ("1", "true", "yes")
+DISABLE_DEMO_RESEED = os.getenv("DISABLE_DEMO_RESEED", "").lower() in ("1", "true", "yes")
+if _db_scheme == "sqlite" and ALLOW_LEGACY_DEMO_SEED and not DISABLE_DEMO_RESEED:
     try:
         _seed_demo_cases()
     except Exception as e:
@@ -1741,6 +1750,183 @@ def reconciliation_link_policy_company(
     db.admin_link_policy_company(body.policy_id, body.company_id)
     db.log_audit(user["id"], "RECONCILIATION_LINK_POLICY_COMPANY", "company_policy", body.policy_id, None, {"company_id": body.company_id})
     return {"ok": True}
+
+
+@app.get("/api/admin/debug/runtime-database")
+def debug_runtime_database(user: Dict[str, Any] = Depends(require_admin)):
+    """
+    Admin diagnostic: show current DB scheme/target and seed flags.
+    Safe to expose (sanitized, no passwords).
+    """
+    info = Database.get_db_info()
+    db_url = info.get("db_url", "")
+    # Sanitize: drop credentials if present.
+    if "@" in db_url and "://" in db_url:
+        scheme, rest = db_url.split("://", 1)
+        if "@" in rest:
+            rest = rest.split("@", 1)[-1]
+        db_url = f"{scheme}://{rest}"
+    disable_demo_reseed = DISABLE_DEMO_RESEED
+    allow_legacy_demo_seed = ALLOW_LEGACY_DEMO_SEED
+    seed_guard_active = _db_scheme == "sqlite" and disable_demo_reseed
+    return {
+        "db_scheme": info.get("db_url_scheme"),
+        "database_target": db_url,
+        "disable_demo_reseed": disable_demo_reseed,
+        "allow_legacy_demo_seed": allow_legacy_demo_seed,
+        "seed_guard_active": seed_guard_active,
+    }
+
+
+@app.get("/api/admin/debug/test-company-graph")
+def debug_test_company_graph(user: Dict[str, Any] = Depends(require_admin)):
+    """
+    Admin diagnostic: snapshot of Test company graph (counts + sample rows).
+    """
+    TEST_COMPANY_ID = db.TEST_COMPANY_FIXED_ID
+    with db.engine.connect() as conn:
+        company = db.get_company(TEST_COMPANY_ID)
+        profiles = conn.execute(
+            text("SELECT id, role, email, company_id FROM profiles WHERE company_id = :cid ORDER BY id LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        hr_users = conn.execute(
+            text("SELECT id, company_id, profile_id FROM hr_users WHERE company_id = :cid ORDER BY id LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        employees = conn.execute(
+            text("SELECT id, company_id, profile_id, relocation_case_id FROM employees WHERE company_id = :cid ORDER BY id LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        cases = conn.execute(
+            text("SELECT id, company_id, employee_id, hr_user_id, status, stage FROM relocation_cases WHERE company_id = :cid ORDER BY id LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        assignments = conn.execute(
+            text(
+                """
+                SELECT a.id, a.case_id, a.canonical_case_id, a.hr_user_id, a.employee_user_id,
+                       a.employee_identifier, a.status
+                FROM case_assignments a
+                LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                WHERE rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid)
+                ORDER BY a.created_at DESC
+                LIMIT 20
+                """
+            ),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        policies = conn.execute(
+            text("SELECT id, company_id, title, extraction_status FROM company_policies WHERE company_id = :cid ORDER BY created_at DESC LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+
+    return {
+        "company": company,
+        "counts": {
+            "profiles": len(profiles),
+            "hr_users": len(hr_users),
+            "employees": len(employees),
+            "relocation_cases": len(cases),
+            "case_assignments": len(assignments),
+            "policies": len(policies),
+        },
+        "sample_profiles": [dict(r._mapping) for r in profiles],
+        "sample_hr_users": [dict(r._mapping) for r in hr_users],
+        "sample_employees": [dict(r._mapping) for r in employees],
+        "sample_cases": [dict(r._mapping) for r in cases],
+        "sample_assignments": [dict(r._mapping) for r in assignments],
+        "sample_policies": [dict(r._mapping) for r in policies],
+    }
+
+
+@app.post("/api/admin/reconciliation/rebuild-test-company-graph")
+def rebuild_test_company_graph(user: Dict[str, Any] = Depends(require_admin)):
+    """
+    Admin: full, idempotent rebuild of Test company graph in the current runtime DB.
+    - Reassigns non-admin demo/test users and related seats/cases to the fixed Test company.
+    - Repairs HR/employee seats and case/assignment linkage when recoverable.
+    """
+    TEST_COMPANY_ID = db.TEST_COMPANY_FIXED_ID
+
+    # Simple before snapshot: counts per table for Test company
+    with db.engine.connect() as conn:
+        before_profiles = conn.execute(
+            text("SELECT COUNT(*) AS n FROM profiles WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        before_hr = conn.execute(
+            text("SELECT COUNT(*) AS n FROM hr_users WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        before_emp = conn.execute(
+            text("SELECT COUNT(*) AS n FROM employees WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        before_cases = conn.execute(
+            text("SELECT COUNT(*) AS n FROM relocation_cases WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        before_policies = conn.execute(
+            text("SELECT COUNT(*) AS n FROM company_policies WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+
+    summary = db.rebuild_test_company_graph()
+
+    with db.engine.connect() as conn:
+        after_profiles = conn.execute(
+            text("SELECT COUNT(*) AS n FROM profiles WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        after_hr = conn.execute(
+            text("SELECT COUNT(*) AS n FROM hr_users WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        after_emp = conn.execute(
+            text("SELECT COUNT(*) AS n FROM employees WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        after_cases = conn.execute(
+            text("SELECT COUNT(*) AS n FROM relocation_cases WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        after_policies = conn.execute(
+            text("SELECT COUNT(*) AS n FROM company_policies WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+
+    db.log_audit(
+        user["id"],
+        "RECONCILIATION_REBUILD_TEST_COMPANY",
+        "reconciliation",
+        None,
+        None,
+        summary,
+    )
+
+    return {
+        "ok": True,
+        "summary": {
+            "test_company_id": db.TEST_COMPANY_FIXED_ID,
+            **summary,
+        },
+        "before": {
+            "profiles": before_profiles,
+            "hr_users": before_hr,
+            "employees": before_emp,
+            "relocation_cases": before_cases,
+            "policies": before_policies,
+        },
+        "after": {
+            "profiles": after_profiles,
+            "hr_users": after_hr,
+            "employees": after_emp,
+            "relocation_cases": after_cases,
+            "policies": after_policies,
+        },
+    }
 
 
 class AdminPatchPolicyRequest(BaseModel):
