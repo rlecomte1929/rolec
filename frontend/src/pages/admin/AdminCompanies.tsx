@@ -96,7 +96,7 @@ export const AdminCompanies: React.FC = () => {
   };
 
   const handleDeactivate = async (c: AdminCompany) => {
-    if (!window.confirm(`Deactivate "${c.name}"? The company will be marked inactive. Existing references (policies, assignments) are preserved.`)) return;
+    if (!window.confirm(`Delete "${c.name}"? Existing assignments and policies will keep their company id, but this company will no longer be editable.`)) return;
     try {
       await adminAPI.deactivateCompany(c.id);
       await load();
@@ -106,7 +106,7 @@ export const AdminCompanies: React.FC = () => {
   };
 
   return (
-    <AdminLayout title="Companies" subtitle="Company accounts — create, edit, plan tier, and deactivate">
+    <AdminLayout title="Companies" subtitle="Company accounts — create, edit, plan tier, and delete">
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -121,12 +121,6 @@ export const AdminCompanies: React.FC = () => {
           <Button variant="primary" onClick={() => setAddOpen(true)}>
             Add company
           </Button>
-          <Button variant="outline" onClick={runBackfill} disabled={backfillRunning}>
-            {backfillRunning ? 'Running…' : 'Rebuild Test company graph'}
-          </Button>
-          {backfillResult && (
-            <span className="text-sm text-[#6b7280] self-center">{backfillResult}</span>
-          )}
         </div>
       </Card>
       <Card padding="lg">
@@ -150,15 +144,15 @@ export const AdminCompanies: React.FC = () => {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280] font-medium">
-                  <th className="py-2 pr-4">Company name</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Plan</th>
-                  <th className="py-2 pr-4">Country</th>
-                  <th className="py-2 pr-4">Size band</th>
-                  <th className="py-2 pr-4 text-right">HR users</th>
-                  <th className="py-2 pr-4 text-right">Employees</th>
-                  <th className="py-2 pr-4 text-right">Cases</th>
-                  <th className="py-2 pr-4">Contact person</th>
+                  <th className="py-2 pr-4 cursor-pointer">Company name</th>
+                  <th className="py-2 pr-4 cursor-pointer">Status</th>
+                  <th className="py-2 pr-4 cursor-pointer">Plan</th>
+                  <th className="py-2 pr-4 cursor-pointer">Country</th>
+                  <th className="py-2 pr-4 cursor-pointer">Size band</th>
+                  <th className="py-2 pr-4 text-right cursor-pointer">HR users</th>
+                  <th className="py-2 pr-4 text-right cursor-pointer">Employees</th>
+                  <th className="py-2 pr-4 text-right cursor-pointer">Cases</th>
+                  <th className="py-2 pr-4 cursor-pointer">Contact person</th>
                   <th className="py-2 pl-2">Actions</th>
                 </tr>
               </thead>
@@ -250,7 +244,7 @@ export const AdminCompanies: React.FC = () => {
                           )}
                           {(c.status || 'active').toLowerCase() === 'active' && (
                             <Button size="sm" variant="outline" onClick={() => handleDeactivate(c)}>
-                              Deactivate
+                              Delete
                             </Button>
                           )}
                         </div>

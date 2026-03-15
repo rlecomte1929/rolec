@@ -4618,7 +4618,7 @@ class Database:
         if company_id is not None:
             updates.append("company_id = :company_id")
             params["company_id"] = company_id.strip() if company_id else None
-        if status is not None:
+        if status is not None and _profiles_has_status_column:
             s = (status or "active").lower()
             if s in ("active", "inactive"):
                 updates.append("status = :status")
@@ -5398,8 +5398,22 @@ class Database:
             updates.append("default_working_location = :default_working_location")
             params["default_working_location"] = default_working_location
         if status is not None:
-            updates.append("status = :status")
-            params["status"] = (status or "active").lower()
+            # Some runtimes (like current production) have no companies.status column.
+            # We only include this update when the column exists.
+            try:
+                with self.engine.connect() as conn:
+                    row = conn.execute(
+                        text(
+                            "SELECT 1 FROM information_schema.columns "
+                            "WHERE table_name = 'companies' AND column_name = 'status'"
+                        )
+                    ).fetchone()
+                if row:
+                    updates.append("status = :status")
+                    params["status"] = (status or "active").lower()
+            except Exception:
+                # If schema lookup fails, skip status update to avoid breaking writes.
+                pass
         if plan_tier is not None:
             pt = (plan_tier or "low").lower()
             if pt in ("low", "medium", "premium"):

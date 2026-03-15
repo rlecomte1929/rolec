@@ -19,9 +19,8 @@ export const AdminUsers: React.FC = () => {
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [loading, setLoading] = useState(false);
   const [editOpen, setEditOpen] = useState<AdminProfile | null>(null);
-  const [reassignOpen, setReassignOpen] = useState<AdminProfile | null>(null);
-  const [changeRoleOpen, setChangeRoleOpen] = useState<AdminProfile | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const loadPeople = async () => {
     setLoading(true);
@@ -100,7 +99,26 @@ export const AdminUsers: React.FC = () => {
               {loading ? 'Loading…' : 'Apply'}
             </Button>
           </div>
-          <div className="self-end ml-auto">
+          <div className="self-end ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              disabled={selectedIds.size === 0}
+              onClick={() => {
+                if (selectedIds.size === 0) return;
+                if (!window.confirm(`Delete ${selectedIds.size} selected people?`)) return;
+                const ids = Array.from(selectedIds);
+                ids.reduce(
+                  (p, id) =>
+                    p.then(() => adminAPI.deactivatePerson(id).catch(console.error)),
+                  Promise.resolve() as Promise<void>,
+                ).then(() => {
+                  setSelectedIds(new Set());
+                  loadPeople();
+                });
+              }}
+            >
+              Delete selected
+            </Button>
             <Button variant="primary" onClick={() => setAddOpen(true)}>
               Add person
             </Button>
@@ -121,8 +139,24 @@ export const AdminUsers: React.FC = () => {
           );
         })()}
         <div className="space-y-3">
-          {people.map((p) => (
+          {people.map((p) => {
+            const checked = selectedIds.has(p.id);
+            return (
             <div key={p.id} className="flex flex-wrap items-center justify-between border-b border-[#e2e8f0] py-3 gap-3">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-[#cbd5e1]"
+                  checked={checked}
+                  onChange={(e) => {
+                    setSelectedIds((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(p.id);
+                      else next.delete(p.id);
+                      return next;
+                    });
+                  }}
+                />
               <div>
                 <div className="font-medium text-[#0b2b43]">{p.name || p.full_name || p.email || p.id}</div>
                 <div className="text-xs text-[#6b7280]">{p.email || '—'} · {p.id}</div>
@@ -140,31 +174,14 @@ export const AdminUsers: React.FC = () => {
                   )}
                 </div>
               </div>
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <Button size="sm" variant="outline" onClick={() => setEditOpen(p)}>
                   Edit
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setReassignOpen(p)}>
-                  Reassign company
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setChangeRoleOpen(p)}>
-                  Change role
-                </Button>
-                {(p.status || 'active').toLowerCase() === 'active' && (
-                  <Button size="sm" variant="outline" onClick={() => {
-                    if (window.confirm(`Deactivate ${p.name || p.email}?`)) {
-                      adminAPI.deactivatePerson(p.id).then(() => loadPeople()).catch(console.error);
-                    }
-                  }}>
-                    Deactivate
-                  </Button>
-                )}
-                <Button size="sm" variant="outline" onClick={() => startViewAs(p, 'employee')}>
-                  View as employee
-                </Button>
               </div>
             </div>
-          ))}
+          )})}
           {people.length === 0 && !loading && (
             <div className="py-12 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
               <div className="text-sm font-medium">No people found</div>
@@ -183,27 +200,6 @@ export const AdminUsers: React.FC = () => {
           onClose={() => setEditOpen(null)}
           onSaved={() => {
             setEditOpen(null);
-            loadPeople();
-          }}
-        />
-      )}
-      {reassignOpen && (
-        <ReassignCompanyModal
-          person={reassignOpen}
-          companies={companies}
-          onClose={() => setReassignOpen(null)}
-          onSaved={() => {
-            setReassignOpen(null);
-            loadPeople();
-          }}
-        />
-      )}
-      {changeRoleOpen && (
-        <ChangeRoleModal
-          person={changeRoleOpen}
-          onClose={() => setChangeRoleOpen(null)}
-          onSaved={() => {
-            setChangeRoleOpen(null);
             loadPeople();
           }}
         />
@@ -233,7 +229,6 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
   const [full_name, setFullName] = useState(person.full_name ?? '');
   const [role, setRole] = useState(person.role ?? 'EMPLOYEE');
   const [company_id, setCompanyId] = useState(person.company_id ?? '');
-  const [status, setStatus] = useState((person.status || 'active').toLowerCase());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -246,7 +241,6 @@ const EditPersonModal: React.FC<EditPersonModalProps> = ({ person, companies, on
         full_name: full_name.trim() || undefined,
         role: role.toUpperCase(),
         company_id: company_id || undefined,
-        status,
       });
       onSaved();
     } catch (err: any) {

@@ -1393,13 +1393,17 @@ def create_person(body: AdminCreatePersonRequest, user: Dict[str, Any] = Depends
     if not email:
         raise HTTPException(status_code=400, detail="email required")
     person_id = str(uuid.uuid4())
-    db.create_profile(
-        person_id=person_id,
-        email=email,
-        full_name=body.full_name,
-        role=body.role or "EMPLOYEE",
-        company_id=body.company_id,
-    )
+    try:
+        db.create_profile(
+            person_id=person_id,
+            email=email,
+            full_name=body.full_name,
+            role=body.role or "EMPLOYEE",
+            company_id=body.company_id,
+        )
+    except IntegrityError:
+        # Likely duplicate email or primary key; surface as a 409 for the admin UI.
+        raise HTTPException(status_code=409, detail="A person with this email already exists.")
     profile = db.get_profile_record(person_id)
     log.info("admin person created id=%s email=%s by=%s", person_id, email, user.get("id"))
     db.log_audit(user["id"], "CREATE", "profile", person_id, None, {"email": email})
