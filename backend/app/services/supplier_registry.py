@@ -184,6 +184,8 @@ def _supplier_to_dict(
                 "preferred_partner": meta.preferred_partner,
                 "premium_partner": meta.premium_partner,
                 "last_verified_at": meta.last_verified_at.isoformat() if meta.last_verified_at else None,
+                "admin_score": float(meta.admin_score) if getattr(meta, "admin_score", None) is not None else None,
+                "manual_priority": int(meta.manual_priority) if getattr(meta, "manual_priority", None) is not None else None,
             }
         else:
             out["scoring"] = None
@@ -207,7 +209,8 @@ def search_by_service_destination(
         .filter(Supplier.status == "active")
         .filter(SupplierServiceCapability.service_category == service_category)
     )
-    # Coverage: global, or country match, or city match
+    # Coverage: supplier must serve the destination country (global or country match).
+    # When destination_city is set, also allow city-level capability in that country.
     if destination_country:
         country_upper = destination_country.upper()[:2]
         q = q.filter(
@@ -215,11 +218,18 @@ def search_by_service_destination(
             | (SupplierServiceCapability.country_code == country_upper)
         )
     if destination_city:
-        q = q.filter(
-            (SupplierServiceCapability.coverage_scope_type == "global")
-            | (SupplierServiceCapability.city_name == destination_city)
-            | (SupplierServiceCapability.country_code.isnot(None))
-        )
+        if destination_country:
+            country_upper = destination_country.upper()[:2]
+            q = q.filter(
+                (SupplierServiceCapability.coverage_scope_type == "global")
+                | (SupplierServiceCapability.city_name == destination_city)
+                | (SupplierServiceCapability.country_code == country_upper)
+            )
+        else:
+            q = q.filter(
+                (SupplierServiceCapability.coverage_scope_type == "global")
+                | (SupplierServiceCapability.city_name == destination_city)
+            )
     q = q.distinct().order_by(Supplier.name).limit(limit)
     rows = q.all()
     result = []
@@ -242,17 +252,24 @@ def _supplier_to_recommendation_item(
     review_count = int(meta.review_count) if meta and meta.review_count is not None else 0
     review_count = max(0, review_count)
     preferred_partner = bool(meta.preferred_partner) if meta else False
-    return {
+    admin_score = float(meta.admin_score) if meta and getattr(meta, "admin_score", None) is not None else None
+    manual_priority = int(meta.manual_priority) if meta and getattr(meta, "manual_priority", None) is not None else None
+    out: Dict[str, Any] = {
         "item_id": s.id,
         "name": s.name,
         "city": city_hint,
         "rating": rating,
         "rating_count": review_count,
-        "availability_level": "medium",
+        "availability_level": "high",
         "confidence": 85,
         "_source": "supplier_registry",
         "_preferred_partner": preferred_partner,
     }
+    if admin_score is not None:
+        out["_admin_score"] = max(0.0, min(100.0, admin_score))
+    if manual_priority is not None:
+        out["_manual_priority"] = manual_priority
+    return out
 
 
 def create_supplier(session: Session, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -303,6 +320,8 @@ def create_supplier(session: Session, data: Dict[str, Any]) -> Dict[str, Any]:
             response_sla_hours=scoring.get("response_sla_hours") if scoring else None,
             preferred_partner=scoring.get("preferred_partner", False) if scoring else False,
             premium_partner=scoring.get("premium_partner", False) if scoring else False,
+            admin_score=scoring.get("admin_score") if scoring else None,
+            manual_priority=scoring.get("manual_priority") if scoring else None,
         )
         session.add(meta)
     session.commit()
@@ -525,6 +544,12 @@ def update_scoring(
         meta.preferred_partner = bool(data["preferred_partner"])
     if "premium_partner" in data:
         meta.premium_partner = bool(data["premium_partner"])
+    if "admin_score" in data:
+        v = data["admin_score"]
+        meta.admin_score = float(v) if v is not None else None
+    if "manual_priority" in data:
+        v = data["manual_priority"]
+        meta.manual_priority = int(v) if v is not None else None
     if "last_verified_at" in data:
         from datetime import datetime, timezone
         v = data["last_verified_at"]

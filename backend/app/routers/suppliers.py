@@ -127,6 +127,52 @@ def get_supplier_api(
         return s
 
 
+@router.get("/{supplier_id}/ranking-debug", response_model=Dict[str, Any])
+def get_supplier_ranking_debug(
+    supplier_id: str,
+    service_category: Optional[str] = Query(None, description="Service category to check match (e.g. movers)"),
+    destination_country: Optional[str] = Query(None, description="Destination country code (e.g. GB)"),
+    destination_city: Optional[str] = Query(None, description="Destination city name"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: debug why a supplier ranks (or does not) for given service + destination."""
+    with SessionLocal() as session:
+        s = get_supplier(session, supplier_id)
+        if not s:
+            raise HTTPException(status_code=404, detail="Supplier not found")
+        # Would this supplier be included by search_by_service_destination?
+        would_match = False
+        match_reason = "Not checked (no service_category and destination provided)"
+        if service_category and (destination_country or destination_city):
+            items = search_by_service_destination(
+                session,
+                service_category=service_category,
+                destination_city=destination_city or None,
+                destination_country=destination_country or None,
+                limit=100,
+            )
+            ids = [str(x.get("item_id") or "") for x in items]
+            would_match = supplier_id in ids
+            match_reason = (
+                "Included: supplier appears in search results for this service + destination."
+                if would_match
+                else "Excluded: supplier not in search results (check status=active, capability service_category and country/city coverage)."
+            )
+        return {
+            "supplier_id": supplier_id,
+            "name": s.get("name"),
+            "status": s.get("status"),
+            "capabilities": s.get("capabilities", []),
+            "coverage_summary": s.get("coverage_summary"),
+            "scoring": s.get("scoring"),
+            "requested_service_category": service_category,
+            "requested_destination_country": destination_country,
+            "requested_destination_city": destination_city,
+            "would_match_search": would_match,
+            "match_reason": match_reason,
+        }
+
+
 @router.patch("/{supplier_id}", response_model=Dict[str, Any])
 def update_supplier_api(
     supplier_id: str,

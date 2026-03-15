@@ -73,9 +73,24 @@ def recommend(
     scored_items: List[Dict[str, Any]] = []
     for item in dataset:
         result = plugin.score(criteria_obj, item)
+        score_raw = result.get("score_raw") or 0.0
+        # Admin/manual ranking boost (supplier_registry): add directly to raw score so it affects rank
+        admin_score = item.get("_admin_score")
+        if admin_score is not None:
+            try:
+                score_raw = score_raw + float(admin_score)
+            except (TypeError, ValueError):
+                pass
+        manual_priority = item.get("_manual_priority")
+        if manual_priority is not None:
+            try:
+                score_raw = score_raw + int(manual_priority) * 2.0  # scale so priority 10 => +20 raw
+            except (TypeError, ValueError):
+                pass
         scored_items.append({
             "item": item,
             **result,
+            "score_raw": score_raw,
         })
 
     raw_scores = [s["score_raw"] for s in scored_items]
@@ -160,6 +175,97 @@ def recommend(
         criteria_echo=criteria_echo,
         recommendations=items,
     )
+
+
+def recommend_debug(
+    category: str,
+    criteria: Dict[str, Any],
+    top_n: int = 100,
+) -> Dict[str, Any]:
+    """
+    Same as recommend() but returns debug payload: criteria_echo, dataset_count,
+    and full ranked list with score_raw, norm_score, preferred, item_id, name, tier.
+    Used by GET /api/admin/recommendations/debug.
+    """
+    plugin = get_plugin(category)
+    if not plugin:
+        raise ValueError(f"Unknown category: {category}")
+
+    criteria_obj = plugin.validate_and_parse(criteria)
+    dataset = _load_dataset_with_registry(category, criteria)
+
+    scored_items = []
+    for item in dataset:
+        result = plugin.score(criteria_obj, item)
+        score_raw = result.get("score_raw") or 0.0
+        admin_score = item.get("_admin_score")
+        if admin_score is not None:
+            try:
+                score_raw = score_raw + float(admin_score)
+            except (TypeError, ValueError):
+                pass
+        manual_priority = item.get("_manual_priority")
+        if manual_priority is not None:
+            try:
+                score_raw = score_raw + int(manual_priority) * 2.0
+            except (TypeError, ValueError):
+                pass
+        scored_items.append({"item": item, **result, "score_raw": score_raw})
+
+    raw_scores = [s["score_raw"] for s in scored_items]
+    norm_scores = plugin.normalize(raw_scores)
+    for i, sc in enumerate(scored_items):
+        sc["norm_score"] = norm_scores[i] if i < len(norm_scores) else 0
+        sc["tier"] = plugin.tier(sc["norm_score"])
+
+    matching = [s for s in scored_items if s["score_raw"] > 0]
+    preferred_ids = {str(sid) for sid in (criteria.get("_preferred_supplier_ids") or []) if sid}
+
+    def _is_preferred(x):
+        it = x.get("item") or {}
+        iid = str(it.get("item_id") or "")
+        return iid in preferred_ids or bool(it.get("_preferred_partner"))
+
+    PREFERRED_BOOST = 15
+    for s in matching:
+        if _is_preferred(s):
+            s["norm_score"] = (s.get("norm_score") or 0) + PREFERRED_BOOST
+            s["_company_preferred"] = True
+            s["tier"] = plugin.tier(min(100, s["norm_score"]))
+        else:
+            s["_company_preferred"] = False
+
+    matching.sort(
+        key=lambda x: (
+            -(x.get("norm_score") or 0),
+            str((x.get("item") or {}).get("item_id") or ""),
+            str((x.get("item") or {}).get("name") or ""),
+        )
+    )
+    ranked = matching[:top_n]
+
+    rows = []
+    for rank, s in enumerate(ranked, 1):
+        item = s.get("item") or {}
+        rows.append({
+            "rank": rank,
+            "item_id": item.get("item_id"),
+            "name": item.get("name"),
+            "score_raw": round(s.get("score_raw") or 0, 2),
+            "norm_score": round(s.get("norm_score") or 0, 2),
+            "tier": str(s.get("tier", "")),
+            "company_preferred": s.get("_company_preferred", False),
+            "source": item.get("_source", "static"),
+        })
+
+    criteria_echo = _sanitize_criteria(criteria)
+    return {
+        "category": category,
+        "criteria_echo": criteria_echo,
+        "dataset_count": len(dataset),
+        "matching_count": len(matching),
+        "ranked": rows,
+    }
 
 
 def _default_office_for_city(city: str) -> str:

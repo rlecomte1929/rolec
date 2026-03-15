@@ -663,6 +663,9 @@ export interface AdminContextResponse {
   } | null;
 }
 
+export type CompanyPlanTier = 'low' | 'medium' | 'premium';
+export type CompanyStatus = 'active' | 'inactive' | 'archived';
+
 export interface AdminCompany {
   id: string;
   name: string;
@@ -672,6 +675,12 @@ export interface AdminCompany {
   phone?: string;
   hr_contact?: string;
   created_at: string;
+  updated_at?: string;
+  status?: CompanyStatus | string;
+  plan_tier?: CompanyPlanTier | string;
+  hr_seat_limit?: number | null;
+  employee_seat_limit?: number | null;
+  missing_from_companies_table?: number;
 }
 
 export interface AdminProfile {
@@ -681,6 +690,12 @@ export interface AdminProfile {
   full_name?: string;
   company_id?: string;
   created_at: string;
+  /** Resolved company name (from admin people API) */
+  company_name?: string;
+  /** active | inactive */
+  status?: string;
+  /** full_name || email || id */
+  name?: string;
 }
 
 export interface AdminEmployee {
@@ -751,8 +766,13 @@ export interface AdminAssignment {
   company_name?: string;
   employee_full_name?: string;
   hr_full_name?: string;
+  employee_email?: string;
+  hr_email?: string;
   employee_company_id?: string;
   hr_company_id?: string;
+  company_id?: string;
+  employee_profile_company_id?: string;
+  hr_profile_company_id?: string;
   assignment_type?: string;
   move_date?: string;
   family_status?: string;
@@ -775,6 +795,51 @@ export interface AdminPolicyCompany {
   latest_version_updated_at?: string;
   resolved_count?: number;
   policy_status: 'no_policy' | 'draft' | 'review_required' | 'reviewed' | 'published';
+}
+
+/** Single policy row in admin company-scoped policy list */
+export interface AdminPolicySummary {
+  policy_id: string;
+  title?: string;
+  extraction_status?: string;
+  version_count: number;
+  published_version_id?: string | null;
+  published_at?: string | null;
+  latest_version_status?: string | null;
+  latest_version_number?: number | null;
+}
+
+/** Response from GET /api/admin/policies?company_id= */
+export interface AdminPoliciesByCompany {
+  company_id: string;
+  company_name?: string;
+  source_document_count: number;
+  policies: AdminPolicySummary[];
+}
+
+/** Policy version from admin versions list */
+export interface AdminPolicyVersion {
+  id: string;
+  policy_id: string;
+  version_number: number;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
+/** Response from GET /api/admin/policies/{id} (detail with versions) */
+export interface AdminPolicyDetail extends Record<string, unknown> {
+  id: string;
+  company_id: string;
+  company_name?: string;
+  title?: string;
+  extraction_status?: string;
+  source_document_count: number;
+  versions: AdminPolicyVersion[];
+  published_version?: AdminPolicyVersion | null;
+  published_version_id?: string | null;
+  published_at?: string | null;
 }
 
 export interface AdminAssignmentDetail extends AdminAssignment {

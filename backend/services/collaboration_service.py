@@ -608,6 +608,8 @@ def list_all_threads(
                 last_body = (comm[0].get("body") or "")[:100]
                 if len((comm[0].get("body") or "")) > 100:
                     last_body = last_body.rstrip() + "…"
+        first_participant_id = participant_ids[0] if participant_ids else None
+        first_participant_name = participant_names[0] if participant_names else "—"
         out.append({
             "thread_id": t["id"],
             "thread_type": "collaboration",
@@ -615,6 +617,9 @@ def list_all_threads(
             "target_id": t.get("thread_target_id"),
             "title": t.get("title"),
             "status": t.get("status"),
+            "participant_id": first_participant_id,
+            "participant_name": first_participant_name,
+            "participant_role": "collaboration",
             "participants": participant_names or ["—"],
             "last_message_preview": last_body or "—",
             "last_message_at": t.get("last_comment_at"),

@@ -88,9 +88,9 @@ export const AdminAssignments: React.FC = () => {
   const isLinkageConsistent = (d: AdminAssignmentDetail | null): { ok: boolean; issues: string[] } => {
     if (!d) return { ok: true, issues: [] };
     const issues: string[] = [];
-    const caseCo = d.case_company_id || (d as { company_id?: string }).company_id;
-    const empCo = d.employee_company_id || (d as { employee_profile_company_id?: string }).employee_profile_company_id;
-    const hrCo = d.hr_company_id || (d as { hr_profile_company_id?: string }).hr_profile_company_id;
+    const caseCo = d.case_company_id ?? d.company_id;
+    const empCo = d.employee_company_id ?? d.employee_profile_company_id;
+    const hrCo = d.hr_company_id ?? d.hr_profile_company_id;
     if (caseCo && empCo && caseCo !== empCo) issues.push('Employee company differs from assignment company');
     if (caseCo && hrCo && caseCo !== hrCo) issues.push('HR company differs from assignment company');
     if (empCo && hrCo && empCo !== hrCo) issues.push('Employee and HR belong to different companies');

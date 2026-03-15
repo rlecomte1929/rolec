@@ -79,6 +79,7 @@ from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
 from .routes import resources as resources_router
 from .app.recommendations.router import router as recommendations_router
+from .app.recommendations.admin_debug import router as admin_recommendations_debug_router
 from .app.routers import suppliers as suppliers_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
@@ -222,6 +223,7 @@ app.include_router(admin_notifications_router.router, prefix="/api/admin")
 app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
+app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
 app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
 app.include_router(recommendations_router)
@@ -1127,7 +1129,8 @@ def stop_impersonation(
 
 @app.get("/api/admin/companies")
 def list_companies(q: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
-    items = db.list_companies(q)
+    items = db.get_admin_company_index(q)
+    log.info("admin_companies list query=%s count=%s", q, len(items))
     db.log_audit(user["id"], "READ", "company", None, None, {"query": q})
     return {"companies": items}
 
@@ -1135,6 +1138,8 @@ def list_companies(q: Optional[str] = Query(None), user: Dict[str, Any] = Depend
 @app.get("/api/admin/companies/{company_id}")
 def get_company_detail(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
     company = db.get_company(company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
     hr_users = db.list_hr_users(company_id)
     employees = db.list_employees(company_id)
     policies = db.list_hr_policies_by_company(company_id)
@@ -1147,11 +1152,202 @@ def get_company_detail(company_id: str, user: Dict[str, Any] = Depends(require_a
     }
 
 
+class AdminCreateCompanyRequest(BaseModel):
+    name: str
+    country: Optional[str] = None
+    size_band: Optional[str] = None
+    status: Optional[str] = None
+    plan_tier: Optional[str] = None
+    hr_seat_limit: Optional[int] = None
+    employee_seat_limit: Optional[int] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    hr_contact: Optional[str] = None
+    support_email: Optional[str] = None
+
+
+class AdminUpdateCompanyRequest(BaseModel):
+    name: Optional[str] = None
+    country: Optional[str] = None
+    size_band: Optional[str] = None
+    status: Optional[str] = None
+    plan_tier: Optional[str] = None
+    hr_seat_limit: Optional[int] = None
+    employee_seat_limit: Optional[int] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    hr_contact: Optional[str] = None
+    support_email: Optional[str] = None
+
+
+@app.post("/api/admin/companies", status_code=201)
+def create_company(body: AdminCreateCompanyRequest, user: Dict[str, Any] = Depends(require_admin)):
+    company_id = str(uuid.uuid4())
+    db.create_company(
+        company_id=company_id,
+        name=body.name,
+        country=body.country,
+        size_band=body.size_band,
+        address=body.address,
+        phone=body.phone,
+        hr_contact=body.hr_contact,
+        support_email=body.support_email,
+        status=body.status,
+        plan_tier=body.plan_tier,
+        hr_seat_limit=body.hr_seat_limit,
+        employee_seat_limit=body.employee_seat_limit,
+    )
+    company = db.get_company(company_id)
+    log.info("admin company created id=%s name=%s by=%s", company_id, body.name, user.get("id"))
+    db.log_audit(user["id"], "CREATE", "company", company_id, None, {"name": body.name})
+    return {"company": company}
+
+
+@app.patch("/api/admin/companies/{company_id}")
+def update_company(company_id: str, body: AdminUpdateCompanyRequest, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_company(company_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Company not found")
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        return {"company": existing}
+    updated = db.update_company(company_id, **payload)
+    if not updated:
+        return {"company": existing}
+    company = db.get_company(company_id)
+    log.info("admin company updated id=%s by=%s keys=%s", company_id, user.get("id"), list(payload.keys()))
+    db.log_audit(user["id"], "UPDATE", "company", company_id, None, payload)
+    return {"company": company}
+
+
+@app.post("/api/admin/companies/{company_id}/deactivate")
+def deactivate_company(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_company(company_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Company not found")
+    if (existing.get("status") or "").lower() == "inactive":
+        return {"company": existing, "message": "Already inactive"}
+    db.deactivate_company(company_id)
+    company = db.get_company(company_id)
+    log.info("admin company deactivated id=%s by=%s", company_id, user.get("id"))
+    db.log_audit(user["id"], "DEACTIVATE", "company", company_id, None, {})
+    return {"company": company, "message": "Deactivated"}
+
+
 @app.get("/api/admin/users")
-def list_users(q: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
-    items = db.list_profiles(q)
-    db.log_audit(user["id"], "READ", "profile", None, None, {"query": q})
-    return {"profiles": items}
+def list_users(
+    q: Optional[str] = Query(None),
+    company_id: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    people, summary = db.get_admin_people_index(company_id=company_id, query=q, role=role)
+    log.info("admin_users list company_id=%s role=%s query=%s count=%s", company_id, role, q, summary.get("count"))
+    db.log_audit(user["id"], "READ", "profile", None, None, {"query": q, "company_id": company_id, "role": role})
+    return {"profiles": people, "summary": summary}
+
+
+@app.get("/api/admin/people")
+def list_people(
+    company_id: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    query: Optional[str] = Query(None, alias="q"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin people list with company, role, and text filters. Returns admin-safe fields including company_name, status."""
+    people, summary = db.get_admin_people_index(company_id=company_id, query=query, role=role)
+    db.log_audit(user["id"], "READ", "people", None, None, {"company_id": company_id, "role": role, "query": query})
+    return {"people": people, "summary": summary}
+
+
+class AdminCreatePersonRequest(BaseModel):
+    email: str
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    company_id: Optional[str] = None
+
+
+class AdminUpdatePersonRequest(BaseModel):
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    company_id: Optional[str] = None
+    status: Optional[str] = None
+
+
+class AdminAssignCompanyRequest(BaseModel):
+    company_id: str
+
+
+class AdminSetRoleRequest(BaseModel):
+    role: str
+
+
+@app.post("/api/admin/people", status_code=201)
+def create_person(body: AdminCreatePersonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    email = (body.email or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="email required")
+    person_id = str(uuid.uuid4())
+    db.create_profile(
+        person_id=person_id,
+        email=email,
+        full_name=body.full_name,
+        role=body.role or "EMPLOYEE",
+        company_id=body.company_id,
+    )
+    profile = db.get_profile_record(person_id)
+    log.info("admin person created id=%s email=%s by=%s", person_id, email, user.get("id"))
+    db.log_audit(user["id"], "CREATE", "profile", person_id, None, {"email": email})
+    return {"person": profile}
+
+
+@app.patch("/api/admin/people/{person_id}")
+def update_person(person_id: str, body: AdminUpdatePersonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_profile_record(person_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Person not found")
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        return {"person": existing}
+    updated = db.update_profile(person_id, **payload)
+    if not updated:
+        return {"person": existing}
+    profile = db.get_profile_record(person_id)
+    db.log_audit(user["id"], "UPDATE", "profile", person_id, None, payload)
+    return {"person": profile}
+
+
+@app.post("/api/admin/people/{person_id}/assign-company")
+def assign_person_company(person_id: str, body: AdminAssignCompanyRequest, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_profile_record(person_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Person not found")
+    db.set_profile_company(person_id, body.company_id)
+    profile = db.get_profile_record(person_id)
+    db.log_audit(user["id"], "ASSIGN_COMPANY", "profile", person_id, None, {"company_id": body.company_id})
+    return {"person": profile}
+
+
+@app.post("/api/admin/people/{person_id}/set-role")
+def set_person_role(person_id: str, body: AdminSetRoleRequest, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_profile_record(person_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Person not found")
+    db.set_profile_role(person_id, body.role)
+    profile = db.get_profile_record(person_id)
+    db.log_audit(user["id"], "SET_ROLE", "profile", person_id, None, {"role": body.role})
+    return {"person": profile}
+
+
+@app.post("/api/admin/people/{person_id}/deactivate")
+def deactivate_person(person_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_profile_record(person_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Person not found")
+    db.deactivate_profile(person_id)
+    profile = db.get_profile_record(person_id)
+    db.log_audit(user["id"], "DEACTIVATE", "profile", person_id, None, {})
+    return {"person": profile}
 
 
 @app.get("/api/admin/employees")
@@ -1274,6 +1470,116 @@ def admin_fix_assignment_company_linkage(
     return {"ok": True}
 
 
+@app.get("/api/admin/data-integrity/overview")
+def get_data_integrity_overview(user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: entity counts and orphan flags for data-integrity dashboard."""
+    data = db.get_data_integrity_overview()
+    db.log_audit(user["id"], "READ", "data_integrity_overview", None, None, {})
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Admin reconciliation (repair missing links; no destructive cleanup)
+# ---------------------------------------------------------------------------
+
+class ReconciliationLinkPersonCompanyRequest(BaseModel):
+    profile_id: str
+    company_id: str
+
+
+class ReconciliationLinkAssignmentCompanyRequest(BaseModel):
+    assignment_id: str
+    company_id: str
+    reason: str
+
+
+class ReconciliationLinkAssignmentPersonRequest(BaseModel):
+    assignment_id: str
+    profile_id: str
+
+
+class ReconciliationLinkPolicyCompanyRequest(BaseModel):
+    policy_id: str
+    company_id: str
+
+
+@app.get("/api/admin/reconciliation/report")
+def get_reconciliation_report(user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: full reconciliation report (companies, people, assignments, policies, missing links)."""
+    data = db.get_reconciliation_report()
+    db.log_audit(user["id"], "READ", "reconciliation_report", None, None, {})
+    return data
+
+
+@app.post("/api/admin/reconciliation/link-person-company")
+def reconciliation_link_person_company(
+    body: ReconciliationLinkPersonCompanyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: attach a profile (person) to a company. Updates profiles.company_id and employees if present."""
+    if not db.get_profile_record(body.profile_id):
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if not db.get_company(body.company_id):
+        raise HTTPException(status_code=404, detail="Company not found")
+    db.admin_reassign_employee_company(body.profile_id, body.company_id)
+    db.log_audit(user["id"], "RECONCILIATION_LINK_PERSON_COMPANY", "profile", body.profile_id, None, {"company_id": body.company_id})
+    return {"ok": True}
+
+
+@app.post("/api/admin/reconciliation/link-assignment-company")
+def reconciliation_link_assignment_company(
+    body: ReconciliationLinkAssignmentCompanyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: set assignment's case company (relocation_cases.company_id)."""
+    _require_reason(body.reason)
+    if not db.get_assignment_by_id(body.assignment_id):
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not db.get_company(body.company_id):
+        raise HTTPException(status_code=404, detail="Company not found")
+    db.admin_fix_assignment_company_linkage(body.assignment_id, body.company_id)
+    db.log_audit(user["id"], "RECONCILIATION_LINK_ASSIGNMENT_COMPANY", "assignment", body.assignment_id, body.reason, {"company_id": body.company_id})
+    return {"ok": True}
+
+
+@app.post("/api/admin/reconciliation/link-assignment-person")
+def reconciliation_link_assignment_person(
+    body: ReconciliationLinkAssignmentPersonRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: attach a profile (person) as employee to an assignment."""
+    if not db.get_assignment_by_id(body.assignment_id):
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not db.get_profile_record(body.profile_id):
+        raise HTTPException(status_code=404, detail="Profile not found")
+    db.attach_employee_to_assignment(body.assignment_id, body.profile_id)
+    db.log_audit(user["id"], "RECONCILIATION_LINK_ASSIGNMENT_PERSON", "assignment", body.assignment_id, None, {"profile_id": body.profile_id})
+    return {"ok": True}
+
+
+@app.post("/api/admin/reconciliation/link-policy-company")
+def reconciliation_link_policy_company(
+    body: ReconciliationLinkPolicyCompanyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: reassign a company_policy to a company."""
+    if not db.get_company_policy(body.policy_id):
+        raise HTTPException(status_code=404, detail="Policy not found")
+    if not db.get_company(body.company_id):
+        raise HTTPException(status_code=404, detail="Company not found")
+    db.admin_link_policy_company(body.policy_id, body.company_id)
+    db.log_audit(user["id"], "RECONCILIATION_LINK_POLICY_COMPANY", "company_policy", body.policy_id, None, {"company_id": body.company_id})
+    return {"ok": True}
+
+
+class AdminPatchPolicyRequest(BaseModel):
+    title: Optional[str] = None
+    version: Optional[str] = None
+    effective_date: Optional[str] = None
+    publish_version_id: Optional[str] = None
+    unpublish: Optional[bool] = None
+
+
 @app.get("/api/admin/policies/overview")
 def list_admin_policy_overview(
     company_id: Optional[str] = Query(None),
@@ -1283,6 +1589,80 @@ def list_admin_policy_overview(
     items = db.list_admin_policy_overview(company_id=company_id)
     db.log_audit(user["id"], "READ", "admin_policy_overview", None, None, {"company_id": company_id})
     return {"companies": items}
+
+
+@app.get("/api/admin/policies")
+def list_admin_policies(
+    company_id: Optional[str] = Query(None, description="Filter by company; required for company-scoped list"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: list policies for a company. Requires company_id."""
+    if not company_id or not company_id.strip():
+        raise HTTPException(status_code=400, detail="company_id is required")
+    data = db.get_admin_policies_by_company(company_id.strip())
+    if data is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    db.log_audit(user["id"], "READ", "admin_policies", None, None, {"company_id": company_id})
+    return data
+
+
+@app.get("/api/admin/policies/{policy_id}")
+def get_admin_policy_detail(policy_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: single policy with company, versions, published version."""
+    data = db.get_admin_policy_detail(policy_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    db.log_audit(user["id"], "READ", "admin_policy_detail", policy_id, None, {})
+    return data
+
+
+@app.get("/api/admin/policies/{policy_id}/versions")
+def list_admin_policy_versions(policy_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: list all versions for a policy."""
+    policy = db.get_company_policy(policy_id)
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    versions = db.list_policy_versions(policy_id)
+    db.log_audit(user["id"], "READ", "admin_policy_versions", policy_id, None, {})
+    return {"policy_id": policy_id, "versions": versions}
+
+
+@app.patch("/api/admin/policies/{policy_id}")
+def patch_admin_policy(
+    policy_id: str,
+    body: AdminPatchPolicyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: update policy metadata and/or publish/unpublish a version."""
+    policy = db.get_company_policy(policy_id)
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        return db.get_admin_policy_detail(policy_id)
+
+    if body.title is not None or body.version is not None or body.effective_date is not None:
+        db.update_company_policy_meta(
+            policy_id,
+            title=body.title,
+            version=body.version,
+            effective_date=body.effective_date,
+        )
+    if body.unpublish is True:
+        db.archive_all_published_versions(policy_id)
+        db.log_audit(user["id"], "ADMIN_UNPUBLISH_POLICY", "policy_version", policy_id, None, {})
+    elif body.publish_version_id:
+        vid = body.publish_version_id
+        version = db.get_policy_version(vid)
+        if not version or version.get("policy_id") != policy_id:
+            raise HTTPException(status_code=400, detail="Version not found or does not belong to this policy")
+        db.archive_other_published_versions(policy_id, vid)
+        db.update_policy_version_status(vid, "published")
+        db.log_audit(user["id"], "ADMIN_PUBLISH_POLICY", "policy_version", policy_id, None, {"version_id": vid})
+
+    updated = db.get_admin_policy_detail(policy_id)
+    db.log_audit(user["id"], "UPDATE", "admin_policy", policy_id, None, payload)
+    return updated
 
 
 @app.get("/api/admin/support-cases")

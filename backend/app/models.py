@@ -159,5 +159,7 @@ class SupplierScoringMetadata(Base):
     preferred_partner = Column(Boolean, nullable=False, default=False)
     premium_partner = Column(Boolean, nullable=False, default=False)
     last_verified_at = Column(DateTime, nullable=True)
+    admin_score = Column(Float, nullable=True)  # 0-100 boost for ranking (admin-tunable)
+    manual_priority = Column(Integer, nullable=True)  # relative priority (higher = rank higher)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

@@ -76,25 +76,29 @@ class MoversPlugin(BasePlugin):
     def score(self, criteria: MoversCriteria, item: Dict[str, Any]) -> Dict[str, Any]:
         c = criteria
         w = c.weights or {}
+        from_registry = item.get("_source") == "supplier_registry"
+        # Registry items often lack movers-specific fields; use friendly defaults so they rank fairly
+        max_vol = item.get("max_volume_m3", 40 if from_registry else 20)
+        intl_cap = item.get("international_capable", True if from_registry else False)
+        lead_days = item.get("typical_lead_days", 14)
+        svc = item.get("services_supported", ["packing", "storage"] if from_registry else []) or []
+        cost_lvl = item.get("avg_cost_level", "medium")
+
         vol_info = estimate_volume_m3(c.model_dump())
         vol_est = vol_info["volume_m3_estimate"]
-        max_vol = item.get("max_volume_m3", 20)
         capacity_fit = 100.0 if max_vol >= vol_est else max(0, 100 * max_vol / vol_est)
 
         intl = c.move_type == "international"
-        intl_cap = item.get("international_capable", False)
         if intl and not intl_cap:
             capacity_fit *= 0.3
         elif intl and intl_cap:
             capacity_fit = min(100, capacity_fit * 1.1)
 
-        lead_days = item.get("typical_lead_days", 14)
         timeline_fit = 100.0
         if c.preferred_move_window:
             timeline_fit = max(50, 100 - (lead_days - 14))
 
         packing = c.packing_service
-        svc = item.get("services_supported", []) or []
         has_packing = "packing" in svc
         has_storage = "storage" in svc
         service_fit = 100.0
@@ -103,7 +107,6 @@ class MoversPlugin(BasePlugin):
         if c.storage_needed and not has_storage:
             service_fit *= 0.7
 
-        cost_lvl = item.get("avg_cost_level", "medium")
         budget_sens = 5
         if c.priorities:
             budget_sens = c.priorities.get("budget_sensitivity", 5)

@@ -30,6 +30,9 @@ import type {
   AdminAssignment,
   AdminAssignmentDetail,
   AdminPolicyCompany,
+  AdminPoliciesByCompany,
+  AdminPolicyDetail,
+  AdminPolicyVersion,
   AdminSupportCase,
   AdminSupportNote,
   CompanyProfilePayload,
@@ -486,8 +489,71 @@ export const adminAPI = {
     const response = await api.get(`/api/admin/companies/${companyId}`);
     return response.data;
   },
-  listProfiles: async (q?: string): Promise<{ profiles: AdminProfile[] }> => {
-    const response = await api.get('/api/admin/users', { params: { q } });
+  createCompany: async (payload: {
+    name: string;
+    country?: string;
+    size_band?: string;
+    status?: string;
+    plan_tier?: string;
+    hr_seat_limit?: number;
+    employee_seat_limit?: number;
+    address?: string;
+    phone?: string;
+    hr_contact?: string;
+    support_email?: string;
+  }): Promise<{ company: AdminCompany }> => {
+    const response = await api.post('/api/admin/companies', payload);
+    return response.data;
+  },
+  updateCompany: async (
+    companyId: string,
+    payload: Partial<{
+      name: string;
+      country: string;
+      size_band: string;
+      status: string;
+      plan_tier: string;
+      hr_seat_limit: number;
+      employee_seat_limit: number;
+      address: string;
+      phone: string;
+      hr_contact: string;
+      support_email: string;
+    }>
+  ): Promise<{ company: AdminCompany }> => {
+    const response = await api.patch(`/api/admin/companies/${companyId}`, payload);
+    return response.data;
+  },
+  deactivateCompany: async (companyId: string): Promise<{ company: AdminCompany; message?: string }> => {
+    const response = await api.post(`/api/admin/companies/${companyId}/deactivate`);
+    return response.data;
+  },
+  listProfiles: async (params?: { q?: string; company_id?: string; role?: string }): Promise<{ profiles: AdminProfile[]; summary?: { count: number; orphans_without_company?: number } }> => {
+    const response = await api.get('/api/admin/users', { params: params || {} });
+    return response.data;
+  },
+  listPeople: async (params?: { company_id?: string; role?: string; q?: string }): Promise<{ people: AdminProfile[]; summary?: { count: number; orphans_without_company?: number } }> => {
+    const response = await api.get('/api/admin/people', { params: params || {} });
+    return response.data;
+  },
+  createPerson: async (payload: { email: string; full_name?: string; role?: string; company_id?: string }): Promise<{ person: AdminProfile }> => {
+    const response = await api.post('/api/admin/people', payload);
+    return response.data;
+  },
+  updatePerson: async (personId: string, payload: Partial<{ full_name: string; role: string; company_id: string; status: string }>): Promise<{ person: AdminProfile }> => {
+    const response = await api.patch(`/api/admin/people/${personId}`, payload);
+    return response.data;
+  },
+  assignPersonCompany: async (personId: string, companyId: string): Promise<{ person: AdminProfile }> => {
+    const response = await api.post(`/api/admin/people/${personId}/assign-company`, { company_id: companyId });
+    return response.data;
+  },
+  setPersonRole: async (personId: string, role: string): Promise<{ person: AdminProfile }> => {
+    const response = await api.post(`/api/admin/people/${personId}/set-role`, { role });
+    return response.data;
+  },
+  deactivatePerson: async (personId: string): Promise<{ person: AdminProfile }> => {
+    const response = await api.post(`/api/admin/people/${personId}/deactivate`);
     return response.data;
   },
   listEmployees: async (companyId?: string): Promise<{ employees: AdminEmployee[] }> => {
@@ -532,6 +598,25 @@ export const adminAPI = {
     const response = await api.get('/api/admin/policies/overview', { params });
     return response.data;
   },
+  listAdminPolicies: async (companyId: string): Promise<AdminPoliciesByCompany> => {
+    const response = await api.get('/api/admin/policies', { params: { company_id: companyId } });
+    return response.data;
+  },
+  getAdminPolicyDetail: async (policyId: string): Promise<AdminPolicyDetail> => {
+    const response = await api.get(`/api/admin/policies/${policyId}`);
+    return response.data;
+  },
+  getAdminPolicyVersions: async (policyId: string): Promise<{ policy_id: string; versions: AdminPolicyVersion[] }> => {
+    const response = await api.get(`/api/admin/policies/${policyId}/versions`);
+    return response.data;
+  },
+  patchAdminPolicy: async (
+    policyId: string,
+    payload: { title?: string; version?: string; effective_date?: string; publish_version_id?: string; unpublish?: boolean }
+  ): Promise<AdminPolicyDetail> => {
+    const response = await api.patch(`/api/admin/policies/${policyId}`, payload);
+    return response.data;
+  },
   listSupportCases: async (params?: { status?: string; severity?: string; company_id?: string }): Promise<{ support_cases: AdminSupportCase[] }> => {
     const response = await api.get('/api/admin/support-cases', { params });
     return response.data;
@@ -560,6 +645,36 @@ export const adminAPI = {
   },
   adminAction: async (action: string, payload: { reason: string; breakGlass?: boolean; payload?: any }) => {
     const response = await api.post(`/api/admin/actions/${action}`, payload);
+    return response.data;
+  },
+  getReconciliationReport: async () => {
+    const response = await api.get('/api/admin/reconciliation/report');
+    return response.data;
+  },
+  reconciliationLinkPersonCompany: async (profileId: string, companyId: string) => {
+    const response = await api.post('/api/admin/reconciliation/link-person-company', { profile_id: profileId, company_id: companyId });
+    return response.data;
+  },
+  reconciliationLinkAssignmentCompany: async (assignmentId: string, companyId: string, reason: string) => {
+    const response = await api.post('/api/admin/reconciliation/link-assignment-company', {
+      assignment_id: assignmentId,
+      company_id: companyId,
+      reason,
+    });
+    return response.data;
+  },
+  reconciliationLinkAssignmentPerson: async (assignmentId: string, profileId: string) => {
+    const response = await api.post('/api/admin/reconciliation/link-assignment-person', {
+      assignment_id: assignmentId,
+      profile_id: profileId,
+    });
+    return response.data;
+  },
+  reconciliationLinkPolicyCompany: async (policyId: string, companyId: string) => {
+    const response = await api.post('/api/admin/reconciliation/link-policy-company', {
+      policy_id: policyId,
+      company_id: companyId,
+    });
     return response.data;
   },
   listResearchCandidates: async (params?: { destination_country?: string; status?: string }) => {
@@ -681,6 +796,23 @@ export const suppliersAPI = {
   },
   updateScoring: async (supplierId: string, payload: Record<string, unknown>) => {
     const response = await api.patch(`/api/suppliers/${supplierId}/scoring`, payload);
+    return response.data;
+  },
+  getRankingDebug: async (
+    supplierId: string,
+    params?: { service_category?: string; destination_country?: string; destination_city?: string }
+  ) => {
+    const response = await api.get(`/api/suppliers/${supplierId}/ranking-debug`, { params });
+    return response.data;
+  },
+};
+
+// Admin recommendations debug (admin only)
+export const adminRecommendationsAPI = {
+  getDebug: async (assignmentId: string, serviceCategory: string) => {
+    const response = await api.get('/api/admin/recommendations/debug', {
+      params: { assignment_id: assignmentId, service_category: serviceCategory },
+    });
     return response.data;
   },
 };

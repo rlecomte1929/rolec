@@ -13,6 +13,9 @@ type Thread = {
   company_name?: string;
   employee_name?: string;
   hr_name?: string;
+  participant_id?: string | null;
+  participant_name?: string | null;
+  participant_role?: string | null;
   participants?: string[];
   last_message_preview?: string;
   last_message_at?: string;
@@ -22,6 +25,8 @@ type Thread = {
   target_id?: string;
   title?: string;
 };
+
+type GroupBy = 'thread' | 'person' | 'role';
 
 type HrThreadDetail = {
   thread_type: 'hr_employee';
@@ -49,6 +54,55 @@ const THREAD_TYPES = [
   { value: 'collaboration', label: 'Internal collaboration' },
 ];
 
+function ThreadRow({
+  thread,
+  isSelected,
+  onSelect,
+  formatTimeAgo,
+}: {
+  thread: Thread;
+  isSelected: boolean;
+  onSelect: () => void;
+  formatTimeAgo: (s?: string) => string;
+}) {
+  const participants = thread.participants?.join(', ') || thread.participant_name || thread.company_name || '—';
+  const raw = thread.last_message_preview || '—';
+  const previewText = raw.length > 60 ? raw.slice(0, 60).trimEnd() + '…' : raw;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => e.key === 'Enter' && onSelect()}
+      className={`flex flex-col gap-1 px-3 py-2 cursor-pointer min-w-0 ${
+        isSelected ? 'bg-[#f0f9ff] border-l-2 border-l-[#0b2b43]' : 'hover:bg-[#f9fafb]'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium text-[#0b2b43] text-sm truncate">{participants}</span>
+        <span className="text-xs text-[#6b7280] shrink-0">{formatTimeAgo(thread.last_message_at)}</span>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge variant="neutral" size="sm">{thread.thread_type === 'hr_employee' ? 'HR' : 'Collab'}</Badge>
+        {thread.status && (
+          <span
+            className={`inline-block px-1.5 py-0.5 rounded text-xs ${
+              thread.status === 'open' || thread.status === 'assigned'
+                ? 'bg-amber-100 text-amber-800'
+                : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            {thread.status}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-[#6b5563] truncate" title={thread.last_message_preview}>
+        {previewText}
+      </p>
+    </div>
+  );
+}
+
 export const AdminMessages: React.FC = () => {
   const navigate = useNavigate();
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -64,6 +118,8 @@ export const AdminMessages: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'threads' | 'support'>('threads');
   const [supportCases, setSupportCases] = useState<any[]>([]);
+  const [groupBy, setGroupBy] = useState<GroupBy>('person');
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
   const loadThreads = useCallback(async () => {
     setLoading(true);
@@ -129,10 +185,11 @@ export const AdminMessages: React.FC = () => {
         const res = await adminAPI.getHrThreadDetail(t.assignment_id);
         setThreadDetail(res);
       } else if (t.thread_type === 'collaboration') {
-        const [, commentsRes] = await Promise.all([
+        const [_thread, commentsRes] = await Promise.all([
           adminCollaborationAPI.getThreadById(t.thread_id),
           adminCollaborationAPI.getComments(t.thread_id),
         ]);
+        void _thread;
         setThreadDetail(null);
         setCollabComments((commentsRes?.comments || []).map((c: any) => ({
           id: c.id,
@@ -149,6 +206,61 @@ export const AdminMessages: React.FC = () => {
   }, []);
 
   const formatDate = (s?: string) => (s ? new Date(s).toLocaleString() : '—');
+  const formatTimeAgo = (s?: string) => {
+    if (!s) return '—';
+    const d = new Date(s);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString();
+  };
+
+  // Group threads: map groupKey -> { label, threads }. Keys for person/role are stable for expand/collapse.
+  const groups = React.useMemo(() => {
+    const map = new Map<string, { label: string; threads: Thread[] }>();
+    for (const t of threads) {
+      let key: string;
+      let label: string;
+      if (groupBy === 'thread') {
+        key = `${t.thread_type}:${t.thread_id}`;
+        label = t.participants?.join(', ') || t.company_name || t.thread_id;
+        map.set(key, { label, threads: [t] });
+      } else if (groupBy === 'role') {
+        const roleLabel =
+          t.participant_role === 'employee' ? 'Employee' : t.participant_role === 'collaboration' ? 'Collaboration' : 'Other';
+        key = `role:${t.participant_role || 'other'}:${t.participant_id || t.thread_id}`;
+        label = `${roleLabel} · ${t.participant_name || t.participants?.join(', ') || '—'}`;
+        if (!map.has(key)) map.set(key, { label, threads: [] });
+        map.get(key)!.threads.push(t);
+      } else {
+        key = `person:${t.participant_id || t.thread_id}`;
+        label = t.participant_name || t.participants?.join(', ') || t.thread_id;
+        if (!map.has(key)) map.set(key, { label, threads: [] });
+        map.get(key)!.threads.push(t);
+      }
+    }
+    return map;
+  }, [threads, groupBy]);
+
+  const groupKeys = [...groups.keys()];
+
+  const expandAll = () => setExpandedKeys(new Set(groupKeys));
+  const collapseAll = () => setExpandedKeys(new Set());
+  const toggleGroup = (key: string) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+  const isGroupExpanded = (key: string) => groupBy === 'thread' || expandedKeys.has(key);
 
   return (
     <AdminLayout title="Messages" subtitle="Message threads and support cases — select a company to view threads">
@@ -269,7 +381,29 @@ export const AdminMessages: React.FC = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card padding="lg">
-              <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Thread list</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h2 className="text-lg font-semibold text-[#0b2b43]">Thread list</h2>
+                {companyFilter && threads.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-sm text-[#6b7280]">Group by</label>
+                    <select
+                      value={groupBy}
+                      onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+                      className="border border-[#d1d5db] rounded px-2 py-1 text-sm"
+                    >
+                      <option value="thread">Thread</option>
+                      <option value="person">Person</option>
+                      <option value="role">Role</option>
+                    </select>
+                    {groupBy !== 'thread' && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={expandAll}>Expand all</Button>
+                        <Button variant="outline" size="sm" onClick={collapseAll}>Collapse all</Button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
               {!companyFilter ? (
                 <div className="p-8 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
                   Select a company above to view message threads.
@@ -279,43 +413,59 @@ export const AdminMessages: React.FC = () => {
               ) : threads.length === 0 ? (
                 <div className="p-8 text-center text-[#6b7280]">No threads found for this company.</div>
               ) : (
-                <div className="space-y-2 max-h-[480px] overflow-y-auto">
-                  {threads.map((t) => (
-                    <div
-                      key={`${t.thread_type}-${t.thread_id}`}
-                      onClick={() => loadThreadDetail(t)}
-                      className={`p-3 rounded-lg border cursor-pointer ${
-                        selectedThread?.thread_id === t.thread_id && selectedThread?.thread_type === t.thread_type
-                          ? 'border-[#0b2b43] bg-[#f0f9ff]'
-                          : 'border-[#e5e7eb] hover:bg-[#f9fafb]'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-[#0b2b43] truncate">
-                            {t.company_name || t.title || t.thread_id}
-                          </div>
-                          <div className="text-xs text-[#6b7280]">
-                            {(t.participants || []).join(', ')}
-                          </div>
-                          <div className="text-sm text-[#4b5563] truncate mt-1" title={t.last_message_preview}>
-                            {t.last_message_preview || '—'}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <Badge variant="neutral" size="sm">{t.thread_type === 'hr_employee' ? 'HR' : 'Collab'}</Badge>
-                          <div className="text-xs text-[#6b7280] mt-1">{formatDate(t.last_message_at)}</div>
-                          {t.status && (
-                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs ${
-                              t.status === 'open' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700'
-                            }`}>
-                              {t.status}
+                <div className="space-y-1 max-h-[480px] overflow-y-auto">
+                  {groupBy === 'thread' ? (
+                    <div className="rounded-lg border border-[#e5e7eb] divide-y divide-[#e5e7eb]">
+                      {threads.map((t) => (
+                        <ThreadRow
+                          key={`${t.thread_type}-${t.thread_id}`}
+                          thread={t}
+                          isSelected={
+                            selectedThread?.thread_id === t.thread_id &&
+                            selectedThread?.thread_type === t.thread_type
+                          }
+                          onSelect={() => loadThreadDetail(t)}
+                          formatTimeAgo={formatTimeAgo}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    groupKeys.map((groupKey) => {
+                      const group = groups.get(groupKey)!;
+                      const expanded = isGroupExpanded(groupKey);
+                      return (
+                        <div key={groupKey} className="rounded-lg border border-[#e5e7eb] overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => toggleGroup(groupKey)}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-[#f8fafc] hover:bg-[#f1f5f9] text-left text-sm font-medium text-[#0b2b43]"
+                          >
+                            <span className="truncate">{group.label}</span>
+                            <span className="text-[#6b7280] shrink-0">
+                              {group.threads.length} thread{group.threads.length !== 1 ? 's' : ''}
                             </span>
+                            <span className="text-[#6b7280] shrink-0">{expanded ? '▼' : '▶'}</span>
+                          </button>
+                          {expanded && (
+                            <div className="divide-y divide-[#e5e7eb]">
+                              {group.threads.map((t) => (
+                                <ThreadRow
+                                  key={`${t.thread_type}-${t.thread_id}`}
+                                  thread={t}
+                                  isSelected={
+                                    selectedThread?.thread_id === t.thread_id &&
+                                    selectedThread?.thread_type === t.thread_type
+                                  }
+                                  onSelect={() => loadThreadDetail(t)}
+                                  formatTimeAgo={formatTimeAgo}
+                                />
+                              ))}
+                            </div>
                           )}
                         </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    })
+                  )}
                 </div>
               )}
             </Card>

@@ -1160,11 +1160,16 @@ class Database:
                     conn.execute(text("ALTER TABLE companies ADD COLUMN phone TEXT"))
                 if "hr_contact" not in col_names:
                     conn.execute(text("ALTER TABLE companies ADD COLUMN hr_contact TEXT"))
-                for col in ("legal_name", "website", "hq_city", "industry", "logo_url", "brand_color", "updated_at", "default_destination_country", "support_email", "default_working_location"):
+                for col in ("legal_name", "website", "hq_city", "industry", "logo_url", "brand_color", "updated_at", "default_destination_country", "support_email", "default_working_location", "status", "plan_tier"):
                     cols = conn.execute(text("PRAGMA table_info(companies)")).fetchall()
                     col_names = {r[1] for r in cols}
                     if col not in col_names:
                         conn.execute(text(f"ALTER TABLE companies ADD COLUMN {col} TEXT"))
+                cols = conn.execute(text("PRAGMA table_info(companies)")).fetchall()
+                col_names = {r[1] for r in cols}
+                for col in ("hr_seat_limit", "employee_seat_limit"):
+                    if col not in col_names:
+                        conn.execute(text(f"ALTER TABLE companies ADD COLUMN {col} INTEGER"))
                 cols = conn.execute(text("PRAGMA table_info(relocation_cases)")).fetchall()
                 col_names = {r[1] for r in cols}
                 if "company_id" not in col_names:
@@ -1183,8 +1188,10 @@ class Database:
                 conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS address TEXT"))
                 conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS phone TEXT"))
                 conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS hr_contact TEXT"))
-                for col in ("legal_name", "website", "hq_city", "industry", "logo_url", "brand_color", "updated_at", "default_destination_country", "support_email", "default_working_location"):
+                for col in ("legal_name", "website", "hq_city", "industry", "logo_url", "brand_color", "updated_at", "default_destination_country", "support_email", "default_working_location", "status", "plan_tier"):
                     conn.execute(text(f"ALTER TABLE companies ADD COLUMN IF NOT EXISTS {col} TEXT"))
+                conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS hr_seat_limit INTEGER"))
+                conn.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS employee_seat_limit INTEGER"))
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS company_id TEXT"))
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS employee_id TEXT"))
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS status TEXT"))
@@ -1193,6 +1200,13 @@ class Database:
                 conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS home_country TEXT"))
 
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email)"))
+            if _is_sqlite:
+                cols = conn.execute(text("PRAGMA table_info(profiles)")).fetchall()
+                col_names = {r[1] for r in cols}
+                if "status" not in col_names:
+                    conn.execute(text("ALTER TABLE profiles ADD COLUMN status TEXT DEFAULT 'active'"))
+            else:
+                conn.execute(text("ALTER TABLE profiles ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_status ON support_cases(status)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_severity ON support_cases(severity)"))
@@ -3060,6 +3074,69 @@ class Database:
                 {"cid": company_id, "ua": datetime.utcnow().isoformat(), "case_id": case_id},
             )
 
+    def admin_link_policy_company(self, policy_id: str, company_id: str) -> None:
+        """Reassign a company_policy to a company (for reconciliation)."""
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE company_policies SET company_id = :cid WHERE id = :id"),
+                {"cid": company_id, "id": policy_id},
+            )
+
+    def get_reconciliation_report(self) -> Dict[str, Any]:
+        """Report for admin data reconciliation: entities and missing links. No destructive changes."""
+        with self.engine.connect() as conn:
+            companies = self._rows_to_list(
+                conn.execute(text("SELECT id, name, country, created_at FROM companies ORDER BY name")).fetchall()
+            )
+            people = self._rows_to_list(
+                conn.execute(text(
+                    "SELECT id, role, email, full_name, company_id, created_at FROM profiles ORDER BY full_name, email"
+                )).fetchall()
+            )
+            people_without_company = [
+                p for p in people
+                if not (p.get("company_id") or "").strip()
+            ]
+            sql_assignments = """
+                SELECT a.id, a.case_id, a.hr_user_id, a.employee_user_id, a.employee_identifier, a.status,
+                       rc.company_id AS case_company_id,
+                       (SELECT hu.company_id FROM hr_users hu WHERE hu.profile_id = a.hr_user_id LIMIT 1) AS hr_company_id
+                FROM case_assignments a
+                LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                ORDER BY a.created_at DESC
+            """
+            assignments = self._rows_to_list(conn.execute(text(sql_assignments)).fetchall())
+            resolved_company_id = lambda a: (a.get("case_company_id") or "").strip() or (a.get("hr_company_id") or "").strip()
+            assignments_without_company = [a for a in assignments if not resolved_company_id(a)]
+            assignments_without_person = [a for a in assignments if not (a.get("employee_user_id") or "").strip()]
+            policies = self._rows_to_list(
+                conn.execute(text(
+                    "SELECT id, company_id, title, extraction_status, created_at FROM company_policies ORDER BY created_at DESC"
+                )).fetchall()
+            )
+            company_ids = {c["id"] for c in companies}
+            policies_without_company = [p for p in policies if (p.get("company_id") or "").strip() not in company_ids]
+        return {
+            "companies": companies,
+            "people": people,
+            "people_without_company": people_without_company,
+            "assignments": assignments,
+            "assignments_without_company": assignments_without_company,
+            "assignments_without_person": assignments_without_person,
+            "policies": policies,
+            "policies_without_company": policies_without_company,
+            "summary": {
+                "companies_count": len(companies),
+                "people_count": len(people),
+                "people_without_company_count": len(people_without_company),
+                "assignments_count": len(assignments),
+                "assignments_without_company_count": len(assignments_without_company),
+                "assignments_without_person_count": len(assignments_without_person),
+                "policies_count": len(policies),
+                "policies_without_company_count": len(policies_without_company),
+            },
+        }
+
     # ------------------------------------------------------------------
     # Dynamic dossier (Phase 1)
     # ------------------------------------------------------------------
@@ -4243,6 +4320,79 @@ class Database:
                 "UPDATE profiles SET company_id = :cid WHERE id = :id"
             ), {"cid": company_id, "id": user_id})
 
+    def update_profile(
+        self,
+        person_id: str,
+        full_name: Optional[str] = None,
+        role: Optional[str] = None,
+        company_id: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> bool:
+        """Partial update of profile. Only non-None fields are updated. Returns True if row existed and was updated."""
+        updates = []
+        params: Dict[str, Any] = {"id": person_id}
+        if full_name is not None:
+            updates.append("full_name = :full_name")
+            params["full_name"] = full_name
+        if role is not None:
+            r = (role or "").strip().upper()
+            if r in ("ADMIN", "HR", "EMPLOYEE", "EMPLOYEE_USER"):
+                updates.append("role = :role")
+                params["role"] = r
+        if company_id is not None:
+            updates.append("company_id = :company_id")
+            params["company_id"] = company_id.strip() if company_id else None
+        if status is not None:
+            s = (status or "active").lower()
+            if s in ("active", "inactive"):
+                updates.append("status = :status")
+                params["status"] = s
+        if not updates:
+            return False
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(f"UPDATE profiles SET {', '.join(updates)} WHERE id = :id"),
+                params,
+            )
+        return result.rowcount > 0
+
+    def set_profile_role(self, person_id: str, role: str) -> bool:
+        r = (role or "").strip().upper()
+        if r not in ("ADMIN", "HR", "EMPLOYEE", "EMPLOYEE_USER"):
+            r = "EMPLOYEE"
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text("UPDATE profiles SET role = :role WHERE id = :id"),
+                {"role": r, "id": person_id},
+            )
+        return result.rowcount > 0
+
+    def deactivate_profile(self, person_id: str) -> bool:
+        return self.update_profile(person_id, status="inactive")
+
+    def create_profile(
+        self,
+        person_id: str,
+        email: str,
+        full_name: Optional[str] = None,
+        role: str = "EMPLOYEE",
+        company_id: Optional[str] = None,
+    ) -> None:
+        """Insert a new profile (admin provisioning). Idempotent: uses upsert if exists."""
+        self.upsert_profile(
+            person_id,
+            email=(email or "").strip().lower(),
+            role=(role or "EMPLOYEE").strip().upper(),
+            full_name=full_name,
+            company_id=company_id,
+        )
+        # Ensure status exists for new row
+        with self.engine.connect() as conn:
+            conn.execute(
+                text("UPDATE profiles SET status = COALESCE(status, 'active') WHERE id = :id"),
+                {"id": person_id},
+            )
+
     def get_company_for_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         profile = self.get_profile_record(user_id)
         if not profile or not profile.get("company_id"):
@@ -4339,8 +4489,8 @@ class Database:
         self,
         company_id: str,
         name: str,
-        country: Optional[str],
-        size_band: Optional[str],
+        country: Optional[str] = None,
+        size_band: Optional[str] = None,
         address: Optional[str] = None,
         phone: Optional[str] = None,
         hr_contact: Optional[str] = None,
@@ -4353,16 +4503,24 @@ class Database:
         default_destination_country: Optional[str] = None,
         support_email: Optional[str] = None,
         default_working_location: Optional[str] = None,
+        status: Optional[str] = None,
+        plan_tier: Optional[str] = None,
+        hr_seat_limit: Optional[int] = None,
+        employee_seat_limit: Optional[int] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
+        status_val = (status or "active").lower() if status else "active"
+        plan_val = (plan_tier or "low").lower() if plan_tier else "low"
+        if plan_val not in ("low", "medium", "premium"):
+            plan_val = "low"
         with self.engine.begin() as conn:
             conn.execute(text(
                 "INSERT INTO companies (id, name, country, size_band, address, phone, hr_contact, created_at, "
                 "legal_name, website, hq_city, industry, logo_url, brand_color, updated_at, "
-                "default_destination_country, support_email, default_working_location) "
+                "default_destination_country, support_email, default_working_location, status, plan_tier, hr_seat_limit, employee_seat_limit) "
                 "VALUES (:id, :name, :country, :size_band, :address, :phone, :hr_contact, :created_at, "
                 ":legal_name, :website, :hq_city, :industry, :logo_url, :brand_color, :updated_at, "
-                ":default_destination_country, :support_email, :default_working_location) "
+                ":default_destination_country, :support_email, :default_working_location, :status, :plan_tier, :hr_seat_limit, :employee_seat_limit) "
                 "ON CONFLICT(id) DO UPDATE SET "
                 "name = excluded.name, country = excluded.country, size_band = excluded.size_band, "
                 "address = excluded.address, phone = excluded.phone, hr_contact = excluded.hr_contact, "
@@ -4375,7 +4533,11 @@ class Database:
                 "updated_at = excluded.updated_at, "
                 "default_destination_country = COALESCE(excluded.default_destination_country, companies.default_destination_country), "
                 "support_email = COALESCE(excluded.support_email, companies.support_email), "
-                "default_working_location = COALESCE(excluded.default_working_location, companies.default_working_location)"
+                "default_working_location = COALESCE(excluded.default_working_location, companies.default_working_location), "
+                "status = COALESCE(excluded.status, companies.status), "
+                "plan_tier = COALESCE(excluded.plan_tier, companies.plan_tier), "
+                "hr_seat_limit = COALESCE(excluded.hr_seat_limit, companies.hr_seat_limit), "
+                "employee_seat_limit = COALESCE(excluded.employee_seat_limit, companies.employee_seat_limit)"
             ), {
                 "id": company_id,
                 "name": name,
@@ -4395,7 +4557,111 @@ class Database:
                 "default_destination_country": default_destination_country,
                 "support_email": support_email,
                 "default_working_location": default_working_location,
+                "status": status_val,
+                "plan_tier": plan_val,
+                "hr_seat_limit": hr_seat_limit,
+                "employee_seat_limit": employee_seat_limit,
             })
+
+    def update_company(
+        self,
+        company_id: str,
+        name: Optional[str] = None,
+        country: Optional[str] = None,
+        size_band: Optional[str] = None,
+        address: Optional[str] = None,
+        phone: Optional[str] = None,
+        hr_contact: Optional[str] = None,
+        legal_name: Optional[str] = None,
+        website: Optional[str] = None,
+        hq_city: Optional[str] = None,
+        industry: Optional[str] = None,
+        logo_url: Optional[str] = None,
+        brand_color: Optional[str] = None,
+        default_destination_country: Optional[str] = None,
+        support_email: Optional[str] = None,
+        default_working_location: Optional[str] = None,
+        status: Optional[str] = None,
+        plan_tier: Optional[str] = None,
+        hr_seat_limit: Optional[int] = None,
+        employee_seat_limit: Optional[int] = None,
+    ) -> bool:
+        """Update company by id. Only provided (non-None) fields are updated. Returns True if row was updated."""
+        updates = []
+        params: Dict[str, Any] = {"id": company_id}
+        if name is not None:
+            updates.append("name = :name")
+            params["name"] = name
+        if country is not None:
+            updates.append("country = :country")
+            params["country"] = country
+        if size_band is not None:
+            updates.append("size_band = :size_band")
+            params["size_band"] = size_band
+        if address is not None:
+            updates.append("address = :address")
+            params["address"] = address
+        if phone is not None:
+            updates.append("phone = :phone")
+            params["phone"] = phone
+        if hr_contact is not None:
+            updates.append("hr_contact = :hr_contact")
+            params["hr_contact"] = hr_contact
+        if legal_name is not None:
+            updates.append("legal_name = :legal_name")
+            params["legal_name"] = legal_name
+        if website is not None:
+            updates.append("website = :website")
+            params["website"] = website
+        if hq_city is not None:
+            updates.append("hq_city = :hq_city")
+            params["hq_city"] = hq_city
+        if industry is not None:
+            updates.append("industry = :industry")
+            params["industry"] = industry
+        if logo_url is not None:
+            updates.append("logo_url = :logo_url")
+            params["logo_url"] = logo_url
+        if brand_color is not None:
+            updates.append("brand_color = :brand_color")
+            params["brand_color"] = brand_color
+        if default_destination_country is not None:
+            updates.append("default_destination_country = :default_destination_country")
+            params["default_destination_country"] = default_destination_country
+        if support_email is not None:
+            updates.append("support_email = :support_email")
+            params["support_email"] = support_email
+        if default_working_location is not None:
+            updates.append("default_working_location = :default_working_location")
+            params["default_working_location"] = default_working_location
+        if status is not None:
+            updates.append("status = :status")
+            params["status"] = (status or "active").lower()
+        if plan_tier is not None:
+            pt = (plan_tier or "low").lower()
+            if pt in ("low", "medium", "premium"):
+                updates.append("plan_tier = :plan_tier")
+                params["plan_tier"] = pt
+        if hr_seat_limit is not None:
+            updates.append("hr_seat_limit = :hr_seat_limit")
+            params["hr_seat_limit"] = hr_seat_limit
+        if employee_seat_limit is not None:
+            updates.append("employee_seat_limit = :employee_seat_limit")
+            params["employee_seat_limit"] = employee_seat_limit
+        if not updates:
+            return False
+        updates.append("updated_at = :updated_at")
+        params["updated_at"] = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(f"UPDATE companies SET {', '.join(updates)} WHERE id = :id"),
+                params,
+            )
+        return result.rowcount > 0
+
+    def deactivate_company(self, company_id: str) -> bool:
+        """Set company status to inactive. Returns True if updated."""
+        return self.update_company(company_id, status="inactive")
 
     def update_company_logo(self, company_id: str, logo_url: Optional[str]) -> None:
         with self.engine.begin() as conn:
@@ -4792,6 +5058,8 @@ class Database:
                 MAX(c.name) AS company_name,
                 MAX(rc.company_id) AS case_company_id,
                 MAX(hu.company_id) AS hr_company_id,
+                MAX(a.employee_user_id) AS employee_user_id,
+                MAX(a.hr_user_id) AS hr_user_id,
                 MAX(emp_p.full_name) AS employee_full_name,
                 MAX(a.employee_identifier) AS employee_identifier,
                 MAX(hr_p.full_name) AS hr_full_name,
@@ -4830,6 +5098,11 @@ class Database:
                 "company_name": r.get("company_name") or "—",
                 "employee_name": emp_name,
                 "hr_name": hr_name,
+                "employee_user_id": r.get("employee_user_id"),
+                "hr_user_id": r.get("hr_user_id"),
+                "participant_id": r.get("employee_user_id"),
+                "participant_name": emp_name,
+                "participant_role": "employee",
                 "participants": parts or ["—"],
                 "last_message_preview": last_body,
                 "last_message_at": r.get("last_message_at"),
@@ -5212,6 +5485,319 @@ class Database:
             r["policy_status"] = status
             result.append(r)
         return result
+
+    def get_admin_policies_by_company(self, company_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Admin: full policy list for one company with version counts, published version, source doc count.
+        Returns None if company not found.
+        """
+        company = self.get_company(company_id)
+        if not company:
+            return None
+        policies_raw = self.list_company_policies(company_id)
+        docs = self.list_policy_documents(company_id)
+        source_document_count = len(docs)
+        policies: List[Dict[str, Any]] = []
+        for cp in policies_raw:
+            pid = cp.get("id")
+            if not pid:
+                continue
+            versions = self.list_policy_versions(pid)
+            published = self.get_published_policy_version(pid)
+            latest = versions[0] if versions else None
+            policies.append({
+                "policy_id": pid,
+                "title": cp.get("title"),
+                "extraction_status": cp.get("extraction_status"),
+                "version_count": len(versions),
+                "published_version_id": published.get("id") if published else None,
+                "published_at": published.get("updated_at") if published else None,
+                "latest_version_status": latest.get("status") if latest else None,
+                "latest_version_number": latest.get("version_number") if latest else None,
+            })
+        return {
+            "company_id": company_id,
+            "company_name": company.get("name"),
+            "source_document_count": source_document_count,
+            "policies": policies,
+        }
+
+    def get_admin_policy_detail(self, policy_id: str) -> Optional[Dict[str, Any]]:
+        """Admin: single policy with company, versions, published version."""
+        policy = self.get_company_policy(policy_id)
+        if not policy:
+            return None
+        cid = policy.get("company_id")
+        company = self.get_company(cid) if cid else None
+        versions = self.list_policy_versions(policy_id)
+        published = self.get_published_policy_version(policy_id)
+        doc_count = len(self.list_policy_documents(cid)) if cid else 0
+        out = dict(policy)
+        out["company_name"] = company.get("name") if company else None
+        out["source_document_count"] = doc_count
+        out["versions"] = versions
+        out["published_version"] = published
+        out["published_version_id"] = published.get("id") if published else None
+        out["published_at"] = published.get("updated_at") if published else None
+        return out
+
+    # -------------------------------------------------------------------------
+    # Admin read model: normalized indexes and data-integrity
+    # -------------------------------------------------------------------------
+
+    def get_admin_company_index(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        List all companies for admin. Includes rows from companies table and any
+        distinct company_id from hr_users, profiles, company_policies, relocation_cases
+        that are not yet in companies (so admin sees every company identity in the system).
+        """
+        q = (query or "").strip().lower()
+        with self.engine.connect() as conn:
+            base_sql = "SELECT * FROM companies WHERE 1=1"
+            params: Dict[str, Any] = {}
+            if q:
+                if _is_sqlite:
+                    base_sql += " AND (LOWER(name) LIKE :q OR LOWER(COALESCE(legal_name,'')) LIKE :q)"
+                else:
+                    base_sql += " AND (LOWER(name) LIKE :q OR LOWER(COALESCE(legal_name,'')) LIKE :q)"
+                params["q"] = f"%{q}%"
+            base_sql += " ORDER BY name ASC"
+            rows = conn.execute(text(base_sql), params).fetchall()
+            result = []
+            for r in rows:
+                d = dict(r._mapping)
+                d["missing_from_companies_table"] = 0
+                result.append(d)
+            seen = {r["id"] for r in result}
+            # Orphan company_ids from other tables (not in companies)
+            for table, col in [("hr_users", "company_id"), ("profiles", "company_id"),
+                              ("company_policies", "company_id"), ("relocation_cases", "company_id")]:
+                try:
+                    orphan_sql = text(
+                        f"SELECT DISTINCT {col} AS id FROM {table} WHERE {col} IS NOT NULL AND TRIM({col}) <> ''"
+                    )
+                    if seen:
+                        placeholders = ",".join([f":s{i}" for i in range(len(seen))])
+                        orphan_sql = text(
+                            f"SELECT DISTINCT {col} AS id FROM {table} WHERE {col} IS NOT NULL AND TRIM({col}) <> '' "
+                            f"AND {col} NOT IN ({placeholders})"
+                        )
+                        orphan_params = {f"s{i}": s for i, s in enumerate(seen)}
+                    else:
+                        orphan_params = {}
+                    orows = conn.execute(orphan_sql, orphan_params).fetchall()
+                    for o in orows:
+                        cid = (o._mapping.get("id") or "").strip()
+                        if cid and cid not in seen:
+                            seen.add(cid)
+                            result.append({
+                                "id": cid, "name": cid, "country": None, "size_band": None,
+                                "created_at": None, "address": None, "phone": None, "hr_contact": None,
+                                "legal_name": None, "website": None, "hq_city": None, "industry": None,
+                                "logo_url": None, "brand_color": None, "updated_at": None,
+                                "default_destination_country": None, "support_email": None,
+                                "default_working_location": None,
+                                "missing_from_companies_table": 1,
+                            })
+                except Exception as e:
+                    log.warning("admin_company_index: orphan lookup %s.%s failed: %s", table, col, e)
+        return result
+
+    def get_admin_people_index(
+        self,
+        company_id: Optional[str] = None,
+        query: Optional[str] = None,
+        role: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        List people (profiles) for admin with optional company, role, and text filters.
+        Returns (list with company_name, status), summary with count and orphans_without_company.
+        """
+        params: Dict[str, Any] = {}
+        clauses = []
+        if company_id:
+            clauses.append("p.company_id = :cid")
+            params["cid"] = company_id
+        if role and (role or "").strip().lower() not in ("", "all"):
+            r = (role or "").strip().upper()
+            if r == "HR":
+                clauses.append("(p.role = 'HR' OR EXISTS (SELECT 1 FROM hr_users hu WHERE hu.profile_id = p.id))")
+            elif r == "EMPLOYEE":
+                clauses.append("(p.role IN ('EMPLOYEE', 'EMPLOYEE_USER') OR EXISTS (SELECT 1 FROM employees e WHERE e.profile_id = p.id))")
+            elif r == "ADMIN":
+                clauses.append("p.role = 'ADMIN'")
+            else:
+                clauses.append("p.role = :role_filter")
+                params["role_filter"] = r
+        if query:
+            q = (query or "").strip()
+            pattern = f"%{q}%"
+            if _is_sqlite:
+                clauses.append("(LOWER(COALESCE(p.email,'')) LIKE LOWER(:q) OR LOWER(COALESCE(p.full_name,'')) LIKE LOWER(:q))")
+            else:
+                clauses.append("(p.email ILIKE :q OR p.full_name ILIKE :q)")
+            params["q"] = pattern
+        where = " AND " + " AND ".join(clauses) if clauses else ""
+        sql = f"""
+            SELECT p.id, p.role, p.email, p.full_name, p.company_id,
+                   COALESCE(p.status, 'active') AS status,
+                   p.created_at,
+                   c.name AS company_name,
+                   (SELECT COUNT(*) FROM hr_users hu WHERE hu.profile_id = p.id) AS hr_link_count,
+                   (SELECT COUNT(*) FROM employees e WHERE e.profile_id = p.id) AS employee_link_count
+            FROM profiles p
+            LEFT JOIN companies c ON c.id = p.company_id
+            WHERE 1=1 {where}
+            ORDER BY p.full_name ASC NULLS LAST, p.created_at DESC
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+        people = [dict(r._mapping) for r in rows]
+        for row in people:
+            row["name"] = row.get("full_name") or row.get("email") or row.get("id")
+        # Orphans: profiles with role in ('HR','EMPLOYEE','EMPLOYEE_USER') and no company_id
+        try:
+            orphan_sql = text("""
+                SELECT COUNT(*) AS n FROM profiles
+                WHERE (role IN ('HR','EMPLOYEE','EMPLOYEE_USER') OR role IS NULL)
+                AND (company_id IS NULL OR TRIM(company_id) = '')
+            """)
+            with self.engine.connect() as conn:
+                orphan_row = conn.execute(orphan_sql, {}).fetchone()
+            orphans = int(orphan_row._mapping["n"]) if orphan_row else 0
+        except Exception as e:
+            log.warning("admin_people_index: orphan count failed: %s", e)
+            orphans = 0
+        summary = {"count": len(people), "orphans_without_company": orphans}
+        return people, summary
+
+    def get_admin_assignments_index(
+        self,
+        company_id: Optional[str] = None,
+        employee_user_id: Optional[str] = None,
+        employee_search: Optional[str] = None,
+        status: Optional[str] = None,
+        destination_country: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        List assignments for admin (same as list_admin_assignments) plus summary with
+        count, orphans_without_company, orphans_without_person.
+        """
+        items = self.list_admin_assignments(
+            company_id=company_id,
+            employee_user_id=employee_user_id,
+            employee_search=employee_search,
+            status=status,
+            destination_country=destination_country,
+        )
+        with self.engine.connect() as conn:
+            total = conn.execute(text("SELECT COUNT(*) AS n FROM case_assignments"), {}).fetchone()
+            total_count = int(total._mapping["n"]) if total else 0
+            no_company_sql = text("""
+                SELECT COUNT(*) AS n FROM case_assignments a
+                LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(COALESCE(a.canonical_case_id,'')), ''), a.case_id)
+                LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                WHERE COALESCE(rc.company_id, hu.company_id) IS NULL
+            """)
+            no_emp_sql = text("""
+                SELECT COUNT(*) AS n FROM case_assignments
+                WHERE employee_user_id IS NULL OR TRIM(COALESCE(employee_user_id,'')) = ''
+            """)
+            try:
+                no_co = conn.execute(no_company_sql, {}).fetchone()
+                no_emp = conn.execute(no_emp_sql, {}).fetchone()
+                orphans_no_company = int(no_co._mapping["n"]) if no_co else 0
+                orphans_no_person = int(no_emp._mapping["n"]) if no_emp else 0
+            except Exception as e:
+                log.warning("admin_assignments_index: orphan counts failed: %s", e)
+                orphans_no_company = orphans_no_person = 0
+        summary = {
+            "count": total_count,
+            "orphans_without_company": orphans_no_company,
+            "orphans_without_person": orphans_no_person,
+        }
+        return items, summary
+
+    def get_admin_policies_index(
+        self, company_id: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        List company_policies for admin with company name; optional company_id filter.
+        Returns (list of policies), summary with count and orphans_without_company.
+        """
+        params: Dict[str, Any] = {}
+        where = "WHERE 1=1"
+        if company_id:
+            where += " AND cp.company_id = :cid"
+            params["cid"] = company_id
+        sql = f"""
+            SELECT cp.id, cp.company_id, cp.title, cp.version, cp.effective_date, cp.file_url, cp.file_type,
+                   cp.extraction_status, cp.extracted_at, cp.created_by, cp.created_at,
+                   c.name AS company_name
+            FROM company_policies cp
+            LEFT JOIN companies c ON c.id = cp.company_id
+            {where}
+            ORDER BY cp.company_id, cp.created_at DESC
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+        policies = [dict(r._mapping) for r in rows]
+        try:
+            orphan_sql = text("""
+                SELECT COUNT(*) AS n FROM company_policies cp
+                WHERE NOT EXISTS (SELECT 1 FROM companies c WHERE c.id = cp.company_id)
+            """)
+            with self.engine.connect() as conn:
+                o = conn.execute(orphan_sql, {}).fetchone()
+            orphans = int(o._mapping["n"]) if o else 0
+        except Exception as e:
+            log.warning("admin_policies_index: orphan count failed: %s", e)
+            orphans = 0
+        summary = {"count": len(policies), "orphans_without_company": orphans}
+        return policies, summary
+
+    def get_data_integrity_overview(self) -> Dict[str, Any]:
+        """
+        Admin-safe summary of entity counts and orphan flags for data-integrity dashboard.
+        """
+        out: Dict[str, Any] = {
+            "companies": {"count": 0},
+            "people": {"count": 0, "orphans_without_company": 0},
+            "assignments": {"count": 0, "orphans_without_company": 0, "orphans_without_person": 0},
+            "policies": {"count": 0, "orphans_without_company": 0},
+        }
+        try:
+            with self.engine.connect() as conn:
+                c = conn.execute(text("SELECT COUNT(*) AS n FROM companies"), {}).fetchone()
+                out["companies"]["count"] = int(c._mapping["n"]) if c else 0
+                p = conn.execute(text("SELECT COUNT(*) AS n FROM profiles"), {}).fetchone()
+                out["people"]["count"] = int(p._mapping["n"]) if p else 0
+                _, people_sum = self.get_admin_people_index()
+                out["people"]["orphans_without_company"] = people_sum.get("orphans_without_company", 0)
+                a = conn.execute(text("SELECT COUNT(*) AS n FROM case_assignments"), {}).fetchone()
+                out["assignments"]["count"] = int(a._mapping["n"]) if a else 0
+                no_co = conn.execute(text("""
+                    SELECT COUNT(*) AS n FROM case_assignments a
+                    LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(COALESCE(a.canonical_case_id,'')), ''), a.case_id)
+                    LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                    WHERE COALESCE(rc.company_id, hu.company_id) IS NULL
+                """), {}).fetchone()
+                out["assignments"]["orphans_without_company"] = int(no_co._mapping["n"]) if no_co else 0
+                no_emp = conn.execute(text("""
+                    SELECT COUNT(*) AS n FROM case_assignments
+                    WHERE employee_user_id IS NULL OR TRIM(COALESCE(employee_user_id,'')) = ''
+                """), {}).fetchone()
+                out["assignments"]["orphans_without_person"] = int(no_emp._mapping["n"]) if no_emp else 0
+                pol = conn.execute(text("SELECT COUNT(*) AS n FROM company_policies"), {}).fetchone()
+                out["policies"]["count"] = int(pol._mapping["n"]) if pol else 0
+                pol_orphan = conn.execute(text("""
+                    SELECT COUNT(*) AS n FROM company_policies cp
+                    WHERE NOT EXISTS (SELECT 1 FROM companies c WHERE c.id = cp.company_id)
+                """), {}).fetchone()
+                out["policies"]["orphans_without_company"] = int(pol_orphan._mapping["n"]) if pol_orphan else 0
+        except Exception as e:
+            log.warning("get_data_integrity_overview failed: %s", e)
+        return out
 
     def get_company_policy(self, policy_id: str) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
@@ -5688,6 +6274,18 @@ class Database:
                     WHERE policy_id = :pid AND status = 'published' AND id != :keep
                 """),
                 {"pid": policy_id, "keep": keep_version_id, "now": datetime.utcnow().isoformat()},
+            )
+            return r.rowcount
+
+    def archive_all_published_versions(self, policy_id: str) -> int:
+        """Set status=archived for all published versions of this policy (unpublish). Returns count updated."""
+        with self.engine.begin() as conn:
+            r = conn.execute(
+                text("""
+                    UPDATE policy_versions SET status = 'archived', updated_at = :now
+                    WHERE policy_id = :pid AND status = 'published'
+                """),
+                {"pid": policy_id, "now": datetime.utcnow().isoformat()},
             )
             return r.rowcount
 

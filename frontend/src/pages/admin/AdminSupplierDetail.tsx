@@ -26,6 +26,8 @@ type Scoring = {
   response_sla_hours?: number;
   preferred_partner: boolean;
   premium_partner: boolean;
+  admin_score?: number | null;
+  manual_priority?: number | null;
   last_verified_at?: string;
 };
 
@@ -508,6 +510,10 @@ export const AdminSupplierDetail: React.FC = () => {
           )}
         </Card>
 
+        {id && (
+          <RankingDebugCard supplierId={id} supplierName={supplier.name} capabilities={supplier.capabilities || []} />
+        )}
+
         <Card padding="lg">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-[#0b2b43]">Service Capabilities</h2>
@@ -690,6 +696,8 @@ function ScoringEditor({
     response_sla_hours: scoring.response_sla_hours ?? '',
     preferred_partner: scoring.preferred_partner,
     premium_partner: scoring.premium_partner,
+    admin_score: scoring.admin_score != null ? String(scoring.admin_score) : '',
+    manual_priority: scoring.manual_priority != null ? String(scoring.manual_priority) : '',
   });
 
   useEffect(() => {
@@ -699,6 +707,8 @@ function ScoringEditor({
       response_sla_hours: scoring.response_sla_hours ?? '',
       preferred_partner: scoring.preferred_partner,
       premium_partner: scoring.premium_partner,
+      admin_score: scoring.admin_score != null ? String(scoring.admin_score) : '',
+      manual_priority: scoring.manual_priority != null ? String(scoring.manual_priority) : '',
     });
   }, [scoring]);
 
@@ -709,6 +719,8 @@ function ScoringEditor({
       response_sla_hours: local.response_sla_hours ? parseInt(String(local.response_sla_hours), 10) : undefined,
       preferred_partner: local.preferred_partner,
       premium_partner: local.premium_partner,
+      admin_score: local.admin_score ? parseFloat(String(local.admin_score)) : undefined,
+      manual_priority: local.manual_priority ? parseInt(String(local.manual_priority), 10) : undefined,
     });
   };
 
@@ -754,6 +766,33 @@ function ScoringEditor({
           </dd>
         </div>
         <div>
+          <dt className="text-[#6b7280]">Admin score (0–100)</dt>
+          <dd>
+            <input
+              type="number"
+              step="1"
+              min="0"
+              max="100"
+              value={local.admin_score}
+              onChange={(e) => setLocal((l) => ({ ...l, admin_score: e.target.value }))}
+              className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
+              placeholder="Optional boost"
+            />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[#6b7280]">Manual priority</dt>
+          <dd>
+            <input
+              type="number"
+              value={local.manual_priority}
+              onChange={(e) => setLocal((l) => ({ ...l, manual_priority: e.target.value }))}
+              className="w-full border border-[#d1d5db] rounded px-2 py-1 text-sm"
+              placeholder="Higher = rank higher"
+            />
+          </dd>
+        </div>
+        <div>
           <dt className="text-[#6b7280]">Flags</dt>
           <dd className="flex gap-4">
             <label className="flex items-center gap-1 cursor-pointer">
@@ -779,5 +818,111 @@ function ScoringEditor({
         {saving ? 'Saving...' : 'Save scoring'}
       </Button>
     </div>
+  );
+}
+
+function RankingDebugCard({
+  supplierId,
+  supplierName,
+  capabilities,
+}: {
+  supplierId: string;
+  supplierName: string;
+  capabilities: Capability[];
+}) {
+  const [serviceCategory, setServiceCategory] = useState('movers');
+  const [destinationCountry, setDestinationCountry] = useState('GB');
+  const [destinationCity, setDestinationCity] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{
+    would_match_search: boolean;
+    match_reason: string;
+    status?: string;
+    coverage_summary?: string;
+    scoring?: Record<string, unknown>;
+  } | null>(null);
+
+  const runCheck = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const data = await suppliersAPI.getRankingDebug(supplierId, {
+        service_category: serviceCategory || undefined,
+        destination_country: destinationCountry || undefined,
+        destination_city: destinationCity || undefined,
+      });
+      setResult({
+        would_match_search: data.would_match_search,
+        match_reason: data.match_reason,
+        status: data.status,
+        coverage_summary: data.coverage_summary,
+        scoring: data.scoring,
+      });
+    } catch {
+      setResult({ would_match_search: false, match_reason: 'Request failed.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card padding="lg">
+      <h2 className="text-lg font-semibold text-[#0b2b43] mb-2">Why this ranks</h2>
+      <p className="text-sm text-[#6b7280] mb-4">
+        Check whether this supplier would appear in recommendations for a given service and destination.
+      </p>
+      <div className="flex flex-wrap gap-3 items-end mb-4">
+        <div>
+          <label className="block text-xs text-[#6b7280] mb-0.5">Service category</label>
+          <select
+            value={serviceCategory}
+            onChange={(e) => setServiceCategory(e.target.value)}
+            className="border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
+          >
+            <option value="movers">movers</option>
+            <option value="living_areas">living_areas</option>
+            <option value="schools">schools</option>
+            <option value="banks">banks</option>
+            <option value="insurance">insurance</option>
+            <option value="electricity">electricity</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-[#6b7280] mb-0.5">Destination country</label>
+          <input
+            type="text"
+            value={destinationCountry}
+            onChange={(e) => setDestinationCountry(e.target.value.toUpperCase().slice(0, 2))}
+            className="w-20 border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
+            placeholder="GB"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-[#6b7280] mb-0.5">Destination city (optional)</label>
+          <input
+            type="text"
+            value={destinationCity}
+            onChange={(e) => setDestinationCity(e.target.value)}
+            className="w-32 border border-[#d1d5db] rounded px-2 py-1.5 text-sm"
+            placeholder="London"
+          />
+        </div>
+        <Button size="sm" onClick={runCheck} disabled={loading}>
+          {loading ? 'Checking…' : 'Check'}
+        </Button>
+      </div>
+      {result && (
+        <div
+          className={`text-sm p-3 rounded-lg ${
+            result.would_match_search ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-amber-50 text-amber-800 border border-amber-200'
+          }`}
+        >
+          <p className="font-medium">{result.would_match_search ? 'Included' : 'Excluded'}</p>
+          <p className="mt-1">{result.match_reason}</p>
+          {result.status && <p className="mt-1 text-xs">Status: {result.status}</p>}
+          {result.coverage_summary && <p className="text-xs mt-1">Coverage: {result.coverage_summary}</p>}
+        </div>
+      )}
+    </Card>
   );
 }

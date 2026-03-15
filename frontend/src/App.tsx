@@ -28,6 +28,7 @@ import { AdminCompanies } from './pages/admin/AdminCompanies';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminAssignments } from './pages/admin/AdminAssignments';
 import { AdminMessages } from './pages/admin/AdminMessages';
+import { AdminReconciliation } from './pages/admin/AdminReconciliation';
 import { AdminSuppliers } from './pages/admin/AdminSuppliers';
 import { AdminSupplierNew } from './pages/admin/AdminSupplierNew';
 import { AdminSupplierDetail } from './pages/admin/AdminSupplierDetail';
@@ -177,6 +178,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminAssignments.path} element={<RequireAdminRoute><AdminAssignments /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPolicies.path} element={<RequireAdminRoute><AdminPoliciesPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminMessages.path} element={<RequireAdminRoute><AdminMessages /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminReconciliation.path} element={<RequireAdminRoute><AdminReconciliation /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResearch.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminOverview.path} replace /></RequireAdminRoute>} />
         <Route path="/admin/companies/:companyId" element={<RequireAdminRoute><AdminCompanyDetail /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminUsers.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminPeople.path} replace /></RequireAdminRoute>} />
