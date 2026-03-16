@@ -5003,7 +5003,7 @@ def _resolve_published_policy_for_employee(
 ) -> Dict[str, Any]:
     """
     Resolve published company policy for an employee's assignment context.
-    Resolution order: case company_id → hr company_id → profile company_id.
+    Canonical resolution order: relocation_cases.company_id → hr company_id → profile.company_id.
     Returns structured result; never raises for "no policy" (only for auth via _require_assignment_visibility).
     """
     from .services.policy_resolution import resolve_policy_for_assignment
@@ -5013,6 +5013,11 @@ def _resolve_published_policy_for_employee(
     case = db.get_relocation_case(case_id) if case_id else None
     hr_user_id = assignment.get("hr_user_id")
     hr_company_id = db.get_hr_company_id(hr_user_id) if hr_user_id else None
+    profile_company_id = None
+    if assignment.get("employee_user_id"):
+        emp_profile = db.get_profile_record(assignment["employee_user_id"])
+        if emp_profile:
+            profile_company_id = emp_profile.get("company_id")
     if not case and case_id and hr_user_id and hr_company_id:
         try:
             db.create_case(case_id, hr_user_id, {}, company_id=hr_company_id)
@@ -5020,7 +5025,7 @@ def _resolve_published_policy_for_employee(
         except Exception:
             pass
     case_company_id = (case or {}).get("company_id") if case else None
-    company_id_for_resolution = case_company_id or hr_company_id
+    company_id_for_resolution = case_company_id or hr_company_id or profile_company_id
     if company_id_for_resolution:
         if case and not case.get("company_id"):
             try:
@@ -5056,19 +5061,33 @@ def _resolve_published_policy_for_employee(
             profile = json.loads(case["profile_json"]) if isinstance(case["profile_json"], str) else case["profile_json"]
         except Exception:
             profile = None
-    employee_profile = db.get_employee_profile(assignment_id)
+    try:
+        employee_profile = db.get_employee_profile(assignment_id)
+    except Exception:
+        employee_profile = None
 
-    resolved = db.get_resolved_assignment_policy(assignment_id)
-    company_id_used = case_company_id or hr_company_id
-    if not company_id_used and assignment.get("employee_user_id"):
-        emp_profile = db.get_profile_record(assignment["employee_user_id"])
-        if emp_profile:
-            company_id_used = emp_profile.get("company_id")
+    resolved = None
+    try:
+        resolved = db.get_resolved_assignment_policy(assignment_id)
+    except Exception:
+        resolved = None
+    company_id_used = case_company_id or hr_company_id or profile_company_id
     if not resolved:
-        resolved = resolve_policy_for_assignment(
-            db, assignment_id, assignment, case, profile, employee_profile
+        try:
+            resolved = resolve_policy_for_assignment(
+                db, assignment_id, assignment, case, profile, employee_profile
+            )
+        except Exception as exc:
+            log.warning(
+                "employee_policy resolve_policy_for_assignment request_id=%s assignment_id=%s company_id_used=%s exc=%s",
+                request_id, assignment_id, company_id_used, exc,
+            )
+            resolved = None
+    if not resolved:
+        log.info(
+            "employee_policy no_policy request_id=%s assignment_id=%s case_id=%s company_id_used=%s",
+            request_id, assignment_id, case_id, company_id_used,
         )
-    if not resolved:
         return {
             "has_policy": False,
             "reason": "No published company policy found for this employee context.",
@@ -5077,13 +5096,31 @@ def _resolve_published_policy_for_employee(
             "company_id_used": company_id_used,
         }
     company_id_used = resolved.get("resolution_company_id") or company_id_used
-    benefits = db.list_resolved_policy_benefits(resolved["id"])
-    exclusions = db.list_resolved_policy_exclusions(resolved["id"])
+    rid = resolved.get("id")
+    if not rid:
+        return {
+            "has_policy": False,
+            "reason": "No published company policy found for this employee context.",
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "company_id_used": company_id_used,
+        }
+    try:
+        benefits = db.list_resolved_policy_benefits(rid)
+        exclusions = db.list_resolved_policy_exclusions(rid)
+    except Exception as exc:
+        log.warning("employee_policy list_benefits/exclusions request_id=%s resolved_id=%s exc=%s", request_id, rid, exc)
+        benefits = []
+        exclusions = []
     policy = resolved.get("policy") or {}
     version = resolved.get("version") or {}
     ctx = resolved.get("resolution_context") or resolved.get("resolution_context_json") or {}
     company = db.get_company(company_id_used) if company_id_used else None
     company_name = (company or {}).get("name") if company else None
+    log.info(
+        "employee_policy resolved request_id=%s assignment_id=%s case_id=%s company_id=%s policy_id=%s version_id=%s has_policy=true",
+        request_id, assignment_id, case_id, company_id_used, policy.get("id"), version.get("id"),
+    )
     return {
         "has_policy": True,
         "company_id": company_id_used,
@@ -5167,6 +5204,7 @@ def get_employee_assignment_policy(
         except Exception:
             pass
         return {
+            "ok": True,
             "has_policy": False,
             "policy": None,
             "benefits": [],
@@ -5189,6 +5227,7 @@ def get_employee_assignment_policy(
         except Exception:
             pass
         return {
+            "ok": True,
             "has_policy": False,
             "policy": None,
             "benefits": [],
@@ -5212,6 +5251,7 @@ def get_employee_assignment_policy(
     except Exception:
         pass
     return {
+        "ok": True,
         "has_policy": True,
         "policy": result.get("policy") or {},
         "benefits": result.get("benefits") or [],
@@ -5311,7 +5351,7 @@ def get_assignment_policy_budget(
             )
         except Exception:
             pass
-        return {"has_policy": False, "currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
+        return {"ok": True, "has_policy": False, "budget": None, "currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
 
     if not result.get("has_policy"):
         try:
@@ -5327,7 +5367,7 @@ def get_assignment_policy_budget(
             )
         except Exception:
             pass
-        return {"has_policy": False, "currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
+        return {"ok": True, "has_policy": False, "budget": None, "currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
 
     benefits = result.get("benefits") or []
     try:
@@ -5349,7 +5389,7 @@ def get_assignment_policy_budget(
         )
     except Exception:
         pass
-    return {"has_policy": True, **budget}
+    return {"ok": True, "has_policy": True, "budget": budget, **budget}
 
 
 @app.post("/api/assignments/{assignment_id}/evidence", response_model=AddEvidenceResponse)
@@ -7017,11 +7057,15 @@ def publish_policy_version_latest(
         log.warning("request_id=%s publish_version_latest policy_id=%s no_version", request_id, policy_id)
         raise HTTPException(status_code=404, detail="No policy version found. Normalize a document first.")
     version_id = version["id"]
+    company_id = (policy or {}).get("company_id") if policy else None
     try:
         db.archive_other_published_versions(policy_id, version_id)
         db.update_policy_version_status(version_id, "published")
         updated = db.get_policy_version(version_id)
-        log.info("request_id=%s publish_version_latest ok policy_id=%s version_id=%s", request_id, policy_id, version_id)
+        log.info(
+            "publish request_id=%s company_id=%s policy_id=%s version_id=%s status=published visibility=employee_lookup",
+            request_id, company_id, policy_id, version_id,
+        )
         return {"version": updated}
     except Exception as exc:
         log.warning("request_id=%s publish_version_latest failed policy_id=%s exc=%s", request_id, policy_id, exc, exc_info=True)
@@ -7081,7 +7125,12 @@ def publish_policy_version(
         db.archive_other_published_versions(policy_id, version_id)
         db.update_policy_version_status(version_id, "published")
         updated = db.get_policy_version(version_id)
-        log.info("request_id=%s publish_version ok policy_id=%s version_id=%s", request_id, policy_id, version_id)
+        policy = db.get_company_policy(policy_id)
+        company_id = (policy or {}).get("company_id") if policy else None
+        log.info(
+            "publish request_id=%s company_id=%s policy_id=%s version_id=%s status=published visibility=employee_lookup",
+            request_id, company_id, policy_id, version_id,
+        )
         return {"version": updated}
     except Exception as exc:
         log.warning("request_id=%s publish_version failed policy_id=%s version_id=%s exc=%s", request_id, policy_id, version_id, exc, exc_info=True)

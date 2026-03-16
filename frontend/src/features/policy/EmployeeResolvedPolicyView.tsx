@@ -284,7 +284,7 @@ export const EmployeeResolvedPolicyView: React.FC<{ assignmentId: string }> = ({
           {policy.version != null && <span>Version {policy.version}</span>}
         </div>
         <p className="text-sm text-[#4b5563] mt-3">
-          This is the policy currently applied to your assignment. For questions or exceptions, please contact your company HR.
+          This is the policy currently applied to your assignment. Questions about interpretation? Contact your HR representative through Messages.
         </p>
       </Card>
 

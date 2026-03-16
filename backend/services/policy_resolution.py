@@ -308,8 +308,11 @@ def resolve_policy_for_assignment(
         return None
 
     policy, version = result
-    policy_id = policy["id"]
-    vid = version["id"]
+    policy_id = (policy or {}).get("id")
+    vid = (version or {}).get("id")
+    if not policy_id or not vid:
+        log.warning("policy_resolution: policy or version missing id assignment_id=%s", assignment_id)
+        return None
     benefit_rules = db.list_policy_benefit_rules(vid)
     exclusions = db.list_policy_exclusions(vid)
     evidence_reqs = db.list_policy_evidence_requirements(vid)
