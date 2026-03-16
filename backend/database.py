@@ -8114,6 +8114,12 @@ class Database:
                 })
             for b in benefits:
                 bid = str(uuid.uuid4())
+                inc = b.get("included", True)
+                apr = b.get("approval_required", False)
+                if not isinstance(inc, bool):
+                    inc = bool(inc)
+                if not isinstance(apr, bool):
+                    apr = bool(apr)
                 conn.execute(text("""
                     INSERT INTO resolved_assignment_policy_benefits
                     (id, resolved_policy_id, benefit_key, included, min_value, standard_value, max_value,
@@ -8121,10 +8127,10 @@ class Database:
                      exclusions_json, condition_summary, source_rule_ids_json, created_at, updated_at)
                     VALUES (:id, :rid, :bk, :inc, :minv, :stdv, :maxv, :cur, :au, :freq, :apr, :evj, :exj, :cs, :srj, :now, :now)
                 """), {
-                    "id": bid, "rid": rid, "bk": b["benefit_key"], "inc": 1 if b.get("included", True) else 0,
+                    "id": bid, "rid": rid, "bk": b["benefit_key"], "inc": inc,
                     "minv": b.get("min_value"), "stdv": b.get("standard_value"), "maxv": b.get("max_value"),
                     "cur": b.get("currency"), "au": b.get("amount_unit"), "freq": b.get("frequency"),
-                    "apr": 1 if b.get("approval_required") else 0,
+                    "apr": apr,
                     "evj": json.dumps(b.get("evidence_required_json") or []),
                     "exj": json.dumps(b.get("exclusions_json") or []),
                     "cs": b.get("condition_summary"), "srj": json.dumps(b.get("source_rule_ids_json") or []),
