@@ -7509,10 +7509,11 @@ class Database:
         request_id: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
+        # Coerce to str for Postgres uuid columns (driver may return UUID from list_company_policies)
         params = {
-            "id": version_id,
-            "pid": policy_id,
-            "doc_id": source_policy_document_id,
+            "id": str(version_id),
+            "pid": str(policy_id),
+            "doc_id": str(source_policy_document_id) if source_policy_document_id is not None else None,
             "vn": version_number,
             "status": status,
             "ag": _policy_bool_for_db(auto_generated),

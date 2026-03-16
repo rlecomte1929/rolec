@@ -321,10 +321,10 @@ def run_normalization(
     storage_path = policy_document.get("storage_path") or ""
     file_url = storage_path or ""
 
-    # Get or create company_policy
+    # Get or create company_policy (coerce ids to str for Postgres uuid columns)
     policies = db.list_company_policies(company_id)
     if policies:
-        policy_id = policies[0]["id"]
+        policy_id = str(policies[0]["id"]) if policies[0].get("id") is not None else str(uuid.uuid4())
     else:
         policy_id = str(uuid.uuid4())
         db.create_company_policy(
@@ -346,12 +346,13 @@ def run_normalization(
     # Normalize clauses to objects
     result = normalize_clauses_to_objects(clauses, doc_id)
 
-    # Create policy_version
+    # Create policy_version (ensure string ids for Postgres)
     version_id = str(uuid.uuid4())
+    doc_id_str = str(doc_id) if doc_id is not None else None
     db.create_policy_version(
         version_id=version_id,
-        policy_id=policy_id,
-        source_policy_document_id=doc_id,
+        policy_id=str(policy_id),
+        source_policy_document_id=doc_id_str,
         version_number=version_number,
         status="auto_generated",
         auto_generated=True,

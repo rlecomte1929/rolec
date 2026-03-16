@@ -678,9 +678,16 @@ function getUploadErrorMessage(err: unknown): string {
     ? (err as { response?: { data?: { error_code?: string; message?: string; detail?: string } } }).response?.data
     : null;
   const code = data?.error_code;
-  if (code && UPLOAD_ERROR_MESSAGES[code]) return UPLOAD_ERROR_MESSAGES[code];
-  if (data?.message && typeof data.message === 'string') return data.message;
-  if (data?.detail && typeof data.detail === 'string') return data.detail;
+  const message = data?.message && typeof data.message === 'string' ? data.message : null;
+  const detail = data?.detail && typeof data.detail === 'string' ? data.detail : null;
+  // For normalization errors, prefer server message (it now includes real error); append detail if message is generic
+  if (code === 'normalization_failed' && message) {
+    if (detail && !message.includes(detail.slice(0, 50))) return `${message} ${detail}`;
+    return message;
+  }
+  if (code && UPLOAD_ERROR_MESSAGES[code] && !message) return UPLOAD_ERROR_MESSAGES[code];
+  if (message) return message;
+  if (detail) return detail;
   return 'An unexpected error occurred. Please try again.';
 }
 
@@ -726,10 +733,6 @@ function PolicyDocumentIntakeSection({
       setDocuments(res.documents || []);
       setMessage('');
     } catch (err: unknown) {
-      // #region agent log
-      const ax = err as { response?: { status?: number; data?: { detail?: string } } };
-      fetch('http://127.0.0.1:7281/ingest/a36ac180-a608-46b4-b5a5-dc68abc2563a', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2c6040' }, body: JSON.stringify({ sessionId: '2c6040', location: 'HrPolicy.tsx:loadDocs', message: 'list documents failed', data: { adminCompanyId: adminCompanyId ?? null, status: ax?.response?.status, detail: (ax?.response?.data?.detail || String(ax))?.slice(0, 200) }, timestamp: Date.now(), hypothesisId: 'C' }) }).catch(() => {});
-      // #endregion
       setMessage('Unable to load documents');
       setDocuments([]);
     }

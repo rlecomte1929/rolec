@@ -4398,14 +4398,8 @@ def _resolve_company_for_policy(
     user: Dict[str, Any], company_id_override: Optional[str] = None
 ) -> str:
     """Resolve company_id for policy access. Admin may override with company_id_override."""
-    # #region agent log
-    _debug_log("main.py:_resolve_company_for_policy", "entry", {"is_admin": user.get("is_admin"), "company_id_override": company_id_override, "override_truthy": bool(company_id_override and str(company_id_override).strip())}, "B")
-    # #endregion
     if user.get("is_admin") and company_id_override:
         return company_id_override
-    # #region agent log
-    _debug_log("main.py:_resolve_company_for_policy", "calling _require_company_for_user", {}, "B")
-    # #endregion
     profile = _require_company_for_user(user)
     return profile.get("company_id") or ""
 
@@ -6511,30 +6505,12 @@ def list_policy_documents(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """List policy documents for company. Admin without company_id gets empty list (no error)."""
-    # #region agent log
-    _debug_log("main.py:list_policy_documents", "list_policy_documents entry", {"user_id": (user or {}).get("id"), "is_admin": (user or {}).get("is_admin"), "company_id_param": company_id}, "A")
-    # #endregion
     request_id = getattr(req.state, "request_id", None)
     # Admin with no company scope: return empty list so the page loads; they can use Admin → company → Policy for scope.
     if user.get("is_admin") and not (company_id and str(company_id).strip()):
-        # #region agent log
-        _debug_log("main.py:list_policy_documents", "admin no company_id return empty", {"doc_count": 0}, "A")
-        # #endregion
         return {"documents": []}
-    try:
-        cid = _resolve_company_for_policy(user, company_id)
-    except HTTPException as e:
-        # #region agent log
-        _debug_log("main.py:list_policy_documents", "resolve_company raised", {"status": e.status_code, "detail": (e.detail or "")[:200]}, "B")
-        # #endregion
-        raise
-    # #region agent log
-    _debug_log("main.py:list_policy_documents", "resolve_company result", {"cid": cid, "cid_empty": not (cid or "").strip()}, "B")
-    # #endregion
+    cid = _resolve_company_for_policy(user, company_id)
     docs = db.list_policy_documents(cid, request_id=request_id)
-    # #region agent log
-    _debug_log("main.py:list_policy_documents", "list_policy_documents ok", {"doc_count": len(docs) if docs else 0}, "A")
-    # #endregion
     return {"documents": docs}
 
 
@@ -6727,9 +6703,9 @@ def normalize_policy_document(
             type(exc).__name__, safe_msg, exc_info=True,
         )
         if "DatatypeMismatch" in err_str or "auto_generated" in err_str or "boolean" in err_str:
-            msg = "Normalization failed because of an invalid policy_versions payload."
+            msg = "Normalization failed because of an invalid policy_versions payload. " + (err_str[:250] or "")
         elif "UndefinedColumn" in err_str or "does not exist" in err_str or "template_source" in err_str or "template_name" in err_str or "is_default_template" in err_str:
-            msg = "Normalization failed due to a database schema mismatch (missing optional columns). Check server logs for request_id."
+            msg = "Normalization failed due to a database schema mismatch (missing optional columns). " + (err_str[:200] or "")
         else:
             msg = f"Normalization failed: {err_str[:500]}"
         return JSONResponse(
@@ -6739,7 +6715,7 @@ def normalize_policy_document(
                 "error_code": "normalization_failed",
                 "message": msg,
                 "request_id": request_id,
-                "detail": err_str[:300],
+                "detail": err_str[:500],
             },
         )
 
