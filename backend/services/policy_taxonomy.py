@@ -6,6 +6,51 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+# Required policy themes for normalized output grouping (HR policy pipeline).
+# All benefit_category values are normalized to one of these for consistent UI grouping.
+POLICY_THEMES: tuple = (
+    "immigration",
+    "travel",
+    "temporary_housing",
+    "household_goods",
+    "schooling",
+    "spouse_support",
+    "family_support",
+    "banking",
+    "tax",
+    "allowances",
+    "medical",
+    "home_leave",
+    "repatriation",
+    "compliance",
+    "documentation",
+    "misc",
+)
+# Map taxonomy group or benefit_key -> POLICY_THEME
+THEME_FROM_GROUP: Dict[str, str] = {
+    "immigration": "immigration",
+    "tax": "tax",
+    "housing": "temporary_housing",
+    "relocation": "household_goods",
+    "education": "schooling",
+    "travel": "travel",
+    "family": "family_support",
+    "integration": "documentation",
+    "setup": "banking",
+    "health": "medical",
+    "compensation": "allowances",
+}
+THEME_FROM_BENEFIT_KEY: Dict[str, str] = {
+    "spouse_support": "spouse_support",
+    "home_leave": "home_leave",
+    "banking_setup": "banking",
+    "settling_in_allowance": "allowances",
+    "mobility_premium": "allowances",
+    "location_allowance": "allowances",
+    "cola": "allowances",
+    "remote_premium": "allowances",
+}
+
 # Canonical benefit keys and metadata
 # Each entry: canonical_key -> { group, default_calc_type, keywords }
 BENEFIT_TAXONOMY: Dict[str, Dict[str, Any]] = {
@@ -216,6 +261,20 @@ def get_benefit_meta(benefit_key: str) -> Dict[str, Any]:
     """Get taxonomy metadata for a canonical benefit key."""
     key = benefit_key.lower().replace("-", "_")
     return BENEFIT_TAXONOMY.get(key, {"group": "other", "default_calc_type": "other", "keywords": []})
+
+
+def resolve_theme(benefit_key: str, group: Optional[str] = None) -> str:
+    """
+    Resolve benefit_key and optional group to a POLICY_THEMES category.
+    Used so normalized output is grouped by a stable set of themes.
+    """
+    key = (benefit_key or "").lower().replace("-", "_")
+    if key and key in THEME_FROM_BENEFIT_KEY:
+        return THEME_FROM_BENEFIT_KEY[key]
+    g = (group or "").lower()
+    if g in THEME_FROM_GROUP:
+        return THEME_FROM_GROUP[g]
+    return "misc"
 
 
 def list_canonical_keys() -> List[str]:

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert, Badge } from '../components/antigravity';
 import { hrAPI } from '../api/client';
@@ -10,6 +10,7 @@ import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { getCaseMissingFields } from '../components/CaseIncompleteBanner';
+import { getAuthItem } from '../utils/demo';
 
 export const HrDashboard: React.FC = () => {
   const { setSelectedCaseId } = useSelectedCase();
@@ -290,7 +291,14 @@ export const HrDashboard: React.FC = () => {
             className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
           />
           <Button variant="outline" onClick={() => setIsFilterOpen(true)}>Filter</Button>
-          <Button onClick={handleCreateCase}>New Case</Button>
+          {getAuthItem('relopass_role') === 'ADMIN' ? (
+            <Link to={buildRoute('adminAssignments')}>
+              <Button>Add assignment</Button>
+            </Link>
+          ) : (
+            <Button onClick={handleCreateCase}>Add assignment</Button>
+          )}
+          <Button variant="outline" onClick={handleCreateCase}>New Case</Button>
         </div>
 
         {caseId && (
@@ -360,7 +368,14 @@ export const HrDashboard: React.FC = () => {
 
         <Card padding="lg">
           <div className="flex items-center justify-between mb-4">
-            <div className="text-sm font-semibold text-[#0b2b43]">Active relocation cases</div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-[#0b2b43]">Active relocation cases</span>
+              {getAuthItem('relopass_role') === 'ADMIN' && (
+                <Link to={buildRoute('adminAssignments')} className="text-xs text-[#0b2b43] hover:underline">
+                  Admin Assignments →
+                </Link>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               {!isManageMode ? (
                 <>

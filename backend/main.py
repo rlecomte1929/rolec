@@ -371,11 +371,18 @@ def _seed_demo_cases() -> None:
         role="HR",
         name="HR Demo",
     )
+    hr_user_id_2 = ensure_user(
+        user_id="demo-hr-002",
+        email="hr@relopass.com",
+        role="HR",
+        name="HR Manager",
+    )
 
     employees = [
         ("demo-emp-001", "sarah.jenkins@relopass.local", "Sarah Jenkins"),
         ("demo-emp-002", "mark.thompson@relopass.local", "Mark Thompson"),
         ("demo-emp-003", "demo@relopass.com", "Demo Employee"),
+        ("test-emp-test", "testEMPtest@relopass.com", "Test Employee"),
     ]
     for emp_id, emp_email, emp_name in employees:
         ensure_user(emp_id, emp_email, "EMPLOYEE", emp_name)
@@ -392,12 +399,19 @@ def _seed_demo_cases() -> None:
     # Seed admin console entities
     company_id = "demo-company-001"
     db.create_company(company_id, "Acme Corp", "Singapore", "200-500", "1 Raffles Place, Singapore", "+65 6123 4567", "hr@acme.com")
+    test_company_id = "test-company-001"
+    db.create_company(test_company_id, "test", "Singapore", "1-50", "", "", "")
     db.ensure_profile_record(hr_user_id, "hr.demo@relopass.local", "HR", "HR Demo", company_id)
+    db.ensure_profile_record(hr_user_id_2, "hr@relopass.com", "HR", "HR Manager", company_id)
     db.ensure_profile_record(admin_user_id, "admin@relopass.com", "ADMIN", "ReloPass Admin", None)
     for emp_id, emp_email, emp_name in employees:
-        db.ensure_profile_record(emp_id, emp_email, "EMPLOYEE", emp_name, company_id)
+        # testEMPtest belongs to company "test" for policy visibility testing
+        profile_company = test_company_id if emp_id == "test-emp-test" else company_id
+        db.ensure_profile_record(emp_id, emp_email, "EMPLOYEE", emp_name, profile_company)
 
     db.create_hr_user("hr-001", company_id, hr_user_id, {"can_manage_policy": True})
+    db.create_hr_user("hr-002", company_id, hr_user_id_2, {"can_manage_policy": True})
+    db.create_hr_user("hr-003", test_company_id, hr_user_id_2, {"can_manage_policy": True})
     db.create_employee("emp-001", company_id, "demo-emp-001", "Band2", "Long-Term", "demo-case-oslo-sg-family", "active")
     db.create_employee("emp-002", company_id, "demo-emp-003", "Band1", "Long-Term", "demo-case-demo-emp", "active")
 
@@ -1708,6 +1722,11 @@ def admin_create_assignment(
             raise HTTPException(status_code=400, detail="Employee is not in the selected company")
         employee_user_id = body.employee_user_id
         employee_identifier = (emp.get("email") or emp.get("full_name") or employee_identifier or "admin-created")
+    elif employee_identifier:
+        # Link to existing user by email/username so employee sees assignment when they log in
+        existing_user = db.get_user_by_identifier(employee_identifier)
+        if existing_user:
+            employee_user_id = existing_user["id"]
     if not employee_identifier:
         employee_identifier = "admin-created"
     case_id = str(uuid.uuid4())
@@ -4417,7 +4436,7 @@ def _map_storage_exception_to_response(exc: Exception, bucket: str) -> tuple[str
     )
     code = get_storage_error_code(exc)
     if code == STORAGE_MISSING_SERVICE_ROLE:
-        return (code, "Policy upload is not configured correctly. Contact support.")
+        return (code, "Policy document uploads require Supabase storage. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the backend .env (see .env.example) to enable uploads.")
     if code == STORAGE_BUCKET_NOT_FOUND:
         return (code, "Policy storage bucket is unavailable.")
     if code == STORAGE_ACCESS_DENIED:
@@ -5074,6 +5093,8 @@ def get_employee_assignment_policy(
     # #endregion
     if not resolved:
         return {"policy": None, "benefits": [], "exclusions": [], "resolution_context": None, "message": "No published policy for your assignment."}
+    # Use company_id that resolution actually used (first candidate with a published policy)
+    company_id_used = resolved.get("resolution_company_id") or company_id_used
     benefits = db.list_resolved_policy_benefits(resolved["id"])
     exclusions = db.list_resolved_policy_exclusions(resolved["id"])
     policy = resolved.get("policy") or {}
@@ -6078,6 +6099,16 @@ def list_company_policies(
 
 # ---------------------------------------------------------------------------
 # Policy Document Intake (staging layer before company_policies)
+#
+# Three-stage pipeline:
+# - Ingest (upload): store file, extract raw text and metadata, segment clauses.
+#   One document -> one policy_documents row; clauses in policy_document_clauses.
+# - Reprocess: re-run extraction and clause segmentation from stored file.
+#   Used when extraction/segmentation logic improves or to fix failures.
+# - Normalize: transform clauses into company_policies, policy_versions, benefit_rules,
+#   exclusions, evidence_requirements, conditions, source_links. Separate so HR can
+#   reprocess without overwriting normalized edits and so we can re-normalize after
+#   taxonomy changes while keeping versioning and traceability.
 # ---------------------------------------------------------------------------
 
 BUCKET_HR_POLICIES = "hr-policies"
@@ -6290,15 +6321,26 @@ async def upload_policy_document(
         )
         return _upload_error_response(
             STORAGE_MISSING_SERVICE_ROLE,
-            "Policy upload is not configured correctly. Contact support.",
+            "Policy document uploads require Supabase storage. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the backend .env (see .env.example) to enable uploads.",
             503,
             request_id=request_id,
         )
     if not health["bucket_access_ok"]:
+        config_err = health.get("config_error")
+        if config_err in ("wrong_key_type", "wrong_project_url_key_mismatch"):
+            log.error("request_id=%s policy_upload stage=config error=config_error diagnosis=%s", request_id, config_err)
+            return _upload_error_response(
+                STORAGE_MISSING_SERVICE_ROLE,
+                "Invalid API key: in the backend .env use SUPABASE_URL from your project (e.g. https://xxxxx.supabase.co) "
+                "and SUPABASE_SERVICE_ROLE_KEY from Supabase → Settings → API (the service_role secret, not the anon key). "
+                "Restart the backend after changing .env.",
+                503,
+                request_id=request_id,
+            )
         log.error("request_id=%s policy_upload stage=config error=bucket_not_ok", request_id)
         return _upload_error_response(
             STORAGE_BUCKET_NOT_FOUND,
-            "Policy storage bucket is unavailable.",
+            "Policy storage bucket is unavailable. In Supabase go to Storage → New bucket, create a bucket named hr-policies (public or private), then try again.",
             503,
             request_id=request_id,
         )
@@ -6361,9 +6403,10 @@ async def upload_policy_document(
         )
         log.info("request_id=%s policy_upload stage=db_insert ok doc_id=%s", request_id, doc_id)
     except Exception as exc:
+        safe_msg = (str(exc) or type(exc).__name__)[:200]
         log.error(
-            "request_id=%s policy_upload stage=db_insert failed doc_id=%s exc=%s",
-            request_id, doc_id, exc, exc_info=True,
+            "request_id=%s policy_pipeline stage=ingest document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
+            request_id, doc_id, company_id, user_id, type(exc).__name__, safe_msg, exc_info=True,
         )
         try:
             supabase = get_supabase_admin_client()
@@ -6419,9 +6462,10 @@ async def upload_policy_document(
             except Exception as seg_exc:
                 log.warning("request_id=%s policy_upload stage=segment failed: %s", request_id, seg_exc)
     except Exception as exc:
+        safe_msg = (str(exc) or type(exc).__name__)[:200]
         log.error(
-            "request_id=%s policy_upload stage=extract failed doc_id=%s exc=%s",
-            request_id, doc_id, exc, exc_info=True,
+            "request_id=%s policy_pipeline stage=ingest document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
+            request_id, doc_id, company_id, user_id, type(exc).__name__, safe_msg, exc_info=True,
         )
         extraction_failed = True
         db.update_policy_document(
@@ -6432,9 +6476,11 @@ async def upload_policy_document(
         )
 
     doc = db.get_policy_document(doc_id, request_id=request_id)
+    num_clauses = len(db.list_policy_document_clauses(doc_id, request_id=request_id)) if doc_id else 0
+    success = not extraction_failed
     log.info(
-        "request_id=%s policy_upload stage=complete status=%s extraction_failed=%s",
-        request_id, doc.get("processing_status") if doc else "?", extraction_failed,
+        "request_id=%s policy_pipeline stage=ingest document_id=%s company_id=%s user_id=%s success=%s rows_document=1 rows_clauses=%d",
+        request_id, doc_id, company_id, user_id, success, num_clauses,
     )
 
     # --- Stage F: Return ---
@@ -6542,7 +6588,11 @@ async def reprocess_policy_document(
     req: Request,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
-    """Re-run text extraction, classification, and metadata extraction."""
+    """
+    Reprocess stage: re-run text extraction, classification, and clause segmentation from stored file.
+    Does not re-upload; uses existing storage_path. Use when extraction logic improves or to fix failures.
+    Does not overwrite normalized policy_versions/benefit_rules; those are created only by normalize.
+    """
     request_id = getattr(req.state, "request_id", None)
     doc = db.get_policy_document(doc_id, request_id=request_id)
     _require_document_access(user, doc)
@@ -6585,12 +6635,22 @@ async def reprocess_policy_document(
             except Exception as seg_exc:
                 log.warning("request_id=%s policy_document_reprocess segmentation failed: %s", request_id, seg_exc)
     except Exception as exc:
-        log.warning("request_id=%s policy_document_reprocess failed: %s", request_id, exc, exc_info=True)
+        safe_msg = (str(exc) or type(exc).__name__)[:200]
+        log.warning(
+            "request_id=%s policy_pipeline stage=reprocess document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
+            request_id, doc_id, doc.get("company_id") if doc else None, user.get("id") if user else None,
+            type(exc).__name__, safe_msg, exc_info=True,
+        )
         db.update_policy_document(
             doc_id, processing_status="failed", extraction_error=str(exc), request_id=request_id
         )
         raise HTTPException(status_code=500, detail=f"Reprocess failed: {str(exc)}")
     doc = db.get_policy_document(doc_id, request_id=request_id)
+    num_clauses = len(db.list_policy_document_clauses(doc_id, request_id=request_id))
+    log.info(
+        "request_id=%s policy_pipeline stage=reprocess document_id=%s company_id=%s user_id=%s success=true clauses=%d",
+        request_id, doc_id, doc.get("company_id") if doc else None, user.get("id") if user else None, num_clauses,
+    )
     return {"document": doc}
 
 
@@ -6600,7 +6660,12 @@ def normalize_policy_document(
     req: Request,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
-    """Normalize policy document clauses into canonical policy objects."""
+    """
+    Normalize stage: transform extracted clauses into structured policy objects.
+    Creates/attaches company_policy, policy_version, benefit_rules, exclusions, evidence_requirements,
+    conditions, assignment/family applicability, and source_links (traceability to clauses).
+    Output is versioned and traceable to source_policy_document_id and clause ids.
+    """
     request_id = getattr(req.state, "request_id", None)
     doc = db.get_policy_document(doc_id, request_id=request_id)
     _require_document_access(user, doc)
@@ -6612,17 +6677,32 @@ def normalize_policy_document(
     try:
         from .services.policy_normalization import run_normalization
         result = run_normalization(db, doc, clauses, created_by=user.get("id"), request_id=request_id)
-        log.info("request_id=%s normalize policy_document=%s -> policy=%s version=%s", request_id, doc_id, result["policy_id"], result["policy_version_id"])
+        summary = result.get("summary") or {}
+        log.info(
+            "request_id=%s policy_pipeline stage=normalize document_id=%s company_id=%s user_id=%s success=true "
+            "policy_id=%s policy_version_id=%s benefit_rules=%d exclusions=%d rows_created=%d",
+            request_id, doc_id, doc.get("company_id") if doc else None, user.get("id") if user else None,
+            result["policy_id"], result["policy_version_id"],
+            summary.get("benefit_rules", 0), summary.get("exclusions", 0),
+            summary.get("benefit_rules", 0) + summary.get("exclusions", 0) + summary.get("evidence_requirements", 0) + summary.get("conditions", 0),
+        )
         return {"policy_id": result["policy_id"], "policy_version_id": result["policy_version_id"], "summary": result["summary"]}
     except ValueError as exc:
         err_str = str(exc)
         log.warning("request_id=%s normalize validation: %s", request_id, err_str)
         raise HTTPException(status_code=400, detail=err_str)
     except Exception as exc:
-        log.warning("request_id=%s normalize failed: %s", request_id, exc, exc_info=True)
         err_str = str(exc)
+        safe_msg = err_str[:200]
+        log.warning(
+            "request_id=%s policy_pipeline stage=normalize document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
+            request_id, doc_id, doc.get("company_id") if doc else None, user.get("id") if user else None,
+            type(exc).__name__, safe_msg, exc_info=True,
+        )
         if "DatatypeMismatch" in err_str or "auto_generated" in err_str or "boolean" in err_str:
             msg = "Normalization failed because of an invalid policy_versions payload."
+        elif "UndefinedColumn" in err_str or "does not exist" in err_str or "template_source" in err_str or "template_name" in err_str or "is_default_template" in err_str:
+            msg = "Normalization failed due to a database schema mismatch (missing optional columns). Check server logs for request_id."
         else:
             msg = f"Normalization failed: {err_str[:500]}"
         return JSONResponse(

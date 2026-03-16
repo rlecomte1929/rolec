@@ -109,6 +109,21 @@ function formatDate(val: string | null | undefined): string {
   }
 }
 
+function formatDateTime(val: string | null | undefined): string {
+  if (!val) return '—';
+  try {
+    return new Date(val).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return val;
+  }
+}
+
 const DOC_TYPE_LABELS: Record<string, string> = {
   assignment_policy: 'Assignment policy',
   policy_summary: 'Policy summary',
@@ -634,9 +649,12 @@ const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
   upload_extract_failed: 'The file was uploaded, but extraction failed.',
   upload_processing_failed: 'The policy document could not be processed.',
   upload_unexpected_exception: 'An unexpected upload error occurred.',
-  storage_missing_service_role: 'Policy upload is not configured correctly. Contact support.',
-  storage_missing_url: 'Policy upload is not configured correctly. Contact support.',
-  storage_bucket_not_found: 'Policy storage bucket is unavailable.',
+  storage_missing_service_role:
+    'Policy document uploads require Supabase storage. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the backend .env (see .env.example) to enable uploads.',
+  storage_missing_url:
+    'Policy document uploads require Supabase storage. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the backend .env (see .env.example) to enable uploads.',
+  storage_bucket_not_found:
+    'Policy storage bucket is unavailable. In Supabase go to Storage → New bucket, create a bucket named hr-policies (public or private), then try again.',
   storage_upload_failed: 'The file could not be uploaded to storage.',
   storage_access_denied: 'Policy storage access denied.',
   policy_documents_table_missing: 'Policy database tables are missing.',
@@ -696,6 +714,8 @@ function PolicyDocumentIntakeSection({
     policy_documents_table_ok: boolean;
     supabase_url_present?: boolean;
     service_role_present?: boolean;
+    config_error?: string;
+    bucket_probe?: { diagnosis?: string };
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -720,7 +740,16 @@ function PolicyDocumentIntakeSection({
     }
   };
 
-  const uploadReady = health === null || (health.bucket_access_ok && health.policy_documents_table_ok);
+  const isDevOrLocalhost =
+    import.meta.env.DEV ||
+    (typeof window !== 'undefined' && window.location.hostname === 'localhost');
+  const configOnlyInvalid =
+    health && (health.config_error === 'wrong_key_type' || health.config_error === 'wrong_project_url_key_mismatch' || health.bucket_probe?.diagnosis === 'wrong_key_type');
+  const uploadReady =
+    health === null ||
+    (health.bucket_access_ok && health.policy_documents_table_ok) ||
+    (isDevOrLocalhost && health && (!health.supabase_url_present || !health.service_role_present)) ||
+    (isDevOrLocalhost && configOnlyInvalid);
 
   useEffect(() => {
     loadDocs();
@@ -816,7 +845,17 @@ function PolicyDocumentIntakeSection({
 
       {message && (
         <div className="mt-4">
-          <Alert variant={message.startsWith('Normalized') || message.startsWith('Document uploaded') || message === 'Saved' ? 'success' : 'error'}>{message}</Alert>
+          <Alert
+            variant={
+              message.startsWith('Normalized') || message.startsWith('Document uploaded') || message === 'Saved'
+                ? 'success'
+                : message.includes('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
+                  ? 'info'
+                  : 'error'
+            }
+          >
+            {message}
+          </Alert>
           {uploadRequestId && (
             <div className="text-xs text-[#9ca3af] mt-1 font-mono">Request ID: {uploadRequestId}</div>
           )}
@@ -824,13 +863,24 @@ function PolicyDocumentIntakeSection({
       )}
 
       {health && !uploadReady && (
-        <Alert variant="error" className="mt-4">
+        <Alert
+          variant={
+            !health.supabase_url_present || !health.service_role_present || health.config_error
+              ? 'info'
+              : 'error'
+          }
+          className="mt-4"
+        >
           {!health.supabase_url_present || !health.service_role_present
-            ? 'Policy upload is not configured correctly. Contact support.'
+            ? 'Policy document uploads require Supabase storage. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the backend .env (see project .env.example) to enable uploads.'
+            : health.config_error === 'wrong_key_type' || health.bucket_probe?.diagnosis === 'wrong_key_type'
+            ? 'Invalid API key: in the backend .env use SUPABASE_URL from your project (e.g. https://xxxxx.supabase.co) and SUPABASE_SERVICE_ROLE_KEY from Supabase → Settings → API (the service_role secret, not the anon key). Restart the backend after changing .env.'
+            : health.config_error === 'wrong_project_url_key_mismatch'
+            ? 'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be from the same Supabase project. Check Settings → API and fix .env, then restart the backend.'
             : !health.bucket_access_ok
-            ? 'Policy storage bucket is unavailable.'
+            ? 'Policy storage bucket is unavailable. In Supabase go to Storage → New bucket, create a bucket named hr-policies (public or private), then reload this page.'
             : !health.policy_documents_table_ok
-            ? 'Policy database tables are missing.'
+            ? 'Policy database tables are missing. Run migrations or use a database that has the policy_documents schema.'
             : 'Policy upload is not ready.'}
         </Alert>
       )}
@@ -890,7 +940,7 @@ function PolicyDocumentIntakeSection({
                       <span>•</span>
                       <span>Scope: {SCOPE_LABELS[doc.detected_policy_scope] || doc.detected_policy_scope || '—'}</span>
                       <span>•</span>
-                      <span>{formatDate(doc.uploaded_at)}</span>
+                      <span>Uploaded: {formatDateTime(doc.uploaded_at)}</span>
                       {needsReview && (
                         <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
                           Needs review

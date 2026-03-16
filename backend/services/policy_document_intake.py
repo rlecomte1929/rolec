@@ -1,6 +1,14 @@
 """
-Policy document intake pipeline: parse PDF/DOCX, classify, extract metadata.
-First layer before extraction to company_policies.
+Policy document intake pipeline (INGEST stage): parse PDF/DOCX, classify, extract metadata.
+
+Pipeline stage (3-stage model):
+- Ingest (this module): store file in blob storage, extract raw text, classify document type/scope,
+  extract metadata (title, version, effective date), and optionally segment into clauses.
+  Called from the upload endpoint after the file is stored. Output: policy_documents row + clauses.
+- Reprocess: re-run extraction and clause segmentation from the stored file without re-uploading.
+  Used when extraction logic or segmentation improves, or to fix failed extraction.
+- Normalize: transform clauses into structured policy objects (company_policies, policy_versions,
+  benefit_rules, exclusions, etc.). Separate so HR can reprocess without overwriting normalized edits.
 """
 from __future__ import annotations
 

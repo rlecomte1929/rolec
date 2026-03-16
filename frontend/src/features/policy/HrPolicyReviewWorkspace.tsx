@@ -25,24 +25,40 @@ function formatBenefitLabel(r: any): string {
   return (meta(r, 'benefit_label') as string) || r?.benefit_key || '—';
 }
 
-/** Topic labels and display order (backend benefit_category -> label). */
+function formatDateTime(val: string | null | undefined): string {
+  if (!val) return '—';
+  try {
+    return new Date(val).toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  } catch {
+    return String(val);
+  }
+}
+
+/** Topic labels and display order (must match backend POLICY_THEMES). */
 const TOPIC_ORDER: string[] = [
-  'housing', 'relocation', 'education', 'immigration', 'travel',
-  'compensation', 'setup', 'health', 'family', 'integration', 'tax', 'other',
+  'immigration', 'travel', 'temporary_housing', 'household_goods', 'schooling',
+  'spouse_support', 'family_support', 'banking', 'tax', 'allowances', 'medical',
+  'home_leave', 'repatriation', 'compliance', 'documentation', 'misc',
 ];
 const TOPIC_LABELS: Record<string, string> = {
-  housing: 'Housing',
-  relocation: 'Movers / Household goods',
-  education: 'Schooling',
   immigration: 'Immigration',
-  travel: 'Travel / Transport / Home leave',
-  compensation: 'Compensation / Allowances',
-  setup: 'Banking / Setup',
-  health: 'Medical / Insurance',
-  family: 'Family support',
-  integration: 'Integration / Cultural',
-  tax: 'Tax / Exclusions',
-  other: 'Miscellaneous',
+  travel: 'Travel',
+  temporary_housing: 'Temporary housing',
+  household_goods: 'Household goods',
+  schooling: 'Schooling',
+  spouse_support: 'Spouse support',
+  family_support: 'Family support',
+  banking: 'Banking',
+  tax: 'Tax',
+  allowances: 'Allowances',
+  medical: 'Medical',
+  home_leave: 'Home leave',
+  repatriation: 'Repatriation',
+  compliance: 'Compliance',
+  documentation: 'Documentation',
+  misc: 'Miscellaneous',
 };
 
 type HrPolicyReviewWorkspaceProps = {
@@ -271,7 +287,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     const rules = normalized?.benefit_rules || [];
     const byCat = rules.reduce(
       (acc: Record<string, any[]>, r: any) => {
-        const cat = r.benefit_category || 'other';
+        const cat = r.benefit_category || 'misc';
         if (!acc[cat]) acc[cat] = [];
         acc[cat].push(r);
         return acc;
@@ -367,6 +383,14 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               <span className="text-xs px-2 py-1 rounded bg-[#e2e8f0]">
                 Version {normalized.version.version_number} · {VERSION_STATUS_LABELS[versionStatus] || versionStatus}
               </span>
+              <span className="text-xs text-[#6b7280]" title="Normalized at">
+                Normalized: {formatDateTime(normalized.version.created_at)}
+              </span>
+              {versionStatus === 'published' && normalized.version.updated_at && (
+                <span className="text-xs text-[#6b7280]" title="Published at">
+                  Published: {formatDateTime(normalized.version.updated_at)}
+                </span>
+              )}
               {avgConfidence != null && (
                 <span className={`text-xs px-2 py-1 rounded ${avgConfidence >= 70 ? 'bg-[#d1fae5] text-[#065f46]' : avgConfidence >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-[#e2e8f0]'}`}>
                   Avg confidence: {avgConfidence}%

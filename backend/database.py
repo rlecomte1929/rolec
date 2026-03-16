@@ -67,6 +67,20 @@ _is_sqlite = _raw_url.startswith("sqlite")
 _profiles_has_status_column = False
 
 
+def _get_company_policies_columns(conn: Any) -> set:
+    """Return set of column names for company_policies (SQLite PRAGMA or Postgres information_schema)."""
+    if _is_sqlite:
+        rows = conn.execute(text("PRAGMA table_info(company_policies)")).fetchall()
+        return {r[1] for r in rows}
+    rows = conn.execute(
+        text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND table_name = 'company_policies'"
+        )
+    ).fetchall()
+    return {r._mapping["column_name"] for r in rows}
+
+
 def _seed_default_policy_template_sqlite(conn: Any) -> None:
     """Insert one platform default policy template for SQLite when none exists."""
     from sqlalchemy import text
@@ -6435,31 +6449,79 @@ class Database:
         template_source: str = "company_uploaded",
         template_name: Optional[str] = None,
         is_default_template: bool = False,
+        request_id: Optional[str] = None,
     ) -> None:
+        """
+        Insert a row into company_policies. Columns are built from actual schema so production
+        Postgres without template_source/template_name/is_default_template still works.
+        """
         now = datetime.utcnow().isoformat()
-        with self.engine.begin() as conn:
-            conn.execute(
-                text(
-                    "INSERT INTO company_policies "
-                    "(id, company_id, title, version, effective_date, file_url, file_type, extraction_status, created_by, created_at, template_source, template_name, is_default_template) "
-                    "VALUES (:id, :cid, :title, :ver, :ed, :url, :ft, :status, :cb, :ca, :tsrc, :tname, :isdef)"
-                ),
-                {
-                    "id": policy_id,
-                    "cid": company_id,
-                    "title": title,
-                    "ver": version,
-                    "ed": effective_date,
-                    "url": file_url,
-                    "ft": file_type,
-                    "status": "pending",
-                    "cb": created_by,
-                    "ca": now,
-                    "tsrc": template_source,
-                    "tname": template_name,
-                    "isdef": 1 if is_default_template else 0,
-                },
+        _col_to_param = {
+            "id": "id",
+            "company_id": "cid",
+            "title": "title",
+            "version": "ver",
+            "effective_date": "ed",
+            "file_url": "url",
+            "file_type": "ft",
+            "extraction_status": "status",
+            "created_by": "cb",
+            "created_at": "ca",
+            "template_source": "tsrc",
+            "template_name": "tname",
+            "is_default_template": "isdef",
+        }
+        _param_values = {
+            "id": policy_id,
+            "cid": company_id,
+            "title": title,
+            "ver": version,
+            "ed": effective_date,
+            "url": file_url,
+            "ft": file_type,
+            "status": "pending",
+            "cb": created_by,
+            "ca": now,
+            "tsrc": template_source,
+            "tname": template_name,
+            "isdef": 1 if is_default_template else 0,
+        }
+        existing: set = set()
+        try:
+            with self.engine.begin() as conn:
+                existing = _get_company_policies_columns(conn)
+                core = [
+                    "id", "company_id", "title", "version", "effective_date",
+                    "file_url", "file_type", "extraction_status", "created_by", "created_at",
+                ]
+                optional = ["template_source", "template_name", "is_default_template"]
+                insert_cols = [c for c in core + optional if c in existing]
+                if not insert_cols:
+                    raise RuntimeError("company_policies has no columns we can insert")
+                placeholders = [f":{_col_to_param[c]}" for c in insert_cols]
+                params = {_col_to_param[c]: _param_values[_col_to_param[c]] for c in insert_cols}
+                sql = (
+                    "INSERT INTO company_policies ("
+                    + ", ".join(insert_cols)
+                    + ") VALUES ("
+                    + ", ".join(placeholders)
+                    + ")"
+                )
+                conn.execute(text(sql), params)
+        except Exception as exc:
+            log.error(
+                "request_id=%s create_company_policy failed company_id=%s policy_id=%s title=%s "
+                "company_policies_columns=%s exc_type=%s exc_msg=%s",
+                request_id or "?",
+                company_id,
+                policy_id,
+                (title or "")[:80],
+                sorted(existing),
+                type(exc).__name__,
+                str(exc)[:500],
+                exc_info=True,
             )
+            raise
 
     def list_company_policies(self, company_id: str) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:

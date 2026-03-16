@@ -18,7 +18,11 @@ _IS_PRODUCTION = (
 if not _IS_PRODUCTION:
     try:
         from dotenv import load_dotenv
-        load_dotenv(override=False)  # Never override existing env vars
+        # Load .env from project root (parent of backend/), so it's found regardless of cwd
+        _backend_dir = os.path.dirname(os.path.abspath(__file__))
+        _project_root = os.path.dirname(_backend_dir)
+        _env_path = os.path.join(_project_root, ".env")
+        load_dotenv(dotenv_path=_env_path, override=False)  # Never override existing env vars
     except ImportError:
         pass  # python-dotenv not installed — rely on shell env only
 

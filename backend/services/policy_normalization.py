@@ -1,5 +1,13 @@
 """
 Policy normalization engine: maps policy_document_clauses into canonical policy objects.
+
+Pipeline stage (3-stage model):
+- Ingest (upload): store file, extract raw text and metadata, segment clauses. See policy_document_intake + main upload.
+- Reprocess: re-run extraction and clause segmentation from stored file. See main reprocess endpoint.
+- Normalize: transform extracted clauses into structured policy objects, policy_version, benefit_rules, exclusions,
+  evidence_requirements, conditions, and source_links. This module implements the normalize stage.
+  Normalize is separate so HR can re-segment (reprocess) without overwriting structured edits, and so we can
+  re-normalize after taxonomy or rule changes while keeping the same policy versioning model.
 """
 from __future__ import annotations
 
@@ -12,8 +20,10 @@ from .policy_taxonomy import (
     BENEFIT_TAXONOMY,
     ASSIGNMENT_TYPE_MAP,
     FAMILY_STATUS_MAP,
+    POLICY_THEMES,
     resolve_benefit_key,
     get_benefit_meta,
+    resolve_theme,
 )
 
 log = logging.getLogger(__name__)
@@ -149,6 +159,7 @@ def normalize_clauses_to_objects(
             if ctype == "exclusion":
                 continue  # handle below
             meta = get_benefit_meta(benefit_key)
+            theme = resolve_theme(benefit_key, meta.get("group"))
             calc_type = _detect_calc_type(raw, hints, benefit_key)
             amount_value = _extract_amount_value(hints, raw)
             amount_unit = hints.get("candidate_unit")
@@ -157,7 +168,7 @@ def normalize_clauses_to_objects(
 
             rule = {
                 "benefit_key": benefit_key,
-                "benefit_category": meta.get("group", "other"),
+                "benefit_category": theme,
                 "calc_type": calc_type,
                 "amount_value": amount_value,
                 "amount_unit": amount_unit,
@@ -292,7 +303,10 @@ def run_normalization(
 ) -> Dict[str, Any]:
     """
     Run full normalization: create/attach company_policy, create policy_version,
-    persist all normalized objects. Returns {policy_id, policy_version_id, summary}.
+    persist benefit_rules, exclusions, evidence_requirements, conditions, applicability,
+    and policy_source_links. Returns {policy_id, policy_version_id, summary}.
+    The created policy_version is versioned (version_number) and traceable to the
+    source document (source_policy_document_id) and to source clauses (policy_source_links).
     """
     company_id = (policy_document.get("company_id") or "").strip() or None
     if not company_id:
@@ -322,6 +336,7 @@ def run_normalization(
             file_url=file_url or "policy-document",  # object key only, e.g. companies/.../policy-documents/.../file.pdf
             file_type=policy_document.get("mime_type", "").split("/")[-1] or "pdf",
             created_by=created_by,
+            request_id=request_id,
         )
 
     # Next version number
@@ -428,6 +443,14 @@ def run_normalization(
     for evid, cid in evidence_ids:
         _source_link_for_clause(cid, "evidence_requirement", evid)
 
+    by_category: Dict[str, int] = {}
+    for r in result["benefit_rules"]:
+        cat = r.get("benefit_category") or "misc"
+        by_category[cat] = by_category.get(cat, 0) + 1
+    for t in POLICY_THEMES:
+        if t not in by_category:
+            by_category[t] = 0
+
     return {
         "policy_id": policy_id,
         "policy_version_id": version_id,
@@ -436,5 +459,6 @@ def run_normalization(
             "exclusions": len(result["exclusions"]),
             "evidence_requirements": len(result["evidence_requirements"]),
             "conditions": len(result["conditions"]),
+            "by_category": by_category,
         },
     }

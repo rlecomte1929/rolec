@@ -149,7 +149,12 @@ def _probe_bucket_via_get_bucket(client: Any, bucket_name: str) -> Dict[str, Any
     result: Dict[str, Any] = {"method": "get_bucket", "ok": False, "error": None}
     try:
         bucket = client.storage.get_bucket(bucket_name)
-        result["ok"] = bucket is not None and (getattr(bucket, "id", None) == bucket_name or (isinstance(bucket, dict) and bucket.get("id") == bucket_name))
+        if bucket is None:
+            result["ok"] = False
+        else:
+            bid = getattr(bucket, "id", None) if not isinstance(bucket, dict) else bucket.get("id")
+            bname = getattr(bucket, "name", None) if not isinstance(bucket, dict) else bucket.get("name")
+            result["ok"] = (bid == bucket_name) or (bname == bucket_name)
     except Exception as e:
         summary = _safe_exception_summary(e)
         result["error"] = summary.get("exc_type", "unknown")
@@ -170,10 +175,15 @@ def _probe_bucket_via_list_buckets(client: Any, bucket_name: str) -> Dict[str, A
         buckets = client.storage.list_buckets()
         bucket_ids = []
         for b in buckets or []:
+            bid = None
             if hasattr(b, "id"):
-                bucket_ids.append(getattr(b, "id"))
-            elif isinstance(b, dict):
-                bucket_ids.append(b.get("id"))
+                bid = getattr(b, "id", None)
+            if bid is None and hasattr(b, "name"):
+                bid = getattr(b, "name", None)
+            if bid is None and isinstance(b, dict):
+                bid = b.get("id") or b.get("name")
+            if bid:
+                bucket_ids.append(bid)
         result["buckets_found"] = len(bucket_ids)
         result["bucket_in_list"] = bucket_name in bucket_ids
         result["ok"] = result["bucket_in_list"]
@@ -254,7 +264,7 @@ def check_policy_storage_health(db: Any) -> Dict[str, Any]:
     if not result["supabase_url_present"] or not result["service_role_present"]:
         return result
 
-    # Bucket probe: get_bucket (primary) -> list_buckets -> list_objects
+    # Bucket probe: try list_objects first (same path as upload), then get_bucket, then list_buckets
     result["bucket_probe"] = {}
     client = None
     try:
@@ -263,14 +273,16 @@ def check_policy_storage_health(db: Any) -> Dict[str, Any]:
     except Exception as e:
         summary = _safe_exception_summary(e)
         result["bucket_probe"]["client_init_error"] = summary
-        result["bucket_probe"]["diagnosis"] = (
+        diagnosis = (
             "wrong_project_url_key_mismatch" if "invalid" in str(e).lower() and "url" in str(e).lower()
             else "wrong_key_type" if "invalid" in str(e).lower() and ("key" in str(e).lower() or "jwt" in str(e).lower())
             else "storage_api_client_incompatibility"
         )
+        result["bucket_probe"]["diagnosis"] = diagnosis
         result["bucket_probe_method"] = "client_init"
         result["bucket_probe_error_type"] = summary.get("exc_type")
         result["bucket_probe_error_message"] = summary.get("exc_message_safe")
+        result["config_error"] = diagnosis  # so frontend can show specific message
         log.warning(
             "policy_storage client init failed: exc_type=%s exc_repr=%s message=%s",
             summary.get("exc_type"),
@@ -285,48 +297,48 @@ def check_policy_storage_health(db: Any) -> Dict[str, Any]:
         result["bucket_probe_error_message"] = err_detail.get("exc_message_safe")
         result["bucket_probe"]["diagnosis"] = _diagnose_from_error(err_detail)
 
-    # 1. Primary: get_bucket(id) - direct bucket metadata fetch
-    get_result: Dict[str, Any] = {}
-    if hasattr(client.storage, "get_bucket"):
-        get_result = _probe_bucket_via_get_bucket(client, POLICY_BUCKET_NAME)
-        result["bucket_probe"]["get_bucket"] = get_result
-    else:
-        result["bucket_probe"]["get_bucket"] = {"ok": False, "error": "method_not_available"}
+    # 1. Prefer list_objects: same code path as upload; succeeds if bucket exists and is readable
+    list_result = _probe_bucket_via_list(client, POLICY_BUCKET_NAME)
+    result["bucket_probe"]["list_objects"] = list_result
 
-    if get_result.get("ok"):
+    if list_result.get("ok"):
         result["bucket_access_ok"] = True
-        result["bucket_probe"]["diagnosis"] = "ok"
+        result["bucket_probe"]["diagnosis"] = "ok_via_list_objects"
     else:
-        # 2. Fallback: list_buckets
-        list_buckets_result: Dict[str, Any] = {}
-        if hasattr(client.storage, "list_buckets"):
-            list_buckets_result = _probe_bucket_via_list_buckets(client, POLICY_BUCKET_NAME)
-            result["bucket_probe"]["list_buckets"] = list_buckets_result
-
-        if list_buckets_result.get("ok"):
-            result["bucket_access_ok"] = list_buckets_result.get("bucket_in_list", False)
-            if not result["bucket_access_ok"]:
-                result["bucket_probe"]["diagnosis"] = "bucket_missing"
-                result["bucket_probe_method"] = "list_buckets"
-                result["bucket_probe_error_type"] = "bucket_not_in_list"
-                result["bucket_probe_error_message"] = f"Bucket {POLICY_BUCKET_NAME} not in list (found {list_buckets_result.get('buckets_found', 0)} buckets)"
+        # 2. Fallback: get_bucket
+        get_result: Dict[str, Any] = {}
+        if hasattr(client.storage, "get_bucket"):
+            get_result = _probe_bucket_via_get_bucket(client, POLICY_BUCKET_NAME)
+            result["bucket_probe"]["get_bucket"] = get_result
         else:
-            # 3. Last resort: list objects
-            list_result = _probe_bucket_via_list(client, POLICY_BUCKET_NAME)
-            result["bucket_probe"]["list_objects"] = list_result
+            result["bucket_probe"]["get_bucket"] = {"ok": False, "error": "method_not_available"}
 
-            if list_result.get("ok"):
-                result["bucket_access_ok"] = True
-                result["bucket_probe"]["diagnosis"] = "ok_via_list_objects"
+        if get_result.get("ok"):
+            result["bucket_access_ok"] = True
+            result["bucket_probe"]["diagnosis"] = "ok"
+        else:
+            # 3. Fallback: list_buckets (match by id or name)
+            list_buckets_result: Dict[str, Any] = {}
+            if hasattr(client.storage, "list_buckets"):
+                list_buckets_result = _probe_bucket_via_list_buckets(client, POLICY_BUCKET_NAME)
+                result["bucket_probe"]["list_buckets"] = list_buckets_result
+
+            if list_buckets_result.get("ok"):
+                result["bucket_access_ok"] = list_buckets_result.get("bucket_in_list", False)
+                if not result["bucket_access_ok"]:
+                    result["bucket_probe"]["diagnosis"] = "bucket_missing"
+                    result["bucket_probe_method"] = "list_buckets"
+                    result["bucket_probe_error_type"] = "bucket_not_in_list"
+                    result["bucket_probe_error_message"] = f"Bucket {POLICY_BUCKET_NAME} not in list (found {list_buckets_result.get('buckets_found', 0)} buckets)"
             else:
                 err_detail = (
-                    get_result.get("error_detail")
+                    list_result.get("error_detail")
+                    or get_result.get("error_detail")
                     or list_buckets_result.get("error_detail")
-                    or list_result.get("error_detail")
                     or {}
                 )
                 _set_probe_error(
-                    get_result.get("method") or list_buckets_result.get("method") or list_result.get("method") or "unknown",
+                    list_result.get("method") or get_result.get("method") or list_buckets_result.get("method") or "unknown",
                     err_detail,
                 )
                 result["bucket_probe"]["error_detail"] = err_detail

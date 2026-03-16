@@ -36,6 +36,11 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
 
   return (
     <AppShell>
+      <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 mb-6">
+        <p className="text-sm text-[#475569]">
+          <strong className="text-[#0b2b43]">Admin view</strong> — not scoped to a single company. Use <strong>Companies</strong> or <strong>Assignments</strong> to select a company and manage HR/employee data for that company.
+        </p>
+      </div>
       <div className="flex flex-wrap gap-2 border-b border-[#e2e8f0] pb-4 mb-4">
         {navItems.map(({ to, label, path }) => {
           const pathToCheck = path ?? to;
