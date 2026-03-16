@@ -5020,9 +5020,16 @@ def get_employee_assignment_policy(
     case_id = assignment.get("case_id")
     case = db.get_relocation_case(case_id) if case_id else None
     hr_user_id = assignment.get("hr_user_id")
+    hr_company_id = db.get_hr_company_id(hr_user_id) if hr_user_id else None
+    # Ensure relocation_cases row exists when missing (e.g. wizard-only case) so resolution gets company_id
+    if not case and case_id and hr_user_id and hr_company_id:
+        try:
+            db.create_case(case_id, hr_user_id, {}, company_id=hr_company_id)
+            case = db.get_relocation_case(case_id)
+        except Exception:
+            pass
     # Align with admin: company from case then hr_users.company_id (get_hr_company_id)
     case_company_id = (case or {}).get("company_id") if case else None
-    hr_company_id = db.get_hr_company_id(hr_user_id) if hr_user_id else None
     # #region agent log
     _debug_log(
         "main.get_employee_assignment_policy",
