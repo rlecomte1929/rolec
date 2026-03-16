@@ -255,6 +255,13 @@ export const EmployeeResolvedPolicyView: React.FC<{ assignmentId: string }> = ({
   }
 
   const policy = data.policy;
+  if (!policy) {
+    return (
+      <Card padding="lg">
+        <div className="text-center py-8 text-sm text-[#6b7280]">No policy details available.</div>
+      </Card>
+    );
+  }
   const ctx = data.resolution_context ?? {};
   const assignmentType = ctx.assignment_type ? String(ctx.assignment_type).toUpperCase() : null;
   const cards = buildCategoryCards(data.benefits, data.exclusions ?? []);
