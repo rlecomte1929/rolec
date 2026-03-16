@@ -7691,14 +7691,15 @@ class Database:
     def insert_policy_benefit_rule(self, rule: Dict[str, Any]) -> str:
         rid = rule.get("id") or str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
+        ag_sql = _policy_ag_sql()
         with self.engine.begin() as conn:
             conn.execute(
-                text("""
+                text(f"""
                     INSERT INTO policy_benefit_rules
                     (id, policy_version_id, benefit_key, benefit_category, calc_type, amount_value,
                      amount_unit, currency, frequency, description, metadata_json, auto_generated,
                      review_status, confidence, raw_text, created_at, updated_at)
-                    VALUES (:id, :vid, :bk, :bc, :ct, :av, :au, :cur, :freq, :desc, :meta, :ag, :rs, :conf, :raw, :now, :now)
+                    VALUES (:id, :vid, :bk, :bc, :ct, :av, :au, :cur, :freq, :desc, :meta, {ag_sql}, :rs, :conf, :raw, :now, :now)
                 """),
                 {
                     "id": rid,
@@ -7724,13 +7725,14 @@ class Database:
     def insert_policy_exclusion(self, excl: Dict[str, Any]) -> str:
         eid = excl.get("id") or str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
+        ag_sql = _policy_ag_sql()
         with self.engine.begin() as conn:
             conn.execute(
-                text("""
+                text(f"""
                     INSERT INTO policy_exclusions
                     (id, policy_version_id, benefit_key, domain, description, auto_generated,
                      review_status, confidence, raw_text, created_at, updated_at)
-                    VALUES (:id, :vid, :bk, :dom, :desc, :ag, :rs, :conf, :raw, :now, :now)
+                    VALUES (:id, :vid, :bk, :dom, :desc, {ag_sql}, :rs, :conf, :raw, :now, :now)
                 """),
                 {
                     "id": eid,
@@ -7776,13 +7778,14 @@ class Database:
     def insert_policy_rule_condition(self, cond: Dict[str, Any]) -> str:
         cid = cond.get("id") or str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
+        ag_sql = _policy_ag_sql()
         with self.engine.begin() as conn:
             conn.execute(
-                text("""
+                text(f"""
                     INSERT INTO policy_rule_conditions
                     (id, policy_version_id, object_type, object_id, condition_type, condition_value_json,
                      auto_generated, review_status, confidence, created_at, updated_at)
-                    VALUES (:id, :vid, :ot, :oid, :ct, :val, :ag, :rs, :conf, :now, :now)
+                    VALUES (:id, :vid, :ot, :oid, :ct, :val, {ag_sql}, :rs, :conf, :now, :now)
                 """),
                 {
                     "id": cid,
