@@ -7515,7 +7515,7 @@ class Database:
             "doc_id": source_policy_document_id,
             "vn": version_number,
             "status": status,
-            "ag": True if auto_generated else False,
+            "ag": _policy_bool_for_db(auto_generated),
             "rs": review_status,
             "conf": confidence,
             "cb": created_by,

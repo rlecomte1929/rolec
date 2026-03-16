@@ -726,6 +726,10 @@ function PolicyDocumentIntakeSection({
       setDocuments(res.documents || []);
       setMessage('');
     } catch (err: unknown) {
+      // #region agent log
+      const ax = err as { response?: { status?: number; data?: { detail?: string } } };
+      fetch('http://127.0.0.1:7281/ingest/a36ac180-a608-46b4-b5a5-dc68abc2563a', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '2c6040' }, body: JSON.stringify({ sessionId: '2c6040', location: 'HrPolicy.tsx:loadDocs', message: 'list documents failed', data: { adminCompanyId: adminCompanyId ?? null, status: ax?.response?.status, detail: (ax?.response?.data?.detail || String(ax))?.slice(0, 200) }, timestamp: Date.now(), hypothesisId: 'C' }) }).catch(() => {});
+      // #endregion
       setMessage('Unable to load documents');
       setDocuments([]);
     }
