@@ -269,9 +269,11 @@ def resolve_policy_for_assignment(
     canonical_case_id = assignment.get("canonical_case_id") or case_id
 
     # Candidate company_ids in priority order (case → hr → profile). Use company_id only, never name.
+    # Use case's hr_user_id when assignment has no hr_user_id so case-owned assignments still resolve.
     candidates: List[str] = []
     cid_case = (case or {}).get("company_id") if case else None
-    cid_hr = db.get_hr_company_id(assignment["hr_user_id"]) if assignment.get("hr_user_id") else None
+    hr_user_id = assignment.get("hr_user_id") or (case.get("hr_user_id") if case else None)
+    cid_hr = db.get_hr_company_id(hr_user_id) if hr_user_id else None
     cid_profile = None
     if assignment.get("employee_user_id"):
         emp_profile = db.get_profile_record(assignment["employee_user_id"])

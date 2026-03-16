@@ -5011,7 +5011,7 @@ def _resolve_published_policy_for_employee(
     assignment = _require_assignment_visibility(assignment_id, user)
     case_id = assignment.get("case_id")
     case = db.get_relocation_case(case_id) if case_id else None
-    hr_user_id = assignment.get("hr_user_id")
+    hr_user_id = assignment.get("hr_user_id") or (case.get("hr_user_id") if case else None)
     hr_company_id = db.get_hr_company_id(hr_user_id) if hr_user_id else None
     profile_company_id = None
     if assignment.get("employee_user_id"):
@@ -5084,10 +5084,20 @@ def _resolve_published_policy_for_employee(
             )
             resolved = None
     if not resolved:
-        log.info(
-            "employee_policy no_policy request_id=%s assignment_id=%s case_id=%s company_id_used=%s",
-            request_id, assignment_id, case_id, company_id_used,
-        )
+        try:
+            with_policy = db.list_company_ids_with_published_policy()
+            log.info(
+                "employee_policy no_policy request_id=%s assignment_id=%s case_id=%s company_id_used=%s "
+                "case_company=%s hr_company=%s profile_company=%s published_for_companies=%s",
+                request_id, assignment_id, case_id, company_id_used,
+                case_company_id, hr_company_id, profile_company_id,
+                [c.get("company_id") for c in with_policy] if with_policy else [],
+            )
+        except Exception:
+            log.info(
+                "employee_policy no_policy request_id=%s assignment_id=%s case_id=%s company_id_used=%s",
+                request_id, assignment_id, case_id, company_id_used,
+            )
         return {
             "has_policy": False,
             "reason": "No published company policy found for this employee context.",
@@ -5096,6 +5106,19 @@ def _resolve_published_policy_for_employee(
             "company_id_used": company_id_used,
         }
     company_id_used = resolved.get("resolution_company_id") or company_id_used
+    if case_id and case and not case.get("company_id") and company_id_used:
+        try:
+            db.upsert_relocation_case(
+                case_id=case_id,
+                company_id=company_id_used,
+                employee_id=case.get("employee_id"),
+                status=case.get("status"),
+                stage=case.get("stage"),
+                host_country=case.get("host_country"),
+                home_country=case.get("home_country"),
+            )
+        except Exception:
+            pass
     rid = resolved.get("id")
     if not rid:
         return {
@@ -5234,6 +5257,7 @@ def get_employee_assignment_policy(
             "exclusions": [],
             "resolution_context": None,
             "message": result.get("reason", "No published policy for your assignment."),
+            "company_id_used": result.get("company_id_used"),
         }
     try:
         _log_employee_policy(
