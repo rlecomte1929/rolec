@@ -5099,6 +5099,17 @@ def get_employee_assignment_policy(
     _debug_log("main.get_employee_assignment_policy", "after resolve", {"assignment_id": assignment_id, "resolve_returned_policy": resolved is not None}, "H3")
     # #endregion
     if not resolved:
+        companies_with_published = []
+        try:
+            companies_with_published = db.list_company_ids_with_published_policy()
+        except Exception:
+            pass
+        _debug_log(
+            "main.get_employee_assignment_policy",
+            "no policy returned — companies that have published policy",
+            {"assignment_id": assignment_id, "companies_with_published": companies_with_published},
+            "H5",
+        )
         return {"policy": None, "benefits": [], "exclusions": [], "resolution_context": None, "message": "No published policy for your assignment."}
     # Use company_id that resolution actually used (first candidate with a published policy)
     company_id_used = resolved.get("resolution_company_id") or company_id_used

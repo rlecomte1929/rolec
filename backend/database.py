@@ -7127,6 +7127,20 @@ class Database:
                 return (policy, version)
         return None
 
+    def list_company_ids_with_published_policy(self) -> List[Dict[str, Any]]:
+        """Return list of {company_id, company_name} for companies that have at least one published policy (for debug logging)."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text("""
+                    SELECT DISTINCT c.id AS company_id, c.name AS company_name
+                    FROM companies c
+                    JOIN company_policies cp ON cp.company_id = c.id
+                    JOIN policy_versions pv ON pv.policy_id = cp.id AND pv.status = 'published'
+                """),
+                {},
+            ).fetchall()
+        return [{"company_id": r._mapping["company_id"], "company_name": r._mapping.get("company_name")} for r in rows]
+
     def update_company_policy_status(
         self,
         policy_id: str,
