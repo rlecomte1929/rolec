@@ -9,19 +9,6 @@ import json as _json
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# #region agent log
-def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = ""):
-    try:
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".cursor", "debug-2c6040.log")
-        payload = {"sessionId": "2c6040", "location": location, "message": message, "data": data, "timestamp": int(time.time() * 1000)}
-        if hypothesis_id:
-            payload["hypothesisId"] = hypothesis_id
-        with open(path, "a") as f:
-            f.write(_json.dumps(payload) + "\n")
-    except Exception:
-        pass
-# #endregion
-
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -5009,35 +4996,30 @@ def submit_vendor_quote(
     return {"ok": True, "quote": quote}
 
 
-@app.get("/api/employee/assignments/{assignment_id}/policy")
-def get_employee_assignment_policy(
+def _resolve_published_policy_for_employee(
     assignment_id: str,
-    user: Dict[str, Any] = Depends(require_hr_or_employee),
-):
-    """Employee: Get resolved policy for this assignment (read-only, published only)."""
-    assignment = _require_assignment_visibility(assignment_id, user)
+    user: Dict[str, Any],
+    request_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Resolve published company policy for an employee's assignment context.
+    Resolution order: case company_id → hr company_id → profile company_id.
+    Returns structured result; never raises for "no policy" (only for auth via _require_assignment_visibility).
+    """
     from .services.policy_resolution import resolve_policy_for_assignment
+
+    assignment = _require_assignment_visibility(assignment_id, user)
     case_id = assignment.get("case_id")
     case = db.get_relocation_case(case_id) if case_id else None
     hr_user_id = assignment.get("hr_user_id")
     hr_company_id = db.get_hr_company_id(hr_user_id) if hr_user_id else None
-    # Ensure relocation_cases row exists when missing (e.g. wizard-only case) so resolution gets company_id
     if not case and case_id and hr_user_id and hr_company_id:
         try:
             db.create_case(case_id, hr_user_id, {}, company_id=hr_company_id)
             case = db.get_relocation_case(case_id)
         except Exception:
             pass
-    # Align with admin: company from case then hr_users.company_id (get_hr_company_id)
     case_company_id = (case or {}).get("company_id") if case else None
-    # #region agent log
-    _debug_log(
-        "main.get_employee_assignment_policy",
-        "employee policy request",
-        {"assignment_id": assignment_id, "case_id": case_id, "case_found": case is not None, "case_company_id": case_company_id, "hr_company_id": hr_company_id},
-        "H2",
-    )
-    # #endregion
     company_id_for_resolution = case_company_id or hr_company_id
     if company_id_for_resolution:
         if case and not case.get("company_id"):
@@ -5077,41 +5059,23 @@ def get_employee_assignment_policy(
     employee_profile = db.get_employee_profile(assignment_id)
 
     resolved = db.get_resolved_assignment_policy(assignment_id)
-    # #region agent log — same company as resolution: case then hr_users
     company_id_used = case_company_id or hr_company_id
     if not company_id_used and assignment.get("employee_user_id"):
         emp_profile = db.get_profile_record(assignment["employee_user_id"])
         if emp_profile:
             company_id_used = emp_profile.get("company_id")
-    has_published = bool(db.get_company_policy_with_published_version(company_id_used)) if company_id_used else False
-    _debug_log(
-        "main.get_employee_assignment_policy",
-        "resolution check",
-        {"assignment_id": assignment_id, "company_id_used": company_id_used, "resolved_cached": resolved is not None, "has_published_version_for_company": has_published},
-        "H1",
-    )
-    # #endregion
     if not resolved:
         resolved = resolve_policy_for_assignment(
             db, assignment_id, assignment, case, profile, employee_profile
         )
-    # #region agent log
-    _debug_log("main.get_employee_assignment_policy", "after resolve", {"assignment_id": assignment_id, "resolve_returned_policy": resolved is not None}, "H3")
-    # #endregion
     if not resolved:
-        companies_with_published = []
-        try:
-            companies_with_published = db.list_company_ids_with_published_policy()
-        except Exception:
-            pass
-        _debug_log(
-            "main.get_employee_assignment_policy",
-            "no policy returned — companies that have published policy",
-            {"assignment_id": assignment_id, "companies_with_published": companies_with_published},
-            "H5",
-        )
-        return {"policy": None, "benefits": [], "exclusions": [], "resolution_context": None, "message": "No published policy for your assignment."}
-    # Use company_id that resolution actually used (first candidate with a published policy)
+        return {
+            "has_policy": False,
+            "reason": "No published company policy found for this employee context.",
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "company_id_used": company_id_used,
+        }
     company_id_used = resolved.get("resolution_company_id") or company_id_used
     benefits = db.list_resolved_policy_benefits(resolved["id"])
     exclusions = db.list_resolved_policy_exclusions(resolved["id"])
@@ -5121,6 +5085,12 @@ def get_employee_assignment_policy(
     company = db.get_company(company_id_used) if company_id_used else None
     company_name = (company or {}).get("name") if company else None
     return {
+        "has_policy": True,
+        "company_id": company_id_used,
+        "policy_id": policy.get("id"),
+        "version_id": version.get("id"),
+        "assignment_id": assignment_id,
+        "case_id": case_id,
         "policy": {
             "id": policy.get("id"),
             "title": policy.get("title"),
@@ -5135,13 +5105,130 @@ def get_employee_assignment_policy(
     }
 
 
+def _log_employee_policy(
+    route: str,
+    request_id: Optional[str],
+    user_id: Optional[str],
+    role: Optional[str],
+    assignment_id: str,
+    case_id: Optional[str],
+    company_id_used: Optional[str],
+    has_policy: bool,
+    policy_id: Optional[str] = None,
+    version_id: Optional[str] = None,
+    exc_type: Optional[str] = None,
+    exc_message: Optional[str] = None,
+):
+    """Structured log for employee policy retrieval (no stack traces)."""
+    log.info(
+        "employee_policy request_id=%s route=%s user_id=%s role=%s assignment_id=%s case_id=%s "
+        "company_id_used=%s has_policy=%s policy_id=%s version_id=%s exc_type=%s exc_message=%s",
+        request_id or "",
+        route,
+        user_id or "",
+        role or "",
+        assignment_id,
+        case_id or "",
+        company_id_used or "",
+        has_policy,
+        policy_id or "",
+        version_id or "",
+        exc_type or "",
+        (exc_message or "")[:200] if exc_message else "",
+    )
+
+
+@app.get("/api/employee/assignments/{assignment_id}/policy")
+def get_employee_assignment_policy(
+    assignment_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Employee: Get resolved policy for this assignment (read-only, published only). Never 500 for missing policy."""
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    try:
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                None,
+                None,
+                False,
+                exc_type=type(exc).__name__,
+                exc_message=str(exc),
+            )
+        except Exception:
+            pass
+        return {
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "message": "No published policy for your assignment.",
+        }
+    if not result.get("has_policy"):
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                result.get("case_id"),
+                result.get("company_id_used"),
+                False,
+            )
+        except Exception:
+            pass
+        return {
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "message": result.get("reason", "No published policy for your assignment."),
+        }
+    try:
+        _log_employee_policy(
+            "GET /api/employee/assignments/{id}/policy",
+            request_id,
+            user.get("id"),
+            user.get("role"),
+            assignment_id,
+            result.get("case_id"),
+            result.get("company_id"),
+            True,
+            result.get("policy_id"),
+            result.get("version_id"),
+        )
+    except Exception:
+        pass
+    return {
+        "has_policy": True,
+        "policy": result.get("policy") or {},
+        "benefits": result.get("benefits") or [],
+        "exclusions": result.get("exclusions") or [],
+        "resolved_at": result.get("resolved_at"),
+        "resolution_context": result.get("resolution_context"),
+    }
+
+
 @app.get("/api/employee/assignments/{assignment_id}/policy-envelope")
 def get_employee_policy_envelope(
     assignment_id: str,
+    req: Request,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     """Employee: Get policy envelope (envelope cards ready) for comparison/budget logic."""
-    data = get_employee_assignment_policy(assignment_id, user)
+    data = get_employee_assignment_policy(assignment_id, req, user)
     if not data.get("benefits"):
         return data
     # Map to envelope shape: included, capped, excluded, approval-required
@@ -5197,32 +5284,72 @@ def get_hr_policy_service_comparison(
 @app.get("/api/employee/assignments/{assignment_id}/policy-budget")
 def get_assignment_policy_budget(
     assignment_id: str,
+    req: Request,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    """Employee: Get policy caps for this assignment. Uses same resolved HR policy as Assignment Package & Limits so Services are comparable to benefits."""
-    assignment = _require_assignment_visibility(assignment_id, user)
-    from .services.policy_adapter import caps_from_resolved_benefits
+    """Employee: Get policy caps for this assignment. Same resolution as policy route. Never 500 for missing policy."""
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    from .services.policy_adapter import caps_from_resolved_benefits, DEFAULT_CURRENCY
 
-    resolved = db.get_resolved_assignment_policy(assignment_id)
-    if not resolved:
-        from .services.policy_resolution import resolve_policy_for_assignment
-        case_id = assignment.get("case_id")
-        case = db.get_relocation_case(case_id) if case_id else None
-        profile = None
-        if case and case.get("profile_json"):
-            try:
-                profile = json.loads(case["profile_json"]) if isinstance(case["profile_json"], str) else case["profile_json"]
-            except Exception:
-                profile = None
-        employee_profile = db.get_employee_profile(assignment_id)
-        resolved = resolve_policy_for_assignment(db, assignment_id, assignment, case, profile, employee_profile)
+    try:
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy-budget",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                None,
+                None,
+                False,
+                exc_type=type(exc).__name__,
+                exc_message=str(exc),
+            )
+        except Exception:
+            pass
+        return {"has_policy": False, "currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
 
-    if resolved:
-        benefits = db.list_resolved_policy_benefits(resolved["id"])
-        return caps_from_resolved_benefits(benefits)
+    if not result.get("has_policy"):
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy-budget",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                result.get("case_id"),
+                result.get("company_id_used"),
+                False,
+            )
+        except Exception:
+            pass
+        return {"has_policy": False, "currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
 
-    policy = policy_engine.load_policy()
-    return normalize_policy_caps(policy)
+    benefits = result.get("benefits") or []
+    try:
+        budget = caps_from_resolved_benefits(benefits)
+    except Exception:
+        budget = {"currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
+    try:
+        _log_employee_policy(
+            "GET /api/employee/assignments/{id}/policy-budget",
+            request_id,
+            user.get("id"),
+            user.get("role"),
+            assignment_id,
+            result.get("case_id"),
+            result.get("company_id"),
+            True,
+            result.get("policy_id"),
+            result.get("version_id"),
+        )
+    except Exception:
+        pass
+    return {"has_policy": True, **budget}
 
 
 @app.post("/api/assignments/{assignment_id}/evidence", response_model=AddEvidenceResponse)

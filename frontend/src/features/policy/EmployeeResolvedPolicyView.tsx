@@ -33,6 +33,7 @@ interface ResolvedExclusion {
 }
 
 interface ResolvedPolicyResponse {
+  has_policy?: boolean;
   policy: { id: string; title: string; version: number; effective_date: string; company_name?: string | null } | null;
   benefits: ResolvedBenefit[];
   exclusions: ResolvedExclusion[];
@@ -237,7 +238,8 @@ export const EmployeeResolvedPolicyView: React.FC<{ assignmentId: string }> = ({
     return <div className="text-sm text-[#6b7280] py-8">Loading your policy…</div>;
   }
 
-  if (!data?.policy || !data.benefits?.length) {
+  const hasPolicy = data?.has_policy === true && data?.policy && (data.benefits?.length ?? 0) > 0;
+  if (!hasPolicy) {
     return (
       <Card padding="lg">
         <div className="text-center py-8">

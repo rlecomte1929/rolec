@@ -280,15 +280,6 @@ def resolve_policy_for_assignment(
     for c in (cid_case, cid_hr, cid_profile):
         if c and c not in candidates:
             candidates.append(c)
-    # #region agent log
-    try:
-        import json as _json
-        _path = "/Users/Rom/Documents/GitHub/rolec/.cursor/debug-2c6040.log"
-        with open(_path, "a") as _f:
-            _f.write(_json.dumps({"sessionId": "2c6040", "hypothesisId": "H1", "location": "policy_resolution.resolve_policy_for_assignment", "message": "candidates", "data": {"assignment_id": assignment_id, "candidates": candidates, "cid_case": cid_case, "cid_hr": cid_hr, "cid_profile": cid_profile}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-    except Exception:
-        pass
-    # #endregion
     if not candidates:
         log.warning(
             "policy_resolution: no company_id for assignment %s (case=%s, hr_user=%s, emp_user=%s)",
@@ -302,50 +293,20 @@ def resolve_policy_for_assignment(
     # Use the first candidate company that has a published policy (handles duplicate company names / wrong link)
     company_id: Optional[str] = None
     result = None
-    per_cid_has_published: List[dict] = []
     for cid in candidates:
         policy_version = db.get_company_policy_with_published_version(cid)
-        has_pub = bool(policy_version)
-        per_cid_has_published.append({"cid": cid, "has_published": has_pub})
         if policy_version:
             result = policy_version
             company_id = cid
             break
-    # #region agent log — per-candidate published check
-    try:
-        import json as _json
-        _path = "/Users/Rom/Documents/GitHub/rolec/.cursor/debug-2c6040.log"
-        with open(_path, "a") as _f:
-            _f.write(_json.dumps({"sessionId": "2c6040", "hypothesisId": "H4", "location": "policy_resolution.resolve_policy_for_assignment", "message": "per_candidate_has_published", "data": {"assignment_id": assignment_id, "candidates": candidates, "per_cid_has_published": per_cid_has_published, "resolved_cid": company_id}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-    except Exception:
-        pass
-    # #endregion
     if not result or not company_id:
         log.info(
             "policy_resolution: no published policy for any of companies %s (assignment %s)",
             candidates,
             assignment_id,
         )
-        # #region agent log
-        try:
-            import json as _json
-            _path = "/Users/Rom/Documents/GitHub/rolec/.cursor/debug-2c6040.log"
-            with open(_path, "a") as _f:
-                _f.write(_json.dumps({"sessionId": "2c6040", "hypothesisId": "H2", "location": "policy_resolution.resolve_policy_for_assignment", "message": "no_published", "data": {"assignment_id": assignment_id, "candidates": candidates}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-        except Exception:
-            pass
-        # #endregion
         return None
 
-    # #region agent log
-    try:
-        import json as _json
-        _path = "/Users/Rom/Documents/GitHub/rolec/.cursor/debug-2c6040.log"
-        with open(_path, "a") as _f:
-            _f.write(_json.dumps({"sessionId": "2c6040", "hypothesisId": "H3", "location": "policy_resolution.resolve_policy_for_assignment", "message": "resolved", "data": {"assignment_id": assignment_id, "company_id": company_id, "policy_id": result[0]["id"], "version_id": result[1]["id"]}, "timestamp": int(__import__("time").time() * 1000)}) + "\n")
-    except Exception:
-        pass
-    # #endregion
     policy, version = result
     policy_id = policy["id"]
     vid = version["id"]
