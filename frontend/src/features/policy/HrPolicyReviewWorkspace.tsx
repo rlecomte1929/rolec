@@ -342,7 +342,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   }, [normalized?.benefit_rules]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-hr-policy-workspace="v2">
       <div className="text-xl font-semibold text-[#0b2b43]">HR Policy Review Workspace</div>
       <div className="text-sm text-[#6b7280] mb-2">
         Review extracted policy content, edit benefit rules, and publish for employee visibility.

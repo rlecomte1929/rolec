@@ -79,22 +79,24 @@ export const HrPolicy: React.FC = () => {
   }
   return (
     <AppShell title={adminCompanyId ? 'Admin: Policy workspace' : 'HR Policy Management'} subtitle={adminCompanyId ? 'Inspect and assist with company policy' : 'Ingest, structure, edit, and publish assignment policies.'}>
-      {adminCompanyId && (
-        <p className="text-sm text-[#6b7280] mb-4">
-          Admin mode: viewing policy for company <code className="bg-[#f1f5f9] px-1 rounded">{adminCompanyId}</code>.{' '}
-          <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policies overview</Link>
-        </p>
-      )}
-      {/* 1. Policy document intake — primary upload path (creates policy_documents) */}
-      <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} adminCompanyId={adminCompanyId} />
-      {/* 2. HR Policy Review workspace (clauses, normalize, publish) */}
-      <div className="mt-8">
-        <HrPolicyReviewWorkspace
+      <div data-hr-policy-page="v2">
+        {adminCompanyId && (
+          <p className="text-sm text-[#6b7280] mb-4">
+            Admin mode: viewing policy for company <code className="bg-[#f1f5f9] px-1 rounded">{adminCompanyId}</code>.{' '}
+            <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policies overview</Link>
+          </p>
+        )}
+        {/* 1. Policy document intake — primary upload path (creates policy_documents) */}
+        <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} adminCompanyId={adminCompanyId} />
+        {/* 2. HR Policy Review workspace (clauses, normalize, publish) */}
+        <div className="mt-8">
+          <HrPolicyReviewWorkspace
           refreshTrigger={workspaceRefreshTrigger}
           postNormalizePolicyId={postNormalizePolicyId}
           onBindComplete={() => setPostNormalizePolicyId(null)}
           adminCompanyId={adminCompanyId}
         />
+        </div>
       </div>
     </AppShell>
   );

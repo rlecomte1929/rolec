@@ -346,21 +346,34 @@ def run_normalization(
     # Normalize clauses to objects
     result = normalize_clauses_to_objects(clauses, doc_id)
 
-    # Create policy_version (ensure string ids for Postgres)
+    # Create policy_version (ensure string ids for Postgres; auto_generated is bool, DB layer uses dialect-safe SQL)
     version_id = str(uuid.uuid4())
     doc_id_str = str(doc_id) if doc_id is not None else None
-    db.create_policy_version(
-        version_id=version_id,
-        policy_id=str(policy_id),
-        source_policy_document_id=doc_id_str,
-        version_number=version_number,
-        status="auto_generated",
-        auto_generated=True,
-        review_status="pending",
-        confidence=0.7,
-        created_by=created_by,
-        request_id=request_id,
-    )
+    if request_id:
+        log.info(
+            "request_id=%s policy_pipeline stage=normalize before policy_versions insert company_id=%s doc_id=%s policy_id=%s version_id=%s auto_generated=%s",
+            request_id, company_id, doc_id_str, policy_id, version_id, True,
+        )
+    try:
+        db.create_policy_version(
+            version_id=version_id,
+            policy_id=str(policy_id),
+            source_policy_document_id=doc_id_str,
+            version_number=version_number,
+            status="auto_generated",
+            auto_generated=True,
+            review_status="pending",
+            confidence=0.7,
+            created_by=created_by,
+            request_id=request_id,
+        )
+    except Exception as e:
+        if request_id:
+            log.warning(
+                "request_id=%s policy_versions insert failed company_id=%s doc_id=%s exc_type=%s exc_msg=%s",
+                request_id, company_id, doc_id_str, type(e).__name__, str(e)[:200],
+            )
+        raise
 
     benefit_idx_to_id: Dict[int, str] = {}
 

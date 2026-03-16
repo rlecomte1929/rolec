@@ -7525,9 +7525,9 @@ class Database:
         params = normalize_policy_boolean_fields(params)
         if request_id:
             log.info(
-                "request_id=%s policy_versions insert payload keys=%s status=%s auto_generated=%s review_status=%s ag_type=%s",
+                "request_id=%s policy_versions insert payload keys=%s status=%s auto_generated=%s review_status=%s ag_type=%s doc_id=%s",
                 request_id, list(params.keys()), params.get("status"), params.get("ag"),
-                params.get("rs"), type(params.get("ag")).__name__,
+                params.get("rs"), type(params.get("ag")).__name__, params.get("doc_id"),
             )
         ag_sql = _policy_ag_sql()
         with self.engine.begin() as conn:
@@ -7752,13 +7752,14 @@ class Database:
     def insert_policy_evidence_requirement(self, ev: Dict[str, Any]) -> str:
         eid = ev.get("id") or str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
+        ag_sql = _policy_ag_sql()
         with self.engine.begin() as conn:
             conn.execute(
-                text("""
+                text(f"""
                     INSERT INTO policy_evidence_requirements
                     (id, policy_version_id, benefit_rule_id, evidence_items_json, description,
                      auto_generated, review_status, confidence, raw_text, created_at, updated_at)
-                    VALUES (:id, :vid, :brid, :items, :desc, :ag, :rs, :conf, :raw, :now, :now)
+                    VALUES (:id, :vid, :brid, :items, :desc, {ag_sql}, :rs, :conf, :raw, :now, :now)
                 """),
                 {
                     "id": eid,

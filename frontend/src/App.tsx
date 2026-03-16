@@ -17,7 +17,6 @@ import { HrComplianceCheck } from './pages/HrComplianceCheck';
 import { HrAssignmentPackageReview } from './pages/HrAssignmentPackageReview';
 import { HrPreferredSuppliers } from './pages/HrPreferredSuppliers';
 import { HrPolicy } from './pages/HrPolicy';
-import { HrPolicyManagement } from './pages/HrPolicyManagement';
 import { CaseWizardPage } from './pages/employee/CaseWizardPage';
 import { EmployeeCaseSummary } from './pages/employee/EmployeeCaseSummary';
 import { CountriesPage } from './pages/admin/CountriesPage';
@@ -162,7 +161,7 @@ function App() {
         <Route path={ROUTE_DEFS.hrPreferredSuppliers.path} element={<HrPreferredSuppliers />} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
         <Route path={ROUTE_DEFS.employeeHrPolicy.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
-        <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<HrPolicyManagement />} />
+        <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<CaseWizardPage />} />

@@ -284,9 +284,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     Employees
                   </Link>
                   <Link
-                    to={buildRoute('hrPolicyManagement')}
+                    to={buildRoute('hrPolicy')}
                     className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrPolicyManagement.path)
+                      isActiveRoute(ROUTE_DEFS.hrPolicy.path)
                         ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
                         : 'border-transparent hover:text-[#0b2b43]'
                     }`}
