@@ -727,6 +727,9 @@ function PolicyDocumentIntakeSection({
     bucket_probe?: { diagnosis?: string };
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
 
   const loadDocs = async () => {
     try {
@@ -847,9 +850,73 @@ function PolicyDocumentIntakeSection({
 
   return (
     <Card padding="lg">
-      <div className="text-lg font-semibold text-[#0b2b43]">Policy document intake</div>
-      <div className="text-sm text-[#6b7280] mt-1">
-        Upload PDF or DOCX to classify and extract metadata before benefit extraction.
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-lg font-semibold text-[#0b2b43]">Policy document intake</div>
+          <div className="text-sm text-[#6b7280] mt-1">
+            Upload PDF or DOCX to classify and extract metadata before benefit extraction.
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {!selectionMode ? (
+            documents.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setSelectionMode(true)}>
+                Edit
+              </Button>
+            )
+          ) : (
+            <>
+              {deleteFeedback === 'done' && (
+                <span className="text-sm text-green-600">Deleted. List updated.</span>
+              )}
+              {deleteFeedback === 'error' && (
+                <span className="text-sm text-red-600">Delete failed or some documents could not be removed.</span>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setSelectionMode(false);
+                  setSelectedDocIds(new Set());
+                  setDeleteFeedback('idle');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={selectedDocIds.size === 0 || deleteFeedback === 'deleting'}
+                onClick={async () => {
+                  if (selectedDocIds.size === 0) return;
+                  if (!window.confirm(`Delete ${selectedDocIds.size} selected document(s)?`)) return;
+                  if (!window.confirm('Are you sure? This action cannot be undone. Documents referenced by a policy version cannot be deleted.')) return;
+                  const ids = Array.from(selectedDocIds);
+                  setDeleteFeedback('deleting');
+                  setSelectedDocIds(new Set());
+                  try {
+                    const res = await policyDocumentsAPI.bulkDelete(ids);
+                    await loadDocs();
+                    onDocumentsChange?.();
+                    setDeleteFeedback(res.deleted === ids.length ? 'done' : 'error');
+                    if (res.deleted === ids.length) {
+                      setSelectionMode(false);
+                      setTimeout(() => setDeleteFeedback('idle'), 3000);
+                    } else {
+                      setTimeout(() => setDeleteFeedback('idle'), 5000);
+                    }
+                  } catch {
+                    await loadDocs();
+                    setDeleteFeedback('error');
+                    setTimeout(() => setDeleteFeedback('idle'), 5000);
+                  }
+                }}
+              >
+                {deleteFeedback === 'deleting' ? 'Deleting…' : 'Delete selected'}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {message && (
@@ -933,11 +1000,32 @@ function PolicyDocumentIntakeSection({
             return (
               <div
                 key={doc.id}
-                className="border border-[#e2e8f0] rounded-lg overflow-hidden"
+                className="border border-[#e2e8f0] rounded-lg overflow-hidden flex items-stretch"
               >
+                {selectionMode && (
+                  <div className="flex items-center pl-3 border-r border-[#e2e8f0] bg-[#f8fafc]">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-[#cbd5e1]"
+                      checked={selectedDocIds.has(doc.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedDocIds((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(doc.id);
+                          else next.delete(doc.id);
+                          return next;
+                        });
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Select ${doc.filename}`}
+                    />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
                 <button
                   type="button"
-                  onClick={() => setExpandedId(isExpanded ? null : doc.id)}
+                  onClick={() => !selectionMode && setExpandedId(isExpanded ? null : doc.id)}
                   className="w-full text-left px-4 py-3 flex items-center justify-between gap-4 hover:bg-[#f8fafc]"
                 >
                   <div className="flex-1 min-w-0">
@@ -1023,6 +1111,7 @@ function PolicyDocumentIntakeSection({
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             );
           })}

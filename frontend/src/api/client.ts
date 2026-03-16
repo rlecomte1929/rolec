@@ -1774,6 +1774,10 @@ export const policyDocumentsAPI = {
     const response = await api.post(`/api/hr/policy-documents/${docId}/normalize`);
     return response.data;
   },
+  bulkDelete: async (documentIds: string[]): Promise<{ ok: boolean; deleted: number; skipped?: Array<{ id: string; reason: string }> }> => {
+    const response = await api.post('/api/hr/policy-documents/bulk-delete', { document_ids: documentIds });
+    return response.data;
+  },
 };
 
 export const resourcesAPI = {

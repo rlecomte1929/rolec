@@ -7350,6 +7350,22 @@ class Database:
                 params,
             )
 
+    def policy_version_references_document(self, doc_id: str) -> bool:
+        """True if any policy_version has source_policy_document_id = doc_id."""
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT 1 FROM policy_versions WHERE source_policy_document_id = :id LIMIT 1"),
+                {"id": doc_id},
+            ).fetchone()
+        return row is not None
+
+    def delete_policy_document(self, doc_id: str, request_id: Optional[str] = None) -> bool:
+        """Delete policy_document and its clauses. Returns True if a row was deleted."""
+        self.delete_policy_document_clauses(doc_id, request_id=request_id)
+        with self.engine.begin() as conn:
+            r = conn.execute(text("DELETE FROM policy_documents WHERE id = :id"), {"id": doc_id})
+            return r.rowcount > 0
+
     def delete_policy_document_clauses(self, doc_id: str, request_id: Optional[str] = None) -> int:
         """Remove all clauses for a document (before re-segment)."""
         with self.engine.begin() as conn:

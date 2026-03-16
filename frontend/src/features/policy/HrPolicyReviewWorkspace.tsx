@@ -88,17 +88,30 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   const [publishBusy, setPublishBusy] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadUnavailable, setDownloadUnavailable] = useState(false);
   const [renormalizeBusy, setRenormalizeBusy] = useState(false);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [expandAll, setExpandAll] = useState(false);
 
-  const loadWorkspaceData = React.useCallback(async (policyId: string): Promise<{ normRes: any; dlRes: string | null }> => {
-    const [normRes, dlRes] = await Promise.all([
+  const downloadCacheRef = React.useRef<{ policyId: string; url: string | null; noFile: boolean } | null>(null);
+
+  const loadWorkspaceData = React.useCallback(async (policyId: string): Promise<{ normRes: any; dlRes: string | null; downloadUnavailable: boolean }> => {
+    const cached = downloadCacheRef.current?.policyId === policyId ? downloadCacheRef.current : null;
+    const fetchDownload = cached
+      ? Promise.resolve(cached.noFile ? { ok: false, url: null } : { ok: true, url: cached.url })
+      : companyPolicyAPI.getDownloadUrl(policyId).then((r: { ok?: boolean; url?: string; reason?: string }) => ({ ok: r?.ok ?? false, url: r?.url ?? null }));
+    const [normRes, dlResult] = await Promise.all([
       companyPolicyAPI.getNormalized(policyId).catch(() => null),
-      companyPolicyAPI.getDownloadUrl(policyId).then((r) => r?.url ?? null).catch(() => null),
+      fetchDownload.then((r) => {
+        const url = r.ok && r.url ? r.url : null;
+        downloadCacheRef.current = { policyId, url, noFile: !r.ok };
+        return { url, unavailable: !r.ok };
+      }).catch(() => {
+        downloadCacheRef.current = { policyId, url: null, noFile: true };
+        return { url: null, unavailable: true };
+      }),
     ]);
-    return { normRes, dlRes: dlRes || null };
+    return { normRes, dlRes: dlResult.url || null, downloadUnavailable: dlResult.unavailable };
   }, []);
 
   const loadDocumentsAndPolicies = React.useCallback(async () => {
@@ -136,19 +149,19 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     if (!selectedPolicyId) {
       setNormalized(null);
       setDownloadUrl(null);
-      setDownloadError(null);
+      setDownloadUnavailable(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
     setDownloadUrl(null);
-    setDownloadError(null);
+    setDownloadUnavailable(false);
     loadWorkspaceData(selectedPolicyId)
-      .then(({ normRes, dlRes }) => {
+      .then(({ normRes, dlRes, downloadUnavailable: unav }) => {
         if (cancelled) return;
         setNormalized(normRes);
         setDownloadUrl(dlRes);
-        setDownloadError(dlRes ? null : 'Download link could not be generated');
+        setDownloadUnavailable(unav);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -372,11 +385,13 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           </select>
           {downloadUrl && (
             <a className="text-sm text-[#0b2b43] underline" href={downloadUrl} target="_blank" rel="noreferrer">
-              Download PDF
+              Download source document
             </a>
           )}
-          {downloadError && (
-            <span className="text-xs text-red-600">{downloadError}</span>
+          {downloadUnavailable && !downloadUrl && normalized?.version && (
+            <span className="text-xs text-[#6b7280]" title="No file in storage for this policy version">
+              No downloadable source file is available for this version.
+            </span>
           )}
           {normalized?.version && (
             <>
@@ -438,6 +453,9 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               const label = TOPIC_LABELS[cat] ?? cat;
               const autoCount = (rules as any[]).filter((r: any) => r.auto_generated).length;
               const manualCount = rules.length - autoCount;
+              const ruleList = rules as any[];
+              const showApproval = ruleList.some((r: any) => meta(r, 'approval_required', false));
+              const showEvidence = ruleList.some((r: any) => meta(r, 'evidence_required', false));
               return (
                 <div key={cat} className="border border-[#e2e8f0] rounded-lg overflow-hidden">
                   <button type="button" onClick={() => toggleTopic(cat)} className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-[#f8fafc]">
@@ -454,22 +472,20 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               <thead>
                 <tr className="border-b border-[#e2e8f0] bg-[#f8fafc]">
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Benefit</th>
-                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Allowed</th>
+                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43] min-w-[200px] max-w-[320px]">Notes</th>
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Value</th>
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Unit</th>
-                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Approval</th>
-                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Evidence</th>
-                  <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Notes</th>
+                  {showApproval && <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Approval</th>}
+                  {showEvidence && <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Evidence</th>}
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]">Source</th>
                   <th className="text-left py-2 px-2 font-medium text-[#0b2b43]"></th>
                 </tr>
               </thead>
               <tbody>
-                {(rules as any[]).map((r: any) => {
+                {ruleList.map((r: any) => {
                   const link = getSourceLink('benefit_rule', r.id);
                   const isEditing = editingRule?.id === r.id;
                   const metaVal = (k: string, def?: any) => meta(r, k, def);
-                  const allowed = metaVal('allowed', true);
                   const primaryVal = r.amount_value ?? metaVal('standard_value') ?? metaVal('max_value') ?? metaVal('min_value');
                   const capVal = metaVal('max_value') ?? r.amount_value;
                   const approvalReq = metaVal('approval_required', false);
@@ -494,18 +510,20 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                           </span>
                         )}
                       </td>
-                      <td className="py-2 px-2">
+                      <td className="py-2 px-2 min-w-[200px] max-w-[320px] align-top">
                         {isEditing ? (
-                          <input
-                            type="checkbox"
-                            checked={!!(editingRule?.metadata_json ? meta(editingRule, 'allowed', true) : allowed)}
-                            onChange={(e) => {
+                          <Input
+                            value={editingRule?.metadata_json ? String(meta(editingRule, 'hr_notes') ?? '') : String(notes)}
+                            onChange={(val) => {
                               const m = editingRule?.metadata_json || r?.metadata_json || {};
-                              setEditingRule({ ...editingRule, metadata_json: { ...m, allowed: e.target.checked } });
+                              setEditingRule({ ...editingRule, metadata_json: { ...m, hr_notes: val } });
                             }}
+                            placeholder="Notes"
                           />
                         ) : (
-                          <span>{allowed ? '✓' : '✗'}</span>
+                          <span className="block break-words whitespace-pre-wrap" title={notes ? String(notes) : undefined}>
+                            {notes || '—'}
+                          </span>
                         )}
                       </td>
                       <td className="py-2 px-2">
@@ -532,48 +550,38 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                           <span>{unitStr}</span>
                         )}
                       </td>
-                      <td className="py-2 px-2">
-                        {isEditing ? (
-                          <input
-                            type="checkbox"
-                            checked={!!(editingRule?.metadata_json ? meta(editingRule, 'approval_required', false) : approvalReq)}
-                            onChange={(e) => {
-                              const m = editingRule?.metadata_json || r?.metadata_json || {};
-                              setEditingRule({ ...editingRule, metadata_json: { ...m, approval_required: e.target.checked } });
-                            }}
-                          />
-                        ) : (
-                          approvalReq ? 'Yes' : '—'
-                        )}
-                      </td>
-                      <td className="py-2 px-2">
-                        {isEditing ? (
-                          <input
-                            type="checkbox"
-                            checked={!!(editingRule?.metadata_json ? meta(editingRule, 'evidence_required', false) : evidenceReq)}
-                            onChange={(e) => {
-                              const m = editingRule?.metadata_json || r?.metadata_json || {};
-                              setEditingRule({ ...editingRule, metadata_json: { ...m, evidence_required: e.target.checked } });
-                            }}
-                          />
-                        ) : (
-                          evidenceReq ? 'Yes' : '—'
-                        )}
-                      </td>
-                      <td className="py-2 px-2 max-w-[120px] truncate" title={String(notes)}>
-                        {isEditing ? (
-                          <Input
-                            value={editingRule?.metadata_json ? String(meta(editingRule, 'hr_notes') ?? '') : String(notes)}
-                            onChange={(val) => {
-                              const m = editingRule?.metadata_json || r?.metadata_json || {};
-                              setEditingRule({ ...editingRule, metadata_json: { ...m, hr_notes: val } });
-                            }}
-                            placeholder="Notes"
-                          />
-                        ) : (
-                          notes || '—'
-                        )}
-                      </td>
+                      {showApproval && (
+                        <td className="py-2 px-2">
+                          {isEditing ? (
+                            <input
+                              type="checkbox"
+                              checked={!!(editingRule?.metadata_json ? meta(editingRule, 'approval_required', false) : approvalReq)}
+                              onChange={(e) => {
+                                const m = editingRule?.metadata_json || r?.metadata_json || {};
+                                setEditingRule({ ...editingRule, metadata_json: { ...m, approval_required: e.target.checked } });
+                              }}
+                            />
+                          ) : (
+                            approvalReq ? 'Yes' : '—'
+                          )}
+                        </td>
+                      )}
+                      {showEvidence && (
+                        <td className="py-2 px-2">
+                          {isEditing ? (
+                            <input
+                              type="checkbox"
+                              checked={!!(editingRule?.metadata_json ? meta(editingRule, 'evidence_required', false) : evidenceReq)}
+                              onChange={(e) => {
+                                const m = editingRule?.metadata_json || r?.metadata_json || {};
+                                setEditingRule({ ...editingRule, metadata_json: { ...m, evidence_required: e.target.checked } });
+                              }}
+                            />
+                          ) : (
+                            evidenceReq ? 'Yes' : '—'
+                          )}
+                        </td>
+                      )}
                       <td className="py-2 px-2">
                         {link ? (
                           <button

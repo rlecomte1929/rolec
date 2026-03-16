@@ -6672,6 +6672,44 @@ def get_policy_document(
     return {"document": doc}
 
 
+@app.post("/api/hr/policy-documents/bulk-delete")
+def bulk_delete_policy_documents(
+    body: Dict[str, Any] = Body(...),
+    req: Request = None,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Delete uploaded policy document records by id. Skips documents that are referenced
+    by any policy_version (source_policy_document_id). Only deletes source document
+    records; does not delete published policy versions.
+    """
+    request_id = getattr(req.state, "request_id", None) if req else None
+    doc_ids = body.get("document_ids") or []
+    if not isinstance(doc_ids, list):
+        raise HTTPException(status_code=400, detail="document_ids must be a list")
+    deleted = 0
+    skipped: List[Dict[str, Any]] = []
+    for doc_id in doc_ids:
+        doc_id = str(doc_id).strip()
+        if not doc_id:
+            continue
+        doc = db.get_policy_document(doc_id, request_id=request_id)
+        if not doc:
+            skipped.append({"id": doc_id, "reason": "not_found"})
+            continue
+        try:
+            _require_document_access(user, doc)
+        except HTTPException:
+            skipped.append({"id": doc_id, "reason": "forbidden"})
+            continue
+        if db.policy_version_references_document(doc_id):
+            skipped.append({"id": doc_id, "reason": "referenced_by_version"})
+            continue
+        if db.delete_policy_document(doc_id, request_id=request_id):
+            deleted += 1
+    return {"ok": True, "deleted": deleted, "skipped": skipped}
+
+
 @app.get("/api/hr/policy-documents/{doc_id}/clauses")
 def list_policy_document_clauses(
     doc_id: str,
@@ -7188,6 +7226,26 @@ def get_company_policy_download_url(
     raw_storage_path = policy.get("storage_path") or ""
     object_key = resolve_policy_storage_object_key(raw_file_url or raw_storage_path)
 
+    # Fallback: if company_policies has no file, use source policy_document from latest policy_version
+    if not object_key:
+        versions = db.list_policy_versions(policy_id)
+        for ver in versions:
+            source_doc_id = ver.get("source_policy_document_id")
+            if not source_doc_id:
+                continue
+            doc = db.get_policy_document(source_doc_id)
+            if not doc:
+                continue
+            doc_storage = (doc.get("storage_path") or "").strip()
+            if doc_storage:
+                object_key = resolve_policy_storage_object_key(doc_storage)
+                if object_key:
+                    log.info(
+                        "request_id=%s download-url policy_id=%s fallback source_doc=%s object_key=%s",
+                        request_id, policy_id, source_doc_id[:8] + "…", object_key[:60] + "…" if len(object_key) > 60 else object_key,
+                    )
+                    break
+
     log.info(
         "request_id=%s download-url policy_id=%s company_id=%s raw_file_url=%s raw_storage_path=%s object_key=%s bucket=%s",
         request_id,
@@ -7199,20 +7257,14 @@ def get_company_policy_download_url(
         BUCKET_HR_POLICIES,
     )
 
-    if not raw_file_url and not raw_storage_path:
-        return _download_url_error_response(
-            POLICY_FILE_MISSING,
-            "Policy has no file URL.",
-            400,
-            request_id=request_id,
-        )
-
     if not object_key:
-        return _download_url_error_response(
-            POLICY_FILE_PATH_INVALID,
-            "Invalid policy file path.",
-            400,
-            request_id=request_id,
+        # No downloadable file: return 200 with ok false so UI shows muted message, not 404/500
+        return JSONResponse(
+            status_code=200,
+            content={
+                "ok": False,
+                "reason": "No downloadable file available for this policy version.",
+            },
         )
 
     try:
@@ -7220,11 +7272,9 @@ def get_company_policy_download_url(
         signed = supabase.storage.from_(BUCKET_HR_POLICIES).create_signed_url(object_key, 3600)
         url = signed.get("signedURL") or signed.get("signed_url") or ""
         if not url:
-            return _download_url_error_response(
-                POLICY_FILE_SIGN_FAILED,
-                "Signed URL was not returned.",
-                500,
-                request_id=request_id,
+            return JSONResponse(
+                status_code=200,
+                content={"ok": False, "reason": "No downloadable file available for this policy version."},
             )
         return JSONResponse(status_code=200, content={"ok": True, "url": url})
     except Exception as exc:
@@ -7234,12 +7284,9 @@ def get_company_policy_download_url(
             "request_id=%s download-url policy_id=%s exc_type=%s exc_msg=%s",
             request_id, policy_id, exc_type, exc_msg,
         )
-        err_code, err_msg = _map_download_storage_exception(exc)
-        return _download_url_error_response(
-            err_code,
-            err_msg,
-            500,
-            request_id=request_id,
+        return JSONResponse(
+            status_code=200,
+            content={"ok": False, "reason": "No downloadable file available for this policy version."},
         )
 
 
