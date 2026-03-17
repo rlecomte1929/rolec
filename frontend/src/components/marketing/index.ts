@@ -19,6 +19,7 @@ export { AudienceBlock } from './AudienceBlock';
 export { TrustTeaser } from './TrustTeaser';
 export { PlatformPreview } from './PlatformPreview';
 export { HeroWorkflowVisual } from './HeroWorkflowVisual';
+export { LandingProductStrip, type ProductStripBlock } from './LandingProductStrip';
 export { CoreModelDiagram } from './CoreModelDiagram';
 export { DualViewSection } from './DualViewSection';
 export { PlatformSystemDiagram } from './PlatformSystemDiagram';

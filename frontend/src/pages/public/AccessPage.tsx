@@ -9,7 +9,7 @@ import { buildRoute } from '../../navigation/routes';
 import { accessContent } from './accessContent';
 
 /** Placeholder for demo booking — wire to your flow when ready */
-const DEMO_LINK = 'mailto:hello@relopass.com?subject=ReloPass%20Demo%20Request';
+const DEMO_LINK = 'mailto:contact@relopass.com?subject=ReloPass%20Demo%20Request';
 
 export const AccessPage: React.FC = () => {
   const c = accessContent;

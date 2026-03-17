@@ -50,7 +50,7 @@ export const CasePreviewMock: React.FC<{ className?: string }> = ({ className = 
         {/* Main content: 2 columns */}
         <div className="grid grid-cols-2 gap-4 mb-5">
           <div className="space-y-2">
-            <p className="text-xs font-medium text-marketing-text-muted">Documents & checks</p>
+            <p className="text-xs font-medium text-marketing-text-muted">Documents & requirements</p>
             <ul className="space-y-1.5 text-xs text-marketing-primary">
               <li className="flex items-center gap-2">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-marketing-accent" />
@@ -80,9 +80,10 @@ export const CasePreviewMock: React.FC<{ className?: string }> = ({ className = 
         <div className="pt-4 border-t border-marketing-border">
           <p className="text-xs font-medium text-marketing-text-muted mb-2">Recent activity</p>
           <ul className="space-y-1.5 text-xs text-marketing-text-subtle">
-            <li>Provider assigned</li>
+            <li>Service provider assigned</li>
             <li>Document request sent</li>
             <li>Review scheduled</li>
+            <li>Awaiting housing provider update</li>
           </ul>
         </div>
       </div>

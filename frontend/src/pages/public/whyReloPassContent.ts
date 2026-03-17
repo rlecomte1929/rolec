@@ -7,7 +7,7 @@ export const whyReloPassContent = {
   hero: {
     headline: 'Relocation breaks in the gaps',
     subheadline:
-      'Most teams are still holding the process together through inboxes, spreadsheets, provider updates, and repeated follow-up. ReloPass cuts through that coordination mess.',
+      'Most teams are still holding the process together through inboxes, spreadsheets, service-provider updates, and repeated follow-up. ReloPass cuts through that coordination mess.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
   },
@@ -22,6 +22,8 @@ export const whyReloPassContent = {
     ],
     supportingLine: 'The work gets done, but it takes more effort than it should.',
   },
+
+  thesis: 'Relocation fails when coordination is fragmented. ReloPass brings that coordination into one system.',
 
   differentiation: {
     title: 'Why ReloPass feels different',

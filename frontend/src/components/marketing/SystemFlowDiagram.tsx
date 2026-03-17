@@ -58,7 +58,7 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
           className="absolute inset-0 w-full h-full overflow-visible"
           aria-hidden
         >
-          {/* Star: lines from center to each node */}
+          {/* Star: lines from center to each node — visible medium grey */}
           {points.map((p, i) => (
             <line
               key={i}
@@ -69,7 +69,7 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
               stroke="currentColor"
               strokeWidth="1"
               strokeDasharray="3 4"
-              className="text-marketing-border"
+              className="text-marketing-text-subtle"
             />
           ))}
           {/* Ring connecting the points */}
@@ -81,7 +81,7 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
             stroke="currentColor"
             strokeWidth="1"
             strokeDasharray="4 6"
-            className="text-marketing-border"
+            className="text-marketing-text-subtle"
           />
           {/* Segments between adjacent nodes */}
           {points.map((p, i) => {
@@ -96,7 +96,7 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
                 stroke="currentColor"
                 strokeWidth="1"
                 strokeDasharray="2 4"
-                className="text-marketing-border"
+                className="text-marketing-text-subtle"
               />
             );
           })}

@@ -7,11 +7,11 @@
 export const landingContent = {
   hero: {
     eyebrow: 'For HR, relocation, and global mobility teams',
-    headline: 'Relocation infrastructure for globally mobile teams',
+    headline: 'Run relocation as one coordinated process',
     subheadline:
-      'ReloPass helps HR and mobility teams manage relocation through structured workflows, clear steps, and better visibility.',
+      'ReloPass helps HR and mobility teams manage relocation across cases, documents, service providers, and progress — without piecing updates together manually.',
     primaryCta: 'Book a demo',
-    secondaryCta: 'Explore the platform',
+    secondaryCta: 'See the platform',
   },
 
   problem: {
@@ -19,15 +19,15 @@ export const landingContent = {
     cards: [
       {
         title: 'Scattered coordination',
-        body: 'Cases are handled across emails, spreadsheets, and external providers.',
+        body: 'Cases are handled across email, spreadsheets, and outside providers.',
       },
       {
         title: 'Limited visibility',
-        body: "It's difficult to see status, ownership, and next steps across cases.",
+        body: 'It is hard to see what is moving, what is blocked, and who owns the next step.',
       },
       {
-        title: 'Repeated follow-ups',
-        body: 'Teams spend time chasing documents, updates, and confirmations.',
+        title: 'Repeated follow-up',
+        body: 'Teams spend too much time chasing documents, updates, and confirmations.',
       },
     ],
   },
@@ -48,9 +48,17 @@ export const landingContent = {
         body: 'Actions follow company rules and requirements.',
       },
       {
-        title: 'Centralized coordination',
-        body: 'Documents, services, and progress are managed in one place.',
+        title: 'Service-provider coordination',
+        body: 'Keep service-provider work tied to the case instead of scattered across threads.',
       },
+    ],
+  },
+
+  productStrip: {
+    blocks: [
+      { title: 'Cases', body: 'Track each relocation as a single case' },
+      { title: 'Service providers', body: 'Keep provider work tied to the case' },
+      { title: 'Progress', body: 'See what is moving, missing, or blocked' },
     ],
   },
 
@@ -70,7 +78,7 @@ export const landingContent = {
     microCopy: 'Start with a single relocation case.',
     options: {
       demo: 'Book a demo',
-      platform: 'Explore the platform',
+      platform: 'See the platform',
       signIn: 'Sign in',
     },
   },

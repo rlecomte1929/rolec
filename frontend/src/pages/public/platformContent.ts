@@ -7,14 +7,14 @@ export const platformContent = {
   hero: {
     headline: 'Run every relocation in one place',
     subheadline:
-      'ReloPass brings the case, the documents, the providers, and the progress into one working view.',
+      'ReloPass brings the case, the documents, the service providers, and the progress into one working view.',
     primaryCta: 'Book a demo',
     secondaryCta: 'How it works',
   },
 
   productDefinition: {
     title: 'A case-based workspace for relocation',
-    body: 'Each relocation is managed as its own case, so your team is not piecing updates together across email, spreadsheets, and provider threads.',
+    body: 'Each relocation is managed as its own case, so your team is not piecing updates together across email, spreadsheets, and service-provider threads.',
   },
 
   insideProduct: {
@@ -28,8 +28,8 @@ export const platformContent = {
         body: 'Keep required documents tied to the case instead of scattered across folders and threads.',
       },
       {
-        title: 'Providers',
-        body: 'Track provider activity without losing the broader case context.',
+        title: 'Service providers',
+        body: 'Track service-provider activity without losing the broader case context.',
       },
     ],
   },

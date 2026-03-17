@@ -13,8 +13,8 @@ export const trustContent = {
   },
 
   process: {
-    title: 'Each relocation runs through clear steps',
-    body: 'Every relocation is handled as its own case. That gives the team a stable structure for tracking requirements, documents, providers, and progress.',
+    title: 'Each relocation moves through clear steps',
+    body: 'Every relocation is handled as its own case. That gives the team a stable structure for tracking requirements, documents, service providers, and progress.',
     supportingLine: 'The goal is not to add more process. It is to make the existing process easier to follow.',
     steps: [
       { title: 'Case Creation', description: 'Start and structure the relocation case' },
@@ -27,7 +27,7 @@ export const trustContent = {
 
   inContext: {
     title: 'Everything stays in context',
-    body: 'Country requirements, case documents, provider activity, and case progress stay tied to the same workflow instead of being split across separate tools and side notes.',
+    body: 'Country requirements, case documents, service-provider activity, and case progress stay tied to the same workflow instead of being split across separate tools, inboxes, and side notes.',
     items: [
       'See what has already been completed',
       'Spot what is still missing',

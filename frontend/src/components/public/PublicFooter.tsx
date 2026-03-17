@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Container } from '../antigravity';
 import { ROUTE_DEFS } from '../../navigation/routes';
 
-const CONTACT_EMAIL = 'mailto:hello@relopass.com?subject=ReloPass%20Inquiry';
+const CONTACT_EMAIL = 'mailto:contact@relopass.com?subject=ReloPass%20Inquiry';
 
 const FOOTER_LINKS = {
   product: [
@@ -31,18 +31,12 @@ export const PublicFooter: React.FC = () => {
             <p className="text-sm text-marketing-text-muted leading-relaxed max-w-[260px]">
               Talk to us about your relocation process, current challenges, or how ReloPass could fit your team.
             </p>
-            <div className="mt-4 flex flex-col gap-2">
-              <a
-                href={CONTACT_EMAIL}
-                className="text-sm font-bold text-black hover:opacity-80 transition-opacity"
-              >
-                Contact us
-              </a>
+            <div className="mt-4">
               <a
                 href={CONTACT_EMAIL}
                 className="text-sm text-marketing-text-subtle hover:text-marketing-text-muted transition-colors"
               >
-                hello@relopass.com
+                contact@relopass.com
               </a>
             </div>
           </div>

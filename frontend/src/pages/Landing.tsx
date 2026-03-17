@@ -8,7 +8,7 @@ import {
   CTAPanel,
   CTAButton,
   TrustDifferentiation,
-  HeroWorkflowVisual,
+  LandingProductStrip,
 } from '../components/marketing';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
@@ -17,7 +17,7 @@ import { landingContent } from './landing/landingContent';
 export const Landing: React.FC = () => {
   useRegisterNav('Landing', [
     { label: 'Book a demo', routeKey: 'access' },
-    { label: 'Explore the platform', routeKey: 'platform' },
+    { label: 'See the platform', routeKey: 'platform' },
   ]);
 
   const c = landingContent;
@@ -40,7 +40,7 @@ export const Landing: React.FC = () => {
               </CTAButton>
             </>
           }
-          visual={<HeroWorkflowVisual />}
+          visual={<LandingProductStrip blocks={c.productStrip.blocks} />}
         />
       </Section>
 
