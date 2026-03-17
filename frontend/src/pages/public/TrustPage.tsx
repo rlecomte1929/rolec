@@ -2,7 +2,6 @@ import React from 'react';
 import { PublicLayout } from '../../components/public';
 import {
   Section,
-  SectionHeader,
   HeroSurface,
   TrustContentBlock,
   BulletBlock,
@@ -46,7 +45,7 @@ export const TrustPage: React.FC = () => {
           />
         </div>
         <div className="mt-10 max-w-4xl mx-auto">
-          <SystemFlowDiagram nodes={c.process.flow} />
+          <SystemFlowDiagram steps={c.process.steps} />
         </div>
       </Section>
 

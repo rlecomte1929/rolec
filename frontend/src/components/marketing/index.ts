@@ -22,4 +22,4 @@ export { HeroWorkflowVisual } from './HeroWorkflowVisual';
 export { CoreModelDiagram } from './CoreModelDiagram';
 export { DualViewSection } from './DualViewSection';
 export { PlatformSystemDiagram } from './PlatformSystemDiagram';
-export { SystemFlowDiagram } from './SystemFlowDiagram';
+export { SystemFlowDiagram, type ProcessStep } from './SystemFlowDiagram';

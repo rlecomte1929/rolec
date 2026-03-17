@@ -17,8 +17,29 @@ export const trustContent = {
   process: {
     title: 'Each relocation runs through clear steps',
     body: 'Every relocation is handled as its own case. That gives the team a stable structure for tracking requirements, documents, providers, and progress.',
-    flow: ['Case', 'Requirements', 'Documents', 'Providers', 'Progress'] as const,
     supportingLine: 'The goal is not to add more process. It is to make the existing process easier to follow.',
+    steps: [
+      {
+        title: 'Case Creation',
+        description: 'Start and structure the relocation case',
+      },
+      {
+        title: 'Requirements Verification',
+        description: 'Check requirements based on destination and profile',
+      },
+      {
+        title: 'Relocation Documentation Pack',
+        description: 'Gather and validate all required documents',
+      },
+      {
+        title: 'Service Providers',
+        description: 'Coordinate with the right partners',
+      },
+      {
+        title: 'Monitor Progress',
+        description: 'Track status and keep the case moving',
+      },
+    ],
   },
 
   inContext: {
