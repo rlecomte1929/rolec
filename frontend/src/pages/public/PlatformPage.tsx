@@ -55,7 +55,7 @@ export const PlatformPage: React.FC = () => {
       {/* 3. INSIDE THE PRODUCT — 3 blocks */}
       <Section spacing="lg" background="transparent">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-          {c.insideProduct.blocks.map((block, i) => (
+          {c.insideProduct.blocks.map((block) => (
             <TrustContentBlock
               key={block.title}
               title={block.title}
