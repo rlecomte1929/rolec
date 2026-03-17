@@ -91,6 +91,13 @@ export const PublicHeader: React.FC = () => {
             >
               Sign in
             </Link>
+            <Link
+              to={buildRoute('access')}
+              onClick={() => setMobileOpen(false)}
+              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-marketing-primary hover:bg-marketing-primary-muted rounded-lg transition-colors"
+            >
+              Book a demo
+            </Link>
             <button
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}

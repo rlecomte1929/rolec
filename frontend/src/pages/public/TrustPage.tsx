@@ -72,11 +72,10 @@ export const TrustPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 5. CTA — Walk through a real case only on this page */}
+      {/* 5. CTA — Only page with "real case" framing */}
       <Section spacing="lg" background="transparent">
         <CTAPanel
           title={c.cta.headline}
-          subtitle={c.cta.microCopy}
           variant="surface"
           primaryAction={
             <CTAButton to={buildRoute('access')} variant="primary" size="lg">
@@ -84,8 +83,8 @@ export const TrustPage: React.FC = () => {
             </CTAButton>
           }
           secondaryAction={
-            <CTAButton to={buildRoute('platform')} variant="outline" size="lg">
-              {c.cta.options.seePlatform}
+            <CTAButton to={`${buildRoute('auth')}?mode=register`} variant="outline" size="lg">
+              {c.cta.options.getStarted}
             </CTAButton>
           }
           tertiaryAction={

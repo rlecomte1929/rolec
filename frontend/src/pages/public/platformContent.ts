@@ -1,29 +1,44 @@
 /**
  * Platform page content configuration.
- * Answers: "What is the product, in practical terms?"
- * For HR, global mobility, and relocation professionals.
- * Edit this file to update copy without touching layout.
+ * Role: What the product is. No comparison, no process flow, no trust sections.
  */
 
 export const platformContent = {
   hero: {
-    headline: 'A better way to run relocation',
+    headline: 'Run every relocation in one place',
     subheadline:
-      'Keep each move on track, know what is missing, and stop piecing updates together across email, spreadsheets, and outside providers.',
+      'ReloPass brings the case, the documents, the providers, and the progress into one working view.',
     primaryCta: 'Book a demo',
-    secondaryCta: 'Why ReloPass',
+    secondaryCta: 'How it works',
   },
 
-  system: {
-    title: 'Each relocation runs as a case',
-    body: 'Each relocation is managed as a structured case, so your team can follow progress without piecing updates together.',
+  productDefinition: {
+    title: 'A case-based workspace for relocation',
+    body: 'Each relocation is managed as its own case, so your team is not piecing updates together across email, spreadsheets, and provider threads.',
+  },
+
+  insideProduct: {
+    blocks: [
+      {
+        title: 'Case overview',
+        body: 'See the current status, key dates, and what still needs attention.',
+      },
+      {
+        title: 'Documents',
+        body: 'Keep required documents tied to the case instead of scattered across folders and threads.',
+      },
+      {
+        title: 'Providers',
+        body: 'Track provider activity without losing the broader case context.',
+      },
+    ],
   },
 
   cta: {
-    headline: 'See how it would fit your process',
+    headline: 'See the product in context',
     options: {
       demo: 'Book a demo',
-      whyReloPass: 'Why ReloPass',
+      howItWorks: 'How it works',
       signIn: 'Sign in',
     },
   },

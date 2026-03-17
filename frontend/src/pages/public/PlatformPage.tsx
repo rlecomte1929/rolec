@@ -4,6 +4,7 @@ import {
   Section,
   SectionHeader,
   HeroSurface,
+  TrustContentBlock,
   CTAPanel,
   CTAButton,
 } from '../../components/marketing';
@@ -16,7 +17,7 @@ export const PlatformPage: React.FC = () => {
 
   return (
     <PublicLayout>
-      {/* 1. HERO — text left (desktop) / top (mobile); mock right (desktop) / below (mobile) */}
+      {/* 1. HERO — split layout, mock to the right / below */}
       <Section spacing="lg" background="transparent" fillViewport>
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-10 lg:gap-12">
           <div className="flex-1 min-w-0">
@@ -28,7 +29,7 @@ export const PlatformPage: React.FC = () => {
                   <CTAButton to={buildRoute('access')} variant="primary" size="lg">
                     {c.hero.primaryCta}
                   </CTAButton>
-                  <CTAButton to={buildRoute('why')} variant="outline" size="lg">
+                  <CTAButton to={buildRoute('trust')} variant="outline" size="lg">
                     {c.hero.secondaryCta}
                   </CTAButton>
                 </>
@@ -41,18 +42,31 @@ export const PlatformPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 2. SYSTEM — What the product is */}
+      {/* 2. PRODUCT DEFINITION */}
       <Section spacing="lg" background="muted">
         <SectionHeader
-          title={c.system.title}
-          subtitle={c.system.body}
+          title={c.productDefinition.title}
+          subtitle={c.productDefinition.body}
           align="center"
           narrow
         />
       </Section>
 
-      {/* 3. CTA */}
+      {/* 3. INSIDE THE PRODUCT — 3 blocks */}
       <Section spacing="lg" background="transparent">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+          {c.insideProduct.blocks.map((block, i) => (
+            <TrustContentBlock
+              key={block.title}
+              title={block.title}
+              body={block.body}
+            />
+          ))}
+        </div>
+      </Section>
+
+      {/* 4. CTA — no Why ReloPass on Platform */}
+      <Section spacing="lg" background="muted">
         <CTAPanel
           title={c.cta.headline}
           variant="surface"
@@ -62,8 +76,8 @@ export const PlatformPage: React.FC = () => {
             </CTAButton>
           }
           secondaryAction={
-            <CTAButton to={buildRoute('why')} variant="outline" size="lg">
-              {c.cta.options.whyReloPass}
+            <CTAButton to={buildRoute('trust')} variant="outline" size="lg">
+              {c.cta.options.howItWorks}
             </CTAButton>
           }
           tertiaryAction={

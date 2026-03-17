@@ -1,8 +1,6 @@
 /**
  * How it works page content configuration.
- * Answers: "How does the process actually work once a team uses ReloPass?"
- * Process-led, confidence-building. Not comparison-led.
- * Edit this file to update copy without touching layout.
+ * Role: How the process runs once adopted. No why-switch, no comparison.
  */
 
 export const trustContent = {
@@ -19,51 +17,35 @@ export const trustContent = {
     body: 'Every relocation is handled as its own case. That gives the team a stable structure for tracking requirements, documents, providers, and progress.',
     supportingLine: 'The goal is not to add more process. It is to make the existing process easier to follow.',
     steps: [
-      {
-        title: 'Case Creation',
-        description: 'Start and structure the relocation case',
-      },
-      {
-        title: 'Requirements Verification',
-        description: 'Check requirements based on destination and profile',
-      },
-      {
-        title: 'Relocation Documentation Pack',
-        description: 'Gather and validate all required documents',
-      },
-      {
-        title: 'Service Providers',
-        description: 'Coordinate with the right partners',
-      },
-      {
-        title: 'Monitor Progress',
-        description: 'Track status and keep the case moving',
-      },
+      { title: 'Case Creation', description: 'Start and structure the relocation case' },
+      { title: 'Requirements Verification', description: 'Check requirements based on destination and profile' },
+      { title: 'Relocation Documentation Pack', description: 'Gather and validate all required documents' },
+      { title: 'Service Providers', description: 'Coordinate with the right partners' },
+      { title: 'Monitor Progress', description: 'Track status and keep the case moving' },
     ],
   },
 
   inContext: {
     title: 'Everything stays in context',
-    body: 'Your team can see what is done, what is missing, and what is holding the case up. Documents and requirements stay tied to each step, so you are not relying on side notes or separate trackers.',
+    body: 'Country requirements, case documents, provider activity, and case progress stay tied to the same workflow instead of being split across separate tools and side notes.',
     items: [
-      'What has already been completed',
-      'What is still missing',
-      'What is holding the case up',
-      'Documents and requirements tied to the right steps',
+      'See what has already been completed',
+      'Spot what is still missing',
+      'Track what is holding the case up',
+      'Keep documents and activity tied to the right step',
     ],
   },
 
   boundaries: {
-    title: 'The process is guided. Judgment stays with your team.',
-    body: 'ReloPass supports the work by keeping the case clear and organized. Your team still makes the call when a situation is unusual, sensitive, or needs closer review.',
+    title: 'The process is guided. Judgment stays human.',
+    body: 'ReloPass keeps the case clear and organized, but your team still makes the call when a situation is unusual, sensitive, or needs closer review.',
   },
 
   cta: {
-    headline: 'See it with a real case',
-    microCopy: 'Walk through a relocation case with us.',
+    headline: 'Walk through a real case',
     options: {
       demo: 'Book a demo',
-      seePlatform: 'See the platform',
+      getStarted: 'Get started',
       signIn: 'Sign in',
     },
   },

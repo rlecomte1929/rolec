@@ -1,15 +1,13 @@
 /**
  * Why ReloPass page content configuration.
- * Answers: "Why should a HR or global mobility team change from how they manage relocation today?"
- * Differentiation page — comparison-led, not process-led.
- * Edit this file to update copy without touching layout.
+ * Role: Why a team should change. No process flow, no workflow diagram, no "walk through a real case".
  */
 
 export const whyReloPassContent = {
   hero: {
-    headline: 'Why teams move away from the usual relocation mess',
+    headline: 'Relocation breaks in the gaps',
     subheadline:
-      'Most relocation work is still held together through inboxes, spreadsheets, provider updates, and repeated follow-up. ReloPass gives teams a cleaner way to stay on top of it.',
+      'Most teams are still holding the process together through inboxes, spreadsheets, provider updates, and repeated follow-up. ReloPass cuts through that coordination mess.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
   },
@@ -30,7 +28,7 @@ export const whyReloPassContent = {
     blocks: [
       {
         title: 'Built around the case',
-        body: 'Relocation is not treated like a generic task list. Each case has its own structure, status, and next steps.',
+        body: 'Relocation is not treated like a generic task list. Each case has its own structure, status, and next step.',
       },
       {
         title: 'Less chasing',
@@ -43,8 +41,8 @@ export const whyReloPassContent = {
     title: 'What that changes day to day',
     items: [
       'Fewer moving parts to keep track of',
-      'Better visibility when a case starts to stall, with requirements and documents tied to the case',
-      'A process that is easier to manage under pressure',
+      'Cases are easier to keep moving when pressure builds',
+      'The team spends less time chasing the same updates twice',
     ],
     supportingLine: 'The goal is not more software. It is less friction in the work.',
   },
