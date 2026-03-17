@@ -432,7 +432,7 @@ export const AdminAssignments: React.FC = () => {
             {assignments.length === 0 && !loading && (
               <div className="py-12 text-center text-[#6b7280] border border-dashed border-[#e5e7eb] rounded-lg bg-[#f9fafb]">
                 <div className="text-sm font-medium">No assignments for selected company</div>
-                <div className="text-xs mt-1">There are no assignments linked to this company. Try another company or create assignments from the HR flow.</div>
+                <div className="text-xs mt-1">No assignments for this company. Try another company or create from the HR flow.</div>
               </div>
             )}
           </>

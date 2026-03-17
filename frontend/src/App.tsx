@@ -1,11 +1,16 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ScrollToTop } from './components/ScrollToTop';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
 import { ServicesFlowProvider } from './features/services/ServicesFlowContext';
 import { ROUTE_DEFS } from './navigation/routes';
 import { Landing } from './pages/Landing';
+import { PlatformPage } from './pages/public/PlatformPage';
+import { TrustPage } from './pages/public/TrustPage';
+import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
+import { AccessPage } from './pages/public/AccessPage';
 import { Auth } from './pages/Auth';
 import { Journey } from './pages/Journey';
 import { Dashboard } from './pages/Dashboard';
@@ -117,12 +122,17 @@ function App() {
   return (
     <ErrorBoundary>
     <Router>
+      <ScrollToTop />
       <SelectedCaseProvider>
       <EmployeeAssignmentProvider>
       <ServicesFlowProvider>
       <QueryRedirect />
       <Routes>
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
+        <Route path={ROUTE_DEFS.platform.path} element={<PlatformPage />} />
+        <Route path={ROUTE_DEFS.why.path} element={<WhyReloPassPage />} />
+        <Route path={ROUTE_DEFS.trust.path} element={<TrustPage />} />
+        <Route path={ROUTE_DEFS.access.path} element={<AccessPage />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         <Route path="/journey" element={<Journey />} />
         <Route path="/dashboard" element={<Dashboard />} />

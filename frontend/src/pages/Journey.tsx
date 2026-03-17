@@ -37,7 +37,7 @@ export const Journey: React.FC = () => {
       if (err.response?.status === 401) {
         navigate('/');
       } else {
-        setError('Failed to load profile. Please refresh.');
+        setError("Couldn't load profile. Refresh to try again.");
       }
     } finally {
       setIsLoading(false);
@@ -66,7 +66,7 @@ export const Journey: React.FC = () => {
         navigate('/dashboard');
       }
     } catch (err: any) {
-      setError('Failed to save answer. Please try again.');
+      setError("Couldn't save answer. Try again.");
     }
   };
 

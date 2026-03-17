@@ -367,7 +367,7 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onC
         role,
         company_id: company_id || undefined,
       });
-      setSuccess('Person created successfully.');
+      setSuccess('Person created.');
       onCreated();
     } catch (err: any) {
       const detail = err?.response?.data;

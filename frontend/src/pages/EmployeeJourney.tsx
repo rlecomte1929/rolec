@@ -91,7 +91,7 @@ export const EmployeeJourney: React.FC = () => {
           safeNavigate(navigate, 'landing');
           return;
         }
-        setError('We could not load your case summary yet. Please refresh to retry.');
+        setError("Couldn't load your case. Refresh to try again.");
       }
     };
     load();
@@ -103,7 +103,7 @@ export const EmployeeJourney: React.FC = () => {
       return;
     }
     if (!claimId.trim() || !claimEmail.trim()) {
-      setError('Enter your email or username and the assignment ID provided by HR.');
+      setError('Use the email or username and assignment ID provided by HR.');
       return;
     }
     setError('');

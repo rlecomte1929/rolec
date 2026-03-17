@@ -159,7 +159,7 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
                 }
                 navigate(ROUTES.EMP_DASH);
               } catch (err: any) {
-                setError(err?.message || 'Unable to save draft. Please try again.');
+                setError(err?.message || "Couldn't save draft. Try again.");
               }
             }}
           >
@@ -169,11 +169,11 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
             disabled={isSaving}
             onClick={() => {
               if (maritalMissing) {
-                setError('Please select a marital status.');
+                setError('Select a marital status.');
                 return;
               }
               if (dependentsMissing) {
-                setError('You marked “Relocating with dependents”. Please add at least a spouse or one child.');
+                setError('You marked “Relocating with dependents”. Add at least a spouse or one child.');
                 return;
               }
               setError('');

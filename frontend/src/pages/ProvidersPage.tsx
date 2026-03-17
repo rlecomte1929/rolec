@@ -98,7 +98,7 @@ export const ProvidersPage: React.FC = () => {
         }
         const status = err?.response?.status;
         const detail = err?.response?.data?.detail || err?.response?.data?.message || err?.message;
-        setLoadError('Couldn’t load services data. Please retry.');
+        setLoadError('Couldn’t load services data. Try again.');
         if (import.meta.env.DEV) {
           setLoadErrorDetails(`status=${status || 'n/a'} url=${err?.config?.url || ''} detail=${detail || ''}`);
           // eslint-disable-next-line no-console
@@ -143,13 +143,13 @@ export const ProvidersPage: React.FC = () => {
         };
       });
       await employeeAPI.saveAssignmentServices(assignmentId, payload);
-      setMessage('Saved services successfully.');
+      setMessage('Saved.');
       return true;
     } catch (err: unknown) {
       const errAny = err as { response?: { data?: { detail?: string; message?: string } }; message?: string };
       const detail = errAny?.response?.data?.detail || errAny?.response?.data?.message || errAny?.message;
-      const friendly = detail === 'Network Error' ? 'Couldn’t save services. Please retry.' : detail;
-      setMessage(friendly || 'Unable to save services. Please try again.');
+      const friendly = detail === 'Network Error' ? 'Couldn’t save. Try again.' : detail;
+      setMessage(friendly || "Couldn't save. Try again.");
       if (import.meta.env.DEV && detail) {
         // eslint-disable-next-line no-console
         console.error('[services] save error', err);
@@ -233,7 +233,7 @@ export const ProvidersPage: React.FC = () => {
               <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
               <div className="mt-4 p-3 bg-[#eef4f8] border border-[#0b2b43]/20 rounded-lg">
                 <p className="text-sm text-[#4b5563] mb-2">
-                  Policy details and benefit limits for your assignment are available on the HR Policy page. For questions, please contact your company HR.
+                  Policy details and benefit limits for your assignment are available on the HR Policy page. For questions, contact your company HR.
                 </p>
                 <Link to={buildRoute('hrPolicy')}>
                   <Button variant="outline" className="mt-1">View HR Policy &amp; limits</Button>

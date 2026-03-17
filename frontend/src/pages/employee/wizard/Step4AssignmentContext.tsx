@@ -137,7 +137,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
                 }
                 navigate(ROUTES.EMP_DASH);
               } catch (err: any) {
-                setError(err?.message || 'Unable to save draft. Please try again.');
+                setError(err?.message || "Couldn't save draft. Try again.");
               }
             }}
           >
@@ -147,7 +147,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
             disabled={isSaving}
             onClick={() => {
               if (hasMissing) {
-                setError('Please complete all required fields (marked with *).');
+                setError('Complete required fields (marked with *).');
                 return;
               }
               setError('');

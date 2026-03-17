@@ -36,7 +36,7 @@ export const Auth: React.FC = () => {
     try {
       await login({ identifier, password });
     } catch (err: any) {
-      const msg = err.response?.data?.detail || 'Login failed. Please try again.';
+      const msg = err.response?.data?.detail || 'Login failed. Try again.';
       try {
         localStorage.setItem('debug_last_auth_error', msg);
       } catch {
@@ -91,7 +91,7 @@ export const Auth: React.FC = () => {
       } else if (!err.response) {
         msg = 'Cannot reach server. Is the backend running? Check the console for details.';
       } else {
-        msg = detail ? (Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail)) : 'Registration failed. Please try again.';
+        msg = detail ? (Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail)) : 'Registration failed. Try again.';
       }
       try {
         localStorage.setItem('debug_last_auth_error', msg);
@@ -141,7 +141,7 @@ export const Auth: React.FC = () => {
                   mode === 'login' ? 'bg-[#0b2b43] text-white' : 'bg-[#f3f4f6] text-[#4b5563]'
                 }`}
               >
-                Sign In
+                Sign in
               </button>
               <button
                 onClick={() => setMode('register')}
@@ -170,7 +170,7 @@ export const Auth: React.FC = () => {
                   value={password}
                   onChange={setPassword}
                   label="Password"
-                  placeholder="Enter your password"
+                  placeholder="Password"
                   autoComplete="current-password"
                   fullWidth
                 />
@@ -181,7 +181,7 @@ export const Auth: React.FC = () => {
                   loadingLabel="Signing in…"
                   disabled={!identifier || !password}
                 >
-                  Sign In
+                  Sign in
                 </LoadingButton>
               </form>
             )}
@@ -238,7 +238,7 @@ export const Auth: React.FC = () => {
                   loading={isLoading}
                   loadingLabel="Creating account…"
                 >
-                  Create Account
+                  Create account
                 </LoadingButton>
               </form>
             )}

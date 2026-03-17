@@ -80,7 +80,7 @@ export const VendorRfq: React.FC = () => {
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : (err as Error)?.message;
-      setError(String(msg || 'Failed to submit quote'));
+      setError(String(msg || "Couldn't submit quote. Try again."));
     } finally {
       setSubmitting(false);
     }
@@ -108,7 +108,7 @@ export const VendorRfq: React.FC = () => {
   if (!rfq) return null;
 
   return (
-    <AppShell title={rfq.rfq_ref} subtitle="Submit your quote">
+    <AppShell title={rfq.rfq_ref} subtitle="Submit quote">
       <Card padding="lg" className="space-y-6">
         {error && (
           <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>

@@ -122,7 +122,7 @@ export const ServicesRfqNew: React.FC = () => {
           <Button
             onClick={async () => {
               if (!caseId) {
-                setError('Missing case information. Please complete your case setup and retry.');
+                setError('Missing case information. Complete case setup and retry.');
                 return;
               }
               setError('');

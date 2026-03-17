@@ -200,7 +200,7 @@ export const HrAssignmentReview: React.FC = () => {
         id: 'msg-2',
         author: 'HR Manager',
         role: 'HR',
-        message: 'Thanks! Please prioritize passport scans and employment letter.',
+        message: 'Prioritize passport scans and employment letter when you can.',
         timestamp: 'Today, 10:05 AM',
       },
     ];
@@ -275,7 +275,7 @@ export const HrAssignmentReview: React.FC = () => {
   };
 
   const handleOpenNudge = () => {
-    setNudgeMessage(`Hi ${fullName.split(' ')[0]}, please complete your profile details and upload missing documents.`);
+    setNudgeMessage(`Hi ${fullName.split(' ')[0]}, complete your profile details and upload missing documents.`);
     setIsNudgeOpen(true);
   };
 

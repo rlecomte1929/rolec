@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 :root {
+  /* Platform tokens (preserved for app shell / dashboard) */
   --rp-primary: #0b2b43;
   --rp-secondary: #1f8e8b;
   --rp-accent: #e6f2f4;
@@ -12,6 +13,45 @@
   --rp-text: #1f2937;
   --rp-muted: #6b7280;
   --rp-border: #e2e8f0;
+
+  /* Public marketing design system */
+  --marketing-primary: #0c1929;
+  --marketing-primary-muted: #1e3a52;
+  --marketing-accent: #197b78;
+  --marketing-accent-muted: #2a9d99;
+  --marketing-surface: #ffffff;
+  --marketing-surface-subtle: #f8fafb;
+  --marketing-surface-muted: #f1f5f7;
+  --marketing-text: #1a2734;
+  --marketing-text-muted: #4a5f73;
+  --marketing-text-subtle: #6b7c8f;
+  --marketing-border: #e4eaef;
+  --marketing-border-subtle: #edf1f4;
+
+  /* Typography scale */
+  --marketing-font-display: 2.5rem;
+  --marketing-font-hero: 3rem;
+  --marketing-font-hero-lg: 3.75rem;
+  --marketing-font-h1: 2rem;
+  --marketing-font-h2: 1.5rem;
+  --marketing-font-h3: 1.25rem;
+  --marketing-font-body: 1rem;
+  --marketing-font-body-lg: 1.125rem;
+  --marketing-font-small: 0.875rem;
+  --marketing-font-xs: 0.75rem;
+
+  /* Spacing scale */
+  --marketing-space-section: 6rem;
+  --marketing-space-section-sm: 4rem;
+  --marketing-space-block: 2rem;
+  --marketing-space-block-sm: 1.5rem;
+  --marketing-space-element: 1rem;
+  --marketing-space-element-sm: 0.5rem;
+
+  /* Container */
+  --marketing-container: 72rem;
+  --marketing-container-narrow: 48rem;
+  --marketing-container-wide: 80rem;
 }
 
 * {

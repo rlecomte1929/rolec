@@ -229,7 +229,7 @@ export const HrComplianceCheck: React.FC = () => {
             <Card padding="md" className="bg-[#fff5f5] border border-[#fecaca]">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-[#7a2a2a]">Cannot proceed to Submission Center</div>
+                  <div className="text-sm font-semibold text-[#7a2a2a]">Submission Center not available</div>
                   <div className="text-xs text-[#6b7280]">
                     Resolve blocking items before submission.
                   </div>

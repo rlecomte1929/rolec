@@ -298,7 +298,7 @@ export const HrDashboard: React.FC = () => {
           ) : (
             <Button onClick={handleCreateCase}>Add assignment</Button>
           )}
-          <Button variant="outline" onClick={handleCreateCase}>New Case</Button>
+          <Button variant="outline" onClick={handleCreateCase}>Create case</Button>
         </div>
 
         {caseId && (

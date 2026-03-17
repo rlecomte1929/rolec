@@ -225,7 +225,7 @@ export const CaseWizardPage: React.FC = () => {
   useEffect(() => {
     if (!assignmentId) return;
     if (currentStep > stepCompletion.maxUnlocked) {
-      setError('Please complete the previous steps before continuing.');
+      setError('Complete the previous steps before continuing.');
       navigate(`/employee/case/${assignmentId}/wizard/${stepCompletion.maxUnlocked}`, { replace: true });
     }
   }, [assignmentId, currentStep, stepCompletion.maxUnlocked, navigate]);
@@ -351,13 +351,13 @@ export const CaseWizardPage: React.FC = () => {
     if (!caseIdToSave && assignmentIdFromRoute) {
       const { data, error: loadError } = await getCaseDetailsByAssignmentId(assignmentIdFromRoute);
       if (loadError || !data?.case?.id) {
-        throw new Error('Unable to locate your case. Please refresh and try again.');
+        throw new Error("Couldn't find your case. Refresh and try again.");
       }
       caseIdToSave = data.case.id;
       setResolvedCaseId(caseIdToSave);
     }
     if (!caseIdToSave) {
-      throw new Error('Unable to locate your case. Please refresh and try again.');
+      throw new Error("Couldn't find your case. Refresh and try again.");
     }
     const updated = await patchCase(caseIdToSave, nextDraft);
     setDraft(caseToWizardDraft(updated));
@@ -372,7 +372,7 @@ export const CaseWizardPage: React.FC = () => {
 
   const handleNext = async (nextDraft: CaseDraftDTO) => {
     if (!assignmentId) {
-      setError('Assignment not found. Please refresh and try again.');
+      setError('Assignment not found. Refresh and try again.');
       return;
     }
     setIsSaving(true);
@@ -389,7 +389,7 @@ export const CaseWizardPage: React.FC = () => {
       }
       navigate(`/employee/case/${assignmentId}/wizard/${currentStep + 1}`);
     } catch (err: any) {
-      setError(err?.message || 'Unable to save. Please try again.');
+      setError(err?.message || "Couldn't save. Try again.");
       // Do not navigate on save failure — user stays on current step
     } finally {
       setIsSaving(false);

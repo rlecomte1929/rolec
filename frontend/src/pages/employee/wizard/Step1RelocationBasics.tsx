@@ -210,7 +210,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
                 }
                 navigate(ROUTES.EMP_DASH);
             } catch (err: any) {
-              setError(err?.message || 'Unable to save draft. Please try again.');
+              setError(err?.message || "Couldn't save draft. Try again.");
             }
           }}
         >
@@ -220,7 +220,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
           disabled={isSaving}
           onClick={() => {
             if (hasMissing) {
-              setError('Please complete all required fields (marked with *).');
+              setError('Complete required fields (marked with *).');
               return;
             }
             setError('');

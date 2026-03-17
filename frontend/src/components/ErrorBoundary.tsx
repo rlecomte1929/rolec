@@ -30,7 +30,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           <div className="max-w-md w-full bg-white border border-[#e2e8f0] rounded-2xl p-8 text-center space-y-4">
             <div className="text-2xl font-semibold text-[#0b2b43]">Something went wrong</div>
             <p className="text-sm text-[#4b5563]">
-              An unexpected error occurred. Please reload the page or go back to the dashboard.
+              Something went wrong. Try reloading the page or go back to the dashboard.
             </p>
             {this.state.error && (
               <pre className="text-xs text-left bg-[#f8fafc] border border-[#e2e8f0] rounded-lg p-3 overflow-auto max-h-32 text-[#6b7280]">

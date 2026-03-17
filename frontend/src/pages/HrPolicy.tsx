@@ -643,7 +643,7 @@ export function NormalizedPolicySectionLegacy() {
 }
 
 const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
-  upload_missing_file: 'Please choose a file first.',
+  upload_missing_file: 'Choose a file first.',
   upload_invalid_mime_type: 'Only PDF or DOCX files are supported.',
   upload_empty_file: 'The selected file is empty.',
   upload_storage_failed: 'The file could not be uploaded to storage.',
@@ -690,7 +690,7 @@ function getUploadErrorMessage(err: unknown): string {
   if (code && UPLOAD_ERROR_MESSAGES[code] && !message) return UPLOAD_ERROR_MESSAGES[code];
   if (message) return message;
   if (detail) return detail;
-  return 'An unexpected error occurred. Please try again.';
+  return 'Something went wrong. Try again.';
 }
 
 function getUploadRequestId(err: unknown): string | null {
@@ -772,7 +772,7 @@ function PolicyDocumentIntakeSection({
   const handleUpload = async () => {
     const fileToUpload = uploadFile;
     if (!fileToUpload || !(fileToUpload instanceof File)) {
-      setMessage('Please choose a file first.');
+      setMessage('Choose a file first.');
       return;
     }
     setMessage('');
@@ -990,7 +990,7 @@ function PolicyDocumentIntakeSection({
       </div>
 
       {documents.length === 0 ? (
-        <p className="text-sm text-[#6b7280] mt-4">No documents uploaded yet.</p>
+        <p className="text-sm text-[#6b7280] mt-4">No documents uploaded.</p>
       ) : (
         <div className="mt-6 space-y-2">
           {documents.map((doc) => {

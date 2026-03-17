@@ -36,7 +36,7 @@ export const PolicyServiceComparisonView: React.FC<{
     return (
       <Card padding="md" className="bg-[#f8fafc]">
         <p className="text-sm text-[#6b7280]">
-          {emptyMessage ?? 'No selected services to compare. Select services and save your answers first.'}
+          {emptyMessage ?? 'No services to compare. Select services and save answers first.'}
         </p>
       </Card>
     );

@@ -211,7 +211,7 @@ export const EmployeeCaseSummary: React.FC = () => {
       )}
 
       {!isLoading && draft && !hasAnyData && (
-        <p className="text-sm text-[#6b7280]">You haven&apos;t filled in the intake wizard yet. Click &quot;Continue editing&quot; to get started.</p>
+        <p className="text-sm text-[#6b7280]">No intake yet. Use Continue editing to complete it.</p>
       )}
 
       {(import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') && assignmentId && (

@@ -4,6 +4,10 @@ export type RouteRole = 'PUBLIC' | 'HR' | 'EMPLOYEE' | 'ADMIN';
 
 export const ROUTE_DEFS = {
   landing: { path: '/', roles: ['PUBLIC'] as RouteRole[] },
+  platform: { path: '/platform', roles: ['PUBLIC'] as RouteRole[] },
+  why: { path: '/why', roles: ['PUBLIC'] as RouteRole[] },
+  trust: { path: '/trust', roles: ['PUBLIC'] as RouteRole[] },
+  access: { path: '/access', roles: ['PUBLIC'] as RouteRole[] },
   auth: { path: '/auth', roles: ['PUBLIC'] as RouteRole[] },
   employeeJourney: { path: '/employee/journey', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeDashboard: { path: '/employee/dashboard', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },

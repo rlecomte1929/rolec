@@ -99,7 +99,7 @@ export const HrEmployeeDetail: React.FC = () => {
         )}
         {saved && (
           <Alert variant="success" className="mb-4">
-            Saved successfully.
+            Saved.
           </Alert>
         )}
 

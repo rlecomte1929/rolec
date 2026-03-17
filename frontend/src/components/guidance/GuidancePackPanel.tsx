@@ -232,7 +232,7 @@ export const GuidancePackPanel: React.FC<{ caseId: string; isStep5Complete: bool
             <div className="space-y-3">
               {pack.plan.items.length === 0 && (
                 <div className="text-sm text-[#6b7280]">
-                  We could not generate plan items yet. Please add the missing information above or try again later.
+                  Add the missing information above, then try again.
                 </div>
               )}
               {pack.plan.items.map((item, idx) => (

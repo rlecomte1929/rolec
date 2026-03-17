@@ -150,7 +150,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
     };
     const existingTexts = new Set(dossierQuestions.map((q) => q.question_text));
     approvedMissingFields.forEach((field) => {
-      const text = questionMap[field] || `Please provide: ${field.replace(/_/g, ' ')}`;
+      const text = questionMap[field] || `${field.replace(/_/g, ' ')}`;
       if (existingTexts.has(text)) return;
       dossierAPI.addCaseQuestion({
         case_id: caseId,
@@ -185,7 +185,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
     try {
       if (DYNAMIC_DOSSIER_ENABLED && caseId && missingFields.length > 0) {
         if (mandatoryRemaining > 0) {
-          setError('Please answer all mandatory dossier questions before continuing.');
+          setError('Answer all mandatory dossier questions before continuing.');
           return;
         }
         setDossierSaving(true);
@@ -214,14 +214,14 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
       if (detail && typeof detail === 'object' && detail.message) {
         const missing = Array.isArray(detail.missingFields) ? detail.missingFields : [];
         setError(missing.length
-          ? `${detail.message}. Please complete Step 1 (Relocation Basics) required fields.`
+          ? `${detail.message}. Complete Step 1 (Relocation Basics) required fields.`
           : detail.message);
       } else if (detail && typeof detail === 'string') {
         setError(detail);
       } else if (resData && typeof resData === 'object' && resData.message) {
         setError(resData.message);
       } else {
-        setError('Unable to save. Please try again.');
+        setError("Couldn't save. Try again.");
       }
     } finally {
       setDossierSaving(false);
@@ -276,7 +276,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
       {saved && (
         <div className="mt-4">
           <Alert variant="success" title="Saved">
-            Your data has been saved successfully. You can continue editing or go to the dashboard.
+            You can continue editing or go to the dashboard.
           </Alert>
         </div>
       )}
@@ -355,7 +355,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
             <div>
               <div className="text-lg font-semibold text-[#0b2b43]">Additional questions to complete your dossier</div>
               <div className="text-sm text-[#6b7280]">
-                These are suggested prompts based on official destination requirements. Please confirm your answers.
+                Suggested prompts from destination requirements. Confirm your answers.
               </div>
             </div>
             <Button

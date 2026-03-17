@@ -172,7 +172,7 @@ export const ServicesQuestions: React.FC = () => {
 
   const onExplicitSave = useCallback(async () => {
     if (!caseId) {
-      setSaveMessage('Case not ready. Please go back and try again.');
+      setSaveMessage('Case not ready. Go back and try again.');
       return false;
     }
     setIsSavingAnswers(true);
@@ -228,15 +228,15 @@ export const ServicesQuestions: React.FC = () => {
 
   const loadRecommendations = async () => {
     if (missingDestination) {
-      workflow.toError('Destination city/country is missing. Please complete your case intake before getting recommendations.');
+      workflow.toError('Destination city/country is missing. Complete case intake before getting recommendations.');
       return;
     }
     if (!isValid) {
-      workflow.toError('Please complete all required questions before continuing.');
+      workflow.toError('Complete all required questions before continuing.');
       return;
     }
     if (!assignmentId) {
-      workflow.toError('Assignment not available. Please go back and try again.');
+      workflow.toError('Assignment not available. Go back and try again.');
       return;
     }
     const saved = await onExplicitSave();
@@ -280,7 +280,7 @@ export const ServicesQuestions: React.FC = () => {
       {questionsError && <Alert variant="error" className="mb-4">{questionsError}</Alert>}
       {missingDestination && (
         <Alert variant="error" className="mb-4">
-          Destination city/country is missing. Please complete your case intake before continuing.
+          Destination city/country is missing. Complete case intake before continuing.
         </Alert>
       )}
       {saveMessage && (
@@ -314,7 +314,7 @@ export const ServicesQuestions: React.FC = () => {
 
       {!isValid && (
         <Alert variant="error" className="mt-4">
-          Some required fields are missing. Please complete them before continuing.
+          Complete required fields before continuing.
         </Alert>
       )}
 
