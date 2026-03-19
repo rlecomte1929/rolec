@@ -107,27 +107,22 @@ export const HrDashboard: React.FC = () => {
     }
   };
 
-  // Resolve company context first, then load assignments. Avoids starting assignments load
-  // only to abort when getCompanyProfile redirects (no company). Single owner for assignments list.
   useEffect(() => {
     const ac = new AbortController();
+    loadAssignments(ac.signal);
+    return () => ac.abort();
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
     hrAPI.getCompanyProfile()
       .then((res) => {
-        if (!mounted) return;
-        if (!res.company) {
+        if (mounted && !res.company) {
           safeNavigate(navigate, 'hrCompanyProfile');
-          return;
         }
-        void loadAssignments(ac.signal);
       })
-      .catch(() => {
-        if (mounted) setIsLoading(false);
-      });
-    return () => {
-      mounted = false;
-      ac.abort();
-    };
+      .catch(() => undefined);
+    return () => { mounted = false; };
   }, [navigate]);
 
   useRegisterNav('HrDashboard', [
