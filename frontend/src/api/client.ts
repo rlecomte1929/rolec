@@ -15,6 +15,7 @@ import type {
   SchoolRecommendation,
   MoverRecommendation,
   AssignmentSummary,
+  AssignmentsListResponse,
   AssignmentDetail,
   AssignCaseResponse,
   EmployeeJourneyResponse,
@@ -305,8 +306,25 @@ export const hrAPI = {
     });
     return response.data;
   },
-  listAssignments: async (opts?: { signal?: AbortSignal }): Promise<AssignmentSummary[]> => {
-    const response = await api.get('/api/hr/assignments', { signal: opts?.signal });
+  listAssignments: async (params?: {
+    signal?: AbortSignal;
+    limit?: number;
+    offset?: number;
+    search?: string;
+    status?: string;
+    destination?: string;
+  }): Promise<AssignmentsListResponse> => {
+    const { signal, ...query } = params ?? {};
+    const response = await api.get('/api/hr/assignments', {
+      signal,
+      params: {
+        limit: query.limit ?? 25,
+        offset: query.offset ?? 0,
+        ...(query.search && { search: query.search }),
+        ...(query.status && { status: query.status }),
+        ...(query.destination && { destination: query.destination }),
+      },
+    });
     return response.data;
   },
   getAssignment: async (assignmentId: string, opts?: { signal?: AbortSignal }): Promise<AssignmentDetail> => {
@@ -359,7 +377,10 @@ export const hrAPI = {
     });
   },
   /** Company-scoped employees for HR */
-  listCompanyEmployees: async (): Promise<{ employees: HrCompanyEmployee[] }> => {
+  listCompanyEmployees: async (): Promise<{
+    employees: HrCompanyEmployee[];
+    has_company?: boolean;
+  }> => {
     const response = await api.get('/api/hr/employees');
     return response.data;
   },

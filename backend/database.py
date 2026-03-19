@@ -2837,23 +2837,93 @@ class Database:
         self, company_id: str, request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """List assignments belonging to a company (via case or HR ownership). Used for HR company-scoped view."""
+        rows, _ = self._list_assignments_for_company_core(
+            company_id, limit=None, offset=0, search=None, status=None, destination=None, request_id=request_id
+        )
+        return rows
+
+    def list_assignments_for_company_paginated(
+        self,
+        company_id: str,
+        *,
+        limit: int = 25,
+        offset: int = 0,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        destination: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """List assignments for company with server-side filter and pagination. Returns (rows, total_count)."""
+        return self._list_assignments_for_company_core(
+            company_id, limit=limit, offset=offset, search=search, status=status, destination=destination, request_id=request_id
+        )
+
+    def _list_assignments_for_company_core(
+        self,
+        company_id: str,
+        *,
+        limit: Optional[int] = None,
+        offset: int = 0,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        destination: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Core query for company assignments with optional filters and pagination."""
         if _is_sqlite:
             join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
         else:
             join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
 
-        sql = f"""
+        base_where = "(rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))"
+        params: Dict[str, Any] = {"cid": company_id}
+        extras: List[str] = []
+
+        if search and (s := search.strip()):
+            pattern = f"%{s}%"
+            params["search"] = pattern
+            extras.append(
+                "(LOWER(COALESCE(a.employee_identifier,'')) LIKE LOWER(:search) OR "
+                "LOWER(COALESCE(a.employee_first_name,'')) LIKE LOWER(:search) OR "
+                "LOWER(COALESCE(a.employee_last_name,'')) LIKE LOWER(:search))"
+            )
+        if status and status.strip() and status.lower() != "all":
+            params["status"] = status.strip()
+            extras.append("a.status = :status")
+        if destination and (d := destination.strip()):
+            dest_pattern = f"%{d}%"
+            params["dest"] = dest_pattern
+            extras.append(
+                "(LOWER(COALESCE(rc.host_country,'')) LIKE LOWER(:dest) OR LOWER(COALESCE(rc.home_country,'')) LIKE LOWER(:dest))"
+            )
+
+        where_clause = base_where + (" AND " + " AND ".join(extras) if extras else "")
+        limit_clause = f" LIMIT {int(limit)}" if limit is not None else ""
+        offset_clause = f" OFFSET {int(offset)}" if offset else ""
+
+        count_sql = f"""
+            SELECT COUNT(*) AS n FROM case_assignments a
+            LEFT JOIN relocation_cases rc ON {join_on_cases}
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            WHERE {where_clause}
+        """
+        data_sql = f"""
             SELECT a.* FROM case_assignments a
             LEFT JOIN relocation_cases rc ON {join_on_cases}
             LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
-            WHERE (rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))
+            WHERE {where_clause}
             ORDER BY a.created_at DESC
+            {limit_clause}{offset_clause}
         """
         with self.engine.connect() as conn:
+            total_row = self._exec(
+                conn, count_sql, params, op_name="list_assignments_for_company_count", request_id=request_id
+            ).fetchone()
+            total = int(total_row._mapping["n"]) if total_row else 0
             rows = self._exec(
-                conn, sql, {"cid": company_id}, op_name="list_assignments_for_company", request_id=request_id
+                conn, data_sql, params, op_name="list_assignments_for_company", request_id=request_id
             ).fetchall()
-        return self._rows_to_list(rows)
+        return self._rows_to_list(rows), total
 
     def list_assignments_for_company_with_details(
         self, company_id: str, request_id: Optional[str] = None
@@ -4160,26 +4230,57 @@ class Database:
     # ------------------------------------------------------------------
     # HR Command Center
     # ------------------------------------------------------------------
-    def get_command_center_kpis(self, hr_user_id: Optional[str] = None) -> Dict[str, Any]:
-        """Aggregate KPIs. hr_user_id=None means admin (all cases)."""
+    def _command_center_base_join(self) -> str:
+        """Join clause for case_assignments -> relocation_cases."""
+        if _is_sqlite:
+            return "rc.id = COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), ca.case_id)"
+        return "rc.id::text = COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), ca.case_id)"
+
+    def _command_center_company_where(self) -> str:
+        """WHERE clause for company-scoped assignments (needs rc, hu joins)."""
+        return "(rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))"
+
+    def get_command_center_kpis(
+        self,
+        company_id: Optional[str] = None,
+        hr_user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Aggregate KPIs. Prefer company_id for company scope; fallback hr_user_id; None = admin (all)."""
+        empty = {
+            "activeCases": 0, "atRiskCount": 0, "attentionNeededCount": 0,
+            "overdueTasksCount": 0, "avgVisaDurationDays": None, "budgetOverrunsCount": 0,
+            "actionRequiredCount": 0, "departingSoonCount": 0, "completedCount": 0,
+        }
         try:
+            join_on = self._command_center_base_join()
             with self.engine.connect() as conn:
-                where = "WHERE hr_user_id = :hr" if hr_user_id else ""
-                params: Dict[str, Any] = {"hr": hr_user_id} if hr_user_id else {}
-                base = f"SELECT * FROM case_assignments {where}"
-                rows = conn.execute(text(f"{base} ORDER BY created_at DESC"), params).fetchall()
+                if company_id:
+                    sql = f"""
+                        SELECT ca.* FROM case_assignments ca
+                        LEFT JOIN relocation_cases rc ON {join_on}
+                        LEFT JOIN hr_users hu ON hu.profile_id = ca.hr_user_id
+                        WHERE {self._command_center_company_where()}
+                    """
+                    rows = conn.execute(text(sql), {"cid": company_id}).fetchall()
+                elif hr_user_id:
+                    rows = conn.execute(
+                        text("SELECT * FROM case_assignments WHERE hr_user_id = :hr ORDER BY created_at DESC"),
+                        {"hr": hr_user_id},
+                    ).fetchall()
+                else:
+                    rows = conn.execute(text("SELECT * FROM case_assignments ORDER BY created_at DESC")).fetchall()
                 assignments = self._rows_to_list(rows)
         except Exception:
-            return {
-                "activeCases": 0, "atRiskCount": 0, "attentionNeededCount": 0,
-                "overdueTasksCount": 0, "avgVisaDurationDays": None, "budgetOverrunsCount": 0,
-                "actionRequiredCount": 0, "departingSoonCount": 0, "completedCount": 0,
-            }
+            return empty
+
         at_risk = sum(1 for a in assignments if (a.get("risk_status") or "green") == "red")
         attention = sum(1 for a in assignments if (a.get("risk_status") or "green") == "yellow")
-        budget_overruns = 0
-        action_required = 0
-        departing_soon = 0
+        budget_overruns = sum(
+            1 for a in assignments
+            if a.get("budget_limit") is not None and a.get("budget_estimated") is not None
+            and float(a.get("budget_estimated") or 0) > float(a.get("budget_limit") or 0)
+        )
+        action_required = sum(1 for a in assignments if a.get("status") == "submitted")
         completed = 0
         now = datetime.utcnow()
 
@@ -4187,61 +4288,45 @@ class Database:
             if not value:
                 return None
             try:
-                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
             except Exception:
                 return None
 
         def _days_until(target: datetime) -> int:
             diff = target - now
             return int(math.ceil(diff.total_seconds() / (60 * 60 * 24)))
-        for a in assignments:
-            bl, be = a.get("budget_limit"), a.get("budget_estimated")
-            if bl is not None and be is not None and float(be or 0) > float(bl or 0):
-                budget_overruns += 1
 
+        for a in assignments:
             status = a.get("status")
             created_at = _parse_date(a.get("created_at"))
-            if status == "approved":
-                if created_at is None or created_at.year == now.year:
-                    completed += 1
+            if status == "approved" and (created_at is None or created_at.year == now.year):
+                completed += 1
 
-            is_action_required = status == "submitted"
-            try:
-                report = self.get_latest_compliance_report(a["id"])
-                checks = report.get("checks") if isinstance(report, dict) else None
-                if checks and any((c.get("status") != "COMPLIANT") for c in checks if isinstance(c, dict)):
-                    is_action_required = True
-            except Exception:
-                pass
-            if is_action_required:
-                action_required += 1
+        departing_soon = 0
+        for a in assignments:
+            expected = _parse_date(str(a.get("expected_start_date") or ""))
+            if expected:
+                d = _days_until(expected)
+                if 0 <= d <= 30:
+                    departing_soon += 1
 
-            try:
-                profile = self.get_employee_profile(a["id"]) or {}
-                move_plan = profile.get("movePlan") if isinstance(profile, dict) else {}
-                target_date = _parse_date(move_plan.get("targetArrivalDate") if isinstance(move_plan, dict) else None)
-                if target_date:
-                    remaining = _days_until(target_date)
-                    if 0 <= remaining <= 30:
-                        departing_soon += 1
-                else:
-                    submitted_at = _parse_date(a.get("submitted_at"))
-                    if submitted_at:
-                        remaining = _days_until(submitted_at)
-                        if 0 <= remaining <= 14:
-                            departing_soon += 1
-            except Exception:
-                pass
+        a_ids = [a["id"] for a in assignments]
         overdue = 0
-        try:
-            for a in assignments:
+        if a_ids:
+            try:
                 with self.engine.connect() as conn:
-                    r = conn.execute(text(
-                        "SELECT COUNT(*) FROM relocation_tasks WHERE assignment_id = :aid AND status = 'overdue'"
-                    ), {"aid": a["id"]}).fetchone()
-                    overdue += (r[0] or 0)
-        except Exception:
-            pass
+                    placeholders = ", ".join(f":a{i}" for i in range(len(a_ids)))
+                    r = conn.execute(
+                        text(
+                            f"SELECT COUNT(*) FROM relocation_tasks "
+                            f"WHERE assignment_id IN ({placeholders}) AND status = 'overdue'"
+                        ),
+                        {f"a{i}": aid for i, aid in enumerate(a_ids)},
+                    ).fetchone()
+                    overdue = r[0] or 0
+            except Exception:
+                pass
+
         return {
             "activeCases": len([a for a in assignments if a.get("status") not in ("closed", "rejected")]),
             "atRiskCount": at_risk,
@@ -4256,83 +4341,145 @@ class Database:
 
     def list_command_center_cases(
         self,
+        company_id: Optional[str] = None,
         hr_user_id: Optional[str] = None,
         page: int = 1,
         limit: int = 25,
         risk_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Paginated cases with task % and risk. hr_user_id=None for admin."""
+        """Paginated cases with task %% and risk. Prefer company_id; fallback hr_user_id; None = admin."""
         try:
+            join_on = self._command_center_base_join()
             with self.engine.connect() as conn:
-                where = "WHERE ca.hr_user_id = :hr" if hr_user_id else "WHERE 1=1"
                 params: Dict[str, Any] = {"limit": limit, "offset": (page - 1) * limit}
-                if hr_user_id:
+                if company_id:
+                    where = "WHERE " + self._command_center_company_where()
+                    params["cid"] = company_id
+                    sql = f"""
+                        SELECT ca.id, ca.employee_identifier, ca.status,
+                               COALESCE(ca.risk_status, 'green') as risk_status,
+                               ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
+                               rc.host_country as dest_country
+                        FROM case_assignments ca
+                        LEFT JOIN relocation_cases rc ON {join_on}
+                        LEFT JOIN hr_users hu ON hu.profile_id = ca.hr_user_id
+                        {where}
+                    """
+                elif hr_user_id:
+                    where = "WHERE ca.hr_user_id = :hr"
                     params["hr"] = hr_user_id
+                    sql = f"""
+                        SELECT ca.id, ca.employee_identifier, ca.status,
+                               COALESCE(ca.risk_status, 'green') as risk_status,
+                               ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
+                               rc.host_country as dest_country
+                        FROM case_assignments ca
+                        LEFT JOIN relocation_cases rc ON {join_on}
+                        {where}
+                    """
+                else:
+                    sql = f"""
+                        SELECT ca.id, ca.employee_identifier, ca.status,
+                               COALESCE(ca.risk_status, 'green') as risk_status,
+                               ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
+                               rc.host_country as dest_country
+                        FROM case_assignments ca
+                        LEFT JOIN relocation_cases rc ON {join_on}
+                        WHERE 1=1
+                    """
                 if risk_filter:
-                    where += " AND COALESCE(ca.risk_status, 'green') = :risk"
+                    sql = sql.rstrip() + " AND COALESCE(ca.risk_status, 'green') = :risk"
                     params["risk"] = risk_filter
-                sql = f"""
-                    SELECT ca.id, ca.employee_identifier, ca.status,
-                           COALESCE(ca.risk_status, 'green') as risk_status,
-                           ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
-                           rc.host_country as dest_country
-                    FROM case_assignments ca
-                    LEFT JOIN relocation_cases rc ON rc.id = ca.case_id
-                    {where}
-                    ORDER BY ca.updated_at DESC
-                    LIMIT :limit OFFSET :offset
-                """
+                sql += " ORDER BY ca.updated_at DESC LIMIT :limit OFFSET :offset"
                 rows = conn.execute(text(sql), params).fetchall()
-                result = []
-                for row in rows:
-                    m = row._mapping
-                    a_id = m["id"]
-                    tasks_done, tasks_total = 0, 0
-                    next_due = None
-                    try:
-                        tr = conn.execute(text(
-                            "SELECT status, due_date FROM relocation_tasks WHERE assignment_id = :aid"
-                        ), {"aid": a_id}).fetchall()
-                        tasks_total = len(tr)
-                        tasks_done = sum(1 for r in tr if r._mapping.get("status") in ("done",))
-                        overdues = [r._mapping.get("due_date") for r in tr if r._mapping.get("status") == "overdue" and r._mapping.get("due_date")]
-                        next_due = min(overdues) if overdues else None
-                    except Exception:
-                        pass
-                    pct = round(100 * tasks_done / tasks_total) if tasks_total else 0
-                    result.append({
-                        "id": a_id,
-                        "employeeIdentifier": m.get("employee_identifier") or "",
-                        "destCountry": m.get("dest_country"),
-                        "status": m.get("status") or "",
-                        "riskStatus": m.get("risk_status") or "green",
-                        "tasksDonePercent": pct,
-                        "budgetLimit": m.get("budget_limit"),
-                        "budgetEstimated": m.get("budget_estimated"),
-                        "nextDeadline": str(next_due) if next_due else None,
-                    })
-                return result
+
+            a_ids = [r._mapping["id"] for r in rows]
+            task_stats: Dict[str, Dict[str, Any]] = {}
+            if a_ids:
+                try:
+                    with self.engine.connect() as conn:
+                        placeholders = ", ".join(f":a{i}" for i in range(len(a_ids)))
+                        tr = conn.execute(
+                            text(
+                                f"SELECT assignment_id, status, due_date FROM relocation_tasks "
+                                f"WHERE assignment_id IN ({placeholders})"
+                            ),
+                            {f"a{i}": aid for i, aid in enumerate(a_ids)},
+                        ).fetchall()
+                        for r in tr:
+                            m = r._mapping
+                            aid = m["assignment_id"]
+                            if aid not in task_stats:
+                                task_stats[aid] = {"total": 0, "done": 0, "next_overdue": None}
+                            task_stats[aid]["total"] += 1
+                            if m.get("status") == "done":
+                                task_stats[aid]["done"] += 1
+                            elif m.get("status") == "overdue" and m.get("due_date"):
+                                cur = task_stats[aid]["next_overdue"]
+                                task_stats[aid]["next_overdue"] = min(cur, m["due_date"]) if cur else m["due_date"]
+                except Exception:
+                    pass
+
+            result = []
+            for row in rows:
+                m = row._mapping
+                a_id = m["id"]
+                stats = task_stats.get(a_id, {"total": 0, "done": 0, "next_overdue": None})
+                pct = round(100 * stats["done"] / stats["total"]) if stats["total"] else 0
+                result.append({
+                    "id": a_id,
+                    "employeeIdentifier": m.get("employee_identifier") or "",
+                    "destCountry": m.get("dest_country"),
+                    "status": m.get("status") or "",
+                    "riskStatus": m.get("risk_status") or "green",
+                    "tasksDonePercent": pct,
+                    "budgetLimit": m.get("budget_limit"),
+                    "budgetEstimated": m.get("budget_estimated"),
+                    "nextDeadline": str(stats["next_overdue"]) if stats["next_overdue"] else None,
+                })
+            return result
         except Exception as e:
             log.warning("list_command_center_cases: %s", e)
             return []
 
     def get_command_center_case_detail(
-        self, assignment_id: str, hr_user_id: Optional[str] = None
+        self,
+        assignment_id: str,
+        company_id: Optional[str] = None,
+        hr_user_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Full case detail: tasks, budget, events."""
         try:
+            join_on = self._command_center_base_join()
             with self.engine.connect() as conn:
-                where = "ca.id = :aid"
                 params: Dict[str, Any] = {"aid": assignment_id}
-                if hr_user_id:
-                    where += " AND ca.hr_user_id = :hr"
+                if company_id:
+                    where = "ca.id = :aid AND " + self._command_center_company_where()
+                    params["cid"] = company_id
+                    sql = f"""
+                        SELECT ca.*, rc.host_country as dest_country
+                        FROM case_assignments ca
+                        LEFT JOIN relocation_cases rc ON {join_on}
+                        LEFT JOIN hr_users hu ON hu.profile_id = ca.hr_user_id
+                        WHERE {where}
+                    """
+                elif hr_user_id:
+                    where = "ca.id = :aid AND ca.hr_user_id = :hr"
                     params["hr"] = hr_user_id
-                row = conn.execute(text(f"""
-                    SELECT ca.*, rc.host_country as dest_country
-                    FROM case_assignments ca
-                    LEFT JOIN relocation_cases rc ON rc.id = ca.case_id
-                    WHERE {where}
-                """), params).fetchone()
+                    sql = f"""
+                        SELECT ca.*, rc.host_country as dest_country
+                        FROM case_assignments ca
+                        LEFT JOIN relocation_cases rc ON {join_on}
+                        WHERE {where}
+                    """
+                else:
+                    sql = f"""
+                        SELECT ca.*, rc.host_country as dest_country
+                        FROM case_assignments ca
+                        LEFT JOIN relocation_cases rc ON {join_on}
+                        WHERE ca.id = :aid
+                    """
+                row = conn.execute(text(sql), params).fetchone()
                 if not row:
                     return None
                 m = row._mapping

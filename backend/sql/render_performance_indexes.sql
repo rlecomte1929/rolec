@@ -12,6 +12,9 @@ create index if not exists idx_case_assignments_hr_user_id
 create index if not exists idx_case_assignments_case_id
   on public.case_assignments (case_id);
 
+create index if not exists idx_case_assignments_status
+  on public.case_assignments (status);
+
 -- Company/profile lookups (get_company_for_user, get_hr_company_id)
 create index if not exists idx_profiles_company_id on public.profiles (company_id);
 create index if not exists idx_hr_users_profile_id on public.hr_users (profile_id);

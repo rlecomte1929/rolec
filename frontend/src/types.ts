@@ -592,6 +592,13 @@ export interface AssignmentSummary {
   complianceStatus?: string | null;
   employeeFirstName?: string | null;
   employeeLastName?: string | null;
+  /** Relocation case metadata (host_country, home_country) for list display */
+  case?: { host_country?: string; home_country?: string; id?: string; status?: string } | null;
+}
+
+export interface AssignmentsListResponse {
+  assignments: AssignmentSummary[];
+  total: number;
 }
 
 export interface AssignmentDetail {

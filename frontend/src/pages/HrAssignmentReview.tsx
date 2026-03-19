@@ -55,7 +55,8 @@ export const HrAssignmentReview: React.FC = () => {
 
   const loadAssignments = async () => {
     try {
-      const data = await hrAPI.listAssignments();
+      const res = await hrAPI.listAssignments();
+      const data = res.assignments ?? [];
       setAssignments(data);
       const paramCaseId = searchParams.get('caseId') || id || localStorage.getItem('relopass_last_assignment_id');
       if (data.length > 0) {

@@ -63,7 +63,8 @@ export const HrComplianceCheck: React.FC = () => {
 
   const loadAssignments = async () => {
     try {
-      const data = await hrAPI.listAssignments();
+      const res = await hrAPI.listAssignments();
+      const data = res.assignments ?? [];
       setAssignments(data);
       if (!caseId && data.length > 0) {
         const nextId = data[0].id;

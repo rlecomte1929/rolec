@@ -1,22 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert, Badge } from '../components/antigravity';
 import { hrAPI } from '../api/client';
-import type { AssignmentSummary, AssignmentDetail } from '../types';
+import type { AssignmentSummary } from '../types';
 import { startInteraction, endInteraction } from '../perf/perf';
 import { trackAuthPerf } from '../perf/authPerf';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
-import { getCaseMissingFields } from '../components/CaseIncompleteBanner';
 import { getAuthItem } from '../utils/demo';
+
+const PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export const HrDashboard: React.FC = () => {
   const { setSelectedCaseId } = useSelectedCase();
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [caseId, setCaseId] = useState<string | null>(null);
   const [employeeIdentifier, setEmployeeIdentifier] = useState('');
@@ -24,76 +29,50 @@ export const HrDashboard: React.FC = () => {
   const [employeeLastName, setEmployeeLastName] = useState('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
-  const [assignmentDetails, setAssignmentDetails] = useState<Record<string, AssignmentDetail>>({});
-  const [detailsLoadedCount, setDetailsLoadedCount] = useState(0);
-  const [detailsErrorCount, setDetailsErrorCount] = useState(0);
   const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [destinationFilter, setDestinationFilter] = useState('');
-  const [departingSoonOnly, setDepartingSoonOnly] = useState(false);
+  const [appliedStatus, setAppliedStatus] = useState<string>('all');
+  const [appliedDestination, setAppliedDestination] = useState('');
   const [isManageMode, setIsManageMode] = useState(false);
   const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
   const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const navigate = useNavigate();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const acRef = useRef<AbortController | null>(null);
 
-  const loadAssignmentDetails = async (items: AssignmentSummary[], limit: number, signal?: AbortSignal) => {
-    if (items.length === 0) {
-      setAssignmentDetails({});
-      setDetailsLoadedCount(0);
-      return;
-    }
-
-    const targets = items
-      .filter((assignment) => !assignmentDetails[assignment.id])
-      .slice(0, limit);
-    if (targets.length === 0) return;
-
-    const detailEntries = await Promise.allSettled(
-      targets.map(async (assignment) => {
-        const detail = await hrAPI.getAssignment(assignment.id, { signal });
-        return [assignment.id, detail] as const;
-      })
-    );
-
-    const nextDetails: Record<string, AssignmentDetail> = {};
-    let fulfilled = 0;
-    let rejected = 0;
-    detailEntries.forEach((entry) => {
-      if (entry.status === 'fulfilled') {
-        const [id, detail] = entry.value;
-        if (detail) {
-          nextDetails[id] = detail;
-          fulfilled += 1;
-        }
-      } else {
-        rejected += 1;
-      }
-    });
-    setAssignmentDetails((prev) => ({ ...prev, ...nextDetails }));
-    setDetailsLoadedCount((prev) => prev + targets.length);
-    setDetailsErrorCount((prev) => prev + rejected);
-  };
-
-  const loadAssignments = async (signal?: AbortSignal) => {
-    setIsLoading(true);
-    setDetailsErrorCount(0);
+  const loadAssignments = useCallback(async (append = false, signal?: AbortSignal) => {
+    const nextOffset = append ? offset : 0;
+    const nextLimit = PAGE_SIZE;
+    const isAppend = append && nextOffset > 0;
+    if (isAppend) setIsLoadingMore(true);
+    else setIsLoading(true);
+    setError('');
     const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     trackAuthPerf({ stage: 'bootstrap_start', route: '/hr/dashboard', meta: { endpoint: 'listAssignments' } });
     try {
-      const data = await hrAPI.listAssignments({ signal });
+      const res = await hrAPI.listAssignments({
+        signal,
+        limit: nextLimit,
+        offset: nextOffset,
+        search: searchDebounced.trim() || undefined,
+        status: appliedStatus !== 'all' ? appliedStatus : undefined,
+        destination: appliedDestination.trim() || undefined,
+      });
       if (signal?.aborted) return;
-      setAssignments(data);
-      if (data.length > 0) {
-        localStorage.setItem('relopass_last_assignment_id', data[0].id);
+      const list = res.assignments;
+      if (list.length > 0 && !append) {
+        localStorage.setItem('relopass_last_assignment_id', list[0].id);
       }
+      setAssignments((prev) => (append ? [...prev, ...list] : list));
+      setTotal(res.total);
+      setOffset(nextOffset + list.length);
       const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-      trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments' } });
-      setIsLoading(false);
-      // Load a small initial batch to avoid request fan-out; user can load more.
-      void loadAssignmentDetails(data, 5, signal ?? undefined);
+      trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments', count: list.length } });
     } catch (err: any) {
       if (err?.name === 'AbortError' || signal?.aborted) return;
       if (err.response?.status === 401) {
@@ -103,15 +82,35 @@ export const HrDashboard: React.FC = () => {
       }
       const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
       trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments', error: true } });
+    } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  };
+  }, [offset, searchDebounced, appliedStatus, appliedDestination, navigate]);
 
   useEffect(() => {
-    const ac = new AbortController();
-    loadAssignments(ac.signal);
-    return () => ac.abort();
-  }, []);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => setSearchDebounced(search), SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [search]);
+
+  useEffect(() => {
+    acRef.current = new AbortController();
+    loadAssignments(false, acRef.current.signal);
+    return () => {
+      acRef.current?.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when filters change, not when loadAssignments identity changes
+  }, [searchDebounced, appliedStatus, appliedDestination]);
+
+  useEffect(() => {
+    if (isFilterOpen) {
+      setStatusFilter(appliedStatus);
+      setDestinationFilter(appliedDestination);
+    }
+  }, [isFilterOpen]);
 
   useRegisterNav('HrDashboard', [
     { label: 'Case Summary', routeKey: 'hrCaseSummary' },
@@ -152,7 +151,7 @@ export const HrDashboard: React.FC = () => {
       if (response.inviteToken) {
         setInviteToken(response.inviteToken);
       }
-      await loadAssignments();
+      await loadAssignments(false);
     } catch (err: any) {
       const data = err.response?.data;
       const msg = data?.detail || data?.error || 'Unable to assign case.';
@@ -184,7 +183,7 @@ export const HrDashboard: React.FC = () => {
       setSelectedForRemoval(new Set());
       setIsConfirmingRemoval(false);
       setIsManageMode(false);
-      await loadAssignments();
+      await loadAssignments(false);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to remove some cases.');
     } finally {
@@ -208,80 +207,20 @@ export const HrDashboard: React.FC = () => {
     return <Badge variant="neutral">Created</Badge>;
   };
 
-  const parseDate = (value?: string | null) => (value ? new Date(value) : null);
-  const daysUntil = (date?: Date | null) => {
-    if (!date) return null;
-    const diffMs = date.getTime() - new Date().getTime();
-    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  };
-
-  const formatRoute = (detail?: AssignmentDetail) => {
-    const origin = detail?.profile?.movePlan?.origin;
-    const destination = detail?.profile?.movePlan?.destination;
-    if (origin && destination) return `${origin} \u2192 ${destination}`;
-    return '—';
-  };
-
-  const formatDeadline = (detail?: AssignmentDetail) => {
-    const target = parseDate(detail?.profile?.movePlan?.targetArrivalDate);
-    if (!target) return { label: '—', helper: '' };
-    const remaining = daysUntil(target);
-    return {
-      label: target.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      helper: remaining !== null ? `${remaining} days remaining` : '',
-    };
-  };
-
   const displayName = (assignment: AssignmentSummary) => {
-    const detail = assignmentDetails[assignment.id];
-    const fromProfile = detail?.profile?.primaryApplicant?.fullName;
-    const fromHr =
-      [assignment.employeeFirstName, assignment.employeeLastName].filter(Boolean).join(' ') ||
-      (detail
-        ? [detail.employeeFirstName, detail.employeeLastName].filter(Boolean).join(' ')
-        : '');
-    return fromProfile || fromHr || assignment.employeeIdentifier;
+    const fromHr = [assignment.employeeFirstName, assignment.employeeLastName].filter(Boolean).join(' ');
+    return fromHr || assignment.employeeIdentifier;
   };
 
   const displayDestination = (assignment: AssignmentSummary) => {
-    const detail = assignmentDetails[assignment.id];
-    return detail?.profile?.movePlan?.destination || '—';
+    const c = assignment.case;
+    return c?.host_country || c?.home_country || '—';
   };
-
-  const filteredAssignments = assignments.filter((assignment) => {
-    if (!search.trim()) return true;
-    const query = search.trim().toLowerCase();
-    const detail = assignmentDetails[assignment.id];
-    const name = detail?.profile?.primaryApplicant?.fullName || assignment.employeeIdentifier;
-    return name.toLowerCase().includes(query);
-  }).filter((assignment) => {
-    if (statusFilter === 'all') return true;
-    return assignment.status === statusFilter;
-  }).filter((assignment) => {
-    if (!destinationFilter.trim()) return true;
-    const detail = assignmentDetails[assignment.id];
-    const destination = detail?.profile?.movePlan?.destination || '';
-    return destination.toLowerCase().includes(destinationFilter.trim().toLowerCase());
-  }).filter((assignment) => {
-    if (!departingSoonOnly) return true;
-    const detail = assignmentDetails[assignment.id];
-    const target = parseDate(detail?.profile?.movePlan?.targetArrivalDate);
-    const targetDays = daysUntil(target);
-    if (targetDays !== null) return targetDays >= 0 && targetDays <= 30;
-    const fallback = parseDate(detail?.submittedAt);
-    const fallbackDays = daysUntil(fallback);
-    return fallbackDays !== null && fallbackDays >= 0 && fallbackDays <= 14;
-  });
 
   return (
     <AppShell title="Assignments" subtitle="Create cases, assign employees, and monitor relocations.">
       <div className="space-y-6">
         {error && <Alert variant="error">{error}</Alert>}
-        {detailsErrorCount > 0 && (
-          <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
-            Some case details could not be loaded ({detailsErrorCount} failed). Showing partial data.
-          </div>
-        )}
 
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <input
@@ -380,7 +319,7 @@ export const HrDashboard: React.FC = () => {
             <div className="flex items-center gap-2">
               {!isManageMode ? (
                 <>
-                  <Button variant="outline" onClick={() => loadAssignments()}>Refresh</Button>
+                  <Button variant="outline" onClick={() => loadAssignments(false)}>Refresh</Button>
                   <Button variant="outline" onClick={() => setIsManageMode(true)}>Manage Cases</Button>
                 </>
               ) : (
@@ -406,14 +345,15 @@ export const HrDashboard: React.FC = () => {
               )}
             </div>
           </div>
-          {detailsLoadedCount < assignments.length && !isManageMode && (
+          {assignments.length < total && !isManageMode && (
             <div className="mb-3 text-xs text-[#6b7280] flex items-center gap-2">
-              Loaded details for {detailsLoadedCount}/{assignments.length} cases.
+              Showing {assignments.length} of {total} cases.
               <Button
                 variant="outline"
-                onClick={() => loadAssignmentDetails(assignments, assignments.length, undefined)}
+                onClick={() => loadAssignments(true)}
+                disabled={isLoadingMore}
               >
-                Load remaining details
+                {isLoadingMore ? 'Loading…' : 'Load more'}
               </Button>
             </div>
           )}
@@ -456,11 +396,11 @@ export const HrDashboard: React.FC = () => {
               ))}
             </div>
           )}
-          {!isLoading && filteredAssignments.length === 0 && (
+          {!isLoading && assignments.length === 0 && (
             <div className="text-sm text-[#4b5563]">No assignments yet.</div>
           )}
 
-          {!isLoading && filteredAssignments.length > 0 && (
+          {!isLoading && assignments.length > 0 && (
             <div className="border border-[#e2e8f0] rounded-xl overflow-hidden">
               <div className={`grid gap-4 bg-[#f8fafc] px-4 py-3 text-[11px] uppercase tracking-wide text-[#6b7280] ${isManageMode ? 'grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,0.3fr]' : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr]'}`}>
                 {isManageMode && <div></div>}
@@ -471,9 +411,7 @@ export const HrDashboard: React.FC = () => {
                 <div>Next deadline</div>
                 <div className="text-right">View</div>
               </div>
-              {filteredAssignments.map((assignment) => {
-                const detail = assignmentDetails[assignment.id];
-                const deadline = formatDeadline(detail);
+              {assignments.map((assignment) => {
                 const isSelected = selectedForRemoval.has(assignment.id);
                 return (
                   <div
@@ -511,20 +449,18 @@ export const HrDashboard: React.FC = () => {
                       <div className="text-sm text-[#0b2b43]">{displayDestination(assignment)}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-[#0b2b43]">{formatRoute(detail)}</div>
-                      <div className="text-xs text-[#6b7280]">
-                        {detail?.profile?.movePlan?.housing?.budgetMonthlySGD || 'Relocation pathway'}
+                      <div className="text-sm text-[#0b2b43]">
+                        {assignment.case?.home_country && assignment.case?.host_country
+                          ? `${assignment.case.home_country} \u2192 ${assignment.case.host_country}`
+                          : '—'}
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-1">
                       {caseStatusBadge(assignment.status)}
-                      {getCaseMissingFields(detail ?? null).length > 0 && (
-                        <Badge variant="warning">Incomplete</Badge>
-                      )}
                     </div>
                     <div>
-                      <div className="text-sm text-[#0b2b43]">{deadline.label}</div>
-                      <div className="text-xs text-[#6b7280]">{deadline.helper}</div>
+                      <div className="text-sm text-[#0b2b43]">—</div>
+                      <div className="text-xs text-[#6b7280]">Open for details</div>
                     </div>
                     <div className="text-right text-[#94a3b8] text-lg">
                       {isManageMode ? '' : '→'}
@@ -574,26 +510,28 @@ export const HrDashboard: React.FC = () => {
                   className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm"
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm text-[#4b5563]">
-                <input
-                  type="checkbox"
-                  checked={departingSoonOnly}
-                  onChange={(event) => setDepartingSoonOnly(event.target.checked)}
-                />
-                Departing soon only
-              </label>
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setStatusFilter('all');
                     setDestinationFilter('');
-                    setDepartingSoonOnly(false);
+                    setAppliedStatus('all');
+                    setAppliedDestination('');
+                    setIsFilterOpen(false);
                   }}
                 >
                   Reset
                 </Button>
-                <Button onClick={() => setIsFilterOpen(false)}>Apply filters</Button>
+                <Button
+                  onClick={() => {
+                    setAppliedStatus(statusFilter);
+                    setAppliedDestination(destinationFilter);
+                    setIsFilterOpen(false);
+                  }}
+                >
+                  Apply filters
+                </Button>
               </div>
             </div>
           </Card>

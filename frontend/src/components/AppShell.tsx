@@ -71,9 +71,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
-  const complianceRoute = selectedCaseId
-    ? `${buildRoute('hrComplianceIndex')}?caseId=${selectedCaseId}`
-    : buildRoute('hrComplianceIndex');
   const policyRoute = selectedCaseId
     ? `${buildRoute('hrPolicy')}?caseId=${selectedCaseId}`
     : buildRoute('hrPolicy');
@@ -292,27 +289,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     }`}
                   >
                     Dashboard
-                  </Link>
-                  <Link
-                    to={buildRoute('hrEmployeeDashboard')}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrEmployeeDashboard.path) ||
-                      isActiveRoute(ROUTE_DEFS.hrAssignmentReview.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    Employee Detail
-                  </Link>
-                  <Link
-                    to={complianceRoute}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrComplianceIndex.path) || isActiveRoute(ROUTE_DEFS.hrCompliance.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    Compliance
                   </Link>
                   <Link
                     to={messagesRoute}

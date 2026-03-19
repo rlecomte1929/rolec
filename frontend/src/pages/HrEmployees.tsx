@@ -10,6 +10,7 @@ import { safeNavigate } from '../navigation/safeNavigate';
 export const HrEmployees: React.FC = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<HrCompanyEmployee[]>([]);
+  const [hasCompany, setHasCompany] = useState<boolean | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -17,8 +18,9 @@ export const HrEmployees: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
-      const { employees: list } = await hrAPI.listCompanyEmployees();
+      const { employees: list, has_company } = await hrAPI.listCompanyEmployees();
       setEmployees(list || []);
+      setHasCompany(has_company ?? true);
     } catch (err: any) {
       if (err?.response?.status === 401) {
         safeNavigate(navigate, 'landing');
@@ -60,10 +62,27 @@ export const HrEmployees: React.FC = () => {
           </Card>
         ) : employees.length === 0 ? (
           <Card padding="lg">
-            <div className="text-sm text-[#6b7280]">No employees found for your company.</div>
-            <div className="mt-2 text-xs text-[#9ca3af]">
-              Employees are added when you create assignments and assign them to cases.
-            </div>
+            {hasCompany === false ? (
+              <>
+                <div className="text-sm text-[#6b7280]">
+                  Complete your company profile to view employees.
+                </div>
+                <div className="mt-2">
+                  <Link to={buildRoute('hrCompanyProfile')}>
+                    <Button variant="primary" size="sm">
+                      Set up company profile
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm text-[#6b7280]">No employees found for your company.</div>
+                <div className="mt-2 text-xs text-[#9ca3af]">
+                  Employees are added when you create assignments and assign them to cases.
+                </div>
+              </>
+            )}
           </Card>
         ) : (
           <Card padding="none">

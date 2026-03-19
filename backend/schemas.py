@@ -323,6 +323,12 @@ class AssignmentSummary(BaseModel):
     case: Optional[Dict[str, Any]] = None
 
 
+class AssignmentsListResponse(BaseModel):
+    """Paginated assignments list. Summary-only, no per-row compliance N+1."""
+    assignments: List[AssignmentSummary]
+    total: int
+
+
 class AssignmentDetail(BaseModel):
     id: str
     caseId: str

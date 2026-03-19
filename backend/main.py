@@ -27,7 +27,7 @@ from .schemas import (
     RelocationProfile, DashboardResponse, HousingRecommendation,
     SchoolRecommendation, MoverRecommendation, TimelinePhase, TimelineTask,
     OverallStatus, UserResponse, UserRole, AssignmentStatus, AssignCaseRequest,
-    AssignCaseResponse, CreateCaseResponse, AssignmentSummary, AssignmentDetail,
+    AssignCaseResponse, CreateCaseResponse, AssignmentSummary, AssignmentDetail, AssignmentsListResponse,
     EmployeeJourneyRequest, EmployeeJourneyNextQuestion, HRAssignmentDecision,
     UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest,
@@ -2771,10 +2771,13 @@ def list_hr_company_employees(user: Dict[str, Any] = Depends(require_role(UserRo
     effective = _effective_user(user, UserRole.HR)
     company_id = _get_hr_company_id(effective)
     if not company_id:
-        raise HTTPException(status_code=400, detail="No company linked to your profile")
+        # Align with get_company_profile: return empty list instead of 400 when no company
+        return {"employees": [], "has_company": False}
+    # Reconcile profiles (Admin/HR assignments) into employees before listing (same as Admin)
+    db.ensure_employees_for_company(company_id)
     items = db.list_employees_with_profiles(company_id)
     db.log_audit(effective["id"], "READ", "employee", None, None, {"company_id": company_id})
-    return {"employees": items}
+    return {"employees": items, "has_company": True}
 
 
 @app.get("/api/hr/employees/{employee_id}")
@@ -3043,6 +3046,9 @@ def assign_case(
                     hr_company_id,
                 )
                 created_new_employee = True
+        # Ensure employees row exists so HR Employees tab shows this employee
+        if employee_user and hr_company_id:
+            db.ensure_employee_for_profile(employee_user["id"], hr_company_id)
         assignment_id = str(uuid.uuid4())
         invite_token = None
 
@@ -3523,17 +3529,20 @@ def update_profile_photo(
     return {"success": True}
 
 
-@app.get("/api/hr/assignments", response_model=List[AssignmentSummary])
+@app.get("/api/hr/assignments", response_model=AssignmentsListResponse)
 def list_hr_assignments(
     request: Request,
+    limit: int = Query(25, ge=1, le=100, description="Max assignments per page"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    search: Optional[str] = Query(None, description="Search by employee name or email"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    destination: Optional[str] = Query(None, description="Filter by destination (host/home country)"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """
-    List HR assignments with attached relocation case summary.
-
+    List HR assignments (summary only). Paginated, server-side filtered. No per-row compliance N+1.
     - Auth: HR (or ADMIN).
-    - Data: assignments from case_assignments filtered by hr_user_id (or all for admin),
-      plus case metadata from relocation_cases.
+    - Returns lightweight summary; use GET /api/hr/assignments/{id} for full detail.
     """
     request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
     t0 = time.perf_counter()
@@ -3541,81 +3550,81 @@ def list_hr_assignments(
         if user.get("is_admin") and not user.get("impersonation"):
             with timed("db.list_all_assignments", request_id):
                 assignments = db.list_all_assignments()
+            total = len(assignments)
+            assignments = assignments[offset : offset + limit]
         else:
             effective = _effective_user(user, UserRole.HR)
             company_id = _get_hr_company_id(effective)
             if company_id:
-                with timed("db.list_assignments_for_company", request_id):
-                    assignments = db.list_assignments_for_company(company_id, request_id=request_id)
+                with timed("db.list_assignments_for_company_paginated", request_id):
+                    assignments, total = db.list_assignments_for_company_paginated(
+                        company_id,
+                        limit=limit,
+                        offset=offset,
+                        search=search,
+                        status=status,
+                        destination=destination,
+                        request_id=request_id,
+                    )
             else:
                 with timed("db.list_assignments_for_hr", request_id):
-                    assignments = db.list_assignments_for_hr(effective["id"], request_id=request_id)
+                    all_assignments = db.list_assignments_for_hr(effective["id"], request_id=request_id)
+                total = len(all_assignments)
+                assignments = all_assignments[offset : offset + limit]
 
         if not assignments:
-            return []
+            dur_ms = (time.perf_counter() - t0) * 1000
+            _log_endpoint_perf("/api/hr/assignments", request_id, user.get("id"), dur_ms, 200)
+            return AssignmentsListResponse(assignments=[], total=total)
 
-        # Collect case_ids for bulk lookup.
         case_ids = [a.get("case_id") for a in assignments if a.get("case_id")]
         cases_by_id: Dict[str, Any] = {}
-
-        if case_ids:
-            # Deduplicate to keep query small.
-            unique_ids = list({cid for cid in case_ids if cid})
-            if unique_ids:
-                # Build a parameterized IN clause to support both SQLite and Postgres.
-                placeholders = ", ".join(f":id{i}" for i in range(len(unique_ids)))
-                sql = (
-                    "SELECT id, status, stage, home_country, host_country, "
-                    "employee_id, company_id "
-                    "FROM relocation_cases WHERE id IN (" + placeholders + ")"
-                )
-                params = {f"id{i}": cid for i, cid in enumerate(unique_ids)}
-                with db.engine.connect() as conn, timed("db.load_relocation_cases_bulk", request_id):
-                    rows = conn.execute(text(sql), params).fetchall()
-                for row in rows:
-                    m = row._mapping
-                    cases_by_id[m["id"]] = {
-                        "id": m["id"],
-                        "status": m.get("status"),
-                        "stage": m.get("stage"),
-                        "home_country": m.get("home_country"),
-                        "host_country": m.get("host_country"),
-                        "employee_id": m.get("employee_id"),
-                        "company_id": m.get("company_id"),
-                    }
+        unique_ids = list({cid for cid in case_ids if cid})
+        if unique_ids:
+            placeholders = ", ".join(f":id{i}" for i in range(len(unique_ids)))
+            sql = (
+                "SELECT id, status, stage, home_country, host_country, "
+                "employee_id, company_id "
+                "FROM relocation_cases WHERE id IN (" + placeholders + ")"
+            )
+            params = {f"id{i}": cid for i, cid in enumerate(unique_ids)}
+            with db.engine.connect() as conn, timed("db.load_relocation_cases_bulk", request_id):
+                rows = conn.execute(text(sql), params).fetchall()
+            for row in rows:
+                m = row._mapping
+                cases_by_id[m["id"]] = {
+                    "id": m["id"],
+                    "status": m.get("status"),
+                    "stage": m.get("stage"),
+                    "home_country": m.get("home_country"),
+                    "host_country": m.get("host_country"),
+                    "employee_id": m.get("employee_id"),
+                    "company_id": m.get("company_id"),
+                }
 
         summaries: List[AssignmentSummary] = []
         for assignment in assignments:
-            report = None
-            try:
-                report = db.get_latest_compliance_report(assignment["id"])
-            except Exception:
-                pass
             case_meta = cases_by_id.get(assignment.get("case_id"))
             case_id = assignment.get("case_id") or assignment.get("id") or ""
-
             submitted_at = assignment.get("submitted_at")
-            # In SQLite this is stored as text; in Postgres it may be timestamptz.
-            # Pydantic model expects Optional[str], so normalize here.
             if isinstance(submitted_at, datetime):
                 submitted_at_str = submitted_at.isoformat()
             else:
                 submitted_at_str = submitted_at
-
             summaries.append(AssignmentSummary(
                 id=assignment["id"],
                 caseId=case_id,
                 employeeIdentifier=assignment["employee_identifier"],
                 status=AssignmentStatus(normalize_status(assignment["status"])),
                 submittedAt=submitted_at_str,
-                complianceStatus=report["overallStatus"] if report else None,
+                complianceStatus=None,
                 employeeFirstName=assignment.get("employee_first_name"),
                 employeeLastName=assignment.get("employee_last_name"),
                 case=case_meta,
             ))
         dur_ms = (time.perf_counter() - t0) * 1000
         _log_endpoint_perf("/api/hr/assignments", request_id, user.get("id"), dur_ms, 200)
-        return summaries
+        return AssignmentsListResponse(assignments=summaries, total=total)
     except Exception as e:
         # Structured error log with request_id and user identity.
         log.error(
@@ -7792,9 +7801,20 @@ def _effective_hr_user(user: Dict[str, Any]) -> Optional[str]:
     return user.get("id")
 
 
+def _command_center_scope(user: Dict[str, Any]) -> tuple:
+    """Return (company_id, hr_user_id) for command center queries. Prefer company scope."""
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    hr_user_id = _effective_hr_user(user)
+    if company_id:
+        return (company_id, None)
+    return (None, hr_user_id)
+
+
 @app.get("/api/hr/command-center/kpis", response_model=CommandCenterKPIs)
 def get_command_center_kpis(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    kpis = db.get_command_center_kpis(hr_user_id=_effective_hr_user(user))
+    company_id, hr_user_id = _command_center_scope(user)
+    kpis = db.get_command_center_kpis(company_id=company_id, hr_user_id=hr_user_id)
     return CommandCenterKPIs(**kpis)
 
 
@@ -7805,8 +7825,9 @@ def list_command_center_cases(
     risk_filter: Optional[str] = Query(None, pattern="^(green|yellow|red)$"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
+    company_id, hr_user_id = _command_center_scope(user)
     rows = db.list_command_center_cases(
-        hr_user_id=_effective_hr_user(user), page=page, limit=limit, risk_filter=risk_filter
+        company_id=company_id, hr_user_id=hr_user_id, page=page, limit=limit, risk_filter=risk_filter
     )
     return [CommandCenterCaseRow(**r) for r in rows]
 
@@ -7816,7 +7837,10 @@ def get_command_center_case_detail(
     assignment_id: str,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
-    detail = db.get_command_center_case_detail(assignment_id=assignment_id, hr_user_id=_effective_hr_user(user))
+    company_id, hr_user_id = _command_center_scope(user)
+    detail = db.get_command_center_case_detail(
+        assignment_id=assignment_id, company_id=company_id, hr_user_id=hr_user_id
+    )
     if not detail:
         raise HTTPException(status_code=404, detail="Case not found or not visible")
     return CommandCenterCaseDetail(**detail)

@@ -8,6 +8,18 @@ import { RiskBadge } from '../components/command-center/RiskBadge';
 import { hrAPI } from '../api/client';
 import { safeNavigate } from '../navigation/safeNavigate';
 
+type CaseRow = {
+  id: string;
+  employeeIdentifier: string;
+  destCountry?: string;
+  status: string;
+  riskStatus: string;
+  tasksDonePercent: number;
+  budgetLimit?: number;
+  budgetEstimated?: number;
+  nextDeadline?: string;
+};
+
 export const HrCommandCenter: React.FC = () => {
   const navigate = useNavigate();
   const role = getAuthItem('relopass_role');
@@ -26,44 +38,48 @@ export const HrCommandCenter: React.FC = () => {
     departingSoonCount: number;
     completedCount: number;
   } | null>(null);
-  const [cases, setCases] = useState<Array<{
-    id: string;
-    employeeIdentifier: string;
-    destCountry?: string;
-    status: string;
-    riskStatus: string;
-    tasksDonePercent: number;
-    budgetLimit?: number;
-    budgetEstimated?: number;
-    nextDeadline?: string;
-  }>>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [cases, setCases] = useState<CaseRow[]>([]);
+  const [kpisLoading, setKpisLoading] = useState(true);
+  const [casesLoading, setCasesLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [riskFilter, setRiskFilter] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      setIsLoading(true);
+    async function loadKpis() {
+      setKpisLoading(true);
       try {
-        const [k, c] = await Promise.all([
-          hrAPI.getCommandCenterKPIs(),
-          hrAPI.listCommandCenterCases({ page, limit: 25, risk_filter: riskFilter || undefined }),
-        ]);
-        if (!cancelled) {
-          setKpis(k);
-          setCases(c);
+        const k = await hrAPI.getCommandCenterKPIs();
+        if (!cancelled) setKpis(k);
+      } catch (err: unknown) {
+        if (!cancelled && (err as { response?: { status?: number } })?.response?.status === 401) {
+          safeNavigate(navigate, 'landing');
         }
+      } finally {
+        if (!cancelled) setKpisLoading(false);
+      }
+    }
+    loadKpis();
+    return () => { cancelled = true; };
+  }, [navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCases() {
+      setCasesLoading(true);
+      try {
+        const c = await hrAPI.listCommandCenterCases({ page, limit: 25, risk_filter: riskFilter || undefined });
+        if (!cancelled) setCases(c);
       } catch (err: unknown) {
         if (!cancelled && (err as { response?: { status?: number } })?.response?.status === 401) {
           safeNavigate(navigate, 'landing');
         }
         if (!cancelled) setCases([]);
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setCasesLoading(false);
       }
     }
-    load();
+    loadCases();
     return () => { cancelled = true; };
   }, [navigate, page, riskFilter]);
 
@@ -74,20 +90,19 @@ export const HrCommandCenter: React.FC = () => {
   return (
     <AppShell title="Command Center" subtitle="Portfolio & risk overview across all relocation cases.">
       <div className="space-y-6">
-        {/* KPI Row */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <KPICard title="Active Cases" value={kpis?.activeCases ?? '—'} />
-          <KPICard title="Action Required" value={kpis?.actionRequiredCount ?? '—'} subtitle="Needs HR attention" />
-          <KPICard title="Departing Soon" value={kpis?.departingSoonCount ?? '—'} subtitle="Next 30 days" />
-          <KPICard title="Completed (YTD)" value={kpis?.completedCount ?? '—'} subtitle="Approved cases" />
-          <KPICard title="At Risk" value={kpis?.atRiskCount ?? '—'} subtitle="Red" />
-          <KPICard title="Attention Needed" value={kpis?.attentionNeededCount ?? '—'} subtitle="Yellow" />
-          <KPICard title="Overdue Tasks" value={kpis?.overdueTasksCount ?? '—'} />
-          <KPICard title="Avg. Visa Duration" value="—" subtitle="Placeholder" />
-          <KPICard title="Budget Overruns" value={kpis?.budgetOverrunsCount ?? '—'} />
+        {/* KPI Row — shell visible immediately, values stream in */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+          <KPICard title="Active Cases" value={kpisLoading && kpis == null ? '…' : (kpis?.activeCases ?? '—')} />
+          <KPICard title="Action Required" value={kpisLoading && kpis == null ? '…' : (kpis?.actionRequiredCount ?? '—')} subtitle="Needs HR attention" />
+          <KPICard title="Departing Soon" value={kpisLoading && kpis == null ? '…' : (kpis?.departingSoonCount ?? '—')} subtitle="Next 30 days" />
+          <KPICard title="Completed (YTD)" value={kpisLoading && kpis == null ? '…' : (kpis?.completedCount ?? '—')} subtitle="Approved cases" />
+          <KPICard title="At Risk" value={kpisLoading && kpis == null ? '…' : (kpis?.atRiskCount ?? '—')} subtitle="Red" />
+          <KPICard title="Attention Needed" value={kpisLoading && kpis == null ? '…' : (kpis?.attentionNeededCount ?? '—')} subtitle="Yellow" />
+          <KPICard title="Overdue Tasks" value={kpisLoading && kpis == null ? '…' : (kpis?.overdueTasksCount ?? '—')} />
+          <KPICard title="Budget Overruns" value={kpisLoading && kpis == null ? '…' : (kpis?.budgetOverrunsCount ?? '—')} />
         </div>
 
-        {/* Cases Table */}
+        {/* Cases Table — shell visible immediately */}
         <Card padding="lg">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-[#0b2b43]">Cases</h2>
@@ -102,8 +117,17 @@ export const HrCommandCenter: React.FC = () => {
               <option value="red">Red</option>
             </select>
           </div>
-          {isLoading ? (
-            <div className="text-sm text-[#6b7280] py-8">Loading...</div>
+          {casesLoading && cases.length === 0 ? (
+            <div className="space-y-2 py-6">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex gap-4 py-3 border-b border-[#e2e8f0] last:border-0">
+                  <div className="h-4 rounded bg-[#e2e8f0] animate-pulse w-32" />
+                  <div className="h-4 rounded bg-[#e2e8f0] animate-pulse w-16" />
+                  <div className="h-4 rounded bg-[#e2e8f0] animate-pulse w-20" />
+                  <div className="h-4 rounded bg-[#e2e8f0] animate-pulse w-24" />
+                </div>
+              ))}
+            </div>
           ) : cases.length === 0 ? (
             <div className="text-sm text-[#6b7280] py-8">No cases match your criteria.</div>
           ) : (
