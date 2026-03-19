@@ -305,12 +305,12 @@ export const hrAPI = {
     });
     return response.data;
   },
-  listAssignments: async (): Promise<AssignmentSummary[]> => {
-    const response = await api.get('/api/hr/assignments');
+  listAssignments: async (opts?: { signal?: AbortSignal }): Promise<AssignmentSummary[]> => {
+    const response = await api.get('/api/hr/assignments', { signal: opts?.signal });
     return response.data;
   },
-  getAssignment: async (assignmentId: string): Promise<AssignmentDetail> => {
-    const response = await api.get(`/api/hr/assignments/${assignmentId}`);
+  getAssignment: async (assignmentId: string, opts?: { signal?: AbortSignal }): Promise<AssignmentDetail> => {
+    const response = await api.get(`/api/hr/assignments/${assignmentId}`, { signal: opts?.signal });
     return response.data;
   },
   getResolvedPolicy: async (assignmentId: string): Promise<{

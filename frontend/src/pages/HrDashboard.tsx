@@ -39,7 +39,7 @@ export const HrDashboard: React.FC = () => {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const navigate = useNavigate();
 
-  const loadAssignmentDetails = async (items: AssignmentSummary[], limit = 20) => {
+  const loadAssignmentDetails = async (items: AssignmentSummary[], limit: number, signal?: AbortSignal) => {
     if (items.length === 0) {
       setAssignmentDetails({});
       setDetailsLoadedCount(0);
@@ -53,7 +53,7 @@ export const HrDashboard: React.FC = () => {
 
     const detailEntries = await Promise.allSettled(
       targets.map(async (assignment) => {
-        const detail = await hrAPI.getAssignment(assignment.id);
+        const detail = await hrAPI.getAssignment(assignment.id, { signal });
         return [assignment.id, detail] as const;
       })
     );
@@ -77,13 +77,14 @@ export const HrDashboard: React.FC = () => {
     setDetailsErrorCount((prev) => prev + rejected);
   };
 
-  const loadAssignments = async () => {
+  const loadAssignments = async (signal?: AbortSignal) => {
     setIsLoading(true);
     setDetailsErrorCount(0);
     const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     trackAuthPerf({ stage: 'bootstrap_start', route: '/hr/dashboard', meta: { endpoint: 'listAssignments' } });
     try {
-      const data = await hrAPI.listAssignments();
+      const data = await hrAPI.listAssignments({ signal });
+      if (signal?.aborted) return;
       setAssignments(data);
       if (data.length > 0) {
         localStorage.setItem('relopass_last_assignment_id', data[0].id);
@@ -91,9 +92,10 @@ export const HrDashboard: React.FC = () => {
       const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
       trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments' } });
       setIsLoading(false);
-      // Load a small batch of details first to keep the page responsive.
-      void loadAssignmentDetails(data, 20);
+      // Load a small initial batch to avoid request fan-out; user can load more.
+      void loadAssignmentDetails(data, 5, signal ?? undefined);
     } catch (err: any) {
+      if (err?.name === 'AbortError' || signal?.aborted) return;
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
@@ -106,7 +108,9 @@ export const HrDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    loadAssignments();
+    const ac = new AbortController();
+    loadAssignments(ac.signal);
+    return () => ac.abort();
   }, []);
 
   useEffect(() => {
@@ -386,7 +390,7 @@ export const HrDashboard: React.FC = () => {
             <div className="flex items-center gap-2">
               {!isManageMode ? (
                 <>
-                  <Button variant="outline" onClick={loadAssignments}>Refresh</Button>
+                  <Button variant="outline" onClick={() => loadAssignments()}>Refresh</Button>
                   <Button variant="outline" onClick={() => setIsManageMode(true)}>Manage Cases</Button>
                 </>
               ) : (
@@ -417,7 +421,7 @@ export const HrDashboard: React.FC = () => {
               Loaded details for {detailsLoadedCount}/{assignments.length} cases.
               <Button
                 variant="outline"
-                onClick={() => loadAssignmentDetails(assignments, assignments.length)}
+                onClick={() => loadAssignmentDetails(assignments, assignments.length, undefined)}
               >
                 Load remaining details
               </Button>

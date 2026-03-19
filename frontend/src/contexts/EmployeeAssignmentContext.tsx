@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { employeeAPI } from '../api/client';
 import { invalidateApiCache } from '../api/client';
 import { getAuthItem } from '../utils/demo';
@@ -23,11 +24,14 @@ const EmployeeAssignmentContext = createContext<EmployeeAssignmentContextValue>(
 export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const location = useLocation();
   const role = getAuthItem('relopass_role');
   const isEmployee = role === 'EMPLOYEE' || role === 'ADMIN';
+  const isOnEmployeeRoute = location.pathname.startsWith('/employee');
 
   const fetchAssignment = useCallback(async (clearCache = false) => {
     if (!isEmployee || !getAuthItem('relopass_token')) return;
+    if (!isOnEmployeeRoute) return;
     if (clearCache) invalidateApiCache(CURRENT_ASSIGNMENT_CACHE_KEY);
     setIsLoading(true);
     try {
@@ -42,7 +46,7 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
     } finally {
       setIsLoading(false);
     }
-  }, [isEmployee]);
+  }, [isEmployee, isOnEmployeeRoute]);
 
   useEffect(() => {
     fetchAssignment(false);

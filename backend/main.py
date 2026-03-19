@@ -1054,6 +1054,7 @@ def logout(authorization: Optional[str] = Header(None)):
 
 
 AUTH_PERF_DEBUG = os.getenv("AUTH_PERF_DEBUG", "").lower() in ("1", "true", "yes")
+PERF_DEBUG = os.getenv("PERF_DEBUG", "").lower() in ("1", "true", "yes")
 
 
 def _log_auth_perf(endpoint: str, request_id: str | None, user_id: str | None, total_duration_ms: float, status_code: int):
@@ -1133,6 +1134,22 @@ def login(request: LoginRequest, req: Request):
             company=profile.get("company_id") if profile else user.get("company"),
         )
     )
+
+
+def _log_endpoint_perf(endpoint: str, request_id: str | None, user_id: str | None, total_duration_ms: float, status_code: int, db_duration_ms: float | None = None):
+    """Structured JSON log for endpoint perf (when PERF_DEBUG=1)."""
+    if not PERF_DEBUG:
+        return
+    payload = {
+        "endpoint": endpoint,
+        "request_id": request_id or "",
+        "user_id": (user_id or "")[:8] if user_id else "",
+        "total_duration_ms": round(total_duration_ms, 2),
+        "status_code": status_code,
+    }
+    if db_duration_ms is not None:
+        payload["db_duration_ms"] = round(db_duration_ms, 2)
+    log.info("[endpoint-perf] %s", _json.dumps(payload))
 
 
 # ---------------------------------------------------------------------------
@@ -2663,17 +2680,25 @@ def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
 
 
 @app.get("/api/hr/company-profile")
-def get_company_profile(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+def get_company_profile(request: Request, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    t0 = time.perf_counter()
+    request_id = getattr(request.state, "request_id", None)
     effective = _effective_user(user, UserRole.HR)
     cid = _get_hr_company_id(effective)
     company = db.get_company(cid) if cid else db.get_company_for_user(effective["id"])
+    dur_ms = (time.perf_counter() - t0) * 1000
+    _log_endpoint_perf("/api/hr/company-profile", request_id, user.get("id"), dur_ms, 200)
     return {"company": company}
 
 
 @app.get("/api/company")
-def get_current_user_company(user: Dict[str, Any] = Depends(get_current_user)):
+def get_current_user_company(request: Request, user: Dict[str, Any] = Depends(get_current_user)):
     """Return the authenticated user's company (for header branding). Available to HR and Employee."""
+    t0 = time.perf_counter()
+    request_id = getattr(request.state, "request_id", None)
     company = db.get_company_for_user(user["id"])
+    dur_ms = (time.perf_counter() - t0) * 1000
+    _log_endpoint_perf("/api/company", request_id, user.get("id"), dur_ms, 200)
     return {"company": company}
 
 
@@ -3492,6 +3517,7 @@ def list_hr_assignments(
       plus case metadata from relocation_cases.
     """
     request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    t0 = time.perf_counter()
     try:
         if user.get("is_admin") and not user.get("impersonation"):
             with timed("db.list_all_assignments", request_id):
@@ -3568,6 +3594,8 @@ def list_hr_assignments(
                 employeeLastName=assignment.get("employee_last_name"),
                 case=case_meta,
             ))
+        dur_ms = (time.perf_counter() - t0) * 1000
+        _log_endpoint_perf("/api/hr/assignments", request_id, user.get("id"), dur_ms, 200)
         return summaries
     except Exception as e:
         # Structured error log with request_id and user identity.
@@ -3579,6 +3607,8 @@ def list_hr_assignments(
             repr(e),
             exc_info=True,
         )
+        dur_ms = (time.perf_counter() - t0) * 1000
+        _log_endpoint_perf("/api/hr/assignments", request_id, user.get("id"), dur_ms, 500)
         return JSONResponse(
             status_code=500,
             content={"error": "Unable to load assignments", "request_id": request_id},
