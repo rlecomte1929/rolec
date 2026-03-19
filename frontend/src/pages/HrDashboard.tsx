@@ -114,13 +114,15 @@ export const HrDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     hrAPI.getCompanyProfile()
       .then((res) => {
-        if (!res.company) {
+        if (mounted && !res.company) {
           safeNavigate(navigate, 'hrCompanyProfile');
         }
       })
       .catch(() => undefined);
+    return () => { mounted = false; };
   }, [navigate]);
 
   useRegisterNav('HrDashboard', [

@@ -15,6 +15,8 @@ create index if not exists idx_case_assignments_case_id
 -- Company/profile lookups (get_company_for_user, get_hr_company_id)
 create index if not exists idx_profiles_company_id on public.profiles (company_id);
 create index if not exists idx_hr_users_profile_id on public.hr_users (profile_id);
+create index if not exists idx_hr_users_company_id on public.hr_users (company_id);
 create index if not exists idx_relocation_cases_company_id on public.relocation_cases (company_id);
+create index if not exists idx_employees_company_id on public.employees (company_id);
 
 commit;

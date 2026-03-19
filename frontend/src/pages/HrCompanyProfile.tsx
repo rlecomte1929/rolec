@@ -2,10 +2,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert } from '../components/antigravity';
 import { hrAPI } from '../api/client';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { safeNavigate } from '../navigation/safeNavigate';
+import { useLocation } from 'react-router-dom';
 import { trackAuthPerf } from '../perf/authPerf';
-import { trackRouteEntry, trackShellRender, trackRequestStart, trackRequestEnd, trackFirstMeaningfulContent } from '../perf/pagePerf';
+import { trackRouteEntry, trackShellRender, trackFirstMeaningfulContent } from '../perf/pagePerf';
+import { useHrCompanyContext } from '../contexts/HrCompanyContext';
 import type { CompanyProfilePayload } from '../types';
 
 const ACCEPT_TYPES = 'image/png,image/jpeg,image/jpg,image/svg+xml';
@@ -17,14 +17,15 @@ const FieldSkeleton = () => (
 );
 
 export const HrCompanyProfile: React.FC = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   const route = location.pathname;
+  const { company, loading: profileLoading, refresh } = useHrCompanyContext();
 
   useEffect(() => {
     trackRouteEntry(route);
     trackShellRender(route);
   }, [route]);
+
   const [name, setName] = useState('');
   const [country, setCountry] = useState('');
   const [sizeBand, setSizeBand] = useState('');
@@ -39,7 +40,6 @@ export const HrCompanyProfile: React.FC = () => {
   const [supportEmail, setSupportEmail] = useState('');
   const [defaultWorkingLocation, setDefaultWorkingLocation] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -48,52 +48,28 @@ export const HrCompanyProfile: React.FC = () => {
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
-    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    trackAuthPerf({ stage: 'bootstrap_start', route: location.pathname });
-    const reqTrack = trackRequestStart({
-      requestName: 'getCompanyProfile',
-      endpoint: '/api/hr/company-profile',
-      route: location.pathname,
-      caller: 'HrCompanyProfile',
-      blockedInitialRender: false,
-    });
+    if (company) {
+      const c = company as Record<string, unknown>;
+      setName((c.name as string) || '');
+      setCountry((c.country as string) || '');
+      setSizeBand((c.size_band as string) || '');
+      setAddress((c.address as string) || '');
+      setPhone((c.phone as string) || '');
+      setHrContact((c.hr_contact as string) || '');
+      setLegalName((c.legal_name as string) || '');
+      setWebsite((c.website as string) || '');
+      setHqCity((c.hq_city as string) || '');
+      setIndustry((c.industry as string) || '');
+      setDefaultDestinationCountry((c.default_destination_country as string) || '');
+      setSupportEmail((c.support_email as string) || '');
+      setDefaultWorkingLocation((c.default_working_location as string) || '');
+      setLogoUrl((c.logo_url as string) || null);
 
-    hrAPI.getCompanyProfile()
-      .then((res) => {
-        if (res.company) {
-          const c = res.company as Record<string, unknown>;
-          setName((c.name as string) || '');
-          setCountry((c.country as string) || '');
-          setSizeBand((c.size_band as string) || '');
-          setAddress((c.address as string) || '');
-          setPhone((c.phone as string) || '');
-          setHrContact((c.hr_contact as string) || '');
-          setLegalName((c.legal_name as string) || '');
-          setWebsite((c.website as string) || '');
-          setHqCity((c.hq_city as string) || '');
-          setIndustry((c.industry as string) || '');
-          setDefaultDestinationCountry((c.default_destination_country as string) || '');
-          setSupportEmail((c.support_email as string) || '');
-          setDefaultWorkingLocation((c.default_working_location as string) || '');
-          setLogoUrl((c.logo_url as string) || null);
-        }
-      })
-      .catch((err: { response?: { status?: number; data?: { detail?: string } } }) => {
-        if (err?.response?.status === 401) safeNavigate(navigate, 'landing');
-      })
-      .finally(() => {
-        setProfileLoading(false);
-        const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-        trackAuthPerf({ stage: 'bootstrap_end', route: location.pathname, durationMs: dur });
-        trackRequestEnd({
-          requestName: 'getCompanyProfile',
-          endpoint: '/api/hr/company-profile',
-          route: location.pathname,
-          startTs: reqTrack.startTs,
-        });
-        trackFirstMeaningfulContent(location.pathname, dur);
-      });
-  }, [navigate, location.pathname]);
+      const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      trackAuthPerf({ stage: 'bootstrap_end', route: location.pathname, durationMs: t0 });
+      trackFirstMeaningfulContent(location.pathname, t0);
+    }
+  }, [company, location.pathname]);
 
   const validateLogo = (file: File): string | null => {
     const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
@@ -117,10 +93,8 @@ export const HrCompanyProfile: React.FC = () => {
       setLogoUploading(true);
       try {
         await hrAPI.uploadCompanyLogo(file);
-        const res = await hrAPI.getCompanyProfile();
-        if (res?.company && typeof (res.company as Record<string, unknown>).logo_url === 'string') {
-          setLogoUrl((res.company as Record<string, unknown>).logo_url as string);
-        }
+        await refresh();
+        // Context will update; useEffect syncs company -> form state including logoUrl
       } catch (e: unknown) {
         const msg = e && typeof e === 'object' && 'response' in e
           ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
@@ -130,7 +104,7 @@ export const HrCompanyProfile: React.FC = () => {
         setLogoUploading(false);
       }
     },
-    []
+    [refresh]
   );
 
   const onDrop = useCallback(
@@ -158,7 +132,7 @@ export const HrCompanyProfile: React.FC = () => {
     setLogoUploading(true);
     try {
       await hrAPI.removeCompanyLogo();
-      setLogoUrl(null);
+      await refresh();
     } catch {
       setLogoError('Failed to remove logo.');
     } finally {
@@ -191,6 +165,7 @@ export const HrCompanyProfile: React.FC = () => {
         default_working_location: defaultWorkingLocation.trim() || undefined,
       };
       await hrAPI.saveCompanyProfile(payload);
+      await refresh();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err: unknown) {

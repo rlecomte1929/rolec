@@ -4,6 +4,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
+import { HrCompanyContextProvider } from './contexts/HrCompanyContext';
 import { ServicesFlowProvider } from './features/services/ServicesFlowContext';
 import { ROUTE_DEFS } from './navigation/routes';
 import { Landing } from './pages/Landing';
@@ -125,6 +126,7 @@ function App() {
       <ScrollToTop />
       <SelectedCaseProvider>
       <EmployeeAssignmentProvider>
+      <HrCompanyContextProvider>
       <ServicesFlowProvider>
       <QueryRedirect />
       <Routes>
@@ -259,6 +261,7 @@ function App() {
         <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
       </Routes>
       </ServicesFlowProvider>
+      </HrCompanyContextProvider>
       </EmployeeAssignmentProvider>
       </SelectedCaseProvider>
       <PerfPanel />

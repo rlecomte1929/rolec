@@ -9,11 +9,20 @@ export interface UseCompanyResult {
   refresh: () => Promise<void>;
 }
 
-export function useCompany(): UseCompanyResult {
+export interface UseCompanyOptions {
+  /** When true, skip fetch (e.g. when HR context supplies company on HR routes). */
+  skip?: boolean;
+}
+
+export function useCompany(opts?: UseCompanyOptions): UseCompanyResult {
   const [company, setCompany] = useState<Company | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!opts?.skip);
 
   const fetchCompany = async () => {
+    if (opts?.skip) {
+      setLoading(false);
+      return;
+    }
     const token = getAuthItem('relopass_token');
     const role = getAuthItem('relopass_role');
     if (!token || (!role || (role !== 'HR' && role !== 'EMPLOYEE' && role !== 'ADMIN'))) {
@@ -34,7 +43,7 @@ export function useCompany(): UseCompanyResult {
 
   useEffect(() => {
     fetchCompany();
-  }, []);
+  }, [opts?.skip]);
 
   return { company, loading, refresh: fetchCompany };
 }

@@ -2696,7 +2696,12 @@ def get_current_user_company(request: Request, user: Dict[str, Any] = Depends(ge
     """Return the authenticated user's company (for header branding). Available to HR and Employee."""
     t0 = time.perf_counter()
     request_id = getattr(request.state, "request_id", None)
-    company = db.get_company_for_user(user["id"])
+    # HR users: use canonical hr_users.company_id path; employees: profile.company_id
+    if user.get("role") == UserRole.HR.value or user.get("is_admin"):
+        cid = _get_hr_company_id(user)
+        company = db.get_company(cid) if cid else None
+    else:
+        company = db.get_company_for_user(user["id"])
     dur_ms = (time.perf_counter() - t0) * 1000
     _log_endpoint_perf("/api/company", request_id, user.get("id"), dur_ms, 200)
     return {"company": company}
