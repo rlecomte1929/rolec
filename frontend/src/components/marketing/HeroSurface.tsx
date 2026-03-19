@@ -24,8 +24,8 @@ export const HeroSurface: React.FC<HeroSurfaceProps> = ({
 }) => {
   return (
     <div className={`${className}`}>
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr,minmax(0,1fr)] gap-12 lg:gap-16 items-center">
-        <div className="order-2 lg:order-1">
+      <div className={`${visual ? 'grid grid-cols-1 lg:grid-cols-[1fr,minmax(0,1fr)] gap-12 lg:gap-16 items-center' : ''}`}>
+        <div className={visual ? 'order-2 lg:order-1' : ''}>
           {eyebrow && (
             <p className="text-xs font-semibold uppercase tracking-wider text-marketing-accent mb-4">
               {eyebrow}

@@ -69,7 +69,7 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
               stroke="currentColor"
               strokeWidth="1"
               strokeDasharray="3 4"
-              className="text-marketing-text-subtle"
+              className="text-marketing-text-muted"
             />
           ))}
           {/* Ring connecting the points */}
@@ -81,7 +81,7 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
             stroke="currentColor"
             strokeWidth="1"
             strokeDasharray="4 6"
-            className="text-marketing-text-subtle"
+            className="text-marketing-text-muted"
           />
           {/* Segments between adjacent nodes */}
           {points.map((p, i) => {
@@ -96,7 +96,7 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
                 stroke="currentColor"
                 strokeWidth="1"
                 strokeDasharray="2 4"
-                className="text-marketing-text-subtle"
+                className="text-marketing-text-muted"
               />
             );
           })}

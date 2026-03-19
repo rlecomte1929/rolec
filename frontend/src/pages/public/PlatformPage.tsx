@@ -19,8 +19,8 @@ export const PlatformPage: React.FC = () => {
     <PublicLayout>
       {/* 1. HERO — split layout, mock to the right / below */}
       <Section spacing="lg" background="transparent" fillViewport>
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-10 lg:gap-12">
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col lg:grid lg:grid-cols-[1.4fr,1fr] lg:items-center gap-10 lg:gap-12">
+          <div className="min-w-0">
             <HeroSurface
               title={c.hero.headline}
               subtitle={c.hero.subheadline}
