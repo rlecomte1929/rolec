@@ -1729,6 +1729,8 @@ class AdminCreateAssignmentRequest(BaseModel):
     hr_user_id: str
     employee_user_id: Optional[str] = None
     employee_identifier: Optional[str] = None
+    employee_first_name: Optional[str] = None
+    employee_last_name: Optional[str] = None
     destination_country: Optional[str] = None
 
 
@@ -1760,6 +1762,8 @@ def admin_create_assignment(
             employee_user_id = existing_user["id"]
     if not employee_identifier:
         employee_identifier = "admin-created"
+    employee_first_name = (body.employee_first_name or "").strip() or None
+    employee_last_name = (body.employee_last_name or "").strip() or None
     case_id = str(uuid.uuid4())
     assignment_id = str(uuid.uuid4())
     db.create_case(case_id, body.hr_user_id, {}, company_id=body.company_id)
@@ -1771,6 +1775,8 @@ def admin_create_assignment(
         employee_identifier=employee_identifier,
         status=AssignmentStatus.ASSIGNED.value,
         request_id=None,
+        employee_first_name=employee_first_name,
+        employee_last_name=employee_last_name,
     )
     if body.destination_country:
         db.update_relocation_case_host_country(case_id, body.destination_country)
@@ -2671,8 +2677,12 @@ def get_dashboard(request: Request, user: Dict[str, Any] = Depends(get_current_u
 def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
-    hr_profile = db.get_profile_record(effective["id"])
-    company_id = hr_profile.get("company_id") if hr_profile else None
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No company linked to your profile. Please complete your company profile first.",
+        )
     case_id = str(uuid.uuid4())
     profile = RelocationProfile(userId=effective["id"]).model_dump()
     db.create_case(case_id, effective["id"], profile, company_id=company_id)
@@ -2965,9 +2975,13 @@ def assign_case(
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
 
-        hr_profile = db.get_profile_record(effective["id"])
-        hr_company_id = hr_profile.get("company_id") if hr_profile else None
-        if hr_company_id and not case.get("company_id"):
+        hr_company_id = _get_hr_company_id(effective)
+        if not hr_company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="No company linked to your profile. Please complete your company profile first.",
+            )
+        if not case.get("company_id"):
             db.upsert_relocation_case(
                 case_id=case_id,
                 company_id=hr_company_id,
