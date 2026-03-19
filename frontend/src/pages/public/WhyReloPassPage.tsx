@@ -49,7 +49,7 @@ export const WhyReloPassPage: React.FC = () => {
       </Section>
 
       {/* 2b. THESIS — Bridging statement */}
-      <Section spacing="md" background="transparent">
+      <Section spacing="sm" background="transparent">
         <p className="text-center text-marketing-body-lg font-medium text-marketing-primary max-w-2xl mx-auto leading-relaxed">
           {c.thesis}
         </p>
