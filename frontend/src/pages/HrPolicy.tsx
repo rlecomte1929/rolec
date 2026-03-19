@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { trackRouteEntry, trackShellRender, trackPolicyStage } from '../perf/pagePerf';
 import { Alert, Button, Card, Input } from '../components/antigravity';
 import { employeeAPI, companyPolicyAPI, policyDocumentsAPI } from '../api/client';
 import { EmployeeResolvedPolicyView } from '../features/policy/EmployeeResolvedPolicyView';
+import { HrPolicyOverview } from '../features/policy/HrPolicyOverview';
 import { HrPolicyReviewWorkspace } from '../features/policy/HrPolicyReviewWorkspace';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
@@ -56,10 +58,25 @@ function EmployeePolicyContent() {
 
 export const HrPolicy: React.FC = () => {
   const role = getAuthItem('relopass_role');
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const adminCompanyId = searchParams.get('adminCompanyId') || null;
+
+  useEffect(() => {
+    trackRouteEntry(location.pathname);
+    trackShellRender(location.pathname);
+  }, [location.pathname]);
+
   const [workspaceRefreshTrigger, setWorkspaceRefreshTrigger] = useState(0);
   const [postNormalizePolicyId, setPostNormalizePolicyId] = useState<string | null>(null);
+  /** Document upload/intake UI shown only after user explicitly requests it. */
+  const [showDocumentWorkflow, setShowDocumentWorkflow] = useState(false);
+
+  useEffect(() => {
+    if (showDocumentWorkflow) {
+      trackPolicyStage('upload_ui_shown');
+    }
+  }, [showDocumentWorkflow]);
 
   const handleNormalized = useCallback((policyId: string) => {
     setPostNormalizePolicyId(policyId);
@@ -77,8 +94,9 @@ export const HrPolicy: React.FC = () => {
       </AppShell>
     );
   }
+
   return (
-    <AppShell title={adminCompanyId ? 'Admin: Policy workspace' : 'HR Policy Management'} subtitle={adminCompanyId ? 'Inspect and assist with company policy' : 'Ingest, structure, edit, and publish assignment policies.'}>
+    <AppShell title={adminCompanyId ? 'Admin: Policy workspace' : 'Policy'} subtitle={adminCompanyId ? 'Inspect and assist with company policy' : 'Manage relocation policies for your company.'}>
       <div data-hr-policy-page="v2">
         {adminCompanyId && (
           <p className="text-sm text-[#6b7280] mb-4">
@@ -86,17 +104,31 @@ export const HrPolicy: React.FC = () => {
             <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policies overview</Link>
           </p>
         )}
-        {/* 1. Policy document intake — primary upload path (creates policy_documents) */}
-        <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} adminCompanyId={adminCompanyId} />
-        {/* 2. HR Policy Review workspace (clauses, normalize, publish) */}
-        <div className="mt-8">
-          <HrPolicyReviewWorkspace
-          refreshTrigger={workspaceRefreshTrigger}
-          postNormalizePolicyId={postNormalizePolicyId}
-          onBindComplete={() => setPostNormalizePolicyId(null)}
-          adminCompanyId={adminCompanyId}
-        />
-        </div>
+
+        {!showDocumentWorkflow ? (
+          <HrPolicyOverview onOpenUpload={() => setShowDocumentWorkflow(true)} />
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => setShowDocumentWorkflow(false)}
+                className="text-sm text-[#6b7280] hover:text-[#0b2b43]"
+              >
+                ← Back to overview
+              </button>
+            </div>
+            <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} adminCompanyId={adminCompanyId} />
+            <div className="mt-8">
+              <HrPolicyReviewWorkspace
+                refreshTrigger={workspaceRefreshTrigger}
+                postNormalizePolicyId={postNormalizePolicyId}
+                onBindComplete={() => setPostNormalizePolicyId(null)}
+                adminCompanyId={adminCompanyId}
+              />
+            </div>
+          </>
+        )}
       </div>
     </AppShell>
   );

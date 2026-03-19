@@ -41,9 +41,9 @@ export const HrEmployees: React.FC = () => {
           <p className="text-sm text-[#6b7280]">
             View and manage employees in your company. Click an employee to view or edit details.
           </p>
-          <Link to={buildRoute('hrPolicyManagement')}>
+          <Link to={buildRoute('hrPolicy')}>
             <Button variant="outline" size="sm">
-              Policy Management
+              Policy
             </Button>
           </Link>
         </div>

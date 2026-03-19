@@ -126,6 +126,15 @@ export function trackPageInteractive(route: string): void {
   log('page_interactive', { route });
 }
 
+/** Custom stage for policy page: upload CTA click, upload UI shown, etc. */
+export function trackPolicyStage(stage: string, meta?: Record<string, unknown>): void {
+  if (!ENABLED) return;
+  const route = '/hr/policy';
+  stageEntries.push({ stage, route, ts: now(), meta });
+  if (stageEntries.length > MAX_ENTRIES) stageEntries.shift();
+  log(`policy_${stage}`, { stage, ...meta });
+}
+
 export function getPagePerfRequests(): PagePerfRequestEntry[] {
   return requestEntries.slice();
 }
