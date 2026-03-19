@@ -2,16 +2,23 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert } from '../components/antigravity';
 import { hrAPI } from '../api/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useCompany } from '../hooks/useCompany';
+import { trackAuthPerf } from '../perf/authPerf';
 import type { CompanyProfilePayload } from '../types';
 
 const ACCEPT_TYPES = 'image/png,image/jpeg,image/jpg,image/svg+xml';
 const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
 
+/** Skeleton placeholder for form fields while profile loads. */
+const FieldSkeleton = () => (
+  <div className="h-10 rounded-lg bg-[#e2e8f0] animate-pulse" />
+);
+
 export const HrCompanyProfile: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { company, refresh: refreshCompany } = useCompany();
   const [name, setName] = useState('');
   const [country, setCountry] = useState('');
@@ -26,7 +33,7 @@ export const HrCompanyProfile: React.FC = () => {
   const [defaultDestinationCountry, setDefaultDestinationCountry] = useState('');
   const [supportEmail, setSupportEmail] = useState('');
   const [defaultWorkingLocation, setDefaultWorkingLocation] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -35,6 +42,9 @@ export const HrCompanyProfile: React.FC = () => {
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackAuthPerf({ stage: 'bootstrap_start', route: location.pathname });
+
     hrAPI.getCompanyProfile()
       .then((res) => {
         if (res.company) {
@@ -57,8 +67,12 @@ export const HrCompanyProfile: React.FC = () => {
       .catch((err: { response?: { status?: number; data?: { detail?: string } } }) => {
         if (err?.response?.status === 401) safeNavigate(navigate, 'landing');
       })
-      .finally(() => setLoading(false));
-  }, [navigate]);
+      .finally(() => {
+        setProfileLoading(false);
+        const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+        trackAuthPerf({ stage: 'bootstrap_end', route: location.pathname, durationMs: dur });
+      });
+  }, [navigate, location.pathname]);
 
   const validateLogo = (file: File): string | null => {
     const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
@@ -167,20 +181,22 @@ export const HrCompanyProfile: React.FC = () => {
 
   const logoUrl = company?.logo_url ?? null;
 
-  if (loading) {
-    return (
-      <AppShell title="Company Profile" subtitle="Set up your organization">
-        <div className="text-sm text-[#6b7280] py-8">Loading company profile...</div>
-      </AppShell>
-    );
-  }
-
   return (
-    <AppShell title="Company Profile" subtitle="Complete your company profile to prefill employee cases.">
+    <AppShell title="Company Profile" subtitle={profileLoading ? 'Loading...' : 'Complete your company profile to prefill employee cases.'}>
       <Card padding="lg">
         {error && <Alert variant="error" className="mb-4">{error}</Alert>}
         {saved && <Alert variant="success" className="mb-4">Saved.</Alert>}
         <div className="space-y-4">
+          {profileLoading ? (
+            <>
+              {[...Array(12)].map((_, i) => <FieldSkeleton key={i} />)}
+              <div className="pt-2">
+                <div className="h-4 w-40 rounded bg-[#e2e8f0] animate-pulse mb-2" />
+                <div className="h-24 rounded-lg bg-[#e2e8f0] animate-pulse" />
+              </div>
+            </>
+          ) : (
+          <>
           <Input label="Company name" value={name} onChange={setName} fullWidth />
           <Input label="Legal name" value={legalName} onChange={setLegalName} fullWidth placeholder="Optional" />
           <Input label="Country" value={country} onChange={setCountry} fullWidth />
@@ -240,6 +256,8 @@ export const HrCompanyProfile: React.FC = () => {
           <Button onClick={save} disabled={saving}>
             {saving ? 'Saving...' : 'Save company profile'}
           </Button>
+          </>
+          )}
         </div>
       </Card>
     </AppShell>

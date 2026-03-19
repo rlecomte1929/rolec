@@ -353,8 +353,10 @@ export const hrAPI = {
     return response.data;
   },
   getCompanyProfile: async (): Promise<{ company: any | null }> => {
-    const response = await api.get('/api/hr/company-profile');
-    return response.data;
+    return cachedRequest('hr:company-profile', 60_000, async () => {
+      const response = await api.get('/api/hr/company-profile');
+      return response.data;
+    });
   },
   /** Company-scoped employees for HR */
   listCompanyEmployees: async (): Promise<{ employees: HrCompanyEmployee[] }> => {
@@ -374,16 +376,22 @@ export const hrAPI = {
   },
   saveCompanyProfile: async (payload: CompanyProfilePayload): Promise<any> => {
     const response = await api.post('/api/hr/company-profile', payload);
+    invalidateApiCache('hr:company-profile');
+    invalidateApiCache('company:get');
     return response.data;
   },
   uploadCompanyLogo: async (file: File): Promise<{ ok: boolean; logo_url: string }> => {
     const formData = new FormData();
     formData.append('file', file);
     const response = await api.post('/api/hr/company-profile/logo', formData);
+    invalidateApiCache('hr:company-profile');
+    invalidateApiCache('company:get');
     return response.data;
   },
   removeCompanyLogo: async (): Promise<{ ok: boolean }> => {
     const response = await api.post('/api/hr/company-profile/remove-logo');
+    invalidateApiCache('hr:company-profile');
+    invalidateApiCache('company:get');
     return response.data;
   },
   listMessages: async (): Promise<{ messages: any[] }> => {

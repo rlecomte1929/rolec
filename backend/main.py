@@ -1053,9 +1053,30 @@ def logout(authorization: Optional[str] = Header(None)):
     return {"success": True}
 
 
+AUTH_PERF_DEBUG = os.getenv("AUTH_PERF_DEBUG", "").lower() in ("1", "true", "yes")
+
+
+def _log_auth_perf(endpoint: str, request_id: str | None, user_id: str | None, total_duration_ms: float, status_code: int):
+    """Structured JSON log for auth perf (when AUTH_PERF_DEBUG=1)."""
+    if not AUTH_PERF_DEBUG:
+        return
+    log.info(
+        "[auth-perf] %s",
+        _json.dumps({
+            "endpoint": endpoint,
+            "request_id": request_id or "",
+            "user_id": (user_id or "")[:8] if user_id else "",
+            "total_duration_ms": round(total_duration_ms, 2),
+            "status_code": status_code,
+        }),
+    )
+
+
 @app.post("/api/auth/login", response_model=LoginResponse)
-def login(request: LoginRequest):
+def login(request: LoginRequest, req: Request):
     """Login with username or email + password."""
+    t0 = time.perf_counter()
+    request_id = getattr(req.state, "request_id", None) or ""
     identifier = (request.identifier or "").strip()
     if not identifier:
         log.warning("auth_login fail identifier_empty")
@@ -1094,7 +1115,13 @@ def login(request: LoginRequest):
         effective_role = UserRole.ADMIN
 
     log.info("auth_login success user_id=%s", user["id"][:8])
-
+    _log_auth_perf(
+        "/api/auth/login",
+        request_id,
+        user["id"],
+        (time.perf_counter() - t0) * 1000,
+        200,
+    )
     return LoginResponse(
         token=token,
         user=UserResponse(

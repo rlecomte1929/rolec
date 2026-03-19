@@ -5,6 +5,7 @@ import { Card, Button, Input, Alert, Badge } from '../components/antigravity';
 import { hrAPI } from '../api/client';
 import type { AssignmentSummary, AssignmentDetail } from '../types';
 import { startInteraction, endInteraction } from '../perf/perf';
+import { trackAuthPerf } from '../perf/authPerf';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
@@ -79,12 +80,16 @@ export const HrDashboard: React.FC = () => {
   const loadAssignments = async () => {
     setIsLoading(true);
     setDetailsErrorCount(0);
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackAuthPerf({ stage: 'bootstrap_start', route: '/hr/dashboard', meta: { endpoint: 'listAssignments' } });
     try {
       const data = await hrAPI.listAssignments();
       setAssignments(data);
       if (data.length > 0) {
         localStorage.setItem('relopass_last_assignment_id', data[0].id);
       }
+      const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+      trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments' } });
       setIsLoading(false);
       // Load a small batch of details first to keep the page responsive.
       void loadAssignmentDetails(data, 20);
@@ -94,6 +99,8 @@ export const HrDashboard: React.FC = () => {
       } else {
         setError('Unable to load assignments.');
       }
+      const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+      trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments', error: true } });
       setIsLoading(false);
     }
   };
@@ -441,7 +448,20 @@ export const HrDashboard: React.FC = () => {
             </div>
           )}
 
-          {isLoading && <div className="text-sm text-[#6b7280]">Loading assignments...</div>}
+          {isLoading && (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="grid grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] gap-4 px-4 py-4 border-t border-[#e2e8f0] first:border-t-0">
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-32" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-20" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-24" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-16" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-20" />
+                  <div className="h-4 rounded bg-[#e2e8f0] animate-pulse w-4 ml-auto" />
+                </div>
+              ))}
+            </div>
+          )}
           {!isLoading && filteredAssignments.length === 0 && (
             <div className="text-sm text-[#4b5563]">No assignments yet.</div>
           )}

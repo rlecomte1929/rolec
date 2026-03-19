@@ -11,8 +11,8 @@ export const useAdminContext = () => {
     setLoading(true);
     const token = getAuthItem('relopass_token');
     const role = getAuthItem('relopass_role');
-    const isPrivileged = role === 'ADMIN' || role === 'HR';
-    if (!token || !isPrivileged) {
+    // Only fetch for ADMIN; /api/admin/context returns 403 for HR-only users.
+    if (!token || role !== 'ADMIN') {
       setContext(null);
       setLoading(false);
       return;
