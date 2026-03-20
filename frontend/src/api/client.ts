@@ -325,7 +325,18 @@ export const hrAPI = {
         ...(query.destination && { destination: query.destination }),
       },
     });
-    return response.data;
+    const payload = response.data;
+    // Defensive: proxies or older backends may return a non-array; prevents ".filter is not a function" crashes.
+    const raw =
+      payload && typeof payload === 'object' && 'assignments' in payload
+        ? (payload as AssignmentsListResponse).assignments
+        : Array.isArray(payload)
+          ? (payload as AssignmentSummary[])
+          : [];
+    const assignments = Array.isArray(raw) ? raw : [];
+    const totalRaw = payload && typeof payload === 'object' && 'total' in payload ? (payload as AssignmentsListResponse).total : undefined;
+    const total = typeof totalRaw === 'number' && Number.isFinite(totalRaw) ? totalRaw : assignments.length;
+    return { assignments, total };
   },
   getAssignment: async (assignmentId: string, opts?: { signal?: AbortSignal }): Promise<AssignmentDetail> => {
     const response = await api.get(`/api/hr/assignments/${assignmentId}`, { signal: opts?.signal });

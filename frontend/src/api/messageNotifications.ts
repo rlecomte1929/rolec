@@ -23,7 +23,8 @@ export async function listUnreadMessageNotifications(limit = 20): Promise<Messag
     '/api/messages/unread-list',
     { params: { limit } }
   );
-  return res.data?.notifications ?? [];
+  const raw = res.data?.notifications;
+  return Array.isArray(raw) ? raw : [];
 }
 
 export async function markConversationRead(assignmentId: string): Promise<void> {

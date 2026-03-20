@@ -64,12 +64,13 @@ export const HrDashboard: React.FC = () => {
         destination: appliedDestination.trim() || undefined,
       });
       if (signal?.aborted) return;
-      const list = res.assignments;
+      const list = Array.isArray(res.assignments) ? res.assignments : [];
+      const totalCount = typeof res.total === 'number' && Number.isFinite(res.total) ? res.total : list.length;
       if (list.length > 0 && !append) {
         localStorage.setItem('relopass_last_assignment_id', list[0].id);
       }
       setAssignments((prev) => (append ? [...prev, ...list] : list));
-      setTotal(res.total);
+      setTotal(totalCount);
       setOffset(nextOffset + list.length);
       const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
       trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments', count: list.length } });
@@ -208,7 +209,8 @@ export const HrDashboard: React.FC = () => {
   };
 
   const displayName = (assignment: AssignmentSummary) => {
-    const fromHr = [assignment.employeeFirstName, assignment.employeeLastName].filter(Boolean).join(' ');
+    const safe = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '');
+    const fromHr = [safe(assignment.employeeFirstName), safe(assignment.employeeLastName)].filter(Boolean).join(' ');
     return fromHr || assignment.employeeIdentifier;
   };
 
