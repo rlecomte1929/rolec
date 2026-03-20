@@ -214,7 +214,9 @@ export const HrAssignmentPackageReview: React.FC = () => {
                   <div className="text-sm font-semibold text-[#0b2b43]">Compliance observations</div>
                   <ul className="text-xs text-[#4b5563] mt-2 space-y-2">
                     {compliance.actions.map((action, idx) => (
-                      <li key={idx}>• {action}</li>
+                      <li key={idx}>
+                        • {typeof action === 'string' ? action : action.title}
+                      </li>
                     ))}
                   </ul>
                 </div>

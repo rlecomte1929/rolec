@@ -260,8 +260,8 @@ export const HrAssignmentReview: React.FC = () => {
   const docsComplete = docsList.filter((doc) => doc.complete).length;
   const docsTotal = docsList.length || 1;
 
-  const attentionItems = compliance?.actions?.length
-    ? compliance.actions
+  const attentionItems: string[] = compliance?.actions?.length
+    ? compliance.actions.map((a) => (typeof a === 'string' ? a : a.title))
     : ['Complete employee profile', 'Collect passport scans'];
   const inProgressItems = compliance?.checks?.length
     ? compliance.checks.filter((check) => check.status === 'NEEDS_REVIEW').map((check) => check.name)
