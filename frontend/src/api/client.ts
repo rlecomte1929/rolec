@@ -342,6 +342,46 @@ export const hrAPI = {
     const response = await api.get(`/api/hr/assignments/${assignmentId}`, { signal: opts?.signal });
     return response.data;
   },
+  getReadinessSummary: async (
+    assignmentId: string,
+    opts?: { signal?: AbortSignal }
+  ): Promise<Record<string, unknown>> => {
+    const response = await api.get(`/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/summary`, {
+      signal: opts?.signal,
+    });
+    return response.data;
+  },
+  getReadinessDetail: async (
+    assignmentId: string,
+    opts?: { signal?: AbortSignal }
+  ): Promise<Record<string, unknown>> => {
+    const response = await api.get(`/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/detail`, {
+      signal: opts?.signal,
+    });
+    return response.data;
+  },
+  patchReadinessChecklistItem: async (
+    assignmentId: string,
+    itemId: string,
+    payload: { status: string; notes?: string }
+  ): Promise<{ success: boolean }> => {
+    const response = await api.patch(
+      `/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/checklist-items/${encodeURIComponent(itemId)}`,
+      payload
+    );
+    return response.data;
+  },
+  patchReadinessMilestone: async (
+    assignmentId: string,
+    milestoneId: string,
+    payload: { completed: boolean; notes?: string }
+  ): Promise<{ success: boolean }> => {
+    const response = await api.patch(
+      `/api/hr/assignments/${encodeURIComponent(assignmentId)}/readiness/milestones/${encodeURIComponent(milestoneId)}`,
+      payload
+    );
+    return response.data;
+  },
   getResolvedPolicy: async (assignmentId: string): Promise<{
     resolved: {
       id: string;

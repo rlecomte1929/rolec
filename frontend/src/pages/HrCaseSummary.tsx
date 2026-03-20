@@ -8,6 +8,7 @@ import type { AssignmentDetail, AssignmentStatus } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { CaseTimeline } from '../features/timeline/CaseTimeline';
+import { CaseReadinessCore } from '../features/readiness/CaseReadinessCore';
 
 const statusBadge = (status?: AssignmentStatus) => {
   if (!status) return <Badge variant="neutral">Unknown</Badge>;
@@ -212,6 +213,8 @@ export const HrCaseSummary: React.FC = () => {
               </div>
             </div>
           </Card>
+
+          {assignment?.id && <CaseReadinessCore assignmentId={assignment.id} />}
 
           {canReopen && isReopenOpen && (
             <Card padding="lg">

@@ -1,0 +1,67 @@
+{
+  "templates": [
+    {
+      "destination_key": "SG",
+      "route_key": "employment",
+      "route_title": "Singapore — Employment Pass (typical sponsored route)",
+      "employee_summary": "Your company will typically sponsor an Employment Pass (EP) or S Pass depending on role and salary. ReloPass tracks documents and milestones so HR and you stay aligned before the move.",
+      "hr_summary": "Standard path: verify quota/salary benchmarks, obtain EP or S Pass approval via MOM, then complete issuance and relocation steps. Timeline compresses if dependants need passes.",
+      "internal_notes_hr": "Confirm COMPASS / Fair Consideration where applicable; check DP needs early.",
+      "watchouts": [
+        "EP processing can take several weeks; start once salary and role classification are firm.",
+        "Dependant passes add parallel documentation (marriage/birth certificates, translations).",
+        "IPA validity window is tight — align travel and entry dates with HR."
+      ],
+      "checklist": [
+        { "sort_order": 1, "title": "Signed employment contract & job description", "owner_role": "employer", "required": true, "notes_employee": "Your HR team provides these for the pass application.", "notes_hr": "Ensure JD matches MOM role classification." },
+        { "sort_order": 2, "title": "Passport bio page (all travellers)", "owner_role": "employee", "required": true, "notes_employee": "Valid for at least 6 months beyond intended entry.", "notes_hr": null },
+        { "sort_order": 3, "title": "Educational certificates & transcripts", "owner_role": "employee", "required": true, "notes_employee": "May require certified translations.", "notes_hr": "Used for EP qualification evidence." },
+        { "sort_order": 4, "title": "Passport photos (MOM specifications)", "owner_role": "employee", "required": true, "notes_employee": null, "notes_hr": null },
+        { "sort_order": 5, "title": "Company EP application submission", "owner_role": "hr", "required": true, "notes_employee": "Handled by HR or immigration partner.", "notes_hr": "Track MOM reference number." },
+        { "sort_order": 6, "title": "In-Principle Approval (IPA) received", "owner_role": "hr", "required": true, "depends_on_sort_order": 5, "notes_employee": "You will need IPA for entry when instructed.", "notes_hr": null },
+        { "sort_order": 7, "title": "Medical examination (if required)", "owner_role": "employee", "required": false, "notes_employee": "Clinic list usually provided with IPA.", "notes_hr": null },
+        { "sort_order": 8, "title": "Issue pass & register fingerprints", "owner_role": "employee", "required": true, "depends_on_sort_order": 6, "notes_employee": "Completed after arrival in Singapore.", "notes_hr": null },
+        { "sort_order": 9, "title": "Housing & schooling shortlist (if family)", "owner_role": "employee", "required": false, "notes_employee": "Parallel track to immigration.", "notes_hr": "Align with target move date." },
+        { "sort_order": 10, "title": "Relocation services booking", "owner_role": "provider", "required": false, "notes_employee": null, "notes_hr": "Optional vendor engagement." }
+      ],
+      "milestones": [
+        { "sort_order": 1, "phase": "pre", "title": "Kickoff & route confirmation", "body_employee": "HR confirms the sponsored pass route and timeline with you.", "body_hr": "Lock salary band, role title, and dependency on EP vs S Pass.", "owner_role": "hr", "relative_timing": "T-10 to 12 weeks" },
+        { "sort_order": 2, "phase": "pre", "title": "Document pack complete", "body_employee": "You upload passport, education, and family documents as requested.", "body_hr": "Validate completeness before MOM submission.", "owner_role": "employee", "relative_timing": "T-8 weeks" },
+        { "sort_order": 3, "phase": "immigration", "title": "MOM submission", "body_employee": "Handled by employer; you may be asked for clarifications.", "body_hr": "Submit EP/S Pass application; monitor status.", "owner_role": "hr", "relative_timing": "T-6 weeks" },
+        { "sort_order": 4, "phase": "immigration", "title": "IPA issued", "body_employee": "Review entry instructions and validity dates.", "body_hr": "Share IPA; plan entry and pass issuance appointment.", "owner_role": "hr", "relative_timing": "T-4 weeks" },
+        { "sort_order": 5, "phase": "move", "title": "Enter Singapore & complete pass formalities", "body_employee": "Follow IPA conditions; attend appointment if required.", "body_hr": "Coordinate onboarding and compliance checks.", "owner_role": "employee", "relative_timing": "T-2 to 0 weeks" },
+        { "sort_order": 6, "phase": "post", "title": "Settle-in & local registrations", "body_employee": "Bank, phone, housing handover as applicable.", "body_hr": "Optional vendor touchpoints.", "owner_role": "employee", "relative_timing": "T+0 to 4 weeks" }
+      ]
+    },
+    {
+      "destination_key": "FR",
+      "route_key": "employment",
+      "route_title": "France — Salarié / passeport talent (high-level typical paths)",
+      "employee_summary": "France offers several sponsored work routes; your employer’s immigration partner usually selects between standard employee permits or talent passports depending on role and compensation.",
+      "hr_summary": "Validate work authorization path with counsel; long-stay visa + titre de séjour sequence applies for most non-EU nationals. Lead times vary by consulate.",
+      "internal_notes_hr": "Talent passport eligibility reduces some steps — confirm with legal.",
+      "watchouts": [
+        "Consulate appointment availability can be the critical path.",
+        "Medical visit (OFII) and titre appointments are sequential — do not skip ordering.",
+        "Housing proof may be needed early for some visa types."
+      ],
+      "checklist": [
+        { "sort_order": 1, "title": "Work contract & assignment letter", "owner_role": "employer", "required": true, "notes_employee": null, "notes_hr": "French or certified translation as required." },
+        { "sort_order": 2, "title": "Passport & prior visas", "owner_role": "employee", "required": true, "notes_employee": null, "notes_hr": null },
+        { "sort_order": 3, "title": "Police clearance / casier (if requested)", "owner_role": "employee", "required": false, "notes_employee": "Depends on consulate checklist.", "notes_hr": null },
+        { "sort_order": 4, "title": "Long-stay visa application", "owner_role": "employee", "required": true, "notes_employee": "Book consulate appointment when HR confirms pack.", "notes_hr": "Track VLS-TS vs other visa types." },
+        { "sort_order": 5, "title": "Arrival declaration & medical (OFII)", "owner_role": "employee", "required": true, "notes_employee": "Follow instructions stamped in passport.", "notes_hr": null },
+        { "sort_order": 6, "title": "Titre de séjour appointment", "owner_role": "employee", "required": true, "notes_employee": "Prefecture scheduling varies by location.", "notes_hr": "Support with employer attestations." },
+        { "sort_order": 7, "title": "Social security & bank setup", "owner_role": "employee", "required": false, "notes_employee": "Often after titre issuance.", "notes_hr": null },
+        { "sort_order": 8, "title": "Housing lease or temporary accommodation proof", "owner_role": "employee", "required": false, "notes_employee": null, "notes_hr": "May be required for some steps." }
+      ],
+      "milestones": [
+        { "sort_order": 1, "phase": "pre", "title": "Route & counsel alignment", "body_employee": "HR explains expected permit path and timing.", "body_hr": "Confirm category with immigration counsel.", "owner_role": "hr", "relative_timing": "T-12 weeks" },
+        { "sort_order": 2, "phase": "pre", "title": "Document pack & translations", "body_employee": "Gather civil and education documents.", "body_hr": "Review translations and apostilles.", "owner_role": "employee", "relative_timing": "T-10 weeks" },
+        { "sort_order": 3, "phase": "immigration", "title": "Consulate visa appointment", "body_employee": "Attend with full pack.", "body_hr": "Track outcomes and validity.", "owner_role": "employee", "relative_timing": "T-6 weeks" },
+        { "sort_order": 4, "phase": "move", "title": "Arrival in France", "body_employee": "Start visa validation / OFII steps as instructed.", "body_hr": "Coordinate start date.", "owner_role": "employee", "relative_timing": "T-2 weeks" },
+        { "sort_order": 5, "phase": "post", "title": "Titre de séjour issued", "body_employee": "Secure physical card and copies.", "body_hr": "HR file for compliance.", "owner_role": "employee", "relative_timing": "T+0 to 8 weeks" }
+      ]
+    }
+  ]
+}

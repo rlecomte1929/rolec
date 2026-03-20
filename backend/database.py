@@ -15,6 +15,13 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
 from .db_config import DATABASE_URL as _raw_url
+from .readiness_service import (
+    DEFAULT_ROUTE_KEY,
+    extract_destination_from_case_profile,
+    extract_destination_from_profile,
+    normalize_destination_key,
+    resolve_readiness_route_key,
+)
 
 log = logging.getLogger(__name__)
 
@@ -217,6 +224,10 @@ class Database:
             with self.engine.connect() as conn:
                 self._db_healthcheck(conn)
             log.info("Runtime DDL disabled via DISABLE_RUNTIME_DDL. Skipping init_db DDL.")
+            try:
+                self.seed_readiness_templates_if_empty()
+            except Exception as e:
+                log.warning("readiness template seed skipped: %s", e)
             return
 
         with self.engine.begin() as conn:
@@ -1311,6 +1322,103 @@ class Database:
                 "ON message_conversation_prefs(user_id, archived_at)"
             ))
 
+            # Case Readiness Core v1: reusable templates + per-assignment state
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS readiness_templates (
+                    id TEXT PRIMARY KEY,
+                    destination_key TEXT NOT NULL,
+                    route_key TEXT NOT NULL DEFAULT 'employment',
+                    route_title TEXT NOT NULL,
+                    employee_summary TEXT NOT NULL DEFAULT '',
+                    hr_summary TEXT NOT NULL DEFAULT '',
+                    internal_notes_hr TEXT,
+                    watchouts_json TEXT NOT NULL DEFAULT '[]',
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(destination_key, route_key)
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_readiness_templates_dest "
+                "ON readiness_templates(destination_key)"
+            ))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS readiness_template_checklist_items (
+                    id TEXT PRIMARY KEY,
+                    template_id TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    title TEXT NOT NULL,
+                    owner_role TEXT NOT NULL DEFAULT 'employee',
+                    required INTEGER NOT NULL DEFAULT 1,
+                    depends_on_sort_order INTEGER,
+                    notes_employee TEXT,
+                    notes_hr TEXT,
+                    stable_key TEXT
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_readiness_tmpl_chk_template "
+                "ON readiness_template_checklist_items(template_id, sort_order)"
+            ))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS readiness_template_milestones (
+                    id TEXT PRIMARY KEY,
+                    template_id TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    phase TEXT NOT NULL DEFAULT 'general',
+                    title TEXT NOT NULL,
+                    body_employee TEXT,
+                    body_hr TEXT,
+                    owner_role TEXT NOT NULL DEFAULT 'hr',
+                    relative_timing TEXT
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_readiness_tmpl_ms_template "
+                "ON readiness_template_milestones(template_id, sort_order)"
+            ))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS case_readiness (
+                    assignment_id TEXT PRIMARY KEY,
+                    template_id TEXT NOT NULL,
+                    destination_key TEXT NOT NULL,
+                    route_key TEXT NOT NULL,
+                    case_note_hr TEXT,
+                    updated_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_case_readiness_template "
+                "ON case_readiness(template_id)"
+            ))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS case_readiness_checklist_state (
+                    assignment_id TEXT NOT NULL,
+                    template_checklist_id TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    notes TEXT,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (assignment_id, template_checklist_id)
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_crcs_assignment "
+                "ON case_readiness_checklist_state(assignment_id)"
+            ))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS case_readiness_milestone_state (
+                    assignment_id TEXT NOT NULL,
+                    template_milestone_id TEXT NOT NULL,
+                    completed_at TEXT,
+                    notes TEXT,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (assignment_id, template_milestone_id)
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_crms_assignment "
+                "ON case_readiness_milestone_state(assignment_id)"
+            ))
+
             # Best-effort schema extensions for relocation_cases
             if _is_sqlite:
                 cols = conn.execute(text("PRAGMA table_info(companies)")).fetchall()
@@ -1532,6 +1640,11 @@ class Database:
 
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
+
+        try:
+            self.seed_readiness_templates_if_empty()
+        except Exception as e:
+            log.warning("readiness template seed skipped: %s", e)
 
     # ------------------------------------------------------------------
     # Users table migration helpers (SQLite only)
@@ -8531,6 +8644,377 @@ class Database:
                     "desc": e.get("description"), "srj": json.dumps(e.get("source_rule_ids_json") or []),
                 })
         return rid
+
+    # ==================================================================
+    # Case Readiness Core v1
+    # ==================================================================
+    def seed_readiness_templates_if_empty(self) -> None:
+        """Load JSON seed when no templates exist (idempotent)."""
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT COUNT(*) AS n FROM readiness_templates")).fetchone()
+            if row and int(row[0] or 0) > 0:
+                return
+        seed_path = os.path.join(os.path.dirname(__file__), "seed_data", "readiness_templates.json")
+        if not os.path.isfile(seed_path):
+            log.warning("readiness seed file missing: %s", seed_path)
+            return
+        with open(seed_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        templates = payload.get("templates") or []
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            for t in templates:
+                tid = str(uuid.uuid4())
+                dest = (t.get("destination_key") or "").strip().upper()
+                route = (t.get("route_key") or DEFAULT_ROUTE_KEY).strip() or DEFAULT_ROUTE_KEY
+                if not dest:
+                    continue
+                watchouts = json.dumps(t.get("watchouts") or [])
+                conn.execute(
+                    text(
+                        "INSERT INTO readiness_templates "
+                        "(id, destination_key, route_key, route_title, employee_summary, hr_summary, "
+                        "internal_notes_hr, watchouts_json, updated_at) "
+                        "VALUES (:id, :dk, :rk, :rt, :es, :hs, :inh, :wj, :ua)"
+                    ),
+                    {
+                        "id": tid,
+                        "dk": dest,
+                        "rk": route,
+                        "rt": t.get("route_title") or f"{dest} — {route}",
+                        "es": t.get("employee_summary") or "",
+                        "hs": t.get("hr_summary") or "",
+                        "inh": t.get("internal_notes_hr"),
+                        "wj": watchouts,
+                        "ua": now,
+                    },
+                )
+                for c in t.get("checklist") or []:
+                    cid = str(uuid.uuid4())
+                    conn.execute(
+                        text(
+                            "INSERT INTO readiness_template_checklist_items "
+                            "(id, template_id, sort_order, title, owner_role, required, depends_on_sort_order, "
+                            "notes_employee, notes_hr, stable_key) "
+                            "VALUES (:id, :tid, :so, :title, :own, :req, :dep, :ne, :nh, :sk)"
+                        ),
+                        {
+                            "id": cid,
+                            "tid": tid,
+                            "so": int(c.get("sort_order") or 0),
+                            "title": c.get("title") or "Item",
+                            "own": (c.get("owner_role") or "employee").strip(),
+                            "req": 1 if c.get("required", True) else 0,
+                            "dep": c.get("depends_on_sort_order"),
+                            "ne": c.get("notes_employee"),
+                            "nh": c.get("notes_hr"),
+                            "sk": c.get("stable_key"),
+                        },
+                    )
+                for m in t.get("milestones") or []:
+                    mid = str(uuid.uuid4())
+                    conn.execute(
+                        text(
+                            "INSERT INTO readiness_template_milestones "
+                            "(id, template_id, sort_order, phase, title, body_employee, body_hr, owner_role, relative_timing) "
+                            "VALUES (:id, :tid, :so, :ph, :title, :be, :bh, :own, :rt)"
+                        ),
+                        {
+                            "id": mid,
+                            "tid": tid,
+                            "so": int(m.get("sort_order") or 0),
+                            "ph": (m.get("phase") or "general").strip(),
+                            "title": m.get("title") or "Milestone",
+                            "be": m.get("body_employee"),
+                            "bh": m.get("body_hr"),
+                            "own": (m.get("owner_role") or "hr").strip(),
+                            "rt": m.get("relative_timing"),
+                        },
+                    )
+
+    def get_readiness_template(self, destination_key: str, route_key: str) -> Optional[Dict[str, Any]]:
+        dk = (destination_key or "").strip().upper()
+        rk = (route_key or DEFAULT_ROUTE_KEY).strip() or DEFAULT_ROUTE_KEY
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM readiness_templates WHERE destination_key = :dk AND route_key = :rk"),
+                {"dk": dk, "rk": rk},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def resolve_readiness_destination_for_assignment(self, assignment_id: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Returns (destination_raw, destination_key) from employee profile, then relocation case.
+        """
+        prof = self.get_employee_profile(assignment_id)
+        raw = extract_destination_from_profile(prof)
+        if not raw:
+            asn = self.get_assignment_by_id(assignment_id)
+            if asn:
+                cid = (asn.get("case_id") or "").strip()
+                case = self.get_case_by_id(cid) if cid else None
+                if case:
+                    pj = case.get("profile_json")
+                    raw = extract_destination_from_case_profile(pj)
+                    if not raw and case.get("host_country"):
+                        raw = str(case.get("host_country")).strip()
+        key = normalize_destination_key(raw)
+        return raw, key
+
+    def ensure_case_readiness_binding(self, assignment_id: str) -> Optional[Dict[str, Any]]:
+        """Create case_readiness row pointing at resolved template; no template duplication."""
+        asn = self.get_assignment_by_id(assignment_id)
+        if not asn:
+            return None
+        prof = self.get_employee_profile(assignment_id)
+        _, dest_key = self.resolve_readiness_destination_for_assignment(assignment_id)
+        route_key = resolve_readiness_route_key(asn, prof)
+        if not dest_key:
+            return None
+        tmpl = self.get_readiness_template(dest_key, route_key)
+        if not tmpl:
+            return None
+        tid = tmpl["id"]
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT * FROM case_readiness WHERE assignment_id = :aid"),
+                {"aid": assignment_id},
+            ).fetchone()
+            if row:
+                d = dict(row._mapping)
+                if d.get("template_id") != tid:
+                    conn.execute(
+                        text(
+                            "UPDATE case_readiness SET template_id = :tid, destination_key = :dk, "
+                            "route_key = :rk, updated_at = :ua WHERE assignment_id = :aid"
+                        ),
+                        {"tid": tid, "dk": dest_key, "rk": route_key, "ua": now, "aid": assignment_id},
+                    )
+                row2 = conn.execute(
+                    text("SELECT * FROM case_readiness WHERE assignment_id = :aid"), {"aid": assignment_id}
+                ).fetchone()
+                return self._row_to_dict(row2) if row2 else None
+            conn.execute(
+                text(
+                    "INSERT INTO case_readiness (assignment_id, template_id, destination_key, route_key, updated_at) "
+                    "VALUES (:aid, :tid, :dk, :rk, :ua)"
+                ),
+                {"aid": assignment_id, "tid": tid, "dk": dest_key, "rk": route_key, "ua": now},
+            )
+        with self.engine.connect() as conn:
+            row = conn.execute(text("SELECT * FROM case_readiness WHERE assignment_id = :aid"), {"aid": assignment_id}).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def get_hr_readiness_summary(self, assignment_id: str) -> Dict[str, Any]:
+        """Compact payload for first paint; no full checklist rows."""
+        raw_dest, dest_key = self.resolve_readiness_destination_for_assignment(assignment_id)
+        prof = self.get_employee_profile(assignment_id)
+        asn = self.get_assignment_by_id(assignment_id)
+        route_key = resolve_readiness_route_key(asn or {}, prof) if asn else DEFAULT_ROUTE_KEY
+        if not dest_key:
+            return {
+                "resolved": False,
+                "reason": "no_destination",
+                "destination_raw": raw_dest,
+                "destination_key": None,
+                "route_key": route_key,
+            }
+        tmpl = self.get_readiness_template(dest_key, route_key)
+        if not tmpl:
+            return {
+                "resolved": False,
+                "reason": "no_template",
+                "destination_raw": raw_dest,
+                "destination_key": dest_key,
+                "route_key": route_key,
+            }
+        bind = self.ensure_case_readiness_binding(assignment_id)
+        tid = tmpl["id"]
+        watchouts = []
+        try:
+            watchouts = json.loads(tmpl.get("watchouts_json") or "[]")
+        except Exception:
+            watchouts = []
+        if not isinstance(watchouts, list):
+            watchouts = []
+        top_watchouts = [str(w) for w in watchouts[:3]]
+
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT
+                        COUNT(c.id) AS total,
+                        SUM(CASE WHEN COALESCE(s.status, 'pending') IN ('done', 'waived') THEN 1 ELSE 0 END) AS doneish
+                    FROM readiness_template_checklist_items c
+                    LEFT JOIN case_readiness_checklist_state s
+                        ON s.template_checklist_id = c.id AND s.assignment_id = :aid
+                    WHERE c.template_id = :tid
+                    """
+                ),
+                {"aid": assignment_id, "tid": tid},
+            ).fetchone()
+        total_chk = int(row[0] or 0) if row else 0
+        done_chk = int(row[1] or 0) if row else 0
+        pending_chk = max(0, total_chk - done_chk)
+
+        next_ms = None
+        with self.engine.connect() as conn:
+            mrows = conn.execute(
+                text(
+                    """
+                    SELECT m.id, m.title, m.sort_order, m.phase, m.relative_timing, ms.completed_at
+                    FROM readiness_template_milestones m
+                    LEFT JOIN case_readiness_milestone_state ms
+                        ON ms.template_milestone_id = m.id AND ms.assignment_id = :aid
+                    WHERE m.template_id = :tid
+                    ORDER BY m.sort_order ASC, m.id ASC
+                    """
+                ),
+                {"aid": assignment_id, "tid": tid},
+            ).fetchall()
+        for mr in mrows:
+            r = dict(mr._mapping)
+            if not r.get("completed_at"):
+                next_ms = {
+                    "id": r.get("id"),
+                    "title": r.get("title"),
+                    "phase": r.get("phase"),
+                    "relative_timing": r.get("relative_timing"),
+                }
+                break
+
+        return {
+            "resolved": True,
+            "assignment_id": assignment_id,
+            "destination_raw": raw_dest,
+            "destination_key": dest_key,
+            "route_key": route_key,
+            "template_id": tid,
+            "route_title": tmpl.get("route_title"),
+            "employee_summary": tmpl.get("employee_summary"),
+            "hr_summary": tmpl.get("hr_summary"),
+            "top_watchouts": top_watchouts,
+            "checklist": {
+                "total": total_chk,
+                "completed_or_waived": done_chk,
+                "pending": pending_chk,
+            },
+            "next_milestone": next_ms,
+            "updated_at": tmpl.get("updated_at"),
+            "case_readiness_updated_at": (bind or {}).get("updated_at"),
+        }
+
+    def get_hr_readiness_detail(self, assignment_id: str) -> Dict[str, Any]:
+        """Full checklist + milestones merged with case state (two queries)."""
+        summary = self.get_hr_readiness_summary(assignment_id)
+        if not summary.get("resolved"):
+            return {"summary": summary, "checklist_items": [], "milestones": []}
+        tid = summary["template_id"]
+        with self.engine.connect() as conn:
+            crows = conn.execute(
+                text(
+                    """
+                    SELECT c.id, c.sort_order, c.title, c.owner_role, c.required, c.depends_on_sort_order,
+                           c.notes_employee, c.notes_hr, c.stable_key,
+                           COALESCE(s.status, 'pending') AS status, s.notes AS state_notes, s.updated_at AS state_updated_at
+                    FROM readiness_template_checklist_items c
+                    LEFT JOIN case_readiness_checklist_state s
+                        ON s.template_checklist_id = c.id AND s.assignment_id = :aid
+                    WHERE c.template_id = :tid
+                    ORDER BY c.sort_order ASC, c.id ASC
+                    """
+                ),
+                {"aid": assignment_id, "tid": tid},
+            ).fetchall()
+            mrows = conn.execute(
+                text(
+                    """
+                    SELECT m.id, m.sort_order, m.phase, m.title, m.body_employee, m.body_hr, m.owner_role, m.relative_timing,
+                           ms.completed_at, ms.notes AS state_notes, ms.updated_at AS state_updated_at
+                    FROM readiness_template_milestones m
+                    LEFT JOIN case_readiness_milestone_state ms
+                        ON ms.template_milestone_id = m.id AND ms.assignment_id = :aid
+                    WHERE m.template_id = :tid
+                    ORDER BY m.sort_order ASC, m.id ASC
+                    """
+                ),
+                {"aid": assignment_id, "tid": tid},
+            ).fetchall()
+        checklist_items = [dict(r._mapping) for r in crows]
+        milestones = [dict(r._mapping) for r in mrows]
+        return {"summary": summary, "checklist_items": checklist_items, "milestones": milestones}
+
+    def upsert_readiness_checklist_state(
+        self, assignment_id: str, template_checklist_id: str, status: str, notes: Optional[str] = None
+    ) -> None:
+        allowed = {"pending", "in_progress", "done", "waived", "blocked"}
+        if status not in allowed:
+            raise ValueError("invalid checklist status")
+        now = datetime.utcnow().isoformat()
+        params = {"aid": assignment_id, "cid": template_checklist_id, "st": status, "notes": notes, "ua": now}
+        sql_sqlite = text(
+            """
+            INSERT INTO case_readiness_checklist_state
+            (assignment_id, template_checklist_id, status, notes, updated_at)
+            VALUES (:aid, :cid, :st, :notes, :ua)
+            ON CONFLICT(assignment_id, template_checklist_id) DO UPDATE SET
+                status = excluded.status,
+                notes = COALESCE(excluded.notes, case_readiness_checklist_state.notes),
+                updated_at = excluded.updated_at
+            """
+        )
+        sql_pg = text(
+            """
+            INSERT INTO case_readiness_checklist_state
+            (assignment_id, template_checklist_id, status, notes, updated_at)
+            VALUES (:aid, :cid, :st, :notes, :ua)
+            ON CONFLICT(assignment_id, template_checklist_id) DO UPDATE SET
+                status = EXCLUDED.status,
+                notes = COALESCE(EXCLUDED.notes, case_readiness_checklist_state.notes),
+                updated_at = EXCLUDED.updated_at
+            """
+        )
+        with self.engine.begin() as conn:
+            conn.execute(sql_sqlite if _is_sqlite else sql_pg, params)
+
+    def upsert_readiness_milestone_state(
+        self, assignment_id: str, template_milestone_id: str, completed: bool, notes: Optional[str] = None
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        completed_at = now if completed else None
+        with self.engine.begin() as conn:
+            if _is_sqlite:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO case_readiness_milestone_state
+                        (assignment_id, template_milestone_id, completed_at, notes, updated_at)
+                        VALUES (:aid, :mid, :cat, :notes, :ua)
+                        ON CONFLICT(assignment_id, template_milestone_id) DO UPDATE SET
+                            completed_at = excluded.completed_at,
+                            notes = COALESCE(excluded.notes, case_readiness_milestone_state.notes),
+                            updated_at = excluded.updated_at
+                        """
+                    ),
+                    {"aid": assignment_id, "mid": template_milestone_id, "cat": completed_at, "notes": notes, "ua": now},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO case_readiness_milestone_state
+                        (assignment_id, template_milestone_id, completed_at, notes, updated_at)
+                        VALUES (:aid, :mid, :cat, :notes, :ua)
+                        ON CONFLICT(assignment_id, template_milestone_id) DO UPDATE SET
+                            completed_at = EXCLUDED.completed_at,
+                            notes = COALESCE(EXCLUDED.notes, case_readiness_milestone_state.notes),
+                            updated_at = EXCLUDED.updated_at
+                        """
+                    ),
+                    {"aid": assignment_id, "mid": template_milestone_id, "cat": completed_at, "notes": notes, "ua": now},
+                )
 
     # ==================================================================
     # Debug KV operations

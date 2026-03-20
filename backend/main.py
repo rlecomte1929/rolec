@@ -896,6 +896,16 @@ class HrFeedbackRequest(BaseModel):
     message: str
 
 
+class ReadinessChecklistPatchRequest(BaseModel):
+    status: str
+    notes: Optional[str] = None
+
+
+class ReadinessMilestonePatchRequest(BaseModel):
+    completed: bool
+    notes: Optional[str] = None
+
+
 def _require_reason(reason: Optional[str]) -> None:
     if not reason or not reason.strip():
         raise HTTPException(status_code=400, detail="Reason is required for admin actions")
@@ -4028,6 +4038,96 @@ def get_hr_assignment(
             status_code=500,
             detail=f"Unable to load assignment: {str(e)[:200]}",
         )
+
+
+def _hr_assignment_or_404(assignment_id: str) -> Dict[str, Any]:
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return assignment
+
+
+@app.get("/api/hr/assignments/{assignment_id}/readiness/summary")
+def get_hr_assignment_readiness_summary(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Case Readiness Core — compact summary (no full checklist rows)."""
+    assignment = _hr_assignment_or_404(assignment_id)
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    return db.get_hr_readiness_summary(aid)
+
+
+@app.get("/api/hr/assignments/{assignment_id}/readiness/detail")
+def get_hr_assignment_readiness_detail(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Full checklist + milestones with case state (load after summary / when panel expanded)."""
+    assignment = _hr_assignment_or_404(assignment_id)
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    return db.get_hr_readiness_detail(aid)
+
+
+@app.patch("/api/hr/assignments/{assignment_id}/readiness/checklist-items/{item_id}")
+def patch_hr_readiness_checklist_item(
+    assignment_id: str,
+    item_id: str,
+    body: ReadinessChecklistPatchRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    _deny_if_impersonating(user)
+    assignment = _hr_assignment_or_404(assignment_id)
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    bind = db.ensure_case_readiness_binding(aid)
+    if not bind:
+        raise HTTPException(status_code=400, detail="Readiness not bound for this case (destination or template missing)")
+    tid = bind.get("template_id")
+    with db.engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT 1 FROM readiness_template_checklist_items WHERE id = :iid AND template_id = :tid"),
+            {"iid": item_id, "tid": tid},
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Checklist item not found for this readiness template")
+    try:
+        db.upsert_readiness_checklist_state(aid, item_id, body.status.strip().lower(), body.notes)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    return {"success": True}
+
+
+@app.patch("/api/hr/assignments/{assignment_id}/readiness/milestones/{milestone_id}")
+def patch_hr_readiness_milestone(
+    assignment_id: str,
+    milestone_id: str,
+    body: ReadinessMilestonePatchRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    _deny_if_impersonating(user)
+    assignment = _hr_assignment_or_404(assignment_id)
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    bind = db.ensure_case_readiness_binding(aid)
+    if not bind:
+        raise HTTPException(status_code=400, detail="Readiness not bound for this case (destination or template missing)")
+    tid = bind.get("template_id")
+    with db.engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT 1 FROM readiness_template_milestones WHERE id = :mid AND template_id = :tid"),
+            {"mid": milestone_id, "tid": tid},
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Milestone not found for this readiness template")
+    db.upsert_readiness_milestone_state(aid, milestone_id, body.completed, body.notes)
+    return {"success": True}
 
 
 @app.get("/api/hr/assignments/{assignment_id}/resolved-policy")
