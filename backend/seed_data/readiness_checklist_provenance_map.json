@@ -1,0 +1,17 @@
+{
+  "version": "2026-03-24.1",
+  "maps": {
+    "SG:employment": {
+      "sg_ep_contract": "mom_ep_eligibility",
+      "sg_passport_bio": "ica_entry_sg",
+      "sg_education_certs": "mom_ep_eligibility",
+      "sg_mom_photos": "mom_ep_eligibility",
+      "sg_company_ep_submit": "mom_passes_hub",
+      "sg_ipa": "mom_passes_hub",
+      "sg_medical": "mom_passes_hub",
+      "sg_issue_pass": "mom_passes_hub",
+      "sg_housing_school": "ica_entry_sg",
+      "sg_relocation_vendor": "mom_passes_hub"
+    }
+  }
+}

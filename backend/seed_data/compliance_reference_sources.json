@@ -1,0 +1,44 @@
+{
+  "version": "2026-03-24.1",
+  "sources": [
+    {
+      "source_key": "mom_passes_hub",
+      "destination_key": "SG",
+      "route_key": "employment",
+      "topic": "work_passes_overview",
+      "source_type": "official_gov",
+      "reference_strength": "official",
+      "source_title": "Singapore MOM — Passes and permits",
+      "source_publisher": "Ministry of Manpower (Singapore)",
+      "source_url": "https://www.mom.gov.sg/passes-and-permits",
+      "source_last_reviewed_at": "2026-03-24",
+      "notes": "Official hub for work pass categories; use for HR diligence, not automated eligibility."
+    },
+    {
+      "source_key": "mom_ep_eligibility",
+      "destination_key": "SG",
+      "route_key": "employment",
+      "topic": "employment_pass",
+      "source_type": "official_gov",
+      "reference_strength": "official",
+      "source_title": "Singapore MOM — Employment Pass",
+      "source_publisher": "Ministry of Manpower (Singapore)",
+      "source_url": "https://www.mom.gov.sg/passes-and-permits/employment-pass",
+      "source_last_reviewed_at": "2026-03-24",
+      "notes": "Official EP information; ReloPass does not evaluate COMPASS or salary benchmarks automatically in v1."
+    },
+    {
+      "source_key": "ica_entry_sg",
+      "destination_key": "SG",
+      "route_key": "employment",
+      "topic": "entry_requirements",
+      "source_type": "official_gov",
+      "reference_strength": "official",
+      "source_title": "Singapore ICA — Entering Singapore",
+      "source_publisher": "Immigration & Checkpoints Authority (Singapore)",
+      "source_url": "https://www.ica.gov.sg/enter-transit-depart/entering-singapore",
+      "source_last_reviewed_at": "2026-03-24",
+      "notes": "Official entry guidance; visa/pass requirements depend on nationality and pass type."
+    }
+  ]
+}

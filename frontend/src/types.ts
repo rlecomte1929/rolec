@@ -615,10 +615,28 @@ export interface AssignmentDetail {
   employeeLastName?: string | null;
 }
 
+export interface ComplianceActionItem {
+  title: string;
+  output_category?: string;
+  human_review_required?: boolean;
+}
+
 export interface ComplianceReport {
   overallStatus: 'COMPLIANT' | 'NON_COMPLIANT' | 'NEEDS_REVIEW';
   checks: ComplianceCheck[];
-  actions: string[];
+  actions: (string | ComplianceActionItem)[];
+  /** Legal safety banner from API */
+  disclaimer_legal?: string;
+  verdict_explanation?: string;
+  outcome_verdict?: string;
+  meta?: Record<string, unknown>;
+  explanation?: {
+    steps: Array<{
+      step: number;
+      title: string;
+      detail: unknown;
+    }>;
+  };
 }
 
 export interface ComplianceCheck {
@@ -628,6 +646,13 @@ export interface ComplianceCheck {
   severity: 'low' | 'medium' | 'high';
   rationale: string;
   affectedFields: string[];
+  /** internal_operational_rule | … */
+  output_category?: string;
+  check_type?: string;
+  reference_strength?: string;
+  human_review_required?: boolean;
+  primary_reference?: Record<string, unknown>;
+  rationale_legal_safety?: string;
 }
 
 export interface AssignCaseResponse {

@@ -2,17 +2,38 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Card, Button, Badge } from '../../components/antigravity';
 import { hrAPI } from '../../api/client';
 
+type RouteRef = {
+  source_key?: string;
+  source_type?: string;
+  reference_strength?: string;
+  source_title?: string;
+  source_publisher?: string;
+  source_url?: string;
+  topic?: string;
+  source_last_reviewed_at?: string;
+};
+
 type Summary = {
   resolved?: boolean;
   reason?: string;
   destination_raw?: string | null;
   destination_key?: string | null;
+  route_key?: string;
   route_title?: string;
   hr_summary?: string;
   employee_summary?: string;
   top_watchouts?: string[];
   checklist?: { total?: number; completed_or_waived?: number; pending?: number };
   next_milestone?: { title?: string; phase?: string; relative_timing?: string } | null;
+  user_message?: string;
+  human_review_required?: boolean;
+  trust_tier?: string;
+  disclaimer_legal?: string;
+  trust_summary?: string;
+  route_references?: RouteRef[];
+  route_references_note?: string | null;
+  reference_set_version?: string;
+  check_catalog_version?: string;
 };
 
 type ChecklistRow = {
@@ -24,6 +45,11 @@ type ChecklistRow = {
   notes_hr?: string | null;
   notes_employee?: string | null;
   state_notes?: string | null;
+  stable_key?: string | null;
+  content_tier?: string;
+  human_review_required?: boolean;
+  reference_note?: string;
+  primary_reference?: RouteRef | null;
 };
 
 type MilestoneRow = {
@@ -167,14 +193,56 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
   }
 
   if (!summary.resolved) {
+    const body =
+      summary.user_message ||
+      (summary.reason === 'no_destination'
+        ? 'Set destination in the employee move plan (or case host country) to see immigration route, documents, and milestones.'
+        : summary.reason === 'readiness_store_unavailable'
+          ? 'Readiness database is not available in this environment. Apply the readiness migration or contact operations.'
+          : `No readiness template for destination “${summary.destination_key || summary.destination_raw || 'unknown'}” yet.`);
     return (
       <Card padding="lg">
         <div className="text-sm font-semibold text-[#0b2b43]">Case readiness</div>
-        <p className="text-sm text-[#6b7280] mt-2">
-          {summary.reason === 'no_destination'
-            ? 'Set destination in the employee move plan (or case host country) to see immigration route, documents, and milestones.'
-            : `No readiness template for destination “${summary.destination_key || summary.destination_raw || 'unknown'}” yet.`}
-        </p>
+        <p className="text-sm text-[#6b7280] mt-2">{body}</p>
+        {summary.human_review_required && (
+          <div className="mt-3 text-xs font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Human review required — ReloPass is not verifying immigration eligibility.
+          </div>
+        )}
+        {summary.disclaimer_legal && (
+          <p className="text-xs text-[#64748b] mt-3 border-t border-[#e2e8f0] pt-3">{summary.disclaimer_legal}</p>
+        )}
+        {summary.route_references && summary.route_references.length > 0 && (
+          <div className="mt-4">
+            <div className="text-xs font-semibold text-[#0b2b43] uppercase tracking-wide">
+              Official pointers (diligence)
+            </div>
+            <ul className="mt-2 space-y-2 text-sm">
+              {summary.route_references.map((r) => (
+                <li key={r.source_key || r.source_title}>
+                  {r.source_url ? (
+                    <a
+                      href={r.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#1d4ed8] hover:underline"
+                    >
+                      {r.source_title || r.source_key}
+                    </a>
+                  ) : (
+                    <span>{r.source_title}</span>
+                  )}
+                  {r.source_publisher && (
+                    <span className="text-[#64748b]"> — {r.source_publisher}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {summary.route_references_note && (
+              <p className="text-xs text-[#64748b] mt-2">{summary.route_references_note}</p>
+            )}
+          </div>
+        )}
       </Card>
     );
   }
@@ -207,9 +275,46 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
         </div>
       </div>
 
+      {summary.disclaimer_legal && (
+        <p className="mt-3 text-xs text-[#64748b] border border-[#e2e8f0] rounded-lg px-3 py-2 bg-[#f8fafc]">
+          {summary.disclaimer_legal}
+        </p>
+      )}
+      {summary.trust_summary && (
+        <p className="mt-2 text-xs text-[#64748b]">{summary.trust_summary}</p>
+      )}
+      {summary.route_references && summary.route_references.length > 0 && (
+        <details className="mt-3 text-sm">
+          <summary className="cursor-pointer text-[#1d4ed8] font-medium">
+            Official reference pointers ({summary.route_references.length})
+          </summary>
+          <ul className="mt-2 space-y-1.5 pl-4 list-disc text-[#475569]">
+            {summary.route_references.map((r) => (
+              <li key={r.source_key || r.source_title}>
+                {r.source_url ? (
+                  <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="text-[#1d4ed8] hover:underline">
+                    {r.source_title}
+                  </a>
+                ) : (
+                  r.source_title
+                )}
+                {r.source_last_reviewed_at && (
+                  <span className="text-[#94a3b8]"> · Last reviewed {r.source_last_reviewed_at}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {summary.human_review_required && (
+        <div className="mt-3 text-xs font-medium text-amber-900">
+          Human review required for immigration decisions — checklist is operational guidance only.
+        </div>
+      )}
+
       {summary.top_watchouts && summary.top_watchouts.length > 0 && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2">
-          <div className="text-xs font-semibold text-amber-900 uppercase tracking-wide">Watchouts</div>
+          <div className="text-xs font-semibold text-amber-900 uppercase tracking-wide">Internal watchouts</div>
           <ul className="mt-1 list-disc list-inside text-sm text-amber-950 space-y-1">
             {summary.top_watchouts.map((w, i) => (
               <li key={i}>{w}</li>
@@ -269,6 +374,32 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                               </div>
                               {row.notes_hr && (
                                 <p className="text-xs text-[#64748b] mt-1">{row.notes_hr}</p>
+                              )}
+                              {row.reference_note && (
+                                <p className="text-xs text-[#475569] mt-1 italic">{row.reference_note}</p>
+                              )}
+                              {row.primary_reference?.source_url && (
+                                <p className="text-xs mt-1">
+                                  <span className="text-[#64748b]">Pointer: </span>
+                                  <a
+                                    href={row.primary_reference.source_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#1d4ed8] hover:underline"
+                                  >
+                                    {row.primary_reference.source_title || 'Source'}
+                                  </a>
+                                  {row.primary_reference.reference_strength && (
+                                    <span className="text-[#94a3b8]"> ({row.primary_reference.reference_strength})</span>
+                                  )}
+                                </p>
+                              )}
+                              {row.human_review_required && (
+                                <div className="mt-1">
+                                  <Badge variant="warning" size="sm">
+                                    Human review
+                                  </Badge>
+                                </div>
                               )}
                             </div>
                             <div className="flex flex-wrap gap-1 shrink-0">

@@ -211,6 +211,8 @@ def _auto_id_col() -> str:
 class Database:
     def __init__(self) -> None:
         self.engine = _engine
+        # None = unknown; False = readiness_templates not available (migration not applied / wrong DB)
+        self._readiness_store_cache: Optional[bool] = None
         self.init_db()
 
     def _exec(
@@ -8822,8 +8824,30 @@ class Database:
     # ==================================================================
     # Case Readiness Core v1
     # ==================================================================
+    def _readiness_store_available(self) -> bool:
+        """
+        False when `readiness_templates` is missing (e.g. Supabase migration not applied).
+        Cached per process; deploy migration + restart to recover.
+        """
+        if self._readiness_store_cache is not None:
+            return self._readiness_store_cache
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(text("SELECT 1 FROM readiness_templates LIMIT 1"))
+            self._readiness_store_cache = True
+        except Exception as e:
+            log.warning(
+                "readiness_templates unavailable — apply migration 20260321000000_case_readiness_core.sql: %s",
+                e,
+            )
+            self._readiness_store_cache = False
+        return self._readiness_store_cache
+
     def seed_readiness_templates_if_empty(self) -> None:
         """Load JSON seed when no templates exist (idempotent)."""
+        if not self._readiness_store_available():
+            log.warning("readiness template seed skipped: readiness_templates table not available")
+            return
         with self.engine.connect() as conn:
             row = conn.execute(text("SELECT COUNT(*) AS n FROM readiness_templates")).fetchone()
             if row and int(row[0] or 0) > 0:
@@ -8907,6 +8931,8 @@ class Database:
                     )
 
     def get_readiness_template(self, destination_key: str, route_key: str) -> Optional[Dict[str, Any]]:
+        if not self._readiness_store_available():
+            return None
         dk = (destination_key or "").strip().upper()
         rk = (route_key or DEFAULT_ROUTE_KEY).strip() or DEFAULT_ROUTE_KEY
         with self.engine.connect() as conn:
@@ -8982,6 +9008,8 @@ class Database:
 
     def get_hr_readiness_summary(self, assignment_id: str) -> Dict[str, Any]:
         """Compact payload for first paint; no full checklist rows."""
+        from . import provenance_catalog
+
         raw_dest, dest_key = self.resolve_readiness_destination_for_assignment(assignment_id)
         prof = self.get_employee_profile(assignment_id)
         asn = self.get_assignment_by_id(assignment_id)
@@ -8993,6 +9021,20 @@ class Database:
                 "destination_raw": raw_dest,
                 "destination_key": None,
                 "route_key": route_key,
+                **provenance_catalog.degraded_readiness_payload(
+                    "no_destination", raw_dest, None, route_key
+                ),
+            }
+        if not self._readiness_store_available():
+            return {
+                "resolved": False,
+                "reason": "readiness_store_unavailable",
+                "destination_raw": raw_dest,
+                "destination_key": dest_key,
+                "route_key": route_key,
+                **provenance_catalog.degraded_readiness_payload(
+                    "readiness_store_unavailable", raw_dest, dest_key, route_key
+                ),
             }
         tmpl = self.get_readiness_template(dest_key, route_key)
         if not tmpl:
@@ -9002,6 +9044,9 @@ class Database:
                 "destination_raw": raw_dest,
                 "destination_key": dest_key,
                 "route_key": route_key,
+                **provenance_catalog.degraded_readiness_payload(
+                    "no_template", raw_dest, dest_key, route_key
+                ),
             }
         bind = self.ensure_case_readiness_binding(assignment_id)
         tid = tmpl["id"]
@@ -9059,7 +9104,7 @@ class Database:
                 }
                 break
 
-        return {
+        base_summary = {
             "resolved": True,
             "assignment_id": assignment_id,
             "destination_raw": raw_dest,
@@ -9079,9 +9124,13 @@ class Database:
             "updated_at": tmpl.get("updated_at"),
             "case_readiness_updated_at": (bind or {}).get("updated_at"),
         }
+        prov = provenance_catalog.readiness_summary_provenance_block(dest_key, route_key, True)
+        return {**base_summary, **prov}
 
     def get_hr_readiness_detail(self, assignment_id: str) -> Dict[str, Any]:
         """Full checklist + milestones merged with case state (two queries)."""
+        from . import provenance_catalog
+
         summary = self.get_hr_readiness_summary(assignment_id)
         if not summary.get("resolved"):
             return {"summary": summary, "checklist_items": [], "milestones": []}
@@ -9118,7 +9167,18 @@ class Database:
             ).fetchall()
         checklist_items = [dict(r._mapping) for r in crows]
         milestones = [dict(r._mapping) for r in mrows]
-        return {"summary": summary, "checklist_items": checklist_items, "milestones": milestones}
+        dk = str(summary.get("destination_key") or "")
+        rk = str(summary.get("route_key") or DEFAULT_ROUTE_KEY)
+        enriched_checklist = [
+            provenance_catalog.enrich_checklist_row(row, dk, rk) for row in checklist_items
+        ]
+        detail_provenance = provenance_catalog.readiness_summary_provenance_block(dk, rk, True)
+        return {
+            "summary": summary,
+            "checklist_items": enriched_checklist,
+            "milestones": milestones,
+            "provenance": detail_provenance,
+        }
 
     def upsert_readiness_checklist_state(
         self, assignment_id: str, template_checklist_id: str, status: str, notes: Optional[str] = None

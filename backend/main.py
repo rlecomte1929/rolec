@@ -6477,10 +6477,16 @@ def run_compliance(assignment_id: str, user: Dict[str, Any] = Depends(require_ro
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     profile = db.get_employee_profile(assignment_id)
+    profile_present = profile is not None
     if not profile:
-        raise HTTPException(status_code=400, detail="No employee profile available")
+        profile = {}
 
     report = compliance_engine.run(profile)
+    from .provenance_catalog import enrich_assignment_compliance_report
+
+    report = enrich_assignment_compliance_report(
+        report, assignment_id=assignment_id, profile_present=profile_present
+    )
     db.save_compliance_report(str(uuid.uuid4()), assignment_id, report)
 
     status = normalize_status(assignment["status"])

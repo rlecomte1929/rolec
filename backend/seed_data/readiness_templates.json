@@ -13,16 +13,16 @@
         "IPA validity window is tight — align travel and entry dates with HR."
       ],
       "checklist": [
-        { "sort_order": 1, "title": "Signed employment contract & job description", "owner_role": "employer", "required": true, "notes_employee": "Your HR team provides these for the pass application.", "notes_hr": "Ensure JD matches MOM role classification." },
-        { "sort_order": 2, "title": "Passport bio page (all travellers)", "owner_role": "employee", "required": true, "notes_employee": "Valid for at least 6 months beyond intended entry.", "notes_hr": null },
-        { "sort_order": 3, "title": "Educational certificates & transcripts", "owner_role": "employee", "required": true, "notes_employee": "May require certified translations.", "notes_hr": "Used for EP qualification evidence." },
-        { "sort_order": 4, "title": "Passport photos (MOM specifications)", "owner_role": "employee", "required": true, "notes_employee": null, "notes_hr": null },
-        { "sort_order": 5, "title": "Company EP application submission", "owner_role": "hr", "required": true, "notes_employee": "Handled by HR or immigration partner.", "notes_hr": "Track MOM reference number." },
-        { "sort_order": 6, "title": "In-Principle Approval (IPA) received", "owner_role": "hr", "required": true, "depends_on_sort_order": 5, "notes_employee": "You will need IPA for entry when instructed.", "notes_hr": null },
-        { "sort_order": 7, "title": "Medical examination (if required)", "owner_role": "employee", "required": false, "notes_employee": "Clinic list usually provided with IPA.", "notes_hr": null },
-        { "sort_order": 8, "title": "Issue pass & register fingerprints", "owner_role": "employee", "required": true, "depends_on_sort_order": 6, "notes_employee": "Completed after arrival in Singapore.", "notes_hr": null },
-        { "sort_order": 9, "title": "Housing & schooling shortlist (if family)", "owner_role": "employee", "required": false, "notes_employee": "Parallel track to immigration.", "notes_hr": "Align with target move date." },
-        { "sort_order": 10, "title": "Relocation services booking", "owner_role": "provider", "required": false, "notes_employee": null, "notes_hr": "Optional vendor engagement." }
+        { "sort_order": 1, "stable_key": "sg_ep_contract", "title": "Signed employment contract & job description", "owner_role": "employer", "required": true, "notes_employee": "Your HR team provides these for the pass application.", "notes_hr": "Ensure JD matches MOM role classification." },
+        { "sort_order": 2, "stable_key": "sg_passport_bio", "title": "Passport bio page (all travellers)", "owner_role": "employee", "required": true, "notes_employee": "Valid for at least 6 months beyond intended entry.", "notes_hr": null },
+        { "sort_order": 3, "stable_key": "sg_education_certs", "title": "Educational certificates & transcripts", "owner_role": "employee", "required": true, "notes_employee": "May require certified translations.", "notes_hr": "Used for EP qualification evidence." },
+        { "sort_order": 4, "stable_key": "sg_mom_photos", "title": "Passport photos (MOM specifications)", "owner_role": "employee", "required": true, "notes_employee": null, "notes_hr": null },
+        { "sort_order": 5, "stable_key": "sg_company_ep_submit", "title": "Company EP application submission", "owner_role": "hr", "required": true, "notes_employee": "Handled by HR or immigration partner.", "notes_hr": "Track MOM reference number." },
+        { "sort_order": 6, "stable_key": "sg_ipa", "title": "In-Principle Approval (IPA) received", "owner_role": "hr", "required": true, "depends_on_sort_order": 5, "notes_employee": "You will need IPA for entry when instructed.", "notes_hr": null },
+        { "sort_order": 7, "stable_key": "sg_medical", "title": "Medical examination (if required)", "owner_role": "employee", "required": false, "notes_employee": "Clinic list usually provided with IPA.", "notes_hr": null },
+        { "sort_order": 8, "stable_key": "sg_issue_pass", "title": "Issue pass & register fingerprints", "owner_role": "employee", "required": true, "depends_on_sort_order": 6, "notes_employee": "Completed after arrival in Singapore.", "notes_hr": null },
+        { "sort_order": 9, "stable_key": "sg_housing_school", "title": "Housing & schooling shortlist (if family)", "owner_role": "employee", "required": false, "notes_employee": "Parallel track to immigration.", "notes_hr": "Align with target move date." },
+        { "sort_order": 10, "stable_key": "sg_relocation_vendor", "title": "Relocation services booking", "owner_role": "provider", "required": false, "notes_employee": null, "notes_hr": "Optional vendor engagement." }
       ],
       "milestones": [
         { "sort_order": 1, "phase": "pre", "title": "Kickoff & route confirmation", "body_employee": "HR confirms the sponsored pass route and timeline with you.", "body_hr": "Lock salary band, role title, and dependency on EP vs S Pass.", "owner_role": "hr", "relative_timing": "T-10 to 12 weeks" },

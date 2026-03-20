@@ -317,19 +317,74 @@ export const HrCaseSummary: React.FC = () => {
           </div>
 
           <Card padding="lg">
-            <div className="text-sm font-semibold text-[#0b2b43]">Blocking items</div>
+            <div className="text-sm font-semibold text-[#0b2b43]">Compliance screening (internal rules)</div>
+            <p className="text-xs text-[#64748b] mt-1">
+              Assignment-level checks use ReloPass internal policy configuration — not immigration law. Outcomes are
+              preliminary; human review is required for any immigration decision.
+            </p>
+            {assignment.complianceReport?.disclaimer_legal && (
+              <p className="text-xs text-[#475569] mt-3 border border-[#e2e8f0] rounded-lg px-3 py-2 bg-[#f8fafc]">
+                {assignment.complianceReport.disclaimer_legal}
+              </p>
+            )}
+            {assignment.complianceReport?.verdict_explanation && (
+              <p className="text-sm text-[#334155] mt-3">{assignment.complianceReport.verdict_explanation}</p>
+            )}
+            {assignment.complianceReport?.explanation?.steps &&
+              assignment.complianceReport.explanation.steps.length > 0 && (
+                <details className="mt-3 text-sm">
+                  <summary className="cursor-pointer text-[#1d4ed8] font-medium">
+                    Step-by-step run log
+                  </summary>
+                  <ol className="mt-2 space-y-2 pl-4 list-decimal text-[#475569]">
+                    {assignment.complianceReport.explanation.steps.map((s) => (
+                      <li key={s.step}>
+                        <span className="font-medium text-[#0f172a]">{s.title}</span>
+                        <pre className="mt-1 text-xs bg-[#f1f5f9] rounded p-2 overflow-x-auto whitespace-pre-wrap">
+                          {JSON.stringify(s.detail, null, 2)}
+                        </pre>
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              )}
+            <div className="text-sm font-semibold text-[#0b2b43] mt-6">Blocking or review items</div>
             {blockingItems.length === 0 && (
-              <div className="text-sm text-[#6b7280] mt-2">No blocking items.</div>
+              <div className="text-sm text-[#6b7280] mt-2">No blocking items under internal rules.</div>
             )}
             {blockingItems.length > 0 && (
               <ul className="mt-3 space-y-2 text-sm text-[#4b5563]">
                 {blockingItems.map((item) => (
-                  <li key={item.id} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg px-3 py-2">
-                    <span>{item.name}</span>
-                    <Badge variant="warning">{item.status}</Badge>
+                  <li
+                    key={item.id}
+                    className="flex flex-col gap-1 border border-[#e2e8f0] rounded-lg px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-[#0f172a]">{item.name}</span>
+                      <Badge variant="warning">{item.status}</Badge>
+                    </div>
+                    {item.rationale && <p className="text-xs text-[#64748b]">{item.rationale}</p>}
+                    {item.rationale_legal_safety && (
+                      <p className="text-xs italic text-[#64748b]">{item.rationale_legal_safety}</p>
+                    )}
+                    {item.human_review_required && (
+                      <Badge variant="warning" size="sm">
+                        Human review
+                      </Badge>
+                    )}
                   </li>
                 ))}
               </ul>
+            )}
+            {assignment.complianceReport?.actions && assignment.complianceReport.actions.length > 0 && (
+              <div className="mt-4">
+                <div className="text-xs font-semibold text-[#0b2b43] uppercase tracking-wide">Suggested actions</div>
+                <ul className="mt-2 list-disc list-inside text-sm text-[#475569] space-y-1">
+                  {assignment.complianceReport.actions.map((a, i) => (
+                    <li key={i}>{typeof a === 'string' ? a : a.title}</li>
+                  ))}
+                </ul>
+              </div>
             )}
           </Card>
 
