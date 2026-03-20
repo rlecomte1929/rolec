@@ -3411,14 +3411,14 @@ def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.
 
 @app.post("/api/employee/assignments/{assignment_id}/claim")
 def claim_assignment(
+    request: Request,
     assignment_id: str,
     claim: ClaimAssignmentRequest,
-    http_req: Request,
     user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
 ):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.EMPLOYEE)
-    claim_req_id = getattr(http_req.state, "request_id", None) or ""
+    claim_req_id = getattr(request.state, "request_id", None) or ""
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         identity_event(
