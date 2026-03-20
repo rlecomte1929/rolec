@@ -601,6 +601,46 @@ export interface AssignmentsListResponse {
   total: number;
 }
 
+export interface IntakeChecklistItemDTO {
+  key: string;
+  label: string;
+  satisfied: boolean;
+  category: string;
+  /** case_milestone.milestone_type — scroll target in relocation plan */
+  linked_tracker_task_type?: string | null;
+}
+
+export interface ReadinessBlockingItemDTO {
+  source: string;
+  title: string;
+  detail?: string | null;
+  human_review_required?: boolean;
+  provenance_note?: string | null;
+  linked_tracker_task_type?: string | null;
+}
+
+export interface ReadinessNextActionDTO {
+  title: string;
+  category: string;
+  linked_tracker_task_type?: string | null;
+}
+
+export interface CaseReadinessUiDTO {
+  overall_status: string;
+  overall_label: string;
+  completion_basis: string;
+  intake_satisfied: number;
+  intake_total: number;
+  checklist_satisfied?: number | null;
+  checklist_total?: number | null;
+  checklist_applicable?: boolean;
+  checklist_pending?: number | null;
+  blocking_items: ReadinessBlockingItemDTO[];
+  next_actions: ReadinessNextActionDTO[];
+  trust_banner?: string | null;
+  next_deadline_display?: string | null;
+}
+
 export interface AssignmentDetail {
   id: string;
   caseId: string;
@@ -613,6 +653,17 @@ export interface AssignmentDetail {
   complianceReport?: ComplianceReport | null;
   employeeFirstName?: string | null;
   employeeLastName?: string | null;
+  /** profiles.email for linked employee_user_id (same GET as assignment detail) */
+  employeeEmail?: string | null;
+  /** profiles.full_name when intake name not yet on RelocationProfile */
+  linkedEmployeeFullName?: string | null;
+  /** relocation_cases / draft relocationBasics — fallback when movePlan empty */
+  caseOriginHint?: string | null;
+  caseDestinationHint?: string | null;
+  /** Explicit intake + document checkpoints (merged readiness block) */
+  intakeChecklist?: IntakeChecklistItemDTO[];
+  readinessSnapshot?: Record<string, unknown> | null;
+  caseReadinessUi?: CaseReadinessUiDTO | null;
 }
 
 export interface ComplianceActionItem {

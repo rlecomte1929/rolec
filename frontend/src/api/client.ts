@@ -1633,32 +1633,64 @@ export interface QuoteCreatePayload {
   quote_lines: Array<{ label: string; amount: number }>;
 }
 
+export interface TimelineTaskSummary {
+  total: number;
+  completed: number;
+  overdue: number;
+  due_this_week: number;
+  blocked: number;
+  in_progress: number;
+}
+
+export interface TimelineResponse {
+  case_id: string;
+  assignment_id?: string;
+  milestones: TimelineMilestone[];
+  summary: TimelineTaskSummary;
+}
+
 export const timelineAPI = {
   getByAssignment: async (
     assignmentId: string,
-    options?: { ensureDefaults?: boolean }
-  ): Promise<{ case_id: string; assignment_id: string; milestones: TimelineMilestone[] }> => {
-    const params = options?.ensureDefaults ? { ensure_defaults: '1' } : {};
+    options?: { ensureDefaults?: boolean; includeLinks?: boolean }
+  ): Promise<TimelineResponse> => {
+    const params: Record<string, string> = {};
+    if (options?.ensureDefaults) params.ensure_defaults = '1';
+    if (options?.includeLinks === false) params.include_links = 'false';
     const response = await api.get(`/api/assignments/${assignmentId}/timeline`, { params });
     return response.data;
   },
   getByCase: async (
     caseId: string,
-    options?: { ensureDefaults?: boolean }
-  ): Promise<{ case_id: string; milestones: TimelineMilestone[] }> => {
-    const params = options?.ensureDefaults ? { ensure_defaults: '1' } : {};
+    options?: { ensureDefaults?: boolean; includeLinks?: boolean }
+  ): Promise<TimelineResponse> => {
+    const params: Record<string, string> = {};
+    if (options?.ensureDefaults) params.ensure_defaults = '1';
+    if (options?.includeLinks === false) params.include_links = 'false';
     const response = await api.get(`/api/cases/${caseId}/timeline`, { params });
     return response.data;
   },
   updateMilestone: async (
     caseId: string,
     milestoneId: string,
-    patch: Partial<{ title: string; description: string; target_date: string; actual_date: string; status: string; sort_order: number }>
+    patch: Partial<{
+      title: string;
+      description: string;
+      target_date: string;
+      actual_date: string;
+      status: string;
+      sort_order: number;
+      owner: string;
+      criticality: string;
+      notes: string | null;
+    }>
   ): Promise<TimelineMilestone> => {
     const response = await api.patch(`/api/cases/${caseId}/timeline/milestones/${milestoneId}`, patch);
     return response.data;
   },
 };
+
+export type TaskOwner = 'hr' | 'employee' | 'provider' | 'joint';
 
 export interface TimelineMilestone {
   id: string;
@@ -1670,6 +1702,9 @@ export interface TimelineMilestone {
   actual_date?: string;
   status: string;
   sort_order: number;
+  owner?: string;
+  criticality?: string;
+  notes?: string | null;
   created_at?: string;
   updated_at?: string;
   links?: Array<{ id: string; linked_entity_type: string; linked_entity_id: string }>;

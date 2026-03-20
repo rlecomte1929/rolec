@@ -1,30 +1,188 @@
-"""Timeline workflow — compute default milestones from case context."""
+"""Timeline / operational relocation tasks — defaults from case context + summary helpers."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-DEFAULT_MILESTONES = [
-    {"milestone_type": "case_created", "title": "Case created", "description": "Relocation case initiated", "sort_order": 0},
-    {"milestone_type": "visa_preparation", "title": "Visa preparation", "description": "Gather documents and apply for work permit / visa", "sort_order": 10},
-    {"milestone_type": "housing_search", "title": "Housing search", "description": "Find accommodation in destination", "sort_order": 20},
-    {"milestone_type": "school_search", "title": "School search", "description": "Research and apply for schools / childcare", "sort_order": 30},
-    {"milestone_type": "move_logistics", "title": "Move logistics", "description": "Arrange movers, shipping, flights", "sort_order": 40},
-    {"milestone_type": "arrival", "title": "Arrival", "description": "Arrive at destination", "sort_order": 50},
-    {"milestone_type": "settling_in", "title": "Settling in", "description": "Register, utilities, bank account", "sort_order": 60},
+# Practical relocation tasks (stored as case_milestones; linked to same case as readiness/checklist).
+# milestone_type is stable for future sync with readiness checklist keys if needed.
+OPERATIONAL_TASK_DEFAULTS: List[Dict[str, Any]] = [
+    {
+        "milestone_type": "task_profile_core",
+        "title": "Confirm employee core profile",
+        "description": "Verify legal name, contact, nationality, and job basics in the case record.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 5,
+        "days_before_move": 95,
+    },
+    {
+        "milestone_type": "task_family_dependents",
+        "title": "Confirm family / dependent details",
+        "description": "Spouse and children (if any) recorded for immigration and benefits.",
+        "owner": "joint",
+        "criticality": "normal",
+        "sort_order": 10,
+        "days_before_move": 92,
+    },
+    {
+        "milestone_type": "task_passport_upload",
+        "title": "Upload passport copy",
+        "description": "Clear scan of passport bio page for visa / work authorization.",
+        "owner": "employee",
+        "criticality": "critical",
+        "sort_order": 15,
+        "days_before_move": 88,
+    },
+    {
+        "milestone_type": "task_employment_letter",
+        "title": "Upload employment / assignment letter",
+        "description": "Signed letter describing role, compensation, and assignment terms.",
+        "owner": "employee",
+        "criticality": "critical",
+        "sort_order": 20,
+        "days_before_move": 85,
+    },
+    {
+        "milestone_type": "task_route_verify",
+        "title": "Verify destination route",
+        "description": "HR confirms origin → destination and assignment routing against policy.",
+        "owner": "hr",
+        "criticality": "normal",
+        "sort_order": 25,
+        "days_before_move": 80,
+    },
+    {
+        "milestone_type": "task_hr_case_review",
+        "title": "HR review of case data",
+        "description": "Internal review of intake, documents, and policy fit before external filings.",
+        "owner": "hr",
+        "criticality": "critical",
+        "sort_order": 30,
+        "days_before_move": 75,
+    },
+    {
+        "milestone_type": "task_immigration_review",
+        "title": "Schedule immigration review",
+        "description": "Book counsel or vendor review as required for the route.",
+        "owner": "hr",
+        "criticality": "normal",
+        "sort_order": 35,
+        "days_before_move": 70,
+    },
+    {
+        "milestone_type": "task_visa_docs_prep",
+        "title": "Prepare visa / work permit application pack",
+        "description": "Compile forms and supporting documents per destination rules.",
+        "owner": "joint",
+        "criticality": "critical",
+        "sort_order": 40,
+        "days_before_move": 65,
+    },
+    {
+        "milestone_type": "task_visa_submit",
+        "title": "Submit visa / work permit application",
+        "description": "Filing with authority or sponsor; capture reference numbers and deadlines.",
+        "owner": "joint",
+        "criticality": "critical",
+        "sort_order": 45,
+        "days_before_move": 55,
+    },
+    {
+        "milestone_type": "task_biometrics",
+        "title": "Book biometrics / appointment (if applicable)",
+        "description": "Visa center or embassy appointments when required by the route.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 50,
+        "days_before_move": 45,
+    },
+    {
+        "milestone_type": "task_temp_housing",
+        "title": "Arrange temporary housing",
+        "description": "Short-term accommodation before permanent housing is secured.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 55,
+        "days_before_move": 35,
+    },
+    {
+        "milestone_type": "task_movers_shipment",
+        "title": "Arrange movers / shipment",
+        "description": "Quotes, inventory, insurance, and shipping dates.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 60,
+        "days_before_move": 28,
+    },
+    {
+        "milestone_type": "task_travel_plan",
+        "title": "Plan travel",
+        "description": "Flights and arrival logistics aligned with visa validity and start date.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 65,
+        "days_before_move": 14,
+    },
+    {
+        "milestone_type": "task_provider_coordination",
+        "title": "Coordinate relocation providers",
+        "description": "Engage approved vendors for housing, schools, or logistics as needed.",
+        "owner": "provider",
+        "criticality": "normal",
+        "sort_order": 68,
+        "days_before_move": 21,
+    },
+    {
+        "milestone_type": "task_arrival_registration",
+        "title": "Complete arrival registration",
+        "description": "Local registration or residency steps required shortly after arrival.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 70,
+        "days_after_move": 3,
+    },
+    {
+        "milestone_type": "task_tax_local_registration",
+        "title": "Tax / local registration",
+        "description": "Tax ID, social security, or host-country equivalents.",
+        "owner": "employee",
+        "criticality": "normal",
+        "sort_order": 75,
+        "days_after_move": 14,
+    },
+    {
+        "milestone_type": "task_settling_in",
+        "title": "Settle in — critical post-arrival steps",
+        "description": "Bank, utilities, healthcare registration, and other blocking local setup.",
+        "owner": "joint",
+        "criticality": "normal",
+        "sort_order": 80,
+        "days_after_move": 21,
+    },
 ]
 
-# Service keys that imply certain milestones
-SERVICE_TO_MILESTONE: Dict[str, str] = {
-    "living_areas": "housing_search",
-    "housing": "housing_search",
-    "schools": "school_search",
-    "childcare": "school_search",
-    "movers": "move_logistics",
-    "banks": "settling_in",
-    "insurance": "visa_preparation",
-    "electricity": "settling_in",
+# Stable milestone_type → title for cross-linking from HR readiness / intake (keep in sync with OPERATIONAL_TASK_DEFAULTS).
+TRACKER_TASK_TITLES: Dict[str, str] = {
+    str(row["milestone_type"]): str(row["title"])
+    for row in OPERATIONAL_TASK_DEFAULTS
+    if isinstance(row, dict) and row.get("milestone_type") and row.get("title")
 }
+
+
+def _parse_move_anchor(case_draft: Optional[Dict[str, Any]], target_move_date: Optional[str]) -> Optional[datetime]:
+    basics = (case_draft or {}).get("relocationBasics", {}) or {}
+    target = target_move_date or basics.get("targetMoveDate") or basics.get("target_move_date")
+    if not target:
+        return None
+    try:
+        if isinstance(target, str) and "T" in target:
+            return datetime.fromisoformat(target.replace("Z", "+00:00"))
+        if isinstance(target, str) and len(target) >= 10:
+            return datetime.strptime(target[:10], "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+    return None
 
 
 def compute_default_milestones(
@@ -34,94 +192,82 @@ def compute_default_milestones(
     target_move_date: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Compute default milestone set from case context.
-    Returns list of milestone dicts ready for upsert.
+    Compute default operational tasks for a case (inserted into case_milestones when none exist).
+    Dates are anchored on target move / arrival when available.
     """
-    basics = (case_draft or {}).get("relocationBasics", {})
-    target = target_move_date or basics.get("targetMoveDate") or basics.get("target_move_date")
-    services = selected_services or []
+    _ = case_id
+    services = set(selected_services or [])
+    base = _parse_move_anchor(case_draft, target_move_date)
 
-    # Start with case_created always
     result: List[Dict[str, Any]] = []
-    seen_types: set = set()
-
-    # Parse target date for offset calculations
-    base_date: Optional[datetime] = None
-    if target:
-        try:
-            if isinstance(target, str) and "T" in target:
-                base_date = datetime.fromisoformat(target.replace("Z", "+00:00"))
-            elif isinstance(target, str):
-                base_date = datetime.strptime(target[:10], "%Y-%m-%d")
-            else:
-                base_date = None
-        except (ValueError, TypeError):
-            base_date = None
-
-    def _add_milestone(mt: str, title: str, desc: str, sort_order: int, target_date: Optional[str] = None) -> None:
-        if mt in seen_types:
-            return
-        seen_types.add(mt)
-        result.append({
-            "milestone_type": mt,
-            "title": title,
-            "description": desc,
-            "sort_order": sort_order,
-            "target_date": target_date,
-            "status": "pending",
-        })
-
-    # Case created — always first
-    _add_milestone("case_created", "Case created", "Relocation case initiated", 0)
-
-    # Visa — typically 8–12 weeks before move
-    if base_date:
-        visa_target = (base_date - timedelta(days=70)).strftime("%Y-%m-%d")
-        _add_milestone("visa_preparation", "Visa preparation", "Gather documents and apply for work permit / visa", 10, visa_target)
-    else:
-        _add_milestone("visa_preparation", "Visa preparation", "Gather documents and apply for work permit / visa", 10)
-
-    # Housing — if housing/living_areas selected
-    if any(s in ("living_areas", "housing") for s in services):
-        if base_date:
-            housing_target = (base_date - timedelta(days=56)).strftime("%Y-%m-%d")
-            _add_milestone("housing_search", "Housing search", "Find accommodation in destination", 20, housing_target)
-        else:
-            _add_milestone("housing_search", "Housing search", "Find accommodation in destination", 20)
-    else:
-        _add_milestone("housing_search", "Housing search", "Find accommodation in destination", 20)
-
-    # School — if schools/childcare selected
-    if any(s in ("schools", "childcare") for s in services):
-        if base_date:
-            school_target = (base_date - timedelta(days=90)).strftime("%Y-%m-%d")
-            _add_milestone("school_search", "School search", "Research and apply for schools / childcare", 30, school_target)
-        else:
-            _add_milestone("school_search", "School search", "Research and apply for schools / childcare", 30)
-    else:
-        _add_milestone("school_search", "School search", "Research and apply for schools / childcare", 30)
-
-    # Move logistics — if movers selected or generally relevant
-    if "movers" in services or not services:
-        if base_date:
-            move_target = (base_date - timedelta(days=21)).strftime("%Y-%m-%d")
-            _add_milestone("move_logistics", "Move logistics", "Arrange movers, shipping, flights", 40, move_target)
-        else:
-            _add_milestone("move_logistics", "Move logistics", "Arrange movers, shipping, flights", 40)
-
-    # Arrival
-    arrival_date = None
-    if target and isinstance(target, str) and len(target) >= 10:
-        arrival_date = target[:10]
-    elif target and isinstance(target, str):
-        arrival_date = target
-    _add_milestone("arrival", "Arrival", "Arrive at destination", 50, arrival_date)
-
-    # Settling in — 2 weeks after arrival
-    if base_date:
-        settling_target = (base_date + timedelta(days=14)).strftime("%Y-%m-%d")
-        _add_milestone("settling_in", "Settling in", "Register, utilities, bank account", 60, settling_target)
-    else:
-        _add_milestone("settling_in", "Settling in", "Register, utilities, bank account", 60)
-
+    for spec in OPERATIONAL_TASK_DEFAULTS:
+        mt = spec["milestone_type"]
+        if mt == "task_provider_coordination" and not services:
+            continue
+        target: Optional[str] = None
+        if base:
+            dbm = spec.get("days_before_move")
+            dam = spec.get("days_after_move")
+            if dbm is not None:
+                target = (base - timedelta(days=int(dbm))).strftime("%Y-%m-%d")
+            elif dam is not None:
+                target = (base + timedelta(days=int(dam))).strftime("%Y-%m-%d")
+        result.append(
+            {
+                "milestone_type": mt,
+                "title": spec["title"],
+                "description": spec.get("description"),
+                "sort_order": spec["sort_order"],
+                "target_date": target,
+                "status": "pending",
+                "owner": spec.get("owner", "joint"),
+                "criticality": spec.get("criticality", "normal"),
+                "notes": None,
+            }
+        )
     return result
+
+
+def _parse_iso_date(value: Optional[str]) -> Optional[date]:
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        return datetime.strptime(value[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def compute_timeline_summary(milestones: List[Dict[str, Any]], today: Optional[date] = None) -> Dict[str, int]:
+    """Compact counts for tracker header (single pass, no extra queries)."""
+    day = today or date.today()
+    week_end = day + timedelta(days=7)
+    total = len(milestones)
+    completed = 0
+    overdue = 0
+    due_this_week = 0
+    blocked = 0
+    in_progress = 0
+    for m in milestones:
+        st = (m.get("status") or "pending").lower()
+        if st == "done" or st == "skipped":
+            completed += 1
+            continue
+        if st == "blocked":
+            blocked += 1
+        if st == "in_progress":
+            in_progress += 1
+        td = _parse_iso_date(m.get("target_date"))
+        if td is None:
+            continue
+        if td < day:
+            overdue += 1
+        elif td <= week_end:
+            due_this_week += 1
+    return {
+        "total": total,
+        "completed": completed,
+        "overdue": overdue,
+        "due_this_week": due_this_week,
+        "blocked": blocked,
+        "in_progress": in_progress,
+    }

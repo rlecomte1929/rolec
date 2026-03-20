@@ -11,6 +11,7 @@ import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { employeeAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
 import { AssignmentDebugPanel } from '../AssignmentDebugPanel';
+import { RelocationTaskTracker } from '../../features/timeline/RelocationTaskTracker';
 import type { CaseDTO, CaseDraftDTO } from '../../types';
 
 function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -158,6 +159,16 @@ export const EmployeeCaseSummary: React.FC = () => {
         </Alert>
       )}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading your case...</div>}
+
+      {!isLoading && draft && assignmentId && (
+        <div className="mb-6">
+          <RelocationTaskTracker
+            assignmentId={assignmentId}
+            ensureDefaults
+            title="Your relocation plan & actions"
+          />
+        </div>
+      )}
 
       {!isLoading && draft && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

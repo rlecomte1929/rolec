@@ -9,6 +9,10 @@ import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { CaseTimeline } from '../features/timeline/CaseTimeline';
 import { CaseReadinessCore } from '../features/readiness/CaseReadinessCore';
+import { CaseEssentialsCard } from '../features/cases/CaseEssentialsCard';
+import { ReadinessAndActionsBlock } from '../features/cases/ReadinessAndActionsBlock';
+import { CaseOperationalSection } from '../features/cases/CaseOperationalSection';
+import { deriveCaseEssentials } from '../features/cases/caseEssentials';
 
 const statusBadge = (status?: AssignmentStatus) => {
   if (!status) return <Badge variant="neutral">Unknown</Badge>;
@@ -19,11 +23,6 @@ const statusBadge = (status?: AssignmentStatus) => {
     return <Badge variant="warning">Intake in progress</Badge>;
   }
   return <Badge variant="neutral">Created</Badge>;
-};
-
-const clampPercent = (value?: number | null) => {
-  if (value === null || value === undefined) return 0;
-  return Math.max(0, Math.min(100, Math.round(value)));
 };
 
 export const HrCaseSummary: React.FC = () => {
@@ -150,24 +149,34 @@ export const HrCaseSummary: React.FC = () => {
     await loadAssignment();
   };
 
+  const essentials = useMemo(
+    () => (assignment ? deriveCaseEssentials(assignment) : null),
+    [assignment]
+  );
+  /** Header line: prefer resolved name; if still unknown, show invite identifier so HR knows which login this is */
   const headerName =
-    assignment?.profile?.primaryApplicant?.fullName || assignment?.employeeIdentifier || 'Employee';
-  const origin = assignment?.profile?.movePlan?.origin;
-  const destination = assignment?.profile?.movePlan?.destination;
+    essentials && essentials.fullName !== 'Not provided'
+      ? essentials.fullName
+      : assignment?.profile?.primaryApplicant?.fullName ||
+        assignment?.employeeIdentifier ||
+        'Employee';
+  const routeSubtitle =
+    essentials &&
+    essentials.origin !== 'Not provided' &&
+    essentials.destination !== 'Not provided'
+      ? `${essentials.origin} → ${essentials.destination}`
+      : essentials &&
+          (essentials.origin !== 'Not provided' || essentials.destination !== 'Not provided')
+        ? `${essentials.origin !== 'Not provided' ? essentials.origin : '…'} → ${essentials.destination !== 'Not provided' ? essentials.destination : '…'}`
+        : 'Route not set';
 
-  const blockingItems = assignment?.complianceReport?.checks?.filter((check) => check.status !== 'COMPLIANT') || [];
-  const complianceStatus = assignment?.complianceReport?.overallStatus || 'NEEDS_REVIEW';
   const canReopen = assignment?.status === 'submitted';
 
-  const nextDeadline = useMemo(() => {
-    const target = assignment?.profile?.movePlan?.targetArrivalDate;
-    if (target) return new Date(target);
-    if (assignment?.submittedAt) return new Date(assignment.submittedAt);
-    return null;
-  }, [assignment]);
-
   return (
-    <AppShell title="Case Summary" subtitle="Overview of the relocation case for review.">
+    <AppShell
+      title="Case Summary"
+      subtitle="Operational flow: who & route → gaps & review → shared plan (same view as employee)."
+    >
       {error && (
         <Alert variant="error">
           {error}
@@ -185,9 +194,7 @@ export const HrCaseSummary: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="text-xl font-semibold text-[#0b2b43]">{headerName}</div>
-                <div className="text-sm text-[#6b7280]">
-                  {origin && destination ? `${origin} → ${destination}` : 'Route not set'}
-                </div>
+                <div className="text-sm text-[#6b7280]">{routeSubtitle}</div>
               </div>
               <div className="flex items-center gap-3">
                 {statusBadge(assignment.status)}
@@ -214,7 +221,50 @@ export const HrCaseSummary: React.FC = () => {
             </div>
           </Card>
 
-          {assignment?.id && <CaseReadinessCore assignmentId={assignment.id} />}
+          <CaseOperationalSection
+            step={1}
+            id="op-step-essentials"
+            title="Case essentials"
+            subtitle="Who this case is for, household shape, and the route — the anchor for readiness and the plan below."
+          >
+            <CaseEssentialsCard assignment={assignment} embedInOperationalFlow />
+          </CaseOperationalSection>
+
+          <CaseOperationalSection
+            step={2}
+            id="op-step-readiness"
+            title="Readiness & actions"
+            subtitle="What is missing, what needs review, and suggested moves. Intake gaps link to concrete plan tasks in step 3 (owner + due date). Human-review labels preserve when official verification is not available."
+          >
+            <ReadinessAndActionsBlock assignment={assignment} embedInOperationalFlow />
+          </CaseOperationalSection>
+
+          {assignment?.id && (
+            <CaseOperationalSection
+              step={3}
+              id="op-step-plan"
+              title="Shared relocation plan"
+              subtitle="Ordered tasks with owner, deadlines, status, and urgency — same list the employee sees. Use this for follow-up; overdue and blocked counts summarize risk at a glance."
+            >
+              <CaseTimeline
+                assignmentId={assignment.id}
+                ensureDefaults
+                hideMainTitle
+                title="Relocation plan & actions"
+              />
+            </CaseOperationalSection>
+          )}
+
+          {assignment?.id && (
+            <>
+              <div className="rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-3 text-xs text-[#64748b] leading-relaxed">
+                <span className="font-semibold text-[#0b2b43]">Route &amp; template reference</span> — Checklist
+                rows, template milestones, and source tiering for this destination. Use after the operational flow
+                above; it complements — but does not replace — the shared plan for day-to-day execution.
+              </div>
+              <CaseReadinessCore assignmentId={assignment.id} />
+            </>
+          )}
 
           {canReopen && isReopenOpen && (
             <Card padding="lg">
@@ -294,48 +344,16 @@ export const HrCaseSummary: React.FC = () => {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Card padding="md">
-              <div className="text-xs uppercase tracking-wide text-[#6b7280]">Profile completeness</div>
-              <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
-                {clampPercent(assignment.completeness)}%
-              </div>
-              <div className="text-xs text-[#6b7280] mt-1">Completion status</div>
-            </Card>
-            <Card padding="md">
-              <div className="text-xs uppercase tracking-wide text-[#6b7280]">Compliance status</div>
-              <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{complianceStatus}</div>
-              <div className="text-xs text-[#6b7280] mt-1">Latest checks</div>
-            </Card>
-            <Card padding="md">
-              <div className="text-xs uppercase tracking-wide text-[#6b7280]">Next deadline</div>
-              <div className="text-2xl font-semibold text-[#0b2b43] mt-2">
-                {nextDeadline ? nextDeadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
-              </div>
-              <div className="text-xs text-[#6b7280] mt-1">Upcoming milestone</div>
-            </Card>
-          </div>
-
-          <Card padding="lg">
-            <div className="text-sm font-semibold text-[#0b2b43]">Compliance screening (internal rules)</div>
-            <p className="text-xs text-[#64748b] mt-1">
-              Assignment-level checks use ReloPass internal policy configuration — not immigration law. Outcomes are
-              preliminary; human review is required for any immigration decision.
-            </p>
-            {assignment.complianceReport?.disclaimer_legal && (
-              <p className="text-xs text-[#475569] mt-3 border border-[#e2e8f0] rounded-lg px-3 py-2 bg-[#f8fafc]">
-                {assignment.complianceReport.disclaimer_legal}
-              </p>
-            )}
-            {assignment.complianceReport?.verdict_explanation && (
-              <p className="text-sm text-[#334155] mt-3">{assignment.complianceReport.verdict_explanation}</p>
-            )}
-            {assignment.complianceReport?.explanation?.steps &&
-              assignment.complianceReport.explanation.steps.length > 0 && (
-                <details className="mt-3 text-sm">
+          {assignment.complianceReport?.explanation?.steps &&
+            assignment.complianceReport.explanation.steps.length > 0 && (
+              <Card padding="md">
+                <details className="text-sm">
                   <summary className="cursor-pointer text-[#1d4ed8] font-medium">
-                    Step-by-step run log
+                    Latest compliance run — step-by-step log
                   </summary>
+                  <p className="text-xs text-[#64748b] mt-2">
+                    Internal policy engine only; not immigration law. Same data as merged block above.
+                  </p>
                   <ol className="mt-2 space-y-2 pl-4 list-decimal text-[#475569]">
                     {assignment.complianceReport.explanation.steps.map((s) => (
                       <li key={s.step}>
@@ -347,48 +365,8 @@ export const HrCaseSummary: React.FC = () => {
                     ))}
                   </ol>
                 </details>
-              )}
-            <div className="text-sm font-semibold text-[#0b2b43] mt-6">Blocking or review items</div>
-            {blockingItems.length === 0 && (
-              <div className="text-sm text-[#6b7280] mt-2">No blocking items under internal rules.</div>
+              </Card>
             )}
-            {blockingItems.length > 0 && (
-              <ul className="mt-3 space-y-2 text-sm text-[#4b5563]">
-                {blockingItems.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex flex-col gap-1 border border-[#e2e8f0] rounded-lg px-3 py-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-[#0f172a]">{item.name}</span>
-                      <Badge variant="warning">{item.status}</Badge>
-                    </div>
-                    {item.rationale && <p className="text-xs text-[#64748b]">{item.rationale}</p>}
-                    {item.rationale_legal_safety && (
-                      <p className="text-xs italic text-[#64748b]">{item.rationale_legal_safety}</p>
-                    )}
-                    {item.human_review_required && (
-                      <Badge variant="warning" size="sm">
-                        Human review
-                      </Badge>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {assignment.complianceReport?.actions && assignment.complianceReport.actions.length > 0 && (
-              <div className="mt-4">
-                <div className="text-xs font-semibold text-[#0b2b43] uppercase tracking-wide">Suggested actions</div>
-                <ul className="mt-2 list-disc list-inside text-sm text-[#475569] space-y-1">
-                  {assignment.complianceReport.actions.map((a, i) => (
-                    <li key={i}>{typeof a === 'string' ? a : a.title}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </Card>
-
-          <CaseTimeline assignmentId={assignment.id} ensureDefaults />
 
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => safeNavigate(navigate, 'hrAssignmentReview', { id: assignment.id })}>

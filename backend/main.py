@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any, List
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 import re
 import json
 from pydantic import BaseModel
@@ -28,6 +28,7 @@ from .schemas import (
     SchoolRecommendation, MoverRecommendation, TimelinePhase, TimelineTask,
     OverallStatus, UserResponse, UserRole, AssignmentStatus, AssignCaseRequest,
     AssignCaseResponse, CreateCaseResponse, AssignmentSummary, AssignmentDetail, AssignmentsListResponse,
+    IntakeChecklistItem, CaseReadinessUi,
     EmployeeJourneyRequest, EmployeeJourneyNextQuestion, HRAssignmentDecision,
     UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest,
@@ -37,7 +38,8 @@ from .services.dossier import evaluate_applies_if, validate_answer, fetch_search
 from .services.guidance_pack_service import generate_guidance_pack
 from .services.policy_adapter import normalize_policy_caps
 from .services.policy_extractor import extract_policy_from_bytes
-from .app.services.timeline_service import compute_default_milestones
+from .app.services.timeline_service import compute_default_milestones, compute_timeline_summary
+from .hr_case_readiness_view import build_intake_checklist_items, build_hr_case_readiness_ui
 from .services.country_resources import (
     build_profile_context,
     get_personalization_hints,
@@ -3972,6 +3974,33 @@ def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(requ
     return {"success": True, "deleted": assignment_id}
 
 
+def _hr_assignment_case_route_hints(case_row: Optional[Dict[str, Any]]) -> tuple:
+    """
+    Origin/destination hints from relocation_cases only (existing stored data).
+    Precedence: relocationBasics in profile_json (wizard draft), then home_country / host_country.
+    """
+    if not case_row:
+        return None, None
+    origin = (case_row.get("home_country") or "").strip() or None
+    dest = (case_row.get("host_country") or "").strip() or None
+    raw = case_row.get("profile_json")
+    if not raw:
+        return origin, dest
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+        if isinstance(data, dict):
+            rb = data.get("relocationBasics") or {}
+            oc = (rb.get("originCountry") or "").strip()
+            dc = (rb.get("destCountry") or "").strip()
+            if oc:
+                origin = oc
+            if dc:
+                dest = dc
+    except Exception:
+        pass
+    return origin, dest
+
+
 @app.get("/api/hr/assignments/{assignment_id}", response_model=AssignmentDetail)
 def get_hr_assignment(
     request: Request,
@@ -4037,6 +4066,78 @@ def get_hr_assignment(
         else:
             submitted_at_str = str(submitted_at) if submitted_at is not None else None
 
+        case_row = None
+        try:
+            if case_id:
+                case_row = db.get_case_by_id(case_id)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s get_case_by_id failed: %s",
+                req_id,
+                assignment_id,
+                e,
+            )
+        case_origin_hint, case_dest_hint = _hr_assignment_case_route_hints(case_row)
+
+        linked_email = None
+        linked_full_name = None
+        emp_uid = assignment.get("employee_user_id")
+        if emp_uid:
+            try:
+                prec = db.get_profile_record(str(emp_uid))
+                if prec:
+                    linked_email = prec.get("email")
+                    linked_full_name = prec.get("full_name")
+            except Exception as e:
+                log.warning(
+                    "request_id=%s assignment_id=%s get_profile_record failed: %s",
+                    req_id,
+                    assignment_id,
+                    e,
+                )
+
+        readiness_snap: Optional[Dict[str, Any]] = None
+        try:
+            readiness_snap = db.get_hr_readiness_summary(aid)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s get_hr_readiness_summary failed: %s",
+                req_id,
+                assignment_id,
+                e,
+            )
+            readiness_snap = {
+                "resolved": False,
+                "reason": "error",
+                "user_message": "Readiness summary temporarily unavailable.",
+            }
+
+        profile_dict = profile if isinstance(profile, dict) else None
+        intake_raw = build_intake_checklist_items(profile_dict)
+        ui_raw = build_hr_case_readiness_ui(
+            profile=profile_dict,
+            intake_items=intake_raw,
+            readiness_snap=readiness_snap,
+            compliance_report=report,
+        )
+        case_readiness_ui: Optional[CaseReadinessUi] = None
+        try:
+            case_readiness_ui = CaseReadinessUi.model_validate(ui_raw)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s CaseReadinessUi validation failed: %s",
+                req_id,
+                assignment_id,
+                e,
+            )
+
+        intake_models: List[IntakeChecklistItem] = []
+        for row in intake_raw:
+            try:
+                intake_models.append(IntakeChecklistItem(**row))
+            except Exception:
+                continue
+
         dur_ms = (time.perf_counter() - start) * 1000
         log.info(
             "request_id=%s assignment_id=%s get_hr_assignment ok dur_ms=%.2f",
@@ -4054,6 +4155,13 @@ def get_hr_assignment(
             complianceReport=report,
             employeeFirstName=assignment.get("employee_first_name"),
             employeeLastName=assignment.get("employee_last_name"),
+            employeeEmail=linked_email,
+            linkedEmployeeFullName=linked_full_name,
+            caseOriginHint=case_origin_hint,
+            caseDestinationHint=case_dest_hint,
+            intakeChecklist=intake_models,
+            readinessSnapshot=readiness_snap,
+            caseReadinessUi=case_readiness_ui,
         )
     except HTTPException:
         raise
@@ -4426,10 +4534,11 @@ def get_case_details_by_assignment(
 def get_assignment_timeline(
     assignment_id: str,
     ensure_defaults: bool = Query(False, description="Create default milestones if none exist"),
+    include_links: bool = Query(True, description="Include milestone link rows (omit for lighter payloads)"),
     req: Request = None,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    """List timeline milestones for the case linked to this assignment. Convenience wrapper."""
+    """List operational relocation tasks (case_milestones) for the case linked to this assignment."""
     assignment = _require_assignment_visibility(assignment_id, user)
     case_id = assignment.get("case_id")
     if not case_id:
@@ -4465,12 +4574,25 @@ def get_assignment_timeline(
                 target_date=m.get("target_date"),
                 status=m.get("status", "pending"),
                 sort_order=m.get("sort_order", 0),
+                owner=m.get("owner", "joint"),
+                criticality=m.get("criticality", "normal"),
+                notes=m.get("notes"),
                 request_id=request_id,
             )
         milestones = db.list_case_milestones(case_id, request_id=request_id)
-    for m in milestones:
-        m["links"] = db.list_milestone_links(m["id"], request_id=request_id)
-    return {"case_id": case_id, "assignment_id": assignment_id, "milestones": milestones}
+    if include_links:
+        for m in milestones:
+            m["links"] = db.list_milestone_links(m["id"], request_id=request_id)
+    else:
+        for m in milestones:
+            m["links"] = []
+    summary = compute_timeline_summary(milestones)
+    return {
+        "case_id": case_id,
+        "assignment_id": assignment_id,
+        "milestones": milestones,
+        "summary": summary,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -5790,9 +5912,10 @@ def get_case_timeline(
     case_id: str,
     req: Request,
     ensure_defaults: bool = Query(False, description="Create default milestones if none exist"),
+    include_links: bool = Query(True, description="Include milestone link rows (omit for lighter payloads)"),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    """List case milestones (timeline). Optionally ensure default set exists."""
+    """List operational relocation tasks (case_milestones). Optionally ensure default set exists."""
     access = _require_case_access(case_id, user)
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     milestones = db.list_case_milestones(case_id, request_id=request_id)
@@ -5830,16 +5953,21 @@ def get_case_timeline(
                 target_date=m.get("target_date"),
                 status=m.get("status", "pending"),
                 sort_order=m.get("sort_order", 0),
+                owner=m.get("owner", "joint"),
+                criticality=m.get("criticality", "normal"),
+                notes=m.get("notes"),
                 request_id=request_id,
             )
         milestones = db.list_case_milestones(case_id, request_id=request_id)
 
-    # Enrich with links
-    for m in milestones:
-        links = db.list_milestone_links(m["id"], request_id=request_id)
-        m["links"] = links
-
-    return {"case_id": case_id, "milestones": milestones}
+    if include_links:
+        for m in milestones:
+            m["links"] = db.list_milestone_links(m["id"], request_id=request_id)
+    else:
+        for m in milestones:
+            m["links"] = []
+    summary = compute_timeline_summary(milestones)
+    return {"case_id": case_id, "milestones": milestones, "summary": summary}
 
 
 @app.patch("/api/cases/{case_id}/timeline/milestones/{milestone_id}")
@@ -5864,7 +5992,12 @@ def update_case_milestone(
         "actual_date": body.get("actual_date") if "actual_date" in body else existing.get("actual_date"),
         "status": body.get("status") if body.get("status") is not None else existing.get("status", "pending"),
         "sort_order": body.get("sort_order") if body.get("sort_order") is not None else existing.get("sort_order", 0),
+        "owner": body.get("owner") if "owner" in body else existing.get("owner", "joint"),
+        "criticality": body.get("criticality") if "criticality" in body else existing.get("criticality", "normal"),
+        "notes": body.get("notes") if "notes" in body else existing.get("notes"),
     }
+    if merged.get("status") == "done" and not merged.get("actual_date"):
+        merged["actual_date"] = date.today().isoformat()
     updated = db.upsert_case_milestone(
         case_id=case_id,
         milestone_type=merged["milestone_type"],
@@ -5874,6 +6007,9 @@ def update_case_milestone(
         actual_date=merged["actual_date"],
         status=merged["status"],
         sort_order=merged["sort_order"],
+        owner=str(merged.get("owner") or "joint"),
+        criticality=str(merged.get("criticality") or "normal"),
+        notes=merged.get("notes"),
         milestone_id=milestone_id,
         request_id=request_id,
     )

@@ -309,6 +309,49 @@ class AssignmentStatus(str, Enum):
     CLOSED = "closed"
 
 
+class IntakeChecklistItem(BaseModel):
+    """Explicit HR-visible intake/document checkpoints (same GET as assignment detail)."""
+
+    key: str
+    label: str
+    satisfied: bool
+    category: str = "intake"
+    linked_tracker_task_type: Optional[str] = None
+
+
+class ReadinessBlockingItemView(BaseModel):
+    source: str
+    title: str
+    detail: Optional[str] = None
+    human_review_required: bool = False
+    provenance_note: Optional[str] = None
+    linked_tracker_task_type: Optional[str] = None
+
+
+class ReadinessNextActionView(BaseModel):
+    title: str
+    category: str = "general"
+    linked_tracker_task_type: Optional[str] = None
+
+
+class CaseReadinessUi(BaseModel):
+    """Merged readiness + compliance + checklist summary for HR case page (no extra requests)."""
+
+    overall_status: str
+    overall_label: str
+    completion_basis: str
+    intake_satisfied: int
+    intake_total: int
+    checklist_satisfied: Optional[int] = None
+    checklist_total: Optional[int] = None
+    checklist_applicable: bool = False
+    checklist_pending: Optional[int] = Field(default=None)
+    blocking_items: List[ReadinessBlockingItemView] = Field(default_factory=list)
+    next_actions: List[ReadinessNextActionView] = Field(default_factory=list)
+    trust_banner: Optional[str] = None
+    next_deadline_display: Optional[str] = None
+
+
 class AssignmentSummary(BaseModel):
     id: str
     caseId: str
@@ -341,6 +384,14 @@ class AssignmentDetail(BaseModel):
     complianceReport: Optional[Dict[str, Any]] = None
     employeeFirstName: Optional[str] = None
     employeeLastName: Optional[str] = None
+    # HR Case Essentials (same GET — profiles + relocation_cases; no extra HTTP round-trips)
+    employeeEmail: Optional[str] = Field(default=None)
+    linkedEmployeeFullName: Optional[str] = Field(default=None)
+    caseOriginHint: Optional[str] = Field(default=None)
+    caseDestinationHint: Optional[str] = Field(default=None)
+    intakeChecklist: List[IntakeChecklistItem] = Field(default_factory=list)
+    readinessSnapshot: Optional[Dict[str, Any]] = None
+    caseReadinessUi: Optional[CaseReadinessUi] = None
 
 
 class HRAssignmentDecision(BaseModel):

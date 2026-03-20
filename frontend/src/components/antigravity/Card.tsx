@@ -5,6 +5,7 @@ interface CardProps {
   className?: string;
   padding?: 'none' | 'sm' | 'md' | 'lg';
   onClick?: () => void;
+  id?: string;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -12,6 +13,7 @@ export const Card: React.FC<CardProps> = ({
   className = '',
   padding = 'md',
   onClick,
+  id,
 }) => {
   const paddings = {
     none: '',
@@ -24,6 +26,7 @@ export const Card: React.FC<CardProps> = ({
   
   return (
     <div
+      id={id}
       onClick={onClick}
       className={`bg-white rounded-xl shadow-sm border border-[#e2e8f0] ${paddings[padding]} ${clickableClass} ${className}`}
     >

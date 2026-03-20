@@ -1616,7 +1616,7 @@ class Database:
                         conn.execute(text("ALTER TABLE case_evidence ADD COLUMN canonical_case_id TEXT"))
                 except Exception:
                     pass
-            # Timeline: case_milestones + milestone_links
+            # Timeline: case_milestones + milestone_links (operational task tracker)
             if _is_sqlite:
                 try:
                     conn.execute(text("""
@@ -1629,10 +1629,14 @@ class Database:
                             description TEXT,
                             target_date TEXT,
                             actual_date TEXT,
-                            status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','in_progress','done','skipped','overdue')),
+                            status TEXT NOT NULL DEFAULT 'pending'
+                              CHECK (status IN ('pending','in_progress','done','skipped','overdue','blocked')),
                             sort_order INTEGER NOT NULL DEFAULT 0,
                             created_at TEXT NOT NULL,
-                            updated_at TEXT NOT NULL
+                            updated_at TEXT NOT NULL,
+                            owner TEXT NOT NULL DEFAULT 'joint',
+                            criticality TEXT NOT NULL DEFAULT 'normal',
+                            notes TEXT
                         )
                     """))
                     conn.execute(text("""
@@ -1647,6 +1651,7 @@ class Database:
                     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_case_milestones_case ON case_milestones(case_id)"))
                     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_case_milestones_canonical ON case_milestones(canonical_case_id)"))
                     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_milestone_links_milestone ON milestone_links(milestone_id)"))
+                    self._ensure_case_milestones_tracker_sqlite(conn)
                 except Exception:
                     pass
             # Analytics: workflow events for observability
@@ -2219,6 +2224,57 @@ class Database:
             ).fetchall()
         return self._rows_to_list(rows)
 
+    def _ensure_case_milestones_tracker_sqlite(self, conn: Any) -> None:
+        """Migrate legacy SQLite case_milestones to blocked status + owner/criticality/notes."""
+        row = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='case_milestones'")
+        ).fetchone()
+        if not row or not row[0]:
+            return
+        ddl = row[0] or ""
+        if "blocked" in ddl and "owner" in ddl:
+            return
+        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        try:
+            conn.execute(text("""
+                CREATE TABLE case_milestones__new (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    canonical_case_id TEXT,
+                    milestone_type TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    target_date TEXT,
+                    actual_date TEXT,
+                    status TEXT NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending','in_progress','done','skipped','overdue','blocked')),
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    owner TEXT NOT NULL DEFAULT 'joint',
+                    criticality TEXT NOT NULL DEFAULT 'normal',
+                    notes TEXT
+                )
+            """))
+            conn.execute(text("""
+                INSERT INTO case_milestones__new (
+                  id, case_id, canonical_case_id, milestone_type, title, description,
+                  target_date, actual_date, status, sort_order, created_at, updated_at,
+                  owner, criticality, notes
+                )
+                SELECT
+                  id, case_id, canonical_case_id, milestone_type, title, description,
+                  target_date, actual_date, status, sort_order, created_at, updated_at,
+                  'joint', 'normal', NULL
+                FROM case_milestones
+            """))
+            conn.execute(text("DROP TABLE case_milestones"))
+            conn.execute(text("ALTER TABLE case_milestones__new RENAME TO case_milestones"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_case_milestones_case ON case_milestones(case_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_case_milestones_canonical ON case_milestones(canonical_case_id)"))
+        finally:
+            conn.execute(text("PRAGMA foreign_keys=ON"))
+
     # ------------------------------------------------------------------
     # Case milestones (timeline workflow)
     # ------------------------------------------------------------------
@@ -2231,7 +2287,8 @@ class Database:
             rows = self._exec(
                 conn,
                 """SELECT id, case_id, canonical_case_id, milestone_type, title, description,
-                   target_date, actual_date, status, sort_order, created_at, updated_at
+                   target_date, actual_date, status, sort_order, created_at, updated_at,
+                   owner, criticality, notes
                    FROM case_milestones
                    WHERE (canonical_case_id = :cid OR case_id = :cid)
                    ORDER BY sort_order ASC, created_at ASC""",
@@ -2252,6 +2309,9 @@ class Database:
         actual_date: Optional[str] = None,
         status: str = "pending",
         sort_order: int = 0,
+        owner: str = "joint",
+        criticality: str = "normal",
+        notes: Optional[str] = None,
         milestone_id: Optional[str] = None,
         request_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -2264,7 +2324,8 @@ class Database:
                     conn,
                     """UPDATE case_milestones SET
                        title = :title, description = :desc, target_date = :td, actual_date = :ad,
-                       status = :status, sort_order = :so, updated_at = :now
+                       status = :status, sort_order = :so, owner = :owner, criticality = :crit,
+                       notes = :notes, updated_at = :now
                        WHERE id = :id AND (canonical_case_id = :cid OR case_id = :cid)""",
                     {
                         "id": milestone_id,
@@ -2275,6 +2336,9 @@ class Database:
                         "ad": actual_date,
                         "status": status,
                         "so": sort_order,
+                        "owner": owner,
+                        "crit": criticality,
+                        "notes": notes,
                         "now": now,
                     },
                     op_name="update_case_milestone",
@@ -2294,8 +2358,8 @@ class Database:
             self._exec(
                 conn,
                 """INSERT INTO case_milestones
-                   (id, case_id, canonical_case_id, milestone_type, title, description, target_date, actual_date, status, sort_order, created_at, updated_at)
-                   VALUES (:id, :cid, :canonical, :mt, :title, :desc, :td, :ad, :status, :so, :now, :now)""",
+                   (id, case_id, canonical_case_id, milestone_type, title, description, target_date, actual_date, status, sort_order, created_at, updated_at, owner, criticality, notes)
+                   VALUES (:id, :cid, :canonical, :mt, :title, :desc, :td, :ad, :status, :so, :now, :now, :owner, :crit, :notes)""",
                 {
                     "id": mid,
                     "cid": case_id,
@@ -2308,6 +2372,9 @@ class Database:
                     "status": status,
                     "so": sort_order,
                     "now": now,
+                    "owner": owner,
+                    "crit": criticality,
+                    "notes": notes,
                 },
                 op_name="insert_case_milestone",
                 request_id=request_id,
