@@ -430,6 +430,45 @@ export const hrAPI = {
     const response = await api.get('/api/hr/messages');
     return response.data;
   },
+  /** One row per assignment (case thread); company-scoped. */
+  listMessageConversations: async (params?: {
+    q?: string;
+    archive?: 'active' | 'archived' | 'all';
+    unread_only?: boolean;
+    limit?: number;
+    offset?: number;
+    signal?: AbortSignal;
+  }): Promise<{ conversations: any[]; has_more?: boolean }> => {
+    const { signal, ...query } = params ?? {};
+    const response = await api.get('/api/hr/messages/conversations', {
+      signal,
+      params: {
+        ...(query.q && { q: query.q }),
+        archive: query.archive ?? 'active',
+        unread_only: query.unread_only ?? false,
+        limit: query.limit ?? 50,
+        offset: query.offset ?? 0,
+      },
+    });
+    return response.data;
+  },
+  getMessageThread: async (
+    assignmentId: string,
+    opts?: { signal?: AbortSignal }
+  ): Promise<{ assignment_id: string; messages: any[] }> => {
+    const response = await api.get(
+      `/api/hr/messages/threads/${encodeURIComponent(assignmentId)}`,
+      { signal: opts?.signal }
+    );
+    return response.data;
+  },
+  archiveMessageConversations: async (payload: {
+    assignment_ids: string[];
+    archived: boolean;
+  }): Promise<{ ok: boolean; updated: number }> => {
+    const response = await api.post('/api/hr/messages/conversations/archive', payload);
+    return response.data;
+  },
   getCaseCompliance: async (caseId: string): Promise<ComplianceCaseReport> => {
     const response = await api.get(`/api/hr/cases/${caseId}/compliance`);
     return response.data;

@@ -1298,6 +1298,19 @@ class Database:
                 "ON messages(assignment_id, created_at)"
             ))
 
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS message_conversation_prefs (
+                    user_id TEXT NOT NULL,
+                    assignment_id TEXT NOT NULL,
+                    archived_at TEXT,
+                    PRIMARY KEY (user_id, assignment_id)
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_message_conversation_prefs_user "
+                "ON message_conversation_prefs(user_id, archived_at)"
+            ))
+
             # Best-effort schema extensions for relocation_cases
             if _is_sqlite:
                 cols = conn.execute(text("PRAGMA table_info(companies)")).fetchall()
@@ -4916,16 +4929,42 @@ class Database:
         return self.get_company(profile["company_id"])
 
     def get_hr_company_id(self, profile_id: str) -> Optional[str]:
-        """Resolve company_id for HR user. Prefers hr_users.company_id, falls back to profile.company_id."""
+        """
+        Resolve company_id for HR user.
+        Uses hr_users.company_id when set; if the row exists but company_id is NULL/empty,
+        falls back to profiles.company_id (Admin assign-company updates profile; hr_users can lag).
+        """
+        profile = self.get_profile_record(profile_id)
+        pcid = (str(profile["company_id"]).strip() if profile and profile.get("company_id") else "") or None
         with self.engine.connect() as conn:
             row = conn.execute(
                 text("SELECT company_id FROM hr_users WHERE profile_id = :pid LIMIT 1"),
                 {"pid": profile_id},
             ).fetchone()
         if row:
-            return row._mapping.get("company_id")
+            v = row._mapping.get("company_id")
+            hcid = str(v).strip() if v is not None and str(v).strip() else None
+            if hcid:
+                return hcid
+            return pcid
+        return pcid
+
+    def sync_hr_user_company_from_profile(self, profile_id: str) -> None:
+        """
+        For HR profiles with profiles.company_id set, ensure hr_users row exists and company_id matches.
+        Fixes blank HR Company Profile when Admin assigned company but hr_users was missing or NULL.
+        """
+        if not profile_id:
+            return
         profile = self.get_profile_record(profile_id)
-        return profile.get("company_id") if profile else None
+        if not profile:
+            return
+        if (profile.get("role") or "").strip().upper() != "HR":
+            return
+        cid = profile.get("company_id")
+        if not cid or not str(cid).strip():
+            return
+        self.ensure_hr_user_for_profile(profile_id, str(cid).strip())
 
     def list_profiles(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
         q = (query or "").strip().lower()
@@ -6178,6 +6217,198 @@ class Database:
                 "SELECT * FROM messages WHERE hr_user_id = :hr ORDER BY created_at DESC"
             ), {"hr": hr_user_id}).fetchall()
         return self._rows_to_list(rows)
+
+    def upsert_message_conversation_pref(
+        self, user_id: str, assignment_id: str, archived: bool
+    ) -> None:
+        """Soft-archive or restore a conversation in the HR user's list (per user_id + assignment_id)."""
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            if archived:
+                if _is_sqlite:
+                    conn.execute(
+                        text(
+                            "INSERT INTO message_conversation_prefs (user_id, assignment_id, archived_at) "
+                            "VALUES (:u, :a, :now) ON CONFLICT (user_id, assignment_id) "
+                            "DO UPDATE SET archived_at = excluded.archived_at"
+                        ),
+                        {"u": user_id, "a": assignment_id, "now": now},
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "INSERT INTO message_conversation_prefs (user_id, assignment_id, archived_at) "
+                            "VALUES (:u, :a, :now) ON CONFLICT (user_id, assignment_id) "
+                            "DO UPDATE SET archived_at = EXCLUDED.archived_at"
+                        ),
+                        {"u": user_id, "a": assignment_id, "now": now},
+                    )
+            else:
+                conn.execute(
+                    text(
+                        "DELETE FROM message_conversation_prefs "
+                        "WHERE user_id = :u AND assignment_id = :a"
+                    ),
+                    {"u": user_id, "a": assignment_id},
+                )
+
+    def list_hr_conversation_summaries(
+        self,
+        hr_user_id: str,
+        hr_company_id: Optional[str],
+        is_admin: bool,
+        search_q: Optional[str] = None,
+        archive_filter: str = "active",
+        unread_only: bool = False,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """
+        One row per assignment_id: preview, counts, archive pref, company-safe HR visibility.
+        archive_filter: 'active' | 'archived' | 'all'
+        """
+        lim = max(1, min(int(limit or 50), 200))
+        off = max(0, int(offset or 0))
+
+        if is_admin:
+            access_sql = "1 = 1"
+            access_params: Dict[str, Any] = {}
+        elif hr_company_id:
+            access_sql = """(
+                a.hr_user_id = :hr_uid OR
+                rc.company_id = :hr_cid OR
+                (rc.company_id IS NULL AND hu.company_id = :hr_cid)
+            )"""
+            access_params = {"hr_uid": hr_user_id, "hr_cid": hr_company_id}
+        else:
+            access_sql = "a.hr_user_id = :hr_uid"
+            access_params = {"hr_uid": hr_user_id}
+
+        if archive_filter == "archived":
+            archive_sql = "p.archived_at IS NOT NULL"
+        elif archive_filter == "all":
+            archive_sql = "1 = 1"
+        else:
+            archive_sql = "(p.archived_at IS NULL)"
+
+        search_sql = "1 = 1"
+        search_params: Dict[str, Any] = {}
+        if search_q and search_q.strip():
+            term = f"%{search_q.strip().lower()}%"
+            search_sql = """(
+                LOWER(COALESCE(emp_p.full_name, '')) LIKE :sq OR
+                LOWER(COALESCE(emp_p.email, '')) LIKE :sq OR
+                LOWER(COALESCE(a.employee_identifier, '')) LIKE :sq OR
+                LOWER(COALESCE(a.employee_first_name, '')) LIKE :sq OR
+                LOWER(COALESCE(a.employee_last_name, '')) LIKE :sq OR
+                LOWER(COALESCE(a.case_id, '')) LIKE :sq OR
+                LOWER(COALESCE(a.canonical_case_id, '')) LIKE :sq
+            )"""
+            search_params["sq"] = term
+
+        unread_sql = "1 = 1"
+        if unread_only:
+            unread_sql = (
+                "(SELECT COUNT(*) FROM messages uq WHERE uq.assignment_id = m.assignment_id "
+                "AND uq.recipient_user_id = :hr_uid_unread "
+                "AND uq.read_at IS NULL AND uq.dismissed_at IS NULL) > 0"
+            )
+
+        order_clause = (
+            "ORDER BY last_message_at DESC NULLS LAST"
+            if not _is_sqlite
+            else "ORDER BY last_message_at DESC"
+        )
+
+        params: Dict[str, Any] = {
+            **access_params,
+            **search_params,
+            "hr_uid": hr_user_id,
+            "hr_uid_unread": hr_user_id,
+            "lim": lim,
+            "off": off,
+        }
+
+        sql = f"""
+            SELECT
+                m.assignment_id,
+                MAX(m.created_at) AS last_message_at,
+                COUNT(*) AS message_count,
+                (SELECT body FROM messages m2 WHERE m2.assignment_id = m.assignment_id
+                 ORDER BY m2.created_at DESC LIMIT 1) AS last_body,
+                (SELECT subject FROM messages m2s WHERE m2s.assignment_id = m.assignment_id
+                 ORDER BY m2s.created_at DESC LIMIT 1) AS last_subject,
+                (SELECT COUNT(*) FROM messages m3 WHERE m3.assignment_id = m.assignment_id
+                 AND m3.recipient_user_id = :hr_uid_unread
+                 AND m3.read_at IS NULL AND m3.dismissed_at IS NULL) AS unread_count,
+                MAX(p.archived_at) AS archived_at,
+                MAX(a.employee_user_id) AS employee_user_id,
+                MAX(a.hr_user_id) AS assignment_hr_user_id,
+                MAX(a.employee_identifier) AS employee_identifier,
+                MAX(a.employee_first_name) AS employee_first_name,
+                MAX(a.employee_last_name) AS employee_last_name,
+                MAX(a.status) AS assignment_status,
+                MAX(emp_p.full_name) AS employee_full_name,
+                MAX(emp_p.email) AS employee_email,
+                MAX(COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)) AS case_id
+            FROM messages m
+            INNER JOIN case_assignments a ON a.id = m.assignment_id
+            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
+            LEFT JOIN message_conversation_prefs p ON p.user_id = :hr_uid AND p.assignment_id = m.assignment_id
+            WHERE m.assignment_id IS NOT NULL
+              AND ({access_sql})
+              AND ({archive_sql})
+              AND ({search_sql})
+              AND ({unread_sql})
+            GROUP BY m.assignment_id
+            {order_clause}
+            LIMIT :lim OFFSET :off
+        """
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            r = dict(row._mapping)
+            aid = r.get("assignment_id")
+            if not aid:
+                continue
+            raw_body = r.get("last_body") or ""
+            raw_sub = r.get("last_subject") or ""
+            preview_src = raw_body.strip() or raw_sub.strip() or ""
+            last_body = preview_src[:100]
+            if len(preview_src) > 100:
+                last_body = last_body.rstrip() + "…"
+
+            fn = (r.get("employee_first_name") or "").strip()
+            ln = (r.get("employee_last_name") or "").strip()
+            composed = (fn + " " + ln).strip()
+            emp_name = (
+                r.get("employee_full_name")
+                or composed
+                or r.get("employee_identifier")
+                or "Employee"
+            )
+            unread = int(r.get("unread_count") or 0)
+            out.append({
+                "assignment_id": aid,
+                "case_id": r.get("case_id"),
+                "employee_user_id": r.get("employee_user_id"),
+                "employee_name": emp_name,
+                "employee_email": r.get("employee_email"),
+                "employee_identifier": r.get("employee_identifier"),
+                "last_message_preview": last_body,
+                "last_message_at": r.get("last_message_at"),
+                "message_count": int(r.get("message_count") or 0),
+                "unread_count": unread,
+                "has_unread": unread > 0,
+                "archived_at": r.get("archived_at"),
+                "assignment_status": r.get("assignment_status"),
+            })
+        return out
 
     def list_messages_for_employee(self, employee_user_id: str) -> List[Dict[str, Any]]:
         assignment = self.get_assignment_for_employee(employee_user_id)

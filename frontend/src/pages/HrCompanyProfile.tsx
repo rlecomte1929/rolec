@@ -19,7 +19,7 @@ const FieldSkeleton = () => (
 export const HrCompanyProfile: React.FC = () => {
   const location = useLocation();
   const route = location.pathname;
-  const { company, loading: profileLoading, refresh } = useHrCompanyContext();
+  const { company, loading: profileLoading, error: contextError, refresh } = useHrCompanyContext();
 
   useEffect(() => {
     trackRouteEntry(route);
@@ -50,20 +50,23 @@ export const HrCompanyProfile: React.FC = () => {
   useEffect(() => {
     if (company) {
       const c = company as Record<string, unknown>;
-      setName((c.name as string) || '');
-      setCountry((c.country as string) || '');
-      setSizeBand((c.size_band as string) || '');
-      setAddress((c.address as string) || '');
-      setPhone((c.phone as string) || '');
-      setHrContact((c.hr_contact as string) || '');
-      setLegalName((c.legal_name as string) || '');
-      setWebsite((c.website as string) || '');
-      setHqCity((c.hq_city as string) || '');
-      setIndustry((c.industry as string) || '');
-      setDefaultDestinationCountry((c.default_destination_country as string) || '');
-      setSupportEmail((c.support_email as string) || '');
-      setDefaultWorkingLocation((c.default_working_location as string) || '');
-      setLogoUrl((c.logo_url as string) || null);
+      const pick = (snake: string, camel: string) =>
+        String((c[snake] ?? c[camel] ?? '') || '').trim();
+      setName(pick('name', 'name'));
+      setCountry(pick('country', 'country'));
+      setSizeBand(pick('size_band', 'sizeBand'));
+      setAddress(pick('address', 'address'));
+      setPhone(pick('phone', 'phone'));
+      setHrContact(pick('hr_contact', 'hrContact'));
+      setLegalName(pick('legal_name', 'legalName'));
+      setWebsite(pick('website', 'website'));
+      setHqCity(pick('hq_city', 'hqCity'));
+      setIndustry(pick('industry', 'industry'));
+      setDefaultDestinationCountry(pick('default_destination_country', 'defaultDestinationCountry'));
+      setSupportEmail(pick('support_email', 'supportEmail'));
+      setDefaultWorkingLocation(pick('default_working_location', 'defaultWorkingLocation'));
+      const logo = pick('logo_url', 'logoUrl');
+      setLogoUrl(logo || null);
 
       const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
       trackAuthPerf({ stage: 'bootstrap_end', route: location.pathname, durationMs: t0 });
@@ -182,6 +185,15 @@ export const HrCompanyProfile: React.FC = () => {
   return (
     <AppShell title="Company Profile" subtitle={profileLoading ? 'Loading...' : 'Complete your company profile to prefill employee cases.'}>
       <Card padding="lg">
+        {contextError && (
+          <Alert variant="error" className="mb-4">{contextError}</Alert>
+        )}
+        {!profileLoading && !contextError && company == null && (
+          <Alert variant="info" className="mb-4">
+            No company record was loaded. If an admin has already assigned you to a company, try refreshing the page.
+            Otherwise, fill in the form and save to create your company profile.
+          </Alert>
+        )}
         {error && <Alert variant="error" className="mb-4">{error}</Alert>}
         {saved && <Alert variant="success" className="mb-4">Saved.</Alert>}
         <div className="space-y-4">

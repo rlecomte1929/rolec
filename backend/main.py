@@ -2694,10 +2694,19 @@ def get_company_profile(request: Request, user: Dict[str, Any] = Depends(require
     t0 = time.perf_counter()
     request_id = getattr(request.state, "request_id", None)
     effective = _effective_user(user, UserRole.HR)
+    # Align hr_users with profiles.company_id so resolution matches Admin-assigned company
+    db.sync_hr_user_company_from_profile(effective["id"])
     cid = _get_hr_company_id(effective)
     company = db.get_company(cid) if cid else db.get_company_for_user(effective["id"])
     dur_ms = (time.perf_counter() - t0) * 1000
     _log_endpoint_perf("/api/hr/company-profile", request_id, user.get("id"), dur_ms, 200)
+    if os.getenv("PERF_DEBUG", "").lower() in ("1", "true", "yes") and company:
+        log.info(
+            "company_profile_loaded user_id=%s company_id=%s name=%s",
+            effective.get("id"),
+            company.get("id"),
+            company.get("name"),
+        )
     return {"company": company}
 
 
@@ -2706,9 +2715,12 @@ def get_current_user_company(request: Request, user: Dict[str, Any] = Depends(ge
     """Return the authenticated user's company (for header branding). Available to HR and Employee."""
     t0 = time.perf_counter()
     request_id = getattr(request.state, "request_id", None)
-    # HR users: use canonical hr_users.company_id path; employees: profile.company_id
+    # HR users: same resolution as /api/hr/company-profile (sync + coalesced company_id)
     if user.get("role") == UserRole.HR.value or user.get("is_admin"):
-        cid = _get_hr_company_id(user)
+        effective = _effective_user(user, UserRole.HR) if user.get("role") == UserRole.HR.value else user
+        if user.get("role") == UserRole.HR.value:
+            db.sync_hr_user_company_from_profile(effective["id"])
+        cid = _get_hr_company_id(effective if user.get("role") == UserRole.HR.value else user)
         company = db.get_company(cid) if cid else None
     else:
         company = db.get_company_for_user(user["id"])
@@ -2757,6 +2769,10 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
         "support_email": request.support_email,
         "default_working_location": request.default_working_location,
     })
+    # Ensure hr_users row exists and matches (set_profile_company UPDATE may no-op if row missing)
+    prof_after = db.get_profile_record(effective["id"])
+    if prof_after and (prof_after.get("role") or "").strip().upper() == "HR":
+        db.ensure_hr_user_for_profile(effective["id"], company_id)
     return {"ok": True, "company_id": company_id}
 
 
@@ -3705,6 +3721,85 @@ def list_hr_messages(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     return {"messages": items}
 
 
+class HrConversationsArchiveRequest(BaseModel):
+    assignment_ids: List[str]
+    archived: bool = True
+
+
+@app.get("/api/hr/messages/conversations")
+def list_hr_message_conversations(
+    q: Optional[str] = Query(None, description="Search name, email, identifier, case id"),
+    archive: str = Query("active", description="active | archived | all"),
+    unread_only: bool = Query(False),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Company-scoped conversation summaries (one row per assignment / case thread)."""
+    effective = _effective_user(user, UserRole.HR)
+    pref_user_id = effective.get("id") or ""
+    is_admin = bool(effective.get("is_admin"))
+    hr_cid = None if is_admin else _get_hr_company_id(effective)
+    archive_norm = archive if archive in ("active", "archived", "all") else "active"
+    rows = db.list_hr_conversation_summaries(
+        hr_user_id=pref_user_id,
+        hr_company_id=hr_cid,
+        is_admin=is_admin,
+        search_q=q,
+        archive_filter=archive_norm,
+        unread_only=unread_only,
+        limit=limit,
+        offset=offset,
+    )
+    return {"conversations": rows, "has_more": len(rows) >= limit}
+
+
+@app.get("/api/hr/messages/threads/{assignment_id}")
+def get_hr_message_thread(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Full message history for one assignment; authorized via same rules as assignment detail."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    items = db.list_messages_by_assignment(aid)
+    return {"assignment_id": aid, "messages": items}
+
+
+@app.post("/api/hr/messages/conversations/archive")
+def archive_hr_message_conversations(
+    request: HrConversationsArchiveRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Soft-archive or restore conversations for the current user (non-destructive).
+    archived=true sets archived_at; archived=false removes the preference row (visible in active list again).
+    """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    pref_user_id = effective.get("id") or ""
+    if not request.assignment_ids:
+        raise HTTPException(status_code=400, detail="assignment_ids required")
+    normalized: List[str] = []
+    for raw_id in request.assignment_ids:
+        aid = (raw_id or "").strip()
+        if not aid:
+            continue
+        assignment = db.get_assignment_by_id(aid)
+        if not assignment:
+            raise HTTPException(status_code=404, detail=f"Assignment not found: {aid}")
+        if not _hr_can_access_assignment(assignment, user):
+            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+        normalized.append(assignment["id"])
+    for aid in normalized:
+        db.upsert_message_conversation_pref(pref_user_id, aid, request.archived)
+    return {"ok": True, "updated": len(normalized)}
+
+
 # Message state / notification bell (HR + Employee)
 @app.get("/api/messages/unread-count")
 def get_message_unread_count(user: Dict[str, Any] = Depends(require_hr_or_employee)):
@@ -3803,7 +3898,17 @@ def mark_conversation_read(
         raise HTTPException(status_code=400, detail="assignment_id or conversation_id required")
     role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
     effective = _effective_user(user, role)
-    db.mark_conversation_read(assignment_id, effective["id"])
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    aid = assignment["id"]
+    if effective.get("role") == UserRole.EMPLOYEE.value:
+        if assignment.get("employee_user_id") != effective.get("id"):
+            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    else:
+        if not _hr_can_access_assignment(assignment, user):
+            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    db.mark_conversation_read(aid, effective["id"])
     return {"success": True}
 
 

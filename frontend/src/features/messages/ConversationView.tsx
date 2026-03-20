@@ -49,6 +49,17 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
     );
   }
 
+  if (conversation.thread_loaded === false && conversation.messages.length === 0) {
+    return (
+      <div
+        className="flex-1 flex flex-col items-center justify-center bg-[#f8fafc] text-[#6b7280] p-8"
+        aria-live="polite"
+      >
+        <p className="text-sm">Loading conversation…</p>
+      </div>
+    );
+  }
+
   const items = groupMessagesByDate(conversation.messages);
   const typingName = typingFrom;
 

@@ -41,4 +41,10 @@ export interface Conversation {
   unread_count?: number;
   /** Messages in this conversation */
   messages: Message[];
+  /** HR summaries: full thread loaded on demand */
+  thread_loaded?: boolean;
+  /** Linked case id for filters / tags */
+  case_id?: string | null;
+  participant_email?: string | null;
+  archived_at?: string | null;
 }

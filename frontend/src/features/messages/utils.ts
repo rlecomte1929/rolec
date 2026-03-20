@@ -5,6 +5,24 @@
 
 import type { Message, Conversation } from './types';
 
+/** Map API conversation summary row to a lightweight Conversation (messages loaded later). */
+export function conversationFromSummary(row: Record<string, unknown>): Conversation {
+  const assignmentId = String(row.assignment_id ?? '');
+  return {
+    id: `conv-${assignmentId}`,
+    assignment_id: assignmentId,
+    other_participant_name: String(row.employee_name ?? 'Employee'),
+    last_message_preview: String(row.last_message_preview ?? ''),
+    last_message_at: String(row.last_message_at ?? new Date().toISOString()),
+    unread_count: typeof row.unread_count === 'number' ? row.unread_count : Number(row.unread_count) || 0,
+    messages: [],
+    thread_loaded: false,
+    case_id: (row.case_id as string) ?? null,
+    participant_email: (row.employee_email as string) ?? null,
+    archived_at: (row.archived_at as string) ?? null,
+  };
+}
+
 function truncate(str: string, max: number): string {
   if (!str) return '';
   const content = str.replace(/\n/g, ' ').trim();
