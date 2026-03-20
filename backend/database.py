@@ -38,11 +38,11 @@ def _agent_debug_log(
 ) -> None:
     """
     Lightweight NDJSON logger for this debug session.
-    Writes to .cursor/debug-2c6040.log; failures are swallowed.
+    Writes to .cursor/debug-2d9978.log; failures are swallowed.
     """
     try:
         payload = {
-            "sessionId": "2c6040",
+            "sessionId": "2d9978",
             "runId": run_id,
             "hypothesisId": hypothesis_id,
             "location": location,
@@ -50,7 +50,7 @@ def _agent_debug_log(
             "data": data,
             "timestamp": int(datetime.utcnow().timestamp() * 1000),
         }
-        log_path = "/Users/Rom/Documents/GitHub/rolec/.cursor/debug-2c6040.log"
+        log_path = "/Users/Rom/Documents/GitHub/rolec/.cursor/debug-2d9978.log"
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(payload) + "\n")
     except Exception:
@@ -68,6 +68,30 @@ if _raw_url.startswith("sqlite"):
 _engine = create_engine(_raw_url, connect_args=_connect_args)
 
 _is_sqlite = _raw_url.startswith("sqlite")
+
+
+def _relocation_cases_join_on(table_alias: str = "a", style: str = "standard") -> str:
+    """
+    Predicate for: LEFT JOIN relocation_cases rc ON <this>
+    Supabase/Postgres often types relocation_cases.id as uuid while case_assignments.case_id is text;
+    comparing without a cast raises 'operator does not exist: uuid = text'. SQLite uses text ids — no ::text.
+    """
+    a = table_alias
+    if style == "simple":
+        rhs = f"{a}.case_id"
+    elif style == "canonical_coalesce":
+        rhs = f"COALESCE(NULLIF(TRIM(COALESCE({a}.canonical_case_id, '')), ''), {a}.case_id)"
+    else:
+        rhs = f"COALESCE(NULLIF(TRIM({a}.canonical_case_id), ''), {a}.case_id)"
+    if _is_sqlite:
+        return f"rc.id = {rhs}"
+    return f"rc.id::text = {rhs}"
+
+
+def _eq_text(lhs_sql: str, rhs_sql: str) -> str:
+    """Cross-type-safe equality for ids (Postgres uuid vs text on messages / assignments / prefs). SQLite: CAST is harmless."""
+    return f"CAST({lhs_sql} AS TEXT) = CAST({rhs_sql} AS TEXT)"
+
 
 # NOTE: Production Postgres currently has no profiles.status column.
 # To avoid schema drift issues we do not reference profiles.status at all.
@@ -3084,9 +3108,9 @@ class Database:
         with self.engine.connect() as conn:
             # Assignments where case has null company_id but HR belongs to this company
             row = conn.execute(
-                text("""
+                text(f"""
                     SELECT COUNT(*) AS n FROM case_assignments a
-                    LEFT JOIN relocation_cases rc ON rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                    LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a")}
                     LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
                     WHERE hu.company_id = :cid AND (rc.company_id IS NULL OR TRIM(COALESCE(rc.company_id, '')) = '')
                 """),
@@ -3118,9 +3142,9 @@ class Database:
 
     def assignment_belongs_to_company(self, assignment_id: str, company_id: str) -> bool:
         """Check if assignment belongs to the given company (via case or HR)."""
-        sql = """
+        sql = f"""
             SELECT 1 FROM case_assignments a
-            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a")}
             LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
             WHERE a.id = :aid AND (rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))
             LIMIT 1
@@ -3594,12 +3618,12 @@ class Database:
                 p for p in people
                 if not (p.get("company_id") or "").strip()
             ]
-            sql_assignments = """
+            sql_assignments = f"""
                 SELECT a.id, a.case_id, a.hr_user_id, a.employee_user_id, a.employee_identifier, a.status,
                        rc.company_id AS case_company_id,
                        (SELECT hu.company_id FROM hr_users hu WHERE hu.profile_id = a.hr_user_id LIMIT 1) AS hr_company_id
                 FROM case_assignments a
-                LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a")}
                 ORDER BY a.created_at DESC
             """
             assignments = self._rows_to_list(conn.execute(text(sql_assignments)).fetchall())
@@ -6387,14 +6411,14 @@ class Database:
             access_sql = "1 = 1"
             access_params: Dict[str, Any] = {}
         elif hr_company_id:
-            access_sql = """(
-                a.hr_user_id = :hr_uid OR
-                rc.company_id = :hr_cid OR
-                (rc.company_id IS NULL AND hu.company_id = :hr_cid)
+            access_sql = f"""(
+                {_eq_text("a.hr_user_id", ":hr_uid")} OR
+                {_eq_text("rc.company_id", ":hr_cid")} OR
+                (rc.company_id IS NULL AND {_eq_text("hu.company_id", ":hr_cid")})
             )"""
             access_params = {"hr_uid": hr_user_id, "hr_cid": hr_company_id}
         else:
-            access_sql = "a.hr_user_id = :hr_uid"
+            access_sql = _eq_text("a.hr_user_id", ":hr_uid")
             access_params = {"hr_uid": hr_user_id}
 
         if archive_filter == "archived":
@@ -6422,8 +6446,11 @@ class Database:
         unread_sql = "1 = 1"
         if unread_only:
             unread_sql = (
-                "(SELECT COUNT(*) FROM messages uq WHERE uq.assignment_id = m.assignment_id "
-                "AND uq.recipient_user_id = :hr_uid_unread "
+                "(SELECT COUNT(*) FROM messages uq WHERE "
+                + _eq_text("uq.assignment_id", "m.assignment_id")
+                + " AND "
+                + _eq_text("uq.recipient_user_id", ":hr_uid_unread")
+                + " "
                 "AND uq.read_at IS NULL AND uq.dismissed_at IS NULL) > 0"
             )
 
@@ -6447,12 +6474,12 @@ class Database:
                 m.assignment_id,
                 MAX(m.created_at) AS last_message_at,
                 COUNT(*) AS message_count,
-                (SELECT body FROM messages m2 WHERE m2.assignment_id = m.assignment_id
+                (SELECT body FROM messages m2 WHERE {_eq_text("m2.assignment_id", "m.assignment_id")}
                  ORDER BY m2.created_at DESC LIMIT 1) AS last_body,
-                (SELECT subject FROM messages m2s WHERE m2s.assignment_id = m.assignment_id
+                (SELECT subject FROM messages m2s WHERE {_eq_text("m2s.assignment_id", "m.assignment_id")}
                  ORDER BY m2s.created_at DESC LIMIT 1) AS last_subject,
-                (SELECT COUNT(*) FROM messages m3 WHERE m3.assignment_id = m.assignment_id
-                 AND m3.recipient_user_id = :hr_uid_unread
+                (SELECT COUNT(*) FROM messages m3 WHERE {_eq_text("m3.assignment_id", "m.assignment_id")}
+                 AND {_eq_text("m3.recipient_user_id", ":hr_uid_unread")}
                  AND m3.read_at IS NULL AND m3.dismissed_at IS NULL) AS unread_count,
                 MAX(p.archived_at) AS archived_at,
                 MAX(a.employee_user_id) AS employee_user_id,
@@ -6465,11 +6492,11 @@ class Database:
                 MAX(emp_p.email) AS employee_email,
                 MAX(COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)) AS case_id
             FROM messages m
-            INNER JOIN case_assignments a ON a.id = m.assignment_id
-            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
-            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
-            LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
-            LEFT JOIN message_conversation_prefs p ON p.user_id = :hr_uid AND p.assignment_id = m.assignment_id
+            INNER JOIN case_assignments a ON {_eq_text("a.id", "m.assignment_id")}
+            LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a")}
+            LEFT JOIN hr_users hu ON {_eq_text("hu.profile_id", "a.hr_user_id")}
+            LEFT JOIN profiles emp_p ON {_eq_text("emp_p.id", "a.employee_user_id")}
+            LEFT JOIN message_conversation_prefs p ON {_eq_text("p.user_id", ":hr_uid")} AND {_eq_text("p.assignment_id", "m.assignment_id")}
             WHERE m.assignment_id IS NOT NULL
               AND ({access_sql})
               AND ({archive_sql})
@@ -6498,9 +6525,9 @@ class Database:
                 m.assignment_id,
                 MAX(m.created_at) AS last_message_at,
                 COUNT(*) AS message_count,
-                (SELECT body FROM messages m2 WHERE m2.assignment_id = m.assignment_id
+                (SELECT body FROM messages m2 WHERE {_eq_text("m2.assignment_id", "m.assignment_id")}
                  ORDER BY m2.created_at DESC LIMIT 1) AS last_body,
-                (SELECT subject FROM messages m2s WHERE m2s.assignment_id = m.assignment_id
+                (SELECT subject FROM messages m2s WHERE {_eq_text("m2s.assignment_id", "m.assignment_id")}
                  ORDER BY m2s.created_at DESC LIMIT 1) AS last_subject,
                 0 AS unread_count,
                 {null_arch} AS archived_at,
@@ -6514,10 +6541,10 @@ class Database:
                 MAX(emp_p.email) AS employee_email,
                 MAX(a.case_id) AS case_id
             FROM messages m
-            INNER JOIN case_assignments a ON a.id = m.assignment_id
-            LEFT JOIN relocation_cases rc ON rc.id = a.case_id
-            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
-            LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
+            INNER JOIN case_assignments a ON {_eq_text("a.id", "m.assignment_id")}
+            LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a", "simple")}
+            LEFT JOIN hr_users hu ON {_eq_text("hu.profile_id", "a.hr_user_id")}
+            LEFT JOIN profiles emp_p ON {_eq_text("emp_p.id", "a.employee_user_id")}
             WHERE m.assignment_id IS NOT NULL
               AND ({access_sql})
               AND ({search_compat_sql})
@@ -6530,13 +6557,59 @@ class Database:
         try:
             with self.engine.connect() as conn:
                 rows = list(conn.execute(text(sql_full), params).fetchall())
+            # #region agent log
+            _agent_debug_log(
+                hypothesis_id="H-conv",
+                location="database.list_hr_conversation_summaries",
+                message="full query ok",
+                data={
+                    "row_count": len(rows),
+                    "archive_filter": archive_filter,
+                    "unread_only": unread_only,
+                    "is_admin": is_admin,
+                },
+            )
+            # #endregion
         except (ProgrammingError, OperationalError) as e:
             log.warning(
                 "list_hr_conversation_summaries: full query failed (%s), using compat query",
                 e,
             )
-            with self.engine.connect() as conn:
-                rows = list(conn.execute(text(sql_compat), compat_params).fetchall())
+            # #region agent log
+            _agent_debug_log(
+                hypothesis_id="H-conv-fallback",
+                location="database.list_hr_conversation_summaries",
+                message="full query failed; trying compat",
+                data={
+                    "error_type": type(e).__name__,
+                    "error": str(e)[:400],
+                },
+            )
+            # #endregion
+            try:
+                with self.engine.connect() as conn:
+                    rows = list(conn.execute(text(sql_compat), compat_params).fetchall())
+                # #region agent log
+                _agent_debug_log(
+                    hypothesis_id="H-conv-compat",
+                    location="database.list_hr_conversation_summaries",
+                    message="compat query ok",
+                    data={"row_count": len(rows)},
+                )
+                # #endregion
+            except (ProgrammingError, OperationalError) as e2:
+                # #region agent log
+                _agent_debug_log(
+                    hypothesis_id="H-conv-fail",
+                    location="database.list_hr_conversation_summaries",
+                    message="compat query failed",
+                    data={
+                        "error_type": type(e2).__name__,
+                        "error": str(e2)[:400],
+                    },
+                )
+                # #endregion
+                raise
 
         out: List[Dict[str, Any]] = []
         for row in rows:
@@ -6652,8 +6725,8 @@ class Database:
                 MAX(hr_p.full_name) AS hr_full_name,
                 MAX(a.status) AS assignment_status
             FROM messages m
-            LEFT JOIN case_assignments a ON a.id = m.assignment_id
-            LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+            LEFT JOIN case_assignments a ON {_eq_text("a.id", "m.assignment_id")}
+            LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a")}
             LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
             LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, hu.company_id)
             LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
@@ -7103,7 +7176,7 @@ class Database:
                  ORDER BY pv2.version_number DESC, pv2.created_at DESC LIMIT 1) AS latest_version_updated_at,
                 (SELECT COUNT(*) FROM resolved_assignment_policies rap
                  JOIN case_assignments ca ON ca.id = rap.assignment_id
-                 LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), ca.case_id)
+                 LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("ca")}
                  WHERE rc.company_id = c.id) AS resolved_count
             FROM companies c
             {where}
@@ -7527,9 +7600,9 @@ class Database:
         with self.engine.connect() as conn:
             total = conn.execute(text("SELECT COUNT(*) AS n FROM case_assignments"), {}).fetchone()
             total_count = int(total._mapping["n"]) if total else 0
-            no_company_sql = text("""
+            no_company_sql = text(f"""
                 SELECT COUNT(*) AS n FROM case_assignments a
-                LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(COALESCE(a.canonical_case_id,'')), ''), a.case_id)
+                LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a", "canonical_coalesce")}
                 LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
                 WHERE COALESCE(rc.company_id, hu.company_id) IS NULL
             """)
@@ -7610,9 +7683,9 @@ class Database:
                 out["people"]["orphans_without_company"] = people_sum.get("orphans_without_company", 0)
                 a = conn.execute(text("SELECT COUNT(*) AS n FROM case_assignments"), {}).fetchone()
                 out["assignments"]["count"] = int(a._mapping["n"]) if a else 0
-                no_co = conn.execute(text("""
+                no_co = conn.execute(text(f"""
                     SELECT COUNT(*) AS n FROM case_assignments a
-                    LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(COALESCE(a.canonical_case_id,'')), ''), a.case_id)
+                    LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a", "canonical_coalesce")}
                     LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
                     WHERE COALESCE(rc.company_id, hu.company_id) IS NULL
                 """), {}).fetchone()
