@@ -79,6 +79,7 @@ The program was delivered in this order; stabilization (this doc) is step **10**
 
 ## Related documents
 
+- `docs/identity/postgres-schema-bootstrap.md` (missing `employee_contacts` on Render/Supabase)
 - `docs/identity/unified-assignment-creation.md`
 - `docs/identity/end-to-end-verification.md`
 - `docs/identity/guardrails.md`

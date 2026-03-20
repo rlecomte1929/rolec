@@ -254,10 +254,195 @@ class Database:
         log.info("DB healthcheck: scheme=%s host=%s", info.get("db_url_scheme"), host)
         conn.execute(text("SELECT 1"))
 
+    def _maybe_ensure_postgres_canonical_identity_schema(self) -> None:
+        """
+        If `public.employee_contacts` is missing (migrations not applied but app is deployed),
+        create canonical identity tables + indexes idempotently.
+
+        Matches supabase/migrations/20260320120000_* and follow-ups; safe when tables already exist.
+        """
+        if _is_sqlite:
+            return
+        try:
+            with self.engine.connect() as c:
+                row = c.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = 'employee_contacts'"
+                    )
+                ).fetchone()
+            if row:
+                return
+        except Exception as ex:
+            log.warning("identity schema presence check skipped: %s", ex)
+            return
+        log.info(
+            "public.employee_contacts missing — applying canonical identity DDL (idempotent). "
+            "Prefer running Supabase migrations for production."
+        )
+        try:
+            with self.engine.begin() as conn:
+                self._ensure_postgres_canonical_identity_schema(conn)
+        except Exception:
+            log.exception("Failed to ensure postgres canonical identity schema")
+
+    def _ensure_postgres_canonical_identity_schema(self, conn) -> None:
+        """Run inside a transaction; Postgres only. See _maybe_ensure_postgres_canonical_identity_schema."""
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS public.employee_contacts (
+                  id text PRIMARY KEY,
+                  company_id text NOT NULL REFERENCES public.companies(id) ON DELETE RESTRICT,
+                  invite_key text NOT NULL,
+                  email_normalized text,
+                  first_name text,
+                  last_name text,
+                  linked_auth_user_id text REFERENCES public.users(id) ON DELETE SET NULL,
+                  created_at timestamptz NOT NULL DEFAULT now(),
+                  updated_at timestamptz NOT NULL DEFAULT now(),
+                  CONSTRAINT employee_contacts_company_invite_unique UNIQUE (company_id, invite_key)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_employee_contacts_company "
+                "ON public.employee_contacts(company_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_employee_contacts_invite_key "
+                "ON public.employee_contacts(invite_key)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_employee_contacts_linked_user "
+                "ON public.employee_contacts(linked_auth_user_id)"
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS public.assignment_claim_invites (
+                  id text PRIMARY KEY,
+                  assignment_id text NOT NULL REFERENCES public.case_assignments(id) ON DELETE CASCADE,
+                  employee_contact_id text NOT NULL REFERENCES public.employee_contacts(id) ON DELETE CASCADE,
+                  email_normalized text,
+                  token text NOT NULL,
+                  status text NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'claimed', 'revoked')),
+                  claimed_by_user_id text REFERENCES public.users(id) ON DELETE SET NULL,
+                  claimed_at timestamptz,
+                  created_at timestamptz NOT NULL DEFAULT now(),
+                  CONSTRAINT assignment_claim_invites_token_unique UNIQUE (token)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_assignment_claim_invites_assignment "
+                "ON public.assignment_claim_invites(assignment_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_assignment_claim_invites_contact "
+                "ON public.assignment_claim_invites(employee_contact_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_assignment_claim_invites_status "
+                "ON public.assignment_claim_invites(status)"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE public.case_assignments "
+                "ADD COLUMN IF NOT EXISTS employee_contact_id text "
+                "REFERENCES public.employee_contacts(id) ON DELETE SET NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_case_assignments_employee_contact "
+                "ON public.case_assignments(employee_contact_id)"
+            )
+        )
+        try:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_employee_contacts_company_email_unique "
+                    "ON public.employee_contacts (company_id, email_normalized) "
+                    "WHERE email_normalized IS NOT NULL AND trim(email_normalized) <> ''"
+                )
+            )
+        except (OperationalError, ProgrammingError) as ex:
+            log.warning("idx_employee_contacts_company_email_unique skipped: %s", ex)
+        try:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_assignment_claim_invites_one_pending_per_assignment "
+                    "ON public.assignment_claim_invites (assignment_id) "
+                    "WHERE status = 'pending'"
+                )
+            )
+        except (OperationalError, ProgrammingError) as ex:
+            log.warning("idx_assignment_claim_invites_one_pending_per_assignment skipped: %s", ex)
+        try:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_assignment_claim_invites_assignment_status "
+                    "ON public.assignment_claim_invites (assignment_id, status)"
+                )
+            )
+        except (OperationalError, ProgrammingError) as ex:
+            log.warning("idx_assignment_claim_invites_assignment_status skipped: %s", ex)
+        try:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_employee_contacts_email_normalized "
+                    "ON public.employee_contacts (email_normalized) "
+                    "WHERE email_normalized IS NOT NULL AND trim(email_normalized) <> ''"
+                )
+            )
+        except (OperationalError, ProgrammingError) as ex:
+            log.warning("idx_employee_contacts_email_normalized skipped: %s", ex)
+        try:
+            conn.execute(text("ALTER TABLE public.employee_contacts ENABLE ROW LEVEL SECURITY"))
+            conn.execute(text("DROP POLICY IF EXISTS employee_contacts_all ON public.employee_contacts"))
+            conn.execute(
+                text(
+                    "CREATE POLICY employee_contacts_all ON public.employee_contacts "
+                    "FOR ALL TO service_role USING (true) WITH CHECK (true)"
+                )
+            )
+        except (OperationalError, ProgrammingError) as ex:
+            log.warning("employee_contacts RLS/policy skipped: %s", ex)
+        try:
+            conn.execute(text("ALTER TABLE public.assignment_claim_invites ENABLE ROW LEVEL SECURITY"))
+            conn.execute(text("DROP POLICY IF EXISTS assignment_claim_invites_all ON public.assignment_claim_invites"))
+            conn.execute(
+                text(
+                    "CREATE POLICY assignment_claim_invites_all ON public.assignment_claim_invites "
+                    "FOR ALL TO service_role USING (true) WITH CHECK (true)"
+                )
+            )
+        except (OperationalError, ProgrammingError) as ex:
+            log.warning("assignment_claim_invites RLS/policy skipped: %s", ex)
+
     # ------------------------------------------------------------------
     # Schema creation
     # ------------------------------------------------------------------
     def init_db(self) -> None:
+        if not _is_sqlite:
+            self._maybe_ensure_postgres_canonical_identity_schema()
+
         # In production (Render), avoid runtime DDL. Use Supabase migrations instead.
         if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):
             with self.engine.connect() as conn:
@@ -267,6 +452,10 @@ class Database:
                 self.seed_readiness_templates_if_empty()
             except Exception as e:
                 log.warning("readiness template seed skipped: %s", e)
+            try:
+                self._backfill_employee_contacts()
+            except Exception as e:
+                log.warning("employee_contacts backfill skipped: %s", e)
             return
 
         with self.engine.begin() as conn:
