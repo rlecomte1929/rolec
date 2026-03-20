@@ -2,13 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { buildRoute } from '../navigation/routes';
-import { Alert, Button, Card, Input, LoadingButton } from '../components/antigravity';
+import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/antigravity';
 import { employeeAPI } from '../api/client';
 import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
 import { getRelocationCase } from '../api/relocation';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../utils/demo';
+import type { PostSignupReconciliation } from '../types';
+import { getApiErrorMessage } from '../utils/apiDetail';
+import { formatRichMessage } from '../utils/richMessage';
 
 const FLOW_STEPS = [
   '1. Fill your case',
@@ -32,8 +35,25 @@ export const EmployeeJourney: React.FC = () => {
     getAuthItem('relopass_email') || getAuthItem('relopass_username') || ''
   );
   const [isClaiming, setIsClaiming] = useState(false);
+  const [linkRec, setLinkRec] = useState<PostSignupReconciliation | null>(null);
 
   const caseInitiated = Boolean(assignmentId && caseId);
+
+  useEffect(() => {
+    try {
+      const raw =
+        sessionStorage.getItem('post_auth_claim_reconciliation') ||
+        sessionStorage.getItem('post_signup_reconciliation');
+      if (!raw) return;
+      sessionStorage.removeItem('post_auth_claim_reconciliation');
+      sessionStorage.removeItem('post_signup_reconciliation');
+      const data = JSON.parse(raw) as PostSignupReconciliation;
+      setLinkRec(data);
+      void refetchAssignment();
+    } catch {
+      /* ignore */
+    }
+  }, [refetchAssignment]);
 
   useEffect(() => {
     if (assignmentLoading) return;
@@ -114,8 +134,7 @@ export const EmployeeJourney: React.FC = () => {
       await refetchAssignment();
       navigate(`/employee/case/${nextAssignment}/wizard/1`);
     } catch (err: unknown) {
-      const ax = err as { response?: { data?: { detail?: string } } };
-      setError(ax?.response?.data?.detail || 'Unable to claim assignment.');
+      setError(getApiErrorMessage(err, 'Unable to claim assignment.'));
     } finally {
       setIsClaiming(false);
     }
@@ -135,20 +154,111 @@ export const EmployeeJourney: React.FC = () => {
   }, []);
 
 
+  const linkAlerts = useMemo(() => {
+    if (!linkRec) return null;
+    const blocks: React.ReactNode[] = [];
+    if (linkRec.headline?.trim() || linkRec.message?.trim()) {
+      blocks.push(
+        <Alert key="primary" variant="success" className="mb-4" title={linkRec.headline?.trim() || undefined}>
+          {linkRec.message?.trim() ? formatRichMessage(linkRec.message) : null}
+        </Alert>
+      );
+    } else if (linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length > 0) {
+      blocks.push(
+        <Alert key="attached" variant="success" className="mb-4" title="Relocation case linked">
+          We linked {linkRec.attachedAssignmentIds.length} assignment
+          {linkRec.attachedAssignmentIds.length > 1 ? 's' : ''} to your account. Open <strong>My case</strong> below
+          when it appears, or tap Refresh.
+        </Alert>
+      );
+    } else if (
+      linkRec.linkedContactIds &&
+      linkRec.linkedContactIds.length > 0 &&
+      !(linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length)
+    ) {
+      blocks.push(
+        <Alert key="profile" variant="info" className="mb-4" title="Profile connected">
+          Your account is tied to your company contact. When HR assigns a relocation to you, it will show up here
+          automatically after you refresh or sign in again.
+        </Alert>
+      );
+    }
+    if ((linkRec.skippedRevokedInvites ?? 0) > 0) {
+      blocks.push(
+        <Alert key="revoked" variant="warning" className="mb-4" title="Invitation no longer active">
+          At least one pending invitation was cancelled by HR. If you still need access, contact your HR contact.
+        </Alert>
+      );
+    }
+    if (
+      (linkRec.skippedContactsLinkedToOtherUser ?? 0) > 0 ||
+      (linkRec.skippedAssignmentsLinkedToOtherUser ?? 0) > 0
+    ) {
+      blocks.push(
+        <Alert key="ambiguous" variant="warning" className="mb-4" title="Manual check may be needed">
+          We could not attach everything automatically — another account may already be linked to the same contact
+          record, or an assignment is owned by someone else. Contact HR with your work email and assignment ID so they
+          can confirm the right account.
+        </Alert>
+      );
+    }
+    return blocks.length ? <div className="mb-6">{blocks}</div> : null;
+  }, [linkRec]);
+
+  const linkStatusBadge = useMemo(() => {
+    if (assignmentId) {
+      return (
+        <Badge variant="success" size="sm">
+          Linked — case on this account
+        </Badge>
+      );
+    }
+    if (linkRec?.linkedContactIds?.length && !(linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length)) {
+      return (
+        <Badge variant="info" size="sm">
+          Connected — waiting for an assignment from HR
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="neutral" size="sm">
+        No case linked yet — use email HR entered or claim below
+      </Badge>
+    );
+  }, [assignmentId, linkRec]);
+
   return (
     <AppShell title="Welcome" subtitle="Here's what happens next with your relocation case.">
+      {linkAlerts}
       {error && <Alert variant="error" className="mb-6">{error}</Alert>}
 
       <Card padding="lg" className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="text-lg font-semibold text-[#0b2b43]">Case link status</div>
+          {linkStatusBadge}
+        </div>
+        <p className="text-sm text-[#4b5563] mb-4">
+          HR can create your case before you register. After you <strong>sign up</strong> or <strong>sign in</strong>{' '}
+          with the same email or username HR used, pending cases usually attach automatically. If nothing appears, use the
+          assignment ID HR sent you.
+        </p>
         <div className="text-lg font-semibold text-[#0b2b43] mb-2">Your relocation flow</div>
         {flowchart}
       </Card>
 
       {!assignmentId && (
         <Card padding="lg" className="mb-6">
-          <div className="text-lg font-semibold text-[#0b2b43]">No case assigned yet</div>
-          <div className="text-sm text-[#4b5563] mt-2">
-            If HR has shared an assignment ID, enter it below to start your case.
+          <div className="text-lg font-semibold text-[#0b2b43]">No case on this dashboard yet</div>
+          <div className="text-sm text-[#4b5563] mt-2 space-y-2">
+            <p>
+              <strong>Most common:</strong> sign in with the <strong>exact email or username</strong> your HR team
+              entered on the assignment. If you just created your account, try <strong>Refresh</strong> — linking runs
+              when you open this page.
+            </p>
+            <p>
+              <strong>Already using the right login?</strong> Ask HR for the <strong>assignment ID</strong> and enter it
+              below with the same email/username you use here (manual claim).
+            </p>
           </div>
           <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input

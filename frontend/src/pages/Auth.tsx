@@ -5,6 +5,7 @@ import { AppShell } from '../components/AppShell';
 import type { UserRole } from '../types';
 import { clearAuthItems } from '../utils/demo';
 import { useAuth } from '../hooks/useAuth';
+import { getApiErrorMessage } from '../utils/apiDetail';
 
 export const Auth: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -36,7 +37,7 @@ export const Auth: React.FC = () => {
     try {
       await login({ identifier, password });
     } catch (err: any) {
-      const msg = err.response?.data?.detail || 'Login failed. Try again.';
+      const msg = getApiErrorMessage(err, 'Login failed. Try again.');
       try {
         localStorage.setItem('debug_last_auth_error', msg);
       } catch {
@@ -86,7 +87,19 @@ export const Auth: React.FC = () => {
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       let msg: string;
-      if (err.response?.status === 400 && detail) {
+      if (err.response?.status === 400 && detail && typeof detail === 'object' && !Array.isArray(detail)) {
+        const code = (detail as { code?: string }).code;
+        const message = (detail as { message?: string }).message;
+        if (code === 'AUTH_EMAIL_TAKEN' && message) {
+          msg = message;
+        } else if (code === 'AUTH_USERNAME_TAKEN' && message) {
+          msg = message;
+        } else if (message) {
+          msg = message;
+        } else {
+          msg = 'Registration failed. Check your details and try again.';
+        }
+      } else if (err.response?.status === 400 && detail) {
         msg = Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail);
       } else if (!err.response) {
         msg = 'Cannot reach server. Is the backend running? Check the console for details.';
@@ -154,6 +167,20 @@ export const Auth: React.FC = () => {
             </div>
 
             {error && <Alert variant="error">{error}</Alert>}
+
+            {mode === 'register' && role === 'EMPLOYEE' && (
+              <Alert variant="info" title="How this works with your relocation case">
+                <p className="text-sm text-[#374151] leading-relaxed">
+                  HR may add your work email to a case <strong>before</strong> you sign up — that does{' '}
+                  <strong>not</strong> block creating your ReloPass account.
+                </p>
+                <p className="text-sm text-[#374151] mt-2 leading-relaxed">
+                  You will only see &quot;email already in use&quot; if that address is already registered as a{' '}
+                  <strong>login</strong> here. After you sign up or sign in with the same email HR used, pending cases
+                  can link automatically; if not, use the assignment ID from HR on your dashboard.
+                </p>
+              </Alert>
+            )}
 
             {mode === 'login' && (
               <form onSubmit={handleLogin} className="space-y-4">

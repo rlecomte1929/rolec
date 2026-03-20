@@ -34,9 +34,22 @@ export interface LoginRequest {
   password: string;
 }
 
+/** Populated after EMPLOYEE register/login when pending cases were linked */
+export interface PostSignupReconciliation {
+  linkedContactIds: string[];
+  attachedAssignmentIds: string[];
+  skippedContactsLinkedToOtherUser?: number;
+  skippedAssignmentsLinkedToOtherUser?: number;
+  skippedRevokedInvites?: number;
+  skippedAlreadyLinkedSameUser?: number;
+  headline?: string | null;
+  message?: string | null;
+}
+
 export interface LoginResponse {
   token: string;
   user: User;
+  reconciliation?: PostSignupReconciliation | null;
 }
 
 export interface RegisterRequest {

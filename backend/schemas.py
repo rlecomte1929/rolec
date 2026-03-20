@@ -202,9 +202,23 @@ class UserResponse(BaseModel):
     company: Optional[str] = None
 
 
+class PostSignupReconciliation(BaseModel):
+    """Returned after EMPLOYEE register/login when pending contacts/assignments were linked."""
+
+    linkedContactIds: List[str] = Field(default_factory=list)
+    attachedAssignmentIds: List[str] = Field(default_factory=list)
+    skippedContactsLinkedToOtherUser: int = 0
+    skippedAssignmentsLinkedToOtherUser: int = 0
+    skippedRevokedInvites: int = 0
+    skippedAlreadyLinkedSameUser: int = 0
+    headline: Optional[str] = None
+    message: Optional[str] = None
+
+
 class LoginResponse(BaseModel):
     token: str
     user: UserResponse
+    reconciliation: Optional[PostSignupReconciliation] = None
 
 
 

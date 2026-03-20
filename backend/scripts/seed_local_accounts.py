@@ -20,6 +20,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./backend/relopass.db")
 
 from passlib.context import CryptContext
 from backend import database
+from backend.dev_seed_auth import ensure_dev_seed_auth_user
+
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 PASSWORD_HASH = pwd_context.hash("Passw0rd!")
 
@@ -52,23 +54,30 @@ def main():
         else:
             db.create_company(test_company, "test", "Singapore", "1-50", "", "", "")
 
-    def ensure_user(uid: str, email: str, role: str, name: str) -> str:
-        existing = db.get_user_by_email(email)
-        if existing:
-            return existing["id"]
-        created = db.create_user(
-            user_id=uid,
-            username=None,
-            email=email,
-            password_hash=PASSWORD_HASH,
-            role=role,
-            name=name,
-        )
-        return uid if created else db.get_user_by_email(email)["id"]
-
-    admin_id = ensure_user("demo-admin-001", "admin@relopass.com", "ADMIN", "ReloPass Admin")
-    hr_id = ensure_user("demo-hr-002", "hr@relopass.com", "HR", "HR Manager")
-    emp_id = ensure_user("test-emp-test", "testEMPtest@relopass.com", "EMPLOYEE", "Test Employee")
+    admin_id = ensure_dev_seed_auth_user(
+        db,
+        user_id="demo-admin-001",
+        email="admin@relopass.com",
+        password_hash=PASSWORD_HASH,
+        role="ADMIN",
+        name="ReloPass Admin",
+    )
+    hr_id = ensure_dev_seed_auth_user(
+        db,
+        user_id="demo-hr-002",
+        email="hr@relopass.com",
+        password_hash=PASSWORD_HASH,
+        role="HR",
+        name="HR Manager",
+    )
+    emp_id = ensure_dev_seed_auth_user(
+        db,
+        user_id="test-emp-test",
+        email="testEMPtest@relopass.com",
+        password_hash=PASSWORD_HASH,
+        role="EMPLOYEE",
+        name="Test Employee",
+    )
 
     db.add_admin_allowlist("admin@relopass.com", admin_id)
     db.ensure_profile_record(admin_id, "admin@relopass.com", "ADMIN", "ReloPass Admin", None)

@@ -29,6 +29,7 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
   const isEmployee = role === 'EMPLOYEE' || role === 'ADMIN';
   const isOnEmployeeRoute = location.pathname.startsWith('/employee');
 
+  /** HR may assign after the employee already signed in; null until provision + server reconcile. */
   const fetchAssignment = useCallback(async (clearCache = false) => {
     if (!isEmployee || !getAuthItem('relopass_token')) return;
     if (!isOnEmployeeRoute) return;

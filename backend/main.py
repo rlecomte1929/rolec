@@ -28,6 +28,7 @@ from .schemas import (
     SchoolRecommendation, MoverRecommendation, TimelinePhase, TimelineTask,
     OverallStatus, UserResponse, UserRole, AssignmentStatus, AssignCaseRequest,
     AssignCaseResponse, CreateCaseResponse, AssignmentSummary, AssignmentDetail, AssignmentsListResponse,
+    PostSignupReconciliation,
     IntakeChecklistItem, CaseReadinessUi,
     EmployeeJourneyRequest, EmployeeJourneyNextQuestion, HRAssignmentDecision,
     UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
@@ -61,6 +62,15 @@ from .app.services.requirements_sufficiency import compute_requirements_sufficie
 from .db_config import DATABASE_URL as _db_url, get_masked_db_log_line
 log.info("Startup DB config (user/host only, no password): %s", get_masked_db_log_line())
 from .database import db, Database
+from .services.unified_assignment_creation import create_assignment_with_contact_and_invites
+from .identity_errors import IdentityErrorCode, err_detail
+from .identity_observability import (
+    identity_event,
+    principal_fingerprint,
+    principal_fingerprint_from_login_identifier,
+)
+from .services.assignment_claim_link_service import reconcile_pending_assignment_claims
+from .dev_seed_auth import ensure_dev_seed_auth_user
 from .agents.orchestrator import IntakeOrchestrator
 from .agents.compliance_engine import ComplianceEngine
 from .policy_engine import PolicyEngine
@@ -341,18 +351,14 @@ def _seed_demo_cases() -> None:
     demo_password = pwd_context.hash("Passw0rd!")
 
     def ensure_user(user_id: str, email: str, role: str, name: str) -> str:
-        existing = db.get_user_by_email(email)
-        if existing:
-            return existing["id"]
-        created = db.create_user(
+        return ensure_dev_seed_auth_user(
+            db,
             user_id=user_id,
-            username=None,
             email=email,
             password_hash=demo_password,
             role=role,
             name=name,
         )
-        return user_id if created else db.get_user_by_email(email)["id"]
 
     hr_user_id = ensure_user(
         user_id="demo-hr-001",
@@ -546,6 +552,8 @@ def _seed_demo_cases() -> None:
 
     hr_profile = db.get_profile_record(hr_user_id)
     hr_company_id = hr_profile.get("company_id") if hr_profile else None
+    # Legacy SQLite demo rows only: direct create_assignment without unified contact/invites.
+    # Production HR/Admin APIs use create_assignment_with_contact_and_invites (see identity_canonical).
     for scenario in scenarios:
         if not db.get_assignment_by_id(scenario["assignment_id"]):
             case_profile = {
@@ -976,6 +984,30 @@ def root():
     return {"status": "ok", "service": "ReloPass API"}
 
 
+def _best_effort_reconcile_employee_assignments(
+    *,
+    context: str,
+    user_id: str,
+    email: Optional[str],
+    username: Optional[str],
+    role: str,
+    request_id: Optional[str],
+) -> None:
+    """Run canonical claim/link reconcile; must not break dashboard or employee routes."""
+    try:
+        reconcile_pending_assignment_claims(
+            db,
+            user_id=user_id,
+            email=email,
+            username=username,
+            role=role,
+            request_id=request_id,
+            emit_side_effects=True,
+        )
+    except Exception as exc:
+        log.warning("%s claim_reconcile skipped error=%s", context, exc)
+
+
 @app.post("/api/auth/register", response_model=LoginResponse)
 def register(request: RegisterRequest):
     """Register a new user with username or email and role."""
@@ -985,19 +1017,47 @@ def register(request: RegisterRequest):
         email = email_raw.lower() if email_raw else None
 
         if not username and not email:
-            raise HTTPException(status_code=400, detail="Provide a username or email")
+            raise HTTPException(
+                status_code=400,
+                detail=err_detail(IdentityErrorCode.AUTH_IDENTIFIER_REQUIRED, "Provide a username or email"),
+            )
 
         if username:
             if not re.match(r"^[A-Za-z0-9_]{3,30}$", username):
+                identity_event("identity.auth.signup.failed", reason="AUTH_USERNAME_INVALID_FORMAT")
                 raise HTTPException(status_code=400, detail="Username must be 3-30 chars, alphanumeric or underscore")
             if db.get_user_by_username(username):
-                raise HTTPException(status_code=400, detail="Username already in use")
+                identity_event(
+                    "identity.auth.signup.failed",
+                    reason="AUTH_USERNAME_TAKEN",
+                    principal_fingerprint=principal_fingerprint(None, username),
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=err_detail(
+                        IdentityErrorCode.AUTH_USERNAME_TAKEN,
+                        "This username is already taken. Choose another or sign in.",
+                    ),
+                )
 
         if email:
             if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+                identity_event("identity.auth.signup.failed", reason="AUTH_EMAIL_INVALID_FORMAT")
                 raise HTTPException(status_code=400, detail="Invalid email format")
+            # Only real auth accounts (public.users) block signup — not employee_contacts / assignments / invites.
             if db.get_user_by_email(email):
-                raise HTTPException(status_code=400, detail="Email already in use")
+                identity_event(
+                    "identity.auth.signup.failed",
+                    reason="AUTH_EMAIL_TAKEN",
+                    principal_fingerprint=principal_fingerprint(email, None),
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=err_detail(
+                        IdentityErrorCode.AUTH_EMAIL_TAKEN,
+                        "An account with this email already exists. Try logging in instead.",
+                    ),
+                )
 
         if not request.password:
             raise HTTPException(status_code=400, detail="Password required")
@@ -1022,7 +1082,18 @@ def register(request: RegisterRequest):
             name=request.name,
         )
         if not created:
-            raise HTTPException(status_code=400, detail="Unable to create user (username or email may already exist)")
+            identity_event(
+                "identity.auth.signup.failed",
+                reason="AUTH_USER_CREATE_FAILED",
+                principal_fingerprint=principal_fingerprint(email, username),
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=err_detail(
+                    IdentityErrorCode.AUTH_USER_CREATE_FAILED,
+                    "Could not create this account. The email or username may already be registered.",
+                ),
+            )
 
         token = str(uuid.uuid4())
         db.create_session(token, user_id)
@@ -1034,6 +1105,58 @@ def register(request: RegisterRequest):
             company_id=None,
         )
 
+        reconciliation_payload = None
+        if role == UserRole.EMPLOYEE and (email or username):
+            try:
+                claim_res = reconcile_pending_assignment_claims(
+                    db,
+                    user_id=user_id,
+                    email=email,
+                    username=username,
+                    role=role.value,
+                    request_id=None,
+                    emit_side_effects=True,
+                )
+                identity_event(
+                    "identity.auth.signup.reconcile",
+                    auth_user_id=user_id,
+                    principal_fingerprint=principal_fingerprint(email, username),
+                    linked_contacts=len(claim_res.linked_contact_ids),
+                    new_attachments=len(claim_res.newly_attached_assignment_ids),
+                    skipped_revoked_invites=claim_res.skipped_revoked_invites,
+                    skipped_contacts_linked_to_other_user=claim_res.skipped_contacts_linked_to_other_user,
+                    skipped_assignments_linked_to_other_user=claim_res.skipped_assignments_linked_to_other_user,
+                    skipped_already_linked_same_user=claim_res.skipped_already_linked_same_user,
+                )
+                rec = claim_res.to_api_dict()
+                if rec.get("linkedContactIds") or rec.get("attachedAssignmentIds") or rec.get("message"):
+                    reconciliation_payload = PostSignupReconciliation(
+                        linkedContactIds=rec.get("linkedContactIds") or [],
+                        attachedAssignmentIds=rec.get("attachedAssignmentIds") or [],
+                        skippedContactsLinkedToOtherUser=int(rec.get("skippedContactsLinkedToOtherUser") or 0),
+                        skippedAssignmentsLinkedToOtherUser=int(
+                            rec.get("skippedAssignmentsLinkedToOtherUser") or 0
+                        ),
+                        skippedRevokedInvites=int(rec.get("skippedRevokedInvites") or 0),
+                        skippedAlreadyLinkedSameUser=int(rec.get("skippedAlreadyLinkedSameUser") or 0),
+                        headline=rec.get("headline"),
+                        message=rec.get("message"),
+                    )
+            except Exception as rec_exc:
+                log.warning("signup_reconciliation skipped user_id=%s error=%s", user_id[:8], rec_exc)
+                identity_event(
+                    "identity.auth.signup.reconcile",
+                    auth_user_id=user_id,
+                    outcome="error",
+                    error_type=type(rec_exc).__name__,
+                )
+
+        identity_event(
+            "identity.auth.signup.ok",
+            auth_user_id=user_id,
+            role=role.value,
+            principal_fingerprint=principal_fingerprint(email, username),
+        )
         log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
         return LoginResponse(
             token=token,
@@ -1044,7 +1167,8 @@ def register(request: RegisterRequest):
                 role=role,
                 name=request.name,
                 company=None,
-            )
+            ),
+            reconciliation=reconciliation_payload,
         )
     except HTTPException:
         raise
@@ -1093,21 +1217,59 @@ def login(request: LoginRequest, req: Request):
     identifier = (request.identifier or "").strip()
     if not identifier:
         log.warning("auth_login fail identifier_empty")
-        raise HTTPException(status_code=401, detail="Enter your username or email")
+        identity_event(
+            "identity.auth.signin.failed",
+            reason="AUTH_IDENTIFIER_REQUIRED",
+            request_id=request_id or None,
+        )
+        raise HTTPException(
+            status_code=401,
+            detail=err_detail(IdentityErrorCode.AUTH_IDENTIFIER_REQUIRED, "Enter your username or email"),
+        )
     user = db.get_user_by_identifier(identifier)
     if not user:
         log.warning("auth_login fail user_not_found identifier=%s", identifier[:3] + "***")
-        raise HTTPException(status_code=401, detail="Invalid username or email. Check spelling or create an account.")
+        identity_event(
+            "identity.auth.signin.failed",
+            reason="AUTH_USER_NOT_FOUND",
+            request_id=request_id or None,
+            principal_fingerprint=principal_fingerprint_from_login_identifier(identifier),
+        )
+        raise HTTPException(
+            status_code=401,
+            detail=err_detail(
+                IdentityErrorCode.AUTH_USER_NOT_FOUND,
+                "Invalid username or email. Check spelling or create an account.",
+            ),
+        )
 
     if not user.get("password_hash"):
         log.warning("auth_login fail no_password user_id=%s", user.get("id", "")[:8])
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        identity_event(
+            "identity.auth.signin.failed",
+            reason="AUTH_NO_PASSWORD",
+            request_id=request_id or None,
+            auth_user_id=user.get("id"),
+        )
+        raise HTTPException(
+            status_code=401,
+            detail=err_detail(IdentityErrorCode.AUTH_NO_PASSWORD, "Invalid credentials"),
+        )
 
     from passlib.context import CryptContext
     pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
     if not pwd_context.verify(request.password, user["password_hash"]):
         log.warning("auth_login fail wrong_password user_id=%s", user.get("id", "")[:8])
-        raise HTTPException(status_code=401, detail="Incorrect password. Try again or reset.")
+        identity_event(
+            "identity.auth.signin.failed",
+            reason="AUTH_WRONG_PASSWORD",
+            request_id=request_id or None,
+            auth_user_id=user.get("id"),
+        )
+        raise HTTPException(
+            status_code=401,
+            detail=err_detail(IdentityErrorCode.AUTH_WRONG_PASSWORD, "Incorrect password. Try again or reset."),
+        )
 
     token = str(uuid.uuid4())
     db.create_session(token, user["id"])
@@ -1127,6 +1289,62 @@ def login(request: LoginRequest, req: Request):
     if _is_admin_user(user):
         effective_role = UserRole.ADMIN
 
+    reconciliation_payload = None
+    if effective_role == UserRole.EMPLOYEE:
+        try:
+            claim_res = reconcile_pending_assignment_claims(
+                db,
+                user_id=user["id"],
+                email=user.get("email"),
+                username=user.get("username"),
+                role=user.get("role") or UserRole.EMPLOYEE.value,
+                request_id=request_id or None,
+                emit_side_effects=True,
+            )
+            identity_event(
+                "identity.auth.signin.reconcile",
+                request_id=request_id or None,
+                auth_user_id=user["id"],
+                principal_fingerprint=principal_fingerprint(user.get("email"), user.get("username")),
+                linked_contacts=len(claim_res.linked_contact_ids),
+                new_attachments=len(claim_res.newly_attached_assignment_ids),
+                skipped_revoked_invites=claim_res.skipped_revoked_invites,
+                skipped_contacts_linked_to_other_user=claim_res.skipped_contacts_linked_to_other_user,
+                skipped_assignments_linked_to_other_user=claim_res.skipped_assignments_linked_to_other_user,
+                skipped_already_linked_same_user=claim_res.skipped_already_linked_same_user,
+            )
+            # Only surface UX payload when we newly attached assignments (avoid repeat banners).
+            if claim_res.newly_attached_assignment_ids:
+                rec = claim_res.to_api_dict()
+                reconciliation_payload = PostSignupReconciliation(
+                    linkedContactIds=rec.get("linkedContactIds") or [],
+                    attachedAssignmentIds=rec.get("attachedAssignmentIds") or [],
+                    skippedContactsLinkedToOtherUser=int(rec.get("skippedContactsLinkedToOtherUser") or 0),
+                    skippedAssignmentsLinkedToOtherUser=int(
+                        rec.get("skippedAssignmentsLinkedToOtherUser") or 0
+                    ),
+                    skippedRevokedInvites=int(rec.get("skippedRevokedInvites") or 0),
+                    skippedAlreadyLinkedSameUser=int(rec.get("skippedAlreadyLinkedSameUser") or 0),
+                    headline=rec.get("headline"),
+                    message=rec.get("message"),
+                )
+        except Exception as rec_exc:
+            log.warning("login claim_link skipped user_id=%s error=%s", user["id"][:8], rec_exc)
+            identity_event(
+                "identity.auth.signin.reconcile",
+                request_id=request_id or None,
+                auth_user_id=user["id"],
+                outcome="error",
+                error_type=type(rec_exc).__name__,
+            )
+
+    identity_event(
+        "identity.auth.signin.ok",
+        request_id=request_id or None,
+        auth_user_id=user["id"],
+        role=effective_role.value,
+        principal_fingerprint=principal_fingerprint(user.get("email"), user.get("username")),
+    )
     log.info("auth_login success user_id=%s", user["id"][:8])
     _log_auth_perf(
         "/api/auth/login",
@@ -1144,7 +1362,8 @@ def login(request: LoginRequest, req: Request):
             role=effective_role,
             name=user.get("name"),
             company=profile.get("company_id") if profile else user.get("company"),
-        )
+        ),
+        reconciliation=reconciliation_payload,
     )
 
 
@@ -1777,19 +1996,21 @@ def admin_create_assignment(
     employee_first_name = (body.employee_first_name or "").strip() or None
     employee_last_name = (body.employee_last_name or "").strip() or None
     case_id = str(uuid.uuid4())
-    assignment_id = str(uuid.uuid4())
     db.create_case(case_id, body.hr_user_id, {}, company_id=body.company_id)
-    db.create_assignment(
-        assignment_id=assignment_id,
-        case_id=case_id,
+    uar = create_assignment_with_contact_and_invites(
+        db,
+        company_id=body.company_id,
         hr_user_id=body.hr_user_id,
-        employee_user_id=employee_user_id,
-        employee_identifier=employee_identifier,
-        status=AssignmentStatus.ASSIGNED.value,
-        request_id=None,
+        case_id=case_id,
+        employee_identifier_raw=employee_identifier,
         employee_first_name=employee_first_name,
         employee_last_name=employee_last_name,
+        employee_user_id=employee_user_id,
+        assignment_status=AssignmentStatus.ASSIGNED.value,
+        request_id=None,
+        observability_channel="admin",
     )
+    assignment_id = uar.assignment_id
     if body.destination_country:
         db.update_relocation_case_host_country(case_id, body.destination_country)
     db.log_audit(user["id"], "CREATE", "assignment", assignment_id, None, {"case_id": case_id, "company_id": body.company_id, "hr_user_id": body.hr_user_id})
@@ -2623,18 +2844,16 @@ def get_dashboard(request: Request, user: Dict[str, Any] = Depends(get_current_u
     profile = db.get_profile(user["id"])
     # Employees may use case/assignment flow: try assignment's employee_profile
     if not profile and user.get("role") in (UserRole.EMPLOYEE.value, UserRole.ADMIN.value):
+        if user.get("role") == UserRole.EMPLOYEE.value and not user.get("impersonation"):
+            _best_effort_reconcile_employee_assignments(
+                context="get_dashboard",
+                user_id=user["id"],
+                email=user.get("email"),
+                username=user.get("username"),
+                role=UserRole.EMPLOYEE.value,
+                request_id=request.state.request_id,
+            )
         assignment = db.get_assignment_for_employee(user["id"], request_id=request.state.request_id)
-        if not assignment:
-            ident = (user.get("email") or user.get("username") or "").strip().lower()
-            if ident:
-                assignment = db.get_unassigned_assignment_by_identifier(
-                    ident, request_id=request.state.request_id
-                )
-                if assignment:
-                    db.attach_employee_to_assignment(
-                        assignment["id"], user["id"], request_id=request.state.request_id
-                    )
-                    assignment = db.get_assignment_by_id(assignment["id"], request_id=request.state.request_id)
         if assignment:
             profile = db.get_employee_profile(assignment["id"])
 
@@ -3023,77 +3242,52 @@ def assign_case(
                 home_country=case.get("home_country"),
             )
 
-        employee_identifier = request.employeeIdentifier.strip()
-        if not employee_identifier:
+        employee_identifier_raw = request.employeeIdentifier.strip()
+        if not employee_identifier_raw:
             raise HTTPException(status_code=400, detail="Employee identifier required")
 
         fn = getattr(request, "employeeFirstName", None) or getattr(request, "employee_first_name", None)
         ln = getattr(request, "employeeLastName", None) or getattr(request, "employee_last_name", None)
         employee_first_name = (fn or "").strip() or None
         employee_last_name = (ln or "").strip() or None
-        display_name_from_hr = (
-            " ".join(filter(None, [employee_first_name, employee_last_name])).strip() or None
-        )
-        fallback_name = employee_identifier.split("@")[0] if "@" in employee_identifier else employee_identifier
 
-        employee_user = db.get_user_by_identifier(employee_identifier)
-        created_new_employee = False
+        employee_user = db.get_user_by_identifier(employee_identifier_raw)
         if employee_user and hr_company_id:
             emp_profile = db.get_profile_record(employee_user["id"])
             if emp_profile and not emp_profile.get("company_id"):
                 db.ensure_profile_record(
                     employee_user["id"],
-                    emp_profile.get("email") or employee_identifier,
+                    emp_profile.get("email") or employee_identifier_raw,
                     emp_profile.get("role") or UserRole.EMPLOYEE.value,
-                    emp_profile.get("full_name") or employee_identifier.split("@")[0],
+                    emp_profile.get("full_name") or employee_identifier_raw.split("@")[0],
                     hr_company_id,
                 )
-        if not employee_user and "@" in employee_identifier:
-            # Auto-register employee user with a temporary password
-            from passlib.context import CryptContext
-
-            pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-            temp_password = "Passw0rd!"
-            employee_user_id = str(uuid.uuid4())
-            initial_name = display_name_from_hr or fallback_name
-            created = db.create_user(
-                user_id=employee_user_id,
-                username=None,
-                email=employee_identifier.lower(),
-                password_hash=pwd_context.hash(temp_password),
-                role=UserRole.EMPLOYEE.value,
-                name=initial_name,
-            )
-            if created:
-                employee_user = db.get_user_by_id(employee_user_id)
-                db.ensure_profile_record(
-                    employee_user_id,
-                    employee_identifier,
-                    UserRole.EMPLOYEE.value,
-                    initial_name,
-                    hr_company_id,
-                )
-                created_new_employee = True
-        # Ensure employees row exists so HR Employees tab shows this employee
+        # Ensure employees row exists so HR Employees tab shows this employee (real auth accounts only)
         if employee_user and hr_company_id:
             db.ensure_employee_for_profile(employee_user["id"], hr_company_id)
-        assignment_id = str(uuid.uuid4())
-        invite_token = None
 
         # New assignments created by HR are immediately in the 'assigned' state.
         assert_canonical_status(AssignmentStatus.ASSIGNED.value)
-        with timed("db.create_assignment", request_id):
-            db.create_assignment(
-                assignment_id=assignment_id,
-                case_id=case_id,
-                hr_user_id=effective["id"],
-                employee_user_id=employee_user["id"] if employee_user else None,
-                employee_identifier=employee_identifier,
-                status=AssignmentStatus.ASSIGNED.value,
-                request_id=request_id,
-                employee_first_name=employee_first_name,
-                employee_last_name=employee_last_name,
-            )
+        try:
+            with timed("unified_assignment_creation", request_id):
+                uar = create_assignment_with_contact_and_invites(
+                    db,
+                    company_id=hr_company_id,
+                    hr_user_id=effective["id"],
+                    case_id=case_id,
+                    employee_identifier_raw=employee_identifier_raw,
+                    employee_first_name=employee_first_name,
+                    employee_last_name=employee_last_name,
+                    employee_user_id=employee_user["id"] if employee_user else None,
+                    assignment_status=AssignmentStatus.ASSIGNED.value,
+                    request_id=request_id,
+                    observability_channel="hr",
+                )
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve)) from ve
+        assignment_id = uar.assignment_id
+        invite_token = uar.invite_token
+        stored_identifier = uar.stored_identifier
         now_iso = datetime.utcnow().isoformat()
         try:
             db.ensure_case_participant(
@@ -3115,7 +3309,7 @@ def assign_case(
                 assignment_id=assignment_id,
                 actor_principal_id=effective["id"],
                 event_type=event_type,
-                payload={"employee_identifier": employee_identifier},
+                payload={"employee_identifier": stored_identifier},
                 request_id=request_id,
             )
         except Exception as exc:
@@ -3127,38 +3321,19 @@ def assign_case(
                 str(exc),
             )
 
-        if not employee_user:
-            invite_token = str(uuid.uuid4())
-            try:
-                db.create_assignment_invite(
-                    invite_id=str(uuid.uuid4()),
-                    case_id=case_id,
-                    hr_user_id=effective["id"],
-                    employee_identifier=employee_identifier,
-                    token=invite_token,
-                )
-            except Exception as exc:
-                log.warning(
-                    "create_assignment_invite skipped assignment_id=%s case_id=%s error=%s",
-                    assignment_id, case_id, str(exc),
-                )
-                invite_token = None
-
         # Prefill invitation message in Messages
         invite_line = (
             f"Invitation token: {invite_token}"
             if invite_token
             else "You can claim your assignment after signing in."
         )
-        temp_line = "Temporary password: Passw0rd!\n\n" if created_new_employee else ""
         message_body = (
             f"Hello,\n\n"
-            f"You have been registered for a relocation case on ReloPass.\n\n"
+            f"You have been assigned a relocation case on ReloPass.\n\n"
             f"Assignment ID: {assignment_id}\n"
-            f"Employee identifier: {employee_identifier}\n"
+            f"Employee identifier: {employee_identifier_raw}\n"
             f"{invite_line}\n\n"
-            f"Login at https://relopass.com/auth?mode=login\n"
-            f"{temp_line}"
+            f"Sign up or log in at https://relopass.com/auth?mode=login\n"
             f"Once logged in, go to My Case to start your intake.\n"
         )
         try:
@@ -3166,7 +3341,7 @@ def assign_case(
                 message_id=str(uuid.uuid4()),
                 assignment_id=assignment_id,
                 hr_user_id=effective["id"],
-                employee_identifier=employee_identifier,
+                employee_identifier=stored_identifier,
                 subject="Your relocation case is ready",
                 body=message_body,
                 status="draft",
@@ -3209,53 +3384,17 @@ def get_employee_assignment(
     user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
 ):
     effective = _effective_user(user, UserRole.EMPLOYEE)
+    if not user.get("impersonation"):
+        _best_effort_reconcile_employee_assignments(
+            context="get_employee_assignment",
+            user_id=effective["id"],
+            email=effective.get("email"),
+            username=effective.get("username"),
+            role=UserRole.EMPLOYEE.value,
+            request_id=getattr(request.state, "request_id", None),
+        )
+
     assignment = db.get_assignment_for_employee(effective["id"], request_id=request.state.request_id)
-    if not assignment:
-        identifier = effective.get("username") or effective.get("email")
-        if identifier:
-            assignment = db.get_unassigned_assignment_by_identifier(
-                identifier, request_id=request.state.request_id
-            )
-            if assignment and not user.get("impersonation"):
-                assignment_id = assignment["id"]
-                db.attach_employee_to_assignment(
-                    assignment["id"], effective["id"], request_id=request.state.request_id
-                )
-                db.mark_invites_claimed(identifier)
-                assignment = db.get_assignment_by_id(assignment["id"], request_id=request.state.request_id)
-                case_id = assignment.get("case_id", "")
-                now_iso = datetime.utcnow().isoformat()
-                try:
-                    db.ensure_case_participant(
-                        case_id=case_id,
-                        person_id=effective["id"],
-                        role="relocatee",
-                        joined_at=now_iso,
-                        request_id=getattr(request.state, "request_id", None),
-                    )
-                except Exception as exc:
-                    log.warning(
-                        "ensure_case_participant skipped assignment_id=%s case_id=%s role=relocatee error=%s",
-                        assignment_id, case_id, str(exc),
-                    )
-                event_type = "assignment.claimed"
-                try:
-                    db.insert_case_event(
-                        case_id=assignment["case_id"],
-                        assignment_id=assignment["id"],
-                        actor_principal_id=effective["id"],
-                        event_type=event_type,
-                        payload={},
-                        request_id=getattr(request.state, "request_id", None),
-                    )
-                except Exception as exc:
-                    log.warning(
-                        "insert_case_event skipped assignment_id=%s case_id=%s event_type=%s error=%s",
-                        assignment_id,
-                        case_id,
-                        event_type,
-                        str(exc),
-                    )
 
     if not assignment:
         return {"assignment": None}
@@ -3273,38 +3412,114 @@ def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.
 @app.post("/api/employee/assignments/{assignment_id}/claim")
 def claim_assignment(
     assignment_id: str,
-    request: ClaimAssignmentRequest,
-    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))
+    claim: ClaimAssignmentRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+    http_req: Request,
 ):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.EMPLOYEE)
+    claim_req_id = getattr(http_req.state, "request_id", None) or ""
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
+        identity_event(
+            "identity.claim.manual.failed",
+            failure_code="ASSIGNMENT_NOT_FOUND",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     # User may have email, username, or both. HR can assign using either.
     user_identifiers = [x.lower() for x in [effective.get("email"), effective.get("username")] if x]
     if not user_identifiers:
-        raise HTTPException(status_code=400, detail="Your account must have an email or username set")
+        identity_event(
+            "identity.claim.manual.failed",
+            failure_code="CLAIM_MISSING_ACCOUNT_IDENTIFIER",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_MISSING_ACCOUNT_IDENTIFIER,
+                "Your account must have an email or username set",
+            ),
+        )
 
-    if not request.email or not request.email.strip():
-        raise HTTPException(status_code=400, detail="Enter your email or username to claim")
+    if not claim.email or not claim.email.strip():
+        identity_event(
+            "identity.claim.manual.failed",
+            failure_code="CLAIM_MISSING_REQUEST_IDENTIFIER",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_MISSING_REQUEST_IDENTIFIER,
+                "Enter your email or username to claim",
+            ),
+        )
 
-    req_id = request.email.strip().lower()
-    if req_id not in user_identifiers:
-        raise HTTPException(status_code=403, detail="The identifier you entered does not match your account. Use the same email or username you used to log in.")
-
-    assignment_identifier = (assignment["employee_identifier"] or "").strip().lower()
-    if assignment_identifier not in user_identifiers:
+    req_ident = claim.email.strip().lower()
+    if req_ident not in user_identifiers:
+        identity_event(
+            "identity.claim.manual.failed",
+            failure_code="CLAIM_ACCOUNT_IDENTIFIER_MISMATCH",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
         raise HTTPException(
             status_code=403,
-            detail="This assignment was created for a different employee. HR must have entered your exact email or username (e.g. jane@relopass.com or janedoe) when assigning the case."
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ACCOUNT_IDENTIFIER_MISMATCH,
+                "The identifier you entered does not match your account. Use the same email or username you used to log in.",
+            ),
+        )
+
+    ident_match = db.assignment_identity_matches_user_identifiers(
+        assignment, user_identifiers, request_id=None
+    )
+    if not ident_match:
+        identity_event(
+            "identity.claim.manual.failed",
+            failure_code="CLAIM_ASSIGNMENT_IDENTIFIER_MISMATCH",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ASSIGNMENT_IDENTIFIER_MISMATCH,
+                "This assignment was created for a different employee. HR must have entered your exact email or username "
+                "(e.g. jane@relopass.com or janedoe) when assigning the case.",
+            ),
+        )
+
+    if db.is_assignment_auto_claim_blocked_by_revoked_invites(assignment_id):
+        identity_event(
+            "identity.claim.manual.failed",
+            failure_code="CLAIM_INVITE_REVOKED",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_INVITE_REVOKED,
+                "This invitation was cancelled by HR. Contact HR if you still need access to this case.",
+            ),
         )
 
     emp_uid = assignment.get("employee_user_id")
     effective_id = str(effective["id"]).strip()
     emp_uid_str = str(emp_uid).strip() if emp_uid else ""
-    ident_match = assignment_identifier in user_identifiers
     # #region agent log
     _debug_log(
         "main.py:claim_assignment",
@@ -3315,17 +3530,42 @@ def claim_assignment(
     # #endregion
     # Already linked to this user (same id) -> success
     if emp_uid_str and emp_uid_str == effective_id:
+        identity_event(
+            "identity.claim.manual",
+            outcome="idempotent_already_linked",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective_id,
+            principal_fingerprint=principal_fingerprint(effective.get("email"), effective.get("username")),
+        )
         return {"success": True, "assignmentId": assignment_id}
     # Linked to another id but assignment is for this person (identifier match) -> allow claim and attach this user
     if emp_uid_str and emp_uid_str != effective_id:
-        if assignment_identifier not in user_identifiers:
+        if not ident_match:
             _debug_log("main.py:claim_assignment", "403 branch", {"reason": "emp_uid != effective_id and ident no match"}, hypothesis_id="H-claim")
-            raise HTTPException(status_code=403, detail="Assignment already claimed")
+            identity_event(
+                "identity.claim.manual.failed",
+                failure_code="CLAIM_ASSIGNMENT_ALREADY_CLAIMED",
+                request_id=claim_req_id or None,
+                assignment_id=assignment_id,
+                auth_user_id=effective_id,
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=err_detail(
+                    IdentityErrorCode.CLAIM_ASSIGNMENT_ALREADY_CLAIMED,
+                    "Assignment already claimed by another account.",
+                ),
+            )
         # Same person (e.g. assignment has profile id, user logged in with user id): attach and proceed
 
     case_id = assignment.get("case_id", "")
     db.attach_employee_to_assignment(assignment_id, effective["id"])
-    db.mark_invites_claimed(assignment["employee_identifier"])
+    db.mark_invites_claimed(
+        assignment.get("employee_identifier") or "",
+        claimed_by_user_id=effective["id"],
+        assignment_id=assignment_id,
+    )
     now_iso = datetime.utcnow().isoformat()
     try:
         db.ensure_case_participant(
@@ -3356,6 +3596,14 @@ def claim_assignment(
             event_type,
             str(exc),
         )
+    identity_event(
+        "identity.claim.manual",
+        outcome="attached",
+        request_id=claim_req_id or None,
+        assignment_id=assignment_id,
+        auth_user_id=effective_id,
+        principal_fingerprint=principal_fingerprint(effective.get("email"), effective.get("username")),
+    )
     return {"success": True, "assignmentId": assignment_id}
 
 

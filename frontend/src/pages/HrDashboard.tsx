@@ -271,37 +271,55 @@ export const HrDashboard: React.FC = () => {
               />
               <Button onClick={handleAssign}>Assign</Button>
               {assignmentId && (
-                <Alert variant="info" title="Assignment created">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span>Assignment ID: <strong>{assignmentId}</strong></span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(assignmentId);
-                          setCopyFeedback(true);
-                          setTimeout(() => setCopyFeedback(false), 2000);
-                        } catch {
-                          const el = document.createElement('input');
-                          el.value = assignmentId;
-                          document.body.appendChild(el);
-                          el.select();
-                          document.execCommand('copy');
-                          document.body.removeChild(el);
-                          setCopyFeedback(true);
-                          setTimeout(() => setCopyFeedback(false), 2000);
-                        }
-                      }}
-                    >
-                      {copyFeedback ? 'Copied!' : 'Copy Assignment ID'}
-                    </Button>
+                <Alert variant="info" title="Assignment created — share next steps with the employee">
+                  <div className="space-y-3 text-[#0b2b43]">
+                    <p className="text-sm leading-relaxed">
+                      The employee does <strong>not</strong> need an account before this assignment exists. They can{' '}
+                      <strong>register later</strong> with the same email or username you entered above, or{' '}
+                      <strong>sign in</strong> if they already have a ReloPass account — their case will link automatically
+                      when they use a matching login.
+                    </p>
+                    <p className="text-sm leading-relaxed">
+                      Send them the <strong>assignment ID</strong> below if they need to claim manually (e.g. typo in
+                      the identifier). Invite token (if shown) is optional for your records.
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm">
+                        Assignment ID: <strong className="font-mono">{assignmentId}</strong>
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(assignmentId);
+                            setCopyFeedback(true);
+                            setTimeout(() => setCopyFeedback(false), 2000);
+                          } catch {
+                            const el = document.createElement('input');
+                            el.value = assignmentId;
+                            document.body.appendChild(el);
+                            el.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(el);
+                            setCopyFeedback(true);
+                            setTimeout(() => setCopyFeedback(false), 2000);
+                          }
+                        }}
+                      >
+                        {copyFeedback ? 'Copied!' : 'Copy Assignment ID'}
+                      </Button>
+                    </div>
                   </div>
                 </Alert>
               )}
               {inviteToken && (
-                <Alert variant="info" title="Invite created">
-                  Share this invite token with the employee: <strong>{inviteToken}</strong>
+                <Alert variant="info" title="Invite token (optional)">
+                  <p className="text-sm mb-2">
+                    You can share this token with the employee; they can still access the case by signing up or signing
+                    in with the identifier you used, without the token.
+                  </p>
+                  <span className="font-mono text-sm break-all">{inviteToken}</span>
                 </Alert>
               )}
             </div>

@@ -5,6 +5,19 @@ import type { LoginRequest, RegisterRequest, UserRole } from '../types';
 import { setAuthItem } from '../utils/demo';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { trackAuthPerf } from '../perf/authPerf';
+import type { PostSignupReconciliation } from '../types';
+
+function shouldPersistReconciliation(rec: PostSignupReconciliation | null | undefined): boolean {
+  if (!rec) return false;
+  const has = (s?: string | null) => Boolean(s && String(s).trim());
+  if (has(rec.headline) || has(rec.message)) return true;
+  if (rec.attachedAssignmentIds && rec.attachedAssignmentIds.length > 0) return true;
+  if (rec.linkedContactIds && rec.linkedContactIds.length > 0) return true;
+  if ((rec.skippedRevokedInvites ?? 0) > 0) return true;
+  if ((rec.skippedContactsLinkedToOtherUser ?? 0) > 0) return true;
+  if ((rec.skippedAssignmentsLinkedToOtherUser ?? 0) > 0) return true;
+  return false;
+}
 
 export const useAuth = () => {
   const navigate = useNavigate();
@@ -32,6 +45,14 @@ export const useAuth = () => {
     trackAuthPerf({ stage: 'auth_request_end', durationMs: authDur });
 
     setSession(response.token, response.user);
+    const loginRec = response.reconciliation;
+    if (shouldPersistReconciliation(loginRec)) {
+      try {
+        sessionStorage.setItem('post_auth_claim_reconciliation', JSON.stringify(loginRec));
+      } catch {
+        /* ignore */
+      }
+    }
 
     // Establish Supabase session so tokens auto-refresh (feedback, review, RPC).
     // Deferred to after redirect so the user sees the app immediately.
@@ -54,6 +75,14 @@ export const useAuth = () => {
     trackAuthPerf({ stage: 'sign_in_click' });
     const response = await authAPI.register(payload);
     setSession(response.token, response.user);
+    const rec = response.reconciliation;
+    if (shouldPersistReconciliation(rec)) {
+      try {
+        sessionStorage.setItem('post_auth_claim_reconciliation', JSON.stringify(rec));
+      } catch {
+        /* ignore */
+      }
+    }
     redirectByRole(response.user.role);
     return response;
   };

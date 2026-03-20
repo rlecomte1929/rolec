@@ -8,13 +8,16 @@ import math
 import uuid
 import logging
 import time
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Set
 from datetime import datetime
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
 from .db_config import DATABASE_URL as _raw_url
+from .identity_normalize import email_normalized_from_identifier, normalize_invite_key
+from .identity_observability import identity_event
+
 from .readiness_service import (
     DEFAULT_ROUTE_KEY,
     extract_destination_from_case_profile,
@@ -68,6 +71,16 @@ if _raw_url.startswith("sqlite"):
 _engine = create_engine(_raw_url, connect_args=_connect_args)
 
 _is_sqlite = _raw_url.startswith("sqlite")
+
+if _is_sqlite:
+    from sqlalchemy import event
+
+    @event.listens_for(_engine, "connect")
+    def _sqlite_enable_foreign_keys(dbapi_connection, _connection_record) -> None:
+        """Enforce REFERENCES clauses on SQLite (off by default)."""
+        cur = dbapi_connection.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
 
 
 def _relocation_cases_join_on(table_alias: str = "a", style: str = "standard") -> str:
@@ -1531,7 +1544,7 @@ class Database:
                     ("rfqs", "canonical_case_id", "TEXT"),
                     ("quotes", "created_by_user_id", "TEXT"),
                 ]
-                for tbl, col, typ in cc_cols:
+                for tbl, col, typ in cc_cols + [("case_assignments", "employee_contact_id", "TEXT")]:
                     try:
                         cols = conn.execute(text(f"PRAGMA table_info({tbl})")).fetchall()
                         if not any(c[1] == col for c in cols):
@@ -1547,6 +1560,7 @@ class Database:
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_last_name TEXT"))
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS canonical_case_id TEXT"))
                 conn.execute(text("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS created_by_user_id TEXT"))
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_contact_id TEXT"))
             try:
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS relocation_tasks (
@@ -1668,6 +1682,76 @@ class Database:
                 conn.execute(text("CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(created_at)"))
             except Exception:
                 pass
+            # Canonical identity: employee contacts (pre-auth) + assignment claim invites
+            try:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS employee_contacts (
+                        id TEXT PRIMARY KEY,
+                        company_id TEXT NOT NULL,
+                        invite_key TEXT NOT NULL,
+                        email_normalized TEXT,
+                        first_name TEXT,
+                        last_name TEXT,
+                        linked_auth_user_id TEXT,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        UNIQUE(company_id, invite_key)
+                    )
+                """))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS idx_employee_contacts_company ON employee_contacts(company_id)"
+                ))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS idx_employee_contacts_invite_key ON employee_contacts(invite_key)"
+                ))
+                try:
+                    conn.execute(text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_employee_contacts_company_email_unique "
+                        "ON employee_contacts(company_id, email_normalized) "
+                        "WHERE email_normalized IS NOT NULL AND TRIM(email_normalized) <> ''"
+                    ))
+                except Exception:
+                    pass
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS assignment_claim_invites (
+                        id TEXT PRIMARY KEY,
+                        assignment_id TEXT NOT NULL,
+                        employee_contact_id TEXT NOT NULL,
+                        email_normalized TEXT,
+                        token TEXT NOT NULL UNIQUE,
+                        status TEXT NOT NULL DEFAULT 'pending',
+                        claimed_by_user_id TEXT,
+                        claimed_at TEXT,
+                        created_at TEXT NOT NULL
+                    )
+                """))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS idx_assignment_claim_invites_a ON assignment_claim_invites(assignment_id)"
+                ))
+                try:
+                    conn.execute(text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_assignment_claim_invites_one_pending_per_assignment "
+                        "ON assignment_claim_invites(assignment_id) WHERE status = 'pending'"
+                    ))
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text(
+                        "CREATE INDEX IF NOT EXISTS idx_assignment_claim_invites_assignment_status "
+                        "ON assignment_claim_invites(assignment_id, status)"
+                    ))
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text(
+                        "CREATE INDEX IF NOT EXISTS idx_employee_contacts_email_normalized "
+                        "ON employee_contacts(email_normalized) "
+                        "WHERE email_normalized IS NOT NULL AND TRIM(email_normalized) <> ''"
+                    ))
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
@@ -1676,6 +1760,11 @@ class Database:
             self.seed_readiness_templates_if_empty()
         except Exception as e:
             log.warning("readiness template seed skipped: %s", e)
+
+        try:
+            self._backfill_employee_contacts()
+        except Exception as e:
+            log.warning("employee_contacts backfill skipped: %s", e)
 
     # ------------------------------------------------------------------
     # Users table migration helpers (SQLite only)
@@ -1926,17 +2015,23 @@ class Database:
         request_id: Optional[str] = None,
         employee_first_name: Optional[str] = None,
         employee_last_name: Optional[str] = None,
+        employee_contact_id: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
         efn = (employee_first_name or "").strip() or None
         eln = (employee_last_name or "").strip() or None
+        ecid_check = (employee_contact_id or "").strip() if employee_contact_id else None
+        if ecid_check:
+            ec_row = self.get_employee_contact_by_id(ecid_check, request_id=request_id)
+            if not ec_row:
+                raise ValueError(f"employee_contact_id not found: {ecid_check}")
         with self.engine.begin() as conn:
             self._exec(
                 conn,
                 "INSERT INTO case_assignments "
                 "(id, case_id, canonical_case_id, hr_user_id, employee_user_id, employee_identifier, status, "
-                "employee_first_name, employee_last_name, created_at, updated_at) "
-                "VALUES (:id, :cid, :canonical, :hr, :emp, :ident, :status, :efn, :eln, :ca, :ua)",
+                "employee_first_name, employee_last_name, employee_contact_id, created_at, updated_at) "
+                "VALUES (:id, :cid, :canonical, :hr, :emp, :ident, :status, :efn, :eln, :ecid, :ca, :ua)",
                 {
                     "id": assignment_id,
                     "cid": case_id,
@@ -1947,6 +2042,7 @@ class Database:
                     "status": status,
                     "efn": efn,
                     "eln": eln,
+                    "ecid": employee_contact_id,
                     "ca": now,
                     "ua": now,
                 },
@@ -1976,14 +2072,429 @@ class Database:
         employee_user_id: str,
         request_id: Optional[str] = None,
     ) -> None:
+        now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT employee_contact_id FROM case_assignments WHERE id = :id"),
+                {"id": assignment_id},
+            ).fetchone()
             self._exec(
                 conn,
                 "UPDATE case_assignments SET employee_user_id = :emp, updated_at = :ua WHERE id = :id",
-                {"emp": employee_user_id, "ua": datetime.utcnow().isoformat(), "id": assignment_id},
+                {"emp": employee_user_id, "ua": now, "id": assignment_id},
                 op_name="attach_employee_to_assignment",
                 request_id=request_id,
             )
+            ecid = None
+            if row:
+                m = row._mapping if hasattr(row, "_mapping") else dict(row)
+                ecid = m.get("employee_contact_id")
+            if ecid and str(ecid).strip():
+                conn.execute(
+                    text(
+                        "UPDATE employee_contacts SET linked_auth_user_id = :uid, updated_at = :ua "
+                        "WHERE id = :ecid AND (linked_auth_user_id IS NULL OR linked_auth_user_id = :uid)"
+                    ),
+                    {"uid": employee_user_id, "ua": now, "ecid": str(ecid).strip()},
+                )
+
+    def get_employee_contact_by_id(
+        self, employee_contact_id: str, request_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        if not (employee_contact_id or "").strip():
+            return None
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM employee_contacts WHERE id = :id LIMIT 1",
+                {"id": employee_contact_id.strip()},
+                op_name="get_employee_contact_by_id",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def list_employee_contacts_matching_signup_email(
+        self, email_normalized: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Contacts that may belong to this signup email (auth is separate).
+        Matches email_normalized and legacy rows where invite_key is the normalized email.
+        """
+        en = normalize_invite_key(email_normalized)
+        if not en or "@" not in en:
+            return []
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM employee_contacts WHERE "
+                "(email_normalized IS NOT NULL AND TRIM(email_normalized) <> '' "
+                "AND LOWER(TRIM(email_normalized)) = :en) "
+                "OR (invite_key = :en)",
+                {"en": en},
+                op_name="list_employee_contacts_matching_signup_email",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_unassigned_assignments_for_employee_contact(
+        self, employee_contact_id: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        if not (employee_contact_id or "").strip():
+            return []
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_assignments "
+                "WHERE employee_contact_id = :ecid AND employee_user_id IS NULL",
+                {"ecid": employee_contact_id.strip()},
+                op_name="list_unassigned_assignments_for_employee_contact",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_employee_contacts_by_invite_key(
+        self, invite_key: str, request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """All company-scoped contacts with this invite_key (e.g. username login)."""
+        ik = normalize_invite_key(invite_key)
+        if not ik:
+            return []
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM employee_contacts WHERE invite_key = :ik",
+                {"ik": ik},
+                op_name="list_employee_contacts_by_invite_key",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_assignment_claim_invite_statuses(self, assignment_id: str) -> List[str]:
+        if not (assignment_id or "").strip():
+            return []
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        "SELECT status FROM assignment_claim_invites WHERE assignment_id = :aid"
+                    ),
+                    {"aid": assignment_id.strip()},
+                ).fetchall()
+            out: List[str] = []
+            for row in rows:
+                m = row._mapping if hasattr(row, "_mapping") else dict(row)
+                s = (m.get("status") or "").strip().lower()
+                if s:
+                    out.append(s)
+            return out
+        except (OperationalError, ProgrammingError):
+            return []
+
+    def is_assignment_auto_claim_blocked_by_revoked_invites(self, assignment_id: str) -> bool:
+        """
+        True when claim-invite rows exist, none are pending/claimed, and all are revoked.
+        HR revoked the invite → do not auto-attach by email/username.
+        """
+        st = self.list_assignment_claim_invite_statuses(assignment_id)
+        if not st:
+            return False
+        if "pending" in st:
+            return False
+        if "claimed" in st:
+            return False
+        return all(x == "revoked" for x in st)
+
+    def list_unassigned_assignments_legacy_for_identifiers(
+        self, identifiers: List[str], request_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Assignments with no employee_contact_id (legacy) and no employee_user_id,
+        matching normalized employee_identifier.
+        """
+        idents = sorted(
+            {normalize_invite_key(x) for x in identifiers if x and normalize_invite_key(x)}
+        )
+        if not idents:
+            return []
+        seen: Set[str] = set()
+        out: List[Dict[str, Any]] = []
+        with self.engine.connect() as conn:
+            for ident in idents:
+                rows = self._exec(
+                    conn,
+                    "SELECT * FROM case_assignments WHERE employee_user_id IS NULL "
+                    "AND (employee_contact_id IS NULL OR TRIM(COALESCE(employee_contact_id, '')) = '') "
+                    "AND LOWER(TRIM(COALESCE(employee_identifier, ''))) = :ident",
+                    {"ident": ident},
+                    op_name="list_unassigned_assignments_legacy_for_identifiers",
+                    request_id=request_id,
+                ).fetchall()
+                for row in rows:
+                    d = self._row_to_dict(row)
+                    aid = d.get("id") if d else None
+                    if aid and aid not in seen:
+                        seen.add(aid)
+                        out.append(d)
+        return out
+
+    def _find_employee_contact_id_for_resolve(
+        self,
+        conn: Any,
+        company_id: str,
+        en: Optional[str],
+        canonical_ik: str,
+        ik: str,
+    ) -> Optional[str]:
+        """SELECT-only: existing contact id for company + email or invite keys (same order as insert path)."""
+        cid = company_id
+        row = None
+        if en:
+            row = conn.execute(
+                text(
+                    "SELECT id FROM employee_contacts "
+                    "WHERE company_id = :c AND email_normalized = :en LIMIT 1"
+                ),
+                {"c": cid, "en": en},
+            ).fetchone()
+        if not row:
+            row = conn.execute(
+                text(
+                    "SELECT id FROM employee_contacts "
+                    "WHERE company_id = :c AND invite_key = :ik LIMIT 1"
+                ),
+                {"c": cid, "ik": canonical_ik},
+            ).fetchone()
+        if not row and canonical_ik != ik:
+            row = conn.execute(
+                text(
+                    "SELECT id FROM employee_contacts "
+                    "WHERE company_id = :c AND invite_key = :ik2 LIMIT 1"
+                ),
+                {"c": cid, "ik2": ik},
+            ).fetchone()
+        if not row:
+            return None
+        m = row._mapping if hasattr(row, "_mapping") else dict(row)
+        return str(m["id"])
+
+    def resolve_or_create_employee_contact(
+        self,
+        company_id: str,
+        employee_identifier_raw: str,
+        *,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> str:
+        """
+        Company-scoped operational identity; does not create auth users.
+        Dedup order: (company_id + normalized email) if email-like, else (company_id + invite_key).
+        New rows use invite_key = normalized email when email is present, else normalized identifier.
+        Idempotent under DB unique constraints: concurrent inserts resolve via IntegrityError retry.
+        """
+        cid = (company_id or "").strip()
+        raw = (employee_identifier_raw or "").strip()
+        ik = normalize_invite_key(raw)
+        en = email_normalized_from_identifier(raw)
+        if not cid or not ik:
+            raise ValueError("company_id and employee identifier are required")
+        canonical_ik = en if en else ik
+        now = datetime.utcnow().isoformat()
+        fn = (first_name or "").strip() or None
+        ln = (last_name or "").strip() or None
+
+        with self.engine.connect() as conn:
+            found = self._find_employee_contact_id_for_resolve(conn, cid, en, canonical_ik, ik)
+            if found:
+                identity_event(
+                    "identity.contact.resolve",
+                    outcome="reused",
+                    request_id=request_id,
+                    company_id=cid,
+                    employee_contact_id=found,
+                    identifier_shape="email" if en else "invite_key",
+                )
+                return found
+
+        for _attempt in range(2):
+            eid = str(uuid.uuid4())
+            try:
+                with self.engine.begin() as conn:
+                    self._exec(
+                        conn,
+                        "INSERT INTO employee_contacts "
+                        "(id, company_id, invite_key, email_normalized, first_name, last_name, linked_auth_user_id, created_at, updated_at) "
+                        "VALUES (:id, :c, :ik, :en, :fn, :ln, NULL, :ca, :ua)",
+                        {
+                            "id": eid,
+                            "c": cid,
+                            "ik": canonical_ik,
+                            "en": en,
+                            "fn": fn,
+                            "ln": ln,
+                            "ca": now,
+                            "ua": now,
+                        },
+                        op_name="resolve_or_create_employee_contact_insert",
+                        request_id=request_id,
+                    )
+                identity_event(
+                    "identity.contact.resolve",
+                    outcome="created",
+                    request_id=request_id,
+                    company_id=cid,
+                    employee_contact_id=eid,
+                    identifier_shape="email" if en else "invite_key",
+                )
+                return eid
+            except IntegrityError:
+                log.info(
+                    "resolve_or_create_employee_contact insert race attempt=%s company_id=%s email=%s",
+                    _attempt,
+                    cid[:8],
+                    (en or "")[:20],
+                )
+                with self.engine.connect() as conn:
+                    found = self._find_employee_contact_id_for_resolve(conn, cid, en, canonical_ik, ik)
+                    if found:
+                        identity_event(
+                            "identity.contact.resolve",
+                            outcome="reused_after_race",
+                            request_id=request_id,
+                            company_id=cid,
+                            employee_contact_id=found,
+                            identifier_shape="email" if en else "invite_key",
+                        )
+                        return found
+
+        raise RuntimeError(
+            "Could not resolve employee_contacts after concurrent insert; retry the request."
+        )
+
+    def get_or_create_employee_contact(
+        self,
+        company_id: str,
+        invite_key: str,
+        *,
+        email_normalized: Optional[str] = None,
+        first_name: Optional[str] = None,
+        last_name: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> str:
+        """Backward-compatible alias: `invite_key` is treated as the raw HR identifier string."""
+        _ = email_normalized  # derived from identifier; kept for call-site compatibility
+        return self.resolve_or_create_employee_contact(
+            company_id,
+            invite_key,
+            first_name=first_name,
+            last_name=last_name,
+            request_id=request_id,
+        )
+
+    def link_employee_contact_to_auth_user(
+        self,
+        employee_contact_id: str,
+        user_id: str,
+        request_id: Optional[str] = None,
+    ) -> None:
+        """Idempotent: set linked_auth_user_id when unset or already same user."""
+        if not (employee_contact_id or "").strip() or not (user_id or "").strip():
+            return
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                "UPDATE employee_contacts SET linked_auth_user_id = :uid, updated_at = :ua "
+                "WHERE id = :ecid AND (linked_auth_user_id IS NULL OR linked_auth_user_id = :uid)",
+                {"uid": user_id.strip(), "ua": now, "ecid": employee_contact_id.strip()},
+                op_name="link_employee_contact_to_auth_user",
+                request_id=request_id,
+            )
+
+    def assignment_identity_matches_user_identifiers(
+        self,
+        assignment: Dict[str, Any],
+        user_identifiers: List[str],
+        request_id: Optional[str] = None,
+    ) -> bool:
+        """True if assignment target matches any normalized identifier (legacy row or employee_contact)."""
+        if not user_identifiers:
+            return False
+        uid_set = {normalize_invite_key(u) for u in user_identifiers if u}
+        uid_set.discard("")
+        ai = normalize_invite_key(assignment.get("employee_identifier"))
+        if ai and ai in uid_set:
+            return True
+        ecid = assignment.get("employee_contact_id")
+        if not ecid:
+            return False
+        ec = self.get_employee_contact_by_id(str(ecid), request_id=request_id)
+        if not ec:
+            return False
+        if normalize_invite_key(ec.get("invite_key")) in uid_set:
+            return True
+        en = normalize_invite_key(ec.get("email_normalized"))
+        return bool(en and en in uid_set)
+
+    def _backfill_employee_contacts(self) -> None:
+        """Attach employee_contact_id to legacy assignments (idempotent). Skips rows without case company_id."""
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        "SELECT a.id AS aid, a.case_id, a.employee_identifier "
+                        "FROM case_assignments a "
+                        "WHERE (a.employee_contact_id IS NULL OR TRIM(COALESCE(a.employee_contact_id, '')) = '') "
+                        "AND a.employee_identifier IS NOT NULL "
+                        "AND TRIM(a.employee_identifier) != ''"
+                    )
+                ).fetchall()
+        except (OperationalError, ProgrammingError) as e:
+            log.debug("_backfill_employee_contacts skipped (schema): %s", e)
+            return
+        join_on = _relocation_cases_join_on("a", style="standard")
+        for row in rows:
+            m = row._mapping if hasattr(row, "_mapping") else dict(row)
+            aid = m.get("aid")
+            case_id = m.get("case_id")
+            ident = m.get("employee_identifier")
+            if not aid or not case_id or not ident:
+                continue
+            ik = normalize_invite_key(str(ident))
+            if not ik:
+                continue
+            try:
+                with self.engine.connect() as conn:
+                    rc_row = conn.execute(
+                        text(f"SELECT rc.company_id AS company_id FROM case_assignments a "
+                             f"LEFT JOIN relocation_cases rc ON {join_on} "
+                             f"WHERE a.id = :aid LIMIT 1"),
+                        {"aid": str(aid)},
+                    ).fetchone()
+                if not rc_row:
+                    continue
+                rcm = rc_row._mapping if hasattr(rc_row, "_mapping") else dict(rc_row)
+                company_id = rcm.get("company_id")
+                if not company_id or not str(company_id).strip():
+                    continue
+                company_id = str(company_id).strip()
+                en = email_normalized_from_identifier(str(ident))
+                ecid = self.get_or_create_employee_contact(
+                    company_id,
+                    ik,
+                    email_normalized=en,
+                    request_id=None,
+                )
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "UPDATE case_assignments SET employee_contact_id = :ecid, updated_at = :ua "
+                            "WHERE id = :aid AND (employee_contact_id IS NULL OR TRIM(COALESCE(employee_contact_id,'')) = '')"
+                        ),
+                        {"ecid": ecid, "ua": datetime.utcnow().isoformat(), "aid": str(aid)},
+                    )
+            except Exception as ex:
+                log.warning("backfill employee_contact for assignment %s: %s", aid, ex)
 
     def set_assignment_submitted(self, assignment_id: str, request_id: Optional[str] = None) -> None:
         now = datetime.utcnow().isoformat()
@@ -3029,13 +3540,20 @@ class Database:
         identifier: str,
         request_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
+        ident = normalize_invite_key(identifier)
+        if not ident:
+            return None
         with self.engine.connect() as conn:
             row = self._exec(
                 conn,
-                "SELECT * FROM case_assignments "
-                "WHERE employee_user_id IS NULL AND employee_identifier = :ident "
-                "ORDER BY created_at DESC LIMIT 1",
-                {"ident": identifier},
+                "SELECT a.* FROM case_assignments a "
+                "LEFT JOIN employee_contacts ec ON ec.id = a.employee_contact_id "
+                "WHERE a.employee_user_id IS NULL AND ( "
+                "LOWER(TRIM(COALESCE(a.employee_identifier, ''))) = :ident "
+                "OR ec.invite_key = :ident "
+                ") "
+                "ORDER BY a.created_at DESC LIMIT 1",
+                {"ident": ident},
                 op_name="get_unassigned_assignment_by_identifier",
                 request_id=request_id,
             ).fetchone()
@@ -4753,14 +5271,23 @@ class Database:
             if not row:
                 return False
             case_id = row._mapping["case_id"]
+            try:
+                conn.execute(
+                    text("DELETE FROM assignment_claim_invites WHERE assignment_id = :aid"),
+                    {"aid": assignment_id},
+                )
+            except (OperationalError, ProgrammingError):
+                pass
             conn.execute(text("DELETE FROM assignment_invites WHERE case_id = :cid"), {"cid": case_id})
             conn.execute(text("DELETE FROM case_assignments WHERE id = :id"), {"id": assignment_id})
             conn.execute(text("DELETE FROM relocation_cases WHERE id = :cid"), {"cid": case_id})
         return True
 
     # ==================================================================
-    # Assignment invites
+    # Assignment invites (legacy `assignment_invites` + canonical `assignment_claim_invites`)
     # ==================================================================
+    # New HR/Admin flows must use `ensure_pending_assignment_invites` only (writes both tables in sync).
+    # Do not add standalone `create_assignment_invite` call sites for product features.
     def create_assignment_invite(
         self, invite_id: str, case_id: str, hr_user_id: str,
         employee_identifier: str, token: str,
@@ -4776,11 +5303,149 @@ class Database:
                 "ca": datetime.utcnow().isoformat(),
             })
 
-    def mark_invites_claimed(self, employee_identifier: str) -> None:
+    def create_assignment_claim_invite(
+        self,
+        invite_id: str,
+        assignment_id: str,
+        employee_contact_id: str,
+        token: str,
+        email_normalized: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        en = (email_normalized or "").strip() or None
         with self.engine.begin() as conn:
-            conn.execute(text(
-                "UPDATE assignment_invites SET status = 'CLAIMED' WHERE employee_identifier = :ident"
-            ), {"ident": employee_identifier})
+            self._exec(
+                conn,
+                "INSERT INTO assignment_claim_invites "
+                "(id, assignment_id, employee_contact_id, email_normalized, token, status, "
+                "claimed_by_user_id, claimed_at, created_at) "
+                "VALUES (:id, :aid, :ecid, :en, :tok, 'pending', NULL, NULL, :ca)",
+                {
+                    "id": invite_id,
+                    "aid": assignment_id,
+                    "ecid": employee_contact_id,
+                    "en": en,
+                    "tok": token,
+                    "ca": now,
+                },
+                op_name="create_assignment_claim_invite",
+                request_id=request_id,
+            )
+
+    def get_pending_claim_invite_token_for_assignment(self, assignment_id: str) -> Optional[str]:
+        if not (assignment_id or "").strip():
+            return None
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        "SELECT token FROM assignment_claim_invites "
+                        "WHERE assignment_id = :aid AND status = 'pending' LIMIT 1"
+                    ),
+                    {"aid": assignment_id.strip()},
+                ).fetchone()
+            if not row:
+                return None
+            m = row._mapping if hasattr(row, "_mapping") else dict(row)
+            return str(m["token"]) if m.get("token") else None
+        except (OperationalError, ProgrammingError):
+            return None
+
+    def ensure_pending_assignment_invites(
+        self,
+        assignment_id: str,
+        case_id: str,
+        hr_user_id: str,
+        employee_contact_id: str,
+        stored_identifier: str,
+        email_normalized: Optional[str],
+        request_id: Optional[str] = None,
+    ) -> str:
+        """
+        Idempotent pending claim for this assignment: reuse existing pending row or create legacy + claim rows.
+        Returns invite token (new or existing).
+        """
+        existing = self.get_pending_claim_invite_token_for_assignment(assignment_id)
+        if existing:
+            identity_event(
+                "identity.invite.pending_ensure",
+                outcome="idempotent_reuse",
+                request_id=request_id,
+                assignment_id=assignment_id,
+                employee_contact_id=employee_contact_id,
+            )
+            return existing
+        token = str(uuid.uuid4())
+        self.create_assignment_invite(
+            str(uuid.uuid4()),
+            case_id,
+            hr_user_id,
+            stored_identifier,
+            token,
+        )
+        try:
+            self.create_assignment_claim_invite(
+                str(uuid.uuid4()),
+                assignment_id,
+                employee_contact_id,
+                token,
+                email_normalized=email_normalized,
+                request_id=request_id,
+            )
+        except IntegrityError:
+            # Unique partial index: at most one pending row per assignment; concurrent HR path.
+            dup = self.get_pending_claim_invite_token_for_assignment(assignment_id)
+            if dup:
+                identity_event(
+                    "identity.invite.pending_ensure",
+                    outcome="idempotent_reuse_concurrent",
+                    request_id=request_id,
+                    assignment_id=assignment_id,
+                    employee_contact_id=employee_contact_id,
+                )
+                return dup
+            raise
+        identity_event(
+            "identity.invite.pending_ensure",
+            outcome="created",
+            request_id=request_id,
+            assignment_id=assignment_id,
+            employee_contact_id=employee_contact_id,
+        )
+        return token
+
+    def mark_invites_claimed(
+        self,
+        employee_identifier: str,
+        *,
+        claimed_by_user_id: Optional[str] = None,
+        assignment_id: Optional[str] = None,
+    ) -> None:
+        ident_raw = (employee_identifier or "").strip()
+        ident_norm = normalize_invite_key(ident_raw)
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            if ident_norm:
+                conn.execute(
+                    text(
+                        "UPDATE assignment_invites SET status = 'CLAIMED' "
+                        "WHERE LOWER(TRIM(COALESCE(employee_identifier, ''))) = :in2"
+                    ),
+                    {"in2": ident_norm},
+                )
+            if assignment_id and claimed_by_user_id:
+                try:
+                    conn.execute(
+                        text(
+                            "UPDATE assignment_claim_invites "
+                            "SET status = 'claimed', claimed_by_user_id = :uid, claimed_at = :ca "
+                            "WHERE assignment_id = :aid AND status = 'pending'"
+                        ),
+                        {"uid": claimed_by_user_id, "ca": now, "aid": assignment_id},
+                    )
+                except (OperationalError, ProgrammingError):
+                    pass
 
     # ==================================================================
     # Employee journey data

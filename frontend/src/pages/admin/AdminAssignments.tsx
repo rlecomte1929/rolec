@@ -444,11 +444,23 @@ export const AdminAssignments: React.FC = () => {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Add assignment</h3>
             {createSuccess && (
-              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-                Assignment created. ID: <span className="font-mono">{createSuccess.assignmentId}</span>
-                <Button size="sm" variant="outline" className="ml-2" onClick={() => navigator.clipboard.writeText(createSuccess.assignmentId).catch(() => {})}>
-                  Copy ID
-                </Button>
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-900 space-y-2">
+                <div className="font-semibold">Assignment created</div>
+                <p className="text-green-800 leading-relaxed">
+                  The employee can <strong>register later</strong> or <strong>sign in</strong> if they already have an
+                  account. When they use the same email or username as on this assignment, the case links automatically.
+                  Share the assignment ID if they need to claim manually.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono">{createSuccess.assignmentId}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigator.clipboard.writeText(createSuccess.assignmentId).catch(() => {})}
+                  >
+                    Copy ID
+                  </Button>
+                </div>
               </div>
             )}
             <div className="space-y-3 text-sm">
