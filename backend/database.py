@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
 from .db_config import DATABASE_URL as _raw_url
 from .readiness_service import (
@@ -6442,7 +6442,7 @@ class Database:
             "off": off,
         }
 
-        sql = f"""
+        sql_full = f"""
             SELECT
                 m.assignment_id,
                 MAX(m.created_at) AS last_message_at,
@@ -6480,8 +6480,63 @@ class Database:
             LIMIT :lim OFFSET :off
         """
 
-        with self.engine.connect() as conn:
-            rows = conn.execute(text(sql), params).fetchall()
+        # Postgres without runtime DDL often lacks: message_conversation_prefs, messages.read_at/*,
+        # case_assignments.canonical_case_id / employee_* name columns. Degraded query keeps messages working.
+        search_compat_sql = "1 = 1"
+        search_compat_params: Dict[str, Any] = {}
+        if search_q and search_q.strip():
+            term = f"%{search_q.strip().lower()}%"
+            search_compat_sql = """(
+                LOWER(COALESCE(a.employee_identifier, '')) LIKE :sqc OR
+                LOWER(COALESCE(a.case_id, '')) LIKE :sqc
+            )"""
+            search_compat_params["sqc"] = term
+        compat_params = {**access_params, **search_compat_params, "hr_uid": hr_user_id, "lim": lim, "off": off}
+        null_arch = "NULL" if _is_sqlite else "CAST(NULL AS TEXT)"
+        sql_compat = f"""
+            SELECT
+                m.assignment_id,
+                MAX(m.created_at) AS last_message_at,
+                COUNT(*) AS message_count,
+                (SELECT body FROM messages m2 WHERE m2.assignment_id = m.assignment_id
+                 ORDER BY m2.created_at DESC LIMIT 1) AS last_body,
+                (SELECT subject FROM messages m2s WHERE m2s.assignment_id = m.assignment_id
+                 ORDER BY m2s.created_at DESC LIMIT 1) AS last_subject,
+                0 AS unread_count,
+                {null_arch} AS archived_at,
+                MAX(a.employee_user_id) AS employee_user_id,
+                MAX(a.hr_user_id) AS assignment_hr_user_id,
+                MAX(a.employee_identifier) AS employee_identifier,
+                {null_arch} AS employee_first_name,
+                {null_arch} AS employee_last_name,
+                MAX(a.status) AS assignment_status,
+                MAX(emp_p.full_name) AS employee_full_name,
+                MAX(emp_p.email) AS employee_email,
+                MAX(a.case_id) AS case_id
+            FROM messages m
+            INNER JOIN case_assignments a ON a.id = m.assignment_id
+            LEFT JOIN relocation_cases rc ON rc.id = a.case_id
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            LEFT JOIN profiles emp_p ON emp_p.id = a.employee_user_id
+            WHERE m.assignment_id IS NOT NULL
+              AND ({access_sql})
+              AND ({search_compat_sql})
+            GROUP BY m.assignment_id
+            {order_clause}
+            LIMIT :lim OFFSET :off
+        """
+
+        rows: List[Any] = []
+        try:
+            with self.engine.connect() as conn:
+                rows = list(conn.execute(text(sql_full), params).fetchall())
+        except (ProgrammingError, OperationalError) as e:
+            log.warning(
+                "list_hr_conversation_summaries: full query failed (%s), using compat query",
+                e,
+            )
+            with self.engine.connect() as conn:
+                rows = list(conn.execute(text(sql_compat), compat_params).fetchall())
 
         out: List[Dict[str, Any]] = []
         for row in rows:
