@@ -14,7 +14,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
-from .db_config import DATABASE_URL as _raw_url
+from .db_config import DATABASE_URL as _raw_url, sqlalchemy_engine_kwargs
 from .identity_normalize import email_normalized_from_identifier, normalize_invite_key
 from .identity_observability import identity_event
 
@@ -64,11 +64,7 @@ def _agent_debug_log(
 # ---------------------------------------------------------------------------
 # Engine setup (shared logic with backend/app/db.py)
 # ---------------------------------------------------------------------------
-_connect_args: dict = {}
-if _raw_url.startswith("sqlite"):
-    _connect_args = {"check_same_thread": False}
-
-_engine = create_engine(_raw_url, connect_args=_connect_args)
+_engine = create_engine(_raw_url, **sqlalchemy_engine_kwargs(_raw_url))
 
 _is_sqlite = _raw_url.startswith("sqlite")
 

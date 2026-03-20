@@ -59,6 +59,8 @@ export { API_BASE_URL };
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
+  /** Avoid hanging UI for minutes when the API/proxy is wedged; large uploads can override per-request. */
+  timeout: 90_000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -75,6 +77,15 @@ const apiCache = new Map<string, CacheEntry<any>>();
 /** Clear a cached value so the next request fetches fresh. Use after 401 or when user retries. */
 export function invalidateApiCache(key: string): void {
   apiCache.delete(key);
+}
+
+/** Drop all cache entries whose key starts with `prefix` (e.g. `admin:companies:`). */
+export function invalidateApiCachePrefix(prefix: string): void {
+  for (const k of [...apiCache.keys()]) {
+    if (k.startsWith(prefix)) {
+      apiCache.delete(k);
+    }
+  }
 }
 
 const cachedRequest = <T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> => {
@@ -600,20 +611,27 @@ export const companyAPI = {
 // Admin API
 export const adminAPI = {
   getContext: async (): Promise<AdminContextResponse> => {
-    const response = await api.get('/api/admin/context');
-    return response.data;
+    return cachedRequest('admin:context', 20_000, async () => {
+      const response = await api.get('/api/admin/context');
+      return response.data;
+    });
   },
   startImpersonation: async (payload: { targetUserId: string; mode: 'hr' | 'employee'; reason?: string }) => {
     const response = await api.post('/api/admin/impersonate/start', payload);
+    invalidateApiCache('admin:context');
     return response.data;
   },
   stopImpersonation: async (): Promise<{ ok: boolean }> => {
     const response = await api.post('/api/admin/impersonate/stop');
+    invalidateApiCache('admin:context');
     return response.data;
   },
   listCompanies: async (q?: string): Promise<{ companies: AdminCompany[] }> => {
-    const response = await api.get('/api/admin/companies', { params: { q } });
-    return response.data;
+    const key = `admin:companies:${q ?? ''}`;
+    return cachedRequest(key, 60_000, async () => {
+      const response = await api.get('/api/admin/companies', { params: { q } });
+      return response.data;
+    });
   },
   getCompanyDetail: async (companyId: string): Promise<{
     company: AdminCompany | null;
@@ -642,6 +660,7 @@ export const adminAPI = {
     support_email?: string;
   }): Promise<{ company: AdminCompany }> => {
     const response = await api.post('/api/admin/companies', payload);
+    invalidateApiCachePrefix('admin:companies:');
     return response.data;
   },
   updateCompany: async (
@@ -661,10 +680,12 @@ export const adminAPI = {
     }>
   ): Promise<{ company: AdminCompany }> => {
     const response = await api.patch(`/api/admin/companies/${companyId}`, payload);
+    invalidateApiCachePrefix('admin:companies:');
     return response.data;
   },
   deactivateCompany: async (companyId: string): Promise<{ company: AdminCompany; message?: string }> => {
     const response = await api.post(`/api/admin/companies/${companyId}/deactivate`);
+    invalidateApiCachePrefix('admin:companies:');
     return response.data;
   },
   runReconciliationBackfillTestCompany: async (): Promise<{ ok: boolean; summary?: { test_company_id: string; profiles_linked: number; hr_users_linked: number; relocation_cases_linked: number }; error?: string }> => {
@@ -919,6 +940,16 @@ export const adminAPI = {
   },
   rejectRequirementFacts: async (payload: { fact_ids: string[] }) => {
     const response = await api.post('/api/admin/requirements/facts/reject', payload);
+    return response.data;
+  },
+  /** Mobility graph: case context + audit logs (admin JWT). */
+  inspectMobilityCase: async (
+    caseId: string
+  ): Promise<{
+    context: Record<string, unknown>;
+    audit_logs: Array<Record<string, unknown>>;
+  }> => {
+    const response = await api.get(`/api/admin/mobility/cases/${encodeURIComponent(caseId)}/inspect`);
     return response.data;
   },
 };

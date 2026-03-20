@@ -92,6 +92,8 @@ export const ROUTE_DEFS = {
   adminOpsReviewers: { path: '/admin/ops/reviewers', roles: ['ADMIN'] as RouteRole[] },
   adminOpsDestinations: { path: '/admin/ops/destinations', roles: ['ADMIN'] as RouteRole[] },
   adminOpsNotifications: { path: '/admin/ops/notifications', roles: ['ADMIN'] as RouteRole[] },
+  adminMobilityCases: { path: '/admin/mobility/cases', roles: ['ADMIN'] as RouteRole[] },
+  adminMobilityCaseInspect: { path: '/admin/mobility/cases/:caseId', roles: ['ADMIN'] as RouteRole[] },
 };
 
 export type RouteKey = keyof typeof ROUTE_DEFS;

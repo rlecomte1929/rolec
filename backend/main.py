@@ -88,6 +88,8 @@ from .app.routers import admin_notifications as admin_notifications_router
 from .app.routers import admin_ops_analytics as admin_ops_analytics_router
 from .app.routers import admin_workflow_analytics as admin_workflow_analytics_router
 from .app.routers import admin_collaboration as admin_collaboration_router
+from .app.routers import mobility_context as mobility_context_router
+from .app.routers import admin_mobility as admin_mobility_router
 from .routes import relocation as relocation_router
 from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
@@ -175,6 +177,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Fewer preflight round-trips on repeat requests (helps perceived lag on slow networks).
+    max_age=86400,
 )
 
 
@@ -239,6 +243,8 @@ async def request_id_and_timing_middleware(request: Request, call_next):
 
 app.include_router(compat_router.router)
 app.include_router(cases_router.router)
+app.include_router(mobility_context_router.router)
+app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
 app.include_router(admin_resources_router.router, prefix="/api/admin")
 app.include_router(admin_staging_router.router, prefix="/api/admin")
@@ -1159,6 +1165,15 @@ def register(request: RegisterRequest):
             principal_fingerprint=principal_fingerprint(email, username),
         )
         log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
+        if email:
+            from .services.supabase_auth_sync import sync_relopass_user_to_supabase_auth
+
+            sync_relopass_user_to_supabase_auth(
+                email,
+                request.password,
+                relopass_user_id=user_id,
+                full_name=request.name,
+            )
         return LoginResponse(
             token=token,
             user=UserResponse(
@@ -1194,7 +1209,7 @@ AUTH_PERF_DEBUG = os.getenv("AUTH_PERF_DEBUG", "").lower() in ("1", "true", "yes
 PERF_DEBUG = os.getenv("PERF_DEBUG", "").lower() in ("1", "true", "yes")
 
 
-def _log_auth_perf(endpoint: str, request_id: str | None, user_id: str | None, total_duration_ms: float, status_code: int):
+def _log_auth_perf(endpoint: str, request_id: Optional[str], user_id: Optional[str], total_duration_ms: float, status_code: int):
     """Structured JSON log for auth perf (when AUTH_PERF_DEBUG=1)."""
     if not AUTH_PERF_DEBUG:
         return
@@ -1347,6 +1362,15 @@ def login(request: LoginRequest, req: Request):
         principal_fingerprint=principal_fingerprint(user.get("email"), user.get("username")),
     )
     log.info("auth_login success user_id=%s", user["id"][:8])
+    if user.get("email"):
+        from .services.supabase_auth_sync import sync_relopass_user_to_supabase_auth
+
+        sync_relopass_user_to_supabase_auth(
+            user["email"],
+            request.password,
+            relopass_user_id=user["id"],
+            full_name=user.get("name"),
+        )
     _log_auth_perf(
         "/api/auth/login",
         request_id,
@@ -1368,7 +1392,7 @@ def login(request: LoginRequest, req: Request):
     )
 
 
-def _log_endpoint_perf(endpoint: str, request_id: str | None, user_id: str | None, total_duration_ms: float, status_code: int, db_duration_ms: float | None = None):
+def _log_endpoint_perf(endpoint: str, request_id: Optional[str], user_id: Optional[str], total_duration_ms: float, status_code: int, db_duration_ms: Optional[float] = None):
     """Structured JSON log for endpoint perf (when PERF_DEBUG=1)."""
     if not PERF_DEBUG:
         return

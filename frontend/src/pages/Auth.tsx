@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, Input, Select, Alert, LoadingButton } from '../components/antigravity';
 import { AppShell } from '../components/AppShell';
 import type { UserRole } from '../types';
 import { clearAuthItems } from '../utils/demo';
 import { useAuth } from '../hooks/useAuth';
-import { getApiErrorMessage } from '../utils/apiDetail';
+import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
 
 export const Auth: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -19,6 +19,8 @@ export const Auth: React.FC = () => {
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
   const { login, register } = useAuth();
+  /** Blocks double-submit before React re-renders (e.g. double-click + Enter). */
+  const authInFlight = useRef(false);
 
 
   useEffect(() => {
@@ -31,13 +33,16 @@ export const Auth: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authInFlight.current || isLoading) return;
     setError('');
+    authInFlight.current = true;
     setIsLoading(true);
 
     try {
       await login({ identifier, password });
     } catch (err: any) {
-      const msg = getApiErrorMessage(err, 'Login failed. Try again.');
+      const transport = getClientTransportErrorMessage(err);
+      const msg = transport ?? getApiErrorMessage(err, 'Login failed. Try again.');
       try {
         localStorage.setItem('debug_last_auth_error', msg);
       } catch {
@@ -45,12 +50,14 @@ export const Auth: React.FC = () => {
       }
       setError(msg);
     } finally {
+      authInFlight.current = false;
       setIsLoading(false);
     }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authInFlight.current || isLoading) return;
     setError('');
 
     const hasUsername = username.trim().length > 0;
@@ -75,6 +82,7 @@ export const Auth: React.FC = () => {
       return;
     }
 
+    authInFlight.current = true;
     setIsLoading(true);
     try {
       await register({
@@ -85,6 +93,16 @@ export const Auth: React.FC = () => {
         name: name.trim() || undefined,
       });
     } catch (err: any) {
+      const transport = getClientTransportErrorMessage(err);
+      if (transport) {
+        try {
+          localStorage.setItem('debug_last_auth_error', transport);
+        } catch {
+          /* ignore */
+        }
+        setError(transport);
+        return;
+      }
       const detail = err.response?.data?.detail;
       let msg: string;
       if (err.response?.status === 400 && detail && typeof detail === 'object' && !Array.isArray(detail)) {
@@ -113,6 +131,7 @@ export const Auth: React.FC = () => {
       }
       setError(msg);
     } finally {
+      authInFlight.current = false;
       setIsLoading(false);
     }
   };
@@ -264,6 +283,7 @@ export const Auth: React.FC = () => {
                   fullWidth
                   loading={isLoading}
                   loadingLabel="Creating account…"
+                  disabled={!password.trim() || (!username.trim() && !email.trim())}
                 >
                   Create account
                 </LoadingButton>

@@ -15,6 +15,8 @@
 | -------------- | -------- | ---------------------------------------------------- |
 | `DATABASE_URL` | Yes      | `postgresql://user:pass@host:5432/dbname`            |
 | `CORS_ORIGINS` | Optional | `https://relopass.com,https://www.relopass.com`      |
+| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Recommended | Same as policy storage; also used to **mirror ReloPass users into Supabase Auth** on login/register (so the frontend can refresh Supabase tokens). |
+| `DISABLE_SUPABASE_AUTH_SYNC` | Optional | Set to `1` only if you must disable that mirroring. |
 
 - If `DATABASE_URL` is not set, the backend falls back to local SQLite (`relopass.db`).
 - **Supabase Session Pooler** (required): Use the pooler connection string, not the direct connection.

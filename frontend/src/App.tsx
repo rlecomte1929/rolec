@@ -28,6 +28,7 @@ import { EmployeeCaseSummary } from './pages/employee/EmployeeCaseSummary';
 import { CountriesPage } from './pages/admin/CountriesPage';
 import { CountryDetailPage } from './pages/admin/CountryDetailPage';
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
+import { AdminMobilityCaseInspectPage } from './pages/admin/AdminMobilityCaseInspectPage';
 import { AdminPoliciesPage } from './pages/admin/AdminPoliciesPage';
 import { AdminCompanies } from './pages/admin/AdminCompanies';
 import { AdminUsers } from './pages/admin/AdminUsers';
@@ -184,6 +185,8 @@ function App() {
         <Route path={ROUTE_DEFS.adminCompanies.path} element={<RequireAdminRoute><AdminCompanies /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPeople.path} element={<RequireAdminRoute><AdminUsers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAssignments.path} element={<RequireAdminRoute><AdminAssignments /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminMobilityCases.path} element={<RequireAdminRoute><AdminMobilityCaseInspectPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminMobilityCaseInspect.path} element={<RequireAdminRoute><AdminMobilityCaseInspectPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPolicies.path} element={<RequireAdminRoute><AdminPoliciesPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminMessages.path} element={<RequireAdminRoute><AdminMessages /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResearch.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminOverview.path} replace /></RequireAdminRoute>} />

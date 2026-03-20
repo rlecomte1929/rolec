@@ -3,8 +3,8 @@
  * Shown when the user clicks "My Case" in the nav.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Card, LoadingButton } from '../../components/antigravity';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
@@ -12,6 +12,7 @@ import { employeeAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
 import { AssignmentDebugPanel } from '../AssignmentDebugPanel';
 import { RelocationTaskTracker } from '../../features/timeline/RelocationTaskTracker';
+import { MobilityCasePanels } from '../../components/employee/MobilityCasePanels';
 import type { CaseDTO, CaseDraftDTO } from '../../types';
 
 function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -76,8 +77,10 @@ function caseToWizardDraft(caseData: CaseDTO | null): CaseDraftDTO {
 export const EmployeeCaseSummary: React.FC = () => {
   const navigate = useNavigate();
   const { caseId } = useParams<{ caseId: string }>();
+  const [searchParams] = useSearchParams();
   const assignmentId = caseId;
   const [draft, setDraft] = useState<CaseDraftDTO | null>(null);
+  const [caseFlags, setCaseFlags] = useState<Record<string, unknown>>({});
   const [feedback, setFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [wizardNavLoading, setWizardNavLoading] = useState(false);
@@ -91,6 +94,7 @@ export const EmployeeCaseSummary: React.FC = () => {
       const { data, error: loadError } = await getCaseDetailsByAssignmentId(assignmentId);
       if (loadError) {
         setDraft(buildDefaultDraft());
+        setCaseFlags({});
         setError(
           loadError.includes('Case row missing')
             ? loadError
@@ -98,12 +102,15 @@ export const EmployeeCaseSummary: React.FC = () => {
         );
       } else if (data?.case) {
         setDraft(caseToWizardDraft(data.case));
+        setCaseFlags(data.case.flags || {});
       } else {
         setDraft(buildDefaultDraft());
+        setCaseFlags({});
         setError('Assignment not found or not visible under RLS.');
       }
     } catch {
       setDraft(buildDefaultDraft());
+      setCaseFlags({});
       setError('Assignment not found or not visible under RLS.');
     }
 
@@ -124,6 +131,15 @@ export const EmployeeCaseSummary: React.FC = () => {
   const ep = draft?.employeeProfile || {};
   const fm = draft?.familyMembers || {};
   const ac = draft?.assignmentContext || {};
+
+  const mobilityCaseId = useMemo(() => {
+    const q = searchParams.get('mcid')?.trim();
+    if (q) return q;
+    const fid = caseFlags.mobility_case_id;
+    if (typeof fid === 'string' && fid.trim()) return fid.trim();
+    const env = import.meta.env.VITE_DEMO_MOBILITY_CASE_ID as string | undefined;
+    return env?.trim() || null;
+  }, [searchParams, caseFlags]);
 
   const hasAnyData =
     (b.originCountry || b.originCity || b.destCountry || b.destCity || b.purpose || b.targetMoveDate != null) ||
@@ -198,6 +214,18 @@ export const EmployeeCaseSummary: React.FC = () => {
       )}
 
       {!isLoading && draft && (
+        <>
+        <div className="mb-6">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
+            Case status & next steps
+          </div>
+          <MobilityCasePanels
+            mobilityCaseId={mobilityCaseId}
+            relocationBasics={b}
+            familyMembers={fm}
+          />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-2">
             <SummarySection title="Relocation Basics">
@@ -246,6 +274,7 @@ export const EmployeeCaseSummary: React.FC = () => {
             </Card>
           </div>
         </div>
+        </>
       )}
 
       {!isLoading && draft && !hasAnyData && (

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, Button, Badge } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { adminAPI } from '../../api/client';
@@ -12,6 +13,8 @@ const ROLE_OPTIONS = [
 ];
 
 export const AdminUsers: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const urlSyncedRef = useRef(false);
   const [query, setQuery] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -43,6 +46,17 @@ export const AdminUsers: React.FC = () => {
     const res = await adminAPI.listCompanies();
     setCompanies(res.companies ?? []);
   };
+
+  useEffect(() => {
+    if (urlSyncedRef.current) return;
+    const cid = searchParams.get('company_id');
+    const ro = (searchParams.get('role') || '').trim().toLowerCase();
+    if (cid) setCompanyId(cid);
+    if (ro === 'employee' || ro === 'emp' || ro === 'employee_user') setRoleFilter('employee');
+    else if (ro === 'hr') setRoleFilter('hr');
+    else if (ro === 'admin') setRoleFilter('admin');
+    urlSyncedRef.current = true;
+  }, [searchParams]);
 
   useEffect(() => {
     loadCompanies().catch(() => undefined);

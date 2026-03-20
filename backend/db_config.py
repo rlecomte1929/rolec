@@ -4,6 +4,7 @@ Single source of truth for database configuration.
 - Local dev: Optionally load .env (override=False) so existing env vars win.
 """
 import os
+from typing import Any, Dict
 from urllib.parse import urlparse
 
 # ---------------------------------------------------------------------------
@@ -48,6 +49,21 @@ if (
     _raw_url = _raw_url + ("&" if "?" in _raw_url else "?") + "sslmode=require"
 
 DATABASE_URL: str = _raw_url
+
+
+def sqlalchemy_engine_kwargs(database_url: str) -> Dict[str, Any]:
+    """
+    SQLAlchemy create_engine kwargs: SQLite uses thread check; Postgres uses a small pool
+    with pre-ping and recycle to survive Supabase/managed-DB idle disconnects.
+    """
+    if database_url.startswith("sqlite"):
+        return {"connect_args": {"check_same_thread": False}}
+    return {
+        "pool_pre_ping": True,
+        "pool_size": int(os.getenv("SQLALCHEMY_POOL_SIZE", "5")),
+        "max_overflow": int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "10")),
+        "pool_recycle": int(os.getenv("SQLALCHEMY_POOL_RECYCLE", "280")),
+    }
 
 
 def get_masked_db_log_line() -> str:

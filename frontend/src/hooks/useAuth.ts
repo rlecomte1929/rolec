@@ -73,7 +73,11 @@ export const useAuth = () => {
 
   const register = async (payload: RegisterRequest) => {
     trackAuthPerf({ stage: 'sign_in_click' });
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackAuthPerf({ stage: 'auth_request_start' });
     const response = await authAPI.register(payload);
+    const authDur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+    trackAuthPerf({ stage: 'auth_request_end', durationMs: authDur });
     setSession(response.token, response.user);
     const rec = response.reconciliation;
     if (shouldPersistReconciliation(rec)) {
@@ -83,7 +87,11 @@ export const useAuth = () => {
         /* ignore */
       }
     }
+    const emailForSb = response.user.email ?? payload.email?.trim() ?? null;
     redirectByRole(response.user.role);
+    if (emailForSb && payload.password) {
+      void signInSupabase(emailForSb, payload.password);
+    }
     return response;
   };
 

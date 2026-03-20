@@ -23,6 +23,28 @@ export function formatDetailToString(detail: unknown, fallback = ''): string {
   return fallback || String(detail);
 }
 
+/**
+ * User-facing hint when axios has no HTTP response (timeout, CORS block, DNS, offline).
+ * Browsers often surface CORS failures as "Network Error" with status 0.
+ */
+export function getClientTransportErrorMessage(err: unknown): string | undefined {
+  const e = err as {
+    code?: string;
+    message?: string;
+    response?: { status?: number };
+  };
+  if (e?.code === 'ECONNABORTED') {
+    return 'Request timed out. The API may be cold-starting or overloaded — wait a moment and try again.';
+  }
+  if (!e?.response && typeof e?.message === 'string' && /network error/i.test(e.message)) {
+    return (
+      'Cannot reach the API (network or CORS). In production, confirm https://api.relopass.com/health ' +
+      'and that the API allows Origin https://relopass.com (see docs/PRODUCTION_RELIABILITY.md).'
+    );
+  }
+  return undefined;
+}
+
 export function getApiErrorCode(err: unknown): string | undefined {
   const ax = err as { response?: { data?: { detail?: unknown } } };
   const detail = ax?.response?.data?.detail;
