@@ -3699,7 +3699,7 @@ def claim_assignment(
             )
         # Same person (e.g. assignment has profile id, user logged in with user id): attach and proceed
 
-    case_id = assignment.get("case_id", "")
+    case_id = (assignment.get("case_id") or assignment.get("canonical_case_id") or "").strip()
     db.attach_employee_to_assignment(assignment_id, effective["id"])
     db.mark_invites_claimed(
         assignment.get("employee_identifier") or "",
@@ -3707,27 +3707,29 @@ def claim_assignment(
         assignment_id=assignment_id,
     )
     now_iso = datetime.utcnow().isoformat()
-    try:
-        db.ensure_case_participant(
-            case_id=case_id,
-            person_id=effective["id"],
-            role="relocatee",
-            joined_at=now_iso,
-        )
-    except Exception as exc:
-        log.warning(
-            "ensure_case_participant skipped assignment_id=%s case_id=%s role=relocatee error=%s",
-            assignment_id, case_id, str(exc),
-        )
+    if case_id:
+        try:
+            db.ensure_case_participant(
+                case_id=case_id,
+                person_id=effective["id"],
+                role="relocatee",
+                joined_at=now_iso,
+            )
+        except Exception as exc:
+            log.warning(
+                "ensure_case_participant skipped assignment_id=%s case_id=%s role=relocatee error=%s",
+                assignment_id, case_id, str(exc),
+            )
     event_type = "assignment.claimed"
     try:
-        db.insert_case_event(
-            case_id=assignment["case_id"],
-            assignment_id=assignment_id,
-            actor_principal_id=effective["id"],
-            event_type=event_type,
-            payload={},
-        )
+        if case_id:
+            db.insert_case_event(
+                case_id=case_id,
+                assignment_id=assignment_id,
+                actor_principal_id=effective["id"],
+                event_type=event_type,
+                payload={},
+            )
     except Exception as exc:
         log.warning(
             "insert_case_event skipped assignment_id=%s case_id=%s event_type=%s error=%s",

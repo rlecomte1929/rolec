@@ -1,5 +1,4 @@
-import { API_BASE_URL } from './client';
-import { supabase } from './supabase';
+import { apiGet, apiPost } from './client';
 import type {
   RelocationCase,
   RelocationCaseListItem,
@@ -25,82 +24,39 @@ const toTitleCase = (value: string) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
-const getSessionToken = async () => {
-  const { data } = await supabase.auth.getSession();
-  const token = data?.session?.access_token;
-  if (!token) {
-    throw new Error('Not authenticated');
-  }
-  return token;
-};
-
-const apiFetch = async <T>(path: string): Promise<T> => {
-  const token = await getSessionToken();
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!res.ok) {
-    if (res.status === 401) {
-      throw new Error('Not authenticated');
-    }
-    if (res.status === 404) {
-      throw new Error('Not found');
-    }
-    throw new Error('Unable to reach the server. Please check your connection and try again.');
-  }
-  return res.json() as Promise<T>;
-};
-
-const apiPost = async <T>(path: string): Promise<T> => {
-  const token = await getSessionToken();
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!res.ok) {
-    if (res.status === 401) {
-      throw new Error('Not authenticated');
-    }
-    if (res.status === 404) {
-      throw new Error('Not found');
-    }
-    throw new Error('Unable to reach the server. Please check your connection and try again.');
-  }
-  return res.json() as Promise<T>;
-};
-
+/**
+ * ReloPass wizard + requirements use the main API with the ReloPass session token.
+ * (Supabase JWT-only relocation routes do not see HR-created cases in Postgres.)
+ */
 export const listRelocationCases = async (): Promise<RelocationCaseListItem[]> => {
-  return apiFetch<RelocationCaseListItem[]>('/api/relocation/cases');
+  return apiGet<RelocationCaseListItem[]>('/api/relocation/cases');
 };
 
 export const getRelocationCase = async (caseId: string): Promise<RelocationCase> => {
-  return apiFetch<RelocationCase>(`/api/relocation/case/${caseId}`);
+  return apiGet<RelocationCase>(`/api/relocation/case/${encodeURIComponent(caseId)}`);
 };
 
 export const getRelocationRuns = async (caseId: string): Promise<RelocationRun[]> => {
-  return apiFetch<RelocationRun[]>(`/api/relocation/case/${caseId}/runs`);
+  return apiGet<RelocationRun[]>(`/api/relocation/case/${encodeURIComponent(caseId)}/runs`);
 };
 
 export const classifyRelocationCase = async (
   caseId: string
 ): Promise<{ case_id: string; classification: CaseClassification }> => {
   return apiPost<{ case_id: string; classification: CaseClassification }>(
-    `/api/relocation/case/${caseId}/classify`
+    `/api/relocation/case/${encodeURIComponent(caseId)}/classify`
   );
 };
 
 export const getRelocationCaseClassification = async (
   caseId: string
 ): Promise<{ case_id: string; classification: CaseClassification; version: number; created_at: string }> => {
-  return apiFetch<{ case_id: string; classification: CaseClassification; version: number; created_at: string }>(
-    `/api/relocation/case/${caseId}/classification`
-  );
+  return apiGet<{
+    case_id: string;
+    classification: CaseClassification;
+    version: number;
+    created_at: string;
+  }>(`/api/relocation/case/${encodeURIComponent(caseId)}/classification`);
 };
 
 export const buildNextActionsFromMissingFields = (missingFields: string[]): NextAction[] => {

@@ -9,7 +9,7 @@ from ..services.relocation_classification import (
 )
 from ..services.relocation_profile import compute_missing_fields
 from ..services.supabase_client import get_supabase_client
-from .relocation import _extract_bearer_token, _is_permission_error
+from .relocation import _extract_bearer_token, _is_permission_error, build_relocation_case_payload_relopass, looks_like_supabase_jwt
 
 router = APIRouter(prefix="/api/relocation", tags=["relocation"])
 
@@ -52,6 +52,20 @@ def _get_case(client, case_id: str) -> Dict[str, Any]:
 
 @router.post("/case/{case_id}/classify")
 def classify_relocation_case(case_id: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.replace("Bearer ", "").strip()
+    if not looks_like_supabase_jwt(token):
+        bundle = build_relocation_case_payload_relopass(case_id, token)
+        profile = bundle.get("profile") or {}
+        missing_fields = bundle.get("missing_fields") or compute_missing_fields(profile)
+        input_payload = {"profile": profile, "missing_fields": missing_fields}
+        output_payload = compute_case_classification({**profile, "missing_fields": missing_fields})
+        return {
+            "case_id": bundle.get("id") or case_id,
+            "classification": output_payload,
+        }
+
     client = _get_client(authorization)
     case_row = _get_case(client, case_id)
     profile = _safe_parse_profile(case_row.get("profile_json"))

@@ -14,10 +14,158 @@ from ..services.relocation_classification import (
     persist_case_classification,
 )
 from ..services.supabase_client import get_supabase_client
+from ..database import db as _rp_db
 
 router = APIRouter(prefix="/relocation", tags=["relocation"])
 api_router = APIRouter(prefix="/api/relocation", tags=["relocation"])
 logger = logging.getLogger(__name__)
+
+
+def looks_like_supabase_jwt(token: str) -> bool:
+    """ReloPass session tokens are UUIDs; Supabase access tokens are JWTs (three dot-separated segments)."""
+    parts = token.split(".")
+    return len(parts) == 3 and min(len(p) for p in parts) >= 4
+
+
+def _profile_from_wizard_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
+    """Map wizard Case draft into relocation_profile.compute_missing_fields shape."""
+    basics = draft.get("relocationBasics") or {}
+    ac = draft.get("assignmentContext") or {}
+    out: Dict[str, Any] = {}
+    oc = basics.get("originCountry") or basics.get("origin_country")
+    dc = (
+        basics.get("destCountry")
+        or basics.get("destination_country")
+        or basics.get("hostCountry")
+        or basics.get("host_country")
+    )
+    if oc:
+        out["origin_country"] = oc
+    if dc:
+        out["destination_country"] = dc
+    md = basics.get("targetMoveDate") or basics.get("move_date")
+    if md:
+        out["move_date"] = md
+    et = basics.get("employmentType") or basics.get("employment_type")
+    if et:
+        out["employment_type"] = et
+    ec = ac.get("employerCountry") or ac.get("employer_country") or basics.get("employerCountry")
+    if ec:
+        out["employer_country"] = ec
+    if basics.get("worksRemote") is not None:
+        out["works_remote"] = basics.get("worksRemote")
+    if basics.get("hasCorporateTaxSupport") is not None:
+        out["has_corporate_tax_support"] = basics.get("hasCorporateTaxSupport")
+    return out
+
+
+def _relopass_can_access_assignment(user: Dict[str, Any], assignment: Dict[str, Any]) -> bool:
+    role = (user.get("role") or "").upper()
+    uid = str(user.get("id") or "").strip()
+    if role == "ADMIN":
+        return True
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    if role == "EMPLOYEE":
+        if emp_id and str(emp_id).strip() == uid:
+            return True
+        if not emp_id:
+            ident = (assignment.get("employee_identifier") or "").strip().lower()
+            ids = [x.lower() for x in [user.get("email"), user.get("username")] if x]
+            return bool(ident and ids and ident in ids)
+        return False
+    if role == "HR":
+        return bool(hr_id and str(hr_id).strip() == uid)
+    return False
+
+
+def _resolve_assignment_for_relocation_route(route_id: str) -> Optional[Dict[str, Any]]:
+    a = _rp_db.get_assignment_by_id(route_id)
+    if a:
+        return a
+    return _rp_db.get_assignment_by_case_id(route_id)
+
+
+def build_relocation_case_payload_relopass(route_case_id: str, relopass_token: str) -> Dict[str, Any]:
+    """
+    Build the same JSON shape as Supabase GET /case/{id} using main DB + wizard_cases draft.
+    route_case_id may be assignment id or relocation/wizard case id.
+    """
+    from ..app.db import SessionLocal
+    from ..app import crud as app_crud
+
+    user = _rp_db.get_user_by_token(relopass_token.strip())
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    assignment = _resolve_assignment_for_relocation_route(route_case_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if not _relopass_can_access_assignment(user, assignment):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    actual_case_id = (assignment.get("canonical_case_id") or assignment.get("case_id") or "").strip()
+    if not actual_case_id:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    profile: Dict[str, Any] = {}
+    rc = _rp_db.get_case_by_id(actual_case_id)
+    status = None
+    stage_db = None
+    home_country = None
+    host_country = None
+    created_at = None
+    updated_at = None
+    if rc:
+        status = rc.get("status")
+        stage_db = rc.get("stage")
+        home_country = rc.get("home_country")
+        host_country = rc.get("host_country")
+        created_at = rc.get("created_at")
+        updated_at = rc.get("updated_at")
+        pj = _safe_parse_profile(rc.get("profile_json"))
+        for k, v in pj.items():
+            if v is not None and v != "":
+                profile[k] = v
+
+    with SessionLocal() as session:
+        wc = app_crud.get_case(session, actual_case_id)
+        if not wc:
+            wc = app_crud.create_case(
+                session,
+                actual_case_id,
+                {
+                    "relocationBasics": {},
+                    "employeeProfile": {},
+                    "familyMembers": {},
+                    "assignmentContext": {},
+                },
+            )
+        draft = json.loads(wc.draft_json or "{}")
+        wprof = _profile_from_wizard_draft(draft)
+        for k, v in wprof.items():
+            if v is not None and v != "" and not profile.get(k):
+                profile[k] = v
+        if wc.updated_at is not None:
+            ua = wc.updated_at.isoformat() if hasattr(wc.updated_at, "isoformat") else str(wc.updated_at)
+            if not updated_at:
+                updated_at = ua
+
+    missing_fields = compute_missing_fields(profile)
+    stage = stage_db or ("incomplete" if missing_fields else "complete")
+
+    return {
+        "id": actual_case_id,
+        "status": status or "draft",
+        "stage": stage,
+        "home_country": home_country,
+        "host_country": host_country,
+        "profile": profile,
+        "missing_fields": missing_fields,
+        "created_at": created_at,
+        "updated_at": updated_at,
+    }
 
 
 def _extract_bearer_token(authorization: Optional[str]) -> str:
@@ -291,6 +439,12 @@ def list_relocation_cases(authorization: Optional[str] = Header(None)):
 
 @api_router.get("/case/{case_id}")
 def get_relocation_case(case_id: str, authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.replace("Bearer ", "").strip()
+    if not looks_like_supabase_jwt(token):
+        return build_relocation_case_payload_relopass(case_id, token)
+
     client, _ = _get_supabase_client_from_header(authorization)
     result = (
         client.table("relocation_cases")
