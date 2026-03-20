@@ -4,9 +4,9 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { Alert, Card } from '../../components/antigravity';
+import { Alert, Card, LoadingButton } from '../../components/antigravity';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { employeeAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
@@ -74,11 +74,13 @@ function caseToWizardDraft(caseData: CaseDTO | null): CaseDraftDTO {
 }
 
 export const EmployeeCaseSummary: React.FC = () => {
+  const navigate = useNavigate();
   const { caseId } = useParams<{ caseId: string }>();
   const assignmentId = caseId;
   const [draft, setDraft] = useState<CaseDraftDTO | null>(null);
   const [feedback, setFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [wizardNavLoading, setWizardNavLoading] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -132,21 +134,31 @@ export const EmployeeCaseSummary: React.FC = () => {
   return (
     <AppShell title="My Case" subtitle="Summary of your intake responses.">
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <Link
-          to={assignmentId ? `/employee/case/${assignmentId}/wizard/1` : '/employee/journey'}
-          className="inline-flex items-center justify-center font-medium rounded-lg px-4 py-2 border-2 border-[#0b2b43] text-[#0b2b43] hover:bg-[#e6f2f4] transition-colors"
+        <LoadingButton
+          variant="outline"
+          loading={wizardNavLoading}
+          loadingLabel="Opening wizard…"
+          onClick={async () => {
+            setWizardNavLoading(true);
+            await new Promise((r) => setTimeout(r, 120));
+            if (assignmentId) {
+              navigate(`/employee/case/${assignmentId}/wizard/1`);
+            } else {
+              navigate('/employee/journey');
+            }
+          }}
         >
           Continue editing
-        </Link>
+        </LoadingButton>
         {assignmentId && (
-          <button
-            type="button"
+          <LoadingButton
+            variant="outline"
+            loading={isLoading}
+            loadingLabel="Refreshing…"
             onClick={() => load()}
-            disabled={isLoading}
-            className="inline-flex items-center justify-center font-medium rounded-lg px-4 py-2 border border-[#6b7280] text-[#6b7280] hover:bg-[#f3f4f6] disabled:opacity-50 transition-colors"
           >
-            {isLoading ? 'Loading…' : 'Refresh'}
-          </button>
+            Refresh
+          </LoadingButton>
         )}
       </div>
 
@@ -158,13 +170,28 @@ export const EmployeeCaseSummary: React.FC = () => {
           )}
         </Alert>
       )}
-      {isLoading && <div className="text-sm text-[#6b7280]">Loading your case...</div>}
+      {isLoading && (
+        <div className="space-y-4 mb-6" aria-busy="true">
+          <div className="text-sm font-medium text-[#0b2b43]">Loading your saved case data…</div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
+            <div className="lg:col-span-2 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-24 rounded-lg bg-[#e2e8f0]" />
+              ))}
+            </div>
+            <div className="h-40 rounded-lg bg-[#e2e8f0]" />
+          </div>
+        </div>
+      )}
 
-      {!isLoading && draft && assignmentId && (
+      {assignmentId && (
         <div className="mb-6">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
+            Relocation plan
+          </div>
           <RelocationTaskTracker
             assignmentId={assignmentId}
-            ensureDefaults
+            deferredEnsureWhenEmpty
             title="Your relocation plan & actions"
           />
         </div>

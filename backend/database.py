@@ -254,40 +254,64 @@ class Database:
         log.info("DB healthcheck: scheme=%s host=%s", info.get("db_url_scheme"), host)
         conn.execute(text("SELECT 1"))
 
-    def _maybe_ensure_postgres_canonical_identity_schema(self) -> None:
+    def _maybe_ensure_postgres_missing_schemas(self) -> None:
         """
-        If `public.employee_contacts` is missing (migrations not applied but app is deployed),
-        create canonical identity tables + indexes idempotently.
+        If core public tables are missing (migrations not applied), apply idempotent DDL.
 
-        Matches supabase/migrations/20260320120000_* and follow-ups; safe when tables already exist.
+        Covers: employee_contacts / claim invites (identity) and case_milestones / milestone_links (timeline).
         """
         if _is_sqlite:
             return
+        need_identity = False
+        need_timeline = False
         try:
             with self.engine.connect() as c:
-                row = c.execute(
+                r1 = c.execute(
                     text(
                         "SELECT 1 FROM information_schema.tables "
                         "WHERE table_schema = 'public' AND table_name = 'employee_contacts'"
                     )
                 ).fetchone()
-            if row:
-                return
+                r2 = c.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = 'case_milestones'"
+                    )
+                ).fetchone()
+                r3 = c.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = 'milestone_links'"
+                    )
+                ).fetchone()
+            need_identity = not r1
+            need_timeline = not r2 or not r3
         except Exception as ex:
-            log.warning("identity schema presence check skipped: %s", ex)
+            log.warning("postgres schema presence check skipped: %s", ex)
             return
-        log.info(
-            "public.employee_contacts missing — applying canonical identity DDL (idempotent). "
-            "Prefer running Supabase migrations for production."
-        )
+        if not need_identity and not need_timeline:
+            return
+        if need_identity:
+            log.info(
+                "public.employee_contacts missing — applying canonical identity DDL (idempotent). "
+                "Prefer running Supabase migrations for production."
+            )
+        if need_timeline:
+            log.info(
+                "public.case_milestones and/or milestone_links missing — applying timeline DDL (idempotent). "
+                "Prefer running Supabase migrations for production."
+            )
         try:
             with self.engine.begin() as conn:
-                self._ensure_postgres_canonical_identity_schema(conn)
+                if need_identity:
+                    self._ensure_postgres_canonical_identity_schema(conn)
+                if need_timeline:
+                    self._ensure_postgres_case_milestones_schema(conn)
         except Exception:
-            log.exception("Failed to ensure postgres canonical identity schema")
+            log.exception("Failed to ensure postgres missing schemas")
 
     def _ensure_postgres_canonical_identity_schema(self, conn) -> None:
-        """Run inside a transaction; Postgres only. See _maybe_ensure_postgres_canonical_identity_schema."""
+        """Run inside a transaction; Postgres only. See _maybe_ensure_postgres_missing_schemas."""
         conn.execute(
             text(
                 """
@@ -436,12 +460,98 @@ class Database:
         except (OperationalError, ProgrammingError) as ex:
             log.warning("assignment_claim_invites RLS/policy skipped: %s", ex)
 
+    def _ensure_postgres_case_milestones_schema(self, conn) -> None:
+        """Postgres timeline tables (text ids, aligned with app inserts). See supabase/migrations/20260325000000_*."""
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS public.case_milestones (
+                  id text PRIMARY KEY,
+                  case_id text NOT NULL,
+                  canonical_case_id text,
+                  milestone_type text NOT NULL,
+                  title text NOT NULL,
+                  description text,
+                  target_date date,
+                  actual_date date,
+                  status text NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending','in_progress','done','skipped','overdue','blocked')),
+                  sort_order int NOT NULL DEFAULT 0,
+                  created_at timestamptz NOT NULL DEFAULT now(),
+                  updated_at timestamptz NOT NULL DEFAULT now(),
+                  owner text NOT NULL DEFAULT 'joint',
+                  criticality text NOT NULL DEFAULT 'normal',
+                  notes text
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_case_milestones_case_id "
+                "ON public.case_milestones(case_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_case_milestones_canonical "
+                "ON public.case_milestones(canonical_case_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_case_milestones_sort "
+                "ON public.case_milestones(case_id, sort_order)"
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS public.milestone_links (
+                  id text PRIMARY KEY,
+                  milestone_id text NOT NULL REFERENCES public.case_milestones(id) ON DELETE CASCADE,
+                  linked_entity_type text NOT NULL,
+                  linked_entity_id text NOT NULL,
+                  created_at timestamptz NOT NULL DEFAULT now()
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_milestone_links_milestone "
+                "ON public.milestone_links(milestone_id)"
+            )
+        )
+        try:
+            conn.execute(text("ALTER TABLE public.case_milestones ENABLE ROW LEVEL SECURITY"))
+            conn.execute(text("DROP POLICY IF EXISTS case_milestones_all ON public.case_milestones"))
+            conn.execute(
+                text(
+                    "CREATE POLICY case_milestones_all ON public.case_milestones "
+                    "FOR ALL TO service_role USING (true) WITH CHECK (true)"
+                )
+            )
+        except (OperationalError, ProgrammingError) as ex:
+            log.warning("case_milestones RLS/policy skipped: %s", ex)
+        try:
+            conn.execute(text("ALTER TABLE public.milestone_links ENABLE ROW LEVEL SECURITY"))
+            conn.execute(text("DROP POLICY IF EXISTS milestone_links_all ON public.milestone_links"))
+            conn.execute(
+                text(
+                    "CREATE POLICY milestone_links_all ON public.milestone_links "
+                    "FOR ALL TO service_role USING (true) WITH CHECK (true)"
+                )
+            )
+        except (OperationalError, ProgrammingError) as ex:
+            log.warning("milestone_links RLS/policy skipped: %s", ex)
+
     # ------------------------------------------------------------------
     # Schema creation
     # ------------------------------------------------------------------
     def init_db(self) -> None:
         if not _is_sqlite:
-            self._maybe_ensure_postgres_canonical_identity_schema()
+            self._maybe_ensure_postgres_missing_schemas()
 
         # In production (Render), avoid runtime DDL. Use Supabase migrations instead.
         if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { Button, Card } from '../../components/antigravity';
+import { Button, Card, LoadingButton } from '../../components/antigravity';
 import { PackageSummary } from '../../features/recommendations/PackageSummary';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
@@ -48,9 +48,18 @@ export const ServicesEstimate: React.FC = () => {
         onStartOver={() => navigate('/services')}
       />
       <div className="mt-6 flex items-center justify-end">
-        <Button onClick={() => navigate('/services/rfq/new')} disabled={!hasShortlist}>
+        <LoadingButton
+          loading={rfqNavLoading}
+          loadingLabel="Opening next step…"
+          disabled={!hasShortlist}
+          onClick={async () => {
+            setRfqNavLoading(true);
+            await new Promise((r) => setTimeout(r, 120));
+            navigate('/services/rfq/new');
+          }}
+        >
           Request quotations
-        </Button>
+        </LoadingButton>
       </div>
     </AppShell>
   );

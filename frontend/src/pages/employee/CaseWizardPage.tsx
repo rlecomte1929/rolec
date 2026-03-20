@@ -181,6 +181,7 @@ export const CaseWizardPage: React.FC = () => {
   const [hrRequestedSections, setHrRequestedSections] = useState<string[]>([]);
   const [caseFeedback, setCaseFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [caseHydrating, setCaseHydrating] = useState(() => Boolean(assignmentIdFromRoute));
   const userEmail = getAuthItem('relopass_email') || getAuthItem('relopass_username') || '';
   const enableTestFill =
     import.meta.env.DEV || userEmail.endsWith('@relopass.com');
@@ -230,8 +231,12 @@ export const CaseWizardPage: React.FC = () => {
     }
   }, [assignmentId, currentStep, stepCompletion.maxUnlocked, navigate]);
 
-  const loadCase = async () => {
-    if (!assignmentIdFromRoute) return;
+  const loadCase = useCallback(async () => {
+    if (!assignmentIdFromRoute) {
+      setCaseHydrating(false);
+      return;
+    }
+    setCaseHydrating(true);
     try {
       const { data, error: loadError } = await getCaseDetailsByAssignmentId(assignmentIdFromRoute);
       if (loadError || !data) {
@@ -249,8 +254,10 @@ export const CaseWizardPage: React.FC = () => {
       setDraft(buildDefaultDraft());
       setResolvedCaseId(null);
       setError('Assignment not found or not visible under RLS.');
+    } finally {
+      setCaseHydrating(false);
     }
-  };
+  }, [assignmentIdFromRoute]);
 
   const loadRequirements = useCallback(async () => {
     const caseIdForReq = resolvedCaseId || assignmentIdFromRoute;
@@ -267,12 +274,12 @@ export const CaseWizardPage: React.FC = () => {
   }, [resolvedCaseId, assignmentIdFromRoute]);
 
   useEffect(() => {
-    loadCase();
-  }, [assignmentIdFromRoute]);
+    void loadCase();
+  }, [loadCase]);
 
   useEffect(() => {
-    if (resolvedCaseId || assignmentIdFromRoute) loadRequirements();
-  }, [resolvedCaseId, assignmentIdFromRoute, loadRequirements]);
+    if (resolvedCaseId) void loadRequirements();
+  }, [resolvedCaseId, loadRequirements]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -586,7 +593,23 @@ export const CaseWizardPage: React.FC = () => {
               <button className="mt-3 text-xs text-[#0b2b43] underline">Contact support</button>
             </Card>
           </div>
-          <div>{stepNode}</div>
+          <div>
+            {caseHydrating ? (
+              <Card padding="lg" className="min-h-[280px]">
+                <div className="text-sm font-medium text-[#0b2b43] mb-1">Restoring your answers…</div>
+                <p className="text-xs text-[#6b7280] mb-4">
+                  Loading saved progress for this assignment. You can move through steps once data is ready.
+                </p>
+                <div className="space-y-3 animate-pulse" aria-hidden>
+                  <div className="h-10 rounded-md bg-[#e2e8f0]" />
+                  <div className="h-10 rounded-md bg-[#e2e8f0]" />
+                  <div className="h-36 rounded-md bg-[#e2e8f0]" />
+                </div>
+              </Card>
+            ) : (
+              stepNode
+            )}
+          </div>
         </div>
       </div>
     </AppShell>

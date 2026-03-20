@@ -82,6 +82,8 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
   const [suggestionSources, setSuggestionSources] = useState<Array<{ title?: string; url: string; snippet?: string }>>([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [approvedMissingFields, setApprovedMissingFields] = useState<string[]>([]);
+  const [sufficiencyLoading, setSufficiencyLoading] = useState(false);
+  const [sufficiencyMessage, setSufficiencyMessage] = useState<string | null>(null);
   const errorRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -106,14 +108,29 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
 
   useEffect(() => {
     if (!caseId) return;
-    requirementsAPI.getSufficiency(caseId)
+    setSufficiencyLoading(true);
+    setSufficiencyMessage(null);
+    requirementsAPI
+      .getSufficiency(caseId)
       .then((res) => {
         const missing = Array.isArray(res.missing_fields) ? res.missing_fields : [];
         setApprovedMissingFields(missing);
+        const status = res?.compute_status;
+        if (status && status !== 'ok') {
+          setSufficiencyMessage(
+            typeof res?.message === 'string' && res.message.trim()
+              ? res.message
+              : 'Recommendations will be calculated after your relocation preferences are saved.'
+          );
+        }
       })
       .catch(() => {
         setApprovedMissingFields([]);
-      });
+        setSufficiencyMessage(
+          'We could not calculate this yet — more information is required, or the service is temporarily unavailable.'
+        );
+      })
+      .finally(() => setSufficiencyLoading(false));
   }, [caseId]);
 
   useEffect(() => {
@@ -338,6 +355,16 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
         >
           View Country Requirements DB
         </button>
+      )}
+
+      {(sufficiencyLoading || sufficiencyMessage) && (
+        <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">
+          {sufficiencyLoading ? (
+            <span>Calculating recommendations against destination requirements…</span>
+          ) : (
+            <span>{sufficiencyMessage}</span>
+          )}
+        </div>
       )}
 
       <div className="mt-6 space-y-6">

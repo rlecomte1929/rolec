@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
-import { employeeAPI, servicesAPI } from '../../api/client';
+import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
+import { buildRoute } from '../../navigation/routes';
 
 const SERVICE_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -21,7 +22,6 @@ export const ServicesRfqNew: React.FC = () => {
   const { assignmentId } = useEmployeeAssignment();
   const [caseId, setCaseId] = useState<string | null>(null);
   const [caseLoading, setCaseLoading] = useState(true);
-  const [error, setError] = useState('');
   const [notes, setNotes] = useState<Record<string, string>>({});
 
   const shortlisted = useMemo(() => {
@@ -81,8 +81,8 @@ export const ServicesRfqNew: React.FC = () => {
     <AppShell title="RFQ builder" subtitle="Generate quotation requests for shortlisted vendors.">
       <Card padding="lg" className="space-y-4">
         {caseLoading && (
-          <Alert variant="info" title="Loading…">
-            Loading case information…
+          <Alert variant="info" title="Loading your case">
+            <p className="text-sm text-[#374151]">Hang on — we&apos;re loading your case details…</p>
           </Alert>
         )}
         {!caseLoading && !caseId && (
@@ -93,15 +93,37 @@ export const ServicesRfqNew: React.FC = () => {
             </Button>
           </Alert>
         )}
-        <Alert variant="info" title="Coming soon">
-          <p>
-            Request for quotations is coming soon. You can build your shortlist and review estimates now.
+        <Card padding="lg" className="border border-[#bfdbfe] bg-[#f8fafc]">
+          <h3 className="text-base font-semibold text-[#0b2b43] mb-2">Quotation requests — coming soon</h3>
+          <p className="text-sm text-[#374151] mb-4">
+            Sending RFQs to vendors isn&apos;t turned on yet. Your shortlist and budget review are saved; you don&apos;t
+            need to do anything on this page right now.
           </p>
-        </Alert>
-        {error && !hasRfqBlockingError && <Alert variant="error">{error}</Alert>}
-
-        <p className="text-sm text-[#6b7280]">
-          Add optional notes for each vendor. Click Send RFQ when ready.
+          <p className="text-sm font-semibold text-[#0b2b43] mb-2">What to do next</p>
+          <ul className="text-sm text-[#374151] list-disc list-inside space-y-2 mb-5">
+            <li>
+              Open the <strong>Resources</strong> tab (top navigation) for country guides, checklists, and what to
+              prepare while you wait on visas, housing, and schools.
+            </li>
+            <li>
+              Review <strong>My Case</strong> for your intake summary and <strong>HR Policy</strong> for benefit caps.
+            </li>
+            <li>Return here later when RFQ sending is available — your shortlisted providers will still be listed below.</li>
+          </ul>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              to={buildRoute('resources')}
+              className="inline-flex items-center justify-center font-medium rounded-lg px-4 py-2.5 bg-[#0b2b43] text-white hover:bg-[#123651] transition-colors"
+            >
+              Explore Resources
+            </Link>
+            <Button variant="outline" onClick={() => navigate('/services/recommendations')}>
+              Back to recommendations
+            </Button>
+          </div>
+        </Card>
+        <p className="text-sm text-[#6b7280] mt-6">
+          Your shortlisted vendors (for when RFQs go live):
         </p>
         {shortlisted.map(({ service, vendor }) => (
           <div key={`${service}-${vendor.item_id}`} className="border border-[#e2e8f0] rounded-lg p-4">
@@ -110,7 +132,7 @@ export const ServicesRfqNew: React.FC = () => {
               Service: {SERVICE_LABELS[service] || service}
             </div>
             <Input
-              label="Optional note"
+              label="Optional note (saved for later)"
               value={notes[vendor.item_id] || ''}
               onChange={(val) => setNotes((prev) => ({ ...prev, [vendor.item_id]: val }))}
               placeholder="e.g. Moving date, special requirements…"
@@ -118,34 +140,9 @@ export const ServicesRfqNew: React.FC = () => {
             />
           </div>
         ))}
-        <div className="flex justify-end">
-          <Button
-            onClick={async () => {
-              if (!caseId) {
-                setError('Missing case information. Complete case setup and retry.');
-                return;
-              }
-              setError('');
-              try {
-                const items = shortlisted.map(({ service, vendor }) => ({
-                  service_key: service,
-                  requirements: { note: notes[vendor.item_id] || '' },
-                }));
-                const supplierIds = shortlisted.map(({ vendor }) => vendor.item_id);
-                await servicesAPI.createRfq(caseId, items, supplierIds);
-                navigate('/quotes');
-              } catch (err: unknown) {
-                const detail =
-                  err && typeof err === 'object' && 'response' in err
-                    ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-                    : undefined;
-                const msg = typeof detail === 'string' ? detail : (err as Error)?.message || 'Unable to send RFQ';
-                setError(msg);
-              }
-            }}
-            disabled
-          >
-            Coming soon
+        <div className="flex justify-end mt-4">
+          <Button type="button" variant="outline" disabled title="RFQ sending is not available yet">
+            Send RFQs (not available yet)
           </Button>
         </div>
       </Card>

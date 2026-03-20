@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Card, Button, Badge } from '../../components/antigravity';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Card, Button, Badge, LoadingButton } from '../../components/antigravity';
 import {
   timelineAPI,
   type TimelineMilestone,
@@ -77,16 +77,26 @@ const emptySummary: TimelineTaskSummary = {
 
 export interface RelocationTaskTrackerProps {
   assignmentId: string;
+  /** HR / flows that should persist default milestones on first load. */
   ensureDefaults?: boolean;
+  /**
+   * Employee My Case: first fetch is read-only; one deferred ensure if still empty (session-scoped).
+   */
+  deferredEnsureWhenEmpty?: boolean;
   /** Shown in card header */
   title?: string;
   /** When embedded under a page section title, hide duplicate H3 */
   hideMainTitle?: boolean;
 }
 
+function timelineEnsureSessionKey(aid: string) {
+  return `rolec_timeline_ensured:${aid}`;
+}
+
 export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
   assignmentId,
-  ensureDefaults = true,
+  ensureDefaults = false,
+  deferredEnsureWhenEmpty = false,
   title = 'Relocation plan & actions',
   hideMainTitle = false,
 }) => {
@@ -98,41 +108,69 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
+  const deferredRanForAssignment = useRef<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!assignmentId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await timelineAPI.getByAssignment(assignmentId, {
-        ensureDefaults,
-        includeLinks: false,
-      });
-      setCaseId(data.case_id);
-      const ms = data.milestones || [];
-      setMilestones(ms);
-      setSummary(data.summary ?? emptySummary);
-      setSelectedId((prev) => {
-        if (!ms.length) return null;
-        if (prev && ms.some((m) => m.id === prev)) return prev;
-        return sortTasksForTracker(ms)[0]?.id ?? null;
-      });
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-          : (err as Error)?.message;
-      setError(String(msg || 'Failed to load tasks'));
-      setMilestones([]);
-      setSummary(emptySummary);
-    } finally {
-      setLoading(false);
-    }
-  }, [assignmentId, ensureDefaults]);
+  const load = useCallback(
+    async (opts?: { forceEnsure?: boolean }) => {
+      if (!assignmentId) return;
+      setLoading(true);
+      setError(null);
+      const useEnsure = deferredEnsureWhenEmpty
+        ? Boolean(opts?.forceEnsure)
+        : Boolean(ensureDefaults);
+      try {
+        const data = await timelineAPI.getByAssignment(assignmentId, {
+          ensureDefaults: useEnsure,
+          includeLinks: false,
+        });
+        setCaseId(data.case_id);
+        const ms = data.milestones || [];
+        setMilestones(ms);
+        setSummary(data.summary ?? emptySummary);
+        setSelectedId((prev) => {
+          if (!ms.length) return null;
+          if (prev && ms.some((m) => m.id === prev)) return prev;
+          return sortTasksForTracker(ms)[0]?.id ?? null;
+        });
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === 'object' && 'response' in err
+            ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+            : (err as Error)?.message;
+        setError(String(msg || 'Failed to load tasks'));
+        setMilestones([]);
+        setSummary(emptySummary);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [assignmentId, deferredEnsureWhenEmpty, ensureDefaults]
+  );
 
   useEffect(() => {
-    load();
+    deferredRanForAssignment.current = null;
+    void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!deferredEnsureWhenEmpty || loading || milestones.length > 0) return;
+    if (deferredRanForAssignment.current === assignmentId) return;
+    const key = timelineEnsureSessionKey(assignmentId);
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(key)) {
+      return;
+    }
+    const t = window.setTimeout(() => {
+      deferredRanForAssignment.current = assignmentId;
+      void load({ forceEnsure: true }).then(() => {
+        try {
+          sessionStorage.setItem(key, '1');
+        } catch {
+          // ignore quota / private mode
+        }
+      });
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [deferredEnsureWhenEmpty, loading, milestones.length, assignmentId, load]);
 
   const sorted = useMemo(() => sortTasksForTracker(milestones), [milestones]);
   const selected = milestones.find((m) => m.id === selectedId);
@@ -182,7 +220,16 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
   if (loading && milestones.length === 0) {
     return (
       <Card padding="lg">
-        <div className="text-sm text-[#6b7280]">Loading relocation plan…</div>
+        <div className="text-sm text-[#6b7280]">
+          {deferredEnsureWhenEmpty
+            ? 'Loading your relocation plan…'
+            : 'Loading relocation plan…'}
+        </div>
+        {deferredEnsureWhenEmpty && (
+          <p className="text-xs text-[#94a3b8] mt-2">
+            Timeline will appear after we load your case. Default tasks may be created once if none exist yet.
+          </p>
+        )}
       </Card>
     );
   }
@@ -191,9 +238,21 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
     return (
       <Card padding="lg">
         <div className="text-sm text-red-600">{error}</div>
-        <Button variant="outline" size="sm" className="mt-2" onClick={load}>
+        {deferredEnsureWhenEmpty && (
+          <p className="text-xs text-[#64748b] mt-2">
+            Timeline will appear after basic case details are completed. You can retry or create a default plan below.
+          </p>
+        )}
+        <LoadingButton
+          variant="outline"
+          size="sm"
+          className="mt-2"
+          loading={loading}
+          loadingLabel="Retrying…"
+          onClick={() => void load({ forceEnsure: true })}
+        >
           Retry
-        </Button>
+        </LoadingButton>
       </Card>
     );
   }
@@ -203,7 +262,12 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
       <Card padding="lg">
         <h3 className="text-base font-semibold text-[#0b2b43] mb-2">{title}</h3>
         <div className="text-sm text-[#6b7280]">No tasks yet.</div>
-        <Button variant="outline" size="sm" className="mt-2" onClick={() => load()}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-2"
+          onClick={() => void load({ forceEnsure: true })}
+        >
           Create default plan
         </Button>
       </Card>

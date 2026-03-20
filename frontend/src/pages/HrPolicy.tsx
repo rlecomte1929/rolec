@@ -10,34 +10,86 @@ import { HrPolicyReviewWorkspace } from '../features/policy/HrPolicyReviewWorksp
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
 
+/** Aligned with EmployeeResolvedPolicyView local shape */
+type EmployeeResolvedPolicySnapshot = {
+  has_policy?: boolean;
+  policy: { id: string; title: string; version: number; effective_date: string; company_name?: string | null } | null;
+  benefits: Array<{
+    benefit_key: string;
+    included: boolean;
+    min_value?: number | null;
+    standard_value?: number | null;
+    max_value?: number | null;
+    currency?: string;
+    amount_unit?: string;
+    frequency?: string;
+    approval_required: boolean;
+    evidence_required_json?: string[];
+    exclusions_json?: Array<{ domain?: string; description?: string }>;
+    condition_summary?: string;
+  }>;
+  exclusions: Array<{ benefit_key?: string; domain: string; description?: string }>;
+  resolved_at?: string;
+  resolution_context?: {
+    assignment_type?: string;
+    family_status?: string;
+    tier?: string;
+  };
+  message?: string;
+};
+
 function EmployeePolicyContent() {
-  const [assignmentId, setAssignmentId] = useState<string | null>(null);
+  const [pack, setPack] = useState<Awaited<ReturnType<typeof employeeAPI.getMyAssignmentPackagePolicy>> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError('');
     employeeAPI
-      .getCurrentAssignment()
+      .getMyAssignmentPackagePolicy()
       .then((res) => {
-        if (!cancelled && res?.assignment?.id) setAssignmentId(res.assignment.id);
+        if (!cancelled) setPack(res);
       })
-      .catch((err: unknown) => {
-        if (!cancelled && (err as { response?: { status?: number } })?.response?.status !== 401) {
-          setError('Unable to load your assignment.');
+      .catch(() => {
+        if (!cancelled) {
+          setPack({
+            status: 'error',
+            ok: false,
+            assignment_id: null,
+            has_policy: false,
+            policy: null,
+            benefits: [],
+            exclusions: [],
+            message: "We couldn't load your policy right now. Please try again shortly.",
+            message_secondary: null,
+          });
         }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  if (loading) return <div className="text-sm text-[#6b7280] py-8">Loading your policy…</div>;
-  if (error) return <Alert variant="error">{error}</Alert>;
-  if (!assignmentId) {
+  if (loading) {
+    return (
+      <Card padding="lg" className="border-[#e2e8f0]">
+        <p className="text-sm text-[#6b7280]">Loading your policy…</p>
+      </Card>
+    );
+  }
+
+  if (!pack || pack.status === 'error') {
+    return (
+      <Alert variant="error">
+        {pack?.message || "We couldn't load your policy right now. Please try again shortly."}
+      </Alert>
+    );
+  }
+
+  if (pack.status === 'no_assignment') {
     return (
       <Card padding="lg">
         <p className="text-[#4b5563]">
@@ -46,9 +98,34 @@ function EmployeePolicyContent() {
       </Card>
     );
   }
+
+  if (pack.status === 'no_policy_found') {
+    return (
+      <Card padding="lg" className="border-[#e2e8f0] bg-[#fafbfc]">
+        <p className="text-[#4b5563] font-medium">
+          {pack.message ||
+            'Your company has not yet published an assignment policy for this case.'}
+        </p>
+        <p className="text-sm text-[#6b7280] mt-2">
+          {pack.message_secondary ||
+            'Once HR publishes a policy that applies to your assignment, your benefits and limits will appear here.'}
+        </p>
+      </Card>
+    );
+  }
+
+  const snapshot: EmployeeResolvedPolicySnapshot = {
+    has_policy: true,
+    policy: pack.policy as EmployeeResolvedPolicySnapshot['policy'],
+    benefits: (pack.benefits || []) as EmployeeResolvedPolicySnapshot['benefits'],
+    exclusions: (pack.exclusions || []) as EmployeeResolvedPolicySnapshot['exclusions'],
+    resolved_at: pack.resolved_at ?? undefined,
+    resolution_context: pack.resolution_context as EmployeeResolvedPolicySnapshot['resolution_context'],
+  };
+
   return (
     <div className="space-y-4">
-      <EmployeeResolvedPolicyView assignmentId={assignmentId} />
+      <EmployeeResolvedPolicyView resolvedSnapshot={snapshot} />
       <Link to={buildRoute('services')}>
         <Button variant="outline">Back to Services</Button>
       </Link>

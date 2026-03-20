@@ -1,12 +1,27 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+import logging
+from typing import Any, Dict, List, Optional
 
 from ...database import db
 from ...app.db import SessionLocal
 from ...app import crud
 from ...services.guidance_pack_service import build_profile_snapshot
+
+log = logging.getLogger(__name__)
+
+
+def _safe_parse_case_draft(raw: Optional[str]) -> Dict[str, Any]:
+    """Never raise: invalid draft_json must not 500 sufficiency."""
+    if not raw or not str(raw).strip():
+        return {}
+    try:
+        out = json.loads(raw)
+        return out if isinstance(out, dict) else {}
+    except (json.JSONDecodeError, TypeError, ValueError):
+        log.warning("requirements_sufficiency: invalid draft_json, using empty dict")
+        return {}
 
 
 def _apply_applies_to(applies_to: Dict[str, Any], snapshot: Dict[str, Any]) -> bool:
@@ -23,7 +38,7 @@ def compute_requirements_sufficiency(case_id: str, user_id: str) -> Dict[str, An
         case = crud.get_case(session, case_id)
         if not case:
             raise ValueError("Case not found")
-        draft = json.loads(case.draft_json or "{}")
+        draft = _safe_parse_case_draft(getattr(case, "draft_json", None))
         dest = case.dest_country or (draft.get("relocationBasics") or {}).get("destCountry")
 
     dossier_answers = {}

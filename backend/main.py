@@ -968,10 +968,11 @@ def _require_case_access(case_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
     hr_id = assignment.get("hr_user_id")
     is_employee = effective.get("role") == UserRole.EMPLOYEE.value
     is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    eid = effective.get("id")
     visible = False
-    if is_employee and emp_id == effective["id"]:
+    if is_employee and eid is not None and emp_id == eid:
         visible = True
-    if is_hr and (effective.get("is_admin") or hr_id == effective["id"]):
+    if is_hr and (effective.get("is_admin") or (eid is not None and hr_id == eid)):
         visible = True
     if not visible:
         raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
@@ -3402,6 +3403,121 @@ def get_employee_assignment(
     return {"assignment": assignment}
 
 
+@app.get("/api/employee/me/assignment-package-policy")
+def get_employee_me_assignment_package_policy(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Single lightweight round-trip for the employee HR Policy / Assignment Package page.
+    Resolves current assignment + applicable published policy (or explicit no_policy_found).
+    """
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    eid = effective.get("id")
+    if not eid:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    if not user.get("impersonation"):
+        _best_effort_reconcile_employee_assignments(
+            context="get_employee_me_assignment_package_policy",
+            user_id=eid,
+            email=effective.get("email"),
+            username=effective.get("username"),
+            role=UserRole.EMPLOYEE.value,
+            request_id=getattr(request.state, "request_id", None),
+        )
+
+    assignment = db.get_assignment_for_employee(eid, request_id=request_id)
+    if not assignment:
+        return {
+            "status": "no_assignment",
+            "ok": True,
+            "assignment_id": None,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "resolved_at": None,
+            "message": "You don't have an active assignment yet.",
+            "message_secondary": None,
+        }
+
+    assignment_id = assignment.get("id")
+    if not assignment_id:
+        return {
+            "status": "no_assignment",
+            "ok": True,
+            "assignment_id": None,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "resolved_at": None,
+            "message": "You don't have an active assignment yet.",
+            "message_secondary": None,
+        }
+
+    try:
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning(
+            "employee_me_assignment_package_policy failed request_id=%s assignment_id=%s exc=%s",
+            request_id,
+            assignment_id,
+            exc,
+            exc_info=True,
+        )
+        return {
+            "status": "error",
+            "ok": False,
+            "assignment_id": assignment_id,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "resolved_at": None,
+            "message": "We couldn't load your policy right now. Please try again shortly.",
+            "message_secondary": None,
+        }
+
+    if not result.get("has_policy"):
+        return {
+            "status": "no_policy_found",
+            "ok": True,
+            "assignment_id": assignment_id,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "resolved_at": None,
+            "message": result.get("reason") or EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+            "message_secondary": result.get("reason_secondary") or EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+            "company_id_used": result.get("company_id_used"),
+        }
+
+    return {
+        "status": "found",
+        "ok": True,
+        "assignment_id": assignment_id,
+        "has_policy": True,
+        "policy": result.get("policy") or {},
+        "benefits": result.get("benefits") or [],
+        "exclusions": result.get("exclusions") or [],
+        "resolved_at": result.get("resolved_at"),
+        "resolution_context": result.get("resolution_context"),
+        "message": None,
+        "message_secondary": None,
+        "company_id_used": result.get("company_id"),
+    }
+
+
 @app.get("/api/employee/messages")
 def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
     effective = _effective_user(user, UserRole.EMPLOYEE)
@@ -4780,10 +4896,10 @@ def get_case_details_by_assignment(
 
 @app.get("/api/assignments/{assignment_id}/timeline")
 def get_assignment_timeline(
+    request: Request,
     assignment_id: str,
     ensure_defaults: bool = Query(False, description="Create default milestones if none exist"),
     include_links: bool = Query(True, description="Include milestone link rows (omit for lighter payloads)"),
-    req: Request = None,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     """List operational relocation tasks (case_milestones) for the case linked to this assignment."""
@@ -4791,43 +4907,65 @@ def get_assignment_timeline(
     case_id = assignment.get("case_id")
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case")
-    request_id = getattr(req.state, "request_id", None) if req else None
-    request_id = request_id or str(uuid.uuid4())
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
     milestones = db.list_case_milestones(case_id, request_id=request_id)
     if ensure_defaults and len(milestones) == 0:
-        services = []
         try:
-            svc_rows = db.list_case_services(assignment_id, request_id=request_id)
-            services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
-        except Exception:
-            pass
-        draft, target_move_date = {}, None
-        with SessionLocal() as session:
-            case = app_crud.get_case(session, case_id)
-            if case:
-                draft = json.loads(getattr(case, "draft_json", None) or "{}")
-                target_move_date = getattr(case, "target_move_date", None)
-        defaults = compute_default_milestones(
-            case_id=case_id,
-            case_draft=draft,
-            selected_services=services,
-            target_move_date=str(target_move_date) if target_move_date else None,
-        )
-        for m in defaults:
-            db.upsert_case_milestone(
+            services = []
+            try:
+                svc_rows = db.list_case_services(assignment_id, request_id=request_id)
+                services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
+            except Exception:
+                pass
+            draft, target_move_date = {}, None
+            with SessionLocal() as session:
+                case = app_crud.get_case(session, case_id)
+                if case:
+                    try:
+                        raw_draft = json.loads(getattr(case, "draft_json", None) or "{}")
+                        draft = raw_draft if isinstance(raw_draft, dict) else {}
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        draft = {}
+                    target_move_date = getattr(case, "target_move_date", None)
+            defaults = compute_default_milestones(
                 case_id=case_id,
-                milestone_type=m["milestone_type"],
-                title=m["title"],
-                description=m.get("description"),
-                target_date=m.get("target_date"),
-                status=m.get("status", "pending"),
-                sort_order=m.get("sort_order", 0),
-                owner=m.get("owner", "joint"),
-                criticality=m.get("criticality", "normal"),
-                notes=m.get("notes"),
-                request_id=request_id,
+                case_draft=draft,
+                selected_services=services,
+                target_move_date=str(target_move_date) if target_move_date else None,
             )
-        milestones = db.list_case_milestones(case_id, request_id=request_id)
+            for m in defaults:
+                try:
+                    db.upsert_case_milestone(
+                        case_id=case_id,
+                        milestone_type=m["milestone_type"],
+                        title=m["title"],
+                        description=m.get("description"),
+                        target_date=m.get("target_date"),
+                        status=m.get("status", "pending"),
+                        sort_order=m.get("sort_order", 0),
+                        owner=m.get("owner", "joint"),
+                        criticality=m.get("criticality", "normal"),
+                        notes=m.get("notes"),
+                        request_id=request_id,
+                    )
+                except Exception as upsert_exc:
+                    log.warning(
+                        "ensure_defaults upsert_case_milestone failed case_id=%s type=%s: %s",
+                        case_id,
+                        m.get("milestone_type"),
+                        upsert_exc,
+                        exc_info=True,
+                    )
+            milestones = db.list_case_milestones(case_id, request_id=request_id)
+        except Exception as exc:
+            log.warning(
+                "get_assignment_timeline ensure_defaults failed assignment_id=%s case_id=%s: %s",
+                assignment_id,
+                case_id,
+                exc,
+                exc_info=True,
+            )
+            milestones = db.list_case_milestones(case_id, request_id=request_id)
     if include_links:
         for m in milestones:
             m["links"] = db.list_milestone_links(m["id"], request_id=request_id)
@@ -4886,7 +5024,10 @@ def get_country_resources(
     hr_id = assignment.get("hr_user_id")
     is_employee = effective.get("role") == UserRole.EMPLOYEE.value
     is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
-    visible = (is_employee and emp_id == effective["id"]) or (is_hr and (effective.get("is_admin") or hr_id == effective["id"]))
+    eid = effective.get("id")
+    visible = (is_employee and eid is not None and emp_id == eid) or (
+        is_hr and (effective.get("is_admin") or (eid is not None and hr_id == eid))
+    )
     if not visible:
         raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
     case_id = assignment.get("case_id")
@@ -4897,7 +5038,12 @@ def get_country_resources(
         if not case:
             draft = {}
         else:
-            draft = json.loads(case.draft_json or "{}")
+            try:
+                draft = json.loads(case.draft_json or "{}")
+                if not isinstance(draft, dict):
+                    draft = {}
+            except (json.JSONDecodeError, TypeError, ValueError):
+                draft = {}
 
     profile = build_profile_context(draft)
     hints = get_personalization_hints(profile)
@@ -5003,8 +5149,8 @@ def get_country_resources(
     }
 
 
-def _require_case_access(case_id: str, user: Dict[str, Any]):
-    """Validate user can access case. Returns assignment. Use for RFQ/quote endpoints that have case_id from rfq."""
+def _require_case_id_assignment_visible(case_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve case_id to an assignment and enforce visibility (RFQ paths, evidence, etc.). Returns assignment row."""
     assignment = db.get_assignment_by_case_id(case_id) or db.get_assignment_by_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -5025,11 +5171,12 @@ def _require_assignment_visibility(
     hr_id = assignment.get("hr_user_id")
     is_employee = effective.get("role") == UserRole.EMPLOYEE.value
     is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    eid = effective.get("id")
     visible = False
-    if is_employee and emp_id == effective["id"]:
+    if is_employee and eid is not None and emp_id == eid:
         visible = True
     elif is_hr:
-        visible = effective.get("is_admin") or hr_id == effective["id"]
+        visible = effective.get("is_admin") or (eid is not None and hr_id == eid)
         if not visible and effective.get("role") == UserRole.HR.value:
             hr_company = _get_hr_company_id(effective)
             if hr_company and db.assignment_belongs_to_company(assignment_id, hr_company):
@@ -5056,7 +5203,8 @@ def _hr_can_access_assignment(assignment: Dict[str, Any], user: Dict[str, Any]) 
     effective = _effective_user(user, UserRole.HR)
     if effective.get("is_admin"):
         return True
-    if assignment.get("hr_user_id") == effective["id"]:
+    eid = effective.get("id")
+    if eid is not None and assignment.get("hr_user_id") == eid:
         return True
     hr_company = _get_hr_company_id(effective)
     return bool(hr_company and db.assignment_belongs_to_company(assignment.get("id", ""), hr_company))
@@ -5532,7 +5680,7 @@ def get_rfq(
     rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
     if not rfq:
         raise HTTPException(status_code=404, detail="RFQ not found")
-    _ = _require_case_access(rfq["case_id"], user)
+    _ = _require_case_id_assignment_visible(rfq["case_id"], user)
     return rfq
 
 
@@ -5577,7 +5725,7 @@ def accept_quote(
     rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
     if not rfq:
         raise HTTPException(status_code=404, detail="RFQ not found")
-    _ = _require_case_access(rfq["case_id"], user)
+    _ = _require_case_id_assignment_visible(rfq["case_id"], user)
     updated = db.update_quote_status(quote_id, "accepted", request_id=getattr(req.state, "request_id", None))
     if not updated:
         raise HTTPException(status_code=404, detail="Quote not found")
@@ -5686,65 +5834,87 @@ def submit_vendor_quote(
     return {"ok": True, "quote": quote}
 
 
+EMPLOYEE_POLICY_FALLBACK_PRIMARY = (
+    "Your company has not yet published an assignment policy for this case."
+)
+EMPLOYEE_POLICY_FALLBACK_SECONDARY = (
+    "Once HR publishes a policy that applies to your assignment, your benefits and limits will appear here."
+)
+
+
 def _resolve_published_policy_for_employee(
     assignment_id: str,
     user: Dict[str, Any],
     request_id: Optional[str] = None,
+    *,
+    read_only: bool = False,
 ) -> Dict[str, Any]:
     """
     Resolve published company policy for an employee's assignment context.
-    Canonical resolution order: relocation_cases.company_id → hr company_id → profile.company_id.
+    Canonical resolution order: relocation_cases.company_id → HR owner's company → employee profile company_id.
     Returns structured result; never raises for "no policy" (only for auth via _require_assignment_visibility).
+
+    read_only: do not create cases or back-fill company_id on profile/case (GET employee policy paths).
     """
-    from .services.policy_resolution import resolve_policy_for_assignment
+    from .services.policy_resolution import (
+        resolve_policy_for_assignment,
+        collect_company_id_candidates_for_assignment,
+        find_first_published_company_policy,
+    )
 
     assignment = _require_assignment_visibility(assignment_id, user)
     case_id = assignment.get("case_id")
     case = db.get_relocation_case(case_id) if case_id else None
-    hr_user_id = assignment.get("hr_user_id") or (case.get("hr_user_id") if case else None)
+    hr_user_id = assignment.get("hr_user_id") or ((case or {}).get("hr_user_id") if case else None)
     hr_company_id = db.get_hr_company_id(hr_user_id) if hr_user_id else None
     profile_company_id = None
     if assignment.get("employee_user_id"):
         emp_profile = db.get_profile_record(assignment["employee_user_id"])
         if emp_profile:
             profile_company_id = emp_profile.get("company_id")
-    if not case and case_id and hr_user_id and hr_company_id:
-        try:
-            db.create_case(case_id, hr_user_id, {}, company_id=hr_company_id)
-            case = db.get_relocation_case(case_id)
-        except Exception:
-            pass
-    case_company_id = (case or {}).get("company_id") if case else None
-    company_id_for_resolution = case_company_id or hr_company_id or profile_company_id
-    if company_id_for_resolution:
-        if case and not case.get("company_id"):
+
+    if not read_only:
+        if not case and case_id and hr_user_id and hr_company_id:
             try:
-                db.upsert_relocation_case(
-                    case_id=case_id,
-                    company_id=company_id_for_resolution,
-                    employee_id=case.get("employee_id"),
-                    status=case.get("status"),
-                    stage=case.get("stage"),
-                    host_country=case.get("host_country"),
-                    home_country=case.get("home_country"),
-                )
-                case = db.get_relocation_case(case_id) or case
+                db.create_case(case_id, hr_user_id, {}, company_id=hr_company_id)
+                case = db.get_relocation_case(case_id)
             except Exception:
                 pass
-        emp_user_id = assignment.get("employee_user_id")
-        if emp_user_id:
-            emp_profile = db.get_profile_record(emp_user_id)
-            if emp_profile and not emp_profile.get("company_id"):
+        case_company_id = (case or {}).get("company_id") if case else None
+        company_id_for_resolution = case_company_id or hr_company_id or profile_company_id
+        if company_id_for_resolution:
+            if case and not case.get("company_id"):
                 try:
-                    db.ensure_profile_record(
-                        emp_user_id,
-                        emp_profile.get("email") or "",
-                        emp_profile.get("role") or "EMPLOYEE",
-                        emp_profile.get("full_name"),
-                        company_id_for_resolution,
+                    db.upsert_relocation_case(
+                        case_id=case_id,
+                        company_id=company_id_for_resolution,
+                        employee_id=case.get("employee_id"),
+                        status=case.get("status"),
+                        stage=case.get("stage"),
+                        host_country=case.get("host_country"),
+                        home_country=case.get("home_country"),
                     )
+                    case = db.get_relocation_case(case_id) or case
                 except Exception:
                     pass
+            emp_user_id = assignment.get("employee_user_id")
+            if emp_user_id:
+                emp_profile2 = db.get_profile_record(emp_user_id)
+                if emp_profile2 and not emp_profile2.get("company_id"):
+                    try:
+                        db.ensure_profile_record(
+                            emp_user_id,
+                            emp_profile2.get("email") or "",
+                            emp_profile2.get("role") or "EMPLOYEE",
+                            emp_profile2.get("full_name"),
+                            company_id_for_resolution,
+                        )
+                    except Exception:
+                        pass
+
+    case_company_id = (case or {}).get("company_id") if case else None
+    company_id_used = case_company_id or hr_company_id or profile_company_id
+
     profile = None
     if case and case.get("profile_json"):
         try:
@@ -5756,47 +5926,116 @@ def _resolve_published_policy_for_employee(
     except Exception:
         employee_profile = None
 
-    resolved = None
-    try:
-        resolved = db.get_resolved_assignment_policy(assignment_id)
-    except Exception:
-        resolved = None
-    company_id_used = case_company_id or hr_company_id or profile_company_id
-    if not resolved:
-        try:
-            resolved = resolve_policy_for_assignment(
-                db, assignment_id, assignment, case, profile, employee_profile
-            )
-        except Exception as exc:
-            log.warning(
-                "employee_policy resolve_policy_for_assignment request_id=%s assignment_id=%s company_id_used=%s exc=%s",
-                request_id, assignment_id, company_id_used, exc,
-            )
-            resolved = None
-    if not resolved:
+    candidates = collect_company_id_candidates_for_assignment(db, assignment, case)
+    pub = find_first_published_company_policy(db, candidates) if candidates else None
+    if not pub:
         try:
             with_policy = db.list_company_ids_with_published_policy()
             log.info(
-                "employee_policy no_policy request_id=%s assignment_id=%s case_id=%s company_id_used=%s "
-                "case_company=%s hr_company=%s profile_company=%s published_for_companies=%s",
-                request_id, assignment_id, case_id, company_id_used,
-                case_company_id, hr_company_id, profile_company_id,
+                "employee_policy no_policy_fast request_id=%s assignment_id=%s case_id=%s candidates=%s published_sample=%s",
+                request_id,
+                assignment_id,
+                case_id,
+                candidates,
                 [c.get("company_id") for c in with_policy] if with_policy else [],
             )
         except Exception:
             log.info(
-                "employee_policy no_policy request_id=%s assignment_id=%s case_id=%s company_id_used=%s",
-                request_id, assignment_id, case_id, company_id_used,
+                "employee_policy no_policy_fast request_id=%s assignment_id=%s case_id=%s candidates=%s",
+                request_id,
+                assignment_id,
+                case_id,
+                candidates,
             )
         return {
             "has_policy": False,
-            "reason": "No published company policy found for this employee context.",
+            "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+            "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
             "assignment_id": assignment_id,
             "case_id": case_id,
             "company_id_used": company_id_used,
         }
-    company_id_used = resolved.get("resolution_company_id") or company_id_used
-    if case_id and case and not case.get("company_id") and company_id_used:
+
+    company_id_pub, policy_row, version_row = pub
+    vid_pub = (version_row or {}).get("id")
+
+    cached_row = None
+    try:
+        cached_row = db.get_resolved_assignment_policy(assignment_id)
+    except Exception:
+        cached_row = None
+
+    if (
+        cached_row
+        and cached_row.get("id")
+        and vid_pub
+        and str(cached_row.get("policy_version_id") or "") == str(vid_pub)
+    ):
+        rid = cached_row["id"]
+        try:
+            benefits = db.list_resolved_policy_benefits(rid)
+            exclusions = db.list_resolved_policy_exclusions(rid)
+        except Exception as exc:
+            log.warning("employee_policy cache list_benefits request_id=%s resolved_id=%s exc=%s", request_id, rid, exc)
+            benefits = []
+            exclusions = []
+        policy = cached_row.get("policy") or policy_row or {}
+        version = cached_row.get("version") or version_row or {}
+        ctx = cached_row.get("resolution_context") or cached_row.get("resolution_context_json") or {}
+        company_id_used = cached_row.get("resolution_company_id") or cached_row.get("company_id") or company_id_pub
+        company = db.get_company(company_id_used) if company_id_used else None
+        company_name = (company or {}).get("name") if company else None
+        log.info(
+            "employee_policy cache_hit request_id=%s assignment_id=%s policy_version_id=%s",
+            request_id,
+            assignment_id,
+            vid_pub,
+        )
+        return {
+            "has_policy": True,
+            "company_id": company_id_used,
+            "policy_id": (policy or {}).get("id"),
+            "version_id": (version or {}).get("id"),
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "policy": {
+                "id": (policy or {}).get("id"),
+                "title": (policy or {}).get("title"),
+                "version": (version or {}).get("version_number"),
+                "effective_date": (policy or {}).get("effective_date"),
+                "company_name": company_name,
+            },
+            "benefits": benefits,
+            "exclusions": exclusions,
+            "resolved_at": cached_row.get("resolved_at"),
+            "resolution_context": ctx,
+        }
+
+    resolved = None
+    try:
+        resolved = resolve_policy_for_assignment(
+            db, assignment_id, assignment, case, profile, employee_profile
+        )
+    except Exception as exc:
+        log.warning(
+            "employee_policy resolve_policy_for_assignment request_id=%s assignment_id=%s company_id_used=%s exc=%s",
+            request_id,
+            assignment_id,
+            company_id_used,
+            exc,
+        )
+        resolved = None
+    if not resolved:
+        return {
+            "has_policy": False,
+            "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+            "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "company_id_used": company_id_used,
+        }
+    company_id_used = resolved.get("resolution_company_id") or company_id_used or company_id_pub
+    if not read_only and case_id and case and not case.get("company_id") and company_id_used:
         try:
             db.upsert_relocation_case(
                 case_id=case_id,
@@ -5813,7 +6052,8 @@ def _resolve_published_policy_for_employee(
     if not rid:
         return {
             "has_policy": False,
-            "reason": "No published company policy found for this employee context.",
+            "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+            "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
             "assignment_id": assignment_id,
             "case_id": case_id,
             "company_id_used": company_id_used,
@@ -5832,7 +6072,12 @@ def _resolve_published_policy_for_employee(
     company_name = (company or {}).get("name") if company else None
     log.info(
         "employee_policy resolved request_id=%s assignment_id=%s case_id=%s company_id=%s policy_id=%s version_id=%s has_policy=true",
-        request_id, assignment_id, case_id, company_id_used, policy.get("id"), version.get("id"),
+        request_id,
+        assignment_id,
+        case_id,
+        company_id_used,
+        policy.get("id"),
+        version.get("id"),
     )
     return {
         "has_policy": True,
@@ -5897,7 +6142,7 @@ def get_employee_assignment_policy(
     """Employee: Get resolved policy for this assignment (read-only, published only). Never 500 for missing policy."""
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     try:
-        result = _resolve_published_policy_for_employee(assignment_id, user, request_id)
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
     except HTTPException:
         raise
     except Exception as exc:
@@ -5946,7 +6191,8 @@ def get_employee_assignment_policy(
             "benefits": [],
             "exclusions": [],
             "resolution_context": None,
-            "message": result.get("reason", "No published policy for your assignment."),
+            "message": result.get("reason", EMPLOYEE_POLICY_FALLBACK_PRIMARY),
+            "message_secondary": result.get("reason_secondary") or EMPLOYEE_POLICY_FALLBACK_SECONDARY,
             "company_id_used": result.get("company_id_used"),
         }
     try:
@@ -6046,7 +6292,7 @@ def get_assignment_policy_budget(
     from .services.policy_adapter import caps_from_resolved_benefits, DEFAULT_CURRENCY
 
     try:
-        result = _resolve_published_policy_for_employee(assignment_id, user, request_id)
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
     except HTTPException:
         raise
     except Exception as exc:
@@ -6146,7 +6392,7 @@ def get_case_evidence(
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     """Phase 1 Step 3: List case_evidence for a case. For verification and debugging."""
-    _ = _require_case_access(case_id, user)
+    _ = _require_case_id_assignment_visible(case_id, user)
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     items = db.list_case_evidence(case_id, request_id=request_id)
     return {"case_id": case_id, "evidence": items}
@@ -6169,44 +6415,65 @@ def get_case_timeline(
     milestones = db.list_case_milestones(case_id, request_id=request_id)
 
     if ensure_defaults and len(milestones) == 0:
-        # Compute and persist defaults from case context
-        assignment = access.get("assignment", {})
-        assignment_id = assignment.get("id")
-        services = []
-        if assignment_id:
-            try:
-                svc_rows = db.list_case_services(assignment_id, request_id=request_id)
-                services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
-            except Exception:
-                pass
-        draft = {}
-        target_move_date = None
-        with SessionLocal() as session:
-            case = app_crud.get_case(session, case_id)
-            if case:
-                draft = json.loads(getattr(case, "draft_json", None) or "{}")
-                target_move_date = getattr(case, "target_move_date", None)
-        defaults = compute_default_milestones(
-            case_id=case_id,
-            case_draft=draft,
-            selected_services=services,
-            target_move_date=str(target_move_date) if target_move_date else None,
-        )
-        for m in defaults:
-            db.upsert_case_milestone(
+        try:
+            assignment = access.get("assignment", {})
+            assignment_id = assignment.get("id")
+            services = []
+            if assignment_id:
+                try:
+                    svc_rows = db.list_case_services(assignment_id, request_id=request_id)
+                    services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
+                except Exception:
+                    pass
+            draft: Dict[str, Any] = {}
+            target_move_date = None
+            with SessionLocal() as session:
+                case = app_crud.get_case(session, case_id)
+                if case:
+                    try:
+                        raw_draft = json.loads(getattr(case, "draft_json", None) or "{}")
+                        draft = raw_draft if isinstance(raw_draft, dict) else {}
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        draft = {}
+                    target_move_date = getattr(case, "target_move_date", None)
+            defaults = compute_default_milestones(
                 case_id=case_id,
-                milestone_type=m["milestone_type"],
-                title=m["title"],
-                description=m.get("description"),
-                target_date=m.get("target_date"),
-                status=m.get("status", "pending"),
-                sort_order=m.get("sort_order", 0),
-                owner=m.get("owner", "joint"),
-                criticality=m.get("criticality", "normal"),
-                notes=m.get("notes"),
-                request_id=request_id,
+                case_draft=draft,
+                selected_services=services,
+                target_move_date=str(target_move_date) if target_move_date else None,
             )
-        milestones = db.list_case_milestones(case_id, request_id=request_id)
+            for m in defaults:
+                try:
+                    db.upsert_case_milestone(
+                        case_id=case_id,
+                        milestone_type=m["milestone_type"],
+                        title=m["title"],
+                        description=m.get("description"),
+                        target_date=m.get("target_date"),
+                        status=m.get("status", "pending"),
+                        sort_order=m.get("sort_order", 0),
+                        owner=m.get("owner", "joint"),
+                        criticality=m.get("criticality", "normal"),
+                        notes=m.get("notes"),
+                        request_id=request_id,
+                    )
+                except Exception as upsert_exc:
+                    log.warning(
+                        "get_case_timeline ensure_defaults upsert failed case_id=%s type=%s: %s",
+                        case_id,
+                        m.get("milestone_type"),
+                        upsert_exc,
+                        exc_info=True,
+                    )
+            milestones = db.list_case_milestones(case_id, request_id=request_id)
+        except Exception as exc:
+            log.warning(
+                "get_case_timeline ensure_defaults failed case_id=%s: %s",
+                case_id,
+                exc,
+                exc_info=True,
+            )
+            milestones = db.list_case_milestones(case_id, request_id=request_id)
 
     if include_links:
         for m in milestones:
@@ -6227,7 +6494,7 @@ def update_case_milestone(
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     """Update a milestone (title, description, target_date, actual_date, status, sort_order)."""
-    _ = _require_case_access(case_id, user)
+    _ = _require_case_id_assignment_visible(case_id, user)
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     existing = next((m for m in db.list_case_milestones(case_id, request_id=request_id) if m.get("id") == milestone_id), None)
     if not existing:
@@ -6277,7 +6544,7 @@ def add_milestone_link(
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     """Link milestone to an entity (evidence, event, rfq, service). Body: { linked_entity_type, linked_entity_id }."""
-    _ = _require_case_access(case_id, user)
+    _ = _require_case_id_assignment_visible(case_id, user)
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     entity_type = body.get("linked_entity_type")
     entity_id = body.get("linked_entity_id")
@@ -6432,7 +6699,7 @@ def dossier_search_suggestions(
     request: DossierSearchSuggestionsRequest,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    _require_case_access(request.case_id, user)
+    _require_case_id_assignment_visible(request.case_id, user)
     with SessionLocal() as session:
         case = app_crud.get_case(session, request.case_id)
         if not case:
@@ -6473,7 +6740,7 @@ def add_dossier_case_question(
     request: DossierCaseQuestionRequest,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    _require_case_access(request.case_id, user)
+    _require_case_id_assignment_visible(request.case_id, user)
     allowed_types = {"text", "boolean", "select", "date", "multiselect"}
     if request.answer_type not in allowed_types:
         raise HTTPException(status_code=400, detail="Unsupported answer_type")
@@ -6620,7 +6887,7 @@ def get_guidance_trace(
     case_id: str = Query(...),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    _require_case_access(case_id, user)
+    _require_case_id_assignment_visible(case_id, user)
     return {"events": db.list_trace_events(case_id)}
 
 
@@ -6629,7 +6896,7 @@ def get_guidance_explain(
     case_id: str = Query(...),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    _require_case_access(case_id, user)
+    _require_case_id_assignment_visible(case_id, user)
     trace_events = db.list_trace_events(case_id)
     trace_id = trace_events[0]["trace_id"] if trace_events else None
     logs = db.list_rule_evaluation_logs(case_id, trace_id)
@@ -6664,16 +6931,32 @@ def get_requirements_sufficiency(
 ):
     access = _require_case_access(case_id, user)
     effective = access["effective_user"]
+    uid = effective.get("id")
+    if not uid:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     try:
-        data = compute_requirements_sufficiency(case_id, effective["id"])
-        return data
+        data = compute_requirements_sufficiency(case_id, str(uid))
+        return {
+            "compute_status": "ok",
+            "message": None,
+            **data,
+        }
     except ValueError as e:
         if "Case not found" in str(e):
             raise HTTPException(status_code=404, detail="Case not found")
-        raise
+        log.warning("compute_requirements_sufficiency value error case %s: %s", case_id, e)
+        return {
+            "compute_status": "insufficient_data",
+            "message": "More case information is needed before this recommendation can be calculated.",
+            "destination_country": None,
+            "missing_fields": [],
+            "supporting_requirements": [],
+        }
     except Exception as e:
         log.warning("compute_requirements_sufficiency failed for case %s: %s", case_id, e, exc_info=True)
         return {
+            "compute_status": "unavailable",
+            "message": "More case information is needed before this recommendation can be calculated.",
             "destination_country": None,
             "missing_fields": [],
             "supporting_requirements": [],
@@ -6814,9 +7097,10 @@ def debug_assignment_check(
     is_employee = effective.get("role") == UserRole.EMPLOYEE.value
     is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
     visible = False
-    if is_employee and emp_id == effective["id"]:
+    eid_dbg = effective.get("id")
+    if is_employee and eid_dbg is not None and emp_id == eid_dbg:
         visible = True
-    if is_hr and (effective.get("is_admin") or hr_id == effective["id"]):
+    if is_hr and (effective.get("is_admin") or (eid_dbg is not None and hr_id == eid_dbg)):
         visible = True
     if not visible:
         return {"found": False, "row": None, "current_user_id": effective.get("id")}

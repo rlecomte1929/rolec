@@ -12,10 +12,11 @@ Apply migrations from the repo on your Supabase project (CLI or Dashboard), espe
 - `supabase/migrations/20260320120000_canonical_identity_employee_contacts.sql`
 - `supabase/migrations/20260321120000_employee_contacts_unique_email_per_company.sql`
 - `supabase/migrations/20260410120000_identity_link_guardrails.sql`
+- `supabase/migrations/20260325000000_case_milestones.sql` (and `20260317000000_case_milestones_tracker.sql`)
 
 ## Automatic bootstrap (app)
 
-On startup, if the DB is **Postgres** and **`public.employee_contacts` is missing**, `Database._maybe_ensure_postgres_canonical_identity_schema()` runs **idempotent** DDL aligned with those migrations (tables, `case_assignments.employee_contact_id`, indexes, RLS policies for `service_role`).
+On startup, if the DB is **Postgres** and **`public.employee_contacts`** and/or **`public.case_milestones`** are missing, `Database._maybe_ensure_postgres_missing_schemas()` runs **idempotent** DDL (identity + timeline tables, indexes, RLS for `service_role` where applicable).
 
 After deploy, **restart the Render service** once so the API runs this step; then retry HR assign.
 

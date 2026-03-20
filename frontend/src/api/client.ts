@@ -1470,8 +1470,31 @@ export const employeeAPI = {
     resolved_at?: string;
     resolution_context?: { assignment_type?: string; family_status?: string; tier?: string };
     message?: string;
+    has_policy?: boolean;
+    message_secondary?: string;
   }> => {
     const response = await api.get(`/api/employee/assignments/${assignmentId}/policy`);
+    return response.data;
+  },
+  /**
+   * Single round-trip for Assignment Package & Limits (employee HR Policy page).
+   * Avoids chaining current-assignment + policy calls on the critical path.
+   */
+  getMyAssignmentPackagePolicy: async (): Promise<{
+    status: 'found' | 'no_policy_found' | 'no_assignment' | 'error';
+    ok?: boolean;
+    assignment_id: string | null;
+    has_policy?: boolean;
+    policy: Record<string, unknown> | null;
+    benefits: unknown[];
+    exclusions: unknown[];
+    resolved_at?: string | null;
+    resolution_context?: Record<string, unknown> | null;
+    message?: string | null;
+    message_secondary?: string | null;
+    company_id_used?: string;
+  }> => {
+    const response = await api.get('/api/employee/me/assignment-package-policy');
     return response.data;
   },
   /** Policy envelope (envelope cards ready) for comparison/budget logic */

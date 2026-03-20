@@ -92,7 +92,7 @@ def extract_resolution_context(
 
     # Destination
     mp = p.get("movePlan") or {}
-    dest = mp.get("destination") or case.get("host_country") or ""
+    dest = mp.get("destination") or (case or {}).get("host_country") or ""
     if isinstance(dest, str) and "," in dest:
         parts = dest.split(",")
         ctx["destination_city"] = parts[0].strip() if parts else None
@@ -268,20 +268,7 @@ def resolve_policy_for_assignment(
     case_id = assignment.get("case_id")
     canonical_case_id = assignment.get("canonical_case_id") or case_id
 
-    # Candidate company_ids in priority order (case → hr → profile). Use company_id only, never name.
-    # Use case's hr_user_id when assignment has no hr_user_id so case-owned assignments still resolve.
-    candidates: List[str] = []
-    cid_case = (case or {}).get("company_id") if case else None
-    hr_user_id = assignment.get("hr_user_id") or (case.get("hr_user_id") if case else None)
-    cid_hr = db.get_hr_company_id(hr_user_id) if hr_user_id else None
-    cid_profile = None
-    if assignment.get("employee_user_id"):
-        emp_profile = db.get_profile_record(assignment["employee_user_id"])
-        if emp_profile:
-            cid_profile = emp_profile.get("company_id")
-    for c in (cid_case, cid_hr, cid_profile):
-        if c and c not in candidates:
-            candidates.append(c)
+    candidates = collect_company_id_candidates_for_assignment(db, assignment, case)
     if not candidates:
         log.warning(
             "policy_resolution: no company_id for assignment %s (case=%s, hr_user=%s, emp_user=%s)",
@@ -292,15 +279,13 @@ def resolve_policy_for_assignment(
         )
         return None
 
-    # Use the first candidate company that has a published policy (handles duplicate company names / wrong link)
-    company_id: Optional[str] = None
-    result = None
-    for cid in candidates:
-        policy_version = db.get_company_policy_with_published_version(cid)
-        if policy_version:
-            result = policy_version
-            company_id = cid
-            break
+    pub = find_first_published_company_policy(db, candidates)
+    if not pub:
+        company_id = None
+        result = None
+    else:
+        company_id, policy, version = pub
+        result = (policy, version)
     if not result or not company_id:
         log.info(
             "policy_resolution: no published policy for any of companies %s (assignment %s)",

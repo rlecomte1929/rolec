@@ -29,18 +29,16 @@ export interface CaseDetailsError {
   caseId?: string;
 }
 
-/** Load case details by assignment id. Gates access via case_assignments. */
-export async function getCaseDetailsByAssignmentId(
-  assignmentId: string
-): Promise<{ data: CaseDetailsResult | null; error: string | null; debug?: CaseDetailsError }> {
-  const assignmentIdTrimmed = assignmentId?.trim();
-  if (!assignmentIdTrimmed) {
-    return {
-      data: null,
-      error: 'Assignment ID is required',
-      debug: import.meta.env.DEV ? { assignmentId: assignmentIdTrimmed || undefined } : undefined,
-    };
-  }
+type CaseDetailsResponse = {
+  data: CaseDetailsResult | null;
+  error: string | null;
+  debug?: CaseDetailsError;
+};
+
+/** In-flight dedupe: wizard + summary often mount together and share the same assignment gate. */
+const caseDetailsInflight = new Map<string, Promise<CaseDetailsResponse>>();
+
+async function fetchCaseDetailsByAssignment(assignmentIdTrimmed: string): Promise<CaseDetailsResponse> {
   try {
     const res = await api.get<{ assignment: CaseAssignment; case: Record<string, unknown> }>(
       `/api/case-details-by-assignment?assignment_id=${encodeURIComponent(assignmentIdTrimmed)}`
@@ -101,5 +99,30 @@ export async function getCaseDetailsByAssignmentId(
             }
           : undefined,
     };
+  }
+}
+
+/** Load case details by assignment id. Gates access via case_assignments. */
+export async function getCaseDetailsByAssignmentId(
+  assignmentId: string
+): Promise<CaseDetailsResponse> {
+  const assignmentIdTrimmed = assignmentId?.trim();
+  if (!assignmentIdTrimmed) {
+    return {
+      data: null,
+      error: 'Assignment ID is required',
+      debug: import.meta.env.DEV ? { assignmentId: assignmentIdTrimmed || undefined } : undefined,
+    };
+  }
+  const existing = caseDetailsInflight.get(assignmentIdTrimmed);
+  if (existing) {
+    return existing;
+  }
+  const promise = fetchCaseDetailsByAssignment(assignmentIdTrimmed);
+  caseDetailsInflight.set(assignmentIdTrimmed, promise);
+  try {
+    return await promise;
+  } finally {
+    caseDetailsInflight.delete(assignmentIdTrimmed);
   }
 }

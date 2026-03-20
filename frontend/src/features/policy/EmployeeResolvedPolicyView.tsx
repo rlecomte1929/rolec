@@ -213,11 +213,25 @@ const CATEGORY_ICONS: Record<DisplayCategory, React.ReactNode> = {
   ),
 };
 
-export const EmployeeResolvedPolicyView: React.FC<{ assignmentId: string }> = ({ assignmentId }) => {
-  const [data, setData] = useState<ResolvedPolicyResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+export const EmployeeResolvedPolicyView: React.FC<{
+  /** Legacy: fetch GET /api/employee/assignments/:id/policy */
+  assignmentId?: string;
+  /** Preferred on employee package page: data from GET /api/employee/me/assignment-package-policy (status=found) */
+  resolvedSnapshot?: ResolvedPolicyResponse | null;
+}> = ({ assignmentId, resolvedSnapshot }) => {
+  const [data, setData] = useState<ResolvedPolicyResponse | null>(resolvedSnapshot ?? null);
+  const [loading, setLoading] = useState(() => !resolvedSnapshot && Boolean(assignmentId));
 
   useEffect(() => {
+    if (resolvedSnapshot) {
+      setData(resolvedSnapshot);
+      setLoading(false);
+      return;
+    }
+    if (!assignmentId) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     employeeAPI
@@ -231,14 +245,20 @@ export const EmployeeResolvedPolicyView: React.FC<{ assignmentId: string }> = ({
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
-  }, [assignmentId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId, resolvedSnapshot]);
 
   if (loading) {
     return <div className="text-sm text-[#6b7280] py-8">Loading your policy…</div>;
   }
 
-  const hasPolicy = data?.has_policy === true && data?.policy && (data.benefits?.length ?? 0) > 0;
+  if (!assignmentId && !resolvedSnapshot) {
+    return null;
+  }
+
+  const hasPolicy = Boolean(data?.has_policy !== false && data?.policy?.id);
   if (!hasPolicy) {
     return (
       <Card padding="lg">
@@ -264,7 +284,9 @@ export const EmployeeResolvedPolicyView: React.FC<{ assignmentId: string }> = ({
   }
   const ctx = data.resolution_context ?? {};
   const assignmentType = ctx.assignment_type ? String(ctx.assignment_type).toUpperCase() : null;
-  const cards = buildCategoryCards(data.benefits, data.exclusions ?? []);
+  const benefitsList = data.benefits ?? [];
+  const exclusionsList = data.exclusions ?? [];
+  const cards = buildCategoryCards(benefitsList, exclusionsList);
 
   const included = data.benefits.filter((b) => b.included && !b.approval_required).map((b) => formatBenefitLabel(b.benefit_key));
   const approvalRequired = data.benefits.filter((b) => b.included && b.approval_required).map((b) => formatBenefitLabel(b.benefit_key));
@@ -286,6 +308,11 @@ export const EmployeeResolvedPolicyView: React.FC<{ assignmentId: string }> = ({
         <p className="text-sm text-[#4b5563] mt-3">
           This is the policy currently applied to your assignment. Questions about interpretation? Contact your HR representative through Messages.
         </p>
+        {benefitsList.length === 0 && (
+          <p className="text-sm text-[#6b7280] mt-3 border-t border-[#e2e8f0] pt-3">
+            Your policy is linked, but no benefit limits matched your assignment profile yet. HR can add or publish benefit rules that apply to your assignment type and family status.
+          </p>
+        )}
       </Card>
 
       {/* Interpretation section */}
