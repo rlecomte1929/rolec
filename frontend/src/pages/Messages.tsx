@@ -33,6 +33,7 @@ export const Messages: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set());
   const [archiveBusy, setArchiveBusy] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const conversationsRef = useRef<Conversation[]>([]);
   conversationsRef.current = conversations;
   const assignmentIdFromUrl = searchParams.get('assignmentId');
@@ -215,6 +216,7 @@ export const Messages: React.FC = () => {
     async (archived: boolean) => {
       if (selectedList.length === 0) return;
       setArchiveBusy(true);
+      setListError(null);
       try {
         await hrAPI.archiveMessageConversations({
           assignment_ids: selectedList,
@@ -222,16 +224,24 @@ export const Messages: React.FC = () => {
         });
         setSelectedAssignmentIds(new Set());
         setEditMode(false);
-        const res = await hrAPI.listMessageConversations({
-          q: debouncedSearch || undefined,
-          archive: archiveFilter,
-          unread_only: unreadOnly,
-          limit: 80,
-        });
-        const built = (res.conversations || []).map((row: Record<string, unknown>) =>
-          conversationFromSummary(row)
-        );
-        setConversations(built);
+        try {
+          const res = await hrAPI.listMessageConversations({
+            q: debouncedSearch || undefined,
+            archive: archiveFilter,
+            unread_only: unreadOnly,
+            limit: 80,
+          });
+          const built = (res.conversations || []).map((row: Record<string, unknown>) =>
+            conversationFromSummary(row)
+          );
+          setConversations(built);
+        } catch {
+          setListError(
+            archived
+              ? 'Archived, but the list could not be refreshed. Reload the page to see changes.'
+              : 'Restored, but the list could not be refreshed. Reload the page to see changes.'
+          );
+        }
       } catch {
         setListError(archived ? 'Could not archive selection.' : 'Could not restore selection.');
       } finally {
@@ -239,6 +249,42 @@ export const Messages: React.FC = () => {
       }
     },
     [selectedList, debouncedSearch, archiveFilter, unreadOnly]
+  );
+
+  const handleDeleteMessage = useCallback(
+    async (messageId: string) => {
+      if (!isHrLike || !messageId) return;
+      if (!window.confirm('Delete this message permanently? This cannot be undone.')) return;
+      setDeletingMessageId(messageId);
+      setListError(null);
+      try {
+        await hrAPI.deleteHrMessage(messageId);
+        const aid = activeConversation?.assignment_id;
+        setConversations((prev) =>
+          prev.map((c) => {
+            if (!aid || c.assignment_id !== aid) return c;
+            const nextMsgs = c.messages.filter((m) => m.id !== messageId);
+            const last = nextMsgs[nextMsgs.length - 1];
+            const raw = last
+              ? (last.body || last.subject || '').replace(/\n/g, ' ').trim()
+              : '';
+            const preview =
+              raw.length > 100 ? `${raw.slice(0, 100).trimEnd()}…` : raw;
+            return {
+              ...c,
+              messages: nextMsgs,
+              last_message_preview: preview,
+              last_message_at: last?.created_at || c.last_message_at,
+            };
+          })
+        );
+      } catch {
+        setListError('Could not delete message.');
+      } finally {
+        setDeletingMessageId(null);
+      }
+    },
+    [isHrLike, activeConversation?.assignment_id]
   );
 
   const exitEditMode = useCallback(() => {
@@ -342,6 +388,9 @@ export const Messages: React.FC = () => {
                 conversation={activeConversation}
                 onSend={handleSend}
                 typingFrom={typingFrom ?? undefined}
+                hrCanDeleteMessages={isHrLike}
+                deletingMessageId={deletingMessageId}
+                onDeleteMessage={handleDeleteMessage}
               />
             </div>
 
@@ -368,6 +417,9 @@ export const Messages: React.FC = () => {
                     conversation={activeConversation}
                     onSend={handleSend}
                     typingFrom={typingFrom ?? undefined}
+                    hrCanDeleteMessages={isHrLike}
+                    deletingMessageId={deletingMessageId}
+                    onDeleteMessage={handleDeleteMessage}
                   />
                 </>
               ) : (

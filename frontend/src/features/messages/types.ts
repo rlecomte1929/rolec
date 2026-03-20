@@ -9,6 +9,8 @@ export interface Message {
   id: string;
   assignment_id?: string;
   hr_user_id?: string;
+  /** When set (HR-sent via newer API), use with hr_user_id for "from me" detection */
+  sender_user_id?: string;
   employee_identifier?: string;
   subject?: string;
   body: string;

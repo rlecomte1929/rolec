@@ -6350,9 +6350,13 @@ class Database:
 
     def list_messages_for_hr(self, hr_user_id: str) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT * FROM messages WHERE hr_user_id = :hr ORDER BY created_at DESC"
-            ), {"hr": hr_user_id}).fetchall()
+            rows = conn.execute(
+                text(
+                    f"SELECT * FROM messages WHERE {_eq_text('hr_user_id', ':hr')} "
+                    "ORDER BY created_at DESC"
+                ),
+                {"hr": hr_user_id},
+            ).fetchall()
         return self._rows_to_list(rows)
 
     def upsert_message_conversation_pref(
@@ -6383,11 +6387,30 @@ class Database:
             else:
                 conn.execute(
                     text(
-                        "DELETE FROM message_conversation_prefs "
-                        "WHERE user_id = :u AND assignment_id = :a"
+                        f"DELETE FROM message_conversation_prefs "
+                        f"WHERE {_eq_text('user_id', ':u')} AND {_eq_text('assignment_id', ':a')}"
                     ),
                     {"u": user_id, "a": assignment_id},
                 )
+
+    def get_message_by_id(self, message_id: str) -> Optional[Dict[str, Any]]:
+        """Single message row by id (cross-type-safe id match on Postgres)."""
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(f"SELECT * FROM messages WHERE {_eq_text('id', ':mid')}"),
+                {"mid": message_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def delete_message_by_id(self, message_id: str) -> bool:
+        """Hard-delete one message row. Caller must enforce authorization."""
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(f"DELETE FROM messages WHERE {_eq_text('id', ':mid')}"),
+                {"mid": message_id},
+            )
+        rc = getattr(result, "rowcount", None)
+        return bool(rc and rc > 0)
 
     def list_hr_conversation_summaries(
         self,
@@ -6656,38 +6679,54 @@ class Database:
         if not assignment:
             return []
         with self.engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT * FROM messages WHERE assignment_id = :aid ORDER BY created_at DESC"
-            ), {"aid": assignment["id"]}).fetchall()
+            rows = conn.execute(
+                text(
+                    f"SELECT * FROM messages WHERE {_eq_text('assignment_id', ':aid')} "
+                    "ORDER BY created_at DESC"
+                ),
+                {"aid": assignment["id"]},
+            ).fetchall()
         return self._rows_to_list(rows)
 
     def mark_conversation_read(self, assignment_id: str, recipient_user_id: str) -> int:
         """Set read_at and dismissed_at for all messages in this assignment to the recipient. Returns count updated."""
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
-            result = conn.execute(text(
-                "UPDATE messages SET read_at = :now, dismissed_at = :now "
-                "WHERE assignment_id = :aid AND recipient_user_id = :uid AND read_at IS NULL"
-            ), {"now": now, "aid": assignment_id, "uid": recipient_user_id})
+            result = conn.execute(
+                text(
+                    "UPDATE messages SET read_at = :now, dismissed_at = :now "
+                    f"WHERE {_eq_text('assignment_id', ':aid')} "
+                    f"AND {_eq_text('recipient_user_id', ':uid')} AND read_at IS NULL"
+                ),
+                {"now": now, "aid": assignment_id, "uid": recipient_user_id},
+            )
         return result.rowcount if hasattr(result, "rowcount") else 0
 
     def dismiss_message_notification(self, message_id: str, recipient_user_id: str) -> bool:
         """Set dismissed_at for one message. Returns True if updated."""
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
-            result = conn.execute(text(
-                "UPDATE messages SET dismissed_at = :now "
-                "WHERE id = :mid AND recipient_user_id = :uid AND dismissed_at IS NULL"
-            ), {"now": now, "mid": message_id, "uid": recipient_user_id})
+            result = conn.execute(
+                text(
+                    "UPDATE messages SET dismissed_at = :now "
+                    f"WHERE {_eq_text('id', ':mid')} "
+                    f"AND {_eq_text('recipient_user_id', ':uid')} AND dismissed_at IS NULL"
+                ),
+                {"now": now, "mid": message_id, "uid": recipient_user_id},
+            )
         return (result.rowcount if hasattr(result, "rowcount") else 0) > 0
 
     def get_unread_message_count(self, recipient_user_id: str) -> int:
         """Count messages where recipient hasn't read and hasn't dismissed."""
         with self.engine.connect() as conn:
-            row = conn.execute(text(
-                "SELECT COUNT(*) as n FROM messages "
-                "WHERE recipient_user_id = :uid AND read_at IS NULL AND dismissed_at IS NULL"
-            ), {"uid": recipient_user_id}).fetchone()
+            row = conn.execute(
+                text(
+                    "SELECT COUNT(*) as n FROM messages "
+                    f"WHERE {_eq_text('recipient_user_id', ':uid')} "
+                    "AND read_at IS NULL AND dismissed_at IS NULL"
+                ),
+                {"uid": recipient_user_id},
+            ).fetchone()
         return row[0] if row else 0
 
     def list_admin_message_threads(
@@ -6777,13 +6816,16 @@ class Database:
     def list_messages_by_assignment(self, assignment_id: str) -> List[Dict[str, Any]]:
         """List all messages for an assignment (admin or HR/employee context)."""
         with self.engine.connect() as conn:
-            rows = conn.execute(text("""
+            rows = conn.execute(
+                text(f"""
                 SELECT m.*, COALESCE(u.name, u.email, u.username) as sender_display_name
                 FROM messages m
-                LEFT JOIN users u ON u.id = COALESCE(m.sender_user_id, m.hr_user_id)
-                WHERE m.assignment_id = :aid
+                LEFT JOIN users u ON {_eq_text("u.id", "COALESCE(m.sender_user_id, m.hr_user_id)")}
+                WHERE {_eq_text("m.assignment_id", ":aid")}
                 ORDER BY m.created_at ASC
-            """), {"aid": assignment_id}).fetchall()
+            """),
+                {"aid": assignment_id},
+            ).fetchall()
         return self._rows_to_list(rows)
 
     def list_unread_message_notifications(
@@ -6791,16 +6833,20 @@ class Database:
     ) -> List[Dict[str, Any]]:
         """List unread, non-dismissed messages for the recipient with sender name and snippet."""
         with self.engine.connect() as conn:
-            rows = conn.execute(text("""
+            rows = conn.execute(
+                text(f"""
                 SELECT m.id as message_id, m.assignment_id as conversation_id,
                        m.body, m.created_at,
                        COALESCE(u.name, u.email, u.username, 'HR') as sender_name
                 FROM messages m
-                LEFT JOIN users u ON u.id = COALESCE(m.sender_user_id, m.hr_user_id)
-                WHERE m.recipient_user_id = :uid AND m.read_at IS NULL AND m.dismissed_at IS NULL
+                LEFT JOIN users u ON {_eq_text("u.id", "COALESCE(m.sender_user_id, m.hr_user_id)")}
+                WHERE {_eq_text("m.recipient_user_id", ":uid")}
+                  AND m.read_at IS NULL AND m.dismissed_at IS NULL
                 ORDER BY m.created_at DESC
                 LIMIT :lim
-            """), {"uid": recipient_user_id, "lim": limit}).fetchall()
+            """),
+                {"uid": recipient_user_id, "lim": limit},
+            ).fetchall()
         out = []
         for r in rows:
             row = dict(r._mapping)

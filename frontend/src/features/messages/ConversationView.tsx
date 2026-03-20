@@ -25,12 +25,19 @@ interface ConversationViewProps {
   conversation: Conversation | null;
   onSend?: (text: string) => void;
   typingFrom?: string;
+  /** HR: show delete on each message */
+  hrCanDeleteMessages?: boolean;
+  deletingMessageId?: string | null;
+  onDeleteMessage?: (messageId: string) => void;
 }
 
 export const ConversationView: React.FC<ConversationViewProps> = ({
   conversation,
   onSend,
   typingFrom,
+  hrCanDeleteMessages,
+  deletingMessageId,
+  onDeleteMessage,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -71,7 +78,15 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
             if (item.type === 'date') {
               return <DateSeparator key={`date-${item.date}`} date={item.date} />;
             }
-            return <MessageBubble key={item.message.id} message={item.message} />;
+            return (
+              <MessageBubble
+                key={item.message.id}
+                message={item.message}
+                showDelete={hrCanDeleteMessages}
+                isDeleting={deletingMessageId === item.message.id}
+                onDelete={onDeleteMessage}
+              />
+            );
           })}
           {typingName && <TypingIndicator name={typingName} />}
           <div ref={bottomRef} aria-hidden />

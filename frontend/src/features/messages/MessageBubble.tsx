@@ -22,9 +22,18 @@ function formatTimestamp(iso: string): string {
 
 interface MessageBubbleProps {
   message: Message;
+  /** HR (or admin) thread: allow removing a message from the thread */
+  showDelete?: boolean;
+  isDeleting?: boolean;
+  onDelete?: (messageId: string) => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  showDelete,
+  isDeleting,
+  onDelete,
+}) => {
   const role = message.sender_role || 'SYSTEM';
   const bgClass = ROLE_BG[role] ?? ROLE_BG.SYSTEM;
   const isFromMe = message.is_from_me ?? false;
@@ -60,6 +69,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
           <span className="text-[10px] uppercase tracking-wide capitalize">
             {message.status_delivery === 'read' ? 'Read' : message.status_delivery === 'delivered' ? 'Delivered' : message.status_delivery}
           </span>
+        )}
+        {showDelete && onDelete && (
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={() => onDelete(message.id)}
+            className="ml-1 text-[11px] text-red-600 hover:text-red-800 underline disabled:opacity-40"
+          >
+            {isDeleting ? 'Deleting…' : 'Delete'}
+          </button>
         )}
       </div>
     </div>

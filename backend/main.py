@@ -3810,6 +3810,36 @@ def archive_hr_message_conversations(
     return {"ok": True, "updated": len(normalized)}
 
 
+@app.delete("/api/hr/messages/{message_id}")
+def delete_hr_message(
+    message_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Permanently remove one message from an assignment thread.
+    Authorized when the caller can access the message's assignment (same rules as thread view).
+    """
+    _deny_if_impersonating(user)
+    mid = (message_id or "").strip()
+    if not mid:
+        raise HTTPException(status_code=400, detail="message_id required")
+    row = db.get_message_by_id(mid)
+    if not row:
+        raise HTTPException(status_code=404, detail="Message not found")
+    aid = row.get("assignment_id")
+    if not aid:
+        raise HTTPException(status_code=400, detail="Message has no assignment")
+    assignment = db.get_assignment_by_id(str(aid)) or db.get_assignment_by_case_id(str(aid))
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this message")
+    deleted = db.delete_message_by_id(mid)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"ok": True}
+
+
 # Message state / notification bell (HR + Employee)
 @app.get("/api/messages/unread-count")
 def get_message_unread_count(user: Dict[str, Any] = Depends(require_hr_or_employee)):

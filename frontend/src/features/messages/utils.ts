@@ -49,6 +49,7 @@ export function buildConversationsFromMessages(
       id: String(raw.id),
       assignment_id: raw.assignment_id as string | undefined,
       hr_user_id: raw.hr_user_id as string | undefined,
+      sender_user_id: raw.sender_user_id as string | undefined,
       employee_identifier: raw.employee_identifier as string | undefined,
       subject: raw.subject as string | undefined,
       body: (raw.body as string) || '',
@@ -59,8 +60,9 @@ export function buildConversationsFromMessages(
     };
 
     const assignmentId = msg.assignment_id || 'unknown';
+    const senderUid = msg.sender_user_id || msg.hr_user_id;
     const isFromMe = currentUserRole === 'HR' || currentUserRole === 'ADMIN'
-      ? !!msg.hr_user_id && msg.hr_user_id === currentUserId
+      ? !!senderUid && senderUid === currentUserId
       : false;
     const isFromHr = !!msg.hr_user_id;
 

@@ -509,6 +509,12 @@ export const hrAPI = {
     const response = await api.post('/api/hr/messages/conversations/archive', payload);
     return response.data;
   },
+  deleteHrMessage: async (messageId: string): Promise<{ ok: boolean }> => {
+    const response = await api.delete(
+      `/api/hr/messages/${encodeURIComponent(messageId)}`
+    );
+    return response.data;
+  },
   getCaseCompliance: async (caseId: string): Promise<ComplianceCaseReport> => {
     const response = await api.get(`/api/hr/cases/${caseId}/compliance`);
     return response.data;
