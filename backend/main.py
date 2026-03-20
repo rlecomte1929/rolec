@@ -3413,8 +3413,8 @@ def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.
 def claim_assignment(
     assignment_id: str,
     claim: ClaimAssignmentRequest,
-    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
     http_req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
 ):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.EMPLOYEE)
