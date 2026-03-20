@@ -18,6 +18,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 export const ServicesEstimate: React.FC = () => {
   const navigate = useNavigate();
   const { recommendations, shortlist } = useServicesFlow();
+  const [rfqNavLoading, setRfqNavLoading] = useState(false);
 
   if (!recommendations) {
     return (

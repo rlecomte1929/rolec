@@ -59,11 +59,6 @@ export const ServicesRfqNew: React.FC = () => {
     };
   }, [assignmentId]);
 
-  const hasRfqBlockingError =
-    error &&
-    (/not a registered supplier|vendor_id|no vendor_id|Add vendor_id/i.test(error) ||
-      /Unable to send RFQ/i.test(error));
-
   if (shortlisted.length === 0) {
     return (
       <AppShell title="RFQ builder" subtitle="Select vendors before sending RFQs.">

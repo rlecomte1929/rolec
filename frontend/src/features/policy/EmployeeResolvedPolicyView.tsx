@@ -274,6 +274,10 @@ export const EmployeeResolvedPolicyView: React.FC<{
     );
   }
 
+  if (!data) {
+    return null;
+  }
+
   const policy = data.policy;
   if (!policy) {
     return (
@@ -288,9 +292,9 @@ export const EmployeeResolvedPolicyView: React.FC<{
   const exclusionsList = data.exclusions ?? [];
   const cards = buildCategoryCards(benefitsList, exclusionsList);
 
-  const included = data.benefits.filter((b) => b.included && !b.approval_required).map((b) => formatBenefitLabel(b.benefit_key));
-  const approvalRequired = data.benefits.filter((b) => b.included && b.approval_required).map((b) => formatBenefitLabel(b.benefit_key));
-  const notCovered = data.benefits.filter((b) => !b.included).map((b) => formatBenefitLabel(b.benefit_key));
+  const included = benefitsList.filter((b) => b.included && !b.approval_required).map((b) => formatBenefitLabel(b.benefit_key));
+  const approvalRequired = benefitsList.filter((b) => b.included && b.approval_required).map((b) => formatBenefitLabel(b.benefit_key));
+  const notCovered = benefitsList.filter((b) => !b.included).map((b) => formatBenefitLabel(b.benefit_key));
 
   return (
     <div className="space-y-6">
