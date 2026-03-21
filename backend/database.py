@@ -2368,9 +2368,13 @@ class Database:
         request_id: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
+        post_ecid: Optional[str] = None
+        post_hr_uid: Optional[str] = None
         with self.engine.begin() as conn:
             row = conn.execute(
-                text("SELECT employee_contact_id FROM case_assignments WHERE id = :id"),
+                text(
+                    "SELECT employee_contact_id, hr_user_id FROM case_assignments WHERE id = :id"
+                ),
                 {"id": assignment_id},
             ).fetchone()
             self._exec(
@@ -2384,14 +2388,30 @@ class Database:
             if row:
                 m = row._mapping if hasattr(row, "_mapping") else dict(row)
                 ecid = m.get("employee_contact_id")
+                hu = m.get("hr_user_id")
+                if hu and str(hu).strip():
+                    post_hr_uid = str(hu).strip()
             if ecid and str(ecid).strip():
+                post_ecid = str(ecid).strip()
                 conn.execute(
                     text(
                         "UPDATE employee_contacts SET linked_auth_user_id = :uid, updated_at = :ua "
                         "WHERE id = :ecid AND (linked_auth_user_id IS NULL OR linked_auth_user_id = :uid)"
                     ),
-                    {"uid": employee_user_id, "ua": now, "ecid": str(ecid).strip()},
+                    {"uid": employee_user_id, "ua": now, "ecid": post_ecid},
                 )
+
+        company_for_dir: Optional[str] = None
+        if post_ecid:
+            ec_row = self.get_employee_contact_by_id(post_ecid, request_id=request_id)
+            if ec_row and ec_row.get("company_id"):
+                company_for_dir = str(ec_row["company_id"]).strip()
+        if not company_for_dir and post_hr_uid:
+            company_for_dir = self.get_hr_company_id(post_hr_uid)
+        if company_for_dir:
+            self.assign_employee_profile_to_company_directory(
+                employee_user_id.strip(), company_for_dir, request_id=request_id
+            )
 
     def get_employee_contact_by_id(
         self, employee_contact_id: str, request_id: Optional[str] = None
@@ -2695,6 +2715,7 @@ class Database:
         """Idempotent: set linked_auth_user_id when unset or already same user."""
         if not (employee_contact_id or "").strip() or not (user_id or "").strip():
             return
+        ec = self.get_employee_contact_by_id(employee_contact_id.strip(), request_id=request_id)
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
             self._exec(
@@ -2705,6 +2726,12 @@ class Database:
                 op_name="link_employee_contact_to_auth_user",
                 request_id=request_id,
             )
+        if ec:
+            cc = (str(ec.get("company_id") or "")).strip()
+            if cc:
+                self.assign_employee_profile_to_company_directory(
+                    user_id.strip(), cc, request_id=request_id
+                )
 
     def assignment_identity_matches_user_identifiers(
         self,
@@ -7026,6 +7053,80 @@ class Database:
                 relocation_case_id=None,
                 status="active",
             )
+
+    def assign_employee_profile_to_company_directory(
+        self,
+        auth_user_id: str,
+        company_id: str,
+        *,
+        request_id: Optional[str] = None,
+    ) -> None:
+        """
+        Set profiles.company_id and ensure an employees row so the person appears on HR → Employees.
+        Used when an employee contact is linked or an assignment is claimed — those flows previously
+        only set case_assignments / employee_contacts and left profiles.company_id null.
+        """
+        _ = request_id
+        cid = (company_id or "").strip()
+        uid = (auth_user_id or "").strip()
+        if not cid or not uid:
+            return
+        profile = self.get_profile_record(uid)
+        if not profile:
+            return
+        role = (profile.get("role") or "").strip().upper()
+        if role not in ("EMPLOYEE", "EMPLOYEE_USER"):
+            return
+        existing = (str(profile.get("company_id") or "")).strip()
+        if existing and existing != cid:
+            log.warning(
+                "assign_employee_profile_to_company_directory: skip conflicting company_id profile=%s",
+                uid[:12],
+            )
+            return
+        if existing == cid:
+            self.ensure_employee_for_profile(uid, cid)
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE profiles SET company_id = :cid WHERE id = :pid"),
+                {"cid": cid, "pid": uid},
+            )
+        self.ensure_employee_for_profile(uid, cid)
+
+    def ensure_directory_from_assignments_for_company(self, company_id: str) -> None:
+        """
+        Backfill HR → Employees for users already attached to assignments (employee_user_id set)
+        but missing profiles.company_id — e.g. claimed before directory sync existed.
+        """
+        cid = (company_id or "").strip()
+        if not cid:
+            return
+        if _is_sqlite:
+            join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+        else:
+            join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
+        sql = f"""
+            SELECT DISTINCT a.employee_user_id AS euid
+            FROM case_assignments a
+            LEFT JOIN relocation_cases rc ON {join_on_cases}
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            WHERE (rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))
+              AND NULLIF(TRIM(CAST(a.employee_user_id AS TEXT)), '') IS NOT NULL
+        """
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), {"cid": cid}).fetchall()
+        seen: Set[str] = set()
+        for row in rows:
+            m = row._mapping if hasattr(row, "_mapping") else dict(row)
+            euid = m.get("euid")
+            if not euid:
+                continue
+            pid = str(euid).strip()
+            if not pid or pid in seen:
+                continue
+            seen.add(pid)
+            self.assign_employee_profile_to_company_directory(pid, cid)
 
     def ensure_employees_for_company(self, company_id: str) -> None:
         """

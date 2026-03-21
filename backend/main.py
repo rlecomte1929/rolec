@@ -1836,6 +1836,7 @@ def deactivate_person(person_id: str, user: Dict[str, Any] = Depends(require_adm
 def list_employees(company_id: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
     if company_id:
         db.ensure_employees_for_company(company_id)
+        db.ensure_directory_from_assignments_for_company(company_id)
         items = db.list_employees_with_profiles(company_id)
     else:
         items = db.list_employees(company_id)
@@ -3055,6 +3056,9 @@ def list_hr_company_employees(user: Dict[str, Any] = Depends(require_role(UserRo
         return {"employees": [], "has_company": False}
     # Reconcile profiles (Admin/HR assignments) into employees before listing (same as Admin)
     db.ensure_employees_for_company(company_id)
+    # People linked only via case_assignments (claimed intake) used to skip profiles.company_id;
+    # backfill so they appear alongside manually-added employees.
+    db.ensure_directory_from_assignments_for_company(company_id)
     items = db.list_employees_with_profiles(company_id)
     db.log_audit(effective["id"], "READ", "employee", None, None, {"company_id": company_id})
     return {"employees": items, "has_company": True}
