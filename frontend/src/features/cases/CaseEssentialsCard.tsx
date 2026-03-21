@@ -49,16 +49,19 @@ export const CaseEssentialsCard: React.FC<Props> = ({
           Case essentials
         </div>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {contactCells.map((c) => (
-          <div key={c.label} className="min-w-0">
-            <div className="text-[11px] font-medium text-[#64748b] uppercase tracking-wide">
-              {c.label}
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {contactCells.map((c) => (
+            <div key={c.label} className="min-w-0">
+              <div className="text-[11px] font-medium text-[#64748b] uppercase tracking-wide">
+                {c.label}
+              </div>
+              <div className="text-sm font-semibold text-[#0b2b43] mt-1 break-words">{c.value}</div>
             </div>
-            <div className="text-sm font-semibold text-[#0b2b43] mt-1 break-words">{c.value}</div>
-          </div>
-        ))}
-        <div className="min-w-0">
+          ))}
+        </div>
+
+        <div className="pt-1 border-t border-[#e2e8f0]">
           <div className="text-[11px] font-medium text-[#64748b] uppercase tracking-wide">
             Assignment ID
           </div>
@@ -81,14 +84,17 @@ export const CaseEssentialsCard: React.FC<Props> = ({
             ) : null}
           </div>
         </div>
-        {routeCells.map((c) => (
-          <div key={c.label} className="min-w-0">
-            <div className="text-[11px] font-medium text-[#64748b] uppercase tracking-wide">
-              {c.label}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-1 border-t border-[#e2e8f0]">
+          {routeCells.map((c) => (
+            <div key={c.label} className="min-w-0">
+              <div className="text-[11px] font-medium text-[#64748b] uppercase tracking-wide">
+                {c.label}
+              </div>
+              <div className="text-sm font-semibold text-[#0b2b43] mt-1 break-words">{c.value}</div>
             </div>
-            <div className="text-sm font-semibold text-[#0b2b43] mt-1 break-words">{c.value}</div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
       <p className="text-xs text-[#64748b] mt-4 border-t border-[#e2e8f0] pt-3 leading-relaxed">
         Gaps in route, household, or documents roll up to <strong className="text-[#475569]">Readiness &amp; actions</strong>{' '}
