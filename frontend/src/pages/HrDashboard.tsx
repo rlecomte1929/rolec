@@ -280,10 +280,24 @@ export const HrDashboard: React.FC = () => {
                       when they use a matching login.
                     </p>
                     <p className="text-sm leading-relaxed">
-                      Send them the <strong>assignment ID</strong> below if they need to claim manually (e.g. typo in
-                      the identifier). Invite token (if shown) is optional for your records.
+                      If they need <strong>manual claim</strong> (e.g. typo in the identifier), send the assignment ID
+                      below and tell them exactly:
                     </p>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <ol className="text-sm leading-relaxed list-decimal pl-5 space-y-1.5 text-[#0b2b43]">
+                      <li>
+                        On the employee dashboard, use <strong>two fields</strong>: first ={' '}
+                        <strong>their ReloPass email or username</strong> (same as they use to log in —{' '}
+                        <strong>not</strong> the ID); second = <strong>assignment ID</strong> (the UUID only).
+                      </li>
+                      <li>
+                        They must <strong>not</strong> paste the assignment ID into the email/username box, or their
+                        email into the assignment ID box.
+                      </li>
+                    </ol>
+                    <p className="text-sm leading-relaxed mt-2">
+                      Invite token (if shown) is optional for your records.
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
                       <span className="text-sm">
                         Assignment ID: <strong className="font-mono">{assignmentId}</strong>
                       </span>

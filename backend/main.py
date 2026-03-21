@@ -3672,14 +3672,6 @@ def claim_assignment(
     emp_uid = assignment.get("employee_user_id")
     effective_id = str(effective["id"]).strip()
     emp_uid_str = str(emp_uid).strip() if emp_uid else ""
-    # #region agent log
-    _debug_log(
-        "main.py:claim_assignment",
-        "claim ids and branch",
-        {"assignment_id": assignment_id, "emp_uid_str": emp_uid_str or None, "effective_id": effective_id, "ids_equal": emp_uid_str == effective_id, "ident_match": ident_match},
-        hypothesis_id="H-claim",
-    )
-    # #endregion
     # Already linked to this user (same id) -> success
     if emp_uid_str and emp_uid_str == effective_id:
         identity_event(
@@ -3694,7 +3686,6 @@ def claim_assignment(
     # Linked to another id but assignment is for this person (identifier match) -> allow claim and attach this user
     if emp_uid_str and emp_uid_str != effective_id:
         if not ident_match:
-            _debug_log("main.py:claim_assignment", "403 branch", {"reason": "emp_uid != effective_id and ident no match"}, hypothesis_id="H-claim")
             identity_event(
                 "identity.claim.manual.failed",
                 failure_code="CLAIM_ASSIGNMENT_ALREADY_CLAIMED",

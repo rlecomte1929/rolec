@@ -1395,6 +1395,7 @@ export const employeeAPI = {
   },
   claimAssignment: async (assignmentId: string, email: string): Promise<{ success: boolean; assignmentId?: string }> => {
     const response = await api.post(`/api/employee/assignments/${assignmentId}/claim`, { email });
+    invalidateApiCache('employee:current-assignment');
     return response.data;
   },
   getNextQuestion: async (assignmentId: string): Promise<EmployeeJourneyResponse> => {
