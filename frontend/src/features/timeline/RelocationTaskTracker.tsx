@@ -5,6 +5,7 @@ import {
   type TimelineMilestone,
   type TimelineTaskSummary,
 } from '../../api/client';
+import { getApiErrorMessage, getClientTransportErrorMessage } from '../../utils/apiDetail';
 import { getTaskUrgency, sortTasksForTracker, parseYmd } from './taskTrackerSort';
 
 const STATUS_OPTIONS = [
@@ -133,11 +134,9 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
           return sortTasksForTracker(ms)[0]?.id ?? null;
         });
       } catch (err: unknown) {
-        const msg =
-          err && typeof err === 'object' && 'response' in err
-            ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-            : (err as Error)?.message;
-        setError(String(msg || 'Failed to load tasks'));
+        const transport = getClientTransportErrorMessage(err);
+        const msg = transport ?? getApiErrorMessage(err, (err as Error)?.message || '');
+        setError(msg.trim() ? msg : 'Failed to load tasks');
         setMilestones([]);
         setSummary(emptySummary);
       } finally {
@@ -197,11 +196,9 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
         await timelineAPI.updateMilestone(caseId, milestoneId, patch);
         await load();
       } catch (err: unknown) {
-        const msg =
-          err && typeof err === 'object' && 'response' in err
-            ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-            : (err as Error)?.message;
-        setError(String(msg || 'Update failed'));
+        const transport = getClientTransportErrorMessage(err);
+        const msg = transport ?? getApiErrorMessage(err, (err as Error)?.message || '');
+        setError(msg.trim() ? msg : 'Update failed');
       } finally {
         setUpdating(false);
       }

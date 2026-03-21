@@ -118,31 +118,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 <span>Admin</span>
               </Link>
             )}
-            {(isHrRole || isEmployeeRole) && !showAdminContextOnly && role !== 'ADMIN' && (
-              <>
-                <CompanyBrand />
-                <Link
-                  to={buildRoute('messages')}
-                  className="p-2 rounded-lg hover:bg-[#eef4f8] text-[#0b2b43] transition-colors"
-                  aria-label="Messages"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 10h8m-8 4h6m-6 6l-4 4V6a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H8z"
-                    />
-                  </svg>
-                </Link>
-              </>
-            )}
+            {(isHrRole || isEmployeeRole) && !showAdminContextOnly && role !== 'ADMIN' && <CompanyBrand />}
             <LogoutButton />
             <div className="text-right text-sm text-slate-600">
               {identity && (

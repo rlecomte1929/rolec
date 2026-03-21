@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { Card, Input, Select, Alert, LoadingButton } from '../components/antigravity';
 import { AppShell } from '../components/AppShell';
 import type { UserRole } from '../types';
-import { clearAuthItems } from '../utils/demo';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
 
@@ -134,16 +133,6 @@ export const Auth: React.FC = () => {
       authInFlight.current = false;
       setIsLoading(false);
     }
-  };
-
-  const handleResetTest = () => {
-    clearAuthItems();
-    setIdentifier('');
-    setPassword('');
-    setUsername('');
-    setEmail('');
-    setName('');
-    setError('');
   };
 
   return (
@@ -292,12 +281,6 @@ export const Auth: React.FC = () => {
           </div>
         </Card>
       </div>
-      <button
-        onClick={handleResetTest}
-        className="fixed bottom-6 right-6 text-xs bg-slate-900 text-white px-3 py-2 rounded-full shadow-lg hover:bg-slate-800"
-      >
-        Reset test data
-      </button>
     </AppShell>
   );
 };

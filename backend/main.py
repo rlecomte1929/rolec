@@ -170,16 +170,11 @@ if env_origins:
     default_origins = list(dict.fromkeys(default_origins + extra))
 origin_regex = os.getenv("CORS_ORIGIN_REGEX") or r"https://.*\.relopass\.com"
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=default_origins,
-    allow_origin_regex=origin_regex,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    # Fewer preflight round-trips on repeat requests (helps perceived lag on slow networks).
-    max_age=86400,
-)
+# NOTE: Register HTTP middleware before CORSMiddleware. Starlette prepends each
+# add_middleware / @app.middleware at index 0, so registering CORS *after* the
+# request-id middleware yields stack ServerError → CORS → RequestID → routes.
+# If CORS is inner (RequestID outer), some cross-origin responses can miss ACAO
+# headers and Chrome reports a generic "CORS error" (often on XHR with Auth).
 
 
 @app.exception_handler(Exception)
@@ -240,6 +235,19 @@ async def request_id_and_timing_middleware(request: Request, call_next):
         user_id,
     )
     return response
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=default_origins,
+    allow_origin_regex=origin_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
+    # Fewer preflight round-trips on repeat requests (helps perceived lag on slow networks).
+    max_age=86400,
+)
 
 app.include_router(compat_router.router)
 app.include_router(cases_router.router)

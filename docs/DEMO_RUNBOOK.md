@@ -49,7 +49,7 @@
    - Visit `/debug/auth` to see session status, user id, last auth error
 
 10. **Reset demo data (if needed)**
-    - Click "Reset test data" on Auth page (clears localStorage)
+    - Clear site data / `localStorage` for the app origin (or use browser DevTools → Application)
     - For DB reset: depends on deployment (SQLite = delete file; Postgres = run migration/reset script)
 
 ---

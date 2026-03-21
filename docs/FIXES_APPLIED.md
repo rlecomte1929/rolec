@@ -65,4 +65,4 @@ None. Uses existing `VITE_API_URL` for API base.
 7. Employee flow (claim assignment, complete wizard)
 8. HR flow (create case, assign, review)
 9. Debug auth (`/debug/auth` in dev)
-10. Reset demo data (Reset test data button or DB reset)
+10. Reset demo data (clear localStorage / DB reset)
