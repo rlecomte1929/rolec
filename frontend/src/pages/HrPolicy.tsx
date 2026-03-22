@@ -107,12 +107,10 @@ function EmployeePolicyContent() {
     return (
       <Card padding="lg" className="border-[#e2e8f0] bg-[#fafbfc]">
         <p className="text-[#4b5563] font-medium">
-          {pack.message ||
-            'Your company has not yet published an assignment policy for this case.'}
+          {pack.message || EMPLOYEE_HR_POLICY_WAIT_PRIMARY}
         </p>
         <p className="text-sm text-[#6b7280] mt-2">
-          {pack.message_secondary ||
-            'Once HR publishes a policy that applies to your assignment, your benefits and limits will appear here.'}
+          {pack.message_secondary || EMPLOYEE_HR_POLICY_WAIT_SECONDARY}
         </p>
       </Card>
     );
