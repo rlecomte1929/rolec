@@ -4,6 +4,10 @@
 
 ReloPass uses `DATABASE_URL` as the single source of truth. When deploying to Render with Supabase Postgres, ensure these migrations have been applied to your Supabase project.
 
+### Case readiness core (duplicate version note)
+
+Two migrations used to share the version `20260321000000` (`case_events_phase1` and `case_readiness_core`). Supabase records only one row per version in `supabase_migrations`, so **readiness DDL never ran** on some remotes while `case_events_phase1` did. The readiness file is now **`20260321000002_case_readiness_core.sql`**. If `supabase db push` reports *local migration files to be inserted before the last migration on remote*, use **`supabase db push --linked --include-all`** (after reviewing the listed files).
+
 ## Tables That Must Exist
 
 | Table | Migration | Purpose |

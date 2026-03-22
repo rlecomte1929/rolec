@@ -17,6 +17,7 @@
 | `CORS_ORIGINS` | Optional | `https://relopass.com,https://www.relopass.com`      |
 | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Recommended | Same as policy storage; also used to **mirror ReloPass users into Supabase Auth** on login/register (so the frontend can refresh Supabase tokens). |
 | `DISABLE_SUPABASE_AUTH_SYNC` | Optional | Set to `1` only if you must disable that mirroring. |
+| `DISABLE_STARTUP_SEED` | Optional | Set to `1` to skip wizard demo cases and supplier JSON seeding entirely. |
 
 - If `DATABASE_URL` is not set, the backend falls back to local SQLite (`relopass.db`).
 - **Supabase Session Pooler** (required): Use the pooler connection string, not the direct connection.
@@ -35,6 +36,8 @@ No Alembic or pre-deploy command needed. On every startup, the backend:
 2. Runs `Base.metadata.create_all()` for all SQLAlchemy tables (wizard cases, country profiles, etc.)
 
 Both steps are idempotent and safe to run on every boot.
+
+Demo wizard cases and supplier rows from bundled JSON are seeded **in the background** after the process starts listening, so Render’s port health check is not blocked by long DB seed work.
 
 ### Manual migration (Option B)
 
@@ -67,7 +70,9 @@ INFO:backend.main:Startup DB config: db_config: scheme=postgresql user=postgres.
 INFO:backend.database:DB schema ensured (legacy tables)
 INFO:backend.main:Initializing database schemas...
 INFO:backend.app.db:DB schema ensured (SQLAlchemy tables)
+INFO:backend.main:Demo/supplier seed scheduled in background after listen (Render-safe).
 INFO:backend.main:Startup complete.
+INFO:backend.main:Background: seeding demo cases…
 ```
 
 **Validate DATABASE_URL on startup:** The first log line shows parsed DB config (password masked). For Supabase pooler:

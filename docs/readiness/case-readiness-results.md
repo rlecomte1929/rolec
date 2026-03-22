@@ -64,7 +64,7 @@ Mutations use **`_deny_if_impersonating`** (read-only view-as).
 
 ## Supabase
 
-- Migration: `supabase/migrations/20260321000000_case_readiness_core.sql` (DDL + FKs).
+- Migration: `supabase/migrations/20260321000002_case_readiness_core.sql` (DDL + FKs).
 
 ## Manual verification
 

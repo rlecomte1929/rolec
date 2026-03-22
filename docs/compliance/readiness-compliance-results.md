@@ -2,7 +2,7 @@
 
 ## Root causes
 
-1. **Missing `readiness_templates` on Postgres** — migration `20260321000000_case_readiness_core.sql` not applied on some environments; any `SELECT` raised `ProgrammingError` → **500** on readiness summary.
+1. **Missing `readiness_templates` on Postgres** — migration `20260321000002_case_readiness_core.sql` (formerly duplicate timestamp `20260321000000`) not applied on some environments; any `SELECT` raised `ProgrammingError` → **500** on readiness summary.
 2. **Strict assignment run-compliance** — `400` when employee profile missing, blocking HR from running internal checks during partial intake.
 3. **Trust gap** — UI and JSON mixed operational checklist copy with no explicit **legal disclaimer**, no **provenance** for checks, and no **step-by-step** audit narrative for compliance runs.
 

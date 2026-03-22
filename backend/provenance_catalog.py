@@ -159,7 +159,7 @@ def degraded_readiness_payload(
         "readiness_store_unavailable": (
             "The readiness reference database is not available on this environment "
             "(expected table `readiness_templates`). Apply migration "
-            "`20260321000000_case_readiness_core.sql` or contact operations. "
+            "`20260321000002_case_readiness_core.sql` or contact operations. "
             "Use official government sources and qualified immigration counsel for decisions."
         ),
         "no_template": (

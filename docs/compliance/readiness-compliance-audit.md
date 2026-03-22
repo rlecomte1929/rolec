@@ -128,7 +128,7 @@ POST /api/hr/cases/{case_id}/compliance/run
 - `backend/readiness_service.py` — destination normalization, default route
 - `backend/provenance_catalog.py` — references, degraded payloads, compliance enrich
 - `backend/seed_data/readiness_templates.json`, `compliance_reference_sources.json`, `readiness_checklist_provenance_map.json`
-- `supabase/migrations/20260321000000_case_readiness_core.sql` — Postgres DDL
+- `supabase/migrations/20260321000002_case_readiness_core.sql` — Postgres DDL
 - `supabase/migrations/20260324120000_compliance_reference_sources.sql` — optional DB mirror for references
 - `frontend/src/features/readiness/CaseReadinessCore.tsx`
 - `frontend/src/pages/HrCaseSummary.tsx`

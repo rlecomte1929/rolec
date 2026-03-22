@@ -1,6 +1,7 @@
 """
 FastAPI main application for ReloPass backend.
 """
+import asyncio
 import logging
 import time
 import os
@@ -113,7 +114,7 @@ from .app.recommendations.admin_debug import router as admin_recommendations_deb
 from .app.routers import suppliers as suppliers_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from .services.supabase_client import get_supabase_admin_client
 
 # ---------------------------------------------------------------------------
@@ -126,6 +127,41 @@ _db_host = _db_info["db_host"] or "(local file)"
 # Legacy demo seed flags (used in startup logs and runtime diagnostics)
 ALLOW_LEGACY_DEMO_SEED = os.getenv("ALLOW_LEGACY_DEMO_SEED", "").lower() in ("1", "true", "yes")
 DISABLE_DEMO_RESEED = os.getenv("DISABLE_DEMO_RESEED", "").lower() in ("1", "true", "yes")
+# When true, skip wizard demo cases + supplier dataset seed (see lifespan below).
+DISABLE_STARTUP_SEED = os.getenv("DISABLE_STARTUP_SEED", "").lower() in ("1", "true", "yes")
+
+
+def _run_background_startup_seed() -> None:
+    """Demo wizard cases + supplier rows; must not block ASGI bind (Render port check)."""
+    log.info("Background: seeding demo cases…")
+    try:
+        seed_demo_cases()
+    except Exception as e:
+        log.warning("Demo case seed skipped or failed: %s", e)
+    try:
+        n = seed_suppliers_from_recommendation_datasets()
+        if n:
+            log.info(
+                "Background: seeded %d suppliers from recommendation datasets (living_areas, schools, movers).",
+                n,
+            )
+    except Exception as e:
+        log.warning("Supplier seed skipped or failed: %s", e)
+    log.info("Background startup seed finished.")
+
+
+async def _background_seed_task() -> None:
+    try:
+        await asyncio.to_thread(_run_background_startup_seed)
+    except Exception:
+        log.exception("Background startup seed task failed")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if not DISABLE_STARTUP_SEED:
+        asyncio.create_task(_background_seed_task())
+    yield
 
 log.info("DB engine: %s | host: %s", _db_scheme, _db_host)
 
@@ -138,7 +174,7 @@ if _db_scheme == "sqlite":
 else:
     log.info("Running with PostgreSQL — data persists across redeploys.")
 
-app = FastAPI(title="ReloPass API", version="1.0.0")
+app = FastAPI(title="ReloPass API", version="1.0.0", lifespan=lifespan)
 admin_graph_build_marker = os.getenv("ADMIN_GRAPH_BUILD_MARKER", "local-dev")
 log.info(
     "ADMIN_GRAPH_BUILD_MARKER=%s db_scheme=%s seed_guard_active=%s DISABLE_DEMO_RESEED=%s ALLOW_LEGACY_DEMO_SEED=%s",
@@ -156,14 +192,10 @@ try:
     log_startup_storage_diagnostic(db)
 except Exception as e:
     log.warning("policy_storage startup diagnostic skipped: %s", e)
-log.info("Seeding demo cases...")
-seed_demo_cases()
-try:
-    n = seed_suppliers_from_recommendation_datasets()
-    if n:
-        log.info("Seeded %d suppliers from recommendation datasets (living_areas, schools, movers).", n)
-except Exception as e:
-    log.warning("Supplier seed skipped or failed: %s", e)
+if DISABLE_STARTUP_SEED:
+    log.info("Startup seed disabled (DISABLE_STARTUP_SEED).")
+else:
+    log.info("Demo/supplier seed scheduled in background after listen (Render-safe).")
 log.info("Startup complete.")
 
 # CORS middleware (include Vite fallback ports 3002–3005 for local dev)

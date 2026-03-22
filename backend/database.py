@@ -10177,7 +10177,7 @@ class Database:
             self._readiness_store_cache = True
         except Exception as e:
             log.warning(
-                "readiness_templates unavailable — apply migration 20260321000000_case_readiness_core.sql: %s",
+                "readiness_templates unavailable — apply migration 20260321000002_case_readiness_core.sql: %s",
                 e,
             )
             self._readiness_store_cache = False
