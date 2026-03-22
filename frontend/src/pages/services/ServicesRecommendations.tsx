@@ -5,6 +5,7 @@ import { Button, Card } from '../../components/antigravity';
 import { RecommendationResults } from '../../features/recommendations/RecommendationResults';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
+import { buildRoute } from '../../navigation/routes';
 
 const CATEGORY_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -28,6 +29,7 @@ export const ServicesRecommendations: React.FC = () => {
   const location = useLocation();
   const { recommendations, shortlist, setShortlist } = useServicesFlow();
   const debugMode = new URLSearchParams(location.search).get('debug') === '1';
+  const go = (path: string) => navigate({ pathname: path, search: location.search });
 
   if (!recommendations || Object.keys(recommendations).length === 0) {
     return (
@@ -36,7 +38,7 @@ export const ServicesRecommendations: React.FC = () => {
           <p className="text-sm text-[#6b7280] mb-4">
             Complete the service questions to unlock recommendations.
           </p>
-          <Button onClick={() => navigate('/services/questions')}>Answer questions</Button>
+          <Button onClick={() => go(buildRoute('servicesQuestions'))}>Answer questions</Button>
         </Card>
       </AppShell>
     );
@@ -55,8 +57,8 @@ export const ServicesRecommendations: React.FC = () => {
         categoryLabels={CATEGORY_LABELS}
         selectedPackage={shortlist}
         onSelectedPackageChange={setShortlist}
-        onStartOver={() => navigate('/services')}
-        onViewSummary={() => navigate('/services/estimate')}
+        onStartOver={() => go(buildRoute('services'))}
+        onViewSummary={() => go(buildRoute('servicesEstimate'))}
         debugMode={debugMode}
       />
     </AppShell>

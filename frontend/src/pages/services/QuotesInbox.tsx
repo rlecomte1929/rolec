@@ -1,20 +1,40 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { EmployeeScopedAssignmentPicker } from '../../components/employee/EmployeeScopedAssignmentPicker';
 import { Button, Card } from '../../components/antigravity';
 import { rfqAPI } from '../../api/client';
 import type { RfqSummary } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { buildRoute } from '../../navigation/routes';
+import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
 
 export const QuotesInbox: React.FC = () => {
   const navigate = useNavigate();
-  const { assignmentId } = useEmployeeAssignment();
+  const location = useLocation();
+  const {
+    assignmentId: primaryAssignmentId,
+    linkedCount,
+    linkedSummaries,
+    isLoading: assignmentLoading,
+  } = useEmployeeAssignment();
+  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  const { effectiveId: assignmentId, needsPicker } = useMemo(
+    () =>
+      resolveScopedAssignmentId({
+        linkedCount,
+        linkedSummaries,
+        primaryAssignmentId,
+        queryAssignmentId,
+      }),
+    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+  );
   const [rfqs, setRfqs] = useState<RfqSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!assignmentId) {
+    if (!assignmentId || needsPicker) {
       setRfqs([]);
       setLoading(false);
       return;
@@ -34,11 +54,34 @@ export const QuotesInbox: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assignmentId]);
+  }, [assignmentId, needsPicker]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  if (assignmentLoading) {
+    return (
+      <AppShell title="Quotes inbox" subtitle="Track vendor replies and quotation threads.">
+        <Card padding="lg">
+          <p className="text-sm text-[#6b7280]">Loading…</p>
+        </Card>
+      </AppShell>
+    );
+  }
+
+  if (!assignmentLoading && needsPicker && linkedSummaries.length > 0) {
+    return (
+      <AppShell title="Quotes inbox" subtitle="Track vendor replies and quotation threads.">
+        <EmployeeScopedAssignmentPicker
+          title="Which assignment’s quotes?"
+          subtitle="You have multiple linked relocations. Choose one to load RFQs for that assignment."
+          linkedSummaries={linkedSummaries}
+          targetBasePath={buildRoute('quotesInbox')}
+        />
+      </AppShell>
+    );
+  }
 
   if (!assignmentId) {
     return (
@@ -73,7 +116,9 @@ export const QuotesInbox: React.FC = () => {
             <p className="text-sm text-[#6b7280]">
               No RFQs yet. Create one from the services flow after shortlisting vendors.
             </p>
-            <Button onClick={() => navigate('/services/rfq/new')}>Create RFQ</Button>
+            <Button onClick={() => navigate(withAssignmentQuery(buildRoute('servicesRfqNew'), assignmentId))}>
+              Create RFQ
+            </Button>
           </div>
         ) : (
           <div className="space-y-3">

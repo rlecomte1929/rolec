@@ -1383,11 +1383,20 @@ export const requirementsAPI = {
 };
 
 export const employeeAPI = {
-  getCurrentAssignment: async (): Promise<{ assignment: any }> => {
+  getCurrentAssignment: async (): Promise<{
+    assignment: any;
+    linked_assignments?: any[];
+    pending_claim_assignments?: any[];
+  }> => {
     return cachedRequest('employee:current-assignment', 30_000, async () => {
       const response = await api.get('/api/employee/assignments/current');
       return response.data;
     });
+  },
+  /** Compact linked + pending summaries (no case draft hydration). */
+  getAssignmentsOverview: async (): Promise<{ linked: any[]; pending: any[] }> => {
+    const response = await api.get('/api/employee/assignments/overview');
+    return response.data;
   },
   listMessages: async (): Promise<{ messages: any[] }> => {
     const response = await api.get('/api/employee/messages');
@@ -1395,6 +1404,15 @@ export const employeeAPI = {
   },
   claimAssignment: async (assignmentId: string, email: string): Promise<{ success: boolean; assignmentId?: string }> => {
     const response = await api.post(`/api/employee/assignments/${assignmentId}/claim`, { email });
+    invalidateApiCache('employee:current-assignment');
+    return response.data;
+  },
+  /** Hub pending rows only: strict eligibility (pending_claim + contact linked + company + invites). */
+  linkPendingAssignment: async (
+    assignmentId: string,
+    email: string
+  ): Promise<{ success: boolean; assignmentId?: string; alreadyLinked?: boolean }> => {
+    const response = await api.post(`/api/employee/assignments/${assignmentId}/link-pending`, { email });
     invalidateApiCache('employee:current-assignment');
     return response.data;
   },

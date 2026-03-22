@@ -112,6 +112,7 @@ def create_assignment_with_contact_and_invites(
         )
 
     aid = assignment_id or str(uuid.uuid4())
+    pending_mode = "pending_claim" if not employee_user_id else None
     db.create_assignment(
         assignment_id=aid,
         case_id=case_id,
@@ -123,6 +124,7 @@ def create_assignment_with_contact_and_invites(
         employee_first_name=employee_first_name,
         employee_last_name=employee_last_name,
         employee_contact_id=employee_contact_id,
+        employee_link_mode=pending_mode,
     )
 
     invite_token: Optional[str] = None

@@ -3,6 +3,11 @@ Canonical auto-claim / link path for employees after login, signup, or loading e
 
 Idempotent: safe to call repeatedly. Company isolation via employee_contact rows; legacy rows match
 normalized identifier only. Revoked-only claim invites block auto-attach for that assignment.
+
+Assignments created via `create_assignment_with_contact_and_invites` without a pre-linked auth user
+are stored with `case_assignments.employee_link_mode = 'pending_claim'` and are **not** auto-attached
+here; the employee must claim explicitly (manual claim API or future accept flow). Legacy rows with
+NULL `employee_link_mode` remain auto-reconcile eligible.
 """
 from __future__ import annotations
 

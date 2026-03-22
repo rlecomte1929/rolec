@@ -58,9 +58,22 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const showEmployeeNav = (isEmployeeRole && !isHrRole) || (role === 'ADMIN' && isOnEmployeeRoute);
   const showHrNav = isHrRole && !(role === 'ADMIN' && isOnEmployeeRoute) && !showAdminContextOnly;
   const { selectedCaseId } = useSelectedCase();
-  const { assignmentId: assignmentIdFromContext } = useEmployeeAssignment();
+  const { assignmentId: assignmentIdFromContext, linkedCount, isLoading: employeeAssignmentLoading } =
+    useEmployeeAssignment();
   const assignmentIdFromPath = location.pathname.match(/^\/employee\/case\/([^/]+)/)?.[1] ?? null;
-  const assignmentId = assignmentIdFromContext ?? assignmentIdFromPath;
+
+  const myAssignmentsHref = buildRoute('employeeDashboard');
+  const myCaseHref =
+    employeeAssignmentLoading && !assignmentIdFromPath
+      ? myAssignmentsHref
+      : linkedCount > 1
+        ? myAssignmentsHref
+        : linkedCount === 1 && assignmentIdFromContext
+          ? `/employee/case/${assignmentIdFromContext}/summary`
+          : assignmentIdFromPath
+            ? `/employee/case/${assignmentIdFromPath}/summary`
+            : myAssignmentsHref;
+  const myCaseNavLabel = linkedCount > 1 ? 'My assignments' : 'My case';
   const { context: adminContext, refresh: refreshAdminContext } = useAdminContext();
 
   const isActiveRoute = (path: string) => {
@@ -148,14 +161,20 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   Dashboard
                 </Link>
                 <Link
-                  to={assignmentId ? `/employee/case/${assignmentId}/summary` : buildRoute('employeeDashboard')}
+                  to={myCaseHref}
+                  title={
+                    linkedCount > 1
+                      ? 'Choose a case from your dashboard when you have multiple assignments'
+                      : undefined
+                  }
                   className={`px-3 py-1 rounded-full border ${
-                    (location.pathname.includes('/wizard') || location.pathname.includes('/summary'))
+                    (location.pathname.includes('/wizard') || location.pathname.includes('/summary')) &&
+                    location.pathname.startsWith('/employee/case/')
                       ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
                       : 'border-transparent hover:text-[#0b2b43]'
                   }`}
                 >
-                  My Case
+                  {myCaseNavLabel}
                 </Link>
                 <Link
                   to={buildRoute('services')}

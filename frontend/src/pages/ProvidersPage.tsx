@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { EmployeeScopedAssignmentPicker } from '../components/employee/EmployeeScopedAssignmentPicker';
 import { Alert, Button, Card } from '../components/antigravity';
 import { API_BASE_URL, employeeAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../utils/employeeAssignmentScope';
 import { TrustBlock } from '../features/services/TrustBlock';
 import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
 import { StickyContinueBar } from '../features/services/StickyContinueBar';
@@ -42,7 +44,25 @@ type ServiceState = {
 };
 
 export const ProvidersPage: React.FC = () => {
-  const { assignmentId, isLoading: assignmentLoading, refetch } = useEmployeeAssignment();
+  const location = useLocation();
+  const {
+    assignmentId: primaryAssignmentId,
+    linkedCount,
+    linkedSummaries,
+    isLoading: assignmentLoading,
+    refetch,
+  } = useEmployeeAssignment();
+  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  const { effectiveId: assignmentId, needsPicker } = useMemo(
+    () =>
+      resolveScopedAssignmentId({
+        linkedCount,
+        linkedSummaries,
+        primaryAssignmentId,
+        queryAssignmentId,
+      }),
+    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+  );
   const [services, setServices] = useState<Record<string, ServiceState>>({});
   const [policy, setPolicy] = useState<{ currency: string; caps: Record<string, number>; total_cap?: number | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,7 +75,7 @@ export const ProvidersPage: React.FC = () => {
 
   useEffect(() => {
     if (assignmentLoading) return;
-    if (!assignmentId) {
+    if (!assignmentId || needsPicker) {
       setIsLoading(false);
       return;
     }
@@ -113,7 +133,7 @@ export const ProvidersPage: React.FC = () => {
       }
     };
     load();
-  }, [assignmentId, assignmentLoading, navigate]);
+  }, [assignmentId, assignmentLoading, needsPicker, navigate]);
 
   const selectedKeys = useMemo(
     () => new Set(Object.entries(services).filter(([, v]) => v.selected).map(([k]) => k)),
@@ -163,13 +183,14 @@ export const ProvidersPage: React.FC = () => {
   const handleContinue = async () => {
     const ok = await handleSave();
     if (!ok) return;
+    if (!assignmentId) return;
     const selected = new Set(
       Object.entries(services)
         .filter(([, v]) => v.selected)
         .map(([k]) => k as ServiceKey)
     );
     setSelectedServices(selected);
-    navigate(buildRoute('servicesQuestions'));
+    navigate(withAssignmentQuery(buildRoute('servicesQuestions'), assignmentId));
   };
 
   if (assignmentLoading || isLoading) {
@@ -179,6 +200,19 @@ export const ProvidersPage: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0b2b43] mx-auto mb-4" />
           <p className="text-[#6b7280]">Loading services...</p>
         </div>
+      </AppShell>
+    );
+  }
+
+  if (!assignmentLoading && needsPicker && linkedSummaries.length > 0) {
+    return (
+      <AppShell title="Services" subtitle="Choose which relocation this services session applies to.">
+        <EmployeeScopedAssignmentPicker
+          title="Which assignment are you working on?"
+          subtitle="You have more than one linked assignment. Pick one to continue — you can switch later from the dashboard or by opening Services again with a different choice."
+          linkedSummaries={linkedSummaries}
+          targetBasePath={buildRoute('services')}
+        />
       </AppShell>
     );
   }

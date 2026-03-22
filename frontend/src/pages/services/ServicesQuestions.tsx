@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { EmployeeScopedAssignmentPicker } from '../../components/employee/EmployeeScopedAssignmentPicker';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { DynamicServicesQuestionnaire, validateDynamicAnswers, type DynamicQuestion } from '../../features/services/DynamicServicesQuestionnaire';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
@@ -9,9 +10,10 @@ import { useServicesWorkflowState } from '../../features/services/useServicesWor
 import { servicesAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
-import { ROUTE_DEFS } from '../../navigation/routes';
+import { ROUTE_DEFS, buildRoute } from '../../navigation/routes';
 import type { ServiceKey } from '../../features/services/serviceConfig';
 import { recommendationsEngineAPI } from '../../features/recommendations/api';
+import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
 
 const SERVICES_QUESTIONS_PATH = ROUTE_DEFS.servicesQuestions.path;
 
@@ -35,7 +37,23 @@ export const ServicesQuestions: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { selectedServices, setSelectedServices, setRecommendations, setShortlist, answers, setAnswers } = useServicesFlow();
-  const { assignmentId } = useEmployeeAssignment();
+  const {
+    assignmentId: primaryAssignmentId,
+    linkedCount,
+    linkedSummaries,
+    isLoading: assignmentLoading,
+  } = useEmployeeAssignment();
+  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  const { effectiveId: assignmentId, needsPicker } = useMemo(
+    () =>
+      resolveScopedAssignmentId({
+        linkedCount,
+        linkedSummaries,
+        primaryAssignmentId,
+        queryAssignmentId,
+      }),
+    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+  );
   const workflow = useServicesWorkflowState();
   const [caseId, setCaseId] = useState<string | null>(null);
   const [initialAnswers, setInitialAnswers] = useState<Record<string, unknown>>({});
@@ -85,7 +103,7 @@ export const ServicesQuestions: React.FC = () => {
   // Single combined load: assignment, case, services, answers, questions (replaces 4 separate requests)
   useEffect(() => {
     let cancelled = false;
-    if (!assignmentId) return;
+    if (!assignmentId || needsPicker) return;
     setQuestionsLoading(true);
     setQuestionsError(null);
     const fallback = Array.from(wizardServices);
@@ -141,7 +159,7 @@ export const ServicesQuestions: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, setAnswers, setSelectedServices, questionsFallbackKey]);
+  }, [assignmentId, needsPicker, setAnswers, setSelectedServices, questionsFallbackKey]);
 
   const onAnswersChange = useCallback(
     (next: Record<string, unknown>) => {
@@ -202,12 +220,41 @@ export const ServicesQuestions: React.FC = () => {
     }
   }, [answers, byService, caseId]);
 
+  if (assignmentLoading) {
+    return (
+      <AppShell title="Service questions" subtitle="Answer a few questions so we can personalize providers.">
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0b2b43] mx-auto mb-4" />
+          <p className="text-[#6b7280]">Loading assignment…</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (needsPicker && linkedSummaries.length > 0) {
+    return (
+      <AppShell title="Service questions" subtitle="Choose which assignment these questions apply to.">
+        <EmployeeScopedAssignmentPicker
+          title="Which assignment?"
+          subtitle="You have multiple linked relocations. Select one to load preferences for that case."
+          linkedSummaries={linkedSummaries}
+          targetBasePath={buildRoute('servicesQuestions')}
+        />
+      </AppShell>
+    );
+  }
+
   if (wizardServices.size === 0) {
     return (
       <AppShell title="Service questions" subtitle="Answer a few questions so we can personalize providers.">
         <Card padding="lg">
           <Alert variant="info">Select at least one service before answering questions.</Alert>
-          <Button className="mt-4" onClick={() => navigate('/services')}>
+          <Button
+            className="mt-4"
+            onClick={() =>
+              navigate({ pathname: buildRoute('services'), search: location.search })
+            }
+          >
             Back to services
           </Button>
         </Card>
@@ -251,7 +298,7 @@ export const ServicesQuestions: React.FC = () => {
       setRecommendations(results);
       setShortlist(new Map());
       workflow.toRecommendationsReady();
-      navigate('/services/recommendations');
+      navigate(withAssignmentQuery(buildRoute('servicesRecommendations'), assignmentId));
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'response' in err
@@ -291,7 +338,10 @@ export const ServicesQuestions: React.FC = () => {
 
       <Card padding="lg" className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <button onClick={() => navigate('/services')} className="text-sm text-[#0b2b43] hover:underline">
+          <button
+            onClick={() => navigate({ pathname: buildRoute('services'), search: location.search })}
+            className="text-sm text-[#0b2b43] hover:underline"
+          >
             ← Change services
           </button>
           {questionsLoading ? (
@@ -319,7 +369,7 @@ export const ServicesQuestions: React.FC = () => {
       )}
 
       <div className="flex flex-wrap items-center gap-3 mt-6">
-        <Button variant="outline" onClick={() => navigate('/services')}>
+        <Button variant="outline" onClick={() => navigate({ pathname: buildRoute('services'), search: location.search })}>
           Back
         </Button>
         <Button variant="outline" onClick={onExplicitSave} disabled={isSavingAnswers || workflow.isBusy}>

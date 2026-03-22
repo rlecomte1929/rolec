@@ -5,6 +5,7 @@ import type { LoginRequest, RegisterRequest, UserRole } from '../types';
 import { setAuthItem } from '../utils/demo';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { trackAuthPerf } from '../perf/authPerf';
+import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
 import type { PostSignupReconciliation } from '../types';
 
 function shouldPersistReconciliation(rec: PostSignupReconciliation | null | undefined): boolean {
@@ -60,12 +61,22 @@ export const useAuth = () => {
     if (email && payload.password) {
       const supabaseT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
       trackAuthPerf({ stage: 'token_refresh_start' });
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
+        role: response.user.role,
+        targetRouteKey: response.user.role === 'EMPLOYEE' ? 'employeeDashboard' : 'hrDashboard',
+        source: 'login',
+      });
       redirectByRole(response.user.role);
       void signInSupabase(email, payload.password).then(() => {
         const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - supabaseT0;
         trackAuthPerf({ stage: 'token_refresh_end', durationMs: dur });
       });
     } else {
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
+        role: response.user.role,
+        targetRouteKey: response.user.role === 'EMPLOYEE' ? 'employeeDashboard' : 'hrDashboard',
+        source: 'login',
+      });
       redirectByRole(response.user.role);
     }
     return response;
@@ -88,6 +99,11 @@ export const useAuth = () => {
       }
     }
     const emailForSb = response.user.email ?? payload.email?.trim() ?? null;
+    trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
+      role: response.user.role,
+      targetRouteKey: response.user.role === 'EMPLOYEE' ? 'employeeDashboard' : 'hrDashboard',
+      source: 'register',
+    });
     redirectByRole(response.user.role);
     if (emailForSb && payload.password) {
       void signInSupabase(emailForSb, payload.password);

@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { EmployeeScopedAssignmentPicker } from '../../components/employee/EmployeeScopedAssignmentPicker';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { buildRoute } from '../../navigation/routes';
+import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
 
 const SERVICE_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -18,8 +20,25 @@ const SERVICE_LABELS: Record<string, string> = {
 
 export const ServicesRfqNew: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { recommendations, shortlist } = useServicesFlow();
-  const { assignmentId } = useEmployeeAssignment();
+  const {
+    assignmentId: primaryAssignmentId,
+    linkedCount,
+    linkedSummaries,
+    isLoading: assignmentLoading,
+  } = useEmployeeAssignment();
+  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  const { effectiveId: assignmentId, needsPicker } = useMemo(
+    () =>
+      resolveScopedAssignmentId({
+        linkedCount,
+        linkedSummaries,
+        primaryAssignmentId,
+        queryAssignmentId,
+      }),
+    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+  );
   const [caseId, setCaseId] = useState<string | null>(null);
   const [caseLoading, setCaseLoading] = useState(true);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -38,7 +57,7 @@ export const ServicesRfqNew: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    if (!assignmentId) {
+    if (!assignmentId || needsPicker) {
       setCaseLoading(false);
       return;
     }
@@ -57,7 +76,42 @@ export const ServicesRfqNew: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [assignmentId]);
+  }, [assignmentId, needsPicker]);
+
+  if (assignmentLoading) {
+    return (
+      <AppShell title="RFQ builder" subtitle="Generate quotation requests for shortlisted vendors.">
+        <Card padding="lg">
+          <p className="text-sm text-[#6b7280]">Loading…</p>
+        </Card>
+      </AppShell>
+    );
+  }
+
+  if (needsPicker && linkedSummaries.length > 0) {
+    return (
+      <AppShell title="RFQ builder" subtitle="Generate quotation requests for shortlisted vendors.">
+        <EmployeeScopedAssignmentPicker
+          title="Which assignment is this RFQ for?"
+          subtitle="You have multiple linked relocations. Choose one to load case details for RFQs."
+          linkedSummaries={linkedSummaries}
+          targetBasePath={buildRoute('servicesRfqNew')}
+        />
+      </AppShell>
+    );
+  }
+
+  if (!assignmentId) {
+    return (
+      <AppShell title="RFQ builder" subtitle="Generate quotation requests for shortlisted vendors.">
+        <Card padding="lg">
+          <p className="text-sm text-[#6b7280]">
+            Sign in as an employee with an assignment to use the RFQ builder.
+          </p>
+        </Card>
+      </AppShell>
+    );
+  }
 
   if (shortlisted.length === 0) {
     return (
@@ -66,7 +120,13 @@ export const ServicesRfqNew: React.FC = () => {
           <p className="text-sm text-[#6b7280] mb-4">
             Go to recommendations, choose one vendor per service, then return here to create your RFQ.
           </p>
-          <Button onClick={() => navigate('/services/recommendations')}>Back to recommendations</Button>
+          <Button
+            onClick={() =>
+              navigate(withAssignmentQuery(buildRoute('servicesRecommendations'), assignmentId))
+            }
+          >
+            Back to recommendations
+          </Button>
         </Card>
       </AppShell>
     );
@@ -83,7 +143,12 @@ export const ServicesRfqNew: React.FC = () => {
         {!caseLoading && !caseId && (
           <Alert variant="warning" title="Case information missing">
             Complete your case setup from the services page first, then try again.
-            <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate('/services')}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => navigate(withAssignmentQuery(buildRoute('services'), assignmentId))}
+            >
               Go to Services
             </Button>
           </Alert>
@@ -107,12 +172,17 @@ export const ServicesRfqNew: React.FC = () => {
           </ul>
           <div className="flex flex-wrap gap-3">
             <Link
-              to={buildRoute('resources')}
+              to={withAssignmentQuery(buildRoute('resources'), assignmentId)}
               className="inline-flex items-center justify-center font-medium rounded-lg px-4 py-2.5 bg-[#0b2b43] text-white hover:bg-[#123651] transition-colors"
             >
               Explore Resources
             </Link>
-            <Button variant="outline" onClick={() => navigate('/services/recommendations')}>
+            <Button
+              variant="outline"
+              onClick={() =>
+                navigate(withAssignmentQuery(buildRoute('servicesRecommendations'), assignmentId))
+              }
+            >
               Back to recommendations
             </Button>
           </div>

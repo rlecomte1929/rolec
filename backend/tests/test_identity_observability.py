@@ -192,8 +192,8 @@ class IdentityObservabilityFlowTests(unittest.TestCase):
         completes = [p for p in payloads if p.get("event") == "identity.reconcile.complete"]
         self.assertTrue(completes)
         last = completes[-1]
-        self.assertEqual(last.get("new_attachments"), 1)
-        self.assertIn(r.assignment_id, last.get("attached_assignment_ids", []))
+        self.assertEqual(last.get("new_attachments"), 0)
+        self.assertEqual(last.get("attached_assignment_ids") or [], [])
 
 
 if __name__ == "__main__":

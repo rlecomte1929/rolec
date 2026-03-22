@@ -2,7 +2,11 @@
 Structured identity / assignment lifecycle logs for verification and ops.
 
 Log line format: ``identity_obs {"event":"...","request_id":"...",...}``
-Search in aggregators: ``identity_obs`` or ``"event":"identity.``
+Search in aggregators: ``identity_obs`` or event prefix ``identity.``.
+
+Common assignment-linking events: ``identity.assignments.overview`` (linked/pending counts),
+``identity.claim.manual`` / ``identity.claim.manual.failed``, ``identity.claim.pending_explicit`` /
+``identity.claim.pending_explicit.failed``.
 
 **Privacy:** raw emails are never logged. Use ``principal_fingerprint`` (SHA-256 prefix) for correlation.
 IDs (assignment_id, employee_contact_id, company_id, auth_user_id) are logged in full for traceability in secured logs.

@@ -5,12 +5,14 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
-import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { EmployeeScopedAssignmentPicker } from '../components/employee/EmployeeScopedAssignmentPicker';
 import { buildRoute } from '../navigation/routes';
 import { Card, Button, Input } from '../components/antigravity';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { resourcesAPI } from '../api/client';
+import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../utils/employeeAssignmentScope';
 import type {
   ResourcesPagePayload,
   ResourceContext,
@@ -80,14 +82,45 @@ function formatEventDate(iso: string): string {
 // --- Hook: resolve assignment/case id for API ---
 function useResourcesContext() {
   const { caseId: caseIdParam } = useParams<{ caseId: string }>();
-  const { assignmentId, isLoading: assignmentLoading } = useEmployeeAssignment();
+  const location = useLocation();
+  const {
+    assignmentId: primaryAssignmentId,
+    linkedCount,
+    linkedSummaries,
+    isLoading: assignmentLoading,
+  } = useEmployeeAssignment();
 
-  const effectiveId = caseIdParam ?? assignmentId ?? null;
-  const source = caseIdParam ? 'case' : 'assignment';
+  const queryAssignmentId = useMemo(
+    () => parseAssignmentSearchParam(location.search),
+    [location.search]
+  );
+
+  const scoped = useMemo(() => {
+    if (caseIdParam) {
+      return {
+        effectiveId: caseIdParam,
+        needsPicker: false,
+        source: 'case' as const,
+      };
+    }
+    const { effectiveId, needsPicker } = resolveScopedAssignmentId({
+      linkedCount,
+      linkedSummaries,
+      primaryAssignmentId,
+      queryAssignmentId,
+    });
+    return {
+      effectiveId,
+      needsPicker,
+      source: 'assignment' as const,
+    };
+  }, [caseIdParam, linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]);
 
   return {
-    effectiveId,
-    source,
+    effectiveId: scoped.effectiveId,
+    source: scoped.source,
+    needsPicker: scoped.needsPicker,
+    linkedSummaries,
     isLoading: !caseIdParam && assignmentLoading,
     isCaseRoute: !!caseIdParam,
   };
@@ -95,7 +128,13 @@ function useResourcesContext() {
 
 export const Resources: React.FC = () => {
   const navigate = useNavigate();
-  const { effectiveId, isLoading: contextLoading, isCaseRoute } = useResourcesContext();
+  const {
+    effectiveId,
+    needsPicker,
+    linkedSummaries,
+    isLoading: contextLoading,
+    isCaseRoute,
+  } = useResourcesContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const [payload, setPayload] = useState<ResourcesPagePayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -241,13 +280,26 @@ export const Resources: React.FC = () => {
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  if (contextLoading || (loading && !payload)) {
+  if (contextLoading || (loading && !payload && !(needsPicker && !isCaseRoute))) {
     return (
       <AppShell title="Resources" subtitle="Practical tips for your relocation.">
         <div className="flex flex-col items-center justify-center py-16 text-[#6b7280]">
           <div className="animate-pulse h-8 w-48 bg-[#e2e8f0] rounded mb-4" />
           <div className="animate-pulse h-4 w-64 bg-[#e2e8f0] rounded" />
         </div>
+      </AppShell>
+    );
+  }
+
+  if (!isCaseRoute && needsPicker && linkedSummaries.length > 0) {
+    return (
+      <AppShell title="Resources" subtitle="Practical tips for your relocation.">
+        <EmployeeScopedAssignmentPicker
+          title="Which assignment’s resources?"
+          subtitle="You have multiple linked relocations. Pick one to load destination-specific guides and events."
+          linkedSummaries={linkedSummaries}
+          targetBasePath={buildRoute('resources')}
+        />
       </AppShell>
     );
   }

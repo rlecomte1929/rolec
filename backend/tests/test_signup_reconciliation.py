@@ -78,14 +78,16 @@ class SignupReconciliationTests(unittest.TestCase):
         rec = reconcile_employee_signup_after_register(
             db, user_id=new_uid, email=email, role="EMPLOYEE", request_id=None
         )
-        self.assertIn(r.assignment_id, rec["attachedAssignmentIds"])
+        self.assertEqual(rec["attachedAssignmentIds"], [])
         self.assertIn(r.employee_contact_id, rec["linkedContactIds"])
 
         asn = db.get_assignment_by_id(r.assignment_id)
-        self.assertEqual(asn.get("employee_user_id"), new_uid)
+        self.assertIsNone(asn.get("employee_user_id"))
 
         ec = db.get_employee_contact_by_id(r.employee_contact_id)
         self.assertEqual(ec.get("linked_auth_user_id"), new_uid)
+        db.attach_employee_to_assignment(r.assignment_id, new_uid, request_id=None)
+        self.assertEqual(db.get_assignment_by_id(r.assignment_id).get("employee_user_id"), new_uid)
 
     def test_reconcile_admin_created_same_as_hr_path(self):
         """Admin-style assignment (same unified creation) reconciles the same way."""
@@ -114,7 +116,9 @@ class SignupReconciliationTests(unittest.TestCase):
         rec = reconcile_employee_signup_after_register(
             db, user_id=new_uid, email=email, role="EMPLOYEE", request_id=None
         )
-        self.assertEqual(rec["attachedAssignmentIds"], [r.assignment_id])
+        self.assertEqual(rec["attachedAssignmentIds"], [])
+        db.attach_employee_to_assignment(r.assignment_id, new_uid, request_id=None)
+        self.assertEqual(db.get_assignment_by_id(r.assignment_id).get("employee_user_id"), new_uid)
 
     def test_reconcile_no_pending_records(self):
         db = self.db

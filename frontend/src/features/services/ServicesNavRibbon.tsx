@@ -16,6 +16,7 @@ const STEPS = [
 export const ServicesNavRibbon: React.FC = () => {
   const location = useLocation();
   const currentPath = location.pathname;
+  const qs = location.search || '';
 
   return (
     <nav
@@ -27,7 +28,7 @@ export const ServicesNavRibbon: React.FC = () => {
           step.path === currentPath ||
           (step.path !== '/services' && currentPath.startsWith(step.path));
         const isServices = step.key === 'services';
-        const path = isServices ? buildRoute('services') : step.path;
+        const path = (isServices ? buildRoute('services') : step.path) + qs;
 
         return (
           <React.Fragment key={step.key}>

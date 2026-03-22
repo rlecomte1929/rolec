@@ -70,6 +70,20 @@ from .identity_observability import (
     principal_fingerprint_from_login_identifier,
 )
 from .services.assignment_claim_link_service import reconcile_pending_assignment_claims
+from .services.employee_assignment_overview import build_employee_assignment_overview
+from .services.explicit_pending_link_service import (
+    execute_pending_explicit_link,
+    finalize_assignment_claim_attach,
+    PENDING_LINK_COMPANY_MISMATCH,
+    PENDING_LINK_CONTACT_NOT_LINKED,
+    PENDING_LINK_EXTRA_VERIFICATION,
+    PENDING_LINK_IDENTITY_MISMATCH,
+    PENDING_LINK_INVITE_REVOKED,
+    PENDING_LINK_NO_CONTACT,
+    PENDING_LINK_NOT_FOUND,
+    PENDING_LINK_NOT_PENDING,
+    PENDING_LINK_OTHER_OWNER,
+)
 from .dev_seed_auth import ensure_dev_seed_auth_user
 from .agents.orchestrator import IntakeOrchestrator
 from .agents.compliance_engine import ComplianceEngine
@@ -3431,12 +3445,86 @@ def get_employee_assignment(
             request_id=getattr(request.state, "request_id", None),
         )
 
-    assignment = db.get_assignment_for_employee(effective["id"], request_id=request.state.request_id)
+    rid = request.state.request_id
+    eid = effective["id"]
+    linked = db.list_linked_assignments_for_employee(eid, request_id=rid)
+    pending_claim = db.list_pending_claim_assignments_for_auth_user(eid, request_id=rid)
+    for row in linked:
+        row["status"] = normalize_status(row.get("status"))
+    for row in pending_claim:
+        row["status"] = normalize_status(row.get("status"))
+    primary = linked[0] if linked else None
+    if not primary:
+        return {
+            "assignment": None,
+            "linked_assignments": [],
+            "pending_claim_assignments": pending_claim,
+        }
+    return {
+        "assignment": primary,
+        "linked_assignments": linked,
+        "pending_claim_assignments": pending_claim,
+    }
 
-    if not assignment:
-        return {"assignment": None}
-    assignment["status"] = normalize_status(assignment["status"])
-    return {"assignment": assignment}
+
+@app.get("/api/employee/assignments/overview")
+def get_employee_assignments_overview(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Lightweight linked + pending assignment summaries for the authenticated employee.
+    No case draft/profile hydration.
+    """
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    if not user.get("impersonation"):
+        _best_effort_reconcile_employee_assignments(
+            context="get_employee_assignments_overview",
+            user_id=effective["id"],
+            email=effective.get("email"),
+            username=effective.get("username"),
+            role=UserRole.EMPLOYEE.value,
+            request_id=getattr(request.state, "request_id", None),
+        )
+    rid = getattr(request.state, "request_id", None)
+    overview = build_employee_assignment_overview(
+        db,
+        effective["id"],
+        request_id=rid,
+        normalize_assignment_status=normalize_status,
+    )
+    linked_n = len(overview.get("linked") or [])
+    pending_n = len(overview.get("pending") or [])
+    identity_event(
+        "identity.assignments.overview",
+        request_id=rid,
+        auth_user_id=str(effective["id"]).strip(),
+        linked_count=linked_n,
+        pending_count=pending_n,
+    )
+    return overview
+
+
+@app.post("/api/employee/assignments/{assignment_id}/dismiss-pending")
+def dismiss_pending_claim_assignment(
+    request: Request,
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """Employee declines a pending_claim assignment (same contact as linked account); does not unlink linked work."""
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    ok = db.dismiss_pending_claim_assignment_for_auth_user(
+        assignment_id,
+        effective["id"],
+        request_id=getattr(request.state, "request_id", None),
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=404,
+            detail="Pending assignment not found or not dismissible for this account.",
+        )
+    return {"ok": True}
 
 
 @app.get("/api/employee/me/assignment-package-policy")
@@ -3561,6 +3649,67 @@ def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.
     return {"messages": items}
 
 
+def _validated_employee_claim_identifiers(
+    effective: Dict[str, Any],
+    claim: ClaimAssignmentRequest,
+    *,
+    claim_req_id: str,
+    assignment_id: str,
+    failure_event: str,
+) -> List[str]:
+    """Require account + request identifiers; return normalized lowercase identifiers for identity checks."""
+    user_identifiers = [x.lower() for x in [effective.get("email"), effective.get("username")] if x]
+    if not user_identifiers:
+        identity_event(
+            failure_event,
+            failure_code="CLAIM_MISSING_ACCOUNT_IDENTIFIER",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_MISSING_ACCOUNT_IDENTIFIER,
+                "Your account must have an email or username set",
+            ),
+        )
+
+    if not claim.email or not claim.email.strip():
+        identity_event(
+            failure_event,
+            failure_code="CLAIM_MISSING_REQUEST_IDENTIFIER",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_MISSING_REQUEST_IDENTIFIER,
+                "Enter your email or username to claim",
+            ),
+        )
+
+    req_ident = claim.email.strip().lower()
+    if req_ident not in user_identifiers:
+        identity_event(
+            failure_event,
+            failure_code="CLAIM_ACCOUNT_IDENTIFIER_MISMATCH",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ACCOUNT_IDENTIFIER_MISMATCH,
+                "The identifier you entered does not match your account. Use the same email or username you used to log in.",
+            ),
+        )
+    return user_identifiers
+
+
 @app.post("/api/employee/assignments/{assignment_id}/claim")
 def claim_assignment(
     request: Request,
@@ -3582,56 +3731,13 @@ def claim_assignment(
         )
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    # User may have email, username, or both. HR can assign using either.
-    user_identifiers = [x.lower() for x in [effective.get("email"), effective.get("username")] if x]
-    if not user_identifiers:
-        identity_event(
-            "identity.claim.manual.failed",
-            failure_code="CLAIM_MISSING_ACCOUNT_IDENTIFIER",
-            request_id=claim_req_id or None,
-            assignment_id=assignment_id,
-            auth_user_id=effective.get("id"),
-        )
-        raise HTTPException(
-            status_code=400,
-            detail=err_detail(
-                IdentityErrorCode.CLAIM_MISSING_ACCOUNT_IDENTIFIER,
-                "Your account must have an email or username set",
-            ),
-        )
-
-    if not claim.email or not claim.email.strip():
-        identity_event(
-            "identity.claim.manual.failed",
-            failure_code="CLAIM_MISSING_REQUEST_IDENTIFIER",
-            request_id=claim_req_id or None,
-            assignment_id=assignment_id,
-            auth_user_id=effective.get("id"),
-        )
-        raise HTTPException(
-            status_code=400,
-            detail=err_detail(
-                IdentityErrorCode.CLAIM_MISSING_REQUEST_IDENTIFIER,
-                "Enter your email or username to claim",
-            ),
-        )
-
-    req_ident = claim.email.strip().lower()
-    if req_ident not in user_identifiers:
-        identity_event(
-            "identity.claim.manual.failed",
-            failure_code="CLAIM_ACCOUNT_IDENTIFIER_MISMATCH",
-            request_id=claim_req_id or None,
-            assignment_id=assignment_id,
-            auth_user_id=effective.get("id"),
-        )
-        raise HTTPException(
-            status_code=403,
-            detail=err_detail(
-                IdentityErrorCode.CLAIM_ACCOUNT_IDENTIFIER_MISMATCH,
-                "The identifier you entered does not match your account. Use the same email or username you used to log in.",
-            ),
-        )
+    user_identifiers = _validated_employee_claim_identifiers(
+        effective,
+        claim,
+        claim_req_id=claim_req_id,
+        assignment_id=assignment_id,
+        failure_event="identity.claim.manual.failed",
+    )
 
     ident_match = db.assignment_identity_matches_user_identifiers(
         assignment, user_identifiers, request_id=None
@@ -3702,54 +3808,136 @@ def claim_assignment(
             )
         # Same person (e.g. assignment has profile id, user logged in with user id): attach and proceed
 
-    case_id = (assignment.get("case_id") or assignment.get("canonical_case_id") or "").strip()
-    db.attach_employee_to_assignment(assignment_id, effective["id"])
-    db.mark_invites_claimed(
-        assignment.get("employee_identifier") or "",
-        claimed_by_user_id=effective["id"],
+    finalize_assignment_claim_attach(
+        db,
         assignment_id=assignment_id,
-    )
-    now_iso = datetime.utcnow().isoformat()
-    if case_id:
-        try:
-            db.ensure_case_participant(
-                case_id=case_id,
-                person_id=effective["id"],
-                role="relocatee",
-                joined_at=now_iso,
-            )
-        except Exception as exc:
-            log.warning(
-                "ensure_case_participant skipped assignment_id=%s case_id=%s role=relocatee error=%s",
-                assignment_id, case_id, str(exc),
-            )
-    event_type = "assignment.claimed"
-    try:
-        if case_id:
-            db.insert_case_event(
-                case_id=case_id,
-                assignment_id=assignment_id,
-                actor_principal_id=effective["id"],
-                event_type=event_type,
-                payload={},
-            )
-    except Exception as exc:
-        log.warning(
-            "insert_case_event skipped assignment_id=%s case_id=%s event_type=%s error=%s",
-            assignment_id,
-            case_id,
-            event_type,
-            str(exc),
-        )
-    identity_event(
-        "identity.claim.manual",
-        outcome="attached",
-        request_id=claim_req_id or None,
-        assignment_id=assignment_id,
-        auth_user_id=effective_id,
-        principal_fingerprint=principal_fingerprint(effective.get("email"), effective.get("username")),
+        employee_user_id=effective["id"],
+        assignment=assignment,
+        request_id=None,
+        identity_event_name="identity.claim.manual",
+        identity_outcome="attached",
+        claim_req_id=claim_req_id,
+        principal_email=effective.get("email"),
+        principal_username=effective.get("username"),
+        case_event_payload={},
     )
     return {"success": True, "assignmentId": assignment_id}
+
+
+@app.post("/api/employee/assignments/{assignment_id}/link-pending")
+def link_pending_assignment(
+    request: Request,
+    assignment_id: str,
+    claim: ClaimAssignmentRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Explicit link for hub "pending" rows only: pending_claim + contact already linked to this user +
+    overview-equivalent company alignment + invite gates. Idempotent when already linked to caller.
+    """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    claim_req_id = getattr(request.state, "request_id", None) or ""
+    fail_ev = "identity.claim.pending_explicit.failed"
+
+    user_identifiers = _validated_employee_claim_identifiers(
+        effective,
+        claim,
+        claim_req_id=claim_req_id,
+        assignment_id=assignment_id,
+        failure_event=fail_ev,
+    )
+
+    res = execute_pending_explicit_link(
+        db,
+        auth_user_id=str(effective["id"]).strip(),
+        assignment_id=assignment_id,
+        user_identifiers=user_identifiers,
+        request_id=claim_req_id or None,
+        claim_req_id=claim_req_id,
+        principal_email=effective.get("email"),
+        principal_username=effective.get("username"),
+    )
+
+    if res.get("success"):
+        return {
+            "success": True,
+            "assignmentId": res.get("assignmentId"),
+            "alreadyLinked": bool(res.get("alreadyLinked")),
+        }
+
+    reason = res.get("reason") or "unknown"
+    aid = res.get("assignmentId") or assignment_id
+    eff_id = str(effective["id"]).strip()
+
+    identity_event(
+        fail_ev,
+        failure_code=str(reason).upper(),
+        request_id=claim_req_id or None,
+        assignment_id=aid,
+        auth_user_id=eff_id,
+    )
+
+    if reason == PENDING_LINK_NOT_FOUND:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if reason == PENDING_LINK_OTHER_OWNER:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ASSIGNMENT_ALREADY_CLAIMED,
+                "Assignment already linked to another account.",
+            ),
+        )
+    if reason == PENDING_LINK_NOT_PENDING:
+        raise HTTPException(
+            status_code=409,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ASSIGNMENT_NOT_PENDING,
+                "This assignment is not waiting for explicit link. Use manual claim with your assignment ID if HR gave you one.",
+            ),
+        )
+    if reason in (PENDING_LINK_NO_CONTACT, PENDING_LINK_CONTACT_NOT_LINKED):
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_PENDING_CONTACT_MISMATCH,
+                "This assignment is not linked to your profile for self-serve linking. Contact HR or use manual assignment ID entry.",
+            ),
+        )
+    if reason == PENDING_LINK_IDENTITY_MISMATCH:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ASSIGNMENT_IDENTIFIER_MISMATCH,
+                "This assignment was created for a different employee. HR must have entered your exact email or username when assigning the case.",
+            ),
+        )
+    if reason == PENDING_LINK_COMPANY_MISMATCH:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_PENDING_COMPANY_MISMATCH,
+                "Company details for this assignment do not match your contact record. Contact HR to fix the assignment.",
+            ),
+        )
+    if reason == PENDING_LINK_INVITE_REVOKED:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_INVITE_REVOKED,
+                "This invitation was cancelled by HR. Contact HR if you still need access to this case.",
+            ),
+        )
+    if reason == PENDING_LINK_EXTRA_VERIFICATION:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_EXTRA_VERIFICATION_REQUIRED,
+                "Additional HR verification is required before this assignment can be linked. Contact your HR contact.",
+            ),
+        )
+
+    raise HTTPException(status_code=400, detail="Unable to link assignment")
 
 
 @app.get("/api/employee/journey/next-question", response_model=EmployeeJourneyNextQuestion)

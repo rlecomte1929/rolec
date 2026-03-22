@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import type { RecommendationResponse, RecommendationItem } from './types';
 
 /** Category key to policy-budget cap key (from resolved HR policy) */
@@ -47,7 +49,23 @@ export const PackageSummary: React.FC<Props> = ({
   onStartOver,
 }) => {
   const [policyCaps, setPolicyCaps] = useState<PolicyCaps | null>(null);
-  const { assignmentId } = useEmployeeAssignment();
+  const location = useLocation();
+  const {
+    assignmentId: primaryAssignmentId,
+    linkedCount,
+    linkedSummaries,
+  } = useEmployeeAssignment();
+  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  const { effectiveId: assignmentId } = useMemo(
+    () =>
+      resolveScopedAssignmentId({
+        linkedCount,
+        linkedSummaries,
+        primaryAssignmentId,
+        queryAssignmentId,
+      }),
+    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+  );
 
   useEffect(() => {
     if (assignmentId) {

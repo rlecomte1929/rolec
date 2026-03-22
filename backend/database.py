@@ -394,6 +394,19 @@ class Database:
                 "ON public.case_assignments(employee_contact_id)"
             )
         )
+        conn.execute(
+            text(
+                "ALTER TABLE public.case_assignments "
+                "ADD COLUMN IF NOT EXISTS employee_link_mode text"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_case_assignments_employee_link_mode "
+                "ON public.case_assignments(employee_link_mode) "
+                "WHERE employee_user_id IS NULL AND employee_link_mode IS NOT NULL"
+            )
+        )
         try:
             conn.execute(
                 text(
@@ -1839,7 +1852,10 @@ class Database:
                     ("rfqs", "canonical_case_id", "TEXT"),
                     ("quotes", "created_by_user_id", "TEXT"),
                 ]
-                for tbl, col, typ in cc_cols + [("case_assignments", "employee_contact_id", "TEXT")]:
+                for tbl, col, typ in cc_cols + [
+                    ("case_assignments", "employee_contact_id", "TEXT"),
+                    ("case_assignments", "employee_link_mode", "TEXT"),
+                ]:
                     try:
                         cols = conn.execute(text(f"PRAGMA table_info({tbl})")).fetchall()
                         if not any(c[1] == col for c in cols):
@@ -1856,6 +1872,7 @@ class Database:
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS canonical_case_id TEXT"))
                 conn.execute(text("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS created_by_user_id TEXT"))
                 conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_contact_id TEXT"))
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_link_mode TEXT"))
             try:
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS relocation_tasks (
@@ -2311,6 +2328,7 @@ class Database:
         employee_first_name: Optional[str] = None,
         employee_last_name: Optional[str] = None,
         employee_contact_id: Optional[str] = None,
+        employee_link_mode: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
         efn = (employee_first_name or "").strip() or None
@@ -2320,13 +2338,14 @@ class Database:
             ec_row = self.get_employee_contact_by_id(ecid_check, request_id=request_id)
             if not ec_row:
                 raise ValueError(f"employee_contact_id not found: {ecid_check}")
+        elm = (employee_link_mode or "").strip() or None
         with self.engine.begin() as conn:
             self._exec(
                 conn,
                 "INSERT INTO case_assignments "
                 "(id, case_id, canonical_case_id, hr_user_id, employee_user_id, employee_identifier, status, "
-                "employee_first_name, employee_last_name, employee_contact_id, created_at, updated_at) "
-                "VALUES (:id, :cid, :canonical, :hr, :emp, :ident, :status, :efn, :eln, :ecid, :ca, :ua)",
+                "employee_first_name, employee_last_name, employee_contact_id, employee_link_mode, created_at, updated_at) "
+                "VALUES (:id, :cid, :canonical, :hr, :emp, :ident, :status, :efn, :eln, :ecid, :elm, :ca, :ua)",
                 {
                     "id": assignment_id,
                     "cid": case_id,
@@ -2338,6 +2357,7 @@ class Database:
                     "efn": efn,
                     "eln": eln,
                     "ecid": employee_contact_id,
+                    "elm": elm,
                     "ca": now,
                     "ua": now,
                 },
@@ -2379,7 +2399,8 @@ class Database:
             ).fetchone()
             self._exec(
                 conn,
-                "UPDATE case_assignments SET employee_user_id = :emp, updated_at = :ua WHERE id = :id",
+                "UPDATE case_assignments SET employee_user_id = :emp, employee_link_mode = NULL, "
+                "updated_at = :ua WHERE id = :id",
                 {"emp": employee_user_id, "ua": now, "id": assignment_id},
                 op_name="attach_employee_to_assignment",
                 request_id=request_id,
@@ -2460,7 +2481,9 @@ class Database:
             rows = self._exec(
                 conn,
                 "SELECT * FROM case_assignments "
-                "WHERE employee_contact_id = :ecid AND employee_user_id IS NULL",
+                "WHERE employee_contact_id = :ecid AND employee_user_id IS NULL "
+                "AND (employee_link_mode IS NULL OR TRIM(COALESCE(employee_link_mode, '')) = '' "
+                "OR LOWER(TRIM(employee_link_mode)) NOT IN ('pending_claim', 'dismissed'))",
                 {"ecid": employee_contact_id.strip()},
                 op_name="list_unassigned_assignments_for_employee_contact",
                 request_id=request_id,
@@ -2505,6 +2528,35 @@ class Database:
         except (OperationalError, ProgrammingError):
             return []
 
+    def map_claim_invite_statuses_by_assignments(
+        self, assignment_ids: List[str], request_id: Optional[str] = None
+    ) -> Dict[str, List[str]]:
+        """Bulk load invite statuses keyed by assignment_id (lowercase status strings)."""
+        ids = sorted({(x or "").strip() for x in assignment_ids if x and str(x).strip()})
+        if not ids:
+            return {}
+        placeholders = ", ".join(f":a{i}" for i in range(len(ids)))
+        params: Dict[str, Any] = {f"a{i}": ids[i] for i in range(len(ids))}
+        out: Dict[str, List[str]] = {aid: [] for aid in ids}
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        f"SELECT assignment_id, status FROM assignment_claim_invites "
+                        f"WHERE assignment_id IN ({placeholders})"
+                    ),
+                    params,
+                ).fetchall()
+            for row in rows:
+                m = row._mapping if hasattr(row, "_mapping") else dict(row)
+                aid = (m.get("assignment_id") or "").strip()
+                s = (m.get("status") or "").strip().lower()
+                if aid and s:
+                    out.setdefault(aid, []).append(s)
+            return out
+        except (OperationalError, ProgrammingError):
+            return {aid: [] for aid in ids}
+
     def is_assignment_auto_claim_blocked_by_revoked_invites(self, assignment_id: str) -> bool:
         """
         True when claim-invite rows exist, none are pending/claimed, and all are revoked.
@@ -2539,7 +2591,9 @@ class Database:
                     conn,
                     "SELECT * FROM case_assignments WHERE employee_user_id IS NULL "
                     "AND (employee_contact_id IS NULL OR TRIM(COALESCE(employee_contact_id, '')) = '') "
-                    "AND LOWER(TRIM(COALESCE(employee_identifier, ''))) = :ident",
+                    "AND LOWER(TRIM(COALESCE(employee_identifier, ''))) = :ident "
+                    "AND (employee_link_mode IS NULL OR TRIM(COALESCE(employee_link_mode, '')) = '' "
+                    "OR LOWER(TRIM(employee_link_mode)) NOT IN ('pending_claim', 'dismissed'))",
                     {"ident": ident},
                     op_name="list_unassigned_assignments_legacy_for_identifiers",
                     request_id=request_id,
@@ -3842,20 +3896,178 @@ class Database:
         d = self._row_to_dict(row)
         return (d or {}).get("vendor_id")
 
+    def list_linked_assignments_for_employee(
+        self,
+        employee_user_id: str,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        if not (employee_user_id or "").strip():
+            return []
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT * FROM case_assignments WHERE employee_user_id = :emp "
+                "ORDER BY created_at DESC",
+                {"emp": employee_user_id.strip()},
+                op_name="list_linked_assignments_for_employee",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_pending_claim_assignments_for_auth_user(
+        self,
+        auth_user_id: str,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Assignments tied to employee_contacts linked to this user, awaiting explicit claim."""
+        uid = (auth_user_id or "").strip()
+        if not uid:
+            return []
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT a.* FROM case_assignments a "
+                "INNER JOIN employee_contacts ec ON ec.id = a.employee_contact_id "
+                "WHERE TRIM(COALESCE(ec.linked_auth_user_id, '')) = :uid "
+                "AND a.employee_user_id IS NULL "
+                "AND LOWER(TRIM(COALESCE(a.employee_link_mode, ''))) = 'pending_claim' "
+                "ORDER BY a.created_at DESC",
+                {"uid": uid},
+                op_name="list_pending_claim_assignments_for_auth_user",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def dismiss_pending_claim_assignment_for_auth_user(
+        self,
+        assignment_id: str,
+        auth_user_id: str,
+        request_id: Optional[str] = None,
+    ) -> bool:
+        """Mark pending_claim assignment as dismissed for this user (no account link). Returns True if updated."""
+        aid = (assignment_id or "").strip()
+        uid = (auth_user_id or "").strip()
+        if not aid or not uid:
+            return False
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            res = self._exec(
+                conn,
+                "UPDATE case_assignments SET employee_link_mode = 'dismissed', updated_at = :ua "
+                "WHERE id = :aid AND employee_user_id IS NULL "
+                "AND LOWER(TRIM(COALESCE(employee_link_mode, ''))) = 'pending_claim' "
+                "AND employee_contact_id IN ("
+                "  SELECT id FROM employee_contacts WHERE TRIM(COALESCE(linked_auth_user_id, '')) = :uid"
+                ")",
+                {"aid": aid, "uid": uid, "ua": now},
+                op_name="dismiss_pending_claim_assignment_for_auth_user",
+                request_id=request_id,
+            )
+            try:
+                rc = res.rowcount
+            except Exception:
+                rc = 0
+        return bool(rc and rc > 0)
+
     def get_assignment_for_employee(
         self,
         employee_user_id: str,
         request_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
+        linked = self.list_linked_assignments_for_employee(employee_user_id, request_id=request_id)
+        return linked[0] if linked else None
+
+    def list_employee_linked_assignment_overview(
+        self,
+        employee_user_id: str,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Lightweight linked rows for the employee overview: assignment + case + company + destination hints.
+        Scoped strictly by case_assignments.employee_user_id.
+        """
+        uid = (employee_user_id or "").strip()
+        if not uid:
+            return []
+        join_on = _relocation_cases_join_on("a", style="standard")
+        sql = f"""
+            SELECT
+                a.id AS assignment_id,
+                COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id) AS case_id,
+                a.status AS assignment_status,
+                a.created_at AS assignment_created_at,
+                a.updated_at AS assignment_updated_at,
+                rc.host_country AS host_country,
+                rc.home_country AS home_country,
+                rc.stage AS relocation_stage,
+                rc.status AS relocation_case_status,
+                COALESCE(rc.company_id, hu.company_id) AS company_id,
+                c.name AS company_name
+            FROM case_assignments a
+            LEFT JOIN relocation_cases rc ON {join_on}
+            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+            LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, hu.company_id)
+            WHERE a.employee_user_id = :uid
+            ORDER BY a.created_at DESC
+        """
         with self.engine.connect() as conn:
-            row = self._exec(
+            rows = self._exec(
                 conn,
-                "SELECT * FROM case_assignments WHERE employee_user_id = :emp ORDER BY created_at DESC LIMIT 1",
-                {"emp": employee_user_id},
-                op_name="get_assignment_for_employee",
+                sql,
+                {"uid": uid},
+                op_name="list_employee_linked_assignment_overview",
                 request_id=request_id,
-            ).fetchone()
-        return self._row_to_dict(row)
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_employee_pending_assignment_overview(
+        self,
+        auth_user_id: str,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Pending_claim assignments for contacts already linked to this auth user.
+        Drops rows where relocation case company disagrees with employee_contact company (anti-leak).
+        """
+        uid = (auth_user_id or "").strip()
+        if not uid:
+            return []
+        join_on = _relocation_cases_join_on("a", style="standard")
+        sql = f"""
+            SELECT
+                a.id AS assignment_id,
+                COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id) AS case_id,
+                a.created_at AS assignment_created_at,
+                a.employee_link_mode AS employee_link_mode,
+                ec.company_id AS contact_company_id,
+                rc.host_country AS host_country,
+                rc.home_country AS home_country,
+                COALESCE(rc.company_id, ec.company_id) AS company_id,
+                c.name AS company_name
+            FROM case_assignments a
+            INNER JOIN employee_contacts ec ON ec.id = a.employee_contact_id
+            LEFT JOIN relocation_cases rc ON {join_on}
+            LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, ec.company_id)
+            WHERE TRIM(COALESCE(ec.linked_auth_user_id, '')) = :uid
+            AND a.employee_user_id IS NULL
+            AND LOWER(TRIM(COALESCE(a.employee_link_mode, ''))) = 'pending_claim'
+            AND (
+                rc.id IS NULL
+                OR TRIM(COALESCE(ec.company_id, '')) = ''
+                OR TRIM(COALESCE(rc.company_id, '')) = ''
+                OR CAST(rc.company_id AS TEXT) = CAST(ec.company_id AS TEXT)
+            )
+            ORDER BY a.created_at DESC
+        """
+        with self.engine.connect() as conn:
+            rows = self._exec(
+                conn,
+                sql,
+                {"uid": uid},
+                op_name="list_employee_pending_assignment_overview",
+                request_id=request_id,
+            ).fetchall()
+        return self._rows_to_list(rows)
 
     def get_unassigned_assignment_by_identifier(
         self,

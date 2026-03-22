@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card, LoadingButton } from '../../components/antigravity';
 import { PackageSummary } from '../../features/recommendations/PackageSummary';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
+import { buildRoute } from '../../navigation/routes';
 
 const CATEGORY_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -17,15 +18,17 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export const ServicesEstimate: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { recommendations, shortlist } = useServicesFlow();
   const [rfqNavLoading, setRfqNavLoading] = useState(false);
+  const go = (path: string) => navigate({ pathname: path, search: location.search });
 
   if (!recommendations) {
     return (
       <AppShell title="Estimate" subtitle="Review your shortlisted providers.">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280] mb-4">No recommendations yet.</p>
-          <Button onClick={() => navigate('/services/questions')}>Answer questions</Button>
+          <Button onClick={() => go(buildRoute('servicesQuestions'))}>Answer questions</Button>
         </Card>
       </AppShell>
     );
@@ -45,8 +48,8 @@ export const ServicesEstimate: React.FC = () => {
         results={recommendations}
         selectedPackage={shortlist}
         categoryLabels={CATEGORY_LABELS}
-        onBack={() => navigate('/services/recommendations')}
-        onStartOver={() => navigate('/services')}
+        onBack={() => go(buildRoute('servicesRecommendations'))}
+        onStartOver={() => go(buildRoute('services'))}
       />
       <div className="mt-6 flex items-center justify-end">
         <LoadingButton
@@ -56,7 +59,7 @@ export const ServicesEstimate: React.FC = () => {
           onClick={async () => {
             setRfqNavLoading(true);
             await new Promise((r) => setTimeout(r, 120));
-            navigate('/services/rfq/new');
+            go(buildRoute('servicesRfqNew'));
           }}
         >
           Request quotations

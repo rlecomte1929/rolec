@@ -79,6 +79,7 @@ class UnifiedAssignmentCreationTests(unittest.TestCase):
         asn = db.get_assignment_by_id(r.assignment_id)
         self.assertIsNotNone(asn)
         self.assertEqual(asn.get("employee_contact_id"), r.employee_contact_id)
+        self.assertEqual((asn.get("employee_link_mode") or "").lower(), "pending_claim")
 
     def test_second_assignment_reuses_same_contact_same_company(self):
         db = self.db
