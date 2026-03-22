@@ -166,14 +166,19 @@ export const HrPolicy: React.FC = () => {
 
   if (role === 'EMPLOYEE') {
     return (
-      <AppShell title="Assignment Package & Limits" subtitle="View your applicable policy and benefit limits.">
+      <AppShell title="Package and limits" subtitle="Policy and benefit caps for this assignment.">
         <EmployeePolicyContent />
       </AppShell>
     );
   }
 
   return (
-    <AppShell title={adminCompanyId ? 'Admin: Policy workspace' : 'Policy'} subtitle={adminCompanyId ? 'Inspect and assist with company policy' : 'Manage relocation policies for your company.'}>
+    <AppShell
+      title={adminCompanyId ? 'Admin: policy' : 'Policy'}
+      subtitle={
+        adminCompanyId ? 'View and edit company policy as admin.' : 'Company relocation policies.'
+      }
+    >
       <div data-hr-policy-page="v2">
         {adminCompanyId && (
           <p className="text-sm text-[#6b7280] mb-4">
@@ -212,7 +217,7 @@ export const HrPolicy: React.FC = () => {
 };
 
 function formatDate(val: string | null | undefined): string {
-  if (!val) return '—';
+  if (!val) return '-';
   try {
     return new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
@@ -221,7 +226,7 @@ function formatDate(val: string | null | undefined): string {
 }
 
 function formatDateTime(val: string | null | undefined): string {
-  if (!val) return '—';
+  if (!val) return '-';
   try {
     return new Date(val).toLocaleString('en-US', {
       year: 'numeric',
@@ -316,7 +321,7 @@ function DetectedMetadataDisplay({ metadata }: { metadata: PolicyDocumentMetadat
   const MetaRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="flex gap-2 py-1 text-sm">
       <span className="text-[#6b7280] min-w-[10rem]">{label}:</span>
-      <span className="text-[#0b2b43]">{value ?? '—'}</span>
+      <span className="text-[#0b2b43]">{value ?? '-'}</span>
     </div>
   );
 
@@ -330,7 +335,7 @@ function DetectedMetadataDisplay({ metadata }: { metadata: PolicyDocumentMetadat
         ))}
       </span>
     ) : (
-      <span className="text-[#9ca3af]">—</span>
+      <span className="text-[#9ca3af]"> - </span>
     );
 
   const BoolBadge = ({ v }: { v: boolean }) => (
@@ -1142,9 +1147,9 @@ function PolicyDocumentIntakeSection({
                     <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-[#6b7280]">
                       <span>Status: {doc.processing_status}</span>
                       <span>•</span>
-                      <span>Type: {DOC_TYPE_LABELS[doc.detected_document_type] || doc.detected_document_type || '—'}</span>
+                      <span>Type: {DOC_TYPE_LABELS[doc.detected_document_type] || doc.detected_document_type || '-'}</span>
                       <span>•</span>
-                      <span>Scope: {SCOPE_LABELS[doc.detected_policy_scope] || doc.detected_policy_scope || '—'}</span>
+                      <span>Scope: {SCOPE_LABELS[doc.detected_policy_scope] || doc.detected_policy_scope || '-'}</span>
                       <span>•</span>
                       <span>Uploaded: {formatDateTime(doc.uploaded_at)}</span>
                       {needsReview && (

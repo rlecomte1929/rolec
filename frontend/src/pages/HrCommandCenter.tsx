@@ -88,21 +88,21 @@ export const HrCommandCenter: React.FC = () => {
   };
 
   return (
-    <AppShell title="Command Center" subtitle="Portfolio & risk overview across all relocation cases.">
+    <AppShell title="Command Center" subtitle="Portfolio view and risk signals across cases.">
       <div className="space-y-6">
-        {/* KPI Row — shell visible immediately, values stream in */}
+        {/* KPI Row: shell visible immediately, values stream in */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          <KPICard title="Active Cases" value={kpisLoading && kpis == null ? '…' : (kpis?.activeCases ?? '—')} />
-          <KPICard title="Action Required" value={kpisLoading && kpis == null ? '…' : (kpis?.actionRequiredCount ?? '—')} subtitle="Needs HR attention" />
-          <KPICard title="Departing Soon" value={kpisLoading && kpis == null ? '…' : (kpis?.departingSoonCount ?? '—')} subtitle="Next 30 days" />
-          <KPICard title="Completed (YTD)" value={kpisLoading && kpis == null ? '…' : (kpis?.completedCount ?? '—')} subtitle="Approved cases" />
-          <KPICard title="At Risk" value={kpisLoading && kpis == null ? '…' : (kpis?.atRiskCount ?? '—')} subtitle="Red" />
-          <KPICard title="Attention Needed" value={kpisLoading && kpis == null ? '…' : (kpis?.attentionNeededCount ?? '—')} subtitle="Yellow" />
-          <KPICard title="Overdue Tasks" value={kpisLoading && kpis == null ? '…' : (kpis?.overdueTasksCount ?? '—')} />
-          <KPICard title="Budget Overruns" value={kpisLoading && kpis == null ? '…' : (kpis?.budgetOverrunsCount ?? '—')} />
+          <KPICard title="Active Cases" value={kpisLoading && kpis == null ? '…' : (kpis?.activeCases ?? '-')} />
+          <KPICard title="Action Required" value={kpisLoading && kpis == null ? '…' : (kpis?.actionRequiredCount ?? '-')} subtitle="Needs HR attention" />
+          <KPICard title="Departing Soon" value={kpisLoading && kpis == null ? '…' : (kpis?.departingSoonCount ?? '-')} subtitle="Next 30 days" />
+          <KPICard title="Completed (YTD)" value={kpisLoading && kpis == null ? '…' : (kpis?.completedCount ?? '-')} subtitle="Approved cases" />
+          <KPICard title="At Risk" value={kpisLoading && kpis == null ? '…' : (kpis?.atRiskCount ?? '-')} subtitle="Red" />
+          <KPICard title="Attention Needed" value={kpisLoading && kpis == null ? '…' : (kpis?.attentionNeededCount ?? '-')} subtitle="Yellow" />
+          <KPICard title="Overdue Tasks" value={kpisLoading && kpis == null ? '…' : (kpis?.overdueTasksCount ?? '-')} />
+          <KPICard title="Budget Overruns" value={kpisLoading && kpis == null ? '…' : (kpis?.budgetOverrunsCount ?? '-')} />
         </div>
 
-        {/* Cases Table — shell visible immediately */}
+        {/* Cases Table: shell visible immediately */}
         <Card padding="lg">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-[#0b2b43]">Cases</h2>
@@ -152,7 +152,7 @@ export const HrCommandCenter: React.FC = () => {
                       className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] cursor-pointer transition-colors"
                     >
                       <td className="py-3 pr-4 text-[#0b2b43] font-medium">{row.employeeIdentifier}</td>
-                      <td className="py-3 pr-4 text-[#4b5563]">{row.destCountry || '—'}</td>
+                      <td className="py-3 pr-4 text-[#4b5563]">{row.destCountry || '-'}</td>
                       <td className="py-3 pr-4 text-[#4b5563]">{row.status}</td>
                       <td className="py-3 pr-4">
                         <RiskBadge status={row.riskStatus as 'green' | 'yellow' | 'red'} size="sm" />
@@ -161,9 +161,9 @@ export const HrCommandCenter: React.FC = () => {
                       <td className="py-3 pr-4 text-[#4b5563]">
                         {row.budgetEstimated != null && row.budgetLimit != null
                           ? `${row.budgetEstimated} / ${row.budgetLimit}`
-                          : '—'}
+                          : '-'}
                       </td>
-                      <td className="py-3 text-[#4b5563]">{row.nextDeadline || '—'}</td>
+                      <td className="py-3 text-[#4b5563]">{row.nextDeadline || '-'}</td>
                     </tr>
                   ))}
                 </tbody>

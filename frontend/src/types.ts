@@ -619,7 +619,7 @@ export interface IntakeChecklistItemDTO {
   label: string;
   satisfied: boolean;
   category: string;
-  /** case_milestone.milestone_type — scroll target in relocation plan */
+  /** case_milestone.milestone_type: scroll target in relocation plan */
   linked_tracker_task_type?: string | null;
 }
 
@@ -670,7 +670,7 @@ export interface AssignmentDetail {
   employeeEmail?: string | null;
   /** profiles.full_name when intake name not yet on RelocationProfile */
   linkedEmployeeFullName?: string | null;
-  /** relocation_cases / draft relocationBasics — fallback when movePlan empty */
+  /** relocation_cases / draft relocationBasics: fallback when movePlan empty */
   caseOriginHint?: string | null;
   caseDestinationHint?: string | null;
   /** Explicit intake + document checkpoints (merged readiness block) */

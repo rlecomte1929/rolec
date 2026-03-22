@@ -17,7 +17,7 @@ export const WhyReloPassPage: React.FC = () => {
 
   return (
     <PublicLayout>
-      {/* 1. HERO — Names the mess, offers a cleaner path */}
+      {/* 1. HERO: Names the mess, offers a cleaner path */}
       <Section spacing="lg" background="transparent" fillViewport>
         <HeroSurface
           title={c.hero.headline}
@@ -35,7 +35,7 @@ export const WhyReloPassPage: React.FC = () => {
         />
       </Section>
 
-      {/* 2. CURRENT REALITY — What teams recognise */}
+      {/* 2. CURRENT REALITY: What teams recognise */}
       <Section spacing="lg" background="muted">
         <SectionHeader title={c.currentReality.title} align="center" />
         <div className="mt-10 max-w-2xl mx-auto">
@@ -48,14 +48,14 @@ export const WhyReloPassPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 2b. THESIS — Bridging statement */}
+      {/* 2b. THESIS: Bridging statement */}
       <Section spacing="sm" background="transparent">
         <p className="text-center text-marketing-body-lg font-medium text-marketing-primary max-w-2xl mx-auto leading-relaxed">
           {c.thesis}
         </p>
       </Section>
 
-      {/* 3. WHY RELOPASS IS DIFFERENT — Differentiation blocks */}
+      {/* 3. WHY RELOPASS IS DIFFERENT: Differentiation blocks */}
       <Section spacing="lg" background="transparent">
         <SectionHeader title={c.differentiation.title} align="center" />
         <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 max-w-4xl mx-auto">
@@ -69,7 +69,7 @@ export const WhyReloPassPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 4. WHAT CHANGES FOR YOUR TEAM — Outcome bullets */}
+      {/* 4. WHAT CHANGES FOR YOUR TEAM: Outcome bullets */}
       <Section spacing="lg" background="muted">
         <SectionHeader title={c.outcomes.title} align="center" />
         <div className="mt-10 max-w-2xl mx-auto">
@@ -82,7 +82,7 @@ export const WhyReloPassPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 5. CTA — See why teams make the switch */}
+      {/* 5. CTA: See why teams make the switch */}
       <Section spacing="lg" background="transparent">
         <CTAPanel
           title={c.cta.headline}

@@ -24,7 +24,7 @@ export const Landing: React.FC = () => {
 
   return (
     <PublicLayout>
-      {/* 1. HERO — Two columns: text + CTAs left, visual right */}
+      {/* 1. HERO: Two columns: text + CTAs left, visual right */}
       <Section spacing="lg" background="transparent" fillViewport>
         <HeroSurface
           eyebrow={c.hero.eyebrow}
@@ -44,7 +44,7 @@ export const Landing: React.FC = () => {
         />
       </Section>
 
-      {/* 2. PROBLEM — 3 cards */}
+      {/* 2. PROBLEM: 3 cards */}
       <Section spacing="lg" background="muted">
         <SectionHeader
           title={c.problem.title}
@@ -61,7 +61,7 @@ export const Landing: React.FC = () => {
         </div>
       </Section>
 
-      {/* 3. SOLUTION — 4 blocks */}
+      {/* 3. SOLUTION: 4 blocks */}
       <Section spacing="lg" background="transparent">
         <SectionHeader
           title={c.solution.title}
@@ -79,7 +79,7 @@ export const Landing: React.FC = () => {
         </div>
       </Section>
 
-      {/* 4. DIFFERENTIATION / TRUST — Left text, right checklist */}
+      {/* 4. DIFFERENTIATION / TRUST: Left text, right checklist */}
       <Section spacing="lg" background="muted">
         <div className="max-w-5xl mx-auto">
         <TrustDifferentiation
@@ -90,7 +90,7 @@ export const Landing: React.FC = () => {
         </div>
       </Section>
 
-      {/* 5. FINAL CTA — Centered, compact, decisive */}
+      {/* 5. FINAL CTA: Centered, compact, decisive */}
       <Section spacing="lg" background="transparent">
         <CTAPanel
           title={c.finalCta.headline}

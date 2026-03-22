@@ -359,7 +359,7 @@ export const AdminStagingEventDetail: React.FC = () => {
                         <option value="">Select match...</option>
                         {matches.map((m) => (
                           <option key={m.id} value={m.id}>
-                            {m.title} ({m.city_name}) —{' '}
+                            {m.title} ({m.city_name})  - {' '}
                             {m.start_datetime
                               ? new Date(m.start_datetime).toLocaleDateString()
                               : '-'}
@@ -433,7 +433,7 @@ export const AdminStagingEventDetail: React.FC = () => {
                       {String(m.title ?? '')}
                     </Link>
                     <span className="ml-1 text-slate-500">
-                      {m.city_name} —{' '}
+                      {m.city_name}  - {' '}
                       {((m.similarity_score ?? 0) * 100).toFixed(0)}% match
                     </span>
                   </li>

@@ -32,7 +32,7 @@ type Props = {
 };
 
 /**
- * Merged profile completeness + compliance + route checklist — one actionable block.
+ * Merged profile completeness + compliance + route checklist: one actionable block.
  * Linked to relocation plan rows via linked_tracker_task_type (same case, no duplicate engine).
  */
 export const ReadinessAndActionsBlock: React.FC<Props> = ({
@@ -53,8 +53,7 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
     return (
       <Card padding="md" className="border border-amber-200 bg-amber-50/50">
         <p className="text-sm text-[#7a5e2a]">
-          Readiness summary is not available. Refresh the page or redeploy the API to load the merged readiness
-          view.
+          Readiness summary unavailable. Refresh the page. If it persists, check the API deployment.
         </p>
       </Card>
     );
@@ -75,14 +74,13 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
           </div>
           <p className="text-sm text-[#475569] mt-2 max-w-3xl">{ui.completion_basis}</p>
           <p className="text-xs text-[#64748b] mt-2 max-w-3xl leading-relaxed">
-            Intake checkpoints and compliance flags here are tied to <strong>relocation plan</strong> tasks in step 3
-            (same case). Use the plan for <strong>who owns</strong> each step and <strong>when it is due</strong> —
-            not legal verification unless an official source is cited in Case readiness.
+            Checklist items map to <strong>relocation plan</strong> tasks in step 3 (same case). Use the plan for owner
+            and due date. This is not legal advice unless Case readiness cites an official source.
           </p>
           {pctExplicit !== null && (
             <p className="text-xs text-[#64748b] mt-1">
-              Intake checkpoints: {pctExplicit}% ({ui.intake_satisfied}/{ui.intake_total}) — explicit fields below, not
-              a black-box score. Plan task completion is tracked separately in step 3.
+              Intake fields: {pctExplicit}% ({ui.intake_satisfied}/{ui.intake_total}) filled. Plan completion is tracked
+              in step 3.
             </p>
           )}
         </div>
@@ -174,9 +172,7 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
       <div className="mt-5">
         <div className="text-sm font-semibold text-[#0b2b43]">Suggested next actions</div>
         {ui.next_actions.length === 0 ? (
-          <p className="text-sm text-[#64748b] mt-2">
-            No automated suggestions — case may be in good shape for the checks above.
-          </p>
+          <p className="text-sm text-[#64748b] mt-2">No suggestions for this case right now.</p>
         ) : (
           <ol className="mt-2 list-decimal list-inside space-y-2 text-sm text-[#334155]">
             {ui.next_actions.map((a, i) => (

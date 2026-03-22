@@ -343,7 +343,7 @@ export const InternalThreadPanel: React.FC<Props> = ({
           </div>
 
           {thread.status === 'closed' && (
-            <p className="text-sm text-slate-500">Thread closed — reopen to add comments.</p>
+            <p className="text-sm text-slate-500">Thread closed. Reopen it to add comments.</p>
           )}
           {thread.status === 'open' && !replyTo && (
             <div className="space-y-2">

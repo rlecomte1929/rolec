@@ -38,7 +38,7 @@ export const AdminOpsSlaPage: React.FC = () => {
   return (
     <AdminOpsLayout
       title="SLA & Operations Dashboard"
-      subtitle="Review performance, SLA compliance, and operational bottlenecks"
+      subtitle="SLA and queue health"
     >
       <div className="space-y-6">
         <div className="flex justify-between">
@@ -115,7 +115,7 @@ export const AdminOpsSlaPage: React.FC = () => {
                         to={buildRoute('adminReviewQueueDetail', { id: String(b.id) })}
                         className="block rounded bg-slate-50 px-2 py-1 text-sm hover:bg-slate-100"
                       >
-                        {String((b.title as string)?.slice(0, 50) || 'Queue item')} — {String(b.priority_band ?? '')}
+                        {String((b.title as string)?.slice(0, 50) || 'Queue item')} · {String(b.priority_band ?? '')}
                       </Link>
                     ))
                   )}

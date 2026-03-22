@@ -145,7 +145,7 @@ export const AdminSources: React.FC = () => {
                         id={`edit-publisher-${s.id}`}
                       />
                     ) : (
-                      s.publisher || '—'
+                      s.publisher || '-'
                     )}
                   </td>
                   <td className="py-2 pr-4">
@@ -156,7 +156,7 @@ export const AdminSources: React.FC = () => {
                         ))}
                       </select>
                     ) : (
-                      s.source_type || '—'
+                      s.source_type || '-'
                     )}
                   </td>
                   <td className="py-2 pr-4">
@@ -167,7 +167,7 @@ export const AdminSources: React.FC = () => {
                         ))}
                       </select>
                     ) : (
-                      s.trust_tier || '—'
+                      s.trust_tier || '-'
                     )}
                   </td>
                   <td className="py-2 pr-4 max-w-[12rem] truncate">
@@ -179,7 +179,7 @@ export const AdminSources: React.FC = () => {
                         placeholder="URL"
                       />
                     ) : (
-                      s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 truncate block max-w-[12rem]">{s.url}</a> : '—'
+                      s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 truncate block max-w-[12rem]">{s.url}</a> : '-'
                     )}
                   </td>
                   <td className="py-2">

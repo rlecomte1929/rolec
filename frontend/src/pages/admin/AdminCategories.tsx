@@ -157,7 +157,7 @@ export const AdminCategories: React.FC = () => {
                       id={`edit-icon-${c.id}`}
                     />
                   ) : (
-                    c.icon_name || '—'
+                    c.icon_name || '-'
                   )}</td>
                   <td className="py-2 pr-4">{editing === c.id ? (
                     <input

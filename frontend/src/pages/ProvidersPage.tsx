@@ -195,7 +195,7 @@ export const ProvidersPage: React.FC = () => {
 
   if (assignmentLoading || isLoading) {
     return (
-      <AppShell title="Services" subtitle="Choose the services you need for your relocation.">
+      <AppShell title="Services" subtitle="Select what you need for this move.">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0b2b43] mx-auto mb-4" />
           <p className="text-[#6b7280]">Loading services...</p>
@@ -206,10 +206,10 @@ export const ProvidersPage: React.FC = () => {
 
   if (!assignmentLoading && needsPicker && linkedSummaries.length > 0) {
     return (
-      <AppShell title="Services" subtitle="Choose which relocation this services session applies to.">
+      <AppShell title="Services" subtitle="Pick the assignment for this session.">
         <EmployeeScopedAssignmentPicker
           title="Which assignment are you working on?"
-          subtitle="You have more than one linked assignment. Pick one to continue — you can switch later from the dashboard or by opening Services again with a different choice."
+          subtitle="Pick one assignment for this session. Change it anytime from the dashboard or by reopening Services with another choice."
           linkedSummaries={linkedSummaries}
           targetBasePath={buildRoute('services')}
         />
@@ -219,7 +219,7 @@ export const ProvidersPage: React.FC = () => {
 
   if (!assignmentId) {
     return (
-      <AppShell title="Services" subtitle="Choose the services you need for your relocation.">
+      <AppShell title="Services" subtitle="Select what you need for this move.">
         <Alert variant="info" className="mb-6">
           <p className="mb-3">No assignment found. You need an active assignment to use Services. If you completed the intake wizard, try refreshing your assignment.</p>
           <div className="flex gap-3">
@@ -234,7 +234,7 @@ export const ProvidersPage: React.FC = () => {
   }
 
   return (
-    <AppShell title="Services" subtitle="Choose the services you need for your relocation.">
+    <AppShell title="Services" subtitle="Select what you need for this move.">
       <ServicesNavRibbon />
       {loadError && (
         <Alert variant="error" className="mb-6">
@@ -261,9 +261,7 @@ export const ProvidersPage: React.FC = () => {
         <Card padding="lg">
             <div className="mb-6">
               <h1 className="text-2xl font-semibold text-[#0b2b43] mb-2">Your relocation plan</h1>
-              <p className="text-[#6b7280]">
-                Select the areas where you need support — we’ll build a clear plan so nothing falls through the cracks.
-              </p>
+              <p className="text-[#6b7280]">Select what you need. We save it for the next steps.</p>
               <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
               <div className="mt-4 p-3 bg-[#eef4f8] border border-[#0b2b43]/20 rounded-lg">
                 <p className="text-sm text-[#4b5563] mb-2">

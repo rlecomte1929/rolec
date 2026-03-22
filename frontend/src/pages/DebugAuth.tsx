@@ -24,23 +24,23 @@ export const DebugAuth: React.FC = () => {
           </div>
           <div>
             <span className="text-[#6b7280]">Token (first 12 chars): </span>
-            <span>{token ? `${token.slice(0, 12)}...` : '—'}</span>
+            <span>{token ? `${token.slice(0, 12)}...` : '-'}</span>
           </div>
           <div>
             <span className="text-[#6b7280]">User ID: </span>
-            <span>{userId || '—'}</span>
+            <span>{userId || '-'}</span>
           </div>
           <div>
             <span className="text-[#6b7280]">Email: </span>
-            <span>{email || '—'}</span>
+            <span>{email || '-'}</span>
           </div>
           <div>
             <span className="text-[#6b7280]">Username: </span>
-            <span>{username || '—'}</span>
+            <span>{username || '-'}</span>
           </div>
           <div>
             <span className="text-[#6b7280]">Role: </span>
-            <span>{role || '—'}</span>
+            <span>{role || '-'}</span>
           </div>
           <div>
             <span className="text-[#6b7280]">Storage: </span>

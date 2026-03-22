@@ -389,7 +389,7 @@ export const CaseWizardPage: React.FC = () => {
       if (currentStep === 1 && caseIdAfterSave) {
         try {
           await startResearch(caseIdAfterSave);
-          setBanner('Pulling destination requirements—shown in Step 5.');
+          setBanner('Pulling destination requirements - shown in Step 5.');
         } catch {
           // Research is non-blocking; continue to next step
         }
@@ -397,7 +397,7 @@ export const CaseWizardPage: React.FC = () => {
       navigate(`/employee/case/${assignmentId}/wizard/${currentStep + 1}`);
     } catch (err: any) {
       setError(err?.message || "Couldn't save. Try again.");
-      // Do not navigate on save failure — user stays on current step
+      // Do not navigate on save failure: user stays on current step
     } finally {
       setIsSaving(false);
     }
@@ -463,7 +463,7 @@ export const CaseWizardPage: React.FC = () => {
   const completedSteps = stepCompletion.completed;
 
   return (
-    <AppShell title="My Case" subtitle="Complete your relocation intake.">
+    <AppShell title="My case" subtitle="Relocation intake wizard.">
       <div className="max-w-6xl mx-auto space-y-6">
         {assignmentStatus === 'awaiting_intake' && hrFeedback && (
           <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">

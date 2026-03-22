@@ -37,7 +37,7 @@ export const HrEmployees: React.FC = () => {
   }, [navigate]);
 
   return (
-    <AppShell title="Employees" subtitle="Company employees">
+    <AppShell title="Employees" subtitle="People at your company on ReloPass">
       <div className="max-w-4xl">
         <div className="flex items-center justify-between gap-4 mb-4">
           <p className="text-sm text-[#6b7280]">
@@ -96,7 +96,7 @@ export const HrEmployees: React.FC = () => {
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="font-medium text-[#0b2b43]">
-                        {emp.full_name || emp.email || emp.profile_id || '—'}
+                        {emp.full_name || emp.email || emp.profile_id || '-'}
                       </div>
                       {emp.email && (
                         <div className="text-xs text-[#6b7280]">{emp.email}</div>

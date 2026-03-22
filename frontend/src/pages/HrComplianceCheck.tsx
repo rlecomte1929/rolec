@@ -167,7 +167,7 @@ export const HrComplianceCheck: React.FC = () => {
         day: 'numeric',
         year: 'numeric',
       })
-    : '—';
+    : '-';
 
   const filteredChecks = useMemo(() => {
     if (!report) return [];
@@ -193,7 +193,7 @@ export const HrComplianceCheck: React.FC = () => {
   const gateBlocked = report?.checks.some((check) => check.blocking) || false;
 
   return (
-    <AppShell title="Compliance Check" subtitle={`Understand compliance requirements for ${employeeName}'s case.`}>
+    <AppShell title="Compliance" subtitle={`${employeeName}: requirements check`}>
       {error && <Alert variant="error">{error}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading compliance checks...</div>}
 

@@ -24,10 +24,10 @@ export const CountryTable: React.FC<CountryTableProps> = ({ data, onSelect }) =>
         >
           <div className="text-sm font-semibold text-[#0b2b43]">{country.countryCode}</div>
           <div className="text-sm text-[#0b2b43]">
-            {country.lastUpdatedAt ? new Date(country.lastUpdatedAt).toLocaleDateString('en-US') : '—'}
+            {country.lastUpdatedAt ? new Date(country.lastUpdatedAt).toLocaleDateString('en-US') : '-'}
           </div>
           <div className="text-sm text-[#0b2b43]">{country.requirementsCount}</div>
-          <div className="text-sm text-[#0b2b43]">{country.confidenceScore ?? '—'}</div>
+          <div className="text-sm text-[#0b2b43]">{country.confidenceScore ?? '-'}</div>
           <div className="text-xs text-[#6b7280]">{country.topDomains.join(', ')}</div>
         </button>
       ))}

@@ -12,7 +12,7 @@ import { buildRoute } from '../../navigation/routes';
 type EvalFilter = 'all' | 'missing' | 'needs_review' | 'met';
 
 function JsonBlock({ value }: { value: unknown }) {
-  if (value == null) return <span className="text-[#9ca3af]">—</span>;
+  if (value == null) return <span className="text-[#9ca3af]"> - </span>;
   try {
     const s = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
     return (
@@ -94,7 +94,7 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
 
   if (!caseId) {
     return (
-      <AdminLayout title="Mobility case inspect" subtitle="Enter a mobility_cases.id (UUID) to load read-only data.">
+      <AdminLayout title="Mobility case inspect" subtitle="Enter mobility_cases.id (UUID) for read-only view">
         <Card padding="md" className="max-w-lg">
           <form
             className="space-y-3"
@@ -129,7 +129,7 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
   }
 
   return (
-    <AdminLayout title="Mobility case inspect" subtitle={`Case ${caseId} — read-only`}>
+    <AdminLayout title="Mobility case inspect" subtitle={`Case ${caseId} · read-only`}>
       <div className="mb-4 flex flex-wrap gap-2 items-center">
         <Link
           to={buildRoute('adminMobilityCases')}
@@ -163,17 +163,17 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
             <div className="text-sm font-semibold text-[#0b2b43] mb-2">Case summary</div>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
               <dt className="text-[#64748b]">ID</dt>
-              <dd className="font-mono">{String(caseRow.id ?? '—')}</dd>
+              <dd className="font-mono">{String(caseRow.id ?? '-')}</dd>
               <dt className="text-[#64748b]">Company</dt>
-              <dd className="font-mono">{String(caseRow.company_id ?? '—')}</dd>
+              <dd className="font-mono">{String(caseRow.company_id ?? '-')}</dd>
               <dt className="text-[#64748b]">Employee user</dt>
-              <dd className="font-mono">{String(caseRow.employee_user_id ?? '—')}</dd>
+              <dd className="font-mono">{String(caseRow.employee_user_id ?? '-')}</dd>
               <dt className="text-[#64748b]">Origin</dt>
-              <dd>{String(caseRow.origin_country ?? '—')}</dd>
+              <dd>{String(caseRow.origin_country ?? '-')}</dd>
               <dt className="text-[#64748b]">Destination</dt>
-              <dd>{String(caseRow.destination_country ?? '—')}</dd>
+              <dd>{String(caseRow.destination_country ?? '-')}</dd>
               <dt className="text-[#64748b]">Case type</dt>
-              <dd>{String(caseRow.case_type ?? '—')}</dd>
+              <dd>{String(caseRow.case_type ?? '-')}</dd>
               <dt className="text-[#64748b]">Metadata</dt>
               <dd className="sm:col-span-1">
                 <JsonBlock value={caseRow.metadata} />
@@ -199,8 +199,8 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
                     {people.map((p) => (
                       <tr key={String(p.id)} className="border-b border-[#f1f5f9]">
                         <td className="py-2 pr-2 font-mono text-xs">{String(p.id)}</td>
-                        <td className="py-2 pr-2">{String(p.role ?? '—')}</td>
-                        <td className="py-2 text-[#64748b]">{String(p.created_at ?? '—')}</td>
+                        <td className="py-2 pr-2">{String(p.role ?? '-')}</td>
+                        <td className="py-2 text-[#64748b]">{String(p.created_at ?? '-')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -227,10 +227,10 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
                   <tbody>
                     {documents.map((d) => (
                       <tr key={String(d.id)} className="border-b border-[#f1f5f9]">
-                        <td className="py-2 pr-2">{String(d.document_key ?? '—')}</td>
-                        <td className="py-2 pr-2">{String(d.document_status ?? '—')}</td>
-                        <td className="py-2 pr-2 font-mono text-xs">{String(d.person_id ?? '—')}</td>
-                        <td className="py-2 text-[#64748b]">{String(d.updated_at ?? '—')}</td>
+                        <td className="py-2 pr-2">{String(d.document_key ?? '-')}</td>
+                        <td className="py-2 pr-2">{String(d.document_status ?? '-')}</td>
+                        <td className="py-2 pr-2 font-mono text-xs">{String(d.person_id ?? '-')}</td>
+                        <td className="py-2 text-[#64748b]">{String(d.updated_at ?? '-')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -281,12 +281,12 @@ export const AdminMobilityCaseInspectPage: React.FC = () => {
                     {filteredEvaluations.map((ev) => (
                       <tr key={String(ev.id)} className="border-b border-[#f1f5f9] align-top">
                         <td className="py-2 pr-2 font-mono text-xs">
-                          {String(ev.requirement_code ?? ev.requirement_id ?? '—')}
+                          {String(ev.requirement_code ?? ev.requirement_id ?? '-')}
                         </td>
-                        <td className="py-2 pr-2">{String(ev.evaluation_status ?? '—')}</td>
-                        <td className="py-2 pr-2 max-w-md">{String(ev.reason_text ?? '—')}</td>
+                        <td className="py-2 pr-2">{String(ev.evaluation_status ?? '-')}</td>
+                        <td className="py-2 pr-2 max-w-md">{String(ev.reason_text ?? '-')}</td>
                         <td className="py-2 text-[#64748b] whitespace-nowrap">
-                          {String(ev.evaluated_at ?? ev.updated_at ?? '—')}
+                          {String(ev.evaluated_at ?? ev.updated_at ?? '-')}
                         </td>
                       </tr>
                     ))}

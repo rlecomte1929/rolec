@@ -34,7 +34,7 @@ export function getClientTransportErrorMessage(err: unknown): string | undefined
     response?: { status?: number };
   };
   if (e?.code === 'ECONNABORTED') {
-    return 'Request timed out. The API may be cold-starting or overloaded — wait a moment and try again.';
+    return 'Request timed out. Wait a moment and try again.';
   }
   if (!e?.response && typeof e?.message === 'string' && /network error/i.test(e.message)) {
     return (

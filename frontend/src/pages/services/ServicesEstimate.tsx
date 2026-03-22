@@ -25,7 +25,7 @@ export const ServicesEstimate: React.FC = () => {
 
   if (!recommendations) {
     return (
-      <AppShell title="Estimate" subtitle="Review your shortlisted providers.">
+      <AppShell title="Estimate" subtitle="Review your shortlist.">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280] mb-4">No recommendations yet.</p>
           <Button onClick={() => go(buildRoute('servicesQuestions'))}>Answer questions</Button>
@@ -37,7 +37,7 @@ export const ServicesEstimate: React.FC = () => {
   const hasShortlist = shortlist.size > 0;
 
   return (
-    <AppShell title="Estimate review" subtitle="Compare your shortlist with your company's HR policy caps.">
+    <AppShell title="Estimate review" subtitle="Shortlist vs HR policy caps.">
       <ServicesNavRibbon />
       <Card padding="lg" className="mb-6">
         <div className="text-sm text-[#4b5563]">

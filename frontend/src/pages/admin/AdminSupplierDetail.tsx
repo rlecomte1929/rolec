@@ -75,7 +75,7 @@ function CoverageSummary({ capabilities }: { capabilities: Capability[] }) {
       <div>
         <dt className="text-[#6b7280] text-sm mb-1">Countries covered</dt>
         <dd className="text-sm text-[#0b2b43]">
-          {hasGlobal ? 'Global (all countries)' : countries.length ? countries.join(', ') : '—'}
+          {hasGlobal ? 'Global (all countries)' : countries.length ? countries.join(', ') : '-'}
         </dd>
       </div>
       {cityCaps.length > 0 && (
@@ -353,17 +353,17 @@ export const AdminSupplierDetail: React.FC = () => {
                     {display.website}
                   </a>
                 ) : (
-                  <span className="text-[#9ca3af]">—</span>
+                  <span className="text-[#9ca3af]"> - </span>
                 )}
               </dd>
             </div>
             <div>
               <dt className="text-[#6b7280]">Email</dt>
-              <dd>{display.contact_email || <span className="text-[#9ca3af]">—</span>}</dd>
+              <dd>{display.contact_email || <span className="text-[#9ca3af]"> - </span>}</dd>
             </div>
             <div>
               <dt className="text-[#6b7280]">Phone</dt>
-              <dd>{display.contact_phone || <span className="text-[#9ca3af]">—</span>}</dd>
+              <dd>{display.contact_phone || <span className="text-[#9ca3af]"> - </span>}</dd>
             </div>
           </dl>
           {display.description && (

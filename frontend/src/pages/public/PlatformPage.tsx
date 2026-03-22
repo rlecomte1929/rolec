@@ -17,7 +17,7 @@ export const PlatformPage: React.FC = () => {
 
   return (
     <PublicLayout>
-      {/* 1. HERO — split layout, mock to the right / below */}
+      {/* 1. HERO: split layout, mock to the right / below */}
       <Section spacing="lg" background="transparent" fillViewport>
         <div className="flex flex-col lg:grid lg:grid-cols-[1.4fr,1fr] lg:items-center gap-10 lg:gap-12">
           <div className="min-w-0">
@@ -52,7 +52,7 @@ export const PlatformPage: React.FC = () => {
         />
       </Section>
 
-      {/* 3. INSIDE THE PRODUCT — 3 blocks */}
+      {/* 3. INSIDE THE PRODUCT: 3 blocks */}
       <Section spacing="lg" background="transparent">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
           {c.insideProduct.blocks.map((block) => (
@@ -65,7 +65,7 @@ export const PlatformPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 4. CTA — no Why ReloPass on Platform */}
+      {/* 4. CTA: no Why ReloPass on Platform */}
       <Section spacing="lg" background="muted">
         <CTAPanel
           title={c.cta.headline}

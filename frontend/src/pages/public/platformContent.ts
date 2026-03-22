@@ -1,41 +1,39 @@
 /**
- * Platform page content configuration.
- * Role: What the product is. No comparison, no process flow, no trust sections.
+ * Platform page: what the product is. No competitor story.
  */
 
 export const platformContent = {
   hero: {
-    headline: 'Run every relocation in one place',
-    subheadline:
-      'ReloPass brings the case, the documents, the service providers, and the progress into one working view.',
+    headline: 'Every relocation in one workspace',
+    subheadline: 'Case, documents, providers, and progress in one view.',
     primaryCta: 'Book a demo',
     secondaryCta: 'How it works',
   },
 
   productDefinition: {
-    title: 'A case-based workspace for relocation',
-    body: 'Each relocation is managed as its own case, so your team is not piecing updates together across email, spreadsheets, and service-provider threads.',
+    title: 'Case-based relocation workspace',
+    body: 'Each move is its own case. Stops updates living only in email, sheets, and vendor threads.',
   },
 
   insideProduct: {
     blocks: [
       {
         title: 'Case overview',
-        body: 'See the current status, key dates, and what still needs attention.',
+        body: 'Status, dates, and open work in one place.',
       },
       {
         title: 'Documents',
-        body: 'Keep required documents tied to the case instead of scattered across folders and threads.',
+        body: 'Requirements and files tied to the case.',
       },
       {
         title: 'Service providers',
-        body: 'Track service-provider activity without losing the broader case context.',
+        body: 'Vendor steps stay linked to the same case.',
       },
     ],
   },
 
   cta: {
-    headline: 'See the product in context',
+    headline: 'See it with your workflow in mind',
     options: {
       demo: 'Book a demo',
       howItWorks: 'How it works',

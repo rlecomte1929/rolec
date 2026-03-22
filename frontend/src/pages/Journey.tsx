@@ -76,7 +76,7 @@ export const Journey: React.FC = () => {
 
   if (isLoading) {
     return (
-      <AppShell title="Journey" subtitle="Capture your relocation profile.">
+      <AppShell title="Journey" subtitle="Your relocation profile.">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your profile...</p>
@@ -94,7 +94,7 @@ export const Journey: React.FC = () => {
   }
 
   return (
-    <AppShell title="Journey" subtitle="Capture your relocation profile.">
+    <AppShell title="Journey" subtitle="Your relocation profile.">
       <ProgressHeader
         answeredCount={nextQuestion.progress.answeredCount}
         totalQuestions={nextQuestion.progress.totalQuestions}
@@ -127,15 +127,9 @@ export const Journey: React.FC = () => {
             </div>
           ) : (
             <div className="text-center py-12">
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">
-                Profile Complete!
-              </h2>
-              <p className="text-slate-600 mb-6">
-                You've provided enough information. Let's see your recommendations.
-              </p>
-              <Button onClick={() => navigate('/dashboard')}>
-                View Dashboard
-              </Button>
+              <h2 className="text-2xl font-bold text-slate-900 mb-4">Profile complete</h2>
+              <p className="text-slate-600 mb-6">Continue to your dashboard for next steps.</p>
+              <Button onClick={() => navigate('/dashboard')}>Open dashboard</Button>
             </div>
           )}
         </div>

@@ -77,7 +77,7 @@ export const HrEmployeeDetail: React.FC = () => {
   const displayName = employee?.full_name || employee?.email || employee?.profile_id || 'Employee';
 
   return (
-    <AppShell title={displayName} subtitle="Employee detail">
+    <AppShell title={displayName} subtitle="Profile and assignments">
       <div className="max-w-2xl">
         <div className="flex items-center gap-2 mb-4">
           <Link
@@ -117,12 +117,12 @@ export const HrEmployeeDetail: React.FC = () => {
               <div>
                 <div className="text-xs text-[#6b7280] uppercase tracking-wide">Name</div>
                 <div className="font-medium text-[#0b2b43]">
-                  {employee.full_name || '—'}
+                  {employee.full_name || '-'}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-[#6b7280] uppercase tracking-wide">Email</div>
-                <div className="text-[#0b2b43]">{employee.email || '—'}</div>
+                <div className="text-[#0b2b43]">{employee.email || '-'}</div>
               </div>
               <div>
                 <div className="text-xs text-[#6b7280] uppercase tracking-wide">Band</div>
@@ -131,7 +131,7 @@ export const HrEmployeeDetail: React.FC = () => {
                   onChange={(e) => setBand(e.target.value)}
                   className="mt-1 block w-full max-w-xs rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
                 >
-                  <option value="">—</option>
+                  <option value="">Select…</option>
                   {BANDS.map((b) => (
                     <option key={b} value={b}>{b}</option>
                   ))}
@@ -144,7 +144,7 @@ export const HrEmployeeDetail: React.FC = () => {
                   onChange={(e) => setAssignmentType(e.target.value)}
                   className="mt-1 block w-full max-w-xs rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
                 >
-                  <option value="">—</option>
+                  <option value="">Select…</option>
                   {ASSIGNMENT_TYPES.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
@@ -157,7 +157,7 @@ export const HrEmployeeDetail: React.FC = () => {
                   onChange={(e) => setStatus(e.target.value)}
                   className="mt-1 block w-full max-w-xs rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
                 >
-                  <option value="">—</option>
+                  <option value="">Select…</option>
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}

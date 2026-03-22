@@ -34,7 +34,7 @@ export const AdminRelocations: React.FC = () => {
   };
 
   return (
-    <AdminLayout title="Assignments" subtitle="View all assignments by company, monitor and unblock">
+    <AdminLayout title="Assignments" subtitle="All companies, search and drill in">
       <Card padding="lg">
         <div className="text-sm text-[#6b7280] mb-2">Cases ({cases.length})</div>
         <div className="space-y-3">
@@ -43,7 +43,7 @@ export const AdminRelocations: React.FC = () => {
               <div>
                 <div className="font-medium text-[#0b2b43]">{c.id}</div>
                 <div className="text-xs text-[#6b7280]">
-                  {c.host_country || '—'} · Stage: {c.stage || '—'} · Employee: {c.employee_id || '—'}
+                  {c.host_country || '-'} · Stage: {c.stage || '-'} · Employee: {c.employee_id || '-'}
                 </div>
               </div>
               <div className="flex items-center gap-2">

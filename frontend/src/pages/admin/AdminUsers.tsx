@@ -67,7 +67,7 @@ export const AdminUsers: React.FC = () => {
   }, [companyId, roleFilter]);
 
   return (
-    <AdminLayout title="People" subtitle="HR and employee accounts — filter by company and role, edit and assign">
+    <AdminLayout title="People" subtitle="HR and employee logins, filtered by company and role">
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-3">
           <div>
@@ -211,7 +211,7 @@ export const AdminUsers: React.FC = () => {
                 )}
               <div>
                 <div className="font-medium text-[#0b2b43]">{p.name || p.full_name || p.email || p.id}</div>
-                <div className="text-xs text-[#6b7280]">{p.email || '—'} · {p.id}</div>
+                <div className="text-xs text-[#6b7280]">{p.email || '-'} · {p.id}</div>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="neutral" size="sm">{(p.role || '').toUpperCase()}</Badge>
                   {p.company_name ? (

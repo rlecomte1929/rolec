@@ -76,7 +76,7 @@ export const HrPolicyManagement: React.FC = () => {
         safeNavigate(navigate, 'landing');
         return;
       }
-      setError('Failed to load policies');
+      setError('Could not load policies.');
     } finally {
       setLoading(false);
     }
@@ -124,7 +124,7 @@ export const HrPolicyManagement: React.FC = () => {
       setView('list');
       loadPolicies();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to save policy');
+      setError(err?.response?.data?.detail || 'Could not save policy.');
     }
   };
 
@@ -140,7 +140,7 @@ export const HrPolicyManagement: React.FC = () => {
       setView('list');
       loadPolicies();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to publish policy');
+      setError(err?.response?.data?.detail || 'Could not publish policy.');
     }
   };
 
@@ -154,7 +154,7 @@ export const HrPolicyManagement: React.FC = () => {
       setView('list');
       loadPolicies();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Upload failed');
+      setError(err?.response?.data?.detail || 'Upload failed.');
     } finally {
       setUploading(false);
     }
@@ -181,14 +181,14 @@ export const HrPolicyManagement: React.FC = () => {
 
   if (loading) {
     return (
-      <AppShell title="HR Policy Management" subtitle="Define and manage relocation policies.">
-        <div className="text-center py-12 text-[#6b7280]">Loading policies...</div>
+      <AppShell title="HR policy" subtitle="Loading…">
+        <div className="text-center py-12 text-[#6b7280]">Loading policies…</div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="HR Policy Management" subtitle="Define, upload, and manage relocation policies. Published policies enable automatic criteria filling for employees.">
+    <AppShell title="HR policy" subtitle="Create, upload, publish. Published applies to employees.">
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
       {view === 'list' && (
@@ -196,17 +196,17 @@ export const HrPolicyManagement: React.FC = () => {
           <div className="flex flex-wrap gap-3">
             <Button onClick={handleCreate}>Create policy</Button>
             <Button variant="outline" onClick={() => setView('upload')}>
-              Upload policy (JSON/YAML)
+              Upload JSON/YAML
             </Button>
             <Button variant="outline" onClick={() => safeNavigate(navigate, 'hrPolicy')}>
-              View assignment policy
+              Open policy workspace
             </Button>
           </div>
 
           <Card padding="lg">
             <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Policies</h2>
             {policies.length === 0 ? (
-              <p className="text-[#6b7280]">No policies yet. Create one or upload a JSON/YAML file.</p>
+              <p className="text-[#6b7280]">No policies yet. Create one or upload JSON/YAML.</p>
             ) : (
               <div className="space-y-2">
                 {policies.map((p) => (
@@ -217,7 +217,7 @@ export const HrPolicyManagement: React.FC = () => {
                     <div>
                       <div className="font-medium text-[#0b2b43]">{p.policyName || 'Untitled'}</div>
                       <div className="text-sm text-[#6b7280]">
-                        {p.companyEntity || '—'} · Effective {p.effectiveDate || '—'} · v{p._meta?.version ?? p.version ?? 1}
+                        {p.companyEntity || '-'} · Effective {p.effectiveDate || '-'} · v{p._meta?.version ?? p.version ?? 1}
                         <span className={`ml-2 px-2 py-0.5 rounded text-xs ${p._meta?.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>
                           {p._meta?.status || p.status || 'draft'}
                         </span>
@@ -238,7 +238,7 @@ export const HrPolicyManagement: React.FC = () => {
         <Card padding="lg">
           <h2 className="text-lg font-semibold text-[#0b2b43] mb-2">Upload policy</h2>
           <p className="text-sm text-[#6b7280] mb-4">
-            Upload a JSON or YAML file with the full policy structure. This enables automatic filling of service criteria for employees.
+            JSON or YAML with the full policy shape. Used to drive employee-side rules and wizard defaults.
           </p>
           <div className="border-2 border-dashed border-[#e2e8f0] rounded-lg p-8 text-center">
             <input
@@ -249,12 +249,12 @@ export const HrPolicyManagement: React.FC = () => {
               id="policy-upload"
             />
             <label htmlFor="policy-upload" className="cursor-pointer text-[#0b2b43] hover:underline">
-              {uploadFile ? uploadFile.name : 'Choose JSON or YAML file'}
+              {uploadFile ? uploadFile.name : 'Choose file'}
             </label>
           </div>
           <div className="flex gap-3 mt-4">
             <Button onClick={handleUpload} disabled={!uploadFile || uploading}>
-              {uploading ? 'Uploading...' : 'Upload'}
+              {uploading ? 'Uploading…' : 'Upload'}
             </Button>
             <Button variant="outline" onClick={() => { setView('list'); setUploadFile(null); }}>
               Cancel
@@ -266,8 +266,8 @@ export const HrPolicyManagement: React.FC = () => {
       {(view === 'create' || view === 'edit') && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <button onClick={() => setView('list')} className="text-sm text-[#0b2b43] hover:underline">
-              ← Back to list
+            <button type="button" onClick={() => setView('list')} className="text-sm text-[#0b2b43] hover:underline">
+              Back to list
             </button>
           </div>
 
@@ -325,7 +325,8 @@ export const HrPolicyManagement: React.FC = () => {
           <Card padding="lg">
             <h3 className="font-semibold text-[#0b2b43] mb-2">Benefit definition matrix</h3>
             <p className="text-sm text-[#6b7280] mb-4">
-              Toggle allowed and set max values per tier (min/medium/extensive/premium). Used for wizard auto-fill: temporaryHousing → housing budget, educationSupport → school budget, shipment → movers.
+              Allow each benefit and set caps per tier. These values feed the intake wizard (e.g. housing, schools,
+              movers).
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -409,7 +410,7 @@ export const HrPolicyManagement: React.FC = () => {
           <div className="flex gap-3">
             <Button onClick={handleSave}>Save draft</Button>
             <Button variant="outline" onClick={handlePublish}>
-              Publish (enable for employees)
+              Publish for employees
             </Button>
             <Button variant="outline" onClick={() => setView('list')}>Cancel</Button>
           </div>

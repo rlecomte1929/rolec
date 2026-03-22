@@ -10,15 +10,15 @@ export const TrustBlock: React.FC<{ className?: string }> = ({ className = '' })
     <ul className="flex flex-wrap gap-6 text-sm text-[#4b5563]">
       <li className="flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-[#0b2b43]" aria-hidden />
-        Step-by-step guidance
+        Guided steps
       </li>
       <li className="flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-[#0b2b43]" aria-hidden />
-        Verified recommendations
+        Curated options
       </li>
       <li className="flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-[#0b2b43]" aria-hidden />
-        Your data stays private
+        Private by design
       </li>
     </ul>
   </div>

@@ -24,7 +24,7 @@ export interface Message {
   sender_name?: string;
   /** Current user sent this */
   is_from_me?: boolean;
-  /** Delivery status: delivered (visible) | read (opened) — show only on last outgoing */
+  /** Delivery status: delivered (visible) | read (opened): show only on last outgoing */
   status_delivery?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 

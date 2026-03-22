@@ -88,7 +88,7 @@ export const HrCaseReview: React.FC = () => {
   const ac = draft?.assignmentContext || {};
 
   return (
-    <AppShell title="Case Review" subtitle="Read-only summary and feedback.">
+    <AppShell title="Case review" subtitle="Read-only summary and feedback.">
       <Button variant="outline" className="mb-4" onClick={() => navigate(buildRoute('hrReview'))}>
         ← Back to list
       </Button>
@@ -100,25 +100,25 @@ export const HrCaseReview: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-2">
             <SummarySection title="Relocation Basics">
-              <div>Origin: {[b.originCity, b.originCountry].filter(Boolean).join(', ') || '—'}</div>
-              <div>Destination: {[b.destCity, b.destCountry].filter(Boolean).join(', ') || '—'}</div>
-              <div>Purpose: {b.purpose || '—'}</div>
-              <div>Target move date: {b.targetMoveDate || '—'}</div>
-              <div>Duration: {b.durationMonths ?? '—'} months</div>
+              <div>Origin: {[b.originCity, b.originCountry].filter(Boolean).join(', ') || '-'}</div>
+              <div>Destination: {[b.destCity, b.destCountry].filter(Boolean).join(', ') || '-'}</div>
+              <div>Purpose: {b.purpose || '-'}</div>
+              <div>Target move date: {b.targetMoveDate || '-'}</div>
+              <div>Duration: {b.durationMonths ?? '-'} months</div>
             </SummarySection>
             <SummarySection title="Employee Profile">
-              <div>Name: {ep.fullName || '—'}</div>
-              <div>Email: {ep.email || '—'}</div>
-              <div>Nationality: {ep.nationality || '—'}</div>
-              <div>Role: {ep.roleTitle || '—'}</div>
+              <div>Name: {ep.fullName || '-'}</div>
+              <div>Email: {ep.email || '-'}</div>
+              <div>Nationality: {ep.nationality || '-'}</div>
+              <div>Role: {ep.roleTitle || '-'}</div>
             </SummarySection>
             <SummarySection title="Family Members">
-              <div>Spouse: {fm.spouse?.fullName ? fm.spouse.fullName : '—'}</div>
+              <div>Spouse: {fm.spouse?.fullName ? fm.spouse.fullName : '-'}</div>
               <div>Children: {fm.children?.length ? fm.children.length : 0}</div>
             </SummarySection>
             <SummarySection title="Assignment / Context">
-              <div>Employer: {ac.employer || '—'}</div>
-              <div>Contract start: {ac.contractStart || '—'}</div>
+              <div>Employer: {ac.employer || '-'}</div>
+              <div>Contract start: {ac.contractStart || '-'}</div>
             </SummarySection>
           </div>
 

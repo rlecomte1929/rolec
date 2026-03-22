@@ -183,7 +183,10 @@ export const HrCompanyProfile: React.FC = () => {
 
 
   return (
-    <AppShell title="Company Profile" subtitle={profileLoading ? 'Loading...' : 'Complete your company profile to prefill employee cases.'}>
+    <AppShell
+      title="Company profile"
+      subtitle={profileLoading ? 'Loading…' : 'Used to prefill new employee cases.'}
+    >
       <Card padding="lg">
         {contextError && (
           <Alert variant="error" className="mb-4">{contextError}</Alert>

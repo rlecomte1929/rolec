@@ -90,8 +90,8 @@ export async function listAssignedCasesForReview(): Promise<{
     const result: AssignedCaseForReview[] = assignments.map((a) => {
       const wc = caseMap.get(a.case_id);
       let caseName = `Case ${a.case_id.slice(0, 8)}`;
-      let origin = '—';
-      let destination = '—';
+      let origin = '-';
+      let destination = '-';
       let targetMoveDate: string | null = null;
       if (wc) {
         try {
@@ -99,12 +99,12 @@ export async function listAssignedCasesForReview(): Promise<{
           const basics = draft?.relocationBasics || {};
           const prof = draft?.employeeProfile || {};
           caseName = prof?.fullName || basics?.originCountry || caseName;
-          origin = [basics?.originCity, basics?.originCountry].filter(Boolean).join(', ') || [wc.origin_city, wc.origin_country].filter(Boolean).join(', ') || '—';
-          destination = [basics?.destCity, basics?.destCountry].filter(Boolean).join(', ') || [wc.dest_city, wc.dest_country].filter(Boolean).join(', ') || '—';
+          origin = [basics?.originCity, basics?.originCountry].filter(Boolean).join(', ') || [wc.origin_city, wc.origin_country].filter(Boolean).join(', ') || '-';
+          destination = [basics?.destCity, basics?.destCountry].filter(Boolean).join(', ') || [wc.dest_city, wc.dest_country].filter(Boolean).join(', ') || '-';
           targetMoveDate = basics?.targetMoveDate || wc.target_move_date || null;
         } catch {
-          origin = [wc.origin_city, wc.origin_country].filter(Boolean).join(', ') || '—';
-          destination = [wc.dest_city, wc.dest_country].filter(Boolean).join(', ') || '—';
+          origin = [wc.origin_city, wc.origin_country].filter(Boolean).join(', ') || '-';
+          destination = [wc.dest_city, wc.dest_country].filter(Boolean).join(', ') || '-';
           targetMoveDate = wc.target_move_date;
         }
       }

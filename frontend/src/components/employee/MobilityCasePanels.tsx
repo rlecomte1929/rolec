@@ -1,5 +1,5 @@
 /**
- * Mobility context summary, missing items, and next actions (MVP — no motion).
+ * Mobility context summary, missing items, and next actions (MVP: no motion).
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -19,13 +19,13 @@ const COUNTRY_LABELS: Record<string, string> = {
 
 function labelCountry(code: string | undefined | null): string {
   const c = (code || '').trim().toUpperCase();
-  if (!c) return '—';
+  if (!c) return '-';
   return COUNTRY_LABELS[c] || c;
 }
 
 function formatCaseType(raw: string | undefined | null): string {
   const s = (raw || '').trim();
-  if (!s) return '—';
+  if (!s) return '-';
   return s.replace(/_/g, ' ');
 }
 

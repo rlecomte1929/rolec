@@ -35,7 +35,7 @@ export const TrustPage: React.FC = () => {
         />
       </Section>
 
-      {/* 2. ONE CASE, CLEAR STEPS — Flow diagram lives here */}
+      {/* 2. ONE CASE, CLEAR STEPS: Flow diagram lives here */}
       <Section spacing="lg" background="muted">
         <div className="max-w-2xl mx-auto">
           <TrustContentBlock
@@ -49,7 +49,7 @@ export const TrustPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 3. EVERYTHING STAYS IN CONTEXT — Merged visibility + requirements */}
+      {/* 3. EVERYTHING STAYS IN CONTEXT: Merged visibility + requirements */}
       <Section spacing="lg" background="transparent">
         <div className="max-w-2xl mx-auto">
           <TrustContentBlock
@@ -62,7 +62,7 @@ export const TrustPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 4. THE PROCESS IS GUIDED — Short paragraph only */}
+      {/* 4. THE PROCESS IS GUIDED: Short paragraph only */}
       <Section spacing="lg" background="muted">
         <div className="max-w-2xl mx-auto">
           <TrustContentBlock
@@ -72,7 +72,7 @@ export const TrustPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 5. CTA — Only page with "real case" framing */}
+      {/* 5. CTA: Only page with "real case" framing */}
       <Section spacing="lg" background="transparent">
         <CTAPanel
           title={c.cta.headline}

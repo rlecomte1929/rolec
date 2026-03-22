@@ -43,7 +43,7 @@ export interface PolicyBenefitRow {
 }
 
 const formatLimits = (limits?: Record<string, any> | null) => {
-  if (!limits) return '—';
+  if (!limits) return '-';
   const parts: string[] = [];
   if (limits.days) parts.push(`${limits.days} days`);
   if (limits.percent) parts.push(`${limits.percent}%`);
@@ -61,11 +61,11 @@ const formatLimits = (limits?: Record<string, any> | null) => {
       .join('; ');
     parts.push(`By type: ${summaries}`);
   }
-  return parts.length ? parts.join(' • ') : '—';
+  return parts.length ? parts.join(' • ') : '-';
 };
 
 const formatEligibility = (elig?: Record<string, any> | null) => {
-  if (!elig) return '—';
+  if (!elig) return '-';
   const parts: string[] = [];
   if (Array.isArray(elig.assignment_types)) {
     parts.push(`Assignment: ${elig.assignment_types.join(', ')}`);
@@ -73,7 +73,7 @@ const formatEligibility = (elig?: Record<string, any> | null) => {
   if (Array.isArray(elig.bands)) {
     parts.push(`Bands: ${elig.bands.join(', ')}`);
   }
-  return parts.length ? parts.join(' • ') : '—';
+  return parts.length ? parts.join(' • ') : '-';
 };
 
 export const PolicyBenefitsTable: React.FC<{
@@ -160,7 +160,7 @@ export const PolicyBenefitsTable: React.FC<{
                       fullWidth
                     />
                   ) : (
-                    row.notes || '—'
+                    row.notes || '-'
                   )}
                 </div>
               </div>

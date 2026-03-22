@@ -2,7 +2,7 @@ import React from 'react';
 
 /**
  * Mock UI preview of a relocation case for the Platform hero.
- * Standalone component — does not replace or modify existing hero content.
+ * Standalone component: does not replace or modify existing hero content.
  */
 export const CasePreviewMock: React.FC<{ className?: string }> = ({ className = '' }) => {
   return (
@@ -23,7 +23,7 @@ export const CasePreviewMock: React.FC<{ className?: string }> = ({ className = 
         <div className="flex flex-wrap items-start justify-between gap-2 mb-5">
           <div>
             <p className="text-sm font-semibold text-marketing-primary">
-              Marie Dubois — France to Singapore
+              Marie Dubois: France to Singapore
             </p>
           </div>
           <span className="inline-flex items-center rounded-full bg-marketing-accent/12 px-2.5 py-1 text-xs font-medium text-marketing-accent">

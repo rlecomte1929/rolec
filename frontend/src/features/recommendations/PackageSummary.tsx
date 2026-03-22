@@ -170,7 +170,7 @@ export const PackageSummary: React.FC<Props> = ({
                       ? `USD ${cost?.toLocaleString()}/yr`
                       : cost != null
                         ? `USD ${cost.toLocaleString()}`
-                        : '—';
+                        : '-';
                 return (
                   <li key={`${category}-${item.item_id}`} className="flex justify-between py-2 border-b border-[#e2e8f0] last:border-0">
                     <span>

@@ -1,81 +1,79 @@
 /**
- * Homepage content configuration.
- * B2B positioning for HR, relocation, and global mobility teams.
- * Edit this file to update copy without touching layout.
+ * Homepage content. Edit here to change marketing copy without layout changes.
  */
 
 export const landingContent = {
   hero: {
-    eyebrow: 'For HR, relocation, and global mobility teams',
-    headline: 'Run relocation as one coordinated process',
+    eyebrow: 'For HR and mobility teams',
+    headline: 'Run relocation as one process',
     subheadline:
-      'ReloPass helps HR and mobility teams manage relocation across cases, documents, service providers, and progress — without piecing updates together manually.',
+      'Cases, documents, providers, and status in one place. Less thread-chasing and spreadsheet glue work.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
   },
 
   problem: {
-    title: 'Relocation is still fragmented',
+    title: 'Relocation still splits across tools',
     cards: [
       {
         title: 'Scattered coordination',
-        body: 'Cases are handled across email, spreadsheets, and outside providers.',
+        body: 'Email, spreadsheets, and vendor threads do not share one case view.',
       },
       {
-        title: 'Limited visibility',
-        body: 'It is hard to see what is moving, what is blocked, and who owns the next step.',
+        title: 'Weak visibility',
+        body: 'Hard to see what moved, what is blocked, and who owns the next step.',
       },
       {
-        title: 'Repeated follow-up',
-        body: 'Teams spend too much time chasing documents, updates, and confirmations.',
+        title: 'Heavy follow-up',
+        body: 'Too much time on documents, pings, and status checks.',
       },
     ],
   },
 
   solution: {
-    title: 'A more structured way to manage relocation',
+    title: 'One structured way to run it',
     blocks: [
       {
         title: 'Case-based workflow',
-        body: 'Each relocation is handled as a clear, trackable case.',
+        body: 'Each move is one trackable case.',
       },
       {
         title: 'Guided steps',
-        body: 'Employees know what to do and when.',
+        body: 'Employees see what to do next.',
       },
       {
         title: 'Policy alignment',
-        body: 'Actions follow company rules and requirements.',
+        body: 'Work follows company rules and caps.',
       },
       {
-        title: 'Service-provider coordination',
-        body: 'Keep service-provider work tied to the case instead of scattered across threads.',
+        title: 'Provider work in context',
+        body: 'Vendor tasks stay tied to the case, not lost in inboxes.',
       },
     ],
   },
 
   productStrip: {
     blocks: [
-      { title: 'Cases', body: 'Track each relocation as a single case' },
-      { title: 'Service providers', body: 'Keep provider work tied to the case' },
-      { title: 'Progress', body: 'See what is moving, missing, or blocked' },
+      { title: 'Cases', body: 'One case per relocation' },
+      { title: 'Service providers', body: 'Activity tied to the case' },
+      { title: 'Progress', body: 'See moving, missing, and blocked work' },
     ],
   },
 
   trust: {
-    title: 'Designed for teams managing real relocation cases',
-    body: 'ReloPass combines structured workflows, policy-aware guidance, and coordinated execution in one system.',
+    title: 'Built for teams running real relocations',
+    body: 'Workflow, policy-aware guidance, and execution in one system.',
     checklist: [
-      'Workflow-based, not chat-based',
-      'Policy-aware, not generic task tracking',
-      'Built for HR and mobility teams',
-      'Structured for visibility and follow-through',
+      'Workflow-first, not chat-first',
+      'Policy-aware, not generic tasks',
+      'For HR and mobility operators',
+      'Built for visibility and follow-through',
     ],
   },
 
   finalCta: {
-    headline: 'Start structuring your relocation process',
-    microCopy: 'Start with a single relocation case.',
+    headline: 'Structure how you run relocation',
+    microCopy: 'Start with one case.',
     options: {
       demo: 'Book a demo',
       platform: 'See the platform',

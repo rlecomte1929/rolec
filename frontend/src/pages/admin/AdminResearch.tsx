@@ -457,7 +457,7 @@ https://www.uscis.gov/..."
           <div className="bg-white rounded-lg p-4 w-[720px] max-w-[95%]">
             <div className="text-sm font-semibold text-[#0b2b43] mb-2">{activeDoc.title}</div>
             <div className="text-xs text-[#6b7280] mb-2">{activeDoc.source_url}</div>
-            <div className="text-xs text-[#6b7280] mb-2">Status: {activeDoc.fetch_status} · Fetched: {activeDoc.fetched_at || '—'}</div>
+            <div className="text-xs text-[#6b7280] mb-2">Status: {activeDoc.fetch_status} · Fetched: {activeDoc.fetched_at || '-'}</div>
             <pre className="text-xs whitespace-pre-wrap border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc] max-h-[320px] overflow-auto">
               {activeDoc.content_excerpt || 'No excerpt available.'}
             </pre>

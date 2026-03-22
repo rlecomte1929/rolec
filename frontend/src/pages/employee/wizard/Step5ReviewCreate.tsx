@@ -127,7 +127,7 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
       .catch(() => {
         setApprovedMissingFields([]);
         setSufficiencyMessage(
-          'We could not calculate this yet — more information is required, or the service is temporarily unavailable.'
+          'Could not calculate recommendations. Add missing fields or try again later.'
         );
       })
       .finally(() => setSufficiencyLoading(false));
@@ -303,47 +303,47 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
       </div>
 
       <div className="mt-6">
-        <div className="text-sm font-semibold text-[#0b2b43] mb-3">Case overview — validate your responses</div>
+        <div className="text-sm font-semibold text-[#0b2b43] mb-3">Case overview</div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SummarySection
             title="Relocation Basics"
             stepNumber={1}
             onEdit={onGoToStep ? () => onGoToStep(1) : undefined}
           >
-            <div>Origin: {[draft.relocationBasics?.originCity, draft.relocationBasics?.originCountry].filter(Boolean).join(', ') || '—'}</div>
-            <div>Destination: {[draft.relocationBasics?.destCity, draft.relocationBasics?.destCountry].filter(Boolean).join(', ') || '—'}</div>
-            <div>Purpose: {draft.relocationBasics?.purpose || '—'}</div>
-            <div>Target move date: {draft.relocationBasics?.targetMoveDate || '—'}</div>
-            <div>Duration: {draft.relocationBasics?.durationMonths != null ? `${draft.relocationBasics.durationMonths} months` : '—'}</div>
+            <div>Origin: {[draft.relocationBasics?.originCity, draft.relocationBasics?.originCountry].filter(Boolean).join(', ') || '-'}</div>
+            <div>Destination: {[draft.relocationBasics?.destCity, draft.relocationBasics?.destCountry].filter(Boolean).join(', ') || '-'}</div>
+            <div>Purpose: {draft.relocationBasics?.purpose || '-'}</div>
+            <div>Target move date: {draft.relocationBasics?.targetMoveDate || '-'}</div>
+            <div>Duration: {draft.relocationBasics?.durationMonths != null ? `${draft.relocationBasics.durationMonths} months` : '-'}</div>
           </SummarySection>
           <SummarySection
             title="Employee Profile"
             stepNumber={2}
             onEdit={onGoToStep ? () => onGoToStep(2) : undefined}
           >
-            <div>Name: {draft.employeeProfile?.fullName || '—'}</div>
-            <div>Email: {draft.employeeProfile?.email || '—'}</div>
-            <div>Nationality: {draft.employeeProfile?.nationality || '—'}</div>
-            <div>Passport: {draft.employeeProfile?.passportCountry || '—'}</div>
-            <div>Residence: {draft.employeeProfile?.residenceCountry || '—'}</div>
+            <div>Name: {draft.employeeProfile?.fullName || '-'}</div>
+            <div>Email: {draft.employeeProfile?.email || '-'}</div>
+            <div>Nationality: {draft.employeeProfile?.nationality || '-'}</div>
+            <div>Passport: {draft.employeeProfile?.passportCountry || '-'}</div>
+            <div>Residence: {draft.employeeProfile?.residenceCountry || '-'}</div>
           </SummarySection>
           <SummarySection
             title="Family Members"
             stepNumber={3}
             onEdit={onGoToStep ? () => onGoToStep(3) : undefined}
           >
-            <div>Spouse: {draft.familyMembers?.spouse?.fullName || '—'}</div>
-            <div>Children: {draft.familyMembers?.children?.length ? `${draft.familyMembers.children.length} child(ren)` : '—'}</div>
+            <div>Spouse: {draft.familyMembers?.spouse?.fullName || '-'}</div>
+            <div>Children: {draft.familyMembers?.children?.length ? `${draft.familyMembers.children.length} child(ren)` : '-'}</div>
           </SummarySection>
           <SummarySection
             title="Assignment / Context"
             stepNumber={4}
             onEdit={onGoToStep ? () => onGoToStep(4) : undefined}
           >
-            <div>Employer: {draft.assignmentContext?.employerName || '—'}</div>
-            <div>Job title: {draft.assignmentContext?.jobTitle || '—'}</div>
-            <div>Contract start: {draft.assignmentContext?.contractStartDate || '—'}</div>
-            <div>Contract type: {draft.assignmentContext?.contractType || '—'}</div>
+            <div>Employer: {draft.assignmentContext?.employerName || '-'}</div>
+            <div>Job title: {draft.assignmentContext?.jobTitle || '-'}</div>
+            <div>Contract start: {draft.assignmentContext?.contractStartDate || '-'}</div>
+            <div>Contract type: {draft.assignmentContext?.contractType || '-'}</div>
           </SummarySection>
         </div>
       </div>

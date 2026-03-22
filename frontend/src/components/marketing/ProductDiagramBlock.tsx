@@ -27,7 +27,7 @@ export const ProductDiagramBlock: React.FC<ProductDiagramBlockProps> = ({
 }) => {
   const DiagramSlot = diagram ?? (
     <div className="aspect-video rounded-xl border-2 border-dashed border-marketing-border bg-marketing-surface-muted flex items-center justify-center">
-      <span className="text-sm text-marketing-text-subtle">Product diagram placeholder</span>
+      <span className="text-sm text-marketing-text-subtle">Diagram</span>
     </div>
   );
 

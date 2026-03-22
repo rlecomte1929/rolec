@@ -111,7 +111,7 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
         setAssignmentId(null);
         setLinkedSummaries([]);
         setPendingSummaries([]);
-        setOverviewError("We couldn't load your assignments. Check your connection and refresh.");
+        setOverviewError('Could not load assignments. Check your connection, then refresh.');
         trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.overviewLookupComplete, {
           pathname,
           ok: false,

@@ -76,14 +76,14 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   const bStatus = budgetStatus();
 
   return (
-    <AppShell title="Case Detail" subtitle={`${detail.employeeIdentifier} · ${detail.destCountry || '—'}`}>
+    <AppShell title="Case Detail" subtitle={`${detail.employeeIdentifier} · ${detail.destCountry || '-'}`}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-semibold text-[#0b2b43]">{detail.employeeIdentifier}</h1>
             <RiskBadge status={detail.riskStatus as 'green' | 'yellow' | 'red'} showLabel />
-            <span className="text-sm text-[#6b7280]">{detail.destCountry || '—'}</span>
+            <span className="text-sm text-[#6b7280]">{detail.destCountry || '-'}</span>
           </div>
           <Button variant="outline" onClick={() => navigate(buildRoute('hrAssignmentReview', { id: detail.id }))}>
             Open in Employee Dashboard
@@ -140,8 +140,8 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
           <Card padding="lg">
             <div className="text-sm font-semibold text-[#0b2b43] mb-3">Budget overview</div>
             <div className="space-y-2 text-sm">
-              <div>Limit: {detail.budgetLimit != null ? detail.budgetLimit : '—'}</div>
-              <div>Estimated: {detail.budgetEstimated != null ? detail.budgetEstimated : '—'}</div>
+              <div>Limit: {detail.budgetLimit != null ? detail.budgetLimit : '-'}</div>
+              <div>Estimated: {detail.budgetEstimated != null ? detail.budgetEstimated : '-'}</div>
               {bStatus && (
                 <div className={`font-medium ${bStatus === 'Exceeded' ? 'text-[#ef4444]' : bStatus === 'Approaching' ? 'text-[#eab308]' : 'text-[#22c55e]'}`}>
                   Status: {bStatus}
@@ -160,7 +160,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                 {detail.events.map((e, i) => (
                   <li key={i} className="flex gap-3 text-sm">
                     <span className="text-[#94a3b8] shrink-0">
-                      {e.created_at ? new Date(e.created_at).toLocaleString() : '—'}
+                      {e.created_at ? new Date(e.created_at).toLocaleString() : '-'}
                     </span>
                     <span className="font-medium text-[#4b5563]">{e.event_type}</span>
                     {e.description && <span className="text-[#6b7280]">{e.description}</span>}

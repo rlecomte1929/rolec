@@ -10,7 +10,7 @@ interface TrustStripProps {
 }
 
 export const TrustStrip: React.FC<TrustStripProps> = ({
-  label = 'Trusted by operations teams',
+  label = 'Trusted by mobility teams',
   logos,
   children,
   className = '',
@@ -38,12 +38,7 @@ export const TrustStrip: React.FC<TrustStripProps> = ({
           ))}
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-12">
-          <span className="text-sm text-marketing-text-subtle">Logo placeholder</span>
-          <span className="text-sm text-marketing-text-subtle">Logo placeholder</span>
-          <span className="text-sm text-marketing-text-subtle">Logo placeholder</span>
-          <span className="text-sm text-marketing-text-subtle">Logo placeholder</span>
-        </div>
+        <p className="text-sm text-marketing-text-subtle text-center w-full">Logo slots</p>
       )}
     </div>
   );

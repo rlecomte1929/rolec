@@ -80,7 +80,7 @@ export const ServicesRfqNew: React.FC = () => {
 
   if (assignmentLoading) {
     return (
-      <AppShell title="RFQ builder" subtitle="Generate quotation requests for shortlisted vendors.">
+      <AppShell title="RFQ builder" subtitle="RFQs for your shortlist (send not live yet).">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280]">Loading…</p>
         </Card>
@@ -90,10 +90,10 @@ export const ServicesRfqNew: React.FC = () => {
 
   if (needsPicker && linkedSummaries.length > 0) {
     return (
-      <AppShell title="RFQ builder" subtitle="Generate quotation requests for shortlisted vendors.">
+      <AppShell title="RFQ builder" subtitle="RFQs for your shortlist (send not live yet).">
         <EmployeeScopedAssignmentPicker
           title="Which assignment is this RFQ for?"
-          subtitle="You have multiple linked relocations. Choose one to load case details for RFQs."
+          subtitle="Several assignments on this account. Pick one for RFQ context."
           linkedSummaries={linkedSummaries}
           targetBasePath={buildRoute('servicesRfqNew')}
         />
@@ -103,7 +103,7 @@ export const ServicesRfqNew: React.FC = () => {
 
   if (!assignmentId) {
     return (
-      <AppShell title="RFQ builder" subtitle="Generate quotation requests for shortlisted vendors.">
+      <AppShell title="RFQ builder" subtitle="RFQs for your shortlist (send not live yet).">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280]">
             Sign in as an employee with an assignment to use the RFQ builder.
@@ -115,7 +115,7 @@ export const ServicesRfqNew: React.FC = () => {
 
   if (shortlisted.length === 0) {
     return (
-      <AppShell title="RFQ builder" subtitle="Select vendors before sending RFQs.">
+      <AppShell title="RFQ builder" subtitle="Pick vendors on recommendations first.">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280] mb-4">
             Go to recommendations, choose one vendor per service, then return here to create your RFQ.
@@ -133,11 +133,11 @@ export const ServicesRfqNew: React.FC = () => {
   }
 
   return (
-    <AppShell title="RFQ builder" subtitle="Generate quotation requests for shortlisted vendors.">
+    <AppShell title="RFQ builder" subtitle="RFQs for your shortlist (send not live yet).">
       <Card padding="lg" className="space-y-4">
         {caseLoading && (
-          <Alert variant="info" title="Loading your case">
-            <p className="text-sm text-[#374151]">Hang on — we&apos;re loading your case details…</p>
+          <Alert variant="info" title="Loading case">
+            <p className="text-sm text-[#374151]">Fetching case details…</p>
           </Alert>
         )}
         {!caseLoading && !caseId && (
@@ -154,21 +154,19 @@ export const ServicesRfqNew: React.FC = () => {
           </Alert>
         )}
         <Card padding="lg" className="border border-[#bfdbfe] bg-[#f8fafc]">
-          <h3 className="text-base font-semibold text-[#0b2b43] mb-2">Quotation requests — coming soon</h3>
+          <h3 className="text-base font-semibold text-[#0b2b43] mb-2">RFQs not available yet</h3>
           <p className="text-sm text-[#374151] mb-4">
-            Sending RFQs to vendors isn&apos;t turned on yet. Your shortlist and budget review are saved; you don&apos;t
-            need to do anything on this page right now.
+            Vendor send is off. Your shortlist and budget work stay saved.
           </p>
-          <p className="text-sm font-semibold text-[#0b2b43] mb-2">What to do next</p>
+          <p className="text-sm font-semibold text-[#0b2b43] mb-2">Meanwhile</p>
           <ul className="text-sm text-[#374151] list-disc list-inside space-y-2 mb-5">
             <li>
-              Open the <strong>Resources</strong> tab (top navigation) for country guides, checklists, and what to
-              prepare while you wait on visas, housing, and schools.
+              Use <strong>Resources</strong> for guides and prep (visas, housing, schools).
             </li>
             <li>
-              Review <strong>My Case</strong> for your intake summary and <strong>HR Policy</strong> for benefit caps.
+              Use <strong>My Case</strong> and <strong>HR Policy</strong> for intake and caps.
             </li>
-            <li>Return here later when RFQ sending is available — your shortlisted providers will still be listed below.</li>
+            <li>Your shortlist below stays on file for when RFQ send ships.</li>
           </ul>
           <div className="flex flex-wrap gap-3">
             <Link

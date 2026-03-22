@@ -1,5 +1,5 @@
 /**
- * Mobility graph API (FastAPI) — case context + next actions.
+ * Mobility graph API (FastAPI): case context + next actions.
  * Requires a mobility_cases.id UUID (see flags.mobility_case_id or ?mcid=).
  */
 

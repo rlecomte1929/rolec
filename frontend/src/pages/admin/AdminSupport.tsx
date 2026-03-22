@@ -44,7 +44,7 @@ export const AdminSupport: React.FC = () => {
               <div>
                 <div className="font-medium text-[#0b2b43]">{c.summary || c.id}</div>
                 <div className="text-xs text-[#6b7280]">
-                  {c.category} · {c.severity} · {c.status} · Error: {c.last_error_code || '—'}
+                  {c.category} · {c.severity} · {c.status} · Error: {c.last_error_code || '-'}
                 </div>
               </div>
               <div className="flex items-center gap-2">

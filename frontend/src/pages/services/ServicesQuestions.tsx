@@ -222,7 +222,7 @@ export const ServicesQuestions: React.FC = () => {
 
   if (assignmentLoading) {
     return (
-      <AppShell title="Service questions" subtitle="Answer a few questions so we can personalize providers.">
+      <AppShell title="Service questions" subtitle="Short answers to refine provider matches.">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0b2b43] mx-auto mb-4" />
           <p className="text-[#6b7280]">Loading assignment…</p>
@@ -236,7 +236,7 @@ export const ServicesQuestions: React.FC = () => {
       <AppShell title="Service questions" subtitle="Choose which assignment these questions apply to.">
         <EmployeeScopedAssignmentPicker
           title="Which assignment?"
-          subtitle="You have multiple linked relocations. Select one to load preferences for that case."
+          subtitle="Pick which assignment these answers apply to."
           linkedSummaries={linkedSummaries}
           targetBasePath={buildRoute('servicesQuestions')}
         />
@@ -246,7 +246,7 @@ export const ServicesQuestions: React.FC = () => {
 
   if (wizardServices.size === 0) {
     return (
-      <AppShell title="Service questions" subtitle="Answer a few questions so we can personalize providers.">
+      <AppShell title="Service questions" subtitle="Short answers to refine provider matches.">
         <Card padding="lg">
           <Alert variant="info">Select at least one service before answering questions.</Alert>
           <Button
@@ -309,7 +309,7 @@ export const ServicesQuestions: React.FC = () => {
   };
 
   return (
-    <AppShell title="Service questions" subtitle="Help us refine your provider matches.">
+    <AppShell title="Service questions" subtitle="Refine your provider matches.">
       <ServicesNavRibbon />
       {workflow.errorMessage && (
         <Alert variant="error" className="mb-4">

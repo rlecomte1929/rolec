@@ -282,7 +282,7 @@ export const Resources: React.FC = () => {
 
   if (contextLoading || (loading && !payload && !(needsPicker && !isCaseRoute))) {
     return (
-      <AppShell title="Resources" subtitle="Practical tips for your relocation.">
+      <AppShell title="Resources" subtitle="Guides and events for your destination.">
         <div className="flex flex-col items-center justify-center py-16 text-[#6b7280]">
           <div className="animate-pulse h-8 w-48 bg-[#e2e8f0] rounded mb-4" />
           <div className="animate-pulse h-4 w-64 bg-[#e2e8f0] rounded" />
@@ -293,10 +293,10 @@ export const Resources: React.FC = () => {
 
   if (!isCaseRoute && needsPicker && linkedSummaries.length > 0) {
     return (
-      <AppShell title="Resources" subtitle="Practical tips for your relocation.">
+      <AppShell title="Resources" subtitle="Guides and events for your destination.">
         <EmployeeScopedAssignmentPicker
-          title="Which assignment’s resources?"
-          subtitle="You have multiple linked relocations. Pick one to load destination-specific guides and events."
+          title="Which assignment?"
+          subtitle="Resources load per assignment."
           linkedSummaries={linkedSummaries}
           targetBasePath={buildRoute('resources')}
         />
@@ -306,11 +306,11 @@ export const Resources: React.FC = () => {
 
   if (!effectiveId) {
     return (
-      <AppShell title="Resources" subtitle="Practical tips for your relocation.">
+      <AppShell title="Resources" subtitle="Guides and events for your destination.">
         <Card padding="lg">
           <p className="text-[#4b5563]">
-            Complete the intake wizard and select a destination to see country-specific resources.
-            {!isCaseRoute && ' Or open resources from a specific case.'}
+            Finish intake and set a destination to see resources here.
+            {!isCaseRoute && ' Or open Resources from a case.'}
           </p>
           <Button
             className="mt-4"
@@ -325,7 +325,7 @@ export const Resources: React.FC = () => {
 
   if (error) {
     return (
-      <AppShell title="Resources" subtitle="Practical tips for your relocation.">
+      <AppShell title="Resources" subtitle="Guides and events for your destination.">
         <Card padding="lg" className="border-red-200 bg-red-50">
           <p className="text-red-700">{error}</p>
           <Button
@@ -342,14 +342,11 @@ export const Resources: React.FC = () => {
 
   if (!hasDestination) {
     return (
-      <AppShell title="Resources" subtitle="Practical tips for your relocation.">
+      <AppShell title="Resources" subtitle="Guides and events for your destination.">
         <Card padding="lg">
-          <h2 className="text-lg font-semibold text-[#0b2b43] mb-2">
-            Select your destination first
-          </h2>
+          <h2 className="text-lg font-semibold text-[#0b2b43] mb-2">Set a destination first</h2>
           <p className="text-[#4b5563] mb-4">
-            Complete the intake wizard and choose your destination country and city to unlock
-            personalized resources, events, and practical guides for your relocation.
+            Finish intake with country and city. Then this page shows guides and events for that location.
           </p>
           <Button onClick={() => navigate(buildRoute('employeeDashboard'))}>
             Go to dashboard
@@ -360,10 +357,7 @@ export const Resources: React.FC = () => {
   }
 
   return (
-    <AppShell
-      title="Resources"
-      subtitle="Practical, structured information for your relocation."
-    >
+    <AppShell title="Resources" subtitle="Guides and events for your destination.">
       {/* Hero */}
       <section
         ref={(el) => {
@@ -377,7 +371,7 @@ export const Resources: React.FC = () => {
         <p className="text-white/90 text-sm">
           {context?.hasChildren && 'Family-focused • '}
           {context?.relocationType && `${context.relocationType.replace('_', ' ')} assignment • `}
-          Based on your relocation profile, here are the most relevant resources for your move.
+          Resources matched to your profile and destination.
         </p>
         {hints.priorities?.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -394,9 +388,7 @@ export const Resources: React.FC = () => {
         )}
         {hints.recommendations?.length > 0 && (
           <div className="mt-3 p-3 rounded-lg bg-white/10">
-            <div className="text-xs font-medium text-white/90 mb-1">
-              Based on your profile we recommend:
-            </div>
+            <div className="text-xs font-medium text-white/90 mb-1">Suggested next:</div>
             <ul className="text-sm text-white/90 space-y-1">
               {hints.recommendations.map((r) => (
                 <li key={r}>• {r}</li>
@@ -433,15 +425,11 @@ export const Resources: React.FC = () => {
         recommended.familyEssentials?.length > 0 ||
         recommended.thisWeekend?.length > 0) && (
         <Card padding="lg" className="mb-6">
-          <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">
-            Recommended for you
-          </h2>
+          <h2 className="text-lg font-semibold text-[#0b2b43] mb-4">Suggested for you</h2>
           <div className="space-y-4">
             {recommended.recommendedForYou?.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-[#64748b] mb-2">
-                  Top picks
-                </h3>
+                <h3 className="text-sm font-medium text-[#64748b] mb-2">Top picks</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                   {recommended.recommendedForYou.slice(0, 5).map((r) => (
                     <ResourceCard key={r.id} resource={r} />
@@ -474,7 +462,7 @@ export const Resources: React.FC = () => {
             {recommended.thisWeekend?.length > 0 && (
               <div>
                 <h3 className="text-sm font-medium text-[#64748b] mb-2">
-                  This week in {context?.cityName || 'your city'}
+                  This week ({context?.cityName || 'local'})
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {recommended.thisWeekend.slice(0, 3).map((e) => (
@@ -492,7 +480,7 @@ export const Resources: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           <div className="w-40 sm:w-48">
             <Input
-              placeholder="Search..."
+              placeholder="Search resources"
               value={filters.search}
               onChange={(value) => updateFilters({ search: value })}
             />
@@ -554,7 +542,7 @@ export const Resources: React.FC = () => {
             onChange={(e) => updateFilters({ free: e.target.value })}
             className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
           >
-            <option value="">Free / Paid</option>
+            <option value="">Price</option>
             <option value="true">Free only</option>
           </select>
           <select
@@ -582,7 +570,7 @@ export const Resources: React.FC = () => {
             onChange={(e) => updateFilters({ weekendOnly: e.target.value })}
             className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
           >
-            <option value="">Weekday / Weekend</option>
+            <option value="">When</option>
             <option value="true">Weekend only</option>
           </select>
           {(Object.values(filters).some(Boolean) && (
@@ -667,9 +655,7 @@ export const Resources: React.FC = () => {
             </div>
           ) : (
             <Card padding="lg">
-              <p className="text-[#6b7280]">
-                No upcoming events matched your filters. Try adjusting or clearing filters.
-              </p>
+              <p className="text-[#6b7280]">No events match these filters. Clear filters or widen the search.</p>
             </Card>
           )}
         </section>
@@ -683,9 +669,7 @@ export const Resources: React.FC = () => {
           (r) => (r.cityName || '').toLowerCase() === (context.cityName || '').toLowerCase()
         ) && (
           <Card padding="md" className="mt-6 border-[#fef3c7] bg-[#fffbeb]">
-            <p className="text-sm text-[#92400e]">
-              Showing country-wide resources because city-specific content is limited.
-            </p>
+            <p className="text-sm text-[#92400e]">City-specific items are thin; showing country-level resources.</p>
           </Card>
         )}
     </AppShell>
@@ -722,9 +706,7 @@ function ResourceSection({
         </div>
       ) : (
         sectionId === 'overview' && (
-          <p className="text-[#6b7280] text-sm">
-            Explore the sections below for practical guidance on your relocation.
-          </p>
+          <p className="text-[#6b7280] text-sm">Use the tabs below to browse by topic.</p>
         )
       )}
     </Card>
@@ -757,7 +739,7 @@ function ResourceCard({ resource }: { resource: PublicResource }) {
               {resource.trustTier}
             </span>
           )}
-          <span className="text-xs text-[#1d4ed8] mt-2 inline-block">View details →</span>
+          <span className="text-xs text-[#1d4ed8] mt-2 inline-block">Open</span>
         </a>
       ) : (
         <>
@@ -815,7 +797,7 @@ function EventCard({ event }: { event: PublicEvent }) {
           rel="noreferrer"
           className="mt-3 inline-block text-sm text-[#1d4ed8] hover:underline"
         >
-          {event.bookingUrl ? 'Book' : 'More info'} →
+          Open
         </a>
       )}
     </Card>

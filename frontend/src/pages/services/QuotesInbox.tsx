@@ -62,7 +62,7 @@ export const QuotesInbox: React.FC = () => {
 
   if (assignmentLoading) {
     return (
-      <AppShell title="Quotes inbox" subtitle="Track vendor replies and quotation threads.">
+      <AppShell title="Quotes inbox" subtitle="RFQs and vendor replies.">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280]">Loading…</p>
         </Card>
@@ -72,10 +72,10 @@ export const QuotesInbox: React.FC = () => {
 
   if (!assignmentLoading && needsPicker && linkedSummaries.length > 0) {
     return (
-      <AppShell title="Quotes inbox" subtitle="Track vendor replies and quotation threads.">
+      <AppShell title="Quotes inbox" subtitle="RFQs and vendor replies.">
         <EmployeeScopedAssignmentPicker
           title="Which assignment’s quotes?"
-          subtitle="You have multiple linked relocations. Choose one to load RFQs for that assignment."
+          subtitle="Pick which assignment this inbox is for."
           linkedSummaries={linkedSummaries}
           targetBasePath={buildRoute('quotesInbox')}
         />
@@ -85,7 +85,7 @@ export const QuotesInbox: React.FC = () => {
 
   if (!assignmentId) {
     return (
-      <AppShell title="Quotes inbox" subtitle="Track vendor replies and quotation threads.">
+      <AppShell title="Quotes inbox" subtitle="RFQs and vendor replies.">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280]">
             Sign in as an employee or select an assignment to view RFQs and quotes.
@@ -97,7 +97,7 @@ export const QuotesInbox: React.FC = () => {
 
   if (loading) {
     return (
-      <AppShell title="Quotes inbox" subtitle="Loading RFQs...">
+      <AppShell title="Quotes inbox" subtitle="Loading…">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280]">Loading...</p>
         </Card>
@@ -106,7 +106,7 @@ export const QuotesInbox: React.FC = () => {
   }
 
   return (
-    <AppShell title="Quotes inbox" subtitle="Track vendor replies and quotation threads.">
+    <AppShell title="Quotes inbox" subtitle="RFQs and vendor replies.">
       <Card padding="lg" className="space-y-4">
         {error && (
           <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>

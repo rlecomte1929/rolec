@@ -80,7 +80,7 @@ interface CaseReadinessCoreProps {
 }
 
 /**
- * Case Readiness Core — summary loads immediately; checklist + timeline load when expanded.
+ * Case Readiness Core: summary loads immediately; checklist + timeline load when expanded.
  * Copy comes from API (templates), not hardcoded in the component.
  */
 export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignmentId }) => {
@@ -206,7 +206,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
         <p className="text-sm text-[#6b7280] mt-2">{body}</p>
         {summary.human_review_required && (
           <div className="mt-3 text-xs font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            Human review required — ReloPass is not verifying immigration eligibility.
+            Human review required. ReloPass does not verify immigration eligibility.
           </div>
         )}
         {summary.disclaimer_legal && (
@@ -233,7 +233,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                     <span>{r.source_title}</span>
                   )}
                   {r.source_publisher && (
-                    <span className="text-[#64748b]"> — {r.source_publisher}</span>
+                    <span className="text-[#64748b]"> · {r.source_publisher}</span>
                   )}
                 </li>
               ))}
@@ -308,7 +308,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
       )}
       {summary.human_review_required && (
         <div className="mt-3 text-xs font-medium text-amber-900">
-          Human review required for immigration decisions — checklist is operational guidance only.
+          Human review required for immigration. This checklist is guidance only.
         </div>
       )}
 
@@ -434,7 +434,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
                     <li key={m.id} className="pl-1">
                       <span className="font-medium text-[#0f172a]">{m.title}</span>
                       {m.relative_timing && (
-                        <span className="text-[#6b7280]"> — {m.relative_timing}</span>
+                        <span className="text-[#6b7280]"> · {m.relative_timing}</span>
                       )}
                       {m.body_hr && <div className="text-xs text-[#64748b] ml-6 mt-0.5">{m.body_hr}</div>}
                       <label className="ml-6 mt-1 flex items-center gap-2 text-xs cursor-pointer">

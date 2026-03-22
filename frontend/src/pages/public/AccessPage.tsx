@@ -8,7 +8,7 @@ import {
 import { buildRoute } from '../../navigation/routes';
 import { accessContent } from './accessContent';
 
-/** Placeholder for demo booking — wire to your flow when ready */
+/** Placeholder for demo booking: wire to your flow when ready */
 const DEMO_LINK = 'mailto:contact@relopass.com?subject=ReloPass%20Demo%20Request';
 
 export const AccessPage: React.FC = () => {
@@ -16,7 +16,7 @@ export const AccessPage: React.FC = () => {
 
   return (
     <PublicLayout>
-      {/* 1. HERO — Decision prompt */}
+      {/* 1. HERO: Decision prompt */}
       <Section spacing="lg" background="transparent" fillViewport>
         <div className="max-w-2xl mx-auto text-center">
           <SectionHeader
@@ -28,7 +28,7 @@ export const AccessPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* 2. THREE OPTIONS — Book a demo primary for buyers */}
+      {/* 2. THREE OPTIONS: Book a demo primary for buyers */}
       <Section spacing="lg" background="muted" className="py-20 sm:py-24 md:py-28">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto px-4 sm:px-6">
           <AccessOptionCard

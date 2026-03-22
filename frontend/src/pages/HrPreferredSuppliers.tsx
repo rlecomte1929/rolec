@@ -179,7 +179,7 @@ export const HrPreferredSuppliers: React.FC = () => {
                     <td className="py-3 px-4 text-sm">{p.service_category ?? 'All'}</td>
                     <td className="py-3 px-4 text-sm">{p.priority_rank}</td>
                     <td className="py-3 px-4 text-sm text-[#6b7280] max-w-xs truncate">
-                      {p.notes ?? '—'}
+                      {p.notes ?? '-'}
                     </td>
                     <td className="py-3 px-4 text-right">
                       {removeConfirm?.supplier_id === p.supplier_id &&

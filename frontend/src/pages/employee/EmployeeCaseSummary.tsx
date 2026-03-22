@@ -148,7 +148,7 @@ export const EmployeeCaseSummary: React.FC = () => {
     (ac.employerName || ac.jobTitle || ac.contractStartDate);
 
   return (
-    <AppShell title="My Case" subtitle="Summary of your intake responses.">
+    <AppShell title="My case" subtitle="Intake summary.">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <LoadingButton
           variant="outline"
@@ -229,28 +229,28 @@ export const EmployeeCaseSummary: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-2">
             <SummarySection title="Relocation Basics">
-              <div>Origin: {[b.originCity, b.originCountry].filter(Boolean).join(', ') || '—'}</div>
-              <div>Destination: {[b.destCity, b.destCountry].filter(Boolean).join(', ') || '—'}</div>
-              <div>Purpose: {b.purpose || '—'}</div>
-              <div>Target move date: {b.targetMoveDate || '—'}</div>
-              <div>Duration: {b.durationMonths != null ? `${b.durationMonths} months` : '—'}</div>
+              <div>Origin: {[b.originCity, b.originCountry].filter(Boolean).join(', ') || '-'}</div>
+              <div>Destination: {[b.destCity, b.destCountry].filter(Boolean).join(', ') || '-'}</div>
+              <div>Purpose: {b.purpose || '-'}</div>
+              <div>Target move date: {b.targetMoveDate || '-'}</div>
+              <div>Duration: {b.durationMonths != null ? `${b.durationMonths} months` : '-'}</div>
             </SummarySection>
             <SummarySection title="Employee Profile">
-              <div>Name: {ep.fullName || '—'}</div>
-              <div>Email: {ep.email || '—'}</div>
-              <div>Nationality: {ep.nationality || '—'}</div>
-              <div>Passport country: {ep.passportCountry || '—'}</div>
-              <div>Residence country: {ep.residenceCountry || '—'}</div>
+              <div>Name: {ep.fullName || '-'}</div>
+              <div>Email: {ep.email || '-'}</div>
+              <div>Nationality: {ep.nationality || '-'}</div>
+              <div>Passport country: {ep.passportCountry || '-'}</div>
+              <div>Residence country: {ep.residenceCountry || '-'}</div>
             </SummarySection>
             <SummarySection title="Family Members">
-              <div>Spouse: {fm.spouse?.fullName ? fm.spouse.fullName : '—'}</div>
-              <div>Children: {fm.children?.length ? `${fm.children.length} child(ren)` : '—'}</div>
+              <div>Spouse: {fm.spouse?.fullName ? fm.spouse.fullName : '-'}</div>
+              <div>Children: {fm.children?.length ? `${fm.children.length} child(ren)` : '-'}</div>
             </SummarySection>
             <SummarySection title="Assignment / Context">
-              <div>Employer: {ac.employerName || '—'}</div>
-              <div>Job title: {ac.jobTitle || '—'}</div>
-              <div>Contract start: {ac.contractStartDate || '—'}</div>
-              <div>Contract type: {ac.contractType || '—'}</div>
+              <div>Employer: {ac.employerName || '-'}</div>
+              <div>Job title: {ac.jobTitle || '-'}</div>
+              <div>Contract start: {ac.contractStartDate || '-'}</div>
+              <div>Contract type: {ac.contractType || '-'}</div>
             </SummarySection>
           </div>
 

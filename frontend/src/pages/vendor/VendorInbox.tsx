@@ -42,7 +42,7 @@ export const VendorInbox: React.FC = () => {
 
   if (loading) {
     return (
-      <AppShell title="Vendor inbox" subtitle="Loading...">
+      <AppShell title="Vendor inbox" subtitle="Loading…">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280]">Loading RFQs...</p>
         </Card>
@@ -52,7 +52,7 @@ export const VendorInbox: React.FC = () => {
 
   if (error) {
     return (
-      <AppShell title="Vendor inbox" subtitle="RFQs assigned to your vendor account.">
+      <AppShell title="Vendor inbox" subtitle="RFQs for your account.">
         <Card padding="lg">
           <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">{error}</div>
         </Card>
@@ -62,18 +62,16 @@ export const VendorInbox: React.FC = () => {
 
   if (rfqs.length === 0) {
     return (
-      <AppShell title="Vendor inbox" subtitle="RFQs assigned to your vendor account.">
+      <AppShell title="Vendor inbox" subtitle="RFQs for your account.">
         <Card padding="lg">
-          <p className="text-sm text-[#6b7280]">
-            No RFQs assigned yet. You'll see quotation requests here when employees send them.
-          </p>
+          <p className="text-sm text-[#6b7280]">No RFQs yet. New requests appear here when employees send them.</p>
         </Card>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Vendor inbox" subtitle="RFQs assigned to your vendor account.">
+    <AppShell title="Vendor inbox" subtitle="RFQs for your account.">
       <Card padding="lg" className="space-y-4">
         {rfqs.map((rfq) => (
           <div

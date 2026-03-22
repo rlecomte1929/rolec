@@ -117,11 +117,11 @@ export const AdminResources: React.FC = () => {
   const inReview = counts.resources_in_review ?? 0;
   const archived = counts.resources_archived ?? 0;
 
-  const categoryLabel = (cid?: string) => categories.find((c) => c.id === cid)?.label || cid || '—';
+  const categoryLabel = (cid?: string) => categories.find((c) => c.id === cid)?.label || cid || '-';
 
   if (view === 'list') {
     return (
-      <AdminLayout title="Resources" subtitle="Country resources — housing, schools, movers, events">
+      <AdminLayout title="Resources" subtitle="Country content: housing, schools, movers, events">
         <div className="mb-4">
           <Link to={buildRoute('adminResources')} className="text-sm text-[#0b2b43] hover:underline">← Back to Resources</Link>
         </div>
@@ -183,8 +183,8 @@ export const AdminResources: React.FC = () => {
                         {r.title || 'Untitled'}
                       </Link>
                     </td>
-                    <td className="py-2">{r.country_code || '—'}</td>
-                    <td className="py-2">{(r as { city_name?: string }).city_name || '—'}</td>
+                    <td className="py-2">{r.country_code || '-'}</td>
+                    <td className="py-2">{(r as { city_name?: string }).city_name || '-'}</td>
                     <td className="py-2">{categoryLabel(r.category_id)}</td>
                     <td className="py-2"><StatusBadge status={r.status} /></td>
                     <td className="py-2">
@@ -202,7 +202,7 @@ export const AdminResources: React.FC = () => {
   }
 
   return (
-    <AdminLayout title="Resources" subtitle="Country resources — housing, schools, movers, events">
+    <AdminLayout title="Resources" subtitle="Country content: housing, schools, movers, events">
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card padding="md" className="bg-green-50">

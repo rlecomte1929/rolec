@@ -102,7 +102,7 @@ export const AdminTags: React.FC = () => {
             onChange={(e) => setNewGroup(e.target.value)}
             className="rounded border border-slate-200 px-3 py-2"
           >
-            <option value="">— group —</option>
+            <option value="">Group (optional)</option>
             {TAG_GROUPS.map((g) => (
               <option key={g} value={g}>
                 {g}
@@ -162,7 +162,7 @@ export const AdminTags: React.FC = () => {
                     id={`edit-group-${t.id}`}
                     className="rounded border border-slate-200 px-2 py-1 text-sm"
                   >
-                    <option value="">—</option>
+                    <option value="">None</option>
                     {TAG_GROUPS.map((g) => (
                       <option key={g} value={g}>{g}</option>
                     ))}

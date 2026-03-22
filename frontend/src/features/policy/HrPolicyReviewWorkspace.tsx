@@ -22,11 +22,11 @@ const meta = (r: any, key: string, def?: number | string | boolean) => {
 };
 
 function formatBenefitLabel(r: any): string {
-  return (meta(r, 'benefit_label') as string) || r?.benefit_key || '—';
+  return (meta(r, 'benefit_label') as string) || r?.benefit_key || '-';
 }
 
 function formatDateTime(val: string | null | undefined): string {
-  if (!val) return '—';
+  if (!val) return '-';
   try {
     return new Date(val).toLocaleString('en-US', {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -491,7 +491,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                   const approvalReq = metaVal('approval_required', false);
                   const evidenceReq = metaVal('evidence_required', false);
                   const notes = metaVal('hr_notes') ?? r.description ?? '';
-                  const unitStr = [r.currency, r.amount_unit].filter(Boolean).join(' ') || '—';
+                  const unitStr = [r.currency, r.amount_unit].filter(Boolean).join(' ') || '-';
                   const hasNumericCap = typeof capVal === 'number' && capVal > 0;
 
                   return (
@@ -522,7 +522,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                           />
                         ) : (
                           <span className="block break-words whitespace-pre-wrap" title={notes ? String(notes) : undefined}>
-                            {notes || '—'}
+                            {notes || '-'}
                           </span>
                         )}
                       </td>
@@ -534,10 +534,10 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                                 <div className="h-full bg-[#1f8e8b]" style={{ width: `${Math.min(100, ((editingRule?.amount_value ?? primaryVal ?? 0) / (typeof capVal === 'number' ? capVal : 1)) * 100)}%` }} />
                               </div>
                             )}
-                            <Input type="number" value={String(editingRule?.amount_value ?? primaryVal ?? '')} onChange={(val) => setEditingRule({ ...editingRule, amount_value: val ? Number(val) : null })} placeholder="—" />
+                            <Input type="number" value={String(editingRule?.amount_value ?? primaryVal ?? '')} onChange={(val) => setEditingRule({ ...editingRule, amount_value: val ? Number(val) : null })} placeholder="-" />
                           </div>
                         ) : (
-                          primaryVal != null ? primaryVal : '—'
+                          primaryVal != null ? primaryVal : '-'
                         )}
                       </td>
                       <td className="py-2 px-2">
@@ -562,7 +562,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                               }}
                             />
                           ) : (
-                            approvalReq ? 'Yes' : '—'
+                            approvalReq ? 'Yes' : '-'
                           )}
                         </td>
                       )}
@@ -578,7 +578,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                               }}
                             />
                           ) : (
-                            evidenceReq ? 'Yes' : '—'
+                            evidenceReq ? 'Yes' : '-'
                           )}
                         </td>
                       )}
@@ -592,7 +592,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                             p.{link.source_page_start ?? '?'}
                           </button>
                         ) : (
-                          '—'
+                          '-'
                         )}
                       </td>
                       <td className="py-2 px-2">
@@ -646,7 +646,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                   {normalized.exclusions.map((e: any) => (
                     <div key={e.id} className="px-2 py-1 rounded bg-amber-50 border border-amber-200 text-xs">
                       {e.benefit_key && <span className="font-medium">{e.benefit_key}</span>}
-                      <span className="text-[#4b5563]"> — {(e.description || e.raw_text || '').slice(0, 60)}{(e.description || e.raw_text || '').length > 60 ? '…' : ''}</span>
+                      <span className="text-[#4b5563]"> · {(e.description || e.raw_text || '').slice(0, 60)}{(e.description || e.raw_text || '').length > 60 ? '…' : ''}</span>
                     </div>
                   ))}
                 </div>
@@ -686,7 +686,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               {publishBusy ? 'Publishing…' : 'Publish version'}
             </Button>
             {versionStatus === 'published' && (
-              <span className="text-sm text-[#059669] font-medium">Published — employees see this policy</span>
+              <span className="text-sm text-[#059669] font-medium">Published (visible to employees)</span>
             )}
           </div>
           <div className="text-xs text-[#6b7280] mt-2">
@@ -718,7 +718,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               {sourceClause.clause_type && ` · ${sourceClause.clause_type}`}
             </div>
             <pre className="flex-1 overflow-auto text-sm text-[#4b5563] bg-[#f8fafc] p-4 rounded border border-[#e2e8f0] whitespace-pre-wrap">
-              {sourceClause.raw_text || '—'}
+              {sourceClause.raw_text || '-'}
             </pre>
             </Card>
           </div>

@@ -52,7 +52,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
           <input
             value={local.employerName || ''}
             readOnly
-            placeholder="—"
+            placeholder="-"
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm bg-[#f8fafc]"
           />
         </label>
@@ -61,7 +61,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
           <input
             value={local.employerCountry || ''}
             readOnly
-            placeholder="—"
+            placeholder="-"
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm bg-[#f8fafc]"
           />
         </label>

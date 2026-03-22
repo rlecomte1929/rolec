@@ -87,7 +87,7 @@ export const NotificationSettings: React.FC = () => {
   };
 
   return (
-    <AppShell title="Notification settings" subtitle="Choose how you receive notifications.">
+    <AppShell title="Notification settings" subtitle="Email and in-app preferences.">
       <div className="max-w-2xl">
         {loading && (
           <div className="text-sm text-[#6b7280] py-8">Loading preferences...</div>

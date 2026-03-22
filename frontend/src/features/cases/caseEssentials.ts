@@ -1,7 +1,7 @@
 import type { AssignmentDetail, RelocationProfile } from '../../types';
 
 /**
- * Case Essentials — field resolution for HR case summary.
+ * Case Essentials: field resolution for HR case summary.
  *
  * Source precedence (same payload as GET /api/hr/assignments/{id}; no extra fetches):
  *
@@ -100,7 +100,7 @@ function formatFamilyStatus(profile: RelocationProfile | undefined): string {
     return `Registered: ${msRaw}`;
   }
   if ((profile.familySize ?? 0) > 1) {
-    return 'To be completed (household size suggests family — details not captured)';
+    return 'To be completed (household size suggests family: details not captured)';
   }
   return TO_COMPLETE;
 }

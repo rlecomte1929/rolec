@@ -244,7 +244,7 @@ export const authAPI = {
         token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
       );
     } catch {
-      // Ignore — client will clear session anyway
+      // Ignore: client will clear session anyway
     }
     await signOutSupabase();
     clearAuthItems();

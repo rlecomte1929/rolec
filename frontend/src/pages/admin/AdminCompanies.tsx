@@ -82,7 +82,7 @@ export const AdminCompanies: React.FC = () => {
   };
 
   return (
-    <AdminLayout title="Companies" subtitle="Company accounts — create, edit, plan tier, and delete">
+    <AdminLayout title="Companies" subtitle="Create, edit, plan tier, delete">
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -193,14 +193,14 @@ export const AdminCompanies: React.FC = () => {
                           placeholder="Country"
                         />
                       ) : (
-                        c.country || '—'
+                        c.country || '-'
                       )}
                     </td>
-                    <td className="py-3 pr-4 text-[#374151]">{c.size_band || '—'}</td>
+                    <td className="py-3 pr-4 text-[#374151]">{c.size_band || '-'}</td>
                     <td className="py-3 pr-4 text-right text-[#374151] tabular-nums">{c.hr_users_count ?? 0}</td>
                     <td className="py-3 pr-4 text-right text-[#374151] tabular-nums">{c.employee_count ?? 0}</td>
                     <td className="py-3 pr-4 text-right text-[#374151] tabular-nums">{c.assignments_count ?? 0}</td>
-                    <td className="py-3 pr-4 text-[#374151]">{c.primary_contact_name ?? '—'}</td>
+                    <td className="py-3 pr-4 text-[#374151]">{c.primary_contact_name ?? '-'}</td>
                     <td className="py-3 pl-2">
                       {canEdit(c) && (
                         <div className="flex items-center gap-1 flex-wrap">
@@ -345,7 +345,7 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
                 value={hr_seat_limit}
                 onChange={(e) => setHrSeatLimit(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                 className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
-                placeholder="—"
+                placeholder="-"
               />
             </div>
             <div>
@@ -356,7 +356,7 @@ const AddCompanyModal: React.FC<AddCompanyModalProps> = ({ onClose, onCreated })
                 value={employee_seat_limit}
                 onChange={(e) => setEmployeeSeatLimit(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
                 className="w-full rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
-                placeholder="—"
+                placeholder="-"
               />
             </div>
           </div>

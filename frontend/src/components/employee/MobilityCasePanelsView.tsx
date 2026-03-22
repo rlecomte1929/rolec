@@ -1,5 +1,5 @@
 /**
- * Presentational panels only (no API imports — safe for unit tests).
+ * Presentational panels only (no API imports: safe for unit tests).
  */
 
 import { Card } from '../antigravity';

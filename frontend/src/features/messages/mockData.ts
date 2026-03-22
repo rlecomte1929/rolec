@@ -43,7 +43,7 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
         hr_user_id: 'hr-1',
         employee_identifier: 'sarah.jenkins@relopass.local',
         subject: 'Re: Your relocation case',
-        body: 'Thanks! I\'ve started the wizard. Quick question — do I need to upload documents in Step 5 or can I do that later?',
+        body: 'Thanks! I\'ve started the wizard. Quick question: do I need to upload documents in Step 5 or can I do that later?',
         status: 'sent',
         created_at: iso(new Date(yesterday.getTime() + 3600000)),
         sender_role: 'EMPLOYEE',

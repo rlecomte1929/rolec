@@ -172,7 +172,7 @@ export const AdminReviewQueuePage: React.FC = () => {
   return (
     <AdminReviewQueueLayout
       title="Review Queue"
-      subtitle="Prioritized operational queue for staged candidates, changes, and stale content"
+      subtitle="Staged items, changes, stale content"
     >
       <div className="space-y-4">
         {/* KPI cards */}

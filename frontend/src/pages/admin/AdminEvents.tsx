@@ -167,11 +167,11 @@ export const AdminEvents: React.FC = () => {
                         {e.title || 'Untitled'}
                       </Link>
                     </td>
-                    <td className="py-2">{e.event_type || '—'}</td>
-                    <td className="py-2">{e.country_code || '—'}</td>
-                    <td className="py-2">{e.city_name || '—'}</td>
+                    <td className="py-2">{e.event_type || '-'}</td>
+                    <td className="py-2">{e.country_code || '-'}</td>
+                    <td className="py-2">{e.city_name || '-'}</td>
                     <td className="py-2 text-slate-500">
-                      {e.start_datetime ? new Date(e.start_datetime).toLocaleString() : '—'}
+                      {e.start_datetime ? new Date(e.start_datetime).toLocaleString() : '-'}
                     </td>
                     <td className="py-2">{e.is_free ? 'Yes' : 'No'}</td>
                     <td className="py-2">{e.is_family_friendly ? 'Yes' : 'No'}</td>

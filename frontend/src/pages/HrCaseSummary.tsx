@@ -175,7 +175,7 @@ export const HrCaseSummary: React.FC = () => {
   return (
     <AppShell
       title="Case Summary"
-      subtitle="Operational flow: who & route → gaps & review → shared plan (same view as employee)."
+      subtitle="Same view as the employee: essentials, gaps, shared plan."
     >
       {error && (
         <Alert variant="error">
@@ -186,7 +186,7 @@ export const HrCaseSummary: React.FC = () => {
         </Alert>
       )}
       {reopenSuccess && <Alert variant="success">{reopenSuccess}</Alert>}
-      {isLoading && <div className="text-sm text-[#6b7280]">Loading case summary...</div>}
+      {isLoading && <div className="text-sm text-[#6b7280]">Loading…</div>}
 
       {!isLoading && assignment && (
         <div className="space-y-6">
@@ -225,7 +225,7 @@ export const HrCaseSummary: React.FC = () => {
             step={1}
             id="op-step-essentials"
             title="Case essentials"
-            subtitle="Who this case is for, household shape, and the route — the anchor for readiness and the plan below."
+            subtitle="Who is moving, household, and route. Ground truth for the checklist and plan below."
           >
             <CaseEssentialsCard assignment={assignment} embedInOperationalFlow />
           </CaseOperationalSection>
@@ -244,7 +244,7 @@ export const HrCaseSummary: React.FC = () => {
               step={3}
               id="op-step-plan"
               title="Shared relocation plan"
-              subtitle="Ordered tasks with owner, deadlines, status, and urgency — same list the employee sees. Use this for follow-up; overdue and blocked counts summarize risk at a glance."
+              subtitle="Same ordered tasks the employee sees: owner, due dates, status, urgency. Use for follow-up; overdue and blocked highlight risk."
             >
               <CaseTimeline
                 assignmentId={assignment.id}
@@ -258,9 +258,9 @@ export const HrCaseSummary: React.FC = () => {
           {assignment?.id && (
             <>
               <div className="rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-3 text-xs text-[#64748b] leading-relaxed">
-                <span className="font-semibold text-[#0b2b43]">Route &amp; template reference</span> — Checklist
-                rows, template milestones, and source tiering for this destination. Use after the operational flow
-                above; it complements — but does not replace — the shared plan for day-to-day execution.
+                <span className="font-semibold text-[#0b2b43]">Route and template reference</span>. Checklist rows,
+                template milestones, and source tiers for this destination. Use after the steps above. Does not replace
+                the shared plan for day-to-day work.
               </div>
               <CaseReadinessCore assignmentId={assignment.id} />
             </>
@@ -349,7 +349,7 @@ export const HrCaseSummary: React.FC = () => {
               <Card padding="md">
                 <details className="text-sm">
                   <summary className="cursor-pointer text-[#1d4ed8] font-medium">
-                    Latest compliance run — step-by-step log
+                    Latest compliance run (step log)
                   </summary>
                   <p className="text-xs text-[#64748b] mt-2">
                     Internal policy engine only; not immigration law. Same data as merged block above.

@@ -1,56 +1,55 @@
 /**
- * Why ReloPass page content configuration.
- * Role: Why a team should change. No process flow, no workflow diagram, no "walk through a real case".
+ * Why ReloPass: problem and differentiation. No full process diagram.
  */
 
 export const whyReloPassContent = {
   hero: {
-    headline: 'Relocation breaks in the gaps',
+    headline: 'Relocation fails in the handoffs',
     subheadline:
-      'Most teams are still holding the process together through inboxes, spreadsheets, service-provider updates, and repeated follow-up. ReloPass cuts through that coordination mess.',
+      'Inboxes, spreadsheets, and vendor updates rarely share one picture. ReloPass keeps coordination on the case.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
   },
 
   currentReality: {
-    title: 'What teams are still dealing with',
+    title: 'What teams still fight',
     items: [
-      'Updates live in too many places',
-      'Employees ask the same questions more than once',
-      'Cases drift when no one has the full picture',
-      'Follow-up becomes its own workload',
+      'Updates in too many channels',
+      'Repeated questions to HR',
+      'Cases drift without a single owner view',
+      'Follow-up becomes its own job',
     ],
-    supportingLine: 'The work gets done, but it takes more effort than it should.',
+    supportingLine: 'Work ships, but the overhead is high.',
   },
 
-  thesis: 'Relocation fails when coordination is fragmented. ReloPass brings that coordination into one system.',
+  thesis: 'Fragmented coordination breaks relocation. ReloPass centralizes it on the case.',
 
   differentiation: {
-    title: 'Why ReloPass feels different',
+    title: 'What is different',
     blocks: [
       {
-        title: 'Built around the case',
-        body: 'Relocation is not treated like a generic task list. Each case has its own structure, status, and next step.',
+        title: 'Case at the center',
+        body: 'Not a generic task list. Each case has structure, status, and next steps.',
       },
       {
         title: 'Less chasing',
-        body: 'The process carries more of the coordination load, so your team spends less time hunting for updates.',
+        body: 'The workflow carries more coordination so the team spends less time hunting updates.',
       },
     ],
   },
 
   outcomes: {
-    title: 'What that changes day to day',
+    title: 'Day-to-day impact',
     items: [
-      'Fewer moving parts to keep track of',
-      'Cases are easier to keep moving when pressure builds',
-      'The team spends less time chasing the same updates twice',
+      'Fewer places to track',
+      'Easier to move cases under pressure',
+      'Less duplicate follow-up',
     ],
-    supportingLine: 'The goal is not more software. It is less friction in the work.',
+    supportingLine: 'Less friction, not more software for its own sake.',
   },
 
   cta: {
-    headline: 'See why teams make the switch',
+    headline: 'See why teams switch',
     options: {
       demo: 'Book a demo',
       howItWorks: 'How it works',

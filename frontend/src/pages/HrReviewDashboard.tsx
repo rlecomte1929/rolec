@@ -34,7 +34,7 @@ export const HrReviewDashboard: React.FC = () => {
   }, []);
 
   const formatDate = (s: string | null) => {
-    if (!s) return '—';
+    if (!s) return '-';
     try {
       return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     } catch {
@@ -43,7 +43,7 @@ export const HrReviewDashboard: React.FC = () => {
   };
 
   return (
-    <AppShell title="Review Cases" subtitle="Assigned cases for feedback and review.">
+    <AppShell title="Review cases" subtitle="Cases waiting on your review.">
       {error && <Alert variant="error">{error}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading assigned cases...</div>}
       {!isLoading && cases.length === 0 && !error && (

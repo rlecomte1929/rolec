@@ -413,7 +413,7 @@ export const AdminStagingResourceDetail: React.FC = () => {
                       {String(m.title ?? '')}
                     </Link>
                     <span className="ml-1 text-slate-500">
-                      ({m.city_name ?? m.country_code}) —{' '}
+                      ({m.city_name ?? m.country_code})  - {' '}
                       {((m.similarity_score ?? 0) * 100).toFixed(0)}% match
                     </span>
                   </li>

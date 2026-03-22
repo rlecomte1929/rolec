@@ -125,7 +125,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     ? 'text-[#0b2b43] bg-[#eef4f8] border border-[#0b2b43]'
                     : 'text-[#0b2b43] bg-[#eef4f8] border border-[#cbd5e1] hover:bg-[#e2e8f0]'
                 }`}
-                title="Admin — company-agnostic view"
+                title="Admin (all companies)"
               >
                 <span className="text-[#64748b]" aria-hidden>◇</span>
                 <span>Admin</span>
@@ -339,7 +339,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
         <div className="bg-amber-50 border-b border-amber-200">
           <Container maxWidth="xl" className="py-2 flex items-center justify-between text-sm text-amber-900">
             <span>
-              View-as mode: {adminContext.impersonation.mode.toUpperCase()} — {adminContext.impersonation.target_user_id}
+              View-as mode: {adminContext.impersonation.mode.toUpperCase()} · {adminContext.impersonation.target_user_id}
             </span>
             <button
               onClick={async () => {

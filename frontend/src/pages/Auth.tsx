@@ -177,15 +177,13 @@ export const Auth: React.FC = () => {
             {error && <Alert variant="error">{error}</Alert>}
 
             {mode === 'register' && role === 'EMPLOYEE' && (
-              <Alert variant="info" title="How this works with your relocation case">
+              <Alert variant="info" title="Signing up with a work email">
                 <p className="text-sm text-[#374151] leading-relaxed">
-                  HR may add your work email to a case <strong>before</strong> you sign up — that does{' '}
-                  <strong>not</strong> block creating your ReloPass account.
+                  HR can add your work email to a case before you register. You can still create an account here.
                 </p>
                 <p className="text-sm text-[#374151] mt-2 leading-relaxed">
-                  You will only see &quot;email already in use&quot; if that address is already registered as a{' '}
-                  <strong>login</strong> here. After you sign up or sign in with the same email HR used, pending cases
-                  can link automatically; if not, use the assignment ID from HR on your dashboard.
+                  &quot;Email already in use&quot; means that address is already a login on ReloPass. Use the same email
+                  HR used and pending cases usually attach. If not, enter the assignment ID from HR on your dashboard.
                 </p>
               </Alert>
             )}

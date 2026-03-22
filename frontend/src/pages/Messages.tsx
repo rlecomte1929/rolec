@@ -360,7 +360,7 @@ export const Messages: React.FC = () => {
   );
 
   return (
-    <AppShell title="Messages" subtitle="Case communications and invitations">
+    <AppShell title="Messages" subtitle="Case threads and invites">
       <div className="flex flex-col h-[calc(100vh-12rem)] md:h-[calc(100vh-10rem)] min-h-[400px] bg-white rounded-xl border border-[#e2e8f0] overflow-hidden shadow-sm">
         {loading ? (
           <div className="flex-1 flex items-center justify-center text-sm text-[#6b7280]">

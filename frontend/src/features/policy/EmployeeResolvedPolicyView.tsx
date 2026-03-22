@@ -58,7 +58,7 @@ interface CategoryCardData {
 }
 
 function formatDate(val: string | null | undefined): string {
-  if (!val) return '—';
+  if (!val) return '-';
   try {
     return new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
@@ -298,7 +298,7 @@ export const EmployeeResolvedPolicyView: React.FC<{
 
   return (
     <div className="space-y-6">
-      {/* Summary banner — read-only; company name + contact HR */}
+      {/* Summary banner: read-only; company name + contact HR */}
       <Card padding="lg" className="bg-[#eef4f8] border border-[#0b2b43]/20">
         <div className="text-sm font-semibold text-[#0b2b43] mb-2">{policy.title}</div>
         {policy.company_name && (

@@ -33,7 +33,7 @@ export const ServicesRecommendations: React.FC = () => {
 
   if (!recommendations || Object.keys(recommendations).length === 0) {
     return (
-      <AppShell title="Recommendations" subtitle="We need your answers before we can recommend providers.">
+      <AppShell title="Recommendations" subtitle="Complete service questions first.">
         <Card padding="lg">
           <p className="text-sm text-[#6b7280] mb-4">
             Complete the service questions to unlock recommendations.
@@ -45,7 +45,7 @@ export const ServicesRecommendations: React.FC = () => {
   }
 
   return (
-    <AppShell title="Recommendations" subtitle="Shortlist providers for each service.">
+    <AppShell title="Recommendations" subtitle="Shortlist by service.">
       <ServicesNavRibbon />
       <Card padding="lg" className="mb-6">
         <div className="text-sm text-[#4b5563]">

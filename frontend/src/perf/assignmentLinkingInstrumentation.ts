@@ -2,7 +2,7 @@
  * Structured logs for employee assignment linking / overview verification.
  *
  * Enable: `VITE_ASSIGNMENT_FLOW_LOG=1` (or `true`), or any dev build (`import.meta.env.DEV`).
- * Log prefix: `[assignment-flow]` — safe to grep in browser devtools or E2E artifacts.
+ * Log prefix: `[assignment-flow]`: safe to grep in browser devtools or E2E artifacts.
  *
  * Server-side counterparts use `identity_obs` JSON lines (see `backend/identity_observability.py`).
  */

@@ -350,7 +350,7 @@ export const AdminEventEditor: React.FC = () => {
                 onChange={(e) => update('source_id', e.target.value || null)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               >
-                <option value="">—</option>
+                <option value="">None</option>
                 {sources.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.source_name}

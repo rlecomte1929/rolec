@@ -15,7 +15,7 @@ export const CountryDetail: React.FC<CountryDetailProps> = ({ profile, onRerun }
           <div>
             <div className="text-lg font-semibold text-[#0b2b43]">{profile.countryCode}</div>
             <div className="text-xs text-[#6b7280]">
-              Last updated: {profile.lastUpdatedAt ? new Date(profile.lastUpdatedAt).toLocaleString('en-US') : '—'}
+              Last updated: {profile.lastUpdatedAt ? new Date(profile.lastUpdatedAt).toLocaleString('en-US') : '-'}
             </div>
           </div>
           <Button onClick={onRerun}>Re-run research</Button>

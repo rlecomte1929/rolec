@@ -70,7 +70,7 @@ export const CaseEssentialsCard: React.FC<Props> = ({
               className="text-sm font-mono font-semibold text-[#0b2b43] break-all"
               title={assignment.id}
             >
-              {assignment.id || '—'}
+              {assignment.id || '-'}
             </span>
             {assignment.id ? (
               <Button

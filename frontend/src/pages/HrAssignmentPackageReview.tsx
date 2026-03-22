@@ -72,7 +72,7 @@ export const HrAssignmentPackageReview: React.FC = () => {
   ]);
 
   return (
-    <AppShell title="Assignment Package & Limits" subtitle="Review coverage, caps, and HR approvals required.">
+    <AppShell title="Package and limits" subtitle="Coverage, caps, approvals.">
       {error && <Alert variant="error">{error}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading package review...</div>}
 

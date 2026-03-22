@@ -62,8 +62,8 @@ function ThreadRow({
   onSelect: () => void;
   formatTimeAgo: (s?: string) => string;
 }) {
-  const participants = thread.participants?.join(', ') || thread.participant_name || thread.company_name || '—';
-  const raw = thread.last_message_preview || '—';
+  const participants = thread.participants?.join(', ') || thread.participant_name || thread.company_name || '-';
+  const raw = thread.last_message_preview || '-';
   const previewText = raw.length > 60 ? raw.slice(0, 60).trimEnd() + '…' : raw;
   const roleLabel = thread.participant_role === 'employee' ? 'Employee' : thread.thread_type === 'hr_employee' ? 'HR' : 'Collab';
   return (
@@ -210,9 +210,9 @@ export const AdminMessages: React.FC = () => {
     }
   }, []);
 
-  const formatDate = (s?: string) => (s ? new Date(s).toLocaleString() : '—');
+  const formatDate = (s?: string) => (s ? new Date(s).toLocaleString() : '-');
   const formatTimeAgo = (s?: string) => {
-    if (!s) return '—';
+    if (!s) return '-';
     const d = new Date(s);
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
@@ -240,7 +240,7 @@ export const AdminMessages: React.FC = () => {
         const roleLabel =
           t.participant_role === 'employee' ? 'Employee' : t.participant_role === 'collaboration' ? 'Collaboration' : 'Other';
         key = `role:${t.participant_role || 'other'}:${t.participant_id || t.thread_id}`;
-        label = `${roleLabel} · ${t.participant_name || t.participants?.join(', ') || '—'}`;
+        label = `${roleLabel} · ${t.participant_name || t.participants?.join(', ') || '-'}`;
         if (!map.has(key)) map.set(key, { label, threads: [] });
         map.get(key)!.threads.push(t);
       } else {
@@ -298,7 +298,7 @@ export const AdminMessages: React.FC = () => {
   const CATEGORY_OPTIONS = ['bug', 'feature request', 'onboarding', 'policy question', 'supplier issue', 'other'] as const;
 
   return (
-    <AdminLayout title="Messages" subtitle="Unified operations inbox — conversations and support tickets">
+    <AdminLayout title="Messages" subtitle="Ops inbox: threads and tickets">
       {/* Company filter at top (shared) */}
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center gap-4">
@@ -377,8 +377,8 @@ export const AdminMessages: React.FC = () => {
                           {(c.status || 'open').toLowerCase()}
                         </Badge>
                       </td>
-                      <td className="py-3 px-4 text-[#4b5563]">{(c.category || '—').replace(/_/g, ' ')}</td>
-                      <td className="py-3 px-4 text-[#4b5563]">{c.assignee_id ? String(c.assignee_id).slice(0, 8) + '…' : '—'}</td>
+                      <td className="py-3 px-4 text-[#4b5563]">{(c.category || '-').replace(/_/g, ' ')}</td>
+                      <td className="py-3 px-4 text-[#4b5563]">{c.assignee_id ? String(c.assignee_id).slice(0, 8) + '…' : '-'}</td>
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1">
                           <Button size="sm" variant="outline" onClick={() => openEditTicket(c)}>
@@ -596,7 +596,7 @@ export const AdminMessages: React.FC = () => {
                 <div className="space-y-4">
                   <div className="border-b border-[#e5e7eb] pb-3">
                     <div className="text-sm text-[#6b7280]">Company</div>
-                    <div className="font-medium">{threadDetail?.company_name ?? selectedThread.company_name ?? '—'}</div>
+                    <div className="font-medium">{threadDetail?.company_name ?? selectedThread.company_name ?? '-'}</div>
                     <div className="text-sm text-[#6b7280] mt-1">Participants</div>
                     <div>{(threadDetail?.participants ?? selectedThread.participants ?? []).join(', ')}</div>
                     {selectedThread.thread_type === 'hr_employee' && selectedThread.assignment_id && (

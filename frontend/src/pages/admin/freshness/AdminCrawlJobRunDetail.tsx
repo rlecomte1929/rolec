@@ -124,7 +124,7 @@ export const AdminCrawlJobRunDetail: React.FC = () => {
             <h3 className="mb-3 font-medium text-slate-800">Changed documents</h3>
             <ul className="space-y-1 text-sm">
               {((changes?.items ?? []) as Array<Record<string, unknown>>).map((c) => {
-                const label = `${String(c.source_name ?? 'Unknown')} — ${String(c.change_type ?? '-')}`;
+                const label = `${String(c.source_name ?? 'Unknown')} · ${String(c.change_type ?? '-')}`;
                 return (
                   <li key={String(c.id)}>
                     <Link to={buildRoute('adminFreshnessChanges')} className="text-[#0b2b43] hover:underline">

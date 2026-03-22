@@ -40,7 +40,7 @@ function positionOnCircle(index: number, total: number) {
 }
 
 /**
- * Star-shaped workflow — nodes in all directions; boxes sized to show full text.
+ * Star-shaped workflow: nodes in all directions; boxes sized to show full text.
  */
 export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
   steps,
@@ -58,7 +58,7 @@ export const SystemFlowDiagram: React.FC<SystemFlowDiagramProps> = ({
           className="absolute inset-0 w-full h-full overflow-visible"
           aria-hidden
         >
-          {/* Star: lines from center to each node — visible medium grey */}
+          {/* Star: lines from center to each node: visible medium grey */}
           {points.map((p, i) => (
             <line
               key={i}

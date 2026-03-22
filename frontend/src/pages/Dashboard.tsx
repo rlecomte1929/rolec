@@ -273,9 +273,7 @@ export const Dashboard: React.FC = () => {
           <Card padding="lg">
             <h2 className="text-2xl font-bold text-[#0b2b43] mb-4">Document Checklist</h2>
             <div className="space-y-4">
-              <Alert variant="info">
-                These are the core documents you'll need for your relocation.
-              </Alert>
+              <Alert variant="info">Core documents for this relocation.</Alert>
 
               <div className="space-y-3">
                 {[

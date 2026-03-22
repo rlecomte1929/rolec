@@ -285,7 +285,7 @@ export const AdminResourceEditor: React.FC = () => {
                 onChange={(e) => update('category_id', e.target.value || null)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               >
-                <option value="">—</option>
+                <option value="">None</option>
                 {[...categories].sort((a, b) => (a.label || a.key).localeCompare(b.label || b.key)).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.label} ({c.key})
@@ -328,7 +328,7 @@ export const AdminResourceEditor: React.FC = () => {
                 onChange={(e) => update('budget_tier', e.target.value || null)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               >
-                <option value="">—</option>
+                <option value="">None</option>
                 {BUDGET_OPTIONS.map((b) => (
                   <option key={b} value={b}>
                     {b}
@@ -419,7 +419,7 @@ export const AdminResourceEditor: React.FC = () => {
                 onChange={(e) => update('source_id', e.target.value || null)}
                 className="w-full rounded border border-slate-200 px-3 py-2"
               >
-                <option value="">—</option>
+                <option value="">None</option>
                 {[...sources].sort((a, b) => (a.source_name || '').localeCompare(b.source_name || '')).map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.source_name}

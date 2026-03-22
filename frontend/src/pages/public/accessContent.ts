@@ -1,32 +1,30 @@
 /**
- * Access page content configuration.
- * Decision page — answers "What is my next step?"
- * Edit this file to update copy without touching layout.
+ * Access / get-started paths.
  */
 
 export const accessContent = {
   hero: {
-    headline: 'Get started the right way',
-    subheadline: 'Choose the path that fits where you are.',
+    headline: 'Choose your next step',
+    subheadline: 'Demo, sign in, or create an account.',
   },
 
   options: {
     bookDemo: {
       label: 'Book a demo',
-      description: 'See how ReloPass would work for your team',
+      description: 'Walk through with our team',
       cta: 'Book a demo',
     },
     signIn: {
       label: 'Sign in',
-      description: 'Go to your workspace',
+      description: 'Open your workspace',
       cta: 'Sign in',
     },
     createAccount: {
       label: 'Create account',
-      description: 'Set up your first case',
+      description: 'Register for ReloPass',
       cta: 'Create account',
     },
   },
 
-  reassurance: 'Start small and build from there.',
+  reassurance: 'You can start with one case.',
 } as const;

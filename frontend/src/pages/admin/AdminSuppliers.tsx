@@ -56,7 +56,7 @@ export const AdminSuppliers: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load categories and countries on mount only — do not load suppliers yet
+  // Load categories and countries on mount only: do not load suppliers yet
   useEffect(() => {
     suppliersAPI.getCategories().then((r) => r.categories && setCategories(r.categories || [])).catch(() => {});
     suppliersAPI.getCountries().then((r) => setCountries(r.countries || [])).catch(() => {});
@@ -110,7 +110,7 @@ export const AdminSuppliers: React.FC = () => {
   };
 
   return (
-    <AdminLayout title="Suppliers" subtitle="Supplier registry — pick a service category to view and manage suppliers">
+    <AdminLayout title="Suppliers" subtitle="Registry by service category">
       {/* Category-first: service category selectors at the top */}
       <Card padding="lg" className="mb-4">
         <h2 className="text-sm font-medium text-[#374151] mb-3">Service category</h2>
@@ -132,7 +132,7 @@ export const AdminSuppliers: React.FC = () => {
         </div>
       </Card>
 
-      {/* Optional filters and Add supplier — only relevant when a category is selected */}
+      {/* Optional filters and Add supplier: only relevant when a category is selected */}
       {selectedCategory && (
         <Card padding="lg" className="mb-4">
           {error && (
@@ -184,7 +184,7 @@ export const AdminSuppliers: React.FC = () => {
         </Card>
       )}
 
-      {/* Supplier list — only after category is selected */}
+      {/* Supplier list: only after category is selected */}
       <Card padding="lg">
         {!selectedCategory ? (
           <div className="py-12 text-center text-[#6b7280]">
@@ -228,11 +228,11 @@ export const AdminSuppliers: React.FC = () => {
                       <td className="py-3 px-4 text-[#4b5563]">
                         {(s.service_categories || []).length
                           ? (s.service_categories || []).map(categoryLabel).join(', ')
-                          : '—'}
+                          : '-'}
                       </td>
                       <td className="py-3 px-4 text-[#4b5563] max-w-[220px]">
                         <span className="block truncate" title={s.coverage_summary || ''}>
-                          {s.coverage_summary || '—'}
+                          {s.coverage_summary || '-'}
                         </span>
                       </td>
                       <td className="py-3 px-4">
@@ -248,7 +248,7 @@ export const AdminSuppliers: React.FC = () => {
                           {s.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4">{s.verified ? '✓' : '—'}</td>
+                      <td className="py-3 px-4">{s.verified ? '✓' : '-'}</td>
                       <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Row actions">
                           <Button

@@ -226,7 +226,7 @@ export const HrAssignmentReview: React.FC = () => {
         day: 'numeric',
         year: 'numeric',
       })
-    : '—';
+    : '-';
   const stageLabel =
     assignment?.status === 'submitted'
       ? 'Stage: Intake - Profile Review'
@@ -297,7 +297,7 @@ export const HrAssignmentReview: React.FC = () => {
   };
 
   return (
-    <AppShell title="Employee Dashboard" subtitle="Review case progress, compliance, and next actions.">
+    <AppShell title="Assignment" subtitle="Progress, compliance, and next actions.">
       {error && (
         <Alert variant="error">
           {error}
@@ -518,28 +518,28 @@ export const HrAssignmentReview: React.FC = () => {
                   {!intakeError && intakeDraft && (
                     <>
                       <IntakeSummarySection title="Relocation Basics">
-                        <div>Origin: {[intakeDraft.relocationBasics?.originCity, intakeDraft.relocationBasics?.originCountry].filter(Boolean).join(', ') || '—'}</div>
-                        <div>Destination: {[intakeDraft.relocationBasics?.destCity, intakeDraft.relocationBasics?.destCountry].filter(Boolean).join(', ') || '—'}</div>
-                        <div>Purpose: {intakeDraft.relocationBasics?.purpose || '—'}</div>
-                        <div>Target move date: {intakeDraft.relocationBasics?.targetMoveDate || '—'}</div>
-                        <div>Duration: {intakeDraft.relocationBasics?.durationMonths != null ? `${intakeDraft.relocationBasics.durationMonths} months` : '—'}</div>
+                        <div>Origin: {[intakeDraft.relocationBasics?.originCity, intakeDraft.relocationBasics?.originCountry].filter(Boolean).join(', ') || '-'}</div>
+                        <div>Destination: {[intakeDraft.relocationBasics?.destCity, intakeDraft.relocationBasics?.destCountry].filter(Boolean).join(', ') || '-'}</div>
+                        <div>Purpose: {intakeDraft.relocationBasics?.purpose || '-'}</div>
+                        <div>Target move date: {intakeDraft.relocationBasics?.targetMoveDate || '-'}</div>
+                        <div>Duration: {intakeDraft.relocationBasics?.durationMonths != null ? `${intakeDraft.relocationBasics.durationMonths} months` : '-'}</div>
                       </IntakeSummarySection>
                       <IntakeSummarySection title="Employee Profile">
-                        <div>Name: {intakeDraft.employeeProfile?.fullName || '—'}</div>
-                        <div>Email: {intakeDraft.employeeProfile?.email || '—'}</div>
-                        <div>Nationality: {intakeDraft.employeeProfile?.nationality || '—'}</div>
-                        <div>Passport country: {intakeDraft.employeeProfile?.passportCountry || '—'}</div>
-                        <div>Residence country: {intakeDraft.employeeProfile?.residenceCountry || '—'}</div>
+                        <div>Name: {intakeDraft.employeeProfile?.fullName || '-'}</div>
+                        <div>Email: {intakeDraft.employeeProfile?.email || '-'}</div>
+                        <div>Nationality: {intakeDraft.employeeProfile?.nationality || '-'}</div>
+                        <div>Passport country: {intakeDraft.employeeProfile?.passportCountry || '-'}</div>
+                        <div>Residence country: {intakeDraft.employeeProfile?.residenceCountry || '-'}</div>
                       </IntakeSummarySection>
                       <IntakeSummarySection title="Family Members">
-                        <div>Spouse: {intakeDraft.familyMembers?.spouse?.fullName ? intakeDraft.familyMembers.spouse.fullName : '—'}</div>
-                        <div>Children: {intakeDraft.familyMembers?.children?.length ? `${intakeDraft.familyMembers.children.length} child(ren)` : '—'}</div>
+                        <div>Spouse: {intakeDraft.familyMembers?.spouse?.fullName ? intakeDraft.familyMembers.spouse.fullName : '-'}</div>
+                        <div>Children: {intakeDraft.familyMembers?.children?.length ? `${intakeDraft.familyMembers.children.length} child(ren)` : '-'}</div>
                       </IntakeSummarySection>
                       <IntakeSummarySection title="Assignment / Context">
-                        <div>Employer: {intakeDraft.assignmentContext?.employerName || '—'}</div>
-                        <div>Job title: {intakeDraft.assignmentContext?.jobTitle || '—'}</div>
-                        <div>Contract start: {intakeDraft.assignmentContext?.contractStartDate || '—'}</div>
-                        <div>Contract type: {intakeDraft.assignmentContext?.contractType || '—'}</div>
+                        <div>Employer: {intakeDraft.assignmentContext?.employerName || '-'}</div>
+                        <div>Job title: {intakeDraft.assignmentContext?.jobTitle || '-'}</div>
+                        <div>Contract start: {intakeDraft.assignmentContext?.contractStartDate || '-'}</div>
+                        <div>Contract type: {intakeDraft.assignmentContext?.contractType || '-'}</div>
                       </IntakeSummarySection>
                     </>
                   )}

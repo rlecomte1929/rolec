@@ -21,7 +21,7 @@ const FLOW_STEPS = [
   '5. Exchange with HR',
 ];
 
-/** Basic UUID shape — used to catch swapped claim fields. */
+/** Basic UUID shape: used to catch swapped claim fields. */
 const ASSIGNMENT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -32,7 +32,7 @@ function pendingBannerStorageKey(): string {
 }
 
 function formatOverviewDate(iso: string | null | undefined): string {
-  if (!iso?.trim()) return '—';
+  if (!iso?.trim()) return '-';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -40,7 +40,7 @@ function formatOverviewDate(iso: string | null | undefined): string {
 
 function linkedStatusLabel(row: EmployeeLinkedOverviewRow): string {
   const parts = [row.status, row.current_stage].filter(Boolean);
-  return parts.length ? parts.join(' · ') : '—';
+  return parts.length ? parts.join(' · ') : '-';
 }
 
 function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: string | null }) {
@@ -50,28 +50,26 @@ function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: str
       role="region"
       aria-label="How to fill the claim form"
     >
-      <div className="font-semibold text-[#0b2b43] mb-2">Follow these steps exactly</div>
+      <div className="font-semibold text-[#0b2b43] mb-2">How to fill this in</div>
       <ol className="list-decimal pl-5 space-y-2 text-[#334155]">
         <li>
-          <strong className="text-[#0b2b43]">Left box — your login only:</strong> Type the{' '}
-          <strong>same email address or username you use to sign in to ReloPass</strong> (what HR should have entered when
-          they assigned you). This is <strong>not</strong> the assignment ID.
+          <strong className="text-[#0b2b43]">First field:</strong> Your ReloPass email or username (what HR should have
+          on file). Not the assignment ID.
         </li>
         <li>
-          <strong className="text-[#0b2b43]">Right box — assignment ID only:</strong> Paste the long code HR gave you
-          (letters, numbers, and hyphens — often shown in ReloPass as &quot;Assignment ID&quot;). Example shape:{' '}
-          <span className="font-mono text-xs text-[#0b2b43]">a631bfd2-aac5-4f54-96bd-e60082157246</span>.
+          <strong className="text-[#0b2b43]">Second field:</strong> Assignment ID from HR (UUID). Example:{' '}
+          <span className="font-mono text-xs text-[#0b2b43]">a631bfd2-aac5-4f54-96bd-e60082157246</span>
         </li>
       </ol>
       {signedInPrincipal ? (
         <p className="mt-3 text-xs text-[#64748b] border-t border-[#bfdbfe] pt-3">
-          You are signed in as <span className="font-medium text-[#0b2b43]">{signedInPrincipal}</span>. The left box should
-          match this account (or your username, if you log in with a username instead of email).
+          Signed in as <span className="font-medium text-[#0b2b43]">{signedInPrincipal}</span>. The first field should
+          match.
         </p>
       ) : null}
       <p className="mt-2 text-xs text-[#64748b]">
-        <strong className="text-[#92400e]">Common mistake:</strong> pasting the assignment ID into the login field, or your
-        email into the assignment ID field — the button will not work until each value is in the correct box.
+        <strong className="text-[#92400e]">Common mistake:</strong> assignment ID in the first field, or email in the
+        second. Swap them and try again.
       </p>
     </div>
   );
@@ -124,7 +122,7 @@ export const EmployeeJourney: React.FC = () => {
   /** No linked and no auto-detected pending → full assignment-ID / manual claim experience. */
   const showPrimaryManualClaimPage = !hasLinked && !hasPendingOnly;
   const showPendingSection = pendingCount > 0;
-  /** Secondary manual path: linked and/or pending hub — recovery & HR UUID without a parallel API. */
+  /** Secondary manual path: linked and/or pending hub: recovery & HR UUID without a parallel API. */
   const showSecondaryManualClaimCard = hasLinked || hasPendingOnly;
 
   const pendingIdsSignature = useMemo(
@@ -294,7 +292,7 @@ export const EmployeeJourney: React.FC = () => {
         reason: 'email_in_assignment_field',
       });
       setError(
-        'The assignment ID is not an email address — use the UUID from HR in the right field only.'
+        'The assignment ID is not an email address: use the UUID from HR in the right field only.'
       );
       return;
     }
@@ -351,10 +349,9 @@ export const EmployeeJourney: React.FC = () => {
       );
     } else if (linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length > 0) {
       blocks.push(
-        <Alert key="attached" variant="success" className="mb-4" title="Relocation case linked">
-          We linked {linkRec.attachedAssignmentIds.length} assignment
-          {linkRec.attachedAssignmentIds.length > 1 ? 's' : ''} to your account. Open <strong>My case</strong> below
-          when it appears, or tap Refresh.
+        <Alert key="attached" variant="success" className="mb-4" title="Case linked">
+          {linkRec.attachedAssignmentIds.length} assignment
+          {linkRec.attachedAssignmentIds.length > 1 ? 's' : ''} linked to this account. Open it below or refresh.
         </Alert>
       );
     } else if (
@@ -363,9 +360,8 @@ export const EmployeeJourney: React.FC = () => {
       !(linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length)
     ) {
       blocks.push(
-        <Alert key="profile" variant="info" className="mb-4" title="Profile connected">
-          Your account is tied to your company contact. When HR assigns a relocation to you, it will show up here
-          automatically after you refresh or sign in again.
+        <Alert key="profile" variant="info" className="mb-4" title="Contact matched">
+          Your login matches a company contact. New assignments from HR should show here after refresh or the next sign-in.
         </Alert>
       );
     }
@@ -381,10 +377,9 @@ export const EmployeeJourney: React.FC = () => {
       (linkRec.skippedAssignmentsLinkedToOtherUser ?? 0) > 0
     ) {
       blocks.push(
-        <Alert key="ambiguous" variant="warning" className="mb-4" title="Manual check may be needed">
-          We could not attach everything automatically — another account may already be linked to the same contact
-          record, or an assignment is owned by someone else. Contact HR with your work email and assignment ID so they
-          can confirm the right account.
+        <Alert key="ambiguous" variant="warning" className="mb-4" title="Could not link automatically">
+          Another account may already own this contact or assignment. Send HR your work email and assignment ID to confirm
+          the correct login.
         </Alert>
       );
     }
@@ -395,7 +390,7 @@ export const EmployeeJourney: React.FC = () => {
     if (hasLinked) {
       return (
         <Badge variant="success" size="sm">
-          {linkedCount === 1 ? 'Linked — case on this account' : `Linked — ${linkedCount} assignments on this account`}
+          {linkedCount === 1 ? 'Linked: case on this account' : `Linked: ${linkedCount} assignments on this account`}
         </Badge>
       );
     }
@@ -409,13 +404,13 @@ export const EmployeeJourney: React.FC = () => {
     if (linkRec?.linkedContactIds?.length && !(linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length)) {
       return (
         <Badge variant="info" size="sm">
-          Connected — waiting for an assignment from HR
+          Connected: waiting for an assignment from HR
         </Badge>
       );
     }
     return (
       <Badge variant="neutral" size="sm">
-        No case linked yet — use email HR entered or claim below
+        No case linked yet: use email HR entered or claim below
       </Badge>
     );
   }, [linkRec, hasLinked, hasPendingOnly, linkedCount, pendingCount]);
@@ -428,25 +423,22 @@ export const EmployeeJourney: React.FC = () => {
         ? 'Pending assignments'
         : 'Welcome';
   const shellSubtitle = assignmentLoading
-    ? "Here's what happens next with your relocation case."
+    ? 'Loading your assignment list.'
     : hasLinked
-      ? 'Open a linked relocation or continue where you left off.'
+      ? 'Open a case or pick up where you left off.'
       : hasPendingOnly
-        ? 'Confirm each assignment in Section B to add it to your account — then open the case from Section A.'
-        : "Here's what happens next with your relocation case.";
+        ? 'Link each row in Section B, then open the case from Section A.'
+        : 'Link a case with the assignment ID from HR, or wait for HR to match your email.';
 
   return (
     <AppShell title={shellTitle} subtitle={shellSubtitle}>
       {linkAlerts}
       {assignmentLoading ? (
-        <EmployeeAssignmentBootstrapCard
-          title="Checking your assignments…"
-          detail="Loading your case access. This usually takes a moment."
-        />
+        <EmployeeAssignmentBootstrapCard title="Checking assignments…" detail="One moment." />
       ) : null}
 
       {!assignmentLoading && overviewError ? (
-        <Alert variant="warning" className="mb-6" title="Could not load assignment list">
+        <Alert variant="warning" className="mb-6" title="Could not load assignments">
           {overviewError}{' '}
           <Button variant="outline" className="ml-2 mt-2 sm:mt-0" onClick={() => void refetchAssignment()}>
             Try again
@@ -459,10 +451,9 @@ export const EmployeeJourney: React.FC = () => {
       {!assignmentLoading && showNewAssignmentBanner ? (
         <div className="mb-6 border border-[#93c5fd] bg-[#eff6ff] rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="min-w-0">
-            <div className="font-semibold text-[#0b2b43]">A new assignment was found for your email</div>
+            <div className="font-semibold text-[#0b2b43]">New assignment for your email</div>
             <p className="text-sm text-[#334155] mt-1">
-              Link it in Section B when you are ready — your existing cases stay available in Section A. Nothing opens
-              until you choose.
+              Link it in Section B when you want. Section A is unchanged. Nothing opens until you act.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
@@ -482,12 +473,12 @@ export const EmployeeJourney: React.FC = () => {
           </div>
           <p className="text-sm text-[#4b5563] mb-4">
             {hasLinked
-              ? 'Assignments linked to your account appear in Section A. Pending work appears in Section B. If HR gave you a UUID and nothing matched automatically, use Enter assignment ID manually below.'
+              ? 'Linked work is in Section A; pending work in Section B. If HR only gave you a UUID, use manual entry at the bottom.'
               : hasPendingOnly
-                ? 'HR matched relocation work to your sign-in email. Section B lists work that still needs linking before you can open the case.'
-                : 'HR can create your case before you register. After you sign in with the same email or username HR used, assignments usually appear automatically. If nothing appears, use manual assignment ID entry below — same secure claim as when HR auto-matches your email.'}
+                ? 'These rows match your sign-in but are not linked yet. Use Section B before you can open the case.'
+                : 'Sign in with the email or username HR used, or paste the assignment ID HR sent you.'}
           </p>
-          <div className="text-lg font-semibold text-[#0b2b43] mb-2">Your relocation flow</div>
+          <div className="text-lg font-semibold text-[#0b2b43] mb-2">Typical flow</div>
           {flowchart}
         </Card>
       ) : null}
@@ -498,10 +489,8 @@ export const EmployeeJourney: React.FC = () => {
           padding="lg"
           className="mb-6 border border-[#e2e8f0] scroll-mt-6"
         >
-          <div className="text-lg font-semibold text-[#0b2b43] mb-1">Section A — Linked assignments</div>
-          <p className="text-sm text-[#64748b] mb-4">
-            Already attached to your ReloPass account. Full case details load only when you open a row.
-          </p>
+          <div className="text-lg font-semibold text-[#0b2b43] mb-1">Section A: Linked assignments</div>
+          <p className="text-sm text-[#64748b] mb-4">On your account. Open a row for full case details.</p>
           {linkedSummaries.length === 0 ? (
             <p className="text-sm text-[#4b5563] py-2">No linked assignments yet.</p>
           ) : (
@@ -542,10 +531,9 @@ export const EmployeeJourney: React.FC = () => {
           padding="lg"
           className="mb-6 border border-[#93c5fd] bg-[#f8fafc] scroll-mt-6"
         >
-          <div className="text-lg font-semibold text-[#0b2b43] mb-1">Section B — Pending assignments to link</div>
+          <div className="text-lg font-semibold text-[#0b2b43] mb-1">Section B: Pending assignments to link</div>
           <p className="text-sm text-[#4b5563] mb-4">
-            HR created these against your contact, but they are not on your account until you link them. Nothing opens
-            until you choose an action — we never pick a case for you.
+            HR set these up for your contact. Link one to add it to your account. We do not auto-open a case.
           </p>
           <ul className="space-y-4">
             {pendingSummaries.map((row) => {
@@ -559,7 +547,7 @@ export const EmployeeJourney: React.FC = () => {
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="w-fit">
                       <Badge variant="info" size="sm">
-                        New assignment found
+                        Pending
                       </Badge>
                     </div>
                     <div className="font-semibold text-[#0b2b43] pt-1">{row.company?.name || 'Company'}</div>
@@ -576,8 +564,7 @@ export const EmployeeJourney: React.FC = () => {
                   <div className="flex sm:flex-col sm:justify-center shrink-0">
                     {blocked ? (
                       <p className="text-sm text-[#b45309] max-w-xs">
-                        HR verification may be required — contact your HR contact or use manual assignment ID entry below
-                        if they gave you a UUID.
+                        Needs HR follow-up or manual claim. Use the form below if you have the assignment ID.
                       </p>
                     ) : (
                       <LoadingButton
@@ -598,11 +585,10 @@ export const EmployeeJourney: React.FC = () => {
 
       {!assignmentLoading && showPrimaryManualClaimPage ? (
         <Card padding="lg" className="mb-6 border border-[#cbd5e1]">
-          <div className="text-lg font-semibold text-[#0b2b43]">Link your case manually (assignment ID)</div>
+          <div className="text-lg font-semibold text-[#0b2b43]">Manual link (assignment ID)</div>
           <p className="text-sm text-[#4b5563] mt-2">
-            No assignments were auto-detected for your sign-in. Enter the UUID HR gave you. This uses the same{' '}
-            <strong>claim</strong> service as every other link path — we locate the assignment, validate you may claim it,
-            then attach it safely.
+            No auto-match for your login. Paste the assignment ID from HR. We run the same claim check as every other link
+            path.
           </p>
           <ManualClaimInstructions signedInPrincipal={signedInPrincipal} />
           <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -610,21 +596,21 @@ export const EmployeeJourney: React.FC = () => {
               type="text"
               value={claimEmail}
               onChange={setClaimEmail}
-              label="Step 1 — Your ReloPass email or username"
+              label="Step 1: Your ReloPass email or username"
               placeholder="Same as your login (e.g. you@company.com)"
               fullWidth
             />
             <Input
               value={claimId}
               onChange={setClaimId}
-              label="Step 2 — Assignment ID from HR (UUID)"
+              label="Step 2: Assignment ID from HR (UUID)"
               placeholder="Paste only the ID from HR, not your email"
               fullWidth
             />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <LoadingButton onClick={() => void handleManualClaimSubmit()} loading={isClaiming} loadingLabel="Linking your case…">
-              Link this case to my account
+            <LoadingButton onClick={() => void handleManualClaimSubmit()} loading={isClaiming} loadingLabel="Linking…">
+              Link case
             </LoadingButton>
             <Button variant="outline" onClick={() => window.location.reload()}>
               Refresh page
@@ -639,9 +625,8 @@ export const EmployeeJourney: React.FC = () => {
             <div>
               <div className="text-lg font-semibold text-[#0b2b43]">Enter assignment ID manually</div>
               <p className="text-sm text-[#4b5563] mt-1 max-w-2xl">
-                Fallback if email matching missed a case or HR only shared a UUID. Uses the same{' '}
-                <strong>manual claim</strong> endpoint as the primary assignment-ID path — not the pending-only link
-                action in Section B.
+                Use if email match failed or HR only sent a UUID. Same manual claim as the card above, not the Section B
+                pending link.
               </p>
             </div>
             {!manualClaimExpanded ? (
@@ -662,21 +647,21 @@ export const EmployeeJourney: React.FC = () => {
                   type="text"
                   value={claimEmail}
                   onChange={setClaimEmail}
-                  label="Step 1 — Your ReloPass email or username"
+                  label="Step 1: Your ReloPass email or username"
                   placeholder="Same as your login (e.g. you@company.com)"
                   fullWidth
                 />
                 <Input
                   value={claimId}
                   onChange={setClaimId}
-                  label="Step 2 — Assignment ID from HR (UUID)"
+                  label="Step 2: Assignment ID from HR (UUID)"
                   placeholder="Paste only the ID from HR, not your email"
                   fullWidth
                 />
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <LoadingButton onClick={() => void handleManualClaimSubmit()} loading={isClaiming} loadingLabel="Linking your case…">
-                  Link this case to my account
+                <LoadingButton onClick={() => void handleManualClaimSubmit()} loading={isClaiming} loadingLabel="Linking…">
+                  Link case
                 </LoadingButton>
                 <Button variant="outline" onClick={() => void refetchAssignment()}>
                   Refresh assignments

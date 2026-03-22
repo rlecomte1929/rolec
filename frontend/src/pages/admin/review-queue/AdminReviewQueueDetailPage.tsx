@@ -508,7 +508,7 @@ export const AdminReviewQueueDetailPage: React.FC = () => {
                   {a.previous_status && a.new_status && (
                     <span className="text-slate-600"> {a.previous_status} → {a.new_status}</span>
                   )}
-                  {a.note && <span className="text-slate-500"> — {a.note.slice(0, 100)}</span>}
+                  {a.note && <span className="text-slate-500"> · {a.note.slice(0, 100)}</span>}
                   <span className="text-slate-400"> • {new Date(a.created_at).toLocaleString()}</span>
                 </div>
               ))

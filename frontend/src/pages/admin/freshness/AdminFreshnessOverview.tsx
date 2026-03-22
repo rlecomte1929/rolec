@@ -162,7 +162,7 @@ export const AdminFreshnessOverview: React.FC = () => {
               <ul className="space-y-1.5 text-sm">
                 {(jobRuns?.items ?? []).slice(0, 6).map((j: Record<string, unknown>) => (
                   <li key={String(j.id)} className="flex items-center justify-between">
-                    <span>{String(j.job_type ?? 'crawl')} — {j.started_at ? new Date(j.started_at as string).toLocaleString() : '-'}</span>
+                    <span>{String(j.job_type ?? 'crawl')} · {j.started_at ? new Date(j.started_at as string).toLocaleString() : '-'}</span>
                     <span className={`rounded px-1.5 text-xs ${
                       j.status === 'succeeded' ? 'bg-green-100 text-green-800' :
                       j.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'
@@ -189,7 +189,7 @@ export const AdminFreshnessOverview: React.FC = () => {
                 {(changes?.items ?? []).slice(0, 6).map((c: Record<string, unknown>) => (
                   <li key={String(c.id)}>
                     <Link to={buildRoute('adminFreshnessChanges')} className="text-[#0b2b43] hover:underline">
-                      {String(c.source_name ?? 'Unknown')} — {String(c.change_type ?? '-')}
+                      {String(c.source_name ?? 'Unknown')} · {String(c.change_type ?? '-')}
                     </Link>
                     <span className="ml-1 text-slate-500">
                       {c.detected_at ? new Date(c.detected_at as string).toLocaleString() : ''}
@@ -215,7 +215,7 @@ export const AdminFreshnessOverview: React.FC = () => {
                       {String(r.title ?? 'Untitled')}
                     </Link>
                     <span className="ml-1 text-slate-500">
-                      {String(r.country_code ?? '')}/{String(r.city_name ?? '')} — {String(r.stale_reason ?? 'old_updated_at')}
+                      {String(r.country_code ?? '')}/{String(r.city_name ?? '')} · {String(r.stale_reason ?? 'old_updated_at')}
                     </span>
                   </li>
                 ))}

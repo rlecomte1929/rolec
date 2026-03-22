@@ -211,7 +211,7 @@ export const EmployeePolicyView: React.FC<{
     if (ma.medium != null && ma.medium > 0) parts.push(`Med: ${ma.medium.toLocaleString()}`);
     if (ma.extensive != null && ma.extensive > 0) parts.push(`Ext: ${ma.extensive.toLocaleString()}`);
     if (ma.premium != null && ma.premium > 0) parts.push(`Prem: ${ma.premium.toLocaleString()}`);
-    return parts.join(' · ') || '—';
+    return parts.join(' · ') || '-';
   };
 
   if (compact) {
@@ -255,8 +255,8 @@ export const EmployeePolicyView: React.FC<{
     <Card padding="lg">
       <h3 className="text-lg font-semibold text-[#0b2b43] mb-2">Applicable policy summary</h3>
       <div className="text-sm text-[#6b7280] mb-4">
-        Employee band: {data.employeeBand || '—'} · Assignment: {data.assignmentType || '—'} · Effective:{' '}
-        {data.policy.effectiveDate ? new Date(data.policy.effectiveDate).toLocaleDateString() : '—'}
+        Employee band: {data.employeeBand || '-'} · Assignment: {data.assignmentType || '-'} · Effective:{' '}
+        {data.policy.effectiveDate ? new Date(data.policy.effectiveDate).toLocaleDateString() : '-'}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">

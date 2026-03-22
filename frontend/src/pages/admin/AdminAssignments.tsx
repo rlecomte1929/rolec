@@ -34,16 +34,16 @@ const DESTINATION_COUNTRY_OPTIONS = [
 ];
 
 const employeeName = (a: AdminAssignment) =>
-  a.employee_full_name || [a.employee_first_name, a.employee_last_name].filter(Boolean).join(' ') || a.employee_identifier || '—';
+  a.employee_full_name || [a.employee_first_name, a.employee_last_name].filter(Boolean).join(' ') || a.employee_identifier || '-';
 
 const destination = (a: AdminAssignment) =>
-  a.destination_country || a.host_country || a.destination_from_profile || '—';
+  a.destination_country || a.host_country || a.destination_from_profile || '-';
 
-const origin = (a: AdminAssignment) => a.home_country || '—';
+const origin = (a: AdminAssignment) => a.home_country || '-';
 
 const formatCreated = (a: AdminAssignment) => {
   const raw = a.created_at;
-  if (!raw) return '—';
+  if (!raw) return '-';
   try {
     const d = new Date(raw);
     return Number.isNaN(d.getTime()) ? raw : d.toLocaleDateString(undefined, { dateStyle: 'short' });
@@ -394,12 +394,12 @@ export const AdminAssignments: React.FC = () => {
                           <span className="ml-1"><Badge variant="warning" size="sm">No person</Badge></span>
                         )}
                       </td>
-                      <td className="py-2 pr-2">{a.company_name || '—'}</td>
+                      <td className="py-2 pr-2">{a.company_name || '-'}</td>
                       <td className="py-2 pr-2">{destination(a)}</td>
                       <td className="py-2 pr-2">{origin(a)}</td>
-                      <td className="py-2 pr-2">{a.assignment_type || '—'}</td>
-                      <td className="py-2 pr-2">{a.family_status || '—'}</td>
-                      <td className="py-2 pr-2">{a.move_date || '—'}</td>
+                      <td className="py-2 pr-2">{a.assignment_type || '-'}</td>
+                      <td className="py-2 pr-2">{a.family_status || '-'}</td>
+                      <td className="py-2 pr-2">{a.move_date || '-'}</td>
                       <td className="py-2 pr-2">
                         {a.policy_resolved ? (
                           <Badge variant="success" size="sm">Resolved</Badge>
@@ -410,7 +410,7 @@ export const AdminAssignments: React.FC = () => {
                         )}
                       </td>
                       <td className="py-2 pr-2">
-                        <Badge variant="neutral" size="sm">{(a.status || '—').replace(/_/g, ' ')}</Badge>
+                        <Badge variant="neutral" size="sm">{(a.status || '-').replace(/_/g, ' ')}</Badge>
                       </td>
                       {!selectionMode && (
                         <td className="py-2 pr-2">
@@ -672,7 +672,7 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
                   </Button>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-3 text-sm text-[#6b7280]">
-                  <span>Status: <strong className="text-[#374151]">{(detail.status ?? '—').replace(/_/g, ' ')}</strong></span>
+                  <span>Status: <strong className="text-[#374151]">{(detail.status ?? '-').replace(/_/g, ' ')}</strong></span>
                   {detail.created_at && <span>Created: {detail.created_at}</span>}
                   {detail.updated_at && <span>Updated: {detail.updated_at}</span>}
                 </div>
@@ -686,7 +686,7 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
               <section>
                 <h3 className="text-sm font-medium text-[#374151] mb-2">Employee</h3>
                 <div className="text-sm text-[#0b2b43]">
-                  {detail.employee_full_name || [detail.employee_first_name, detail.employee_last_name].filter(Boolean).join(' ') || detail.employee_identifier || '—'}
+                  {detail.employee_full_name || [detail.employee_first_name, detail.employee_last_name].filter(Boolean).join(' ') || detail.employee_identifier || '-'}
                 </div>
                 {detail.employee_email && <div className="text-xs text-[#6b7280]">{detail.employee_email}</div>}
                 {empId && (
@@ -698,8 +698,8 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
 
               <section>
                 <h3 className="text-sm font-medium text-[#374151] mb-2">Company & HR</h3>
-                <div className="text-sm">Company: {detail.company_name ?? '—'}</div>
-                <div className="text-sm">Assigned HR: {detail.hr_full_name ?? '—'} {detail.hr_email ? `(${detail.hr_email})` : ''}</div>
+                <div className="text-sm">Company: {detail.company_name ?? '-'}</div>
+                <div className="text-sm">Assigned HR: {detail.hr_full_name ?? '-'} {detail.hr_email ? `(${detail.hr_email})` : ''}</div>
                 {hrId && (
                   <Link to={buildRoute('hrDashboard')} className="text-xs text-[#0b2b43] hover:underline mt-1 inline-block">
                     Open HR dashboard →
@@ -710,10 +710,10 @@ const AdminAssignmentDetailDrawer: React.FC<AdminAssignmentDetailDrawerProps> = 
               <section>
                 <h3 className="text-sm font-medium text-[#374151] mb-2">Relocation</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <span className="text-[#6b7280]">Destination:</span><span>{detail.host_country ?? detail.destination_from_profile ?? '—'}</span>
-                  <span className="text-[#6b7280]">Origin:</span><span>{detail.home_country ?? '—'}</span>
-                  <span className="text-[#6b7280]">Type:</span><span>{detail.assignment_type ?? '—'}</span>
-                  <span className="text-[#6b7280]">Move date:</span><span>{detail.move_date ?? '—'}</span>
+                  <span className="text-[#6b7280]">Destination:</span><span>{detail.host_country ?? detail.destination_from_profile ?? '-'}</span>
+                  <span className="text-[#6b7280]">Origin:</span><span>{detail.home_country ?? '-'}</span>
+                  <span className="text-[#6b7280]">Type:</span><span>{detail.assignment_type ?? '-'}</span>
+                  <span className="text-[#6b7280]">Move date:</span><span>{detail.move_date ?? '-'}</span>
                 </div>
               </section>
 

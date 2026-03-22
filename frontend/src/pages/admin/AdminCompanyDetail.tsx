@@ -61,7 +61,7 @@ export const AdminCompanyDetail: React.FC = () => {
 
   if (loading && !company) {
     return (
-      <AdminLayout title="Company Detail" subtitle="—">
+      <AdminLayout title="Company Detail" subtitle="-">
         <div className="py-8 text-center text-[#6b7280]">Loading...</div>
       </AdminLayout>
     );
@@ -69,7 +69,7 @@ export const AdminCompanyDetail: React.FC = () => {
 
   if (error || !company) {
     return (
-      <AdminLayout title="Company Detail" subtitle="—">
+      <AdminLayout title="Company Detail" subtitle="-">
         <Card padding="lg">
           <div className="text-[#7a2a2a] font-medium">{error || 'Company not found.'}</div>
           <p className="text-sm text-[#6b7280] mt-1">
@@ -116,13 +116,13 @@ export const AdminCompanyDetail: React.FC = () => {
               )}
             </div>
             <div className="text-sm text-[#6b7280] mt-1">
-              Plan: {(company as { plan_tier?: string }).plan_tier ?? '—'} · {company.country ?? '—'} · {company.size_band ?? '—'}
+              Plan: {(company as { plan_tier?: string }).plan_tier ?? '-'} · {company.country ?? '-'} · {company.size_band ?? '-'}
             </div>
             <div className="text-xs text-[#6b7280] mt-1">
-              Primary contact: {company.hr_contact ?? (hrUsers[0]?.name || hrUsers[0]?.email) ?? '—'}
+              Primary contact: {company.hr_contact ?? (hrUsers[0]?.name || hrUsers[0]?.email) ?? '-'}
             </div>
             <div className="text-xs text-[#6b7280] mt-0.5">
-              {company.address ?? '—'} · {company.phone ?? '—'}
+              {company.address ?? '-'} · {company.phone ?? '-'}
             </div>
           </div>
           <Link to={buildRoute('adminCompanies')} className="text-sm text-[#0b2b43] underline">
@@ -176,7 +176,7 @@ export const AdminCompanyDetail: React.FC = () => {
                 {hrUsers.map((h) => (
                   <tr key={h.id} className="border-b border-[#e2e8f0]">
                     <td className="py-2 pr-4 text-[#0b2b43]">{h.name ?? h.profile_id}</td>
-                    <td className="py-2 pr-4 text-[#374151]">{h.email ?? '—'}</td>
+                    <td className="py-2 pr-4 text-[#374151]">{h.email ?? '-'}</td>
                     <td className="py-2 pr-4">
                       <Badge variant="neutral" size="sm">{h.status ?? 'active'}</Badge>
                     </td>
@@ -215,7 +215,7 @@ export const AdminCompanyDetail: React.FC = () => {
                 {employees.map((e) => (
                   <tr key={e.id} className="border-b border-[#e2e8f0]">
                     <td className="py-2 pr-4 text-[#0b2b43]">{e.name ?? e.profile_id}</td>
-                    <td className="py-2 pr-4 text-[#374151]">{e.email ?? '—'}</td>
+                    <td className="py-2 pr-4 text-[#374151]">{e.email ?? '-'}</td>
                     <td className="py-2 pr-4">
                       <Badge variant="neutral" size="sm">{e.status ?? 'active'}</Badge>
                     </td>
@@ -254,10 +254,10 @@ export const AdminCompanyDetail: React.FC = () => {
               <tbody>
                 {assignments.map((a) => (
                   <tr key={a.id} className="border-b border-[#e2e8f0]">
-                    <td className="py-2 pr-4 text-[#0b2b43]">{a.employee_name ?? '—'}</td>
-                    <td className="py-2 pr-4 text-[#374151]">{a.destination ?? '—'}</td>
+                    <td className="py-2 pr-4 text-[#0b2b43]">{a.employee_name ?? '-'}</td>
+                    <td className="py-2 pr-4 text-[#374151]">{a.destination ?? '-'}</td>
                     <td className="py-2 pr-4">
-                      <Badge variant="neutral" size="sm">{a.status ?? '—'}</Badge>
+                      <Badge variant="neutral" size="sm">{a.status ?? '-'}</Badge>
                     </td>
                     <td className="py-2 pl-2">
                       <Link to={buildRoute('hrAssignmentReview', { id: a.id })} className="text-sm text-[#0b2b43] underline">
@@ -301,7 +301,7 @@ export const AdminCompanyDetail: React.FC = () => {
                 {policies.map((p) => (
                   <tr key={p.policy_id} className="border-b border-[#e2e8f0]">
                     <td className="py-2 pr-4 text-[#0b2b43]">{p.title ?? p.policy_id}</td>
-                    <td className="py-2 pr-4 text-[#374151]">{p.latest_version ?? '—'}</td>
+                    <td className="py-2 pr-4 text-[#374151]">{p.latest_version ?? '-'}</td>
                     <td className="py-2 pr-4">
                       <Badge variant="neutral" size="sm">{p.status ?? 'draft'}</Badge>
                     </td>

@@ -32,7 +32,7 @@ const VERSION_STATUS_VARIANTS: Record<string, 'neutral' | 'success' | 'warning'>
 };
 
 function formatDate(val: string | null | undefined): string {
-  if (!val) return '—';
+  if (!val) return '-';
   try {
     return new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
@@ -218,7 +218,7 @@ export const AdminPoliciesPage: React.FC = () => {
   return (
     <AdminLayout
       title="Policies"
-      subtitle="Company-scoped policy management — inspect, edit, publish"
+      subtitle="Inspect, edit, and publish policies per company"
     >
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -334,7 +334,7 @@ export const AdminPoliciesPage: React.FC = () => {
                   <tbody>
                     {policies.map((p) => (
                       <tr key={p.policy_id} className="border-b border-[#e2e8f0] hover:bg-[#f8fafc]">
-                        <td className="py-2 pr-2 font-medium text-[#0b2b43]">{p.title || '—'}</td>
+                        <td className="py-2 pr-2 font-medium text-[#0b2b43]">{p.title || '-'}</td>
                         <td className="py-2 pr-2">
                           {(p.template_source ?? 'company_uploaded') === 'default_platform_template' ? (
                             <Badge variant="neutral" size="sm">Default template</Badge>
@@ -344,7 +344,7 @@ export const AdminPoliciesPage: React.FC = () => {
                         </td>
                         <td className="py-2 pr-2">
                           <Badge variant={VERSION_STATUS_VARIANTS[p.latest_version_status ?? ''] || 'neutral'} size="sm">
-                            {p.latest_version_number ?? '—'} ({VERSION_STATUS_LABELS[p.latest_version_status ?? ''] ?? p.latest_version_status ?? '—'})
+                            {p.latest_version_number ?? '-'} ({VERSION_STATUS_LABELS[p.latest_version_status ?? ''] ?? p.latest_version_status ?? '-'})
                           </Badge>
                         </td>
                         <td className="py-2 pr-2">
@@ -396,7 +396,7 @@ export const AdminPoliciesPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[#6b7280]">Title:</span>{' '}
-                    {inspectDetail.title ?? '—'}
+                    {inspectDetail.title ?? '-'}
                   </div>
                   <div>
                     <span className="text-[#6b7280]">Source:</span>{' '}
@@ -522,12 +522,12 @@ export const AdminPoliciesPage: React.FC = () => {
       )}
 
       <Card padding="lg" className="mt-4">
-        <h3 className="text-sm font-medium text-[#374151] mb-2">Policy assistance</h3>
+        <h3 className="text-sm font-medium text-[#374151] mb-2">Quick tips</h3>
         <ul className="text-sm text-[#4b5563] space-y-1 list-disc list-inside">
-          <li><strong>Company filter</strong> — Select a company first to see its policies, source docs, and versions.</li>
-          <li><strong>Inspect</strong> — View policy detail, versions, and published state; publish or unpublish from here.</li>
-          <li><strong>Edit</strong> — Change policy title, version label, effective date; publish/unpublish a version.</li>
-          <li><strong>Open</strong> — Opens the HR policy workspace for this company (upload, normalize, review).</li>
+          <li>Pick a company first.</li>
+          <li>Inspect shows detail, versions, publish state.</li>
+          <li>Edit changes title, version label, dates, publish flags.</li>
+          <li>Open sends you to the HR policy workspace for uploads and review.</li>
         </ul>
         <div className="mt-3 flex gap-4">
           <Link to={buildRoute('adminCompanies')} className="text-sm font-medium text-[#0b2b43] hover:underline">Companies →</Link>
