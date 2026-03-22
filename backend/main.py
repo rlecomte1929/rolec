@@ -3461,6 +3461,15 @@ def assign_case(
         )
 
 
+def _sanitize_assignment_row_dict(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """JSON-safe case_assignments row (Postgres may return UUID/datetime-like values)."""
+    if not row:
+        return row
+    from .services.employee_assignment_overview import _json_scalar
+
+    return {k: _json_scalar(v) for k, v in row.items()}
+
+
 @app.get("/api/employee/assignments/current")
 def get_employee_assignment(
     request: Request,
@@ -3479,23 +3488,44 @@ def get_employee_assignment(
 
     rid = request.state.request_id
     eid = effective["id"]
-    linked = db.list_linked_assignments_for_employee(eid, request_id=rid)
-    pending_claim = db.list_pending_claim_assignments_for_auth_user(eid, request_id=rid)
+    try:
+        linked = db.list_linked_assignments_for_employee(eid, request_id=rid)
+        pending_claim = db.list_pending_claim_assignments_for_auth_user(eid, request_id=rid)
+    except Exception as e:
+        log.error(
+            "request_id=%s get_employee_assignment list failed user=%s error=%s",
+            rid,
+            eid,
+            repr(e),
+            exc_info=True,
+        )
+        return {
+            "assignment": None,
+            "linked_assignments": [],
+            "pending_claim_assignments": [],
+            "overview_degraded": True,
+        }
+    linked_safe = []
     for row in linked:
-        row["status"] = normalize_status(row.get("status"))
+        d = dict(row)
+        d["status"] = normalize_status(d.get("status"))
+        linked_safe.append(_sanitize_assignment_row_dict(d))
+    pending_safe = []
     for row in pending_claim:
-        row["status"] = normalize_status(row.get("status"))
-    primary = linked[0] if linked else None
+        d = dict(row)
+        d["status"] = normalize_status(d.get("status"))
+        pending_safe.append(_sanitize_assignment_row_dict(d))
+    primary = linked_safe[0] if linked_safe else None
     if not primary:
         return {
             "assignment": None,
             "linked_assignments": [],
-            "pending_claim_assignments": pending_claim,
+            "pending_claim_assignments": pending_safe,
         }
     return {
         "assignment": primary,
-        "linked_assignments": linked,
-        "pending_claim_assignments": pending_claim,
+        "linked_assignments": linked_safe,
+        "pending_claim_assignments": pending_safe,
     }
 
 
@@ -3519,21 +3549,34 @@ def get_employee_assignments_overview(
             request_id=getattr(request.state, "request_id", None),
         )
     rid = getattr(request.state, "request_id", None)
-    overview = build_employee_assignment_overview(
-        db,
-        effective["id"],
-        request_id=rid,
-        normalize_assignment_status=normalize_status,
-    )
+    try:
+        overview = build_employee_assignment_overview(
+            db,
+            effective["id"],
+            request_id=rid,
+            normalize_assignment_status=normalize_status,
+        )
+    except Exception as e:
+        log.error(
+            "request_id=%s get_employee_assignments_overview failed user=%s error=%s",
+            rid,
+            effective.get("id"),
+            repr(e),
+            exc_info=True,
+        )
+        overview = {"linked": [], "pending": [], "overview_degraded": True}
     linked_n = len(overview.get("linked") or [])
     pending_n = len(overview.get("pending") or [])
-    identity_event(
-        "identity.assignments.overview",
-        request_id=rid,
-        auth_user_id=str(effective["id"]).strip(),
-        linked_count=linked_n,
-        pending_count=pending_n,
-    )
+    try:
+        identity_event(
+            "identity.assignments.overview",
+            request_id=rid,
+            auth_user_id=str(effective["id"]).strip(),
+            linked_count=linked_n,
+            pending_count=pending_n,
+        )
+    except Exception:
+        log.warning("request_id=%s identity_event overview failed", rid, exc_info=True)
     return overview
 
 

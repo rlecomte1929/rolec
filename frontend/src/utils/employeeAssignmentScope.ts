@@ -6,7 +6,11 @@ export function shouldLoadEmployeeAssignmentOverview(pathname: string): boolean 
     pathname.startsWith('/employee') ||
     pathname.startsWith('/services') ||
     pathname.startsWith('/quotes') ||
-    pathname.startsWith('/resources')
+    pathname.startsWith('/resources') ||
+    pathname.startsWith('/providers') ||
+    pathname.startsWith('/messages') ||
+    pathname.startsWith('/hr/policy') ||
+    pathname.startsWith('/employee/hr-policy')
   );
 }
 

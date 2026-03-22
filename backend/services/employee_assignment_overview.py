@@ -3,9 +3,28 @@ Compact employee assignment overview for dashboard bootstrap (no case hydration)
 """
 from __future__ import annotations
 
+import logging
+import uuid
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Callable, Dict, List, Optional
 
 from ..database import Database
+
+log = logging.getLogger(__name__)
+
+
+def _json_scalar(v: Any) -> Any:
+    """Ensure JSON-serializable scalars (Postgres may return UUID/datetime/Decimal in row mappings)."""
+    if v is None:
+        return None
+    if isinstance(v, uuid.UUID):
+        return str(v)
+    if isinstance(v, (datetime, date)):
+        return v.isoformat()
+    if isinstance(v, Decimal):
+        return float(v)
+    return v
 
 
 def _destination_payload(host: Optional[str], home: Optional[str]) -> Dict[str, Any]:
@@ -50,27 +69,56 @@ def build_employee_assignment_overview(
     normalize_assignment_status: Callable[[Optional[str]], str],
 ) -> Dict[str, Any]:
     uid = (employee_user_id or "").strip()
-    linked_rows = db.list_employee_linked_assignment_overview(uid, request_id=request_id)
-    pending_rows = db.list_employee_pending_assignment_overview(uid, request_id=request_id)
+    linked_rows: List[Dict[str, Any]] = []
+    pending_rows: List[Dict[str, Any]] = []
+    try:
+        linked_rows = db.list_employee_linked_assignment_overview(uid, request_id=request_id)
+    except Exception as e:
+        log.warning(
+            "list_employee_linked_assignment_overview failed user=%s request_id=%s: %s",
+            uid,
+            request_id,
+            e,
+            exc_info=True,
+        )
+    try:
+        pending_rows = db.list_employee_pending_assignment_overview(uid, request_id=request_id)
+    except Exception as e:
+        log.warning(
+            "list_employee_pending_assignment_overview failed user=%s request_id=%s: %s",
+            uid,
+            request_id,
+            e,
+            exc_info=True,
+        )
     pending_ids = [str(x) for x in (r.get("assignment_id") for r in pending_rows) if x]
-    invite_map = db.map_claim_invite_statuses_by_assignments(pending_ids, request_id=request_id)
+    invite_map: Dict[str, List[str]] = {}
+    try:
+        invite_map = db.map_claim_invite_statuses_by_assignments(pending_ids, request_id=request_id)
+    except Exception as e:
+        log.warning(
+            "map_claim_invite_statuses_by_assignments failed request_id=%s: %s",
+            request_id,
+            e,
+            exc_info=True,
+        )
 
     linked_out: List[Dict[str, Any]] = []
     for r in linked_rows:
         linked_out.append(
             {
-                "assignment_id": r.get("assignment_id"),
-                "case_id": r.get("case_id"),
+                "assignment_id": _json_scalar(r.get("assignment_id")),
+                "case_id": _json_scalar(r.get("case_id")),
                 "company": {
-                    "id": r.get("company_id"),
-                    "name": r.get("company_name"),
+                    "id": _json_scalar(r.get("company_id")),
+                    "name": _json_scalar(r.get("company_name")),
                 },
                 "destination": _destination_payload(r.get("host_country"), r.get("home_country")),
                 "status": normalize_assignment_status(r.get("assignment_status")),
-                "created_at": r.get("assignment_created_at"),
-                "updated_at": r.get("assignment_updated_at"),
-                "current_stage": r.get("relocation_stage"),
-                "relocation_case_status": r.get("relocation_case_status"),
+                "created_at": _json_scalar(r.get("assignment_created_at")),
+                "updated_at": _json_scalar(r.get("assignment_updated_at")),
+                "current_stage": _json_scalar(r.get("relocation_stage")),
+                "relocation_case_status": _json_scalar(r.get("relocation_case_status")),
             }
         )
 
@@ -81,14 +129,14 @@ def build_employee_assignment_overview(
         st_list = invite_map.get(aid_s, []) if aid_s else []
         pending_out.append(
             {
-                "assignment_id": aid,
-                "case_id": r.get("case_id"),
+                "assignment_id": _json_scalar(aid),
+                "case_id": _json_scalar(r.get("case_id")),
                 "company": {
-                    "id": r.get("company_id"),
-                    "name": r.get("company_name"),
+                    "id": _json_scalar(r.get("company_id")),
+                    "name": _json_scalar(r.get("company_name")),
                 },
                 "destination": _destination_payload(r.get("host_country"), r.get("home_country")),
-                "created_at": r.get("assignment_created_at"),
+                "created_at": _json_scalar(r.get("assignment_created_at")),
                 "claim": _claim_summary(st_list),
             }
         )

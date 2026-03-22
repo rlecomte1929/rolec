@@ -94,7 +94,8 @@ def _relocation_cases_join_on(table_alias: str = "a", style: str = "standard") -
         rhs = f"COALESCE(NULLIF(TRIM({a}.canonical_case_id), ''), {a}.case_id)"
     if _is_sqlite:
         return f"rc.id = {rhs}"
-    return f"rc.id::text = {rhs}"
+    # CAST both sides: avoids uuid=text operator errors across mixed schemas.
+    return f"CAST(rc.id AS TEXT) = CAST(({rhs}) AS TEXT)"
 
 
 def _eq_text(lhs_sql: str, rhs_sql: str) -> str:

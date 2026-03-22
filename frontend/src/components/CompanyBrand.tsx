@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { useCompany } from '../hooks/useCompany';
 import { useHrCompanyContext } from '../contexts/HrCompanyContext';
+import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../utils/demo';
 
 const MAX_NAME_LENGTH = 24;
@@ -18,13 +19,33 @@ export const CompanyBrand: React.FC = () => {
   const role = getAuthItem('relopass_role');
   const isOnHrRoute = location.pathname.startsWith('/hr');
   const isHrUser = role === 'HR' || role === 'ADMIN';
-
   const hrContext = useHrCompanyContext();
-  const companyAPI = useCompany({ skip: isHrUser && isOnHrRoute });
+  const { primaryAssignmentCompany, isLoading: employeeAssignmentLoading } = useEmployeeAssignment();
+  const preferAssignmentCompany =
+    (role === 'EMPLOYEE' || role === 'ADMIN') && !isOnHrRoute && Boolean(primaryAssignmentCompany?.name);
+  const companyAPI = useCompany({
+    skip: (isHrUser && isOnHrRoute) || preferAssignmentCompany,
+  });
 
-  // HR on HR routes: use context (single fetch). Otherwise: use company API.
-  const company = isHrUser && isOnHrRoute ? hrContext.company : companyAPI.company;
-  const loading = isHrUser && isOnHrRoute ? hrContext.loading : companyAPI.loading;
+  const assignmentCompany = preferAssignmentCompany
+    ? {
+        id: primaryAssignmentCompany!.id ?? undefined,
+        name: primaryAssignmentCompany!.name!,
+        logo_url: null as string | null | undefined,
+      }
+    : null;
+
+  // HR on HR routes: context. Employee (or admin on employee-style routes) with linked assignment: overview company. Else: /api/company.
+  const company =
+    isHrUser && isOnHrRoute ? hrContext.company : assignmentCompany ?? companyAPI.company;
+  const loading =
+    isHrUser && isOnHrRoute
+      ? hrContext.loading
+      : preferAssignmentCompany && employeeAssignmentLoading
+        ? true
+        : assignmentCompany
+          ? false
+          : companyAPI.loading;
 
   if (loading || !company) {
     return null;

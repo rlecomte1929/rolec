@@ -215,6 +215,7 @@ api.interceptors.response.use(
         localStorage.setItem('debug_last_auth_error', '401 Unauthorized');
       }
       invalidateApiCache('employee:current-assignment');
+      invalidateApiCache('employee:assignments-overview');
       clearAuthItems();
       const path = window.location.pathname || '';
       if (!path.startsWith('/auth') && path !== '/' && path !== '') {
@@ -1395,8 +1396,10 @@ export const employeeAPI = {
   },
   /** Compact linked + pending summaries (no case draft hydration). */
   getAssignmentsOverview: async (): Promise<{ linked: any[]; pending: any[] }> => {
-    const response = await api.get('/api/employee/assignments/overview');
-    return response.data;
+    return cachedRequest('employee:assignments-overview', 60_000, async () => {
+      const response = await api.get('/api/employee/assignments/overview');
+      return response.data;
+    });
   },
   listMessages: async (): Promise<{ messages: any[] }> => {
     const response = await api.get('/api/employee/messages');
@@ -1405,6 +1408,7 @@ export const employeeAPI = {
   claimAssignment: async (assignmentId: string, email: string): Promise<{ success: boolean; assignmentId?: string }> => {
     const response = await api.post(`/api/employee/assignments/${assignmentId}/claim`, { email });
     invalidateApiCache('employee:current-assignment');
+    invalidateApiCache('employee:assignments-overview');
     return response.data;
   },
   /** Hub pending rows only: strict eligibility (pending_claim + contact linked + company + invites). */
@@ -1414,6 +1418,7 @@ export const employeeAPI = {
   ): Promise<{ success: boolean; assignmentId?: string; alreadyLinked?: boolean }> => {
     const response = await api.post(`/api/employee/assignments/${assignmentId}/link-pending`, { email });
     invalidateApiCache('employee:current-assignment');
+    invalidateApiCache('employee:assignments-overview');
     return response.data;
   },
   getNextQuestion: async (assignmentId: string): Promise<EmployeeJourneyResponse> => {

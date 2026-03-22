@@ -9,6 +9,7 @@ import { patchCase, startResearch } from '../../api/cases';
 import { notifyHrEmployeeSaved } from '../../api/notifications';
 import { buildNextActionsFromMissingFields, classifyRelocationCase, getRelocationCase } from '../../api/relocation';
 import { employeeAPI } from '../../api/client';
+import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../utils/demo';
 import type { AssignmentStatus, CaseDTO, CaseDraftDTO, NextAction } from '../../types';
 import { Step1RelocationBasics } from './wizard/Step1RelocationBasics';
@@ -100,7 +101,7 @@ const createRng = (seed: number) => {
 
 const formatDate = (date: Date) => date.toISOString().slice(0, 10);
 
-const buildTestDraft = (seedKey: string, baseDraft: CaseDraftDTO): CaseDraftDTO => {
+const buildTestDraft = (seedKey: string, baseDraft: CaseDraftDTO, employerNameFallback?: string | null): CaseDraftDTO => {
   const rng = createRng(seedFromString(seedKey));
   const pick = <T,>(items: T[]) => items[Math.floor(rng() * items.length)];
 
@@ -152,7 +153,7 @@ const buildTestDraft = (seedKey: string, baseDraft: CaseDraftDTO): CaseDraftDTO 
     },
     assignmentContext: {
       ...baseDraft.assignmentContext,
-      employerName: 'ReloPass Demo Co',
+      employerName: (employerNameFallback && employerNameFallback.trim()) || 'Your employer',
       employerCountry: destinationCountry.name,
       workLocation: destCity,
       contractStartDate: formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
@@ -168,6 +169,7 @@ export const CaseWizardPage: React.FC = () => {
   const { caseId: assignmentIdFromRoute, step } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { linkedSummaries } = useEmployeeAssignment();
   const [draft, setDraft] = useState<CaseDraftDTO>(() => buildDefaultDraft());
   const [caseData, setCaseData] = useState<CaseDTO | null>(null);
   const [resolvedCaseId, setResolvedCaseId] = useState<string | null>(null);
@@ -182,6 +184,7 @@ export const CaseWizardPage: React.FC = () => {
   const [caseFeedback, setCaseFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [caseHydrating, setCaseHydrating] = useState(() => Boolean(assignmentIdFromRoute));
+  const lastSavedDraftJsonRef = React.useRef<string | null>(null);
   const userEmail = getAuthItem('relopass_email') || getAuthItem('relopass_username') || '';
   const enableTestFill =
     import.meta.env.DEV || userEmail.endsWith('@relopass.com');
@@ -248,6 +251,9 @@ export const CaseWizardPage: React.FC = () => {
         setCaseData(data.case);
         setDraft(caseToWizardDraft(data.case, data.assignment));
         setResolvedCaseId(data.case.id);
+        lastSavedDraftJsonRef.current = JSON.stringify(
+          caseToWizardDraft(data.case, data.assignment)
+        );
       }
     } catch {
       setCaseData(null);
@@ -287,55 +293,51 @@ export const CaseWizardPage: React.FC = () => {
     console.debug('Wizard defaults (relocationBasics):', caseToWizardDraft(caseData).relocationBasics);
   }, [caseData?.id, caseData?.updatedAt]);
 
-  // Route gating: the wizard is only for intake / changes-requested.
+  const overviewRowForAssignment = useMemo(
+    () => linkedSummaries.find((r) => r.assignment_id === assignmentId) ?? null,
+    [linkedSummaries, assignmentId]
+  );
+
+  // Assignment status from canonical overview (avoid extra GET /assignments/current per wizard step).
+  useEffect(() => {
+    if (overviewRowForAssignment?.status) {
+      setAssignmentStatus(overviewRowForAssignment.status as AssignmentStatus);
+    }
+  }, [overviewRowForAssignment?.status]);
+
   useEffect(() => {
     const run = async () => {
+      const storedFeedback = sessionStorage.getItem('relopass_hr_notes') || '';
+      const hydrateFeedback = (raw: string) => {
+        if (!raw) return;
+        try {
+          const parsed = JSON.parse(raw);
+          const notes = typeof parsed?.notes === 'string' ? parsed.notes : '';
+          const sections = Array.isArray(parsed?.requestedSections)
+            ? parsed.requestedSections.filter((s: any) => typeof s === 'string')
+            : [];
+          setHrFeedback(notes || raw);
+          setHrRequestedSections(sections);
+        } catch {
+          setHrFeedback(raw);
+          setHrRequestedSections([]);
+        }
+      };
+
+      if (storedFeedback) {
+        hydrateFeedback(storedFeedback);
+        return;
+      }
+      if (overviewRowForAssignment?.status !== 'awaiting_intake' || !assignmentId) return;
       try {
-        const res = await employeeAPI.getCurrentAssignment();
-        const assignment = res.assignment;
-        if (!assignment) return;
-        if (assignmentId && assignment.id !== assignmentId) return;
-        setAssignmentStatus(assignment.status as AssignmentStatus);
-
-        const storedFeedback = sessionStorage.getItem('relopass_hr_notes') || '';
-        const hydrateFeedback = (raw: string) => {
-          if (!raw) return;
-          try {
-            const parsed = JSON.parse(raw);
-            const notes = typeof parsed?.notes === 'string' ? parsed.notes : '';
-            const sections = Array.isArray(parsed?.requestedSections)
-              ? parsed.requestedSections.filter((s: any) => typeof s === 'string')
-              : [];
-            setHrFeedback(notes || raw);
-            setHrRequestedSections(sections);
-          } catch {
-            setHrFeedback(raw);
-            setHrRequestedSections([]);
-          }
-        };
-
-        if (storedFeedback) {
-          hydrateFeedback(storedFeedback);
-        } else if (assignment.status === 'awaiting_intake' && assignmentId) {
-          // If the employee opened the wizard directly, pull HR notes from journey API.
-          const journey = await employeeAPI.getNextQuestion(assignmentId);
-          if (journey.hrNotes) hydrateFeedback(journey.hrNotes);
-        }
-
-        const isSubmitted =
-          assignment.status === 'submitted' ||
-          assignment.status === 'approved' ||
-          assignment.status === 'rejected' ||
-          assignment.status === 'closed';
-        if (isSubmitted) {
-          setAssignmentStatus(assignment.status as AssignmentStatus);
-        }
+        const journey = await employeeAPI.getNextQuestion(assignmentId);
+        if (journey.hrNotes) hydrateFeedback(journey.hrNotes);
       } catch {
-        // Best effort; wizard can still function for MVP draft creation.
+        // best effort
       }
     };
-    run();
-  }, [assignmentId, navigate]);
+    void run();
+  }, [assignmentId, overviewRowForAssignment?.status]);
 
   useEffect(() => {
     if (!assignmentId) return;
@@ -366,14 +368,16 @@ export const CaseWizardPage: React.FC = () => {
     if (!caseIdToSave) {
       throw new Error("Couldn't find your case. Refresh and try again.");
     }
-    const updated = await patchCase(caseIdToSave, nextDraft);
-    setDraft(caseToWizardDraft(updated));
-    setCaseData(updated);
-    await loadRequirements();
-    setError('');
-    if (assignmentId) {
-      notifyHrEmployeeSaved(assignmentId).catch(() => {});
+    const nextJson = JSON.stringify(nextDraft);
+    if (lastSavedDraftJsonRef.current === nextJson) {
+      return caseIdToSave;
     }
+    const updated = await patchCase(caseIdToSave, nextDraft);
+    const merged = caseToWizardDraft(updated);
+    setDraft(merged);
+    setCaseData(updated);
+    lastSavedDraftJsonRef.current = JSON.stringify(merged);
+    setError('');
     return caseIdToSave;
   };
 
@@ -394,6 +398,10 @@ export const CaseWizardPage: React.FC = () => {
           // Research is non-blocking; continue to next step
         }
       }
+      await loadRequirements();
+      if (currentStep === 4 && assignmentId) {
+        notifyHrEmployeeSaved(assignmentId).catch(() => {});
+      }
       navigate(`/employee/case/${assignmentId}/wizard/${currentStep + 1}`);
     } catch (err: any) {
       setError(err?.message || "Couldn't save. Try again.");
@@ -412,7 +420,9 @@ export const CaseWizardPage: React.FC = () => {
     if (!assignmentId) return;
     setError('');
     const baseDraft = caseToWizardDraft(caseData);
-    const nextDraft = buildTestDraft(assignmentId, baseDraft);
+    const empName =
+      linkedSummaries.find((r) => r.assignment_id === assignmentId)?.company?.name?.trim() || null;
+    const nextDraft = buildTestDraft(assignmentId, baseDraft, empName);
     setIsSaving(true);
     try {
       await handleSave(nextDraft);
@@ -515,6 +525,16 @@ export const CaseWizardPage: React.FC = () => {
               ))}
             </div>
           </Card>
+        )}
+        {caseHydrating && (
+          <div
+            className="rounded-lg border border-[#e2e8f0] bg-white px-4 py-3 text-sm text-[#0b2b43]"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            Restoring your saved details…
+          </div>
         )}
         {enableTestFill && (
           <Card padding="md">
