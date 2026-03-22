@@ -7,7 +7,11 @@ import { markConversationRead } from '../api/messageNotifications';
 import { getAuthItem } from '../utils/demo';
 import { ConversationList } from '../features/messages/ConversationList';
 import { ConversationView } from '../features/messages/ConversationView';
-import { buildConversationsFromMessages, conversationFromSummary } from '../features/messages/utils';
+import {
+  buildConversationsFromMessages,
+  buildConversationsFromQuoteThreads,
+  conversationFromSummary,
+} from '../features/messages/utils';
 import { MOCK_CONVERSATIONS } from '../features/messages/mockData';
 import type { Conversation } from '../features/messages/types';
 
@@ -47,21 +51,42 @@ export const Messages: React.FC = () => {
     ? conversations.find((c) => c.id === activeId) ?? null
     : null;
 
-  /** Employee / legacy: load all messages for their assignment(s) */
+  /** Employee: HR threads per linked assignment + provider quote threads */
   useEffect(() => {
     if (isHrLike) return;
     const load = async () => {
       try {
-        const res = await employeeAPI.listMessages();
+        const [res, overview] = await Promise.all([
+          employeeAPI.listMessages(),
+          employeeAPI.getAssignmentsOverview().catch(() => ({ linked: [] as { assignment_id?: string; company?: { name?: string } }[] })),
+        ]);
         const raw = (res.messages || []) as Record<string, unknown>[];
-        let built = buildConversationsFromMessages(raw, userId, role || 'EMPLOYEE', userName);
+        const quoteRaw = (res.quote_threads || []) as Record<string, unknown>[];
+        const labels = new Map<string, string>();
+        for (const row of overview.linked || []) {
+          const aid = row.assignment_id;
+          const nm = row.company?.name?.trim();
+          if (aid && nm) labels.set(aid, nm);
+        }
+        let hrBuilt = buildConversationsFromMessages(raw, userId, role || 'EMPLOYEE', userName);
+        hrBuilt = hrBuilt.map((c) => ({
+          ...c,
+          list_subtitle: labels.get(c.assignment_id) || null,
+        }));
+        const supplierBuilt = buildConversationsFromQuoteThreads(
+          quoteRaw,
+          userId,
+          userName,
+          labels
+        );
+        let built = [...hrBuilt, ...supplierBuilt];
         if (built.length === 0 && import.meta.env.DEV) {
           built = MOCK_CONVERSATIONS;
         }
         setConversations(built);
-        const assignmentIdFromUrl = searchParams.get('assignmentId');
-        if (assignmentIdFromUrl) {
-          const convId = `conv-${assignmentIdFromUrl}`;
+        const aidFromUrl = searchParams.get('assignmentId');
+        if (aidFromUrl) {
+          const convId = `conv-${aidFromUrl}`;
           if (built.some((c) => c.id === convId)) {
             setActiveId(convId);
             searchParams.delete('assignmentId');
@@ -181,17 +206,35 @@ export const Messages: React.FC = () => {
   /** Clear selection if active thread disappears (e.g. after archive + active filter). */
   useEffect(() => {
     if (!activeId) return;
-    const aid = activeId.replace(/^conv-/, '');
-    if (!conversations.some((c) => c.assignment_id === aid)) {
+    if (!conversations.some((c) => c.id === activeId)) {
       setActiveId(null);
     }
   }, [conversations, activeId]);
 
   useEffect(() => {
-    if (activeConversation?.assignment_id) {
-      markConversationRead(activeConversation.assignment_id).catch(() => {});
-    }
-  }, [activeConversation?.assignment_id]);
+    if (!activeConversation?.assignment_id || activeConversation.channel === 'supplier') return;
+    markConversationRead(activeConversation.assignment_id).catch(() => {});
+  }, [activeConversation?.assignment_id, activeConversation?.channel]);
+
+  const employeeMessageSections = useMemo(() => {
+    if (isHrLike) return undefined;
+    const hr = conversations.filter((c) => c.channel !== 'supplier');
+    const sup = conversations.filter((c) => c.channel === 'supplier');
+    return [
+      {
+        title: 'Employer & HR',
+        conversations: hr,
+        emptyHint:
+          'No HR messages yet. When your employer contacts you about an assignment, it appears here—one thread per assignment.',
+      },
+      {
+        title: 'Service providers',
+        conversations: sup,
+        emptyHint:
+          'No provider conversations yet. When you request quotes, messages with vendors appear here in the same layout as HR threads.',
+      },
+    ];
+  }, [conversations, isHrLike]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -373,7 +416,9 @@ export const Messages: React.FC = () => {
               {hrListHeader}
               <div className="flex-1 min-h-0 overflow-hidden">
                 <ConversationList
-                  conversations={conversations}
+                  {...(isHrLike
+                    ? { conversations }
+                    : { sections: employeeMessageSections, conversations: [] })}
                   activeId={activeId}
                   onSelect={setActiveId}
                   editMode={isHrLike && editMode}
@@ -409,9 +454,16 @@ export const Messages: React.FC = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
-                    <span className="font-semibold text-[#1A1A1A] truncate">
-                      {activeConversation?.other_participant_name || 'Conversation'}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-[#1A1A1A] truncate block">
+                        {activeConversation?.other_participant_name || 'Conversation'}
+                      </span>
+                      {activeConversation?.list_subtitle ? (
+                        <span className="text-xs text-[#64748b] truncate block">
+                          {activeConversation.list_subtitle}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <ConversationView
                     conversation={activeConversation}
@@ -427,7 +479,9 @@ export const Messages: React.FC = () => {
                   {hrListHeader}
                   <div className="flex-1 min-h-0 overflow-hidden">
                     <ConversationList
-                      conversations={conversations}
+                      {...(isHrLike
+                        ? { conversations }
+                        : { sections: employeeMessageSections, conversations: [] })}
                       activeId={null}
                       onSelect={setActiveId}
                       editMode={isHrLike && editMode}
@@ -441,12 +495,6 @@ export const Messages: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
-      <div className="mt-6 rounded-xl border border-dashed border-[#cbd5f5] bg-[#f8fafc] p-4 text-sm text-[#6b7280]">
-        <div className="font-semibold text-[#0b2b43] mb-1">Supplier messaging (Coming soon)</div>
-        <div>
-          You will be able to message relocation service providers directly once quotes are enabled.
-        </div>
       </div>
     </AppShell>
   );

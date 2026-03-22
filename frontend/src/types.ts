@@ -607,6 +607,8 @@ export interface AssignmentSummary {
   employeeLastName?: string | null;
   /** Relocation case metadata (host_country, home_country) for list display */
   case?: { host_country?: string; home_country?: string; id?: string; status?: string } | null;
+  /** Earliest open milestone due date (from HR assignments list API). */
+  nextDeadline?: string | null;
 }
 
 export interface AssignmentsListResponse {

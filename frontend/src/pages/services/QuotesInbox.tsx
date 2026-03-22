@@ -14,7 +14,6 @@ export const QuotesInbox: React.FC = () => {
   const location = useLocation();
   const {
     assignmentId: primaryAssignmentId,
-    linkedCount,
     linkedSummaries,
     isLoading: assignmentLoading,
   } = useEmployeeAssignment();
@@ -22,12 +21,11 @@ export const QuotesInbox: React.FC = () => {
   const { effectiveId: assignmentId, needsPicker } = useMemo(
     () =>
       resolveScopedAssignmentId({
-        linkedCount,
         linkedSummaries,
         primaryAssignmentId,
         queryAssignmentId,
       }),
-    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+    [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
   const [rfqs, setRfqs] = useState<RfqSummary[]>([]);
   const [loading, setLoading] = useState(true);

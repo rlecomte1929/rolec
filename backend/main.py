@@ -3720,8 +3720,10 @@ def get_employee_me_assignment_package_policy(
 @app.get("/api/employee/messages")
 def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
     effective = _effective_user(user, UserRole.EMPLOYEE)
-    items = db.list_messages_for_employee(effective["id"])
-    return {"messages": items}
+    uid = effective["id"]
+    items = db.list_messages_for_employee(uid)
+    quote_threads = db.list_quote_threads_for_employee(uid)
+    return {"messages": items, "quote_threads": quote_threads}
 
 
 def _validated_employee_claim_identifiers(
@@ -4163,28 +4165,58 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
             detail="Profile is not complete. Please fill in all required fields in the wizard steps (Relocation Basics, Employee Profile, Family, Assignment Context).",
         )
 
+    eff_case_for_sync = _effective_relocation_case_id(assignment)
+    if eff_case_for_sync:
+        try:
+            with SessionLocal() as session:
+                wc = app_crud.get_case(session, eff_case_for_sync) or app_crud.get_case(
+                    session, assignment_id
+                ) or (
+                    app_crud.get_case(session, (assignment.get("case_id") or "").strip())
+                    if (assignment.get("case_id") or "").strip()
+                    else None
+                )
+                if wc:
+                    try:
+                        draft = json.loads(wc.draft_json or "{}")
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        draft = {}
+                    if isinstance(draft, dict):
+                        db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, draft)
+        except Exception as exc:
+            log.warning(
+                "submit_assignment: relocation_cases draft sync failed assignment_id=%s case_id=%s error=%s",
+                assignment_id,
+                eff_case_for_sync,
+                str(exc),
+                exc_info=True,
+            )
+
     db.set_assignment_submitted(assignment_id)
 
-    case_id = assignment.get("case_id") or ""
+    case_id = _effective_relocation_case_id(assignment)
     event_type = "assignment.submitted"
-    try:
-        db.insert_case_event(
-            case_id=case_id,
-            assignment_id=assignment_id,
-            actor_principal_id=effective["id"],
-            event_type=event_type,
-            payload={},
-        )
-    except Exception as exc:
-        log.error(
-            "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
-            assignment_id,
-            case_id,
-            event_type,
-            str(exc),
-            exc_info=True,
-        )
-        raise
+    if case_id:
+        try:
+            db.insert_case_event(
+                case_id=case_id,
+                assignment_id=assignment_id,
+                actor_principal_id=effective["id"],
+                event_type=event_type,
+                payload={},
+            )
+        except Exception as exc:
+            log.error(
+                "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+                assignment_id,
+                case_id,
+                event_type,
+                str(exc),
+                exc_info=True,
+            )
+            raise
+    else:
+        log.warning("submit_assignment: missing case_id for event assignment_id=%s", assignment_id)
 
     return {"success": True}
 
@@ -4211,6 +4243,14 @@ def update_profile_photo(
     profile["primaryApplicant"]["photoUrl"] = request.photoUrl
     db.save_employee_profile(assignment_id, profile)
     return {"success": True}
+
+
+def _effective_relocation_case_id(assignment: Dict[str, Any]) -> str:
+    """relocation_cases.id for this assignment (canonical wins over legacy case_id)."""
+    cc = (assignment.get("canonical_case_id") or "").strip()
+    if cc:
+        return cc
+    return (assignment.get("case_id") or "").strip()
 
 
 @app.get("/api/hr/assignments", response_model=AssignmentsListResponse)
@@ -4261,7 +4301,7 @@ def list_hr_assignments(
             _log_endpoint_perf("/api/hr/assignments", request_id, user.get("id"), dur_ms, 200)
             return AssignmentsListResponse(assignments=[], total=total)
 
-        case_ids = [a.get("case_id") for a in assignments if a.get("case_id")]
+        case_ids = [_effective_relocation_case_id(a) for a in assignments]
         cases_by_id: Dict[str, Any] = {}
         unique_ids = list({cid for cid in case_ids if cid})
         if unique_ids:
@@ -4286,15 +4326,25 @@ def list_hr_assignments(
                     "company_id": m.get("company_id"),
                 }
 
+        deadline_by_case: Dict[str, str] = {}
+        if unique_ids:
+            try:
+                deadline_by_case = db.next_open_milestone_deadlines_for_cases(unique_ids, request_id=request_id)
+            except Exception:
+                log.warning("next_open_milestone_deadlines_for_cases failed", exc_info=True)
+
         summaries: List[AssignmentSummary] = []
         for assignment in assignments:
-            case_meta = cases_by_id.get(assignment.get("case_id"))
-            case_id = assignment.get("case_id") or assignment.get("id") or ""
+            eff_case = _effective_relocation_case_id(assignment)
+            case_meta = cases_by_id.get(eff_case) if eff_case else None
+            case_id = eff_case or assignment.get("case_id") or assignment.get("id") or ""
             submitted_at = assignment.get("submitted_at")
             if isinstance(submitted_at, datetime):
                 submitted_at_str = submitted_at.isoformat()
             else:
                 submitted_at_str = submitted_at
+            nk = db.coalesce_case_lookup_id(eff_case) if eff_case else ""
+            next_deadline = deadline_by_case.get(nk) if nk else None
             summaries.append(AssignmentSummary(
                 id=assignment["id"],
                 caseId=case_id,
@@ -4305,6 +4355,7 @@ def list_hr_assignments(
                 employeeFirstName=assignment.get("employee_first_name"),
                 employeeLastName=assignment.get("employee_last_name"),
                 case=case_meta,
+                nextDeadline=next_deadline,
             ))
         dur_ms = (time.perf_counter() - t0) * 1000
         _log_endpoint_perf("/api/hr/assignments", request_id, user.get("id"), dur_ms, 200)
@@ -4673,7 +4724,7 @@ def get_hr_assignment(
             raise HTTPException(status_code=403, detail="Not authorized for this assignment")
 
         aid = assignment["id"]
-        case_id = assignment.get("case_id") or assignment.get("id") or ""
+        case_id = _effective_relocation_case_id(assignment) or assignment.get("id") or ""
         if not case_id:
             log.warning("request_id=%s assignment_id=%s assignment has no case_id", req_id, assignment_id)
 
@@ -5118,7 +5169,7 @@ def get_case_details_by_assignment(
         visible = True
     if not visible:
         raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
-    case_id = assignment.get("case_id")
+    case_id = _effective_relocation_case_id(assignment)
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case_id")
 
@@ -5175,7 +5226,7 @@ def get_case_details_by_assignment(
     return {
         "assignment": {
             "id": assignment["id"],
-            "case_id": assignment["case_id"],
+            "case_id": case_id,
             "employee_user_id": emp_id,
             "hr_user_id": hr_id,
             "status": assignment.get("status", ""),
@@ -5196,7 +5247,7 @@ def get_assignment_timeline(
 ):
     """List operational relocation tasks (case_milestones) for the case linked to this assignment."""
     assignment = _require_assignment_visibility(assignment_id, user)
-    case_id = assignment.get("case_id")
+    case_id = _effective_relocation_case_id(assignment)
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case")
     request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
@@ -5541,6 +5592,32 @@ def _require_document_access(user: Dict[str, Any], doc: Optional[Dict[str, Any]]
     profile = _require_company_for_user(user)
     if doc.get("company_id") != profile.get("company_id"):
         raise HTTPException(status_code=404, detail="Document not found")
+
+
+def _hr_publish_policy_version(
+    policy_id: str,
+    policy_version_id: str,
+    user: Dict[str, Any],
+    request_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Publish one policy version for HR: archive other published rows, set status=published.
+    Same rules as POST .../versions/{id}/publish.
+    """
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    db.archive_other_published_versions(policy_id, policy_version_id)
+    db.update_policy_version_status(policy_version_id, "published")
+    updated = db.get_policy_version(policy_version_id) or {}
+    company_id = (policy or {}).get("company_id") if policy else None
+    log.info(
+        "publish request_id=%s company_id=%s policy_id=%s version_id=%s status=published visibility=employee_lookup source=normalize_or_manual",
+        request_id,
+        company_id,
+        policy_id,
+        policy_version_id,
+    )
+    return updated
 
 
 def _map_storage_exception_to_response(exc: Exception, bucket: str) -> tuple[str, str]:
@@ -6127,10 +6204,10 @@ def submit_vendor_quote(
 
 
 EMPLOYEE_POLICY_FALLBACK_PRIMARY = (
-    "Your company has not yet published an assignment policy for this case."
+    "Your HR team has not published your company's assignment policy in ReloPass yet."
 )
 EMPLOYEE_POLICY_FALLBACK_SECONDARY = (
-    "Once HR publishes a policy that applies to your assignment, your benefits and limits will appear here."
+    "This page will show your package and limits after HR publishes the policy from the HR Policy workspace."
 )
 
 
@@ -8200,7 +8277,8 @@ def normalize_policy_document(
     Normalize stage: transform extracted clauses into structured policy objects.
     Creates/attaches company_policy, policy_version, benefit_rules, exclusions, evidence_requirements,
     conditions, assignment/family applicability, and source_links (traceability to clauses).
-    Output is versioned and traceable to source_policy_document_id and clause ids.
+    On success, the new version is published immediately so employees see it on HR Policy (same as
+    Normalize & publish). Use the review workspace to edit rules or re-publish later if needed.
     """
     request_id = getattr(req.state, "request_id", None)
     doc = db.get_policy_document(doc_id, request_id=request_id)
@@ -8214,15 +8292,53 @@ def normalize_policy_document(
         from .services.policy_normalization import run_normalization
         result = run_normalization(db, doc, clauses, created_by=user.get("id"), request_id=request_id)
         summary = result.get("summary") or {}
+        policy_id = str(result["policy_id"])
+        version_id = str(result["policy_version_id"])
+        try:
+            published_version = _hr_publish_policy_version(policy_id, version_id, user, request_id=request_id)
+        except HTTPException:
+            raise
+        except Exception as pub_exc:
+            log.warning(
+                "request_id=%s policy_pipeline stage=normalize publish_failed document_id=%s policy_id=%s version_id=%s exc=%s",
+                request_id,
+                doc_id,
+                policy_id,
+                version_id,
+                pub_exc,
+                exc_info=True,
+            )
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "ok": False,
+                    "error_code": "publish_failed_after_normalize",
+                    "message": (
+                        "Policy data was saved, but publishing failed so employees will not see it yet. "
+                        "Use “Publish version” in the HR Policy review workspace, or contact support."
+                    ),
+                    "request_id": request_id,
+                    "detail": str(pub_exc)[:500],
+                    "policy_id": policy_id,
+                    "policy_version_id": version_id,
+                    "summary": summary,
+                },
+            )
         log.info(
-            "request_id=%s policy_pipeline stage=normalize document_id=%s company_id=%s user_id=%s success=true "
+            "request_id=%s policy_pipeline stage=normalize document_id=%s company_id=%s user_id=%s success=true published=true "
             "policy_id=%s policy_version_id=%s benefit_rules=%d exclusions=%d rows_created=%d",
             request_id, doc_id, doc.get("company_id") if doc else None, user.get("id") if user else None,
-            result["policy_id"], result["policy_version_id"],
+            policy_id, version_id,
             summary.get("benefit_rules", 0), summary.get("exclusions", 0),
             summary.get("benefit_rules", 0) + summary.get("exclusions", 0) + summary.get("evidence_requirements", 0) + summary.get("conditions", 0),
         )
-        return {"policy_id": result["policy_id"], "policy_version_id": result["policy_version_id"], "summary": result["summary"]}
+        return {
+            "policy_id": policy_id,
+            "policy_version_id": version_id,
+            "summary": result["summary"],
+            "published": True,
+            "version": published_version,
+        }
     except ValueError as exc:
         err_str = str(exc)
         log.warning("request_id=%s normalize validation: %s", request_id, err_str)
@@ -8367,16 +8483,11 @@ def publish_policy_version_latest(
         log.warning("request_id=%s publish_version_latest policy_id=%s no_version", request_id, policy_id)
         raise HTTPException(status_code=404, detail="No policy version found. Normalize a document first.")
     version_id = version["id"]
-    company_id = (policy or {}).get("company_id") if policy else None
     try:
-        db.archive_other_published_versions(policy_id, version_id)
-        db.update_policy_version_status(version_id, "published")
-        updated = db.get_policy_version(version_id)
-        log.info(
-            "publish request_id=%s company_id=%s policy_id=%s version_id=%s status=published visibility=employee_lookup",
-            request_id, company_id, policy_id, version_id,
-        )
+        updated = _hr_publish_policy_version(policy_id, version_id, user, request_id=request_id)
         return {"version": updated}
+    except HTTPException:
+        raise
     except Exception as exc:
         log.warning("request_id=%s publish_version_latest failed policy_id=%s exc=%s", request_id, policy_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Publish failed")
@@ -8432,16 +8543,10 @@ def publish_policy_version(
         log.warning("request_id=%s publish_version policy_id=%s version_id=%s version_policy_mismatch", request_id, policy_id, version_id)
         raise HTTPException(status_code=404, detail="Version not found")
     try:
-        db.archive_other_published_versions(policy_id, version_id)
-        db.update_policy_version_status(version_id, "published")
-        updated = db.get_policy_version(version_id)
-        policy = db.get_company_policy(policy_id)
-        company_id = (policy or {}).get("company_id") if policy else None
-        log.info(
-            "publish request_id=%s company_id=%s policy_id=%s version_id=%s status=published visibility=employee_lookup",
-            request_id, company_id, policy_id, version_id,
-        )
+        updated = _hr_publish_policy_version(policy_id, version_id, user, request_id=request_id)
         return {"version": updated}
+    except HTTPException:
+        raise
     except Exception as exc:
         log.warning("request_id=%s publish_version failed policy_id=%s version_id=%s exc=%s", request_id, policy_id, version_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Publish failed")

@@ -39,7 +39,6 @@ export const ServicesQuestions: React.FC = () => {
   const { selectedServices, setSelectedServices, setRecommendations, setShortlist, answers, setAnswers } = useServicesFlow();
   const {
     assignmentId: primaryAssignmentId,
-    linkedCount,
     linkedSummaries,
     isLoading: assignmentLoading,
   } = useEmployeeAssignment();
@@ -47,12 +46,11 @@ export const ServicesQuestions: React.FC = () => {
   const { effectiveId: assignmentId, needsPicker } = useMemo(
     () =>
       resolveScopedAssignmentId({
-        linkedCount,
         linkedSummaries,
         primaryAssignmentId,
         queryAssignmentId,
       }),
-    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+    [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
   const workflow = useServicesWorkflowState();
   const [caseId, setCaseId] = useState<string | null>(null);

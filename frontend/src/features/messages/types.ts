@@ -3,7 +3,7 @@
  * Compatible with existing backend schema (id, assignment_id, hr_user_id, employee_identifier, subject, body, status, created_at).
  */
 
-export type SenderRole = 'HR' | 'EMPLOYEE' | 'ADMIN' | 'SYSTEM';
+export type SenderRole = 'HR' | 'EMPLOYEE' | 'ADMIN' | 'SYSTEM' | 'SUPPLIER';
 
 export interface Message {
   id: string;
@@ -28,9 +28,17 @@ export interface Message {
   status_delivery?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
+export type MessageChannel = 'hr' | 'supplier';
+
 export interface Conversation {
   id: string;
   assignment_id: string;
+  /** HR vs quote/vendor thread (employee UI). */
+  channel?: MessageChannel;
+  /** quote_conversations.id when channel === 'supplier' */
+  supplier_conversation_id?: string;
+  /** Secondary line in list row (e.g. employer name) */
+  list_subtitle?: string | null;
   /** Display name of the other participant */
   other_participant_name: string;
   /** Avatar initial or URL */

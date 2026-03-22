@@ -8,7 +8,7 @@ Owned by **`EmployeeAssignmentContext`** (`frontend/src/contexts/EmployeeAssignm
 |-------|---------|
 | `assignmentId` | Primary linked assignment id (`linked[0].assignment_id` from overview). |
 | `primaryAssignmentCompany` | `{ id, name }` from `linked[0].company` (assignment-scoped). |
-| `linkedSummaries` / `pendingSummaries` | Full overview rows. |
+| `linkedSummaries` / `pendingSummaries` | Full overview rows (`linked` deduped by `assignment_id` in the provider). |
 | `isLoading` | Overview in flight (single gate for “bootstrap resolving”). |
 | `overviewError` | User-visible failure after overview request fails. |
 | `refetch` | Clears `employee:current-assignment` + `employee:assignments-overview` caches and reloads. |
@@ -17,16 +17,18 @@ Owned by **`EmployeeAssignmentContext`** (`frontend/src/contexts/EmployeeAssignm
 
 | Concept | Source |
 |---------|--------|
-| **Assignment id** (primary) | `GET /api/employee/assignments/overview` → `linked[0].assignment_id` unless multi-assignment picker / `?assignment=` overrides (see `resolveScopedAssignmentId`). |
+| **Assignment id** (primary) | Overview → deduped `linked[0].assignment_id`, then scoped by `resolveScopedAssignmentId` (`?assignment=`, stored preference, or picker). |
 | **Relocation case id** | From `case-details-by-assignment` or wizard case load — canonical **per assignment**, not global. |
 | **Company (HR-created)** | Overview row `company.id` / `company.name` (joined from `relocation_cases` + `companies` / HR user company on backend). |
 
 ## Precedence (multiple linked assignments)
 
-Unchanged from `resolveScopedAssignmentId` (`frontend/src/utils/employeeAssignmentScope.ts`):
+From `resolveScopedAssignmentId` (`frontend/src/utils/employeeAssignmentScope.ts`), using **deduped** linked rows:
 
-- **0–1 linked** — use primary overview id unless `?assignment=` matches a linked row.
-- **2+ linked** — require `?assignment=` that matches a linked row, else `needsPicker`.
+1. **`?assignment=`** — if it matches a linked `assignment_id`, use it (Services also persists this to `relopass_employee_preferred_assignment_*`).
+2. **Stored preference** — last focus from `/employee/case/:id/…`, the assignment picker, or a single-assignment overview; kept only while that id is still in linked rows.
+3. **0–1 distinct linked** — primary id, no picker.
+4. **2+ distinct linked** and no valid query or preference — `needsPicker`.
 
 ## When overview loads
 

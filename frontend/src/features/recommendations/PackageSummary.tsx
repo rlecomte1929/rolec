@@ -52,19 +52,17 @@ export const PackageSummary: React.FC<Props> = ({
   const location = useLocation();
   const {
     assignmentId: primaryAssignmentId,
-    linkedCount,
     linkedSummaries,
   } = useEmployeeAssignment();
   const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
   const { effectiveId: assignmentId } = useMemo(
     () =>
       resolveScopedAssignmentId({
-        linkedCount,
         linkedSummaries,
         primaryAssignmentId,
         queryAssignmentId,
       }),
-    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+    [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
 
   useEffect(() => {

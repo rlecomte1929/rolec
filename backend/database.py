@@ -181,17 +181,20 @@ def _seed_default_policy_template_sqlite(conn: Any) -> None:
     )
 
 
-def _policy_bool_for_db(value: Any) -> int:
-    """Return 1 or 0 for policy_* boolean columns. Use with _policy_ag_sql() in INSERTs for dialect-safe behavior."""
+def _policy_bool_bind(value: Any) -> Any:
+    """
+    Bind value for policy_* auto_generated columns.
+    SQLite uses INTEGER 0/1; Postgres expects a boolean bind (avoids driver/type mismatches with CASE+int).
+    """
     b = bool(value) if value is not None else True
-    return 1 if b else 0
+    if _is_sqlite:
+        return 1 if b else 0
+    return b
 
 
 def _policy_ag_sql() -> str:
-    """SQL fragment for auto_generated column: plain :ag for SQLite (INTEGER), CASE for Postgres (boolean)."""
-    if _is_sqlite:
-        return ":ag"
-    return "(CASE WHEN :ag = 1 THEN true ELSE false END)"
+    """SQL placeholder for auto_generated; use :ag with _policy_bool_bind() for each dialect."""
+    return ":ag"
 
 
 def normalize_policy_boolean_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -207,7 +210,7 @@ def normalize_policy_boolean_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
         v = out[k]
         if v is None:
             continue
-        out[k] = _policy_bool_for_db(v)
+        out[k] = _policy_bool_bind(v)
     return out
 
 
@@ -4685,6 +4688,144 @@ class Database:
                 {"host": host_country, "ua": datetime.utcnow().isoformat(), "cid": case_id},
             )
 
+    def touch_relocation_case_route_from_wizard(
+        self,
+        relocation_case_id: str,
+        *,
+        home_country: Optional[str] = None,
+        host_country: Optional[str] = None,
+    ) -> None:
+        """Denormalize wizard origin/destination onto relocation_cases for HR lists and filters."""
+        rid = (relocation_case_id or "").strip()
+        if not rid or (not home_country and not host_country):
+            return
+        if not self.get_case_by_id(rid):
+            return
+        now = datetime.utcnow().isoformat()
+        parts = ["updated_at = :ua"]
+        params: Dict[str, Any] = {"cid": rid, "ua": now}
+        if home_country:
+            parts.append("home_country = :home")
+            params["home"] = home_country
+        if host_country:
+            parts.append("host_country = :host")
+            params["host"] = host_country
+        sql = f"UPDATE relocation_cases SET {', '.join(parts)} WHERE id = :cid"
+        with self.engine.begin() as conn:
+            conn.execute(text(sql), params)
+
+    def sync_relocation_case_route_from_wizard_draft(self, relocation_case_id: str, draft: Dict[str, Any]) -> None:
+        """
+        Denormalize relocationBasics onto relocation_cases (same fields as PATCH /api/cases).
+        Used on employee submit so HR lists stay current without an extra wizard save.
+        """
+        basics = draft.get("relocationBasics") or {}
+        home = (basics.get("originCountry") or basics.get("origin_country") or "").strip() or None
+        host = (
+            basics.get("destCountry")
+            or basics.get("destination_country")
+            or basics.get("hostCountry")
+            or basics.get("host_country")
+            or ""
+        )
+        host = (host or "").strip() or None
+        if home or host:
+            self.touch_relocation_case_route_from_wizard(
+                relocation_case_id,
+                home_country=home,
+                host_country=host,
+            )
+
+    def apply_wizard_patch_side_effects(self, case_id: str, draft: Dict[str, Any], derived: Dict[str, Any]) -> None:
+        """
+        After PATCH /api/cases/{id}: sync relocation_cases columns used by HR dashboard,
+        and move assignment into awaiting_intake once the employee enters basics.
+        """
+        cid = (case_id or "").strip()
+        if not cid:
+            return
+        home = (derived.get("origin_country") or "").strip() or None
+        host = (derived.get("dest_country") or "").strip() or None
+        if home or host:
+            self.touch_relocation_case_route_from_wizard(cid, home_country=home, host_country=host)
+        assignment = self.get_assignment_by_case_id(cid)
+        if not assignment:
+            return
+        st = (assignment.get("status") or "").strip().lower()
+        if st not in ("created", "assigned"):
+            return
+        basics = draft.get("relocationBasics") or {}
+        if not any((str(basics.get(k) or "").strip()) for k in ("destCountry", "destCity", "originCountry", "originCity")):
+            return
+        self.update_assignment_status(assignment["id"], "awaiting_intake")
+
+    def next_open_milestone_deadlines_for_cases(
+        self, relocation_case_ids: List[str], request_id: Optional[str] = None
+    ) -> Dict[str, str]:
+        """Map normalized case id -> human-readable next open milestone date (earliest target_date)."""
+        if not relocation_case_ids:
+            return {}
+        normalized: List[str] = []
+        seen: Set[str] = set()
+        for raw in relocation_case_ids:
+            r = (raw or "").strip()
+            if not r:
+                continue
+            nid = self.coalesce_case_lookup_id(r)
+            if nid and nid not in seen:
+                seen.add(nid)
+                normalized.append(nid)
+        if not normalized:
+            return {}
+        n = len(normalized)
+        c_ph = ", ".join(f":c{i}" for i in range(n))
+        d_ph = ", ".join(f":d{i}" for i in range(n))
+        params: Dict[str, Any] = {f"c{i}": normalized[i] for i in range(n)}
+        params.update({f"d{i}": normalized[i] for i in range(n)})
+        sql = (
+            f"SELECT case_id, canonical_case_id, target_date, status FROM case_milestones "
+            f"WHERE case_id IN ({c_ph}) OR canonical_case_id IN ({d_ph})"
+        )
+        terminal = frozenset({"completed", "done", "cancelled", "canceled"})
+        best: Dict[str, Optional[str]] = {k: None for k in normalized}
+        try:
+            with self.engine.connect() as conn:
+                rows = self._exec(
+                    conn, sql, params, op_name="milestones_bulk_for_deadlines", request_id=request_id
+                ).fetchall()
+        except Exception:
+            return {}
+        for row in rows:
+            m = row._mapping if hasattr(row, "_mapping") else dict(row)
+            td = m.get("target_date")
+            if not td or not str(td).strip():
+                continue
+            st = (m.get("status") or "").strip().lower()
+            if st in terminal:
+                continue
+            c1 = (m.get("canonical_case_id") or "").strip()
+            c0 = (m.get("case_id") or "").strip()
+            key = self.coalesce_case_lookup_id(c1 or c0)
+            if key not in best:
+                continue
+            ts = str(td).strip()
+            cur = best.get(key)
+            if cur is None or ts < cur:
+                best[key] = ts
+        out: Dict[str, str] = {}
+        for nid, raw_date in best.items():
+            if not raw_date:
+                continue
+            disp = raw_date
+            try:
+                dpart = raw_date[:10]
+                parsed = datetime.strptime(dpart, "%Y-%m-%d").date()
+                disp = f"{parsed.strftime('%b')} {parsed.day}, {parsed.year}"
+            except Exception:
+                pass
+            out[nid] = disp
+        return out
+
     def admin_link_policy_company(self, policy_id: str, company_id: str) -> None:
         """Reassign a company_policy to a company (for reconciliation)."""
         with self.engine.begin() as conn:
@@ -8017,19 +8158,125 @@ class Database:
             })
         return out
 
-    def list_messages_for_employee(self, employee_user_id: str) -> List[Dict[str, Any]]:
-        assignment = self.get_assignment_for_employee(employee_user_id)
-        if not assignment:
+    def list_messages_for_employee(self, employee_user_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """All HR↔employee platform messages across every linked assignment."""
+        linked = self.list_linked_assignments_for_employee(employee_user_id, request_id=request_id)
+        if not linked:
             return []
+        aids = [str(a["id"]).strip() for a in linked if a.get("id")]
+        aids = [x for x in aids if x]
+        if not aids:
+            return []
+        n = len(aids)
+        placeholders = ", ".join(f":a{i}" for i in range(n))
+        params: Dict[str, Any] = {f"a{i}": aids[i] for i in range(n)}
         with self.engine.connect() as conn:
-            rows = conn.execute(
-                text(
-                    f"SELECT * FROM messages WHERE {_eq_text('assignment_id', ':aid')} "
-                    "ORDER BY created_at DESC"
-                ),
-                {"aid": assignment["id"]},
+            rows = self._exec(
+                conn,
+                f"SELECT * FROM messages WHERE assignment_id IN ({placeholders}) ORDER BY created_at ASC",
+                params,
+                op_name="list_messages_for_employee",
+                request_id=request_id,
             ).fetchall()
         return self._rows_to_list(rows)
+
+    def _vendor_names_for_rfq(self, rfq_id: Optional[str]) -> Optional[str]:
+        if not rfq_id or not str(rfq_id).strip():
+            return None
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        "SELECT v.name AS name FROM rfq_recipients rr "
+                        "LEFT JOIN vendors v ON v.id = rr.vendor_id "
+                        "WHERE rr.rfq_id = :r ORDER BY rr.created_at"
+                    ),
+                    {"r": str(rfq_id).strip()},
+                ).fetchall()
+            names: List[str] = []
+            for row in rows:
+                m = row._mapping if hasattr(row, "_mapping") else dict(row)
+                nm = (m.get("name") or "").strip()
+                if nm:
+                    names.append(nm)
+            if not names:
+                return None
+            if len(names) == 1:
+                return names[0]
+            return f"{names[0]} (+{len(names) - 1})"
+        except Exception:
+            return None
+
+    def list_quote_threads_for_employee(self, employee_user_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Quote / vendor threads for all assignments linked to this employee.
+        Same quote_messages model as RFQ flows; empty list if none.
+        """
+        linked = self.list_linked_assignments_for_employee(employee_user_id, request_id=request_id)
+        if not linked:
+            return []
+        case_to_assignment: Dict[str, str] = {}
+        for a in linked:
+            aid = a.get("id")
+            if not aid:
+                continue
+            for cid_raw in (a.get("canonical_case_id"), a.get("case_id")):
+                cid = (cid_raw or "").strip()
+                if cid:
+                    case_to_assignment[cid] = str(aid).strip()
+        case_ids = list(case_to_assignment.keys())
+        if not case_ids:
+            return []
+        n = len(case_ids)
+        ph = ", ".join(f":c{i}" for i in range(n))
+        params = {f"c{i}": case_ids[i] for i in range(n)}
+        sql = (
+            f"SELECT qc.id AS conversation_id, qc.thread_type, qc.case_id, qc.rfq_id, qc.created_at, r.rfq_ref AS rfq_ref "
+            f"FROM quote_conversations qc "
+            f"LEFT JOIN rfqs r ON r.id = qc.rfq_id "
+            f"WHERE qc.case_id IN ({ph}) "
+            f"ORDER BY qc.created_at DESC"
+        )
+        try:
+            with self.engine.connect() as conn:
+                rows = self._exec(
+                    conn, sql, params, op_name="list_quote_conversations_for_employee", request_id=request_id
+                ).fetchall()
+        except Exception:
+            return []
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            m = row._mapping if hasattr(row, "_mapping") else dict(row)
+            cid = (m.get("case_id") or "").strip()
+            aid = case_to_assignment.get(cid)
+            conv_id = m.get("conversation_id")
+            if not aid or not conv_id:
+                continue
+            label = self._vendor_names_for_rfq(m.get("rfq_id")) or "Service provider"
+            try:
+                with self.engine.connect() as conn:
+                    qrows = conn.execute(
+                        text(
+                            "SELECT * FROM quote_messages WHERE conversation_id = :qid ORDER BY created_at ASC"
+                        ),
+                        {"qid": str(conv_id)},
+                    ).fetchall()
+                msgs = self._rows_to_list(qrows)
+            except Exception:
+                msgs = []
+            out.append(
+                {
+                    "conversation_id": str(conv_id),
+                    "assignment_id": aid,
+                    "case_id": cid,
+                    "rfq_id": m.get("rfq_id"),
+                    "rfq_ref": m.get("rfq_ref"),
+                    "thread_type": m.get("thread_type"),
+                    "counterparty_label": label,
+                    "messages": msgs,
+                }
+            )
+        return out
 
     def mark_conversation_read(self, assignment_id: str, recipient_user_id: str) -> int:
         """Set read_at and dismissed_at for all messages in this assignment to the recipient. Returns count updated."""
@@ -8740,7 +8987,7 @@ class Database:
                      auto_generated, review_status, confidence, created_by, created_at, updated_at)
                     VALUES (:id, :pid, NULL, 1, 'draft', {ag_sql}, 'accepted', NULL, :cb, :now, :now)
                 """),
-                {"id": version_id, "pid": policy_id, "ag": 1, "cb": created_by, "now": now},
+                {"id": version_id, "pid": policy_id, "ag": _policy_bool_bind(True), "cb": created_by, "now": now},
             )
         benefit_rules = snapshot.get("benefit_rules") or []
         for br in benefit_rules:
@@ -8759,7 +9006,7 @@ class Database:
                     {
                         "id": rule_id,
                         "vid": version_id,
-                        "ag": 1,
+                        "ag": _policy_bool_bind(True),
                         "bk": br.get("benefit_key") or "",
                         "cat": br.get("benefit_category") or "",
                         "ct": br.get("calc_type"),
@@ -9544,7 +9791,7 @@ class Database:
             "doc_id": str(source_policy_document_id) if source_policy_document_id is not None else None,
             "vn": version_number,
             "status": status,
-            "ag": _policy_bool_for_db(auto_generated),
+            "ag": _policy_bool_bind(auto_generated),
             "rs": review_status,
             "conf": confidence,
             "cb": created_by,
@@ -9741,7 +9988,7 @@ class Database:
                     "freq": rule.get("frequency"),
                     "desc": rule.get("description"),
                     "meta": json.dumps(rule.get("metadata_json")) if rule.get("metadata_json") else None,
-                    "ag": _policy_bool_for_db(rule.get("auto_generated", True)),
+                    "ag": _policy_bool_bind(rule.get("auto_generated", True)),
                     "rs": rule.get("review_status", "pending"),
                     "conf": rule.get("confidence"),
                     "raw": rule.get("raw_text"),
@@ -9768,7 +10015,7 @@ class Database:
                     "bk": excl.get("benefit_key"),
                     "dom": excl["domain"],
                     "desc": excl.get("description"),
-                    "ag": _policy_bool_for_db(excl.get("auto_generated", True)),
+                    "ag": _policy_bool_bind(excl.get("auto_generated", True)),
                     "rs": excl.get("review_status", "pending"),
                     "conf": excl.get("confidence"),
                     "raw": excl.get("raw_text"),
@@ -9795,7 +10042,7 @@ class Database:
                     "brid": ev.get("benefit_rule_id"),
                     "items": json.dumps(ev.get("evidence_items_json") or []),
                     "desc": ev.get("description"),
-                    "ag": _policy_bool_for_db(ev.get("auto_generated", True)),
+                    "ag": _policy_bool_bind(ev.get("auto_generated", True)),
                     "rs": ev.get("review_status", "pending"),
                     "conf": ev.get("confidence"),
                     "raw": ev.get("raw_text"),
@@ -9823,7 +10070,7 @@ class Database:
                     "oid": cond["object_id"],
                     "ct": cond["condition_type"],
                     "val": json.dumps(cond.get("condition_value_json") or {}),
-                    "ag": _policy_bool_for_db(cond.get("auto_generated", True)),
+                    "ag": _policy_bool_bind(cond.get("auto_generated", True)),
                     "rs": cond.get("review_status", "pending"),
                     "conf": cond.get("confidence"),
                     "now": now,

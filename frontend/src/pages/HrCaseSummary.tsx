@@ -16,13 +16,13 @@ import { deriveCaseEssentials } from '../features/cases/caseEssentials';
 
 const statusBadge = (status?: AssignmentStatus) => {
   if (!status) return <Badge variant="neutral">Unknown</Badge>;
-  if (status === 'approved') return <Badge variant="success">Approved</Badge>;
+  if (status === 'approved') return <Badge variant="success">Complete</Badge>;
   if (status === 'rejected') return <Badge variant="warning">Rejected</Badge>;
-  if (status === 'submitted') return <Badge variant="info">HR review</Badge>;
-  if (status === 'assigned' || status === 'awaiting_intake') {
-    return <Badge variant="warning">Intake in progress</Badge>;
-  }
-  return <Badge variant="neutral">Created</Badge>;
+  if (status === 'closed') return <Badge variant="neutral">Canceled</Badge>;
+  if (status === 'submitted') return <Badge variant="info">Awaiting HR review</Badge>;
+  if (status === 'awaiting_intake') return <Badge variant="warning">Intake in progress</Badge>;
+  if (status === 'assigned' || status === 'created') return <Badge variant="neutral">Not started</Badge>;
+  return <Badge variant="neutral">Not started</Badge>;
 };
 
 export const HrCaseSummary: React.FC = () => {

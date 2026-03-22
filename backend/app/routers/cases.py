@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from typing import Any, Dict
 from datetime import datetime
@@ -8,10 +9,12 @@ from fastapi import APIRouter, HTTPException, Request
 
 from ..db import SessionLocal
 from .. import crud, schemas
+from ...database import db as main_db
 from ..services.research import run_country_research
 from ..services.requirements_builder import compute_case_requirements
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/{case_id}", response_model=schemas.CaseDTO)
@@ -45,6 +48,10 @@ def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
             "hasDependents": basics.get("hasDependents"),
         }
         case = crud.update_case(db, case, draft, derived, flags)
+        try:
+            main_db.apply_wizard_patch_side_effects(case_id, draft, derived)
+        except Exception:
+            logger.exception("apply_wizard_patch_side_effects failed case_id=%s", case_id)
         return _case_dto(case, draft)
 
 

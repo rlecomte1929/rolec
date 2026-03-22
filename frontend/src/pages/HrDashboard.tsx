@@ -199,13 +199,15 @@ export const HrDashboard: React.FC = () => {
   };
 
   const caseStatusBadge = (status: AssignmentSummary['status']) => {
-    if (status === 'approved') return <Badge variant="success">Approved</Badge>;
+    if (status === 'approved') return <Badge variant="success">Complete</Badge>;
     if (status === 'rejected') return <Badge variant="warning">Rejected</Badge>;
-    if (status === 'submitted') return <Badge variant="info">HR review</Badge>;
-    if (status === 'assigned' || status === 'awaiting_intake') {
-      return <Badge variant="warning">Intake in progress</Badge>;
+    if (status === 'closed') return <Badge variant="neutral">Canceled</Badge>;
+    if (status === 'submitted') return <Badge variant="info">Awaiting HR review</Badge>;
+    if (status === 'awaiting_intake') return <Badge variant="warning">Intake in progress</Badge>;
+    if (status === 'assigned' || status === 'created') {
+      return <Badge variant="neutral">Not started</Badge>;
     }
-    return <Badge variant="neutral">Created</Badge>;
+    return <Badge variant="neutral">Not started</Badge>;
   };
 
   const displayName = (assignment: AssignmentSummary) => {
@@ -216,7 +218,10 @@ export const HrDashboard: React.FC = () => {
 
   const displayDestination = (assignment: AssignmentSummary) => {
     const c = assignment.case;
-    return c?.host_country || c?.home_country || '-';
+    const dest = (c?.host_country || '').trim();
+    if (dest) return dest;
+    const home = (c?.home_country || '').trim();
+    return home || '-';
   };
 
   return (
@@ -487,8 +492,12 @@ export const HrDashboard: React.FC = () => {
                       {caseStatusBadge(assignment.status)}
                     </div>
                     <div>
-                      <div className="text-sm text-[#0b2b43]"> - </div>
-                      <div className="text-xs text-[#6b7280]">Open for details</div>
+                      <div className="text-sm text-[#0b2b43]">
+                        {assignment.nextDeadline?.trim() || '—'}
+                      </div>
+                      <div className="text-xs text-[#6b7280]">
+                        {assignment.nextDeadline?.trim() ? 'Next milestone' : 'No upcoming date'}
+                      </div>
                     </div>
                     <div className="text-right text-[#94a3b8] text-lg">
                       {isManageMode ? '' : '→'}
@@ -527,6 +536,8 @@ export const HrDashboard: React.FC = () => {
                   <option value="awaiting_intake">Awaiting intake</option>
                   <option value="submitted">HR review</option>
                   <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="closed">Closed</option>
                 </select>
               </div>
               <div>

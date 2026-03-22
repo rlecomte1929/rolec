@@ -3,6 +3,7 @@ import type { Message } from './types';
 
 const ROLE_BG: Record<string, string> = {
   HR: 'bg-[#E3F2FD]',
+  SUPPLIER: 'bg-[#E3F2FD]',
   EMPLOYEE: 'bg-[#E8F5E9]',
   ADMIN: 'bg-[#F3E5F5]',
   SYSTEM: 'bg-[#F5F5F5]',

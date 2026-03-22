@@ -3,7 +3,11 @@ import { useLocation } from 'react-router-dom';
 import { employeeAPI, invalidateApiCache } from '../api/client';
 import { getAuthItem } from '../utils/demo';
 import type { EmployeeLinkedOverviewRow, EmployeePendingOverviewRow } from '../types/employeeAssignmentOverview';
-import { shouldLoadEmployeeAssignmentOverview } from '../utils/employeeAssignmentScope';
+import {
+  dedupeLinkedSummariesByAssignmentId,
+  setPreferredEmployeeAssignmentId,
+  shouldLoadEmployeeAssignmentOverview,
+} from '../utils/employeeAssignmentScope';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
 
 const CURRENT_ASSIGNMENT_CACHE_KEY = 'employee:current-assignment';
@@ -109,12 +113,17 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
         const overview = await employeeAPI.getAssignmentsOverview();
         const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
         if (gen !== fetchGenRef.current) return;
-        const linked = (overview?.linked || []) as EmployeeLinkedOverviewRow[];
+        const linked = dedupeLinkedSummariesByAssignmentId(
+          (overview?.linked || []) as EmployeeLinkedOverviewRow[]
+        );
         const pending = (overview?.pending || []) as EmployeePendingOverviewRow[];
         setLinkedSummaries(linked);
         setPendingSummaries(pending);
         const primary = linked[0]?.assignment_id ?? null;
         setAssignmentId(primary);
+        if (linked.length === 1 && primary) {
+          setPreferredEmployeeAssignmentId(primary);
+        }
         const c0 = linked[0]?.company;
         const cn = (c0?.name && String(c0.name).trim()) || null;
         const cid = (c0?.id && String(c0.id).trim()) || null;

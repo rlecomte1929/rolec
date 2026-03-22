@@ -7,7 +7,7 @@ using assignment context (type, family status, destination, duration, tier).
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .policy_taxonomy import ASSIGNMENT_TYPE_MAP, FAMILY_STATUS_MAP, get_benefit_meta
 
@@ -121,6 +121,67 @@ def extract_resolution_context(
     ctx["tier"] = str(tier).strip() if tier else None
 
     return ctx
+
+
+def collect_company_id_candidates_for_assignment(
+    db: Any,
+    assignment: Dict[str, Any],
+    case: Optional[Dict[str, Any]],
+) -> List[str]:
+    """
+    Ordered unique company_ids to try when resolving a published policy.
+    Matches product order: case.company_id → HR owner's company → employee profile company_id.
+    """
+    candidates: List[str] = []
+    seen: Set[str] = set()
+
+    def add(cid: Optional[Any]) -> None:
+        if cid is None:
+            return
+        s = str(cid).strip()
+        if not s or s in seen:
+            return
+        seen.add(s)
+        candidates.append(s)
+
+    if case:
+        add(case.get("company_id"))
+    hr_uid = assignment.get("hr_user_id") or (case.get("hr_user_id") if case else None)
+    if hr_uid:
+        try:
+            add(db.get_hr_company_id(hr_uid))
+        except Exception:
+            pass
+    emp_uid = assignment.get("employee_user_id")
+    if emp_uid:
+        try:
+            prof = db.get_profile_record(emp_uid)
+            if prof:
+                add(prof.get("company_id"))
+        except Exception:
+            pass
+    return candidates
+
+
+def find_first_published_company_policy(
+    db: Any,
+    company_ids: List[str],
+) -> Optional[Tuple[str, Dict[str, Any], Dict[str, Any]]]:
+    """
+    Return (company_id, company_policy_row, published_version_row) for the first
+    candidate company that has a published policy_versions row.
+    """
+    for cid in company_ids:
+        try:
+            pub = db.get_company_policy_with_published_version(cid)
+        except Exception:
+            pub = None
+        if not pub:
+            continue
+        policy, version = pub
+        if policy and version:
+            return (cid, policy, version)
+    return None
 
 
 def _rule_applies_by_assignment_type(

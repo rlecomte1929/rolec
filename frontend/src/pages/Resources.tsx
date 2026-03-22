@@ -85,7 +85,6 @@ function useResourcesContext() {
   const location = useLocation();
   const {
     assignmentId: primaryAssignmentId,
-    linkedCount,
     linkedSummaries,
     isLoading: assignmentLoading,
   } = useEmployeeAssignment();
@@ -104,7 +103,6 @@ function useResourcesContext() {
       };
     }
     const { effectiveId, needsPicker } = resolveScopedAssignmentId({
-      linkedCount,
       linkedSummaries,
       primaryAssignmentId,
       queryAssignmentId,
@@ -114,7 +112,7 @@ function useResourcesContext() {
       needsPicker,
       source: 'assignment' as const,
     };
-  }, [caseIdParam, linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]);
+  }, [caseIdParam, linkedSummaries, primaryAssignmentId, queryAssignmentId]);
 
   return {
     effectiveId: scoped.effectiveId,

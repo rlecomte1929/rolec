@@ -5,6 +5,10 @@ import { trackRouteEntry, trackShellRender, trackPolicyStage } from '../perf/pag
 import { Alert, Button, Card, Input } from '../components/antigravity';
 import { employeeAPI, companyPolicyAPI, policyDocumentsAPI } from '../api/client';
 import { EmployeeResolvedPolicyView } from '../features/policy/EmployeeResolvedPolicyView';
+import {
+  EMPLOYEE_HR_POLICY_WAIT_PRIMARY,
+  EMPLOYEE_HR_POLICY_WAIT_SECONDARY,
+} from '../features/policy/employeePolicyMessages';
 import { HrPolicyOverview } from '../features/policy/HrPolicyOverview';
 import { HrPolicyReviewWorkspace } from '../features/policy/HrPolicyReviewWorkspace';
 import { getAuthItem } from '../utils/demo';
@@ -606,7 +610,9 @@ export function NormalizedPolicySectionLegacy() {
       </div>
       {loading && <div className="text-sm text-[#6b7280] mt-4">Loading…</div>}
       {!loading && selectedPolicyId && !normalized?.version && (
-        <div className="text-sm text-[#6b7280] mt-4">No normalized version. Upload a document, Reprocess, then Normalize.</div>
+        <div className="text-sm text-[#6b7280] mt-4">
+          No released version yet. Upload a document, Reprocess, then Normalize & publish.
+        </div>
       )}
       {!loading && normalized?.version && (
         <div className="mt-6 space-y-6">
@@ -781,6 +787,8 @@ const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
   upload_company_required: 'Company is required for upload. When viewing a company\'s policy workspace, uploads are scoped to that company.',
   invalid_file_type: 'Only PDF or DOCX files are supported.',
   normalization_failed: 'Normalization failed because of an invalid policy_versions payload.',
+  publish_failed_after_normalize:
+    'Policy was saved but could not be published. Use “Publish version” in the HR Policy review workspace.',
   // Download-url and policy errors
   policy_policy_not_found: 'Policy not found.',
   policy_file_missing: 'Policy file not found in storage.',
@@ -906,14 +914,16 @@ function PolicyDocumentIntakeSection({
       if (res.ok) {
         setUploadFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
-        setMessage('Document uploaded and classified. Review the entry below, then normalize to create a policy version.');
+        setMessage(
+          'Document uploaded and classified. Review the entry below, then use Normalize & publish to create and release a policy version to employees.'
+        );
         await loadDocs();
         onDocumentsChange?.();
       } else {
         setMessage(UPLOAD_ERROR_MESSAGES[res.error_code || ''] || res.message || 'Upload failed.');
         if (res.document) {
           await loadDocs();
-          setMessage((m) => m + ' Document is in the list below; you can reprocess or normalize.');
+          setMessage((m) => m + ' Document is in the list below; you can reprocess or normalize & publish.');
         }
       }
     } catch (err: unknown) {
@@ -947,7 +957,10 @@ function PolicyDocumentIntakeSection({
     setNormalizingId(docId);
     try {
       const res = await policyDocumentsAPI.normalize(docId);
-      setMessage(`Normalization complete. ${res.summary?.benefit_rules ?? 0} benefits, ${res.summary?.exclusions ?? 0} exclusions.`);
+      const pubNote = res.published ? ' Published to employees.' : '';
+      setMessage(
+        `Normalize & publish complete. ${res.summary?.benefit_rules ?? 0} benefits, ${res.summary?.exclusions ?? 0} exclusions.${pubNote}`
+      );
       await loadDocs();
       if (res.policy_id) onNormalized?.(res.policy_id);
     } catch (err: unknown) {
@@ -956,7 +969,7 @@ function PolicyDocumentIntakeSection({
         : null;
       const code = data?.error_code;
       const msg = (code && UPLOAD_ERROR_MESSAGES[code]) || data?.message || data?.detail;
-      setMessage(String(msg || 'Normalize failed'));
+      setMessage(String(msg || 'Normalize & publish failed'));
     } finally {
       setNormalizingId(null);
     }
@@ -1037,7 +1050,9 @@ function PolicyDocumentIntakeSection({
         <div className="mt-4">
           <Alert
             variant={
-              message.startsWith('Normalized') || message.startsWith('Document uploaded') || message === 'Saved'
+              message.startsWith('Normalize & publish complete') ||
+              message.startsWith('Document uploaded') ||
+              message === 'Saved'
                 ? 'success'
                 : message.includes('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
                   ? 'info'
@@ -1214,7 +1229,7 @@ function PolicyDocumentIntakeSection({
                               onClick={() => handleNormalize(doc.id)}
                               disabled={normalizingId === doc.id || !doc.raw_text}
                             >
-                              {normalizingId === doc.id ? 'Normalizing…' : 'Normalize now'}
+                              {normalizingId === doc.id ? 'Normalize & publish…' : 'Normalize & publish'}
                             </Button>
                           </div>
                         </>

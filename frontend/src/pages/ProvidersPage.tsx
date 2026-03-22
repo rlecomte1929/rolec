@@ -6,7 +6,12 @@ import { Alert, Button, Card } from '../components/antigravity';
 import { API_BASE_URL, employeeAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
-import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../utils/employeeAssignmentScope';
+import {
+  parseAssignmentSearchParam,
+  resolveScopedAssignmentId,
+  setPreferredEmployeeAssignmentId,
+  withAssignmentQuery,
+} from '../utils/employeeAssignmentScope';
 import { TrustBlock } from '../features/services/TrustBlock';
 import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
 import { StickyContinueBar } from '../features/services/StickyContinueBar';
@@ -47,7 +52,6 @@ export const ProvidersPage: React.FC = () => {
   const location = useLocation();
   const {
     assignmentId: primaryAssignmentId,
-    linkedCount,
     linkedSummaries,
     isLoading: assignmentLoading,
     refetch,
@@ -56,13 +60,17 @@ export const ProvidersPage: React.FC = () => {
   const { effectiveId: assignmentId, needsPicker } = useMemo(
     () =>
       resolveScopedAssignmentId({
-        linkedCount,
         linkedSummaries,
         primaryAssignmentId,
         queryAssignmentId,
       }),
-    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+    [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
+
+  useEffect(() => {
+    if (!queryAssignmentId || needsPicker || assignmentId !== queryAssignmentId) return;
+    setPreferredEmployeeAssignmentId(queryAssignmentId);
+  }, [queryAssignmentId, needsPicker, assignmentId]);
   const [services, setServices] = useState<Record<string, ServiceState>>({});
   const [policy, setPolicy] = useState<{ currency: string; caps: Record<string, number>; total_cap?: number | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);

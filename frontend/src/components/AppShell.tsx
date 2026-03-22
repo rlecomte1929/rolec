@@ -8,6 +8,7 @@ import { buildRoute, ROUTE_DEFS } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentScope';
 import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
 import { CompanyBrand } from './CompanyBrand';
@@ -104,6 +105,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
     window.addEventListener('nav-error', handler as EventListener);
     return () => window.removeEventListener('nav-error', handler as EventListener);
   }, []);
+
+  useEffect(() => {
+    if (!showEmployeeNav) return;
+    const id = location.pathname.match(/^\/employee\/case\/([^/]+)/)?.[1]?.trim();
+    if (!id) return;
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+    ) {
+      return;
+    }
+    setPreferredEmployeeAssignmentId(id);
+  }, [location.pathname, showEmployeeNav]);
 
   return (
     <div className="min-h-screen bg-[#f5f7fa] text-[#1f2937] flex flex-col">

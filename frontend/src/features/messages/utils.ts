@@ -98,11 +98,13 @@ export function buildConversationsFromMessages(
     conversations.push({
       id: `conv-${assignmentId}`,
       assignment_id: assignmentId,
+      channel: currentUserRole === 'EMPLOYEE' ? 'hr' : undefined,
       other_participant_name: otherName,
       last_message_preview: truncate(last?.body || last?.subject || '', 60),
       last_message_at: last?.created_at || new Date().toISOString(),
       unread_count: 0,
       messages: sorted,
+      thread_loaded: true,
     });
   }
 
@@ -110,4 +112,54 @@ export function buildConversationsFromMessages(
     new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
   );
   return conversations;
+}
+
+/** Map RFQ / vendor quote_threads from GET /api/employee/messages into Conversation rows. */
+export function buildConversationsFromQuoteThreads(
+  rawThreads: Record<string, unknown>[],
+  currentUserId: string,
+  currentUserName: string,
+  assignmentLabels?: Map<string, string>
+): Conversation[] {
+  const out: Conversation[] = [];
+  for (const t of rawThreads) {
+    const conversationId = String(t.conversation_id ?? '');
+    const assignmentId = String(t.assignment_id ?? '');
+    if (!conversationId || !assignmentId) continue;
+    const label = String(t.counterparty_label ?? 'Service provider');
+    const rawMsgs = (t.messages as Record<string, unknown>[]) || [];
+    const messages: Message[] = rawMsgs.map((raw) => {
+      const sid = String(raw.sender_user_id ?? '');
+      const isFromMe = Boolean(currentUserId) && sid === currentUserId;
+      return {
+        id: String(raw.id),
+        body: String(raw.body ?? ''),
+        created_at: String(raw.created_at ?? ''),
+        sender_user_id: sid || undefined,
+        sender_role: isFromMe ? 'EMPLOYEE' : 'SUPPLIER',
+        sender_name: isFromMe ? currentUserName : label,
+        is_from_me: isFromMe,
+      };
+    });
+    const last = messages[messages.length - 1];
+    const rfqRef = t.rfq_ref != null ? String(t.rfq_ref) : '';
+    out.push({
+      id: `qconv-${conversationId}`,
+      assignment_id: assignmentId,
+      channel: 'supplier',
+      supplier_conversation_id: conversationId,
+      list_subtitle: assignmentLabels?.get(assignmentId) || rfqRef || null,
+      other_participant_name: label,
+      other_participant_avatar: label.slice(0, 2).toUpperCase(),
+      last_message_preview: truncate(last?.body ?? '', 60),
+      last_message_at: last?.created_at || String(t.created_at ?? new Date().toISOString()),
+      unread_count: 0,
+      messages,
+      thread_loaded: true,
+    });
+  }
+  out.sort(
+    (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
+  );
+  return out;
 }

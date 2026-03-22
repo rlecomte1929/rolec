@@ -10,12 +10,13 @@ See also: [linked-vs-pending-model.md](./linked-vs-pending-model.md).
 
 For employee flows that need a **single** assignment id (services steps, quotes inbox, resources by assignment, policy fetches, etc.), the scoped assignment is:
 
-- **`?assignment=<assignment_id>`** — must be one of the employee’s **linked** assignments when they have **two or more** linked rows.
+- **`?assignment=<assignment_id>`** — must be one of the employee’s **linked** assignments when resolving scope; with **two or more distinct** linked ids (after deduping duplicate overview rows), a valid query **or** a stored preference (see below) avoids the picker.
 
 Helpers live in `frontend/src/utils/employeeAssignmentScope.ts`:
 
 - `parseAssignmentSearchParam` — read `assignment` from the URL.
-- `resolveScopedAssignmentId` — decide `effectiveId` and whether a **picker** is required.
+- `resolveScopedAssignmentId` — decide `effectiveId` and whether a **picker** is required (`?assignment=` → localStorage preference → single primary → picker).
+- `getPreferredEmployeeAssignmentId` / `setPreferredEmployeeAssignmentId` — persist last focused assignment (wizard/case URL, picker choice, or single linked row); cleared with other `relopass_*` keys on logout.
 - `withAssignmentQuery(path, assignmentId)` — append/replace `assignment` while preserving other query keys.
 
 ---
@@ -26,7 +27,7 @@ Helpers live in `frontend/src/utils/employeeAssignmentScope.ts`:
 |--------------|----------------------------------------|-------------------|
 | **0** | No assignment id until the user completes onboarding / links an assignment. Show existing empty states or dashboard guidance. | N/A |
 | **1** | Use the **primary** linked assignment from the employee overview (same as today). Optional `?assignment=` is accepted if it matches that linked id. | Allowed: e.g. open `/services`, `/quotes`, `/resources` without forcing `?assignment=`. |
-| **2+** | **Do not** silently pick one assignment for the whole session. Require either a valid `?assignment=` in the linked set or show the **assignment picker** (hub-style list of linked rows). | Landing without `?assignment=` shows the picker; choosing a row navigates with `?assignment=` set. **Do not** require the user to manually type an assignment id. |
+| **2+ distinct** | **Do not** silently pick among assignments the user has never focused. Require a valid `?assignment=` **or** a stored preference that still matches the linked set; otherwise show the **assignment picker**. Duplicate overview rows for the same `assignment_id` count as one. | Choosing a row navigates with `?assignment=` set and updates preference. **Do not** require the user to manually type an assignment id. |
 
 Opening one case or choosing one assignment for a flow **does not remove** other linked assignments from the hub or from the picker; navigation preserves the ability to switch via dashboard + picker + deep links with `?assignment=`.
 

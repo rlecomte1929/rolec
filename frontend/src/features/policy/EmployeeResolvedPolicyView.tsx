@@ -8,6 +8,7 @@ import {
   formatBenefitLabel,
   type DisplayCategory,
 } from './benefitCategories';
+import { EMPLOYEE_HR_POLICY_WAIT_PRIMARY, EMPLOYEE_HR_POLICY_WAIT_SECONDARY } from './employeePolicyMessages';
 
 type CoverageStatus = 'covered' | 'partially_covered' | 'not_covered' | 'approval_required';
 
@@ -263,12 +264,8 @@ export const EmployeeResolvedPolicyView: React.FC<{
     return (
       <Card padding="lg">
         <div className="text-center py-8">
-          <p className="text-[#4b5563] font-medium">
-            Your company has not yet published an assignment policy for this case.
-          </p>
-          <p className="text-sm text-[#6b7280] mt-2">
-            Once HR publishes a policy that applies to your assignment, your benefits and limits will appear here.
-          </p>
+          <p className="text-[#4b5563] font-medium">{EMPLOYEE_HR_POLICY_WAIT_PRIMARY}</p>
+          <p className="text-sm text-[#6b7280] mt-2">{EMPLOYEE_HR_POLICY_WAIT_SECONDARY}</p>
         </div>
       </Card>
     );

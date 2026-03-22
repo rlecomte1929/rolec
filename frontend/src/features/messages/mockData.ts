@@ -17,6 +17,8 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
   {
     id: 'conv-1',
     assignment_id: 'assign-1',
+    channel: 'hr',
+    thread_loaded: true,
     other_participant_name: 'Sarah Jenkins',
     other_participant_avatar: 'SJ',
     last_message_preview: 'I\'ve completed the relocation basics. Should I proceed with the family members section?',
@@ -82,6 +84,8 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
   {
     id: 'conv-2',
     assignment_id: 'assign-2',
+    channel: 'hr',
+    thread_loaded: true,
     other_participant_name: 'Mark Thompson',
     other_participant_avatar: 'MT',
     last_message_preview: 'Your relocation case is ready for review.',

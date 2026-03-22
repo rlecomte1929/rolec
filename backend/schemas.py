@@ -378,6 +378,10 @@ class AssignmentSummary(BaseModel):
     # 6B/6C: Optional relocation case summary attached to assignment
     # Contains a safe subset of fields from relocation_cases.
     case: Optional[Dict[str, Any]] = None
+    nextDeadline: Optional[str] = Field(
+        default=None,
+        description="Earliest open milestone due date for HR list (human-readable).",
+    )
 
 
 class AssignmentsListResponse(BaseModel):

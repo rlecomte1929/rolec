@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card } from '../antigravity';
 import type { EmployeeLinkedOverviewRow } from '../../types/employeeAssignmentOverview';
-import { withAssignmentQuery } from '../../utils/employeeAssignmentScope';
+import { setPreferredEmployeeAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
 import { buildRoute } from '../../navigation/routes';
 
 type Props = {
@@ -30,7 +30,10 @@ export function EmployeeScopedAssignmentPicker({
             <Button
               variant="outline"
               className="w-full justify-start !text-left h-auto py-3 whitespace-normal"
-              onClick={() => navigate(withAssignmentQuery(targetBasePath, row.assignment_id))}
+              onClick={() => {
+                setPreferredEmployeeAssignmentId(row.assignment_id);
+                navigate(withAssignmentQuery(targetBasePath, row.assignment_id));
+              }}
             >
               <span className="block font-medium text-[#0b2b43]">{row.company?.name || 'Company'}</span>
               <span className="block text-sm text-[#64748b] font-normal">

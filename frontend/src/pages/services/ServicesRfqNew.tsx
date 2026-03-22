@@ -24,7 +24,6 @@ export const ServicesRfqNew: React.FC = () => {
   const { recommendations, shortlist } = useServicesFlow();
   const {
     assignmentId: primaryAssignmentId,
-    linkedCount,
     linkedSummaries,
     isLoading: assignmentLoading,
   } = useEmployeeAssignment();
@@ -32,12 +31,11 @@ export const ServicesRfqNew: React.FC = () => {
   const { effectiveId: assignmentId, needsPicker } = useMemo(
     () =>
       resolveScopedAssignmentId({
-        linkedCount,
         linkedSummaries,
         primaryAssignmentId,
         queryAssignmentId,
       }),
-    [linkedCount, linkedSummaries, primaryAssignmentId, queryAssignmentId]
+    [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
   const [caseId, setCaseId] = useState<string | null>(null);
   const [caseLoading, setCaseLoading] = useState(true);

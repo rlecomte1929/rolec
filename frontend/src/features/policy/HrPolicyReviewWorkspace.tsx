@@ -361,7 +361,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         Review extracted policy content, edit benefit rules, and publish for employee visibility.
       </div>
       <div className="rounded-lg bg-[#f0fdf4] border border-[#bbf7d0] px-4 py-2 text-xs text-[#166534]">
-        <strong>Workflow:</strong> Upload document → Reprocess (if needed) → Normalize into policy version → Review/edit matrix → Publish version
+        <strong>Workflow:</strong> Upload document → Reprocess (if needed) → Normalize & publish (releases to employees) → Optional: review/edit matrix → Publish again after edits
       </div>
 
       {message && (
@@ -421,7 +421,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                   onClick={handleRenormalize}
                   disabled={renormalizeBusy}
                 >
-                  {renormalizeBusy ? 'Re-normalizing…' : 'Re-run normalization'}
+                  {renormalizeBusy ? 'Re-running…' : 'Re-run normalize & publish'}
                 </Button>
               )}
             </>
@@ -445,7 +445,9 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
             </button>
           </div>
           {groupedBenefits.length === 0 ? (
-            <div className="text-sm text-[#6b7280] py-4">No benefit rules. Upload a document, Reprocess, then Normalize.</div>
+            <div className="text-sm text-[#6b7280] py-4">
+              No benefit rules. Upload a document, Reprocess, then Normalize & publish from document intake.
+            </div>
           ) : (
           <div className="space-y-2">
             {groupedBenefits.map(([cat, rules]) => {
@@ -690,7 +692,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
             )}
           </div>
           <div className="text-xs text-[#6b7280] mt-2">
-            Status: {VERSION_STATUS_LABELS[versionStatus] || versionStatus}. Only published versions are visible to employees.
+            Status: {VERSION_STATUS_LABELS[versionStatus] || versionStatus}. New versions from document intake are published automatically; use Publish after edits to replace the live version.
           </div>
         </Card>
       )}

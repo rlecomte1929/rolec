@@ -1401,7 +1401,10 @@ export const employeeAPI = {
       return response.data;
     });
   },
-  listMessages: async (): Promise<{ messages: any[] }> => {
+  listMessages: async (): Promise<{
+    messages: any[];
+    quote_threads?: any[];
+  }> => {
     const response = await api.get('/api/employee/messages');
     return response.data;
   },
@@ -2008,7 +2011,15 @@ export const policyDocumentsAPI = {
     );
     return response.data;
   },
-  normalize: async (docId: string): Promise<{ policy_id: string; policy_version_id: string; summary: any }> => {
+  normalize: async (
+    docId: string
+  ): Promise<{
+    policy_id: string;
+    policy_version_id: string;
+    summary: any;
+    published?: boolean;
+    version?: Record<string, unknown>;
+  }> => {
     const response = await api.post(`/api/hr/policy-documents/${docId}/normalize`);
     return response.data;
   },
