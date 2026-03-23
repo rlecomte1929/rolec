@@ -1,13 +1,23 @@
 import React from 'react';
 import type { ServiceItem } from './serviceConfig';
 
+export type ServicePolicyHintVariant = 'compare' | 'excluded' | 'partial' | 'muted';
+
+export interface ServicePolicyHint {
+  variant: ServicePolicyHintVariant;
+  /** Single line under the description (from resolved policy, Layer 2). */
+  line: string;
+}
+
 interface ServiceCardProps {
   item: ServiceItem;
   selected: boolean;
   onToggle: () => void;
+  /** Optional: normalized published policy summary for this service's wizard category. */
+  policyHint?: ServicePolicyHint | null;
 }
 
-export const ServiceCard: React.FC<ServiceCardProps> = ({ item, selected, onToggle }) => {
+export const ServiceCard: React.FC<ServiceCardProps> = ({ item, selected, onToggle, policyHint }) => {
   const disabled = !item.enabled;
 
   return (
@@ -47,6 +57,21 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ item, selected, onTogg
           )}
         </div>
         <p className="text-sm text-[#6b7280] mt-0.5 line-clamp-2">{item.description}</p>
+        {policyHint && (
+          <div
+            className={`text-xs mt-2 pl-2 border-l-2 leading-snug ${
+              policyHint.variant === 'compare'
+                ? 'border-[#0b2b43] text-[#0b2b43] font-medium'
+                : policyHint.variant === 'excluded'
+                  ? 'border-[#f87171] text-[#991b1b]'
+                  : policyHint.variant === 'partial'
+                    ? 'border-[#fbbf24] text-[#92400e]'
+                    : 'border-[#cbd5e1] text-[#64748b]'
+            }`}
+          >
+            {policyHint.line}
+          </div>
+        )}
       </div>
       <div className="shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center">
         {selected ? (

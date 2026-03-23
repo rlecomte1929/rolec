@@ -1,6 +1,13 @@
 """
 Policy document intake pipeline (INGEST stage): parse PDF/DOCX, classify, extract metadata.
 
+Pipeline layers (see docs/policy/metadata-vs-decision-layer.md):
+- **Layer 1 — document metadata / structure:** Everything in this module (classification,
+  extracted_metadata, heuristic flags, mentioned_* terms) is descriptive only. It must not be
+  treated as binding coverage for employees.
+- **Layer 2 — decision output:** Produced later by normalization + publish + resolution
+  (policy_benefit_rules, resolved_assignment_policy_benefits, etc.).
+
 Pipeline stage (3-stage model):
 - Ingest (this module): store file in blob storage, extract raw text, classify document type/scope,
   extract metadata (title, version, effective date), and optionally segment into clauses.

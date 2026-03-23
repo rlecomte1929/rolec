@@ -5,6 +5,10 @@ import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import type { RecommendationResponse, RecommendationItem } from './types';
+import {
+  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
+  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
+} from '../policy/employeePolicyMessages';
 
 /** Category key to policy-budget cap key (from resolved HR policy) */
 const CATEGORY_TO_CAP: Record<string, string> = {
@@ -49,6 +53,8 @@ export const PackageSummary: React.FC<Props> = ({
   onStartOver,
 }) => {
   const [policyCaps, setPolicyCaps] = useState<PolicyCaps | null>(null);
+  const [comparisonAvailable, setComparisonAvailable] = useState<boolean | null>(null);
+  const [hasPublishedPolicy, setHasPublishedPolicy] = useState(false);
   const location = useLocation();
   const {
     assignmentId: primaryAssignmentId,
@@ -70,6 +76,14 @@ export const PackageSummary: React.FC<Props> = ({
       employeeAPI
         .getPolicyBudget(assignmentId)
         .then((res) => {
+          const hp = res?.has_policy === true;
+          setHasPublishedPolicy(hp);
+          const cmp = res?.comparison_available !== false;
+          setComparisonAvailable(cmp);
+          if (!cmp) {
+            setPolicyCaps(null);
+            return;
+          }
           const caps = res?.caps || {};
           if (Object.keys(caps).length > 0) {
             setPolicyCaps({
@@ -81,8 +95,14 @@ export const PackageSummary: React.FC<Props> = ({
           }
           return employeeAPI.getPolicyCaps().then(setPolicyCaps);
         })
-        .catch(() => employeeAPI.getPolicyCaps().then(setPolicyCaps).catch(() => setPolicyCaps(null)));
+        .catch(() => {
+          setComparisonAvailable(null);
+          setHasPublishedPolicy(false);
+          employeeAPI.getPolicyCaps().then(setPolicyCaps).catch(() => setPolicyCaps(null));
+        });
     } else {
+      setComparisonAvailable(null);
+      setHasPublishedPolicy(false);
       employeeAPI
         .getPolicyCaps()
         .then(setPolicyCaps)
@@ -184,7 +204,14 @@ export const PackageSummary: React.FC<Props> = ({
             </ul>
           </Card>
 
-          {policyCaps && comparison.length > 0 && (
+          {hasPublishedPolicy && comparisonAvailable === false && packageItems.length > 0 && (
+            <Card padding="lg" className="border-[#e2e8f0] bg-[#fafbfc]">
+              <p className="text-[#4b5563] font-medium">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY}</p>
+              <p className="text-sm text-[#6b7280] mt-2">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY}</p>
+            </Card>
+          )}
+
+          {policyCaps && comparison.length > 0 && comparisonAvailable !== false && (
             <Card padding="lg">
               <h3 className="font-semibold text-[#0b2b43] mb-2">HR Policy Comparison</h3>
               <p className="text-sm text-[#6b7280] mb-2">
@@ -263,7 +290,7 @@ export const PackageSummary: React.FC<Props> = ({
             </Card>
           )}
 
-          {!policyCaps && (
+          {!policyCaps && comparisonAvailable !== false && (
             <p className="text-sm text-[#6b7280]">
               Policy caps could not be loaded. Cost comparison is based on estimated values from recommendations. View &quot;Assignment Package &amp; Limits&quot; for your company&apos;s policy summary.
             </p>

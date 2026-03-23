@@ -1,6 +1,10 @@
 """
 Policy document clause segmentation: split raw text into structured clause blocks
 with source traceability. No normalization to final policy rules here.
+
+`normalized_hint_json` is **Layer 1** (heuristic hints). It feeds the normalization
+transform into **Layer 2** (`policy_benefit_rules`, etc.) but is not itself a machine
+decision — see docs/policy/metadata-vs-decision-layer.md.
 """
 from __future__ import annotations
 

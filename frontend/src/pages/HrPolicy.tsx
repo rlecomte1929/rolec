@@ -8,6 +8,7 @@ import { EmployeeResolvedPolicyView } from '../features/policy/EmployeeResolvedP
 import {
   EMPLOYEE_HR_POLICY_WAIT_PRIMARY,
   EMPLOYEE_HR_POLICY_WAIT_SECONDARY,
+  EMPLOYEE_POLICY_LOADING_ASSIGNMENT,
 } from '../features/policy/employeePolicyMessages';
 import { HrPolicyOverview } from '../features/policy/HrPolicyOverview';
 import { HrPolicyReviewWorkspace } from '../features/policy/HrPolicyReviewWorkspace';
@@ -40,6 +41,7 @@ type EmployeeResolvedPolicySnapshot = {
     tier?: string;
   };
   message?: string;
+  comparison_available?: boolean;
 };
 
 function EmployeePolicyContent() {
@@ -80,7 +82,13 @@ function EmployeePolicyContent() {
   if (loading) {
     return (
       <Card padding="lg" className="border-[#e2e8f0]">
-        <p className="text-sm text-[#6b7280]">Loading your policy…</p>
+        <div role="status" aria-live="polite">
+          <p className="text-sm font-medium text-[#0b2b43]">{EMPLOYEE_POLICY_LOADING_ASSIGNMENT}</p>
+          <p className="text-xs text-[#6b7280] mt-2">
+            No assignment, missing published policy, and network errors are handled explicitly—this is not stuck
+            loading.
+          </p>
+        </div>
       </Card>
     );
   }
@@ -118,6 +126,7 @@ function EmployeePolicyContent() {
 
   const snapshot: EmployeeResolvedPolicySnapshot = {
     has_policy: true,
+    comparison_available: pack.comparison_available,
     policy: pack.policy as EmployeeResolvedPolicySnapshot['policy'],
     benefits: (pack.benefits || []) as EmployeeResolvedPolicySnapshot['benefits'],
     exclusions: (pack.exclusions || []) as EmployeeResolvedPolicySnapshot['exclusions'],
@@ -320,6 +329,13 @@ function DetectedMetadataDisplay({ metadata }: { metadata: PolicyDocumentMetadat
 
   if (!hasAny) return null;
 
+  const layer1Note = (
+    <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-3">
+      These fields are <strong>document metadata</strong> (Layer 1) for triage only. Employee eligibility and
+      cost comparison use the <strong>published normalized policy</strong> (Layer 2), not this list.
+    </p>
+  );
+
   const MetaRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="flex gap-2 py-1 text-sm">
       <span className="text-[#6b7280] min-w-[10rem]">{label}:</span>
@@ -349,6 +365,7 @@ function DetectedMetadataDisplay({ metadata }: { metadata: PolicyDocumentMetadat
   return (
     <div>
       <div className="text-sm font-medium text-[#0b2b43] mb-2">Detected metadata</div>
+      {layer1Note}
       <div className="bg-white rounded border border-[#e2e8f0] p-4 space-y-1">
         <MetaRow label="Title" value={title} />
         <MetaRow label="Version" value={version} />
@@ -368,7 +385,7 @@ function DetectedMetadataDisplay({ metadata }: { metadata: PolicyDocumentMetadat
   );
 }
 
-/** Compact display of normalized hints (non-authoritative). */
+/** Compact display of normalized hints (Layer 1 — non-authoritative clause heuristics). */
 function NormalizedHintsDisplay({ hints }: { hints: Record<string, unknown> }) {
   if (!hints || typeof hints !== 'object') return null;
   const entries = Object.entries(hints).filter(([, v]) => v != null && v !== '');
@@ -382,7 +399,7 @@ function NormalizedHintsDisplay({ hints }: { hints: Record<string, unknown> }) {
     k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return (
     <div className="mt-2 px-2 py-1.5 rounded bg-[#f0fdf4] border border-[#bbf7d0] text-xs">
-      <span className="text-[#166534] font-medium">Hints: </span>
+      <span className="text-[#166534] font-medium">Clause hints (Layer 1): </span>
       <span className="text-[#15803d]">
         {entries.map(([k, v]) => `${label(k)}=${fmt(v)}`).join(' · ')}
       </span>
@@ -787,6 +804,8 @@ const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
   normalization_failed: 'Normalization failed because of an invalid policy_versions payload.',
   publish_failed_after_normalize:
     'Policy was saved but could not be published. Use “Publish version” in the HR Policy review workspace.',
+  normalization_input_invalid:
+    'This document is not ready to normalize. See details below, then try Reprocess if needed.',
   // Download-url and policy errors
   policy_policy_not_found: 'Policy not found.',
   policy_file_missing: 'Policy file not found in storage.',
@@ -963,10 +982,33 @@ function PolicyDocumentIntakeSection({
       if (res.policy_id) onNormalized?.(res.policy_id);
     } catch (err: unknown) {
       const data = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { data?: { error_code?: string; message?: string; detail?: string } } }).response?.data
+        ? (err as {
+            response?: {
+              data?: {
+                error_code?: string;
+                message?: string;
+                detail?: string;
+                hint?: string;
+                errors?: Array<{ path?: string; code?: string; message?: string }>;
+              };
+            };
+          }).response?.data
         : null;
       const code = data?.error_code;
-      const msg = (code && UPLOAD_ERROR_MESSAGES[code]) || data?.message || data?.detail;
+      let msg = (code && UPLOAD_ERROR_MESSAGES[code]) || data?.message || data?.detail;
+      const issues = data?.errors;
+      if (Array.isArray(issues) && issues.length) {
+        const detail = issues
+          .map((e) => (e.path && e.message ? `${e.path}: ${e.message}` : e.message || e.code || ''))
+          .filter(Boolean)
+          .join(' · ');
+        if (detail) {
+          msg = msg ? `${msg} ${detail}` : detail;
+        }
+      }
+      if (data?.hint && typeof data.hint === 'string') {
+        msg = msg ? `${msg} ${data.hint}` : data.hint;
+      }
       setMessage(String(msg || 'Normalize & publish failed'));
     } finally {
       setNormalizingId(null);

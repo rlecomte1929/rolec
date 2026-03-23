@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
 import { companyPolicyAPI, policyDocumentsAPI } from '../../api/client';
+import { deriveHrPolicyPipelineState } from './hrPolicyDegradedState';
+import { HrPolicyPipelineBanner } from './HrPolicyPipelineBanner';
 
 const VERSION_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
@@ -289,7 +291,18 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       loadDocumentsAndPolicies();
     } catch (err: any) {
       const data = err?.response?.data;
-      setMessage(data?.message || data?.detail || 'Re-normalization failed');
+      let m = data?.message || data?.detail || 'Re-normalization failed';
+      const issues = data?.errors;
+      if (Array.isArray(issues) && issues.length) {
+        const detail = issues
+          .map((e: { path?: string; message?: string; code?: string }) =>
+            e.path && e.message ? `${e.path}: ${e.message}` : e.message || e.code || '')
+          .filter(Boolean)
+          .join(' · ');
+        if (detail) m = `${m} ${detail}`;
+      }
+      if (data?.hint) m = `${m} ${data.hint}`;
+      setMessage(m);
       setMessageVariant('error');
     } finally {
       setRenormalizeBusy(false);
@@ -354,6 +367,11 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     return Math.round((sum / rules.length) * 100);
   }, [normalized?.benefit_rules]);
 
+  const pipelineDerived = useMemo(
+    () => deriveHrPolicyPipelineState(documents, normalized),
+    [documents, normalized]
+  );
+
   return (
     <div className="space-y-6" data-hr-policy-workspace="v2">
       <div className="text-xl font-semibold text-[#0b2b43]">HR Policy Review Workspace</div>
@@ -363,6 +381,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       <div className="rounded-lg bg-[#f0fdf4] border border-[#bbf7d0] px-4 py-2 text-xs text-[#166534]">
         <strong>Workflow:</strong> Upload document → Reprocess (if needed) → Normalize & publish (releases to employees) → Optional: review/edit matrix → Publish again after edits
       </div>
+
+      <HrPolicyPipelineBanner derived={pipelineDerived} loading={Boolean(selectedPolicyId && loading)} />
 
       {message && (
         <Alert variant={messageVariant}>{message}</Alert>
@@ -427,7 +447,11 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
             </>
           )}
         </div>
-        {loading && <div className="text-sm text-[#6b7280] mt-2">Loading…</div>}
+        {loading && (
+          <div className="text-sm text-[#6b7280] mt-2" role="status" aria-live="polite">
+            Loading policy version, benefit matrix, and publish status…
+          </div>
+        )}
         {documents.length > 0 && (
           <div className="text-xs text-[#6b7280] mt-2">
             Source: {documents.length} document{documents.length !== 1 ? 's' : ''}

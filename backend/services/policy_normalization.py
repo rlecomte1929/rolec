@@ -12,6 +12,7 @@ Pipeline stage (3-stage model):
 from __future__ import annotations
 
 import logging
+import math
 import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
@@ -25,8 +26,22 @@ from .policy_taxonomy import (
     get_benefit_meta,
     resolve_theme,
 )
+from .policy_pipeline_layers import layer1_fields_for_company_policy_shell
 
 log = logging.getLogger(__name__)
+
+# Must match policy_benefit_rules.calc_type CHECK in migrations
+ALLOWED_CALC_TYPES = frozenset(
+    {
+        "percent_salary",
+        "flat_amount",
+        "unit_cap",
+        "reimbursement",
+        "difference_only",
+        "per_diem",
+        "other",
+    }
+)
 
 # calc_type detection patterns
 CALC_PERCENT = re.compile(r"(\d{1,3})\s*%\s*(?:of|on)?\s*(?:base\s+)?salary", re.I)
@@ -243,7 +258,8 @@ def normalize_clauses_to_objects(
                     "object_type": "benefit_rule",
                     "object_id": None,  # set when we have benefit_rule_id
                     "condition_type": "assignment_type",
-                    "condition_value_json": {"types": [at]},
+                    # Keys must match policy_resolution._evaluate_condition (assignment_types / values)
+                    "condition_value_json": {"assignment_types": [at]},
                     "auto_generated": True,
                     "review_status": "pending",
                     "confidence": conf,
@@ -294,6 +310,29 @@ def normalize_clauses_to_objects(
     }
 
 
+def _sanitize_benefit_rules_for_db(rules: List[Dict[str, Any]], request_id: Optional[str] = None) -> None:
+    """Coerce calc_type and amount_value so INSERT never violates DB constraints."""
+    for idx, r in enumerate(rules):
+        ct = r.get("calc_type")
+        if ct not in ALLOWED_CALC_TYPES:
+            if request_id:
+                log.warning(
+                    "request_id=%s normalization sanitize benefit_rules[%s].calc_type %r -> other",
+                    request_id,
+                    idx,
+                    ct,
+                )
+            r["calc_type"] = "other"
+        av = r.get("amount_value")
+        if av is not None:
+            try:
+                f = float(av)
+                if math.isnan(f) or math.isinf(f):
+                    r["amount_value"] = None
+            except (TypeError, ValueError):
+                r["amount_value"] = None
+
+
 def run_normalization(
     db: Any,
     policy_document: Dict[str, Any],
@@ -307,15 +346,24 @@ def run_normalization(
     and policy_source_links. Returns {policy_id, policy_version_id, summary}.
     The created policy_version is versioned (version_number) and traceable to the
     source document (source_policy_document_id) and to source clauses (policy_source_links).
+
+    Layer 1 (document metadata) is used only for company_policies shell labels via
+    layer1_fields_for_company_policy_shell. Clause hints are Layer-1 inputs transformed
+    into Layer-2 rows (benefit_rules, exclusions, …) — see policy_pipeline_layers.
     """
     company_id = (policy_document.get("company_id") or "").strip() or None
     if not company_id:
         raise ValueError("Policy document has no company_id. Re-upload the document from the company's policy workspace.")
     doc_id = policy_document.get("id")
-    meta = policy_document.get("extracted_metadata") or {}
-    title = meta.get("detected_title") or meta.get("policy_title") or policy_document.get("filename", "Policy")
-    version_label = meta.get("detected_version") or meta.get("version") or policy_document.get("version_label")
-    effective_date = meta.get("detected_effective_date") or meta.get("effective_date")
+    shell = layer1_fields_for_company_policy_shell(
+        policy_document.get("extracted_metadata"),
+        filename=policy_document.get("filename"),
+        version_label_row=policy_document.get("version_label"),
+        effective_date_row=policy_document.get("effective_date"),
+    )
+    title = str(shell.get("title") or "Policy")[:200]
+    version_label = shell.get("version")
+    effective_date = shell.get("effective_date")
 
     # Build file_url from storage_path for company_policy (object key only, no bucket prefix)
     storage_path = policy_document.get("storage_path") or ""
@@ -345,6 +393,7 @@ def run_normalization(
 
     # Normalize clauses to objects
     result = normalize_clauses_to_objects(clauses, doc_id)
+    _sanitize_benefit_rules_for_db(result.get("benefit_rules") or [], request_id=request_id)
 
     # Create policy_version (ensure string ids for Postgres; auto_generated is bool, DB layer uses dialect-safe SQL)
     version_id = str(uuid.uuid4())

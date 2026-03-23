@@ -1192,6 +1192,12 @@ export interface PolicyServiceComparisonResponse {
   assignment_id: string;
   case_id?: string;
   message?: string;
+  comparison_available?: boolean;
+  comparison_readiness?: {
+    comparison_ready: boolean;
+    comparison_blockers: string[];
+    partial_numeric_coverage?: boolean;
+  };
   diagnostics?: { benefits_count: number; services_count: number; answers_keys: string[] };
 }
 

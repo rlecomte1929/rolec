@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
+import {
+  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
+  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
+} from './employeePolicyMessages';
 
 const formatBenefitLabel = (key: string): string =>
   key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -144,14 +148,33 @@ export const EmployeePolicyView: React.FC<{
   const [data, setData] = useState<ApplicablePolicy | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
+  const [comparisonUnavailable, setComparisonUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     const load = async () => {
       try {
+        setComparisonUnavailable(false);
         if (assignmentId) {
           const resolved = await employeeAPI.getResolvedPolicy(assignmentId);
+          if (!cancelled && resolved.has_policy && resolved.comparison_available === false) {
+            setComparisonUnavailable(true);
+            setData({
+              policy: resolved.policy
+                ? {
+                    policyId: resolved.policy.id,
+                    policyName: resolved.policy.title,
+                    effectiveDate: resolved.policy.effective_date,
+                    employeeBands: [],
+                    assignmentTypes: [],
+                  }
+                : null,
+              allowedBenefits: [],
+              wizardCriteria: {},
+            });
+            return;
+          }
           if (!cancelled && resolved.policy && resolved.benefits?.length) {
             const allowedBenefits: AllowedBenefit[] = resolved.benefits
               .filter((b: { included?: boolean }) => b.included)
@@ -195,6 +218,17 @@ export const EmployeePolicyView: React.FC<{
 
   if (loading) return <div className="text-sm text-[#6b7280] py-8">Loading policy...</div>;
   if (!data) return null;
+  if (comparisonUnavailable && data.policy) {
+    return (
+      <Card padding="lg" className="border-[#e2e8f0] bg-[#fafbfc]">
+        <p className="text-[#4b5563] font-medium">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY}</p>
+        <p className="text-sm text-[#6b7280] mt-2">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY}</p>
+        <p className="text-sm text-[#6b7280] mt-4">
+          <span className="font-medium text-[#0b2b43]">Policy on file:</span> {data.policy.policyName}
+        </p>
+      </Card>
+    );
+  }
   if (!data.policy || data.allowedBenefits.length === 0) {
     return (
       <Card padding="lg">

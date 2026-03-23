@@ -2486,6 +2486,9 @@ def patch_admin_policy(
         version = db.get_policy_version(vid)
         if not version or version.get("policy_id") != policy_id:
             raise HTTPException(status_code=400, detail="Version not found or does not belong to this policy")
+        from .services.policy_publish_gate import require_employee_publishable_policy_version
+
+        require_employee_publishable_policy_version(db, vid)
         db.archive_other_published_versions(policy_id, vid)
         db.update_policy_version_status(vid, "published")
         db.log_audit(user["id"], "ADMIN_PUBLISH_POLICY", "policy_version", policy_id, None, {"version_id": vid})
@@ -3699,6 +3702,8 @@ def get_employee_me_assignment_package_policy(
             "message": result.get("reason") or EMPLOYEE_POLICY_FALLBACK_PRIMARY,
             "message_secondary": result.get("reason_secondary") or EMPLOYEE_POLICY_FALLBACK_SECONDARY,
             "company_id_used": result.get("company_id_used"),
+            "comparison_readiness": result.get("comparison_readiness"),
+            "comparison_available": result.get("comparison_available"),
         }
 
     return {
@@ -3714,6 +3719,8 @@ def get_employee_me_assignment_package_policy(
         "message": None,
         "message_secondary": None,
         "company_id_used": result.get("company_id"),
+        "comparison_readiness": result.get("comparison_readiness"),
+        "comparison_available": result.get("comparison_available"),
     }
 
 
@@ -5599,6 +5606,8 @@ def _hr_publish_policy_version(
     policy_version_id: str,
     user: Dict[str, Any],
     request_id: Optional[str] = None,
+    *,
+    publish_source: str = "manual",
 ) -> Dict[str, Any]:
     """
     Publish one policy version for HR: archive other published rows, set status=published.
@@ -5606,17 +5615,93 @@ def _hr_publish_policy_version(
     """
     policy = db.get_company_policy(policy_id)
     _require_policy_access(user, policy)
-    db.archive_other_published_versions(policy_id, policy_version_id)
-    db.update_policy_version_status(policy_version_id, "published")
-    updated = db.get_policy_version(policy_version_id) or {}
     company_id = (policy or {}).get("company_id") if policy else None
+    try:
+        from .services.policy_pipeline_analytics import (
+            emit_policy_publish_completed,
+            emit_policy_publish_failed,
+            emit_policy_publish_started,
+        )
+
+        emit_policy_publish_started(
+            request_id=request_id,
+            user_id=user.get("id"),
+            company_id=company_id,
+            policy_id=policy_id,
+            policy_version_id=policy_version_id,
+            source=publish_source,
+        )
+    except Exception:
+        pass
+    from .services.policy_publish_gate import require_employee_publishable_policy_version
+
+    try:
+        require_employee_publishable_policy_version(db, policy_version_id)
+    except HTTPException as gate_exc:
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_publish_failed
+
+            emit_policy_publish_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=company_id,
+                policy_id=policy_id,
+                policy_version_id=policy_version_id,
+                error_code="publish_gate_failed",
+                detail=str(gate_exc.detail) if gate_exc.detail else gate_exc.status_code,
+                source=publish_source,
+            )
+        except Exception:
+            pass
+        raise
+    try:
+        db.archive_other_published_versions(policy_id, policy_version_id)
+        db.update_policy_version_status(policy_version_id, "published")
+        try:
+            from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+
+            invalidate_comparison_readiness_cache(policy_version_id)
+        except Exception:
+            pass
+        updated = db.get_policy_version(policy_version_id) or {}
+    except Exception as exc:
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_publish_failed
+
+            emit_policy_publish_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=company_id,
+                policy_id=policy_id,
+                policy_version_id=policy_version_id,
+                error_code="publish_persist_failed",
+                detail=str(exc)[:400],
+                source=publish_source,
+            )
+        except Exception:
+            pass
+        raise
     log.info(
-        "publish request_id=%s company_id=%s policy_id=%s version_id=%s status=published visibility=employee_lookup source=normalize_or_manual",
+        "publish request_id=%s company_id=%s policy_id=%s version_id=%s status=published visibility=employee_lookup source=%s",
         request_id,
         company_id,
         policy_id,
         policy_version_id,
+        publish_source,
     )
+    try:
+        from .services.policy_pipeline_analytics import emit_policy_publish_completed
+
+        emit_policy_publish_completed(
+            request_id=request_id,
+            user_id=user.get("id"),
+            company_id=company_id,
+            policy_id=policy_id,
+            policy_version_id=policy_version_id,
+            source=publish_source,
+        )
+    except Exception:
+        pass
     return updated
 
 
@@ -6211,6 +6296,60 @@ EMPLOYEE_POLICY_FALLBACK_SECONDARY = (
 )
 
 
+def _finalize_employee_policy_resolution(
+    db: Any,
+    out: Dict[str, Any],
+    *,
+    comparison_readiness_precalc: Optional[Dict[str, Any]] = None,
+    telemetry: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Attach comparison_readiness / comparison_available for employee policy consumers."""
+    from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
+
+    if not out.get("has_policy"):
+        out["comparison_readiness"] = {
+            "comparison_ready": False,
+            "comparison_blockers": ["NO_MATCHING_PUBLISHED_POLICY"],
+            "partial_numeric_coverage": False,
+        }
+        out["comparison_available"] = False
+        _emit_employee_policy_telemetry(out, telemetry)
+        return out
+    if comparison_readiness_precalc is not None:
+        cr = comparison_readiness_precalc
+    else:
+        vid = out.get("version_id") or (out.get("version") or {}).get("id")
+        cr = evaluate_version_comparison_readiness(db, str(vid) if vid else None)
+    out["comparison_readiness"] = cr
+    out["comparison_available"] = bool(cr.get("comparison_ready"))
+    _emit_employee_policy_telemetry(out, telemetry)
+    return out
+
+
+def _emit_employee_policy_telemetry(out: Dict[str, Any], telemetry: Optional[Dict[str, Any]]) -> None:
+    if not telemetry:
+        return
+    try:
+        from .services.policy_pipeline_analytics import record_employee_policy_resolution
+
+        record_employee_policy_resolution(
+            request_id=telemetry.get("request_id"),
+            assignment_id=telemetry.get("assignment_id") or out.get("assignment_id"),
+            case_id=telemetry.get("case_id") or out.get("case_id"),
+            user_id=telemetry.get("user_id"),
+            user_role=telemetry.get("user_role"),
+            has_policy=bool(out.get("has_policy")),
+            comparison_available=bool(out.get("comparison_available")),
+            comparison_readiness=out.get("comparison_readiness"),
+            policy_id=out.get("policy_id") or (out.get("policy") or {}).get("id"),
+            policy_version_id=out.get("version_id") or (out.get("version") or {}).get("id"),
+            company_id_used=out.get("company_id") or out.get("company_id_used"),
+            resolution_cache_hit=telemetry.get("resolution_cache_hit"),
+        )
+    except Exception:
+        pass
+
+
 def _resolve_published_policy_for_employee(
     assignment_id: str,
     user: Dict[str, Any],
@@ -6230,6 +6369,7 @@ def _resolve_published_policy_for_employee(
         collect_company_id_candidates_for_assignment,
         find_first_published_company_policy,
     )
+    from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
 
     assignment = _require_assignment_visibility(assignment_id, user)
     case_id = assignment.get("case_id")
@@ -6237,8 +6377,10 @@ def _resolve_published_policy_for_employee(
     hr_user_id = assignment.get("hr_user_id") or ((case or {}).get("hr_user_id") if case else None)
     hr_company_id = db.get_hr_company_id(hr_user_id) if hr_user_id else None
     profile_company_id = None
-    if assignment.get("employee_user_id"):
-        emp_profile = db.get_profile_record(assignment["employee_user_id"])
+    emp_profile = None
+    emp_user_id = assignment.get("employee_user_id")
+    if emp_user_id:
+        emp_profile = db.get_profile_record(emp_user_id)
         if emp_profile:
             profile_company_id = emp_profile.get("company_id")
 
@@ -6266,16 +6408,15 @@ def _resolve_published_policy_for_employee(
                     case = db.get_relocation_case(case_id) or case
                 except Exception:
                     pass
-            emp_user_id = assignment.get("employee_user_id")
             if emp_user_id:
-                emp_profile2 = db.get_profile_record(emp_user_id)
-                if emp_profile2 and not emp_profile2.get("company_id"):
+                ep = emp_profile or db.get_profile_record(emp_user_id)
+                if ep and not ep.get("company_id"):
                     try:
                         db.ensure_profile_record(
                             emp_user_id,
-                            emp_profile2.get("email") or "",
-                            emp_profile2.get("role") or "EMPLOYEE",
-                            emp_profile2.get("full_name"),
+                            ep.get("email") or "",
+                            ep.get("role") or "EMPLOYEE",
+                            ep.get("full_name"),
                             company_id_for_resolution,
                         )
                     except Exception:
@@ -6316,14 +6457,25 @@ def _resolve_published_policy_for_employee(
                 case_id,
                 candidates,
             )
-        return {
-            "has_policy": False,
-            "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
-            "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
-            "assignment_id": assignment_id,
-            "case_id": case_id,
-            "company_id_used": company_id_used,
-        }
+        return _finalize_employee_policy_resolution(
+            db,
+            {
+                "has_policy": False,
+                "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+                "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "company_id_used": company_id_used,
+            },
+            telemetry={
+                "request_id": request_id,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "user_id": user.get("id"),
+                "user_role": user.get("role"),
+                "resolution_cache_hit": False,
+            },
+        )
 
     company_id_pub, policy_row, version_row = pub
     vid_pub = (version_row or {}).get("id")
@@ -6341,13 +6493,17 @@ def _resolve_published_policy_for_employee(
         and str(cached_row.get("policy_version_id") or "") == str(vid_pub)
     ):
         rid = cached_row["id"]
-        try:
-            benefits = db.list_resolved_policy_benefits(rid)
-            exclusions = db.list_resolved_policy_exclusions(rid)
-        except Exception as exc:
-            log.warning("employee_policy cache list_benefits request_id=%s resolved_id=%s exc=%s", request_id, rid, exc)
-            benefits = []
-            exclusions = []
+        readiness = evaluate_version_comparison_readiness(db, str(vid_pub))
+        benefits: List[Any] = []
+        exclusions: List[Any] = []
+        if readiness.get("comparison_ready"):
+            try:
+                benefits = db.list_resolved_policy_benefits(rid)
+                exclusions = db.list_resolved_policy_exclusions(rid)
+            except Exception as exc:
+                log.warning("employee_policy cache list_benefits request_id=%s resolved_id=%s exc=%s", request_id, rid, exc)
+                benefits = []
+                exclusions = []
         policy = cached_row.get("policy") or policy_row or {}
         version = cached_row.get("version") or version_row or {}
         ctx = cached_row.get("resolution_context") or cached_row.get("resolution_context_json") or {}
@@ -6355,30 +6511,43 @@ def _resolve_published_policy_for_employee(
         company = db.get_company(company_id_used) if company_id_used else None
         company_name = (company or {}).get("name") if company else None
         log.info(
-            "employee_policy cache_hit request_id=%s assignment_id=%s policy_version_id=%s",
+            "employee_policy cache_hit request_id=%s assignment_id=%s policy_version_id=%s comparison_ready=%s",
             request_id,
             assignment_id,
             vid_pub,
+            readiness.get("comparison_ready"),
         )
-        return {
-            "has_policy": True,
-            "company_id": company_id_used,
-            "policy_id": (policy or {}).get("id"),
-            "version_id": (version or {}).get("id"),
-            "assignment_id": assignment_id,
-            "case_id": case_id,
-            "policy": {
-                "id": (policy or {}).get("id"),
-                "title": (policy or {}).get("title"),
-                "version": (version or {}).get("version_number"),
-                "effective_date": (policy or {}).get("effective_date"),
-                "company_name": company_name,
+        return _finalize_employee_policy_resolution(
+            db,
+            {
+                "has_policy": True,
+                "company_id": company_id_used,
+                "policy_id": (policy or {}).get("id"),
+                "version_id": (version or {}).get("id") or vid_pub,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "policy": {
+                    "id": (policy or {}).get("id"),
+                    "title": (policy or {}).get("title"),
+                    "version": (version or {}).get("version_number"),
+                    "effective_date": (policy or {}).get("effective_date"),
+                    "company_name": company_name,
+                },
+                "benefits": benefits,
+                "exclusions": exclusions,
+                "resolved_at": cached_row.get("resolved_at"),
+                "resolution_context": ctx,
             },
-            "benefits": benefits,
-            "exclusions": exclusions,
-            "resolved_at": cached_row.get("resolved_at"),
-            "resolution_context": ctx,
-        }
+            comparison_readiness_precalc=readiness,
+            telemetry={
+                "request_id": request_id,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "user_id": user.get("id"),
+                "user_role": user.get("role"),
+                "resolution_cache_hit": True,
+            },
+        )
 
     resolved = None
     try:
@@ -6395,14 +6564,25 @@ def _resolve_published_policy_for_employee(
         )
         resolved = None
     if not resolved:
-        return {
-            "has_policy": False,
-            "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
-            "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
-            "assignment_id": assignment_id,
-            "case_id": case_id,
-            "company_id_used": company_id_used,
-        }
+        return _finalize_employee_policy_resolution(
+            db,
+            {
+                "has_policy": False,
+                "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+                "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "company_id_used": company_id_used,
+            },
+            telemetry={
+                "request_id": request_id,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "user_id": user.get("id"),
+                "user_role": user.get("role"),
+                "resolution_cache_hit": False,
+            },
+        )
     company_id_used = resolved.get("resolution_company_id") or company_id_used or company_id_pub
     if not read_only and case_id and case and not case.get("company_id") and company_id_used:
         try:
@@ -6419,54 +6599,83 @@ def _resolve_published_policy_for_employee(
             pass
     rid = resolved.get("id")
     if not rid:
-        return {
-            "has_policy": False,
-            "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
-            "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
-            "assignment_id": assignment_id,
-            "case_id": case_id,
-            "company_id_used": company_id_used,
-        }
-    try:
-        benefits = db.list_resolved_policy_benefits(rid)
-        exclusions = db.list_resolved_policy_exclusions(rid)
-    except Exception as exc:
-        log.warning("employee_policy list_benefits/exclusions request_id=%s resolved_id=%s exc=%s", request_id, rid, exc)
-        benefits = []
-        exclusions = []
+        return _finalize_employee_policy_resolution(
+            db,
+            {
+                "has_policy": False,
+                "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+                "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "company_id_used": company_id_used,
+            },
+            telemetry={
+                "request_id": request_id,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "user_id": user.get("id"),
+                "user_role": user.get("role"),
+                "resolution_cache_hit": False,
+            },
+        )
     policy = resolved.get("policy") or {}
     version = resolved.get("version") or {}
+    vid_res = version.get("id") or vid_pub
+    readiness = evaluate_version_comparison_readiness(db, str(vid_res) if vid_res else None)
+    benefits: List[Any] = []
+    exclusions: List[Any] = []
+    if readiness.get("comparison_ready"):
+        try:
+            benefits = db.list_resolved_policy_benefits(rid)
+            exclusions = db.list_resolved_policy_exclusions(rid)
+        except Exception as exc:
+            log.warning("employee_policy list_benefits/exclusions request_id=%s resolved_id=%s exc=%s", request_id, rid, exc)
+            benefits = []
+            exclusions = []
     ctx = resolved.get("resolution_context") or resolved.get("resolution_context_json") or {}
     company = db.get_company(company_id_used) if company_id_used else None
     company_name = (company or {}).get("name") if company else None
     log.info(
-        "employee_policy resolved request_id=%s assignment_id=%s case_id=%s company_id=%s policy_id=%s version_id=%s has_policy=true",
+        "employee_policy resolved request_id=%s assignment_id=%s case_id=%s company_id=%s policy_id=%s version_id=%s has_policy=true comparison_ready=%s",
         request_id,
         assignment_id,
         case_id,
         company_id_used,
         policy.get("id"),
         version.get("id"),
+        readiness.get("comparison_ready"),
     )
-    return {
-        "has_policy": True,
-        "company_id": company_id_used,
-        "policy_id": policy.get("id"),
-        "version_id": version.get("id"),
-        "assignment_id": assignment_id,
-        "case_id": case_id,
-        "policy": {
-            "id": policy.get("id"),
-            "title": policy.get("title"),
-            "version": version.get("version_number"),
-            "effective_date": policy.get("effective_date"),
-            "company_name": company_name,
+    return _finalize_employee_policy_resolution(
+        db,
+        {
+            "has_policy": True,
+            "company_id": company_id_used,
+            "policy_id": policy.get("id"),
+            "version_id": version.get("id"),
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "policy": {
+                "id": policy.get("id"),
+                "title": policy.get("title"),
+                "version": version.get("version_number"),
+                "effective_date": policy.get("effective_date"),
+                "company_name": company_name,
+            },
+            "benefits": benefits,
+            "exclusions": exclusions,
+            "resolved_at": resolved.get("resolved_at"),
+            "resolution_context": ctx,
         },
-        "benefits": benefits,
-        "exclusions": exclusions,
-        "resolved_at": resolved.get("resolved_at"),
-        "resolution_context": ctx,
-    }
+        comparison_readiness_precalc=readiness,
+        telemetry={
+            "request_id": request_id,
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "user_id": user.get("id"),
+            "user_role": user.get("role"),
+            "resolution_cache_hit": False,
+        },
+    )
 
 
 def _log_employee_policy(
@@ -6538,6 +6747,12 @@ def get_employee_assignment_policy(
             "exclusions": [],
             "resolution_context": None,
             "message": "No published policy for your assignment.",
+            "comparison_readiness": {
+                "comparison_ready": False,
+                "comparison_blockers": ["ERROR_LOADING_POLICY"],
+                "partial_numeric_coverage": False,
+            },
+            "comparison_available": False,
         }
     if not result.get("has_policy"):
         try:
@@ -6563,6 +6778,8 @@ def get_employee_assignment_policy(
             "message": result.get("reason", EMPLOYEE_POLICY_FALLBACK_PRIMARY),
             "message_secondary": result.get("reason_secondary") or EMPLOYEE_POLICY_FALLBACK_SECONDARY,
             "company_id_used": result.get("company_id_used"),
+            "comparison_readiness": result.get("comparison_readiness"),
+            "comparison_available": result.get("comparison_available"),
         }
     try:
         _log_employee_policy(
@@ -6587,6 +6804,8 @@ def get_employee_assignment_policy(
         "exclusions": result.get("exclusions") or [],
         "resolved_at": result.get("resolved_at"),
         "resolution_context": result.get("resolution_context"),
+        "comparison_readiness": result.get("comparison_readiness"),
+        "comparison_available": result.get("comparison_available"),
     }
 
 
@@ -6598,6 +6817,8 @@ def get_employee_policy_envelope(
 ):
     """Employee: Get policy envelope (envelope cards ready) for comparison/budget logic."""
     data = get_employee_assignment_policy(assignment_id, req, user)
+    if data.get("has_policy") and data.get("comparison_available") is False:
+        return {**data, "benefits": [], "exclusions": [], "envelopes": []}
     if not data.get("benefits"):
         return data
     # Map to envelope shape: included, capped, excluded, approval-required
@@ -6632,7 +6853,9 @@ def get_employee_policy_service_comparison(
     """Employee: Get comparison of selected services vs resolved policy (read-only, explanatory)."""
     _ = _require_assignment_visibility(assignment_id, user)
     from .services.policy_service_comparison import compute_policy_service_comparison
-    return compute_policy_service_comparison(db, assignment_id, include_diagnostics=False)
+    return compute_policy_service_comparison(
+        db, assignment_id, include_diagnostics=False, employee_gate=True
+    )
 
 
 @app.get("/api/hr/assignments/{assignment_id}/policy-service-comparison")
@@ -6648,6 +6871,48 @@ def get_hr_policy_service_comparison(
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
     from .services.policy_service_comparison import compute_policy_service_comparison
     return compute_policy_service_comparison(db, assignment_id, assignment=assignment, include_diagnostics=True)
+
+
+@app.get("/api/employee/assignments/{assignment_id}/services-policy-context")
+def get_employee_services_policy_context(
+    assignment_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Employee Services: per-wizard-category policy view model from resolved published policy only (Layer 2).
+    Does not use document extraction metadata.
+    """
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    _ = _require_assignment_visibility(assignment_id, user)
+    try:
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning(
+            "services_policy_context failed request_id=%s assignment_id=%s exc=%s",
+            request_id,
+            assignment_id,
+            exc,
+        )
+        return {
+            "ok": False,
+            "has_policy": False,
+            "comparison_available": False,
+            "comparison_readiness": {
+                "comparison_ready": False,
+                "comparison_blockers": ["ERROR_LOADING_POLICY"],
+                "partial_numeric_coverage": False,
+            },
+            "currency": "USD",
+            "categories": {},
+            "source": "resolved_assignment_policy",
+        }
+
+    from .services.employee_services_policy_context import build_employee_services_policy_context
+
+    return build_employee_services_policy_context(result)
 
 
 @app.get("/api/employee/assignments/{assignment_id}/policy-budget")
@@ -6680,7 +6945,20 @@ def get_assignment_policy_budget(
             )
         except Exception:
             pass
-        return {"ok": True, "has_policy": False, "budget": None, "currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
+        return {
+            "ok": True,
+            "has_policy": False,
+            "comparison_available": False,
+            "comparison_readiness": {
+                "comparison_ready": False,
+                "comparison_blockers": ["ERROR_LOADING_POLICY"],
+                "partial_numeric_coverage": False,
+            },
+            "budget": None,
+            "currency": DEFAULT_CURRENCY,
+            "caps": {},
+            "total_cap": None,
+        }
 
     if not result.get("has_policy"):
         try:
@@ -6696,7 +6974,48 @@ def get_assignment_policy_budget(
             )
         except Exception:
             pass
-        return {"ok": True, "has_policy": False, "budget": None, "currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
+        return {
+            "ok": True,
+            "has_policy": False,
+            "comparison_available": False,
+            "comparison_readiness": result.get("comparison_readiness")
+            or {
+                "comparison_ready": False,
+                "comparison_blockers": ["NO_MATCHING_PUBLISHED_POLICY"],
+                "partial_numeric_coverage": False,
+            },
+            "budget": None,
+            "currency": DEFAULT_CURRENCY,
+            "caps": {},
+            "total_cap": None,
+        }
+
+    if not result.get("comparison_available", False):
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy-budget",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                result.get("case_id"),
+                result.get("company_id"),
+                True,
+                result.get("policy_id"),
+                result.get("version_id"),
+            )
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "has_policy": True,
+            "comparison_available": False,
+            "comparison_readiness": result.get("comparison_readiness"),
+            "budget": None,
+            "currency": DEFAULT_CURRENCY,
+            "caps": {},
+            "total_cap": None,
+        }
 
     benefits = result.get("benefits") or []
     try:
@@ -6718,7 +7037,14 @@ def get_assignment_policy_budget(
         )
     except Exception:
         pass
-    return {"ok": True, "has_policy": True, "budget": budget, **budget}
+    return {
+        "ok": True,
+        "has_policy": True,
+        "comparison_available": True,
+        "comparison_readiness": result.get("comparison_readiness"),
+        "budget": budget,
+        **budget,
+    }
 
 
 @app.post("/api/assignments/{assignment_id}/evidence", response_model=AddEvidenceResponse)
@@ -7884,6 +8210,20 @@ async def upload_policy_document(
         request_id, filename, mime, file_size, company_id[:8] + "…" if company_id and len(company_id) > 8 else company_id,
     )
 
+    _upload_wall_start = time.monotonic()
+    try:
+        from .services.policy_pipeline_analytics import emit_policy_upload_started
+
+        emit_policy_upload_started(
+            request_id=request_id,
+            user_id=user_id,
+            company_id=company_id,
+            filename=filename,
+            file_size_bytes=file_size,
+        )
+    except Exception:
+        pass
+
     # Validate config before upload
     health = check_policy_storage_health(db)
     if not health["supabase_url_present"] or not health["service_role_present"]:
@@ -7997,6 +8337,19 @@ async def upload_policy_document(
     extraction_failed = False
     try:
         from .services.policy_document_intake import process_uploaded_document
+        from .services.policy_pipeline_analytics import (
+            emit_policy_classify_completed,
+            emit_policy_classify_failed,
+            emit_policy_classify_started,
+        )
+
+        emit_policy_classify_started(
+            request_id=request_id,
+            user_id=user_id,
+            company_id=company_id,
+            document_id=doc_id,
+            source="upload",
+        )
         result = process_uploaded_document(content, mime, filename, request_id=request_id)
         log.info(
             "request_id=%s policy_upload stage=extract ok status=%s",
@@ -8021,6 +8374,30 @@ async def upload_policy_document(
                 "request_id=%s policy_upload stage=extract failed extraction_error=%s",
                 request_id, (result.get("extraction_error") or "")[:200],
             )
+            try:
+                emit_policy_classify_failed(
+                    request_id=request_id,
+                    user_id=user_id,
+                    company_id=company_id,
+                    document_id=doc_id,
+                    extraction_error=result.get("extraction_error"),
+                    source="upload",
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                emit_policy_classify_completed(
+                    request_id=request_id,
+                    user_id=user_id,
+                    company_id=company_id,
+                    document_id=doc_id,
+                    processing_status=result.get("processing_status"),
+                    detected_document_type=result.get("detected_document_type"),
+                    source="upload",
+                )
+            except Exception:
+                pass
         # Segment into clauses when we have raw text
         if result.get("raw_text") and result.get("processing_status") != "failed":
             try:
@@ -8046,6 +8423,19 @@ async def upload_policy_document(
             extraction_error=str(exc),
             request_id=request_id,
         )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_classify_failed
+
+            emit_policy_classify_failed(
+                request_id=request_id,
+                user_id=user_id,
+                company_id=company_id,
+                document_id=doc_id,
+                extraction_error=str(exc),
+                source="upload",
+            )
+        except Exception:
+            pass
 
     doc = db.get_policy_document(doc_id, request_id=request_id)
     num_clauses = len(db.list_policy_document_clauses(doc_id, request_id=request_id)) if doc_id else 0
@@ -8057,6 +8447,20 @@ async def upload_policy_document(
 
     # --- Stage F: Return ---
     if extraction_failed:
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_upload_completed
+
+            emit_policy_upload_completed(
+                request_id=request_id,
+                user_id=user_id,
+                company_id=company_id,
+                document_id=doc_id,
+                processing_status=doc.get("processing_status"),
+                clause_count=num_clauses,
+                duration_ms=(time.monotonic() - _upload_wall_start) * 1000.0,
+            )
+        except Exception:
+            pass
         return JSONResponse(
             status_code=207,
             content={
@@ -8067,6 +8471,20 @@ async def upload_policy_document(
                 "document": doc,
             },
         )
+    try:
+        from .services.policy_pipeline_analytics import emit_policy_upload_completed
+
+        emit_policy_upload_completed(
+            request_id=request_id,
+            user_id=user_id,
+            company_id=company_id,
+            document_id=doc_id,
+            processing_status=doc.get("processing_status"),
+            clause_count=num_clauses,
+            duration_ms=(time.monotonic() - _upload_wall_start) * 1000.0,
+        )
+    except Exception:
+        pass
     return {"ok": True, "document": doc, "request_id": request_id}
 
 
@@ -8096,7 +8514,9 @@ def get_policy_document(
     request_id = getattr(req.state, "request_id", None)
     doc = db.get_policy_document(doc_id, request_id=request_id)
     _require_document_access(user, doc)
-    return {"document": doc}
+    from .services.policy_pipeline_layers import enrich_policy_document_for_hr
+
+    return {"document": enrich_policy_document_for_hr(doc)}
 
 
 @app.post("/api/hr/policy-documents/bulk-delete")
@@ -8209,6 +8629,7 @@ async def reprocess_policy_document(
     request_id = getattr(req.state, "request_id", None)
     doc = db.get_policy_document(doc_id, request_id=request_id)
     _require_document_access(user, doc)
+    company_id_rp = (doc or {}).get("company_id")
     file_path = doc.get("storage_path") or ""
     object_key = normalize_policy_storage_object_key(file_path)
     log.info("request_id=%s policy_document_reprocess bucket=%s object_key=%s", request_id, BUCKET_HR_POLICIES, object_key)
@@ -8220,6 +8641,19 @@ async def reprocess_policy_document(
         raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, BUCKET_HR_POLICIES))
     try:
         from .services.policy_document_intake import process_uploaded_document
+        from .services.policy_pipeline_analytics import (
+            emit_policy_classify_completed,
+            emit_policy_classify_failed,
+            emit_policy_classify_started,
+        )
+
+        emit_policy_classify_started(
+            request_id=request_id,
+            user_id=user.get("id"),
+            company_id=company_id_rp,
+            document_id=doc_id,
+            source="reprocess",
+        )
         result = process_uploaded_document(
             data, doc.get("mime_type", ""), doc.get("filename", ""), request_id=request_id
         )
@@ -8235,6 +8669,31 @@ async def reprocess_policy_document(
             extracted_metadata=result.get("extracted_metadata"),
             request_id=request_id,
         )
+        if result.get("processing_status") == "failed":
+            try:
+                emit_policy_classify_failed(
+                    request_id=request_id,
+                    user_id=user.get("id"),
+                    company_id=company_id_rp,
+                    document_id=doc_id,
+                    extraction_error=result.get("extraction_error"),
+                    source="reprocess",
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                emit_policy_classify_completed(
+                    request_id=request_id,
+                    user_id=user.get("id"),
+                    company_id=company_id_rp,
+                    document_id=doc_id,
+                    processing_status=result.get("processing_status"),
+                    detected_document_type=result.get("detected_document_type"),
+                    source="reprocess",
+                )
+            except Exception:
+                pass
         # Re-segment clauses
         if result.get("raw_text") and result.get("processing_status") != "failed":
             try:
@@ -8257,6 +8716,19 @@ async def reprocess_policy_document(
         db.update_policy_document(
             doc_id, processing_status="failed", extraction_error=str(exc), request_id=request_id
         )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_classify_failed
+
+            emit_policy_classify_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=company_id_rp,
+                document_id=doc_id,
+                extraction_error=str(exc),
+                source="reprocess",
+            )
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Reprocess failed: {str(exc)}")
     doc = db.get_policy_document(doc_id, request_id=request_id)
     num_clauses = len(db.list_policy_document_clauses(doc_id, request_id=request_id))
@@ -8283,19 +8755,83 @@ def normalize_policy_document(
     request_id = getattr(req.state, "request_id", None)
     doc = db.get_policy_document(doc_id, request_id=request_id)
     _require_document_access(user, doc)
-    if not doc.get("raw_text"):
-        raise HTTPException(status_code=400, detail="Document has no extracted text. Run Reprocess first.")
     clauses = db.list_policy_document_clauses(doc_id, request_id=request_id)
-    if not clauses:
-        raise HTTPException(status_code=400, detail="No clauses. Run Reprocess to segment the document first.")
+    try:
+        from .services.policy_pipeline_analytics import emit_policy_normalize_started
+
+        emit_policy_normalize_started(
+            request_id=request_id,
+            user_id=user.get("id"),
+            company_id=(doc or {}).get("company_id"),
+            document_id=doc_id,
+        )
+    except Exception:
+        pass
+    try:
+        from .services.normalization_input import (
+            NormalizationInputInvalid,
+            issues_to_jsonable,
+            validate_and_prepare_normalization_input,
+        )
+
+        doc_prepared, clauses_prepared, input_issues = validate_and_prepare_normalization_input(
+            doc, clauses, doc_id, request_id=request_id
+        )
+    except NormalizationInputInvalid as inv:
+        log.warning(
+            "request_id=%s normalization_input_invalid document_id=%s issues=%s",
+            request_id,
+            doc_id,
+            [i.code for i in inv.issues],
+        )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+
+            emit_policy_normalize_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=(doc or {}).get("company_id"),
+                document_id=doc_id,
+                error_code="normalization_input_invalid",
+                detail=",".join([i.code for i in inv.issues])[:400],
+                http_status=422,
+            )
+        except Exception:
+            pass
+        return JSONResponse(
+            status_code=422,
+            content={
+                "ok": False,
+                "error_code": "normalization_input_invalid",
+                "message": (
+                    "This document is not ready to normalize. Fix the issues below, then use Reprocess if needed. "
+                    "Your file and extracted text in the database are unchanged."
+                ),
+                "errors": issues_to_jsonable([i for i in inv.issues if i.severity == "blocking"]),
+                "request_id": request_id,
+            },
+        )
+    repair_only = [i for i in input_issues if i.severity == "repair"]
+    if repair_only:
+        log.info(
+            "request_id=%s normalization_input_repairs document_id=%s count=%s",
+            request_id,
+            doc_id,
+            len(repair_only),
+        )
     try:
         from .services.policy_normalization import run_normalization
-        result = run_normalization(db, doc, clauses, created_by=user.get("id"), request_id=request_id)
+
+        result = run_normalization(
+            db, doc_prepared, clauses_prepared, created_by=user.get("id"), request_id=request_id
+        )
         summary = result.get("summary") or {}
         policy_id = str(result["policy_id"])
         version_id = str(result["policy_version_id"])
         try:
-            published_version = _hr_publish_policy_version(policy_id, version_id, user, request_id=request_id)
+            published_version = _hr_publish_policy_version(
+                policy_id, version_id, user, request_id=request_id, publish_source="normalize"
+            )
         except HTTPException:
             raise
         except Exception as pub_exc:
@@ -8308,6 +8844,20 @@ def normalize_policy_document(
                 pub_exc,
                 exc_info=True,
             )
+            try:
+                from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+
+                emit_policy_normalize_failed(
+                    request_id=request_id,
+                    user_id=user.get("id"),
+                    company_id=(doc or {}).get("company_id"),
+                    document_id=doc_id,
+                    error_code="publish_failed_after_normalize",
+                    detail=str(pub_exc)[:400],
+                    http_status=500,
+                )
+            except Exception:
+                pass
             return JSONResponse(
                 status_code=500,
                 content={
@@ -8324,6 +8874,21 @@ def normalize_policy_document(
                     "summary": summary,
                 },
             )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_normalize_completed
+
+            emit_policy_normalize_completed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=(doc or {}).get("company_id"),
+                document_id=doc_id,
+                policy_id=policy_id,
+                policy_version_id=version_id,
+                summary=summary,
+                auto_published=True,
+            )
+        except Exception:
+            pass
         log.info(
             "request_id=%s policy_pipeline stage=normalize document_id=%s company_id=%s user_id=%s success=true published=true "
             "policy_id=%s policy_version_id=%s benefit_rules=%d exclusions=%d rows_created=%d",
@@ -8332,16 +8897,33 @@ def normalize_policy_document(
             summary.get("benefit_rules", 0), summary.get("exclusions", 0),
             summary.get("benefit_rules", 0) + summary.get("exclusions", 0) + summary.get("evidence_requirements", 0) + summary.get("conditions", 0),
         )
-        return {
+        out = {
             "policy_id": policy_id,
             "policy_version_id": version_id,
             "summary": result["summary"],
             "published": True,
             "version": published_version,
         }
+        if repair_only:
+            out["input_repairs"] = issues_to_jsonable(repair_only)
+        return out
     except ValueError as exc:
         err_str = str(exc)
         log.warning("request_id=%s normalize validation: %s", request_id, err_str)
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+
+            emit_policy_normalize_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=(doc or {}).get("company_id"),
+                document_id=doc_id,
+                error_code="normalize_validation_error",
+                detail=err_str[:400],
+                http_status=400,
+            )
+        except Exception:
+            pass
         raise HTTPException(status_code=400, detail=err_str)
     except Exception as exc:
         err_str = str(exc)
@@ -8351,10 +8933,35 @@ def normalize_policy_document(
             request_id, doc_id, doc.get("company_id") if doc else None, user.get("id") if user else None,
             type(exc).__name__, safe_msg, exc_info=True,
         )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+
+            emit_policy_normalize_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=(doc or {}).get("company_id"),
+                document_id=doc_id,
+                error_code="normalization_failed",
+                detail=safe_msg,
+                http_status=500,
+            )
+        except Exception:
+            pass
         if "DatatypeMismatch" in err_str or "auto_generated" in err_str or "boolean" in err_str:
-            msg = "Normalization failed because of an invalid policy_versions payload. " + (err_str[:250] or "")
+            msg = (
+                "The database rejected a policy row (often a boolean/column type mismatch). "
+                "Your policy document and clauses were not deleted—run Reprocess and try again, or apply pending migrations. "
+                f"Detail: {err_str[:220]}"
+            )
         elif "UndefinedColumn" in err_str or "does not exist" in err_str or "template_source" in err_str or "template_name" in err_str or "is_default_template" in err_str:
-            msg = "Normalization failed due to a database schema mismatch (missing optional columns). " + (err_str[:200] or "")
+            msg = "Normalization failed: database schema is missing columns the app expects. Apply migrations, then retry."
+        elif "violates check constraint" in err_str.lower() or "check constraint" in err_str.lower():
+            msg = (
+                "A value did not satisfy a database check (for example policy_versions.status or benefit calc_type). "
+                f"Detail: {err_str[:280]}"
+            )
+        elif "foreign key" in err_str.lower() or "violates foreign key" in err_str.lower():
+            msg = "Normalization failed: a referenced id is missing (policy, document, or clause). Reprocess or re-upload."
         else:
             msg = f"Normalization failed: {err_str[:500]}"
         return JSONResponse(
@@ -8365,6 +8972,10 @@ def normalize_policy_document(
                 "message": msg,
                 "request_id": request_id,
                 "detail": err_str[:500],
+                "hint": (
+                    "Extraction data is unchanged. Try Reprocess, then Normalize again. "
+                    "If this persists, capture request_id for support."
+                ),
             },
         )
 
@@ -8378,14 +8989,58 @@ def get_normalized_policy(
     policy_id: str,
     req: Request,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+    detail: str = Query(
+        "full",
+        description="Use detail=summary for pipeline/publish headers only (no benefit matrix rows).",
+    ),
+    include_readiness: bool = Query(
+        True,
+        description="With detail=summary, set false to skip published comparison readiness (faster polling).",
+    ),
 ):
     """Get normalized policy version with benefits, exclusions, evidence, conditions, source links."""
     request_id = getattr(req.state, "request_id", None)
     policy = db.get_company_policy(policy_id)
     _require_policy_access(user, policy)
+    mode = (detail or "full").strip().lower()
     version = db.get_latest_policy_version(policy_id)
+    published_version = db.get_published_policy_version(policy_id)
+    published_comparison_readiness = None
+    if published_version and published_version.get("id") and include_readiness:
+        from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
+
+        published_comparison_readiness = evaluate_version_comparison_readiness(db, str(published_version["id"]))
+
+    if mode == "summary":
+        return {
+            "policy": policy,
+            "version": version,
+            "benefit_rules": [],
+            "exclusions": [],
+            "evidence_requirements": [],
+            "conditions": [],
+            "assignment_applicability": [],
+            "family_applicability": [],
+            "source_links": [],
+            "published_version": published_version,
+            "published_comparison_readiness": published_comparison_readiness if include_readiness else None,
+            "detail": "summary",
+        }
+
     if not version:
-        return {"policy": policy, "version": None, "benefit_rules": [], "exclusions": [], "evidence_requirements": [], "conditions": [], "source_links": []}
+        return {
+            "policy": policy,
+            "version": None,
+            "benefit_rules": [],
+            "exclusions": [],
+            "evidence_requirements": [],
+            "conditions": [],
+            "assignment_applicability": [],
+            "family_applicability": [],
+            "source_links": [],
+            "published_version": published_version,
+            "published_comparison_readiness": published_comparison_readiness,
+        }
     vid = version["id"]
     benefit_rules = db.list_policy_benefit_rules(vid)
     exclusions = db.list_policy_exclusions(vid)
@@ -8404,6 +9059,8 @@ def get_normalized_policy(
         "assignment_applicability": assignment_applicability,
         "family_applicability": family_applicability,
         "source_links": source_links,
+        "published_version": published_version,
+        "published_comparison_readiness": published_comparison_readiness,
     }
 
 
@@ -8437,6 +9094,14 @@ def patch_benefit_rule(
         metadata_json=body.get("metadata_json"),
     )
     updated = db.get_policy_benefit_rule(benefit_rule_id)
+    try:
+        from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+
+        pv = updated.get("policy_version_id") if updated else None
+        if pv:
+            invalidate_comparison_readiness_cache(str(pv))
+    except Exception:
+        pass
     return {"benefit_rule": updated}
 
 
@@ -8459,6 +9124,10 @@ def patch_policy_version_status_latest(
     status = body.get("status")
     if status not in ("draft", "review_required", "reviewed", "published", "archived"):
         raise HTTPException(status_code=400, detail="Invalid status")
+    if status == "published":
+        from .services.policy_publish_gate import require_employee_publishable_policy_version
+
+        require_employee_publishable_policy_version(db, version_id)
     try:
         db.update_policy_version_status(version_id, status)
         updated = db.get_policy_version(version_id)
@@ -8515,6 +9184,10 @@ def patch_policy_version_status(
     status = body.get("status")
     if status not in ("draft", "review_required", "reviewed", "published", "archived"):
         raise HTTPException(status_code=400, detail="Invalid status")
+    if status == "published":
+        from .services.policy_publish_gate import require_employee_publishable_policy_version
+
+        require_employee_publishable_policy_version(db, version_id)
     try:
         db.update_policy_version_status(version_id, status)
         updated = db.get_policy_version(version_id)

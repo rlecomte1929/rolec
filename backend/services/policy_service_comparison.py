@@ -2,7 +2,12 @@
 Service-policy comparison: evaluates selected employee services and answers
 against the resolved assignment policy.
 
-Produces comparison results usable in both employee read-only and HR review views.
+**Layer 2 only:** Uses `resolved_assignment_policy_*` / benefits keyed by `benefit_key`.
+Never use `extracted_metadata` or document-level `mentioned_*` lists for comparison logic.
+
+Employee calls use `employee_gate=True` so comparisons run only when
+`policy_comparison_readiness.evaluate_version_comparison_readiness` is satisfied.
+HR calls omit the gate so HR can always inspect diagnostics.
 """
 from __future__ import annotations
 
@@ -187,6 +192,8 @@ def compute_policy_service_comparison(
     assignment_id: str,
     assignment: Optional[Dict[str, Any]] = None,
     include_diagnostics: bool = False,
+    *,
+    employee_gate: bool = False,
 ) -> Dict[str, Any]:
     """
     Compute comparison between selected services + answers and resolved policy.
@@ -195,7 +202,10 @@ def compute_policy_service_comparison(
     """
     assignment = assignment or db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
-        return {"comparisons": [], "message": "Assignment not found.", "resolved_policy": None}
+        out: Dict[str, Any] = {"comparisons": [], "message": "Assignment not found.", "resolved_policy": None}
+        if employee_gate:
+            out["comparison_available"] = False
+        return out
 
     case_id = assignment.get("case_id")
     canonical_case_id = assignment.get("canonical_case_id") or case_id
@@ -217,11 +227,39 @@ def compute_policy_service_comparison(
         resolved = resolve_policy_for_assignment(db, assignment_id, assignment, case, profile, employee_profile)
 
     if not resolved:
-        return {
+        out = {
             "comparisons": [],
             "message": "No published policy for this assignment. Cannot compare services.",
             "resolved_policy": None,
         }
+        if employee_gate:
+            out["comparison_available"] = False
+        return out
+
+    comparison_readiness = None
+    if employee_gate:
+        from .policy_comparison_readiness import evaluate_version_comparison_readiness
+
+        pvid = resolved.get("policy_version_id")
+        comparison_readiness = evaluate_version_comparison_readiness(db, str(pvid) if pvid else None)
+        if not comparison_readiness.get("comparison_ready"):
+            return {
+                "comparisons": [],
+                "comparison_available": False,
+                "comparison_readiness": comparison_readiness,
+                "message": (
+                    "Policy comparison is not available yet. You can still review service costs; "
+                    "company coverage and limits will appear here after your policy is published in a comparison-ready form."
+                ),
+                "resolved_policy": {
+                    "id": resolved.get("id"),
+                    "policy_version_id": resolved.get("policy_version_id"),
+                    "resolved_at": resolved.get("resolved_at"),
+                },
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "canonical_case_id": canonical_case_id,
+            }
 
     benefits = db.list_resolved_policy_benefits(resolved["id"])
     benefits_by_key: Dict[str, Dict] = {b.get("benefit_key"): b for b in benefits if b.get("benefit_key")}
@@ -305,6 +343,10 @@ def compute_policy_service_comparison(
         "case_id": case_id,
         "canonical_case_id": canonical_case_id,
     }
+    if employee_gate:
+        result["comparison_available"] = True
+        if comparison_readiness is not None:
+            result["comparison_readiness"] = comparison_readiness
     if include_diagnostics:
         result["diagnostics"] = {
             "benefits_count": len(benefits),

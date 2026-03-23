@@ -1490,10 +1490,50 @@ export const employeeAPI = {
     const response = await api.post(`/api/employee/assignments/${assignmentId}/services`, { services });
     return response.data;
   },
+  /**
+   * Services page: per-category policy view from resolved published policy (Layer 2) only.
+   */
+  getServicesPolicyContext: async (assignmentId: string): Promise<{
+    ok?: boolean;
+    has_policy?: boolean;
+    comparison_available?: boolean;
+    comparison_readiness?: {
+      comparison_ready: boolean;
+      comparison_blockers: string[];
+      partial_numeric_coverage?: boolean;
+    };
+    currency: string;
+    categories: Record<
+      string,
+      {
+        wizard_key: string;
+        benefit_key: string | null;
+        determination: string;
+        show_policy_comparison: boolean;
+        primary_label: string;
+        detail?: string | null;
+        approval_required?: boolean;
+        cap_summary?: string | null;
+      }
+    >;
+    source?: string;
+  }> => {
+    const response = await api.get(`/api/employee/assignments/${assignmentId}/services-policy-context`);
+    return response.data;
+  },
   getPolicyBudget: async (assignmentId: string): Promise<{
+    ok?: boolean;
+    has_policy?: boolean;
+    comparison_available?: boolean;
+    comparison_readiness?: {
+      comparison_ready: boolean;
+      comparison_blockers: string[];
+      partial_numeric_coverage?: boolean;
+    };
     currency: string;
     caps: Record<string, number>;
     total_cap?: number | null;
+    budget?: unknown;
   }> => {
     const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-budget`);
     return response.data;
@@ -1530,6 +1570,12 @@ export const employeeAPI = {
     message?: string;
     has_policy?: boolean;
     message_secondary?: string;
+    comparison_available?: boolean;
+    comparison_readiness?: {
+      comparison_ready: boolean;
+      comparison_blockers: string[];
+      partial_numeric_coverage?: boolean;
+    };
   }> => {
     const response = await api.get(`/api/employee/assignments/${assignmentId}/policy`);
     return response.data;
@@ -1551,6 +1597,12 @@ export const employeeAPI = {
     message?: string | null;
     message_secondary?: string | null;
     company_id_used?: string;
+    comparison_available?: boolean;
+    comparison_readiness?: {
+      comparison_ready: boolean;
+      comparison_blockers: string[];
+      partial_numeric_coverage?: boolean;
+    };
   }> => {
     const response = await api.get('/api/employee/me/assignment-package-policy');
     return response.data;
@@ -1875,7 +1927,10 @@ export const companyPolicyAPI = {
     const response = await api.put(`/api/company-policies/${policyId}/benefits`, { benefits });
     return response.data;
   },
-  getNormalized: async (policyId: string): Promise<{
+  getNormalized: async (
+    policyId: string,
+    opts?: { detail?: 'full' | 'summary'; includeReadiness?: boolean }
+  ): Promise<{
     policy: any;
     version: any;
     benefit_rules: any[];
@@ -1885,8 +1940,21 @@ export const companyPolicyAPI = {
     assignment_applicability: any[];
     family_applicability: any[];
     source_links: any[];
+    /** Present when a published version exists for this company policy. */
+    published_version?: any;
+    /** Result of evaluate_version_comparison_readiness on the published version. */
+    published_comparison_readiness?: {
+      comparison_ready?: boolean;
+      comparison_blockers?: string[];
+    };
+    detail?: string;
   }> => {
-    const response = await api.get(`/api/company-policies/${policyId}/normalized`);
+    const params: Record<string, string | boolean> = {};
+    if (opts?.detail === 'summary') params.detail = 'summary';
+    if (opts?.includeReadiness === false) params.include_readiness = 'false';
+    const response = await api.get(`/api/company-policies/${policyId}/normalized`, {
+      params: Object.keys(params).length ? params : undefined,
+    });
     return response.data;
   },
   patchBenefitRule: async (

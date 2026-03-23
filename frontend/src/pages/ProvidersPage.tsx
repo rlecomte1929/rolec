@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { EmployeeScopedAssignmentPicker } from '../components/employee/EmployeeScopedAssignmentPicker';
@@ -16,8 +16,35 @@ import { TrustBlock } from '../features/services/TrustBlock';
 import { ServiceGroupSection } from '../features/services/ServiceGroupSection';
 import { StickyContinueBar } from '../features/services/StickyContinueBar';
 import { ServicesNavRibbon } from '../features/services/ServicesNavRibbon';
-import { SERVICE_CONFIG, type ServiceKey } from '../features/services/serviceConfig';
+import { SERVICE_CONFIG, type ServiceItem, type ServiceKey } from '../features/services/serviceConfig';
 import { useServicesFlow } from '../features/services/ServicesFlowContext';
+import type { ServicePolicyHint } from '../features/services/ServiceCard';
+import {
+  EMPLOYEE_HR_POLICY_WAIT_PRIMARY,
+  EMPLOYEE_HR_POLICY_WAIT_SECONDARY,
+  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
+  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
+} from '../features/policy/employeePolicyMessages';
+
+type ServicesCategoryEntry = NonNullable<
+  Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>>['categories']
+>[string];
+
+function policyHintFromCategory(entry: ServicesCategoryEntry | undefined): ServicePolicyHint | undefined {
+  if (!entry) return undefined;
+  const { determination, show_policy_comparison, primary_label } = entry;
+  let variant: ServicePolicyHint['variant'] = 'muted';
+  if (show_policy_comparison) variant = 'compare';
+  else if (determination === 'excluded') variant = 'excluded';
+  else if (
+    determination === 'out_of_scope' ||
+    determination === 'no_published_policy' ||
+    determination === 'no_benefit_rule'
+  )
+    variant = 'muted';
+  else variant = 'partial';
+  return { variant, line: primary_label };
+}
 
 const ENABLED_SERVICES = SERVICE_CONFIG.filter((svc) => svc.enabled);
 const ALL_SERVICES = SERVICE_CONFIG;
@@ -72,7 +99,9 @@ export const ProvidersPage: React.FC = () => {
     setPreferredEmployeeAssignmentId(queryAssignmentId);
   }, [queryAssignmentId, needsPicker, assignmentId]);
   const [services, setServices] = useState<Record<string, ServiceState>>({});
-  const [policy, setPolicy] = useState<{ currency: string; caps: Record<string, number>; total_cap?: number | null } | null>(null);
+  const [svcPolicy, setSvcPolicy] = useState<Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>> | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -92,7 +121,11 @@ export const ProvidersPage: React.FC = () => {
       setLoadError('');
       setLoadErrorDetails('');
       try {
-        const serviceRes = await employeeAPI.getAssignmentServices(assignmentId);
+        const [serviceRes, ctxRes] = await Promise.all([
+          employeeAPI.getAssignmentServices(assignmentId),
+          employeeAPI.getServicesPolicyContext(assignmentId).catch(() => null),
+        ]);
+        setSvcPolicy(ctxRes);
         const baseState: Record<string, ServiceState> = {};
         ENABLED_SERVICES.forEach((svc) => {
           baseState[svc.key] = { selected: false, estimated_cost: '' };
@@ -112,13 +145,6 @@ export const ProvidersPage: React.FC = () => {
             .map((r) => r.service_key as ServiceKey)
         );
         setSelectedServices(selected);
-        try {
-          const policyRes = await employeeAPI.getPolicyBudget(assignmentId);
-          setPolicy(policyRes);
-        } catch {
-          // policy budget is optional; keep services usable
-          setPolicy(null);
-        }
       } catch (err: any) {
         if (err?.response?.status === 401) {
           navigate(buildRoute('landing'));
@@ -135,7 +161,7 @@ export const ProvidersPage: React.FC = () => {
         if (!API_BASE_URL && !import.meta.env.DEV) {
           setLoadErrorDetails('Missing VITE_API_URL in frontend build.');
         }
-        setPolicy(null);
+        setSvcPolicy(null);
       } finally {
         setIsLoading(false);
       }
@@ -146,6 +172,15 @@ export const ProvidersPage: React.FC = () => {
   const selectedKeys = useMemo(
     () => new Set(Object.entries(services).filter(([, v]) => v.selected).map(([k]) => k)),
     [services]
+  );
+
+  const policyHintForItem = useCallback(
+    (item: ServiceItem) => {
+      const bk = item.backendKey;
+      if (!bk || !svcPolicy?.categories) return undefined;
+      return policyHintFromCategory(svcPolicy.categories[bk]);
+    },
+    [svcPolicy]
   );
 
   const handleToggle = (key: string) => {
@@ -167,7 +202,7 @@ export const ProvidersPage: React.FC = () => {
           category: CATEGORY_MAP[svc.key] || 'other',
           selected: state.selected,
           estimated_cost: state.estimated_cost ? Number(state.estimated_cost) : null,
-          currency: policy?.currency || 'EUR',
+          currency: svcPolicy?.currency || 'EUR',
         };
       });
       await employeeAPI.saveAssignmentServices(assignmentId, payload);
@@ -206,7 +241,10 @@ export const ProvidersPage: React.FC = () => {
       <AppShell title="Services" subtitle="Select what you need for this move.">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0b2b43] mx-auto mb-4" />
-          <p className="text-[#6b7280]">Loading services...</p>
+          <p className="text-[#0b2b43] font-medium">Loading services and policy context…</p>
+          <p className="text-sm text-[#6b7280] mt-2">
+            We load your selections together with published policy hints when available. If policy data is missing, the page will still open with clear messaging.
+          </p>
         </div>
       </AppShell>
     );
@@ -271,12 +309,36 @@ export const ProvidersPage: React.FC = () => {
               <h1 className="text-2xl font-semibold text-[#0b2b43] mb-2">Your relocation plan</h1>
               <p className="text-[#6b7280]">Select what you need. We save it for the next steps.</p>
               <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
+              {svcPolicy?.comparison_available && (
+                <div className="mt-4 p-3 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4]">
+                  <p className="text-sm font-medium text-[#166534]">Company policy comparison is active</p>
+                  <p className="text-xs text-[#15803d] mt-1">
+                    Supported categories show limits from your published assignment policy (resolved benefits). Partial
+                    or out-of-scope categories are labeled on each card.
+                  </p>
+                </div>
+              )}
+              {svcPolicy && svcPolicy.has_policy === false && (
+                <div className="mt-4 p-3 bg-[#fafbfc] border border-[#e2e8f0] rounded-lg">
+                  <p className="text-sm text-[#4b5563] font-medium">{EMPLOYEE_HR_POLICY_WAIT_PRIMARY}</p>
+                  <p className="text-sm text-[#6b7280] mt-2">{EMPLOYEE_HR_POLICY_WAIT_SECONDARY}</p>
+                </div>
+              )}
+              {svcPolicy && svcPolicy.has_policy === true && svcPolicy.comparison_available === false && (
+                <div className="mt-4 p-3 bg-[#fafbfc] border border-[#e2e8f0] rounded-lg">
+                  <p className="text-sm text-[#4b5563] font-medium">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY}</p>
+                  <p className="text-sm text-[#6b7280] mt-2">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY}</p>
+                </div>
+              )}
               <div className="mt-4 p-3 bg-[#eef4f8] border border-[#0b2b43]/20 rounded-lg">
                 <p className="text-sm text-[#4b5563] mb-2">
-                  Policy details and benefit limits for your assignment are available on the HR Policy page. For questions, contact your company HR.
+                  Full policy wording and benefit details are on the HR Policy page. For questions, contact your company
+                  HR.
                 </p>
                 <Link to={buildRoute('hrPolicy')}>
-                  <Button variant="outline" className="mt-1">View HR Policy &amp; limits</Button>
+                  <Button variant="outline" className="mt-1">
+                    View HR Policy &amp; limits
+                  </Button>
                 </Link>
               </div>
             </div>
@@ -291,18 +353,21 @@ export const ProvidersPage: React.FC = () => {
               items={ALL_SERVICES.filter((s) => s.group === 'before')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
+              policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
             />
             <ServiceGroupSection
               group="arrival"
               items={ALL_SERVICES.filter((s) => s.group === 'arrival')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
+              policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
             />
             <ServiceGroupSection
               group="settle"
               items={ALL_SERVICES.filter((s) => s.group === 'settle')}
               selectedKeys={selectedKeys}
               onToggle={handleToggle}
+              policyHintForItem={svcPolicy?.categories ? policyHintForItem : undefined}
             />
             <StickyContinueBar
               selectedCount={selectedKeys.size}

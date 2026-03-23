@@ -1,5 +1,5 @@
 import React from 'react';
-import { ServiceCard } from './ServiceCard';
+import { ServiceCard, type ServicePolicyHint } from './ServiceCard';
 import type { ServiceItem, ServiceGroup } from './serviceConfig';
 import { GROUP_LABELS } from './serviceConfig';
 
@@ -8,6 +8,8 @@ interface ServiceGroupSectionProps {
   items: ServiceItem[];
   selectedKeys: Set<string>;
   onToggle: (key: string) => void;
+  /** Layer-2 policy line per service (backendKey → hint). */
+  policyHintForItem?: (item: ServiceItem) => ServicePolicyHint | null | undefined;
 }
 
 export const ServiceGroupSection: React.FC<ServiceGroupSectionProps> = ({
@@ -15,6 +17,7 @@ export const ServiceGroupSection: React.FC<ServiceGroupSectionProps> = ({
   items,
   selectedKeys,
   onToggle,
+  policyHintForItem,
 }) => {
   const { title, subtitle } = GROUP_LABELS[group];
 
@@ -29,6 +32,7 @@ export const ServiceGroupSection: React.FC<ServiceGroupSectionProps> = ({
             item={item}
             selected={selectedKeys.has(item.key) && item.enabled}
             onToggle={() => item.enabled && onToggle(item.key)}
+            policyHint={policyHintForItem ? policyHintForItem(item) : undefined}
           />
         ))}
       </div>

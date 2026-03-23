@@ -8,7 +8,17 @@ import {
   formatBenefitLabel,
   type DisplayCategory,
 } from './benefitCategories';
-import { EMPLOYEE_HR_POLICY_WAIT_PRIMARY, EMPLOYEE_HR_POLICY_WAIT_SECONDARY } from './employeePolicyMessages';
+import {
+  EMPLOYEE_HR_POLICY_WAIT_PRIMARY,
+  EMPLOYEE_HR_POLICY_WAIT_SECONDARY,
+  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
+  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
+  EMPLOYEE_POLICY_LOADING_ASSIGNMENT,
+  EMPLOYEE_POLICY_PARTIAL_INFO_LABEL,
+  EMPLOYEE_POLICY_PARTIAL_INFO_DETAIL,
+  EMPLOYEE_POLICY_COMPARISON_ACTIVE_TITLE,
+  EMPLOYEE_POLICY_COMPARISON_ACTIVE_BODY,
+} from './employeePolicyMessages';
 
 type CoverageStatus = 'covered' | 'partially_covered' | 'not_covered' | 'approval_required';
 
@@ -35,6 +45,7 @@ interface ResolvedExclusion {
 
 interface ResolvedPolicyResponse {
   has_policy?: boolean;
+  comparison_available?: boolean;
   policy: { id: string; title: string; version: number; effective_date: string; company_name?: string | null } | null;
   benefits: ResolvedBenefit[];
   exclusions: ResolvedExclusion[];
@@ -252,7 +263,16 @@ export const EmployeeResolvedPolicyView: React.FC<{
   }, [assignmentId, resolvedSnapshot]);
 
   if (loading) {
-    return <div className="text-sm text-[#6b7280] py-8">Loading your policy…</div>;
+    return (
+      <Card padding="lg" className="border-[#e2e8f0]">
+        <div role="status" aria-live="polite">
+          <p className="text-sm font-medium text-[#0b2b43]">{EMPLOYEE_POLICY_LOADING_ASSIGNMENT}</p>
+          <p className="text-xs text-[#6b7280] mt-2">
+            If this takes more than a few seconds, refresh the page or try again later.
+          </p>
+        </div>
+      </Card>
+    );
   }
 
   if (!assignmentId && !resolvedSnapshot) {
@@ -275,6 +295,28 @@ export const EmployeeResolvedPolicyView: React.FC<{
     return null;
   }
 
+  if (data.comparison_available === false) {
+    return (
+      <Card padding="lg" className="border-[#e2e8f0] bg-[#fafbfc]">
+        <p className="text-[#4b5563] font-medium">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY}</p>
+        <p className="text-sm text-[#6b7280] mt-2">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY}</p>
+        <div
+          className="mt-4 rounded-lg border border-amber-200/80 bg-amber-50/90 px-4 py-3"
+          role="region"
+          aria-label={EMPLOYEE_POLICY_PARTIAL_INFO_LABEL}
+        >
+          <p className="text-sm font-medium text-amber-950">{EMPLOYEE_POLICY_PARTIAL_INFO_LABEL}</p>
+          <p className="text-xs text-amber-900/90 mt-1.5 leading-relaxed">{EMPLOYEE_POLICY_PARTIAL_INFO_DETAIL}</p>
+        </div>
+        {data.policy?.title && (
+          <p className="text-sm text-[#6b7280] mt-4">
+            <span className="font-medium text-[#0b2b43]">Policy on file:</span> {data.policy.title}
+          </p>
+        )}
+      </Card>
+    );
+  }
+
   const policy = data.policy;
   if (!policy) {
     return (
@@ -295,6 +337,10 @@ export const EmployeeResolvedPolicyView: React.FC<{
 
   return (
     <div className="space-y-6">
+      <Card padding="md" className="border-[#bbf7d0] bg-[#f0fdf4]">
+        <div className="text-sm font-semibold text-[#166534]">{EMPLOYEE_POLICY_COMPARISON_ACTIVE_TITLE}</div>
+        <p className="text-xs text-[#15803d] mt-1">{EMPLOYEE_POLICY_COMPARISON_ACTIVE_BODY}</p>
+      </Card>
       {/* Summary banner: read-only; company name + contact HR */}
       <Card padding="lg" className="bg-[#eef4f8] border border-[#0b2b43]/20">
         <div className="text-sm font-semibold text-[#0b2b43] mb-2">{policy.title}</div>

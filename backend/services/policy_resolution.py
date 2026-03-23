@@ -1,6 +1,11 @@
 """
 Policy resolution: transforms published policy versions into concrete assignment packages.
 
+**Layer 2 only:** This module reads published `policy_versions` / related tables and writes
+`resolved_assignment_policies`. It does not use `policy_documents.extracted_metadata` or
+clause-level `normalized_hint_json`. Employee comparison must consume this path (or equivalent
+resolved snapshots), not Layer-1 document metadata — see docs/policy/metadata-vs-decision-layer.md.
+
 Resolves benefit rules, exclusions, and applicability conditions for a specific assignment
 using assignment context (type, family status, destination, duration, tier).
 """

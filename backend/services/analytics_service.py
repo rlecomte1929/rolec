@@ -23,6 +23,23 @@ EVENT_QUOTE_RECEIVED = "quote_received"
 EVENT_QUOTE_COMPARED = "quote_compared"
 EVENT_QUOTE_ACCEPTED = "quote_accepted"
 
+# HR policy document pipeline → employee resolution (observability / verification)
+EVENT_POLICY_UPLOAD_STARTED = "policy_upload_started"
+EVENT_POLICY_UPLOAD_COMPLETED = "policy_upload_completed"
+EVENT_POLICY_UPLOAD_FAILED = "policy_upload_failed"
+EVENT_POLICY_CLASSIFY_STARTED = "policy_classify_started"
+EVENT_POLICY_CLASSIFY_COMPLETED = "policy_classify_completed"
+EVENT_POLICY_CLASSIFY_FAILED = "policy_classify_failed"
+EVENT_POLICY_NORMALIZE_STARTED = "policy_normalize_started"
+EVENT_POLICY_NORMALIZE_COMPLETED = "policy_normalize_completed"
+EVENT_POLICY_NORMALIZE_FAILED = "policy_normalize_failed"
+EVENT_POLICY_PUBLISH_STARTED = "policy_publish_started"
+EVENT_POLICY_PUBLISH_COMPLETED = "policy_publish_completed"
+EVENT_POLICY_PUBLISH_FAILED = "policy_publish_failed"
+EVENT_POLICY_EMPLOYEE_RESOLUTION = "policy_employee_resolution"
+EVENT_EMPLOYEE_POLICY_FALLBACK = "employee_policy_fallback_triggered"
+EVENT_EMPLOYEE_POLICY_COMPARISON = "employee_policy_comparison_triggered"
+
 
 def emit_event(
     event_name: str,

@@ -9364,12 +9364,35 @@ class Database:
     def get_company_policy_with_published_version(
         self, company_id: str
     ) -> Optional[Tuple[Dict[str, Any], Dict[str, Any]]]:
-        """Return (policy, version) for the first company policy that has a published version."""
-        policies = self.list_company_policies(company_id)
-        for policy in policies:
-            version = self.get_published_policy_version(policy["id"])
-            if version:
-                return (policy, version)
+        """
+        Return (policy, version) for the best-matching published policy for this company.
+
+        Uses one indexed lookup for (policy_id, version_id) instead of N queries per policy row
+        (list_company_policies × get_published_policy_version).
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT cp.id AS policy_id, pv.id AS version_id
+                    FROM company_policies cp
+                    INNER JOIN policy_versions pv
+                        ON pv.policy_id = cp.id AND LOWER(TRIM(pv.status)) = 'published'
+                    WHERE cp.company_id = :cid
+                    ORDER BY cp.created_at DESC, pv.version_number DESC, pv.created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"cid": company_id},
+            ).fetchone()
+        if not row:
+            return None
+        m = row._mapping
+        pid, vid = str(m["policy_id"]), str(m["version_id"])
+        policy = self.get_company_policy(pid)
+        version = self.get_policy_version(vid)
+        if policy and version:
+            return (policy, version)
         return None
 
     def list_company_ids_with_published_policy(self) -> List[Dict[str, Any]]:
