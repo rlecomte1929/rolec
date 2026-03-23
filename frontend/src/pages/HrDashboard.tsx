@@ -44,9 +44,13 @@ export const HrDashboard: React.FC = () => {
   const navigate = useNavigate();
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const acRef = useRef<AbortController | null>(null);
+  const offsetRef = useRef(0);
+  useEffect(() => {
+    offsetRef.current = offset;
+  }, [offset]);
 
   const loadAssignments = useCallback(async (append = false, signal?: AbortSignal) => {
-    const nextOffset = append ? offset : 0;
+    const nextOffset = append ? offsetRef.current : 0;
     const nextLimit = PAGE_SIZE;
     const isAppend = append && nextOffset > 0;
     if (isAppend) setIsLoadingMore(true);
@@ -87,7 +91,7 @@ export const HrDashboard: React.FC = () => {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [offset, searchDebounced, appliedStatus, appliedDestination, navigate]);
+  }, [searchDebounced, appliedStatus, appliedDestination, navigate]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -129,6 +133,7 @@ export const HrDashboard: React.FC = () => {
     try {
       const response = await hrAPI.createCase();
       setCaseId(response.caseId);
+      await loadAssignments(false);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to create case.');
     }

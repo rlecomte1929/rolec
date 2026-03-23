@@ -4,7 +4,7 @@ import { AdminLayout } from './AdminLayout';
 import { adminAPI } from '../../api/client';
 import type { AdminAssignment, AdminAssignmentDetail, AdminCompany } from '../../types';
 import { buildRoute } from '../../navigation/routes';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { COUNTRY_OPTIONS } from '../../utils/countries';
 
 const STATUS_OPTIONS = [
@@ -53,6 +53,9 @@ const formatCreated = (a: AdminAssignment) => {
 };
 
 export const AdminAssignments: React.FC = () => {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const companyIdFromUrl = searchParams.get('company_id')?.trim() ?? '';
   const [assignments, setAssignments] = useState<AdminAssignment[]>([]);
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [filters, setFilters] = useState({
@@ -120,6 +123,12 @@ export const AdminAssignments: React.FC = () => {
   useEffect(() => {
     loadCompanies().catch(() => undefined);
   }, [loadCompanies]);
+
+  useEffect(() => {
+    if (!companyIdFromUrl) return;
+    setFilters((f) => ({ ...f, company_id: companyIdFromUrl }));
+    // location.key: honor ?company_id= on each navigation; avoid resetting user-cleared company on same visit.
+  }, [location.key, companyIdFromUrl]);
 
   useEffect(() => {
     if (filters.company_id) {

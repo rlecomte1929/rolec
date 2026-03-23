@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Alert, Badge } from '../components/antigravity';
 import { hrAPI } from '../api/client';
@@ -9,12 +9,13 @@ import { safeNavigate } from '../navigation/safeNavigate';
 
 export const HrEmployees: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [employees, setEmployees] = useState<HrCompanyEmployee[]>([]);
   const [hasCompany, setHasCompany] = useState<boolean | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const loadEmployees = async () => {
+  const loadEmployees = useCallback(async () => {
     setIsLoading(true);
     setError('');
     try {
@@ -30,11 +31,11 @@ export const HrEmployees: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
-    loadEmployees();
-  }, [navigate]);
+    void loadEmployees();
+  }, [location.key, loadEmployees]);
 
   return (
     <AppShell title="Employees" subtitle="People at your company on ReloPass">

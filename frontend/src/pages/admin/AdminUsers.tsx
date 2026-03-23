@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { Card, Button, Badge } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { adminAPI } from '../../api/client';
@@ -13,8 +13,10 @@ const ROLE_OPTIONS = [
 ];
 
 export const AdminUsers: React.FC = () => {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const urlSyncedRef = useRef(false);
+  const companyIdFromUrl = searchParams.get('company_id')?.trim() ?? '';
+  const roleFromUrl = (searchParams.get('role') || '').trim().toLowerCase();
   const [query, setQuery] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -48,15 +50,16 @@ export const AdminUsers: React.FC = () => {
   };
 
   useEffect(() => {
-    if (urlSyncedRef.current) return;
-    const cid = searchParams.get('company_id');
-    const ro = (searchParams.get('role') || '').trim().toLowerCase();
-    if (cid) setCompanyId(cid);
-    if (ro === 'employee' || ro === 'emp' || ro === 'employee_user') setRoleFilter('employee');
-    else if (ro === 'hr') setRoleFilter('hr');
-    else if (ro === 'admin') setRoleFilter('admin');
-    urlSyncedRef.current = true;
-  }, [searchParams]);
+    if (companyIdFromUrl) setCompanyId(companyIdFromUrl);
+    if (roleFromUrl === 'employee' || roleFromUrl === 'emp' || roleFromUrl === 'employee_user') {
+      setRoleFilter('employee');
+    } else if (roleFromUrl === 'hr') {
+      setRoleFilter('hr');
+    } else if (roleFromUrl === 'admin') {
+      setRoleFilter('admin');
+    }
+    // location.key: apply deep links on each navigation; do not overwrite after user clears filters on same visit.
+  }, [location.key, companyIdFromUrl, roleFromUrl]);
 
   useEffect(() => {
     loadCompanies().catch(() => undefined);

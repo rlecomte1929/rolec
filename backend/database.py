@@ -310,6 +310,39 @@ class Database:
         except Exception:
             log.exception("Failed to ensure postgres missing schemas")
 
+    def _maybe_ensure_postgres_case_assignments_employee_link_mode(self) -> None:
+        """
+        case_assignments.employee_link_mode is required for create_assignment INSERT and pending-claim flows.
+        Supabase migration: 20260413120000_case_assignments_employee_link_mode.sql
+
+        When DISABLE_RUNTIME_DDL skips full init_db DDL, this narrow idempotent patch still runs so
+        production does not 500 on HR assign (UndefinedColumn).
+        """
+        if _is_sqlite:
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS employee_link_mode TEXT"
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_case_assignments_employee_link_mode
+                        ON case_assignments (employee_link_mode)
+                        WHERE employee_user_id IS NULL AND employee_link_mode IS NOT NULL
+                        """
+                    )
+                )
+            log.info(
+                "Ensured case_assignments.employee_link_mode exists (idempotent). "
+                "Prefer applying supabase/migrations/20260413120000_case_assignments_employee_link_mode.sql in CI."
+            )
+        except Exception as ex:
+            log.warning("case_assignments.employee_link_mode ensure failed (run Supabase migration): %s", ex)
+
     def _ensure_postgres_canonical_identity_schema(self, conn) -> None:
         """Run inside a transaction; Postgres only. See _maybe_ensure_postgres_missing_schemas."""
         conn.execute(
@@ -565,6 +598,7 @@ class Database:
     def init_db(self) -> None:
         if not _is_sqlite:
             self._maybe_ensure_postgres_missing_schemas()
+            self._maybe_ensure_postgres_case_assignments_employee_link_mode()
 
         # In production (Render), avoid runtime DDL. Use Supabase migrations instead.
         if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):

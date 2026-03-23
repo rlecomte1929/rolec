@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { Card, Badge, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { adminAPI } from '../../api/client';
@@ -16,6 +16,7 @@ import type {
 
 export const AdminCompanyDetail: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
+  const location = useLocation();
   const [company, setCompany] = useState<AdminCompany | null>(null);
   const [hrUsers, setHrUsers] = useState<AdminHrUser[]>([]);
   const [employees, setEmployees] = useState<AdminEmployee[]>([]);
@@ -26,11 +27,11 @@ export const AdminCompanyDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!companyId) return;
+  const loadDetail = useCallback(() => {
+    if (!companyId) return Promise.resolve();
     setLoading(true);
     setError(null);
-    adminAPI
+    return adminAPI
       .getCompanyDetail(companyId)
       .then((res) => {
         setCompany(res.company);
@@ -52,6 +53,10 @@ export const AdminCompanyDetail: React.FC = () => {
       })
       .finally(() => setLoading(false));
   }, [companyId]);
+
+  useEffect(() => {
+    void loadDetail();
+  }, [loadDetail, location.key]);
 
   const hasOrphanIssues =
     orphanDiagnostics &&
@@ -125,9 +130,14 @@ export const AdminCompanyDetail: React.FC = () => {
               {company.address ?? '-'} · {company.phone ?? '-'}
             </div>
           </div>
-          <Link to={buildRoute('adminCompanies')} className="text-sm text-[#0b2b43] underline">
-            ← Companies
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void loadDetail()} disabled={loading}>
+              {loading ? 'Refreshing…' : 'Refresh'}
+            </Button>
+            <Link to={buildRoute('adminCompanies')} className="text-sm text-[#0b2b43] underline">
+              ← Companies
+            </Link>
+          </div>
         </div>
       </Card>
 
