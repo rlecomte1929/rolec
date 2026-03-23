@@ -130,20 +130,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             />
           </Link>
           <div className="flex items-center gap-2">
-            {role === 'ADMIN' && (
-              <Link
-                to={buildRoute('adminConsole')}
-                className={`flex items-center gap-2 shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  showAdminContextOnly
-                    ? 'text-[#0b2b43] bg-[#eef4f8] border border-[#0b2b43]'
-                    : 'text-[#0b2b43] bg-[#eef4f8] border border-[#cbd5e1] hover:bg-[#e2e8f0]'
-                }`}
-                title="Admin (all companies)"
-              >
-                <span className="text-[#64748b]" aria-hidden>◇</span>
-                <span>Admin</span>
-              </Link>
-            )}
             {(isHrRole || isEmployeeRole) && !showAdminContextOnly && role !== 'ADMIN' && <CompanyBrand />}
             <LogoutButton />
             <div className="text-right text-sm text-slate-600">

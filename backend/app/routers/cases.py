@@ -17,6 +17,17 @@ router = APIRouter(prefix="/api/cases", tags=["cases"])
 logger = logging.getLogger(__name__)
 
 
+def _deep_merge_case_drafts(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge PATCH payload into stored draft so partial saves never wipe other wizard sections."""
+    out = dict(base)
+    for key, val in update.items():
+        if key in out and isinstance(out[key], dict) and isinstance(val, dict):
+            out[key] = _deep_merge_case_drafts(out[key], val)
+        else:
+            out[key] = val
+    return out
+
+
 @router.get("/{case_id}", response_model=schemas.CaseDTO)
 def get_case(case_id: str):
     with SessionLocal() as db:
@@ -30,11 +41,19 @@ def get_case(case_id: str):
 @router.patch("/{case_id}", response_model=schemas.CaseDTO)
 def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
     with SessionLocal() as db:
+        incoming = patch.model_dump(mode="json")
         case = crud.get_case(db, case_id)
         if not case:
-            case = crud.create_case(db, case_id, patch.model_dump(mode="json"))
-
-        draft = patch.model_dump(mode="json")
+            case = crud.create_case(db, case_id, incoming)
+            draft = incoming
+        else:
+            try:
+                existing = json.loads(case.draft_json or "{}")
+            except (json.JSONDecodeError, TypeError, ValueError):
+                existing = {}
+            if not isinstance(existing, dict):
+                existing = {}
+            draft = _deep_merge_case_drafts(existing, incoming)
         basics = draft.get("relocationBasics", {})
         derived = {
             "origin_country": basics.get("originCountry"),

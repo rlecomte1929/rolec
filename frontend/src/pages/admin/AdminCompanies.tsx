@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { adminAPI } from '../../api/client';
@@ -11,6 +11,18 @@ const PLAN_OPTIONS: { value: CompanyPlanTier; label: string }[] = [
   { value: 'premium', label: 'Premium' },
 ];
 
+type SortKey =
+  | 'name'
+  | 'status'
+  | 'plan'
+  | 'country'
+  | 'size_band'
+  | 'hr_users_count'
+  | 'employee_count'
+  | 'assignments_count'
+  | 'contact'
+  | null;
+
 export const AdminCompanies: React.FC = () => {
   const [query, setQuery] = useState('');
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
@@ -19,6 +31,17 @@ export const AdminCompanies: React.FC = () => {
   const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Partial<AdminCompany>>({});
+  const [filterNameCol, setFilterNameCol] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterPlan, setFilterPlan] = useState<'' | CompanyPlanTier>('');
+  const [filterCountry, setFilterCountry] = useState('');
+  const [filterSizeBand, setFilterSizeBand] = useState('');
+  const [filterHrMin, setFilterHrMin] = useState('');
+  const [filterEmployeesMin, setFilterEmployeesMin] = useState('');
+  const [filterCasesMin, setFilterCasesMin] = useState('');
+  const [filterContact, setFilterContact] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const load = async () => {
     setLoading(true);
@@ -37,6 +60,139 @@ export const AdminCompanies: React.FC = () => {
   const canEdit = (c: AdminCompany) => !c.missing_from_companies_table;
   const planTier = (c: AdminCompany) => (c.plan_tier as CompanyPlanTier) || 'low';
   const statusLabel = (c: AdminCompany) => (c.status || 'active').toLowerCase();
+
+  const hasColumnFilters =
+    filterNameCol.trim() !== '' ||
+    filterStatus !== '' ||
+    filterPlan !== '' ||
+    filterCountry.trim() !== '' ||
+    filterSizeBand.trim() !== '' ||
+    filterHrMin.trim() !== '' ||
+    filterEmployeesMin.trim() !== '' ||
+    filterCasesMin.trim() !== '' ||
+    filterContact.trim() !== '';
+
+  const clearColumnFilters = () => {
+    setFilterNameCol('');
+    setFilterStatus('');
+    setFilterPlan('');
+    setFilterCountry('');
+    setFilterSizeBand('');
+    setFilterHrMin('');
+    setFilterEmployeesMin('');
+    setFilterCasesMin('');
+    setFilterContact('');
+    setSortKey(null);
+    setSortDir('asc');
+  };
+
+  const toggleSort = (key: NonNullable<SortKey>) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir('asc');
+    } else if (sortDir === 'asc') {
+      setSortDir('desc');
+    } else {
+      setSortKey(null);
+      setSortDir('asc');
+    }
+  };
+
+  const sortIndicator = (key: NonNullable<SortKey>) => {
+    if (sortKey !== key) return '';
+    return sortDir === 'asc' ? ' ↑' : ' ↓';
+  };
+
+  const filteredAndSorted = useMemo(() => {
+    const nameQ = filterNameCol.trim().toLowerCase();
+    const countryQ = filterCountry.trim().toLowerCase();
+    const sizeQ = filterSizeBand.trim().toLowerCase();
+    const contactQ = filterContact.trim().toLowerCase();
+    const hrMinN = filterHrMin.trim() === '' ? null : Number(filterHrMin);
+    const empMinN = filterEmployeesMin.trim() === '' ? null : Number(filterEmployeesMin);
+    const casesMinN = filterCasesMin.trim() === '' ? null : Number(filterCasesMin);
+
+    let list = companies.filter((c) => {
+      if (nameQ && !(c.name || '').toLowerCase().includes(nameQ)) return false;
+      if (filterStatus && statusLabel(c) !== filterStatus) return false;
+      if (filterPlan && planTier(c) !== filterPlan) return false;
+      if (countryQ && !(c.country || '').toLowerCase().includes(countryQ)) return false;
+      if (sizeQ && !(c.size_band || '').toLowerCase().includes(sizeQ)) return false;
+      if (contactQ && !(c.primary_contact_name || '').toLowerCase().includes(contactQ)) return false;
+      if (hrMinN !== null && Number.isFinite(hrMinN) && (c.hr_users_count ?? 0) < hrMinN) return false;
+      if (empMinN !== null && Number.isFinite(empMinN) && (c.employee_count ?? 0) < empMinN) return false;
+      if (casesMinN !== null && Number.isFinite(casesMinN) && (c.assignments_count ?? 0) < casesMinN) return false;
+      return true;
+    });
+
+    if (sortKey) {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      list = [...list].sort((a, b) => {
+        let va: string | number = '';
+        let vb: string | number = '';
+        switch (sortKey) {
+          case 'name':
+            va = (a.name || '').toLowerCase();
+            vb = (b.name || '').toLowerCase();
+            break;
+          case 'status':
+            va = statusLabel(a);
+            vb = statusLabel(b);
+            break;
+          case 'plan':
+            va = planTier(a);
+            vb = planTier(b);
+            break;
+          case 'country':
+            va = (a.country || '').toLowerCase();
+            vb = (b.country || '').toLowerCase();
+            break;
+          case 'size_band':
+            va = (a.size_band || '').toLowerCase();
+            vb = (b.size_band || '').toLowerCase();
+            break;
+          case 'hr_users_count':
+            va = a.hr_users_count ?? 0;
+            vb = b.hr_users_count ?? 0;
+            break;
+          case 'employee_count':
+            va = a.employee_count ?? 0;
+            vb = b.employee_count ?? 0;
+            break;
+          case 'assignments_count':
+            va = a.assignments_count ?? 0;
+            vb = b.assignments_count ?? 0;
+            break;
+          case 'contact':
+            va = (a.primary_contact_name || '').toLowerCase();
+            vb = (b.primary_contact_name || '').toLowerCase();
+            break;
+          default:
+            return 0;
+        }
+        if (typeof va === 'number' && typeof vb === 'number') {
+          return va === vb ? 0 : va < vb ? -dir : dir;
+        }
+        const sa = String(va);
+        const sb = String(vb);
+        return sa === sb ? 0 : sa < sb ? -dir : dir;
+      });
+    }
+    return list;
+  }, [
+    companies,
+    filterNameCol,
+    filterStatus,
+    filterPlan,
+    filterCountry,
+    filterSizeBand,
+    filterHrMin,
+    filterEmployeesMin,
+    filterCasesMin,
+    filterContact,
+    sortKey,
+    sortDir,
+  ]);
 
   const handleSave = async (companyId: string) => {
     const draft = editDraft;
@@ -97,10 +253,18 @@ export const AdminCompanies: React.FC = () => {
           <Button variant="primary" onClick={() => setAddOpen(true)}>
             Add company
           </Button>
+          {hasColumnFilters && (
+            <Button variant="outline" onClick={clearColumnFilters}>
+              Clear table filters
+            </Button>
+          )}
         </div>
       </Card>
       <Card padding="lg">
-        <div className="text-sm text-[#6b7280] mb-2">Companies ({companies.length})</div>
+        <div className="text-sm text-[#6b7280] mb-2">
+          Companies (
+          {hasColumnFilters ? `${filteredAndSorted.length} shown · ${companies.length} loaded` : companies.length})
+        </div>
         {loading && companies.length === 0 ? (
           <div className="py-8 text-center text-[#6b7280]">Loading...</div>
         ) : companies.length === 0 ? (
@@ -120,20 +284,206 @@ export const AdminCompanies: React.FC = () => {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280] font-medium">
-                  <th className="py-2 pr-4 cursor-pointer">Company name</th>
-                  <th className="py-2 pr-4 cursor-pointer">Status</th>
-                  <th className="py-2 pr-4 cursor-pointer">Plan</th>
-                  <th className="py-2 pr-4 cursor-pointer">Country</th>
-                  <th className="py-2 pr-4 cursor-pointer">Size band</th>
-                  <th className="py-2 pr-4 text-right cursor-pointer">HR users</th>
-                  <th className="py-2 pr-4 text-right cursor-pointer">Employees</th>
-                  <th className="py-2 pr-4 text-right cursor-pointer">Cases</th>
-                  <th className="py-2 pr-4 cursor-pointer">Contact person</th>
-                  <th className="py-2 pl-2">Actions</th>
+                  <th className="py-2 pr-4 align-bottom">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('name')}
+                      className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
+                    >
+                      Company name{sortIndicator('name')}
+                    </button>
+                  </th>
+                  <th className="py-2 pr-4 align-bottom">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('status')}
+                      className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
+                    >
+                      Status{sortIndicator('status')}
+                    </button>
+                  </th>
+                  <th className="py-2 pr-4 align-bottom">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('plan')}
+                      className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
+                    >
+                      Plan{sortIndicator('plan')}
+                    </button>
+                  </th>
+                  <th className="py-2 pr-4 align-bottom">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('country')}
+                      className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
+                    >
+                      Country{sortIndicator('country')}
+                    </button>
+                  </th>
+                  <th className="py-2 pr-4 align-bottom">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('size_band')}
+                      className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
+                    >
+                      Size band{sortIndicator('size_band')}
+                    </button>
+                  </th>
+                  <th className="py-2 pr-4 text-right align-bottom">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('hr_users_count')}
+                      className="w-full text-right font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
+                    >
+                      HR users{sortIndicator('hr_users_count')}
+                    </button>
+                  </th>
+                  <th className="py-2 pr-4 text-right align-bottom">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('employee_count')}
+                      className="w-full text-right font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
+                    >
+                      Employees{sortIndicator('employee_count')}
+                    </button>
+                  </th>
+                  <th className="py-2 pr-4 text-right align-bottom">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('assignments_count')}
+                      className="w-full text-right font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
+                    >
+                      Cases{sortIndicator('assignments_count')}
+                    </button>
+                  </th>
+                  <th className="py-2 pr-4 align-bottom">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('contact')}
+                      className="text-left font-medium text-[#6b7280] hover:text-[#0b2b43] cursor-pointer"
+                    >
+                      Contact person{sortIndicator('contact')}
+                    </button>
+                  </th>
+                  <th className="py-2 pl-2 align-bottom text-left font-medium text-[#6b7280]">Actions</th>
+                </tr>
+                <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-left">
+                  <th className="py-2 pr-4 font-normal align-top">
+                    <input
+                      value={filterNameCol}
+                      onChange={(e) => setFilterNameCol(e.target.value)}
+                      placeholder="Contains…"
+                      className="w-full min-w-[7rem] max-w-[11rem] rounded border border-[#d1d5db] px-2 py-1 text-xs text-[#374151]"
+                      aria-label="Filter by company name"
+                    />
+                  </th>
+                  <th className="py-2 pr-4 font-normal align-top">
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-full min-w-[5.5rem] max-w-[8rem] rounded border border-[#d1d5db] px-1 py-1 text-xs text-[#374151]"
+                      aria-label="Filter by status"
+                    >
+                      <option value="">All</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                  </th>
+                  <th className="py-2 pr-4 font-normal align-top">
+                    <select
+                      value={filterPlan}
+                      onChange={(e) => setFilterPlan((e.target.value || '') as '' | CompanyPlanTier)}
+                      className="w-full min-w-[5rem] max-w-[7rem] rounded border border-[#d1d5db] px-1 py-1 text-xs text-[#374151]"
+                      aria-label="Filter by plan"
+                    >
+                      <option value="">All</option>
+                      {PLAN_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </th>
+                  <th className="py-2 pr-4 font-normal align-top">
+                    <input
+                      value={filterCountry}
+                      onChange={(e) => setFilterCountry(e.target.value)}
+                      placeholder="Contains…"
+                      className="w-full min-w-[4rem] max-w-[6rem] rounded border border-[#d1d5db] px-2 py-1 text-xs text-[#374151]"
+                      aria-label="Filter by country"
+                    />
+                  </th>
+                  <th className="py-2 pr-4 font-normal align-top">
+                    <input
+                      value={filterSizeBand}
+                      onChange={(e) => setFilterSizeBand(e.target.value)}
+                      placeholder="Contains…"
+                      className="w-full min-w-[4rem] max-w-[6rem] rounded border border-[#d1d5db] px-2 py-1 text-xs text-[#374151]"
+                      aria-label="Filter by size band"
+                    />
+                  </th>
+                  <th className="py-2 pr-4 font-normal align-top">
+                    <input
+                      type="number"
+                      min={0}
+                      value={filterHrMin}
+                      onChange={(e) => setFilterHrMin(e.target.value)}
+                      placeholder="Min"
+                      className="w-full min-w-[3.25rem] max-w-[4.5rem] ml-auto block rounded border border-[#d1d5db] px-1 py-1 text-xs text-[#374151] text-right tabular-nums"
+                      aria-label="Minimum HR users"
+                    />
+                  </th>
+                  <th className="py-2 pr-4 font-normal align-top">
+                    <input
+                      type="number"
+                      min={0}
+                      value={filterEmployeesMin}
+                      onChange={(e) => setFilterEmployeesMin(e.target.value)}
+                      placeholder="Min"
+                      className="w-full min-w-[3.25rem] max-w-[4.5rem] ml-auto block rounded border border-[#d1d5db] px-1 py-1 text-xs text-[#374151] text-right tabular-nums"
+                      aria-label="Minimum employees"
+                    />
+                  </th>
+                  <th className="py-2 pr-4 font-normal align-top">
+                    <input
+                      type="number"
+                      min={0}
+                      value={filterCasesMin}
+                      onChange={(e) => setFilterCasesMin(e.target.value)}
+                      placeholder="Min"
+                      className="w-full min-w-[3.25rem] max-w-[4.5rem] ml-auto block rounded border border-[#d1d5db] px-1 py-1 text-xs text-[#374151] text-right tabular-nums"
+                      aria-label="Minimum cases"
+                    />
+                  </th>
+                  <th className="py-2 pr-4 font-normal align-top">
+                    <input
+                      value={filterContact}
+                      onChange={(e) => setFilterContact(e.target.value)}
+                      placeholder="Contains…"
+                      className="w-full min-w-[6rem] max-w-[9rem] rounded border border-[#d1d5db] px-2 py-1 text-xs text-[#374151]"
+                      aria-label="Filter by contact"
+                    />
+                  </th>
+                  <th className="py-2 pl-2 align-top" />
                 </tr>
               </thead>
               <tbody>
-                {companies.map((c) => (
+                {filteredAndSorted.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-8 text-center text-[#6b7280] text-sm">
+                      No companies match the table filters.{' '}
+                      <button
+                        type="button"
+                        onClick={clearColumnFilters}
+                        className="text-[#0b2b43] underline font-medium"
+                      >
+                        Clear filters
+                      </button>
+                    </td>
+                  </tr>
+                ) : null}
+                {filteredAndSorted.map((c) => (
                   <tr key={c.id} className="border-b border-[#e2e8f0]">
                     <td className="py-3 pr-4">
                       <div className="flex items-center gap-2 flex-wrap">

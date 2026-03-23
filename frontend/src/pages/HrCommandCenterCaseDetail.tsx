@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { getAuthItem } from '../utils/demo';
 import { Card, Button } from '../components/antigravity';
@@ -11,6 +11,7 @@ import { safeNavigate } from '../navigation/safeNavigate';
 export const HrCommandCenterCaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const role = getAuthItem('relopass_role');
   useEffect(() => {
     if (role && role !== 'HR' && role !== 'ADMIN') {
@@ -45,7 +46,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       })
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
-  }, [id, navigate]);
+  }, [id, navigate, location.key]);
 
   const budgetStatus = (): 'Within' | 'Approaching' | 'Exceeded' | null => {
     if (!detail?.budgetLimit || detail.budgetEstimated == null) return null;

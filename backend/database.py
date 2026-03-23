@@ -5677,11 +5677,56 @@ class Database:
     # ------------------------------------------------------------------
     # HR Command Center
     # ------------------------------------------------------------------
-    def _command_center_base_join(self) -> str:
-        """Join clause for case_assignments -> relocation_cases."""
+    def _command_center_join_relocation_cases(self) -> str:
+        """Join relocation_cases using legacy case_id and/or canonical_case_id (COALESCE alone can miss rows)."""
         if _is_sqlite:
-            return "rc.id = COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), ca.case_id)"
-        return "rc.id::text = COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), ca.case_id)"
+            return (
+                "("
+                "(NULLIF(TRIM(ca.case_id), '') IS NOT NULL AND rc.id = NULLIF(TRIM(ca.case_id), ''))"
+                " OR "
+                "(NULLIF(TRIM(ca.canonical_case_id), '') IS NOT NULL AND rc.id = NULLIF(TRIM(ca.canonical_case_id), ''))"
+                ")"
+            )
+        return (
+            "("
+            "(NULLIF(TRIM(ca.case_id::text), '') IS NOT NULL AND rc.id::text = NULLIF(TRIM(ca.case_id::text), ''))"
+            " OR "
+            "(NULLIF(TRIM(ca.canonical_case_id::text), '') IS NOT NULL AND rc.id::text = NULLIF(TRIM(ca.canonical_case_id::text), ''))"
+            ")"
+        )
+
+    def _command_center_join_wizard_cases(self) -> str:
+        """Join wizard_cases (intake source of truth) using the same id as relocation_cases / assignment pointers."""
+        if _is_sqlite:
+            return "wc.id = COALESCE(NULLIF(TRIM(ca.canonical_case_id), ''), NULLIF(TRIM(ca.case_id), ''))"
+        return "wc.id::text = COALESCE(NULLIF(TRIM(ca.canonical_case_id::text), ''), NULLIF(TRIM(ca.case_id::text), ''))"
+
+    def _command_center_dest_country_sql(self) -> str:
+        """Prefer denormalized relocation_cases; fall back to wizard_cases from PATCH /api/cases."""
+        return (
+            "COALESCE(NULLIF(TRIM(rc.host_country), ''), NULLIF(TRIM(wc.dest_country), ''))"
+        )
+
+    def _command_center_base_join(self) -> str:
+        """Join clause for case_assignments -> relocation_cases (alias rc)."""
+        return self._command_center_join_relocation_cases()
+
+    @staticmethod
+    def _command_center_display_status(
+        raw_status: Optional[str],
+        wizard_origin: Optional[str],
+        wizard_dest: Optional[str],
+    ) -> str:
+        """
+        If intake wizard has saved route basics but assignment row is still created/assigned,
+        show awaiting_intake so HR Command Center matches employee progress.
+        """
+        s = (raw_status or "").strip().lower()
+        if s not in ("assigned", "created"):
+            return (raw_status or "").strip() or ""
+        if (wizard_origin or "").strip() or (wizard_dest or "").strip():
+            return "awaiting_intake"
+        return (raw_status or "").strip() or ""
 
     def _command_center_company_where(self) -> str:
         """WHERE clause for company-scoped assignments (needs rc, hu joins)."""
@@ -5796,7 +5841,9 @@ class Database:
     ) -> List[Dict[str, Any]]:
         """Paginated cases with task %% and risk. Prefer company_id; fallback hr_user_id; None = admin."""
         try:
-            join_on = self._command_center_base_join()
+            rc_join = self._command_center_join_relocation_cases()
+            wc_join = self._command_center_join_wizard_cases()
+            dest_sql = self._command_center_dest_country_sql()
             with self.engine.connect() as conn:
                 params: Dict[str, Any] = {"limit": limit, "offset": (page - 1) * limit}
                 if company_id:
@@ -5806,9 +5853,13 @@ class Database:
                         SELECT ca.id, ca.employee_identifier, ca.status,
                                COALESCE(ca.risk_status, 'green') as risk_status,
                                ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
-                               rc.host_country as dest_country
+                               {dest_sql} as dest_country,
+                               wc.origin_country as wizard_origin_country,
+                               wc.dest_country as wizard_dest_country,
+                               wc.target_move_date as wizard_target_move_date
                         FROM case_assignments ca
-                        LEFT JOIN relocation_cases rc ON {join_on}
+                        LEFT JOIN relocation_cases rc ON {rc_join}
+                        LEFT JOIN wizard_cases wc ON {wc_join}
                         LEFT JOIN hr_users hu ON hu.profile_id = ca.hr_user_id
                         {where}
                     """
@@ -5819,9 +5870,13 @@ class Database:
                         SELECT ca.id, ca.employee_identifier, ca.status,
                                COALESCE(ca.risk_status, 'green') as risk_status,
                                ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
-                               rc.host_country as dest_country
+                               {dest_sql} as dest_country,
+                               wc.origin_country as wizard_origin_country,
+                               wc.dest_country as wizard_dest_country,
+                               wc.target_move_date as wizard_target_move_date
                         FROM case_assignments ca
-                        LEFT JOIN relocation_cases rc ON {join_on}
+                        LEFT JOIN relocation_cases rc ON {rc_join}
+                        LEFT JOIN wizard_cases wc ON {wc_join}
                         {where}
                     """
                 else:
@@ -5829,9 +5884,13 @@ class Database:
                         SELECT ca.id, ca.employee_identifier, ca.status,
                                COALESCE(ca.risk_status, 'green') as risk_status,
                                ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
-                               rc.host_country as dest_country
+                               {dest_sql} as dest_country,
+                               wc.origin_country as wizard_origin_country,
+                               wc.dest_country as wizard_dest_country,
+                               wc.target_move_date as wizard_target_move_date
                         FROM case_assignments ca
-                        LEFT JOIN relocation_cases rc ON {join_on}
+                        LEFT JOIN relocation_cases rc ON {rc_join}
+                        LEFT JOIN wizard_cases wc ON {wc_join}
                         WHERE 1=1
                     """
                 if risk_filter:
@@ -5873,16 +5932,27 @@ class Database:
                 a_id = m["id"]
                 stats = task_stats.get(a_id, {"total": 0, "done": 0, "next_overdue": None})
                 pct = round(100 * stats["done"] / stats["total"]) if stats["total"] else 0
+                wiz_o = m.get("wizard_origin_country")
+                wiz_d = m.get("wizard_dest_country")
+                display_status = self._command_center_display_status(m.get("status"), wiz_o, wiz_d)
+                next_d = stats["next_overdue"]
+                if not next_d and m.get("expected_start_date"):
+                    next_d = m.get("expected_start_date")
+                if not next_d and m.get("wizard_target_move_date"):
+                    next_d = m.get("wizard_target_move_date")
+                dest = m.get("dest_country")
+                if dest is not None and isinstance(dest, str) and not dest.strip():
+                    dest = None
                 result.append({
                     "id": a_id,
                     "employeeIdentifier": m.get("employee_identifier") or "",
-                    "destCountry": m.get("dest_country"),
-                    "status": m.get("status") or "",
+                    "destCountry": dest,
+                    "status": display_status,
                     "riskStatus": m.get("risk_status") or "green",
                     "tasksDonePercent": pct,
                     "budgetLimit": m.get("budget_limit"),
                     "budgetEstimated": m.get("budget_estimated"),
-                    "nextDeadline": str(stats["next_overdue"]) if stats["next_overdue"] else None,
+                    "nextDeadline": str(next_d) if next_d else None,
                 })
             return result
         except Exception as e:
@@ -5897,16 +5967,22 @@ class Database:
     ) -> Optional[Dict[str, Any]]:
         """Full case detail: tasks, budget, events."""
         try:
-            join_on = self._command_center_base_join()
+            rc_join = self._command_center_join_relocation_cases()
+            wc_join = self._command_center_join_wizard_cases()
+            dest_sql = self._command_center_dest_country_sql()
             with self.engine.connect() as conn:
                 params: Dict[str, Any] = {"aid": assignment_id}
                 if company_id:
                     where = "ca.id = :aid AND " + self._command_center_company_where()
                     params["cid"] = company_id
                     sql = f"""
-                        SELECT ca.*, rc.host_country as dest_country
+                        SELECT ca.*, {dest_sql} as intake_dest_country,
+                               wc.origin_country as wizard_origin_country,
+                               wc.dest_country as wizard_dest_country,
+                               wc.target_move_date as wizard_target_move_date
                         FROM case_assignments ca
-                        LEFT JOIN relocation_cases rc ON {join_on}
+                        LEFT JOIN relocation_cases rc ON {rc_join}
+                        LEFT JOIN wizard_cases wc ON {wc_join}
                         LEFT JOIN hr_users hu ON hu.profile_id = ca.hr_user_id
                         WHERE {where}
                     """
@@ -5914,16 +5990,24 @@ class Database:
                     where = "ca.id = :aid AND ca.hr_user_id = :hr"
                     params["hr"] = hr_user_id
                     sql = f"""
-                        SELECT ca.*, rc.host_country as dest_country
+                        SELECT ca.*, {dest_sql} as intake_dest_country,
+                               wc.origin_country as wizard_origin_country,
+                               wc.dest_country as wizard_dest_country,
+                               wc.target_move_date as wizard_target_move_date
                         FROM case_assignments ca
-                        LEFT JOIN relocation_cases rc ON {join_on}
+                        LEFT JOIN relocation_cases rc ON {rc_join}
+                        LEFT JOIN wizard_cases wc ON {wc_join}
                         WHERE {where}
                     """
                 else:
                     sql = f"""
-                        SELECT ca.*, rc.host_country as dest_country
+                        SELECT ca.*, {dest_sql} as intake_dest_country,
+                               wc.origin_country as wizard_origin_country,
+                               wc.dest_country as wizard_dest_country,
+                               wc.target_move_date as wizard_target_move_date
                         FROM case_assignments ca
-                        LEFT JOIN relocation_cases rc ON {join_on}
+                        LEFT JOIN relocation_cases rc ON {rc_join}
+                        LEFT JOIN wizard_cases wc ON {wc_join}
                         WHERE ca.id = :aid
                     """
                 row = conn.execute(text(sql), params).fetchone()
@@ -5954,15 +6038,24 @@ class Database:
                     if ph not in phases:
                         phases[ph] = []
                     phases[ph].append({"title": t.get("title"), "status": t.get("status"), "due_date": t.get("due_date")})
+                dest_val = m.get("intake_dest_country")
+                if dest_val is not None and isinstance(dest_val, str) and not dest_val.strip():
+                    dest_val = None
+                display_status = self._command_center_display_status(
+                    m.get("status"),
+                    m.get("wizard_origin_country"),
+                    m.get("wizard_dest_country"),
+                )
+                exp_start = m.get("expected_start_date") or m.get("wizard_target_move_date")
                 return {
                     "id": assignment_id,
                     "employeeIdentifier": m.get("employee_identifier") or "",
-                    "destCountry": m.get("dest_country"),
-                    "status": m.get("status") or "",
+                    "destCountry": dest_val,
+                    "status": display_status,
                     "riskStatus": m.get("risk_status") or "green",
                     "budgetLimit": m.get("budget_limit"),
                     "budgetEstimated": m.get("budget_estimated"),
-                    "expectedStartDate": str(m.get("expected_start_date")) if m.get("expected_start_date") else None,
+                    "expectedStartDate": str(exp_start) if exp_start else None,
                     "tasksTotal": len(tasks),
                     "tasksDone": tasks_done,
                     "tasksOverdue": tasks_overdue,

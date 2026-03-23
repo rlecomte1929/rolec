@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { getAuthItem } from '../utils/demo';
 import { Card } from '../components/antigravity';
@@ -22,6 +22,7 @@ type CaseRow = {
 
 export const HrCommandCenter: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const role = getAuthItem('relopass_role');
   useEffect(() => {
     if (role && role !== 'HR' && role !== 'ADMIN') {
@@ -61,7 +62,7 @@ export const HrCommandCenter: React.FC = () => {
     }
     loadKpis();
     return () => { cancelled = true; };
-  }, [navigate]);
+  }, [navigate, location.key]);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,7 +82,7 @@ export const HrCommandCenter: React.FC = () => {
     }
     loadCases();
     return () => { cancelled = true; };
-  }, [navigate, page, riskFilter]);
+  }, [navigate, location.key, page, riskFilter]);
 
   const handleRowClick = (id: string) => {
     navigate(`/hr/command-center/cases/${id}`);
