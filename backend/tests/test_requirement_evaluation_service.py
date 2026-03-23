@@ -38,6 +38,7 @@ CREATE TABLE case_people (
   id TEXT PRIMARY KEY,
   case_id TEXT NOT NULL REFERENCES mobility_cases(id) ON DELETE CASCADE,
   role TEXT NOT NULL,
+  metadata TEXT NOT NULL DEFAULT '{}',
   created_at TEXT,
   updated_at TEXT
 );
@@ -47,6 +48,7 @@ CREATE TABLE case_documents (
   person_id TEXT REFERENCES case_people(id) ON DELETE SET NULL,
   document_key TEXT,
   document_status TEXT NOT NULL DEFAULT 'missing',
+  metadata TEXT NOT NULL DEFAULT '{}',
   created_at TEXT,
   updated_at TEXT
 );

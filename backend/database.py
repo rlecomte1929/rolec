@@ -675,6 +675,73 @@ class Database:
             """))
 
             conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS mobility_cases (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    employee_user_id TEXT,
+                    origin_country TEXT,
+                    destination_country TEXT,
+                    case_type TEXT,
+                    metadata TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS assignment_mobility_links (
+                    id TEXT PRIMARY KEY,
+                    assignment_id TEXT NOT NULL UNIQUE,
+                    mobility_case_id TEXT NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (mobility_case_id) REFERENCES mobility_cases(id) ON DELETE RESTRICT
+                )
+            """))
+
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_assignment_mobility_links_assignment_id "
+                "ON assignment_mobility_links(assignment_id)"
+            ))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS case_people (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    metadata TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (case_id) REFERENCES mobility_cases(id) ON DELETE CASCADE
+                )
+            """))
+
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS case_people_one_employee_per_case "
+                "ON case_people(case_id) WHERE role = 'employee'"
+            ))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS case_documents (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    person_id TEXT,
+                    document_key TEXT,
+                    document_status TEXT NOT NULL DEFAULT 'missing',
+                    metadata TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (case_id) REFERENCES mobility_cases(id) ON DELETE CASCADE,
+                    FOREIGN KEY (person_id) REFERENCES case_people(id) ON DELETE SET NULL
+                )
+            """))
+
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS case_documents_one_passport_copy_per_case "
+                "ON case_documents(case_id) WHERE document_key = 'passport_copy'"
+            ))
+
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS assignment_invites (
                     id TEXT PRIMARY KEY,
                     case_id TEXT NOT NULL,
@@ -3469,6 +3536,49 @@ class Database:
                 request_id=request_id,
             ).fetchone()
         return self._row_to_dict(row)
+
+    def get_assignment_id_for_mobility_case(
+        self, mobility_case_id: str, request_id: Optional[str] = None
+    ) -> Optional[str]:
+        """Reverse lookup: mobility_cases.id -> case_assignments.id via assignment_mobility_links."""
+        mid = (mobility_case_id or "").strip()
+        if not mid:
+            return None
+        try:
+            with self.engine.connect() as conn:
+                row = self._exec(
+                    conn,
+                    "SELECT assignment_id FROM assignment_mobility_links WHERE mobility_case_id = :mid LIMIT 1",
+                    {"mid": mid},
+                    op_name="get_assignment_id_for_mobility_case",
+                    request_id=request_id,
+                ).mappings().first()
+            if not row:
+                return None
+            aid = row.get("assignment_id")
+            return str(aid).strip() if aid is not None else None
+        except Exception as e:
+            log.debug("get_assignment_id_for_mobility_case failed: %s", e)
+            return None
+
+    def mobility_case_row_exists(self, mobility_case_id: str, request_id: Optional[str] = None) -> bool:
+        """True if a mobility_cases row exists (used for admin read access without assignment bridge)."""
+        mid = (mobility_case_id or "").strip()
+        if not mid:
+            return False
+        try:
+            with self.engine.connect() as conn:
+                row = self._exec(
+                    conn,
+                    "SELECT 1 FROM mobility_cases WHERE id = :id LIMIT 1",
+                    {"id": mid},
+                    op_name="mobility_case_row_exists",
+                    request_id=request_id,
+                ).fetchone()
+            return row is not None
+        except Exception as e:
+            log.debug("mobility_case_row_exists failed: %s", e)
+            return False
 
     def list_case_services(self, assignment_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:

@@ -1,6 +1,7 @@
 /**
  * Mobility graph API (FastAPI): case context + next actions.
- * Requires a mobility_cases.id UUID (see flags.mobility_case_id or ?mcid=).
+ * Requires auth (same Bearer as rest of app). Access is assignment-gated via assignment_mobility_links.
+ * mobility_cases.id: prefer assignment.mobility_case_id from case-details; ?mcid= is debug-only.
  */
 
 import api from './client';

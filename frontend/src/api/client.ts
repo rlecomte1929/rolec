@@ -609,6 +609,49 @@ export const companyAPI = {
   },
 };
 
+/** Compact readiness + evaluation snapshot from GET .../mobility/cases/{id}/inspect */
+export type AdminMobilityOperationalInspect = {
+  assignment_id: string | null;
+  mobility_case_id: string;
+  bridge_status: 'linked' | 'missing';
+  readiness_flags: {
+    has_mobility_link: boolean;
+    has_employee_person: boolean;
+    has_passport_document: boolean;
+    has_evaluations: boolean;
+  };
+  employee_snapshot: {
+    full_name: string | null;
+    email: string | null;
+    nationality: string | null;
+    residence_country: string | null;
+    passport_country: string | null;
+  };
+  passport_document_snapshot: {
+    document_key: string | null;
+    document_status: string | null;
+    source_evidence_id: string | null;
+    submitted_at: string | null;
+  };
+  latest_evaluation_summary: {
+    evaluated_at: string | null;
+    counts_by_status: Record<string, number>;
+  };
+  latest_results: Array<{
+    requirement_code?: string | null;
+    evaluation_status?: string | null;
+    source_rule_code?: string | null;
+    evaluated_at?: string | null;
+  }>;
+  next_actions_preview: {
+    actions: Array<{
+      action_title?: string | null;
+      priority?: number | null;
+      related_requirement_code?: string | null;
+    }>;
+  };
+};
+
 // Admin API
 export const adminAPI = {
   getContext: async (): Promise<AdminContextResponse> => {
@@ -949,8 +992,16 @@ export const adminAPI = {
   ): Promise<{
     context: Record<string, unknown>;
     audit_logs: Array<Record<string, unknown>>;
+    operational?: AdminMobilityOperationalInspect;
   }> => {
     const response = await api.get(`/api/admin/mobility/cases/${encodeURIComponent(caseId)}/inspect`);
+    return response.data;
+  },
+  /** Run requirement evaluation for the assignment linked to a mobility case (admin JWT). */
+  evaluateMobilityAssignmentRequirements: async (assignmentId: string) => {
+    const response = await api.post(
+      `/api/admin/mobility/assignments/${encodeURIComponent(assignmentId)}/evaluate-requirements`
+    );
     return response.data;
   },
 };

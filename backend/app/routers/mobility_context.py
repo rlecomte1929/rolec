@@ -1,24 +1,41 @@
 """Mobility graph case context API."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from ...database import db
 from ...services.case_context_service import CaseContextService, CaseContextError
-from ...services.requirement_evaluation_service import RequirementEvaluationService
+from ...services.mobility_route_access import enforce_mobility_graph_read_access
 from ...services.next_action_service import NextActionService
+from ...services.requirement_evaluation_service import RequirementEvaluationService
 
 router = APIRouter(prefix="/api/mobility", tags=["mobility"])
 
 
+async def mobility_authenticated_user(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+) -> Dict[str, Any]:
+    """Same as main.get_current_user; imported lazily to avoid circular imports at startup."""
+    from backend.main import get_current_user as main_get_current_user  # noqa: WPS433
+
+    return await main_get_current_user(request, authorization)
+
+
 @router.get("/cases/{case_id}/context")
-def get_mobility_case_context(case_id: str) -> dict:
+async def get_mobility_case_context(
+    case_id: str,
+    user: Dict[str, Any] = Depends(mobility_authenticated_user),
+) -> dict:
     """
     Return normalized mobility graph context for ``case_id`` (UUID).
 
     Response keys: ``meta``, ``case``, ``people``, ``documents``,
     ``applicable_rules``, ``requirements``, ``evaluations``.
     """
+    enforce_mobility_graph_read_access(db, case_id, user)
     try:
         with db.engine.connect() as conn:
             ctx = CaseContextService().fetch(conn, case_id)
@@ -36,12 +53,31 @@ def get_mobility_case_context(case_id: str) -> dict:
     return ctx
 
 
-@router.post("/cases/{case_id}/evaluate-requirements")
-def evaluate_mobility_case_requirements(case_id: str) -> dict:
+@router.post(
+    "/cases/{case_id}/evaluate-requirements",
+    deprecated=True,
+    summary="Deprecated: use admin assignment-scoped evaluation",
+)
+async def evaluate_mobility_case_requirements(
+    case_id: str,
+    user: Dict[str, Any] = Depends(mobility_authenticated_user),
+) -> dict:
     """
+    **Deprecated.** Admin-only. Prefer
+    ``POST /api/admin/mobility/assignments/{assignment_id}/evaluate-requirements``.
+
     Run deterministic system evaluation for applicable policy rules, upsert
     ``case_requirement_evaluations`` (evaluated_by=system), return results + fresh context.
     """
+    if not user.get("is_admin"):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Admin only. Use POST /api/admin/mobility/assignments/{assignment_id}/evaluate-requirements "
+                "with a linked assignment."
+            ),
+        )
+    enforce_mobility_graph_read_access(db, case_id, user)
     try:
         with db.engine.begin() as conn:
             ev = RequirementEvaluationService().evaluate_case(conn, case_id)
@@ -72,11 +108,15 @@ def evaluate_mobility_case_requirements(case_id: str) -> dict:
 
 
 @router.get("/cases/{case_id}/next-actions")
-def get_mobility_case_next_actions(case_id: str) -> dict:
+async def get_mobility_case_next_actions(
+    case_id: str,
+    user: Dict[str, Any] = Depends(mobility_authenticated_user),
+) -> dict:
     """
     User-facing next steps derived from open evaluations (missing / needs_review)
     plus optional household spouse reminder from case metadata.
     """
+    enforce_mobility_graph_read_access(db, case_id, user)
     with db.engine.connect() as conn:
         payload = NextActionService().list_actions(conn, case_id)
 

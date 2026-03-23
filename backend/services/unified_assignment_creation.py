@@ -14,6 +14,10 @@ log = logging.getLogger(__name__)
 from ..identity_normalize import email_normalized_from_identifier, normalize_invite_key
 from ..identity_observability import identity_event
 
+from .assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
+from .employee_case_person_service import ensure_employee_case_person_for_assignment
+from .passport_case_document_sync_service import ensure_passport_case_document_for_assignment
+
 if TYPE_CHECKING:
     from ..database import Database
 
@@ -83,6 +87,18 @@ def create_assignment_with_contact_and_invites(
             assignment_id=aid,
             pre_linked_auth_user=bool(employee_user_id),
         )
+        try:
+            ensure_mobility_case_link_for_assignment(db, aid, request_id=request_id)
+        except Exception as exc:
+            log.warning("ensure_mobility_case_link_for_assignment failed assignment_id=%s: %s", aid, exc)
+        try:
+            ensure_employee_case_person_for_assignment(db, aid, request_id=request_id)
+        except Exception as exc:
+            log.warning("ensure_employee_case_person_for_assignment failed assignment_id=%s: %s", aid, exc)
+        try:
+            ensure_passport_case_document_for_assignment(db, aid, request_id=request_id)
+        except Exception as exc:
+            log.warning("ensure_passport_case_document_for_assignment failed assignment_id=%s: %s", aid, exc)
         return UnifiedAssignmentCreationResult(
             assignment_id=aid,
             case_id=case_id,
@@ -154,6 +170,19 @@ def create_assignment_with_contact_and_invites(
         has_pending_invite=bool(invite_token),
         pre_linked_auth_user=bool(employee_user_id),
     )
+
+    try:
+        ensure_mobility_case_link_for_assignment(db, aid, request_id=request_id)
+    except Exception as exc:
+        log.warning("ensure_mobility_case_link_for_assignment failed assignment_id=%s: %s", aid, exc)
+    try:
+        ensure_employee_case_person_for_assignment(db, aid, request_id=request_id)
+    except Exception as exc:
+        log.warning("ensure_employee_case_person_for_assignment failed assignment_id=%s: %s", aid, exc)
+    try:
+        ensure_passport_case_document_for_assignment(db, aid, request_id=request_id)
+    except Exception as exc:
+        log.warning("ensure_passport_case_document_for_assignment failed assignment_id=%s: %s", aid, exc)
 
     return UnifiedAssignmentCreationResult(
         assignment_id=aid,

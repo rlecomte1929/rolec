@@ -267,7 +267,7 @@ class CaseContextService:
         rows = conn.execute(
             text(
                 """
-                SELECT id, case_id, role, created_at, updated_at
+                SELECT id, case_id, role, metadata, created_at, updated_at
                 FROM case_people
                 WHERE case_id = :case_id
                 ORDER BY created_at ASC, id ASC
@@ -286,7 +286,7 @@ class CaseContextService:
         rows = conn.execute(
             text(
                 """
-                SELECT id, case_id, person_id, document_key, document_status, created_at, updated_at
+                SELECT id, case_id, person_id, document_key, document_status, metadata, created_at, updated_at
                 FROM case_documents
                 WHERE case_id = :case_id
                 ORDER BY created_at ASC, id ASC

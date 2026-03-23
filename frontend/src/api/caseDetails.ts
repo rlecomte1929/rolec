@@ -15,6 +15,8 @@ export interface CaseAssignment {
   employee_identifier?: string;
   /** Set by HR/Admin; used to pre-fill employee name in wizard */
   employee_full_name?: string | null;
+  /** Durable graph lane id from assignment_mobility_links (not wizard flags). */
+  mobility_case_id?: string | null;
 }
 
 export interface CaseDetailsResult {

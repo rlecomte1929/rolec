@@ -64,6 +64,9 @@ from .db_config import DATABASE_URL as _db_url, get_masked_db_log_line
 log.info("Startup DB config (user/host only, no password): %s", get_masked_db_log_line())
 from .database import db, Database
 from .services.unified_assignment_creation import create_assignment_with_contact_and_invites
+from .services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
+from .services.employee_case_person_service import ensure_employee_case_person_for_assignment
+from .services.passport_case_document_sync_service import ensure_passport_case_document_for_assignment
 from .identity_errors import IdentityErrorCode, err_detail
 from .identity_observability import (
     identity_event,
@@ -630,7 +633,19 @@ def _seed_demo_cases() -> None:
                 employee_identifier=scenario["employee_identifier"],
                 status=scenario["status"],
             )
+            try:
+                ensure_mobility_case_link_for_assignment(db, scenario["assignment_id"])
+            except Exception:
+                pass
             db.save_employee_profile(scenario["assignment_id"], scenario["profile"])
+            try:
+                ensure_employee_case_person_for_assignment(db, scenario["assignment_id"])
+            except Exception:
+                pass
+            try:
+                ensure_passport_case_document_for_assignment(db, scenario["assignment_id"])
+            except Exception:
+                pass
 
     # Seed default published HR policy for wizard auto-fill
     _seed_default_hr_policy()
@@ -5180,6 +5195,22 @@ def get_case_details_by_assignment(
     if not case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case_id")
 
+    mobility_case_id: Optional[str] = None
+    try:
+        mobility_case_id = ensure_mobility_case_link_for_assignment(
+            db, str(assignment["id"]), request_id=None
+        )
+    except Exception as exc:
+        log.warning("ensure_mobility_case_link_for_assignment in case-details: %s", exc)
+    try:
+        ensure_employee_case_person_for_assignment(db, str(assignment["id"]), request_id=None)
+    except Exception as exc:
+        log.warning("ensure_employee_case_person_for_assignment in case-details: %s", exc)
+    try:
+        ensure_passport_case_document_for_assignment(db, str(assignment["id"]), request_id=None)
+    except Exception as exc:
+        log.warning("ensure_passport_case_document_for_assignment in case-details: %s", exc)
+
     # Prefill employer name/country from company profile (source of truth for HR)
     company = None
     employer_name = None
@@ -5239,6 +5270,7 @@ def get_case_details_by_assignment(
             "status": assignment.get("status", ""),
             "employee_identifier": assignment.get("employee_identifier"),
             "employee_full_name": employee_full_name,
+            "mobility_case_id": mobility_case_id,
         },
         "case": case_dump,
     }
@@ -7072,6 +7104,12 @@ def add_assignment_evidence(
             status="submitted",
             request_id=request_id,
         )
+        try:
+            ensure_mobility_case_link_for_assignment(db, assignment_id, request_id=request_id)
+            ensure_employee_case_person_for_assignment(db, assignment_id, request_id=request_id)
+            ensure_passport_case_document_for_assignment(db, assignment_id, request_id=request_id)
+        except Exception as exc:
+            log.warning("mobility graph sync after evidence upload: %s", exc)
         return AddEvidenceResponse(evidenceId=evidence_id)
     except IntegrityError:
         raise HTTPException(

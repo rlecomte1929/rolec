@@ -14,6 +14,7 @@ import { AssignmentDebugPanel } from '../AssignmentDebugPanel';
 import { RelocationTaskTracker } from '../../features/timeline/RelocationTaskTracker';
 import { MobilityCasePanels } from '../../components/employee/MobilityCasePanels';
 import type { CaseDTO, CaseDraftDTO } from '../../types';
+import { resolveMobilityCaseIdForSummary } from './mobilityCaseIdResolution';
 
 function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -80,7 +81,7 @@ export const EmployeeCaseSummary: React.FC = () => {
   const [searchParams] = useSearchParams();
   const assignmentId = caseId;
   const [draft, setDraft] = useState<CaseDraftDTO | null>(null);
-  const [caseFlags, setCaseFlags] = useState<Record<string, unknown>>({});
+  const [assignmentMobilityCaseId, setAssignmentMobilityCaseId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [wizardNavLoading, setWizardNavLoading] = useState(false);
@@ -94,7 +95,7 @@ export const EmployeeCaseSummary: React.FC = () => {
       const { data, error: loadError } = await getCaseDetailsByAssignmentId(assignmentId);
       if (loadError) {
         setDraft(buildDefaultDraft());
-        setCaseFlags({});
+        setAssignmentMobilityCaseId(null);
         setError(
           loadError.includes('Case row missing')
             ? loadError
@@ -102,15 +103,15 @@ export const EmployeeCaseSummary: React.FC = () => {
         );
       } else if (data?.case) {
         setDraft(caseToWizardDraft(data.case));
-        setCaseFlags(data.case.flags || {});
+        setAssignmentMobilityCaseId(data.assignment?.mobility_case_id?.trim() || null);
       } else {
         setDraft(buildDefaultDraft());
-        setCaseFlags({});
+        setAssignmentMobilityCaseId(null);
         setError('Assignment not found or not visible under RLS.');
       }
     } catch {
       setDraft(buildDefaultDraft());
-      setCaseFlags({});
+      setAssignmentMobilityCaseId(null);
       setError('Assignment not found or not visible under RLS.');
     }
 
@@ -132,14 +133,16 @@ export const EmployeeCaseSummary: React.FC = () => {
   const fm = draft?.familyMembers || {};
   const ac = draft?.assignmentContext || {};
 
-  const mobilityCaseId = useMemo(() => {
-    const q = searchParams.get('mcid')?.trim();
-    if (q) return q;
-    const fid = caseFlags.mobility_case_id;
-    if (typeof fid === 'string' && fid.trim()) return fid.trim();
-    const env = import.meta.env.VITE_DEMO_MOBILITY_CASE_ID as string | undefined;
-    return env?.trim() || null;
-  }, [searchParams, caseFlags]);
+  const mobilityCaseId = useMemo(
+    () =>
+      resolveMobilityCaseIdForSummary({
+        backendMobilityCaseId: assignmentMobilityCaseId,
+        debugQueryMcid: searchParams.get('mcid'),
+        devDemoEnvMobilityCaseId: import.meta.env.VITE_DEMO_MOBILITY_CASE_ID as string | undefined,
+        isDev: import.meta.env.DEV,
+      }),
+    [assignmentMobilityCaseId, searchParams],
+  );
 
   const hasAnyData =
     (b.originCountry || b.originCity || b.destCountry || b.destCity || b.purpose || b.targetMoveDate != null) ||
