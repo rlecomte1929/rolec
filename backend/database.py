@@ -29,39 +29,6 @@ from .readiness_service import (
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Debug-mode instrumentation for admin company/people/assignment flows
-# ---------------------------------------------------------------------------
-#region agent log
-def _agent_debug_log(
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: Dict[str, Any],
-    run_id: str = "pre-fix",
-) -> None:
-    """
-    Lightweight NDJSON logger for this debug session.
-    Writes to .cursor/debug-2d9978.log; failures are swallowed.
-    """
-    try:
-        payload = {
-            "sessionId": "2d9978",
-            "runId": run_id,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(datetime.utcnow().timestamp() * 1000),
-        }
-        log_path = "/Users/Rom/Documents/GitHub/rolec/.cursor/debug-2d9978.log"
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload) + "\n")
-    except Exception:
-        # Never let debug logging break the app.
-        return
-#endregion
-
-# ---------------------------------------------------------------------------
 # Engine setup (shared logic with backend/app/db.py)
 # ---------------------------------------------------------------------------
 _engine = create_engine(_raw_url, **sqlalchemy_engine_kwargs(_raw_url))
@@ -4828,22 +4795,6 @@ class Database:
             # Cast uuid to text for a safe, index-friendly join.
             join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
 
-        _agent_debug_log(
-            hypothesis_id="H1",
-            location="database.list_admin_assignments",
-            message="list_admin_assignments SQL prepared",
-            data={
-                "is_sqlite": _is_sqlite,
-                "company_id": company_id,
-                "employee_user_id": employee_user_id,
-                "status": status,
-                "destination_country": destination_country,
-                "employee_search_present": bool(employee_search),
-                "join_on_cases": join_on_cases,
-                "where_sql": where_sql,
-            },
-        )
-
         sql = f"""
             SELECT
                 a.id, a.case_id, a.canonical_case_id, a.hr_user_id, a.employee_user_id, a.employee_identifier,
@@ -6778,11 +6729,10 @@ class Database:
             if updated:
                 return True
         except Exception as e:
-            _agent_debug_log(
-                hypothesis_id="H4",
-                location="database.deactivate_profile",
-                message="deactivate_profile fallback delete",
-                data={"person_id": person_id, "error": str(e)},
+            log.warning(
+                "deactivate_profile: status=inactive update failed, falling back to delete person_id=%s err=%s",
+                person_id,
+                e,
             )
         with self.engine.begin() as conn:
             conn.execute(text("DELETE FROM profiles WHERE id = :id"), {"id": person_id})
@@ -8451,58 +8401,15 @@ class Database:
         try:
             with self.engine.connect() as conn:
                 rows = list(conn.execute(text(sql_full), params).fetchall())
-            # #region agent log
-            _agent_debug_log(
-                hypothesis_id="H-conv",
-                location="database.list_hr_conversation_summaries",
-                message="full query ok",
-                data={
-                    "row_count": len(rows),
-                    "archive_filter": archive_filter,
-                    "unread_only": unread_only,
-                    "is_admin": is_admin,
-                },
-            )
-            # #endregion
         except (ProgrammingError, OperationalError) as e:
             log.warning(
                 "list_hr_conversation_summaries: full query failed (%s), using compat query",
                 e,
             )
-            # #region agent log
-            _agent_debug_log(
-                hypothesis_id="H-conv-fallback",
-                location="database.list_hr_conversation_summaries",
-                message="full query failed; trying compat",
-                data={
-                    "error_type": type(e).__name__,
-                    "error": str(e)[:400],
-                },
-            )
-            # #endregion
             try:
                 with self.engine.connect() as conn:
                     rows = list(conn.execute(text(sql_compat), compat_params).fetchall())
-                # #region agent log
-                _agent_debug_log(
-                    hypothesis_id="H-conv-compat",
-                    location="database.list_hr_conversation_summaries",
-                    message="compat query ok",
-                    data={"row_count": len(rows)},
-                )
-                # #endregion
-            except (ProgrammingError, OperationalError) as e2:
-                # #region agent log
-                _agent_debug_log(
-                    hypothesis_id="H-conv-fail",
-                    location="database.list_hr_conversation_summaries",
-                    message="compat query failed",
-                    data={
-                        "error_type": type(e2).__name__,
-                        "error": str(e2)[:400],
-                    },
-                )
-                # #endregion
+            except (ProgrammingError, OperationalError):
                 raise
 
         out: List[Dict[str, Any]] = []
@@ -9126,12 +9033,14 @@ class Database:
             "ca": now,
             "tsrc": template_source,
             "tname": template_name,
-            "isdef": 1 if is_default_template else 0,
+            # Postgres: company_policies.is_default_template is boolean (strict). SQLite uses INTEGER 0/1.
+            "isdef": _policy_bool_bind(is_default_template),
         }
         existing: set = set()
+        last_insert_params: Optional[Dict[str, Any]] = None
 
         def _exec(conn: Any) -> None:
-            nonlocal existing
+            nonlocal existing, last_insert_params
             existing = _get_company_policies_columns(conn)
             core = [
                 "id", "company_id", "title", "version", "effective_date",
@@ -9141,8 +9050,19 @@ class Database:
             insert_cols = [c for c in core + optional if c in existing]
             if not insert_cols:
                 raise RuntimeError("company_policies has no columns we can insert")
-            placeholders = [f":{_col_to_param[c]}" for c in insert_cols]
-            params = {_col_to_param[c]: _param_values[_col_to_param[c]] for c in insert_cols}
+            # Postgres rejects integer binds into boolean columns; some drivers still send 0/1.
+            # Use a SQL CASE so the column expression is boolean-typed regardless of driver.
+            placeholders: List[str] = []
+            params: Dict[str, Any] = {}
+            for c in insert_cols:
+                key = _col_to_param[c]
+                if c == "is_default_template" and not _is_sqlite:
+                    placeholders.append("(CASE WHEN :cp_isdef_i = 0 THEN false ELSE true END)")
+                    params["cp_isdef_i"] = 1 if is_default_template else 0
+                else:
+                    placeholders.append(f":{key}")
+                    params[key] = _param_values[key]
+            last_insert_params = dict(params)
             sql = (
                 "INSERT INTO company_policies ("
                 + ", ".join(insert_cols)
@@ -9159,9 +9079,12 @@ class Database:
                 with self.engine.begin() as conn:
                     _exec(conn)
         except Exception as exc:
+            _lip = last_insert_params or {}
+            _isdef = _lip.get("cp_isdef_i") if "cp_isdef_i" in _lip else _param_values.get("isdef")
             log.error(
                 "request_id=%s create_company_policy failed company_id=%s policy_id=%s title=%s "
-                "company_policies_columns=%s exc_type=%s exc_msg=%s",
+                "company_policies_columns=%s exc_type=%s exc_msg=%s "
+                "bind_isdef_type=%s bind_isdef_repr=%s engine_is_sqlite=%s",
                 request_id or "?",
                 company_id,
                 policy_id,
@@ -9169,8 +9092,39 @@ class Database:
                 sorted(existing),
                 type(exc).__name__,
                 str(exc)[:500],
+                type(_isdef).__name__,
+                repr(_isdef),
+                _is_sqlite,
                 exc_info=True,
             )
+            # region agent log
+            try:
+                if os.environ.get("RELOPASS_DEBUG_NDJ", "").strip() in ("1", "476bd2"):
+                    _lp = "/Users/Rom/Documents/GitHub/rolec/.cursor/debug-476bd2.log"
+                    with open(_lp, "a", encoding="utf-8") as _f:
+                        _f.write(
+                            json.dumps(
+                                {
+                                    "sessionId": "476bd2",
+                                    "hypothesisId": "H-create_company_policy-fail",
+                                    "location": "database.create_company_policy",
+                                    "message": (str(exc) or type(exc).__name__)[:300],
+                                    "data": {
+                                        "bind_isdef_type": type(_isdef).__name__,
+                                        "bind_isdef_repr": repr(_isdef),
+                                        "engine_is_sqlite": _is_sqlite,
+                                        "columns": sorted(existing),
+                                        "request_id": request_id,
+                                        "insert_param_keys": sorted((last_insert_params or {}).keys()),
+                                    },
+                                    "timestamp": int(time.time() * 1000),
+                                }
+                            )
+                            + "\n"
+                        )
+            except Exception:
+                pass
+            # endregion
             raise
 
     def list_company_policies(self, company_id: str) -> List[Dict[str, Any]]:
@@ -9506,16 +9460,6 @@ class Database:
                     ) AS primary_contact_name
                 FROM ({unions}) v
                 """
-                _agent_debug_log(
-                    hypothesis_id="H1",
-                    location="database.get_admin_company_index",
-                    message="admin_company_index aggregation SQL prepared",
-                    data={
-                        "is_sqlite": _is_sqlite,
-                        "company_ids_count": len(ids),
-                        "join_on_cases": join_on_cases,
-                    },
-                )
                 try:
                     agg_rows = conn.execute(text(agg_sql), params_agg).fetchall()
                     by_id = {row._mapping["id"]: dict(row._mapping) for row in agg_rows}

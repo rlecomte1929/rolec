@@ -21,7 +21,7 @@ import re
 import json
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .schemas import (
     RegisterRequest, LoginRequest, LoginResponse, AnswerRequest, NextQuestionResponse,
@@ -229,14 +229,19 @@ origin_regex = os.getenv("CORS_ORIGIN_REGEX") or r"https://.*\.relopass\.com"
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Ensure 500 responses include JSON body and go through normal response path (CORS)."""
+    import traceback as _traceback
+
     from fastapi import HTTPException as _HTTPEx
     if isinstance(exc, _HTTPEx):
         raise exc
     req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
     log.error(
-        "request_id=%s method=%s path=%s unhandled_exception=%s",
-        req_id, request.method, request.url.path, repr(exc),
-        exc_info=True,
+        "request_id=%s method=%s path=%s unhandled_exception=%s\n%s",
+        req_id,
+        request.method,
+        request.url.path,
+        repr(exc),
+        _traceback.format_exc(),
     )
     return JSONResponse(
         status_code=500,
@@ -320,27 +325,6 @@ app.include_router(recommendations_router)
 app.include_router(relocation_router.router)
 app.include_router(relocation_router.api_router)
 app.include_router(relocation_classify_router.router)
-
-# ---------------------------------------------------------------------------
-# Global exception handler: log unhandled errors
-# ---------------------------------------------------------------------------
-import traceback
-
-@app.exception_handler(Exception)
-def _log_unhandled_exception(request, exc: Exception):
-    from fastapi import HTTPException as _HTTP
-    if isinstance(exc, _HTTP):
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-    tb = traceback.format_exc()
-    log.error("Unhandled exception: %s\n%s", exc, tb)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "request_id": getattr(request.state, "request_id", None),
-        },
-    )
-
 
 @contextmanager
 def timed(span: str, request_id: Optional[str] = None):
@@ -8210,6 +8194,21 @@ def hr_initialize_company_policy_from_template(
         if exc.code == "POLICY_ALREADY_EXISTS":
             raise HTTPException(status_code=409, detail=detail) from exc
         raise HTTPException(status_code=400, detail=detail) from exc
+    except SQLAlchemyError as exc:
+        log.error(
+            "request_id=%s hr_initialize_company_policy_from_template db_error=%s",
+            request_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "POLICY_INIT_DB_ERROR",
+                "message": "Database error while creating policy from template. Retry or contact support with the request ID.",
+                "request_id": request_id,
+            },
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -8702,7 +8701,15 @@ async def upload_policy_document(
         )
     except Exception:
         pass
-    return {"ok": True, "document": doc, "request_id": request_id}
+    total_ms = (time.monotonic() - _upload_wall_start) * 1000.0
+    log.info(
+        "request_id=%s policy_upload stage=complete ok document_id=%s total_ms=%.1f clauses=%d",
+        request_id,
+        doc_id,
+        total_ms,
+        num_clauses,
+    )
+    return {"ok": True, "document": doc, "request_id": request_id, "ingest_duration_ms": round(total_ms, 1)}
 
 
 @app.get("/api/hr/policy-documents")
