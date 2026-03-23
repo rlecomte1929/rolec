@@ -8,7 +8,7 @@ import math
 import uuid
 import logging
 import time
-from typing import Optional, Dict, Any, List, Tuple, Set
+from typing import Optional, Dict, Any, List, Tuple, Set, Callable
 from datetime import datetime
 
 from sqlalchemy import create_engine, text
@@ -310,6 +310,109 @@ class Database:
         except Exception:
             log.exception("Failed to ensure postgres missing schemas")
 
+    def _maybe_ensure_policy_versions_normalization_draft_json(self) -> None:
+        """policy_versions.normalization_draft_json — HR normalized draft blob. Supabase: 20260422100000_policy_versions_normalization_draft_json.sql"""
+        if _is_sqlite:
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE public.policy_versions ADD COLUMN IF NOT EXISTS normalization_draft_json JSONB"
+                    )
+                )
+            log.info(
+                "Ensured policy_versions.normalization_draft_json exists (idempotent). "
+                "Prefer applying supabase/migrations/20260422100000_policy_versions_normalization_draft_json.sql in CI."
+            )
+        except Exception as ex:
+            log.warning("policy_versions.normalization_draft_json ensure failed (run Supabase migration): %s", ex)
+
+    def _maybe_ensure_policy_versions_normalization_state(self) -> None:
+        """policy_versions.normalization_state — normalization pipeline lifecycle marker."""
+        if _is_sqlite:
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE public.policy_versions ADD COLUMN IF NOT EXISTS normalization_state TEXT"
+                    )
+                )
+            log.info(
+                "Ensured policy_versions.normalization_state exists (idempotent). "
+                "Prefer supabase/migrations/20260321120000_policy_versions_normalization_state.sql in CI."
+            )
+        except Exception as ex:
+            log.warning("policy_versions.normalization_state ensure failed (run Supabase migration): %s", ex)
+
+    def _maybe_ensure_policy_benefit_rule_hr_overrides(self) -> None:
+        """HR override layer tables. Supabase: 20260422120000_policy_benefit_rule_hr_overrides.sql"""
+        if _is_sqlite:
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS public.policy_benefit_rule_hr_overrides (
+                          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                          policy_version_id uuid NOT NULL REFERENCES public.policy_versions (id) ON DELETE CASCADE,
+                          benefit_rule_id uuid NOT NULL REFERENCES public.policy_benefit_rules (id) ON DELETE CASCADE,
+                          service_visibility text NULL,
+                          amount_value_override numeric NULL,
+                          amount_unit_override text NULL,
+                          currency_override text NULL,
+                          duration_quantity_json jsonb NULL,
+                          approval_required_override boolean NULL,
+                          hr_notes text NULL,
+                          created_by text NULL,
+                          updated_by text NULL,
+                          created_at timestamptz NOT NULL DEFAULT now(),
+                          updated_at timestamptz NOT NULL DEFAULT now(),
+                          UNIQUE (policy_version_id, benefit_rule_id)
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS public.policy_benefit_rule_hr_override_audit (
+                          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                          override_id uuid NOT NULL REFERENCES public.policy_benefit_rule_hr_overrides (id) ON DELETE CASCADE,
+                          action text NOT NULL,
+                          previous_json jsonb NULL,
+                          new_json jsonb NULL,
+                          actor_id text NULL,
+                          created_at timestamptz NOT NULL DEFAULT now()
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_pbr_hr_overrides_version
+                        ON public.policy_benefit_rule_hr_overrides (policy_version_id)
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_pbr_hr_override_audit_override
+                        ON public.policy_benefit_rule_hr_override_audit (override_id, created_at DESC)
+                        """
+                    )
+                )
+            log.info(
+                "Ensured policy_benefit_rule_hr_overrides tables exist (idempotent). "
+                "Prefer supabase/migrations/20260422120000_policy_benefit_rule_hr_overrides.sql for RLS."
+            )
+        except Exception as ex:
+            log.warning("policy_benefit_rule_hr_overrides ensure failed (run Supabase migration): %s", ex)
+
     def _maybe_ensure_postgres_case_assignments_employee_link_mode(self) -> None:
         """
         case_assignments.employee_link_mode is required for create_assignment INSERT and pending-claim flows.
@@ -599,6 +702,9 @@ class Database:
         if not _is_sqlite:
             self._maybe_ensure_postgres_missing_schemas()
             self._maybe_ensure_postgres_case_assignments_employee_link_mode()
+            self._maybe_ensure_policy_versions_normalization_draft_json()
+            self._maybe_ensure_policy_versions_normalization_state()
+            self._maybe_ensure_policy_benefit_rule_hr_overrides()
 
         # In production (Render), avoid runtime DDL. Use Supabase migrations instead.
         if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):
@@ -1076,7 +1182,8 @@ class Database:
                     confidence REAL,
                     created_by TEXT,
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    normalization_draft_json TEXT
                 )
             """))
             conn.execute(text("""
@@ -1171,6 +1278,40 @@ class Database:
                 )
             """))
             conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_benefit_rule_hr_overrides (
+                    id TEXT PRIMARY KEY,
+                    policy_version_id TEXT NOT NULL,
+                    benefit_rule_id TEXT NOT NULL,
+                    service_visibility TEXT,
+                    amount_value_override REAL,
+                    amount_unit_override TEXT,
+                    currency_override TEXT,
+                    duration_quantity_json TEXT,
+                    approval_required_override INTEGER,
+                    hr_notes TEXT,
+                    created_by TEXT,
+                    updated_by TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(policy_version_id, benefit_rule_id)
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_benefit_rule_hr_override_audit (
+                    id TEXT PRIMARY KEY,
+                    override_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    previous_json TEXT,
+                    new_json TEXT,
+                    actor_id TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_pbr_hr_overrides_version
+                ON policy_benefit_rule_hr_overrides(policy_version_id)
+            """))
+            conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS policy_source_links (
                     id TEXT PRIMARY KEY,
                     policy_version_id TEXT NOT NULL,
@@ -1185,6 +1326,15 @@ class Database:
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_policy_versions_policy ON policy_versions(policy_id)
             """))
+            try:
+                pv_cols = conn.execute(text("PRAGMA table_info(policy_versions)")).fetchall()
+                pv_names = {r[1] for r in pv_cols}
+                if "normalization_draft_json" not in pv_names:
+                    conn.execute(text("ALTER TABLE policy_versions ADD COLUMN normalization_draft_json TEXT"))
+                if "normalization_state" not in pv_names:
+                    conn.execute(text("ALTER TABLE policy_versions ADD COLUMN normalization_state TEXT"))
+            except Exception:
+                pass
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_policy_benefit_rules_version ON policy_benefit_rules(policy_version_id)
             """))
@@ -8918,6 +9068,14 @@ class Database:
     # ==================================================================
     # Company policy documents + extracted benefits
     # ==================================================================
+    def run_policy_normalization_transaction(self, fn: Callable[[Any], None]) -> None:
+        """
+        Execute ``fn(connection)`` in a single commit/rollback boundary for policy normalization
+        persistence (company shell + policy_version + Layer-2 + draft).
+        """
+        with self.engine.begin() as conn:
+            fn(conn)
+
     def create_company_policy(
         self,
         policy_id: str,
@@ -8932,6 +9090,8 @@ class Database:
         template_name: Optional[str] = None,
         is_default_template: bool = False,
         request_id: Optional[str] = None,
+        *,
+        connection: Any = None,
     ) -> None:
         """
         Insert a row into company_policies. Columns are built from actual schema so production
@@ -8969,27 +9129,35 @@ class Database:
             "isdef": 1 if is_default_template else 0,
         }
         existing: set = set()
+
+        def _exec(conn: Any) -> None:
+            nonlocal existing
+            existing = _get_company_policies_columns(conn)
+            core = [
+                "id", "company_id", "title", "version", "effective_date",
+                "file_url", "file_type", "extraction_status", "created_by", "created_at",
+            ]
+            optional = ["template_source", "template_name", "is_default_template"]
+            insert_cols = [c for c in core + optional if c in existing]
+            if not insert_cols:
+                raise RuntimeError("company_policies has no columns we can insert")
+            placeholders = [f":{_col_to_param[c]}" for c in insert_cols]
+            params = {_col_to_param[c]: _param_values[_col_to_param[c]] for c in insert_cols}
+            sql = (
+                "INSERT INTO company_policies ("
+                + ", ".join(insert_cols)
+                + ") VALUES ("
+                + ", ".join(placeholders)
+                + ")"
+            )
+            conn.execute(text(sql), params)
+
         try:
-            with self.engine.begin() as conn:
-                existing = _get_company_policies_columns(conn)
-                core = [
-                    "id", "company_id", "title", "version", "effective_date",
-                    "file_url", "file_type", "extraction_status", "created_by", "created_at",
-                ]
-                optional = ["template_source", "template_name", "is_default_template"]
-                insert_cols = [c for c in core + optional if c in existing]
-                if not insert_cols:
-                    raise RuntimeError("company_policies has no columns we can insert")
-                placeholders = [f":{_col_to_param[c]}" for c in insert_cols]
-                params = {_col_to_param[c]: _param_values[_col_to_param[c]] for c in insert_cols}
-                sql = (
-                    "INSERT INTO company_policies ("
-                    + ", ".join(insert_cols)
-                    + ") VALUES ("
-                    + ", ".join(placeholders)
-                    + ")"
-                )
-                conn.execute(text(sql), params)
+            if connection is not None:
+                _exec(connection)
+            else:
+                with self.engine.begin() as conn:
+                    _exec(conn)
         except Exception as exc:
             log.error(
                 "request_id=%s create_company_policy failed company_id=%s policy_id=%s title=%s "
@@ -10042,6 +10210,9 @@ class Database:
         confidence: Optional[float] = None,
         created_by: Optional[str] = None,
         request_id: Optional[str] = None,
+        *,
+        normalization_state: Optional[str] = None,
+        connection: Any = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
         # Coerce to str for Postgres uuid columns (driver may return UUID from list_company_policies)
@@ -10056,6 +10227,7 @@ class Database:
             "conf": confidence,
             "cb": created_by,
             "now": now,
+            "ns": normalization_state,
         }
         params = normalize_policy_boolean_fields(params)
         if request_id:
@@ -10065,16 +10237,24 @@ class Database:
                 params.get("rs"), type(params.get("ag")).__name__, params.get("doc_id"),
             )
         ag_sql = _policy_ag_sql()
-        with self.engine.begin() as conn:
+
+        def _ins(conn: Any) -> None:
             conn.execute(
                 text(f"""
                     INSERT INTO policy_versions
                     (id, policy_id, source_policy_document_id, version_number, status,
-                     auto_generated, review_status, confidence, created_by, created_at, updated_at)
-                    VALUES (:id, :pid, :doc_id, :vn, :status, {ag_sql}, :rs, :conf, :cb, :now, :now)
+                     auto_generated, review_status, confidence, created_by, created_at, updated_at,
+                     normalization_state)
+                    VALUES (:id, :pid, :doc_id, :vn, :status, {ag_sql}, :rs, :conf, :cb, :now, :now, :ns)
                 """),
                 params,
             )
+
+        if connection is not None:
+            _ins(connection)
+        else:
+            with self.engine.begin() as conn:
+                _ins(conn)
 
     def get_latest_policy_version(self, policy_id: str) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
@@ -10082,7 +10262,9 @@ class Database:
                 text("SELECT * FROM policy_versions WHERE policy_id = :pid ORDER BY version_number DESC, created_at DESC LIMIT 1"),
                 {"pid": policy_id},
             ).fetchone()
-        return self._row_to_dict(row)
+        d = self._row_to_dict(row)
+        self._decode_policy_version_row(d)
+        return d
 
     def get_published_policy_version(self, policy_id: str) -> Optional[Dict[str, Any]]:
         """Get the latest published version. Employees see only published policies."""
@@ -10091,7 +10273,9 @@ class Database:
                 text("SELECT * FROM policy_versions WHERE policy_id = :pid AND status = 'published' ORDER BY version_number DESC, created_at DESC LIMIT 1"),
                 {"pid": policy_id},
             ).fetchone()
-        return self._row_to_dict(row)
+        d = self._row_to_dict(row)
+        self._decode_policy_version_row(d)
+        return d
 
     def update_policy_version_status(self, version_id: str, status: str) -> None:
         with self.engine.begin() as conn:
@@ -10130,7 +10314,9 @@ class Database:
                 text("SELECT * FROM policy_versions WHERE id = :id"),
                 {"id": version_id},
             ).fetchone()
-        return self._row_to_dict(row)
+        d = self._row_to_dict(row)
+        self._decode_policy_version_row(d)
+        return d
 
     def list_policy_versions(self, policy_id: str) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
@@ -10138,7 +10324,82 @@ class Database:
                 text("SELECT * FROM policy_versions WHERE policy_id = :pid ORDER BY version_number DESC"),
                 {"pid": policy_id},
             ).fetchall()
-        return self._rows_to_list(rows)
+        items = self._rows_to_list(rows)
+        for d in items:
+            self._decode_policy_version_row(d)
+        return items
+
+    def list_policy_versions_by_source_document(self, document_id: str) -> List[Dict[str, Any]]:
+        """Versions created from normalization of this policy_documents row (newest first)."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT * FROM policy_versions
+                    WHERE source_policy_document_id = :did
+                    ORDER BY version_number DESC, created_at DESC
+                    """
+                ),
+                {"did": str(document_id)},
+            ).fetchall()
+        items = self._rows_to_list(rows)
+        for d in items:
+            self._decode_policy_version_row(d)
+        return items
+
+    def _decode_policy_version_row(self, d: Optional[Dict[str, Any]]) -> None:
+        if not d:
+            return
+        self._parse_json_col(d, "normalization_draft_json")
+
+    def update_policy_version_normalization_draft(
+        self,
+        version_id: str,
+        draft: Dict[str, Any],
+        *,
+        request_id: Optional[str] = None,
+        normalization_state: Optional[str] = None,
+        connection: Any = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        payload = json.dumps(draft, default=str)
+        if request_id:
+            log.info(
+                "request_id=%s policy_versions normalization_draft_json updated version_id=%s bytes=%s",
+                request_id,
+                version_id,
+                len(payload),
+            )
+
+        def _upd(conn: Any) -> None:
+            if normalization_state is not None:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_versions
+                        SET normalization_draft_json = :draft, normalization_state = :ns, updated_at = :now
+                        WHERE id = :id
+                        """
+                    ),
+                    {"id": str(version_id), "draft": payload, "now": now, "ns": normalization_state},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_versions
+                        SET normalization_draft_json = :draft, updated_at = :now
+                        WHERE id = :id
+                        """
+                    ),
+                    {"id": str(version_id), "draft": payload, "now": now},
+                )
+
+        if connection is not None:
+            _upd(connection)
+        else:
+            with self.engine.begin() as conn:
+                _upd(conn)
 
     def _parse_json_col(self, d: Dict[str, Any], key: str) -> None:
         if d.get(key) and isinstance(d[key], str):
@@ -10215,6 +10476,211 @@ class Database:
             self._parse_json_col(d, "override_limits_json")
         return items
 
+    def list_hr_benefit_rule_overrides(self, policy_version_id: str) -> List[Dict[str, Any]]:
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(
+                    text(
+                        """
+                        SELECT * FROM policy_benefit_rule_hr_overrides
+                        WHERE policy_version_id = :vid
+                        ORDER BY benefit_rule_id
+                        """
+                    ),
+                    {"vid": str(policy_version_id)},
+                ).fetchall()
+        except Exception:
+            return []
+        items = self._rows_to_list(rows)
+        for d in items:
+            self._parse_json_col(d, "duration_quantity_json")
+            avo = d.get("approval_required_override")
+            if avo is not None and not isinstance(avo, bool):
+                try:
+                    d["approval_required_override"] = bool(int(avo))
+                except (TypeError, ValueError):
+                    d["approval_required_override"] = bool(avo)
+        return items
+
+    def get_hr_benefit_rule_override(
+        self, policy_version_id: str, benefit_rule_id: str
+    ) -> Optional[Dict[str, Any]]:
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        """
+                        SELECT * FROM policy_benefit_rule_hr_overrides
+                        WHERE policy_version_id = :vid AND benefit_rule_id = :bid
+                        """
+                    ),
+                    {"vid": str(policy_version_id), "bid": str(benefit_rule_id)},
+                ).fetchone()
+        except Exception:
+            return None
+        d = self._row_to_dict(row)
+        if not d:
+            return None
+        self._parse_json_col(d, "duration_quantity_json")
+        avo = d.get("approval_required_override")
+        if avo is not None and not isinstance(avo, bool):
+            try:
+                d["approval_required_override"] = bool(int(avo))
+            except (TypeError, ValueError):
+                d["approval_required_override"] = bool(avo)
+        return d
+
+    def upsert_hr_benefit_rule_override(
+        self,
+        policy_version_id: str,
+        benefit_rule_id: str,
+        patch: Dict[str, Any],
+        *,
+        actor_id: Optional[str] = None,
+    ) -> str:
+        """
+        Merge patch into existing override row (or create). Only keys present in patch are updated.
+        """
+        vid, bid = str(policy_version_id), str(benefit_rule_id)
+        prev = self.get_hr_benefit_rule_override(vid, bid)
+        prev_json = json.dumps(prev, default=str) if prev else None
+        merge: Dict[str, Any] = dict(prev) if prev else {}
+        override_keys = (
+            "service_visibility",
+            "amount_value_override",
+            "amount_unit_override",
+            "currency_override",
+            "duration_quantity_json",
+            "approval_required_override",
+            "hr_notes",
+        )
+        for k in override_keys:
+            if k in patch:
+                merge[k] = patch[k]
+        now = datetime.utcnow().isoformat()
+        oid = str(merge.get("id")) if merge.get("id") else str(uuid.uuid4())
+
+        dqj = merge.get("duration_quantity_json")
+        if isinstance(dqj, dict):
+            dqj_s = json.dumps(dqj)
+        elif isinstance(dqj, str):
+            dqj_s = dqj
+        else:
+            dqj_s = None
+
+        apbind = merge.get("approval_required_override")
+        if _is_sqlite and apbind is not None:
+            apbind = 1 if apbind else 0
+
+        params = {
+            "id": oid,
+            "vid": vid,
+            "bid": bid,
+            "sv": merge.get("service_visibility"),
+            "avo": merge.get("amount_value_override"),
+            "auo": merge.get("amount_unit_override"),
+            "cur": merge.get("currency_override"),
+            "dqj": dqj_s,
+            "aro": apbind,
+            "notes": merge.get("hr_notes"),
+            "actor": actor_id,
+            "now": now,
+        }
+
+        with self.engine.begin() as conn:
+            if prev:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_benefit_rule_hr_overrides SET
+                          service_visibility = :sv,
+                          amount_value_override = :avo,
+                          amount_unit_override = :auo,
+                          currency_override = :cur,
+                          duration_quantity_json = :dqj,
+                          approval_required_override = :aro,
+                          hr_notes = :notes,
+                          updated_by = :actor,
+                          updated_at = :now
+                        WHERE id = :id
+                        """
+                    ),
+                    params,
+                )
+                action = "update"
+            else:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO policy_benefit_rule_hr_overrides
+                        (id, policy_version_id, benefit_rule_id, service_visibility,
+                         amount_value_override, amount_unit_override, currency_override,
+                         duration_quantity_json, approval_required_override, hr_notes,
+                         created_by, updated_by, created_at, updated_at)
+                        VALUES (:id, :vid, :bid, :sv, :avo, :auo, :cur, :dqj, :aro, :notes, :actor, :actor, :now, :now)
+                        """
+                    ),
+                    params,
+                )
+                action = "insert"
+
+        new_row = self.get_hr_benefit_rule_override(vid, bid)
+        new_json = json.dumps(new_row, default=str) if new_row else None
+        self._append_hr_benefit_rule_override_audit(oid, action, prev_json, new_json, actor_id)
+        return oid
+
+    def _append_hr_benefit_rule_override_audit(
+        self,
+        override_id: str,
+        action: str,
+        previous_json: Optional[str],
+        new_json: Optional[str],
+        actor_id: Optional[str],
+    ) -> None:
+        aid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO policy_benefit_rule_hr_override_audit
+                        (id, override_id, action, previous_json, new_json, actor_id, created_at)
+                        VALUES (:id, :oid, :act, :prev, :newj, :actor, :now)
+                        """
+                    ),
+                    {
+                        "id": aid,
+                        "oid": str(override_id),
+                        "act": action,
+                        "prev": previous_json,
+                        "newj": new_json,
+                        "actor": actor_id,
+                        "now": now,
+                    },
+                )
+        except Exception as exc:
+            log.warning("hr override audit append failed: %s", exc)
+
+    def delete_hr_benefit_rule_override(
+        self, policy_version_id: str, benefit_rule_id: str, *, actor_id: Optional[str] = None
+    ) -> bool:
+        prev = self.get_hr_benefit_rule_override(policy_version_id, benefit_rule_id)
+        if not prev:
+            return False
+        oid = str(prev.get("id"))
+        prev_json = json.dumps(prev, default=str)
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text("DELETE FROM policy_benefit_rule_hr_overrides WHERE id = :id"),
+                    {"id": oid},
+                )
+        except Exception:
+            return False
+        self._append_hr_benefit_rule_override_audit(oid, "delete", prev_json, None, actor_id)
+        return True
+
     def list_policy_source_links(self, policy_version_id: str) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
             rows = conn.execute(
@@ -10223,11 +10689,30 @@ class Database:
             ).fetchall()
         return self._rows_to_list(rows)
 
-    def insert_policy_benefit_rule(self, rule: Dict[str, Any]) -> str:
+    def insert_policy_benefit_rule(self, rule: Dict[str, Any], *, connection: Any = None) -> str:
         rid = rule.get("id") or str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
         ag_sql = _policy_ag_sql()
-        with self.engine.begin() as conn:
+        bind = {
+            "id": rid,
+            "vid": rule["policy_version_id"],
+            "bk": rule["benefit_key"],
+            "bc": rule["benefit_category"],
+            "ct": rule.get("calc_type"),
+            "av": rule.get("amount_value"),
+            "au": rule.get("amount_unit"),
+            "cur": rule.get("currency"),
+            "freq": rule.get("frequency"),
+            "desc": rule.get("description"),
+            "meta": json.dumps(rule.get("metadata_json")) if rule.get("metadata_json") else None,
+            "ag": _policy_bool_bind(rule.get("auto_generated", True)),
+            "rs": rule.get("review_status", "pending"),
+            "conf": rule.get("confidence"),
+            "raw": rule.get("raw_text"),
+            "now": now,
+        }
+
+        def _ins(conn: Any) -> None:
             conn.execute(
                 text(f"""
                     INSERT INTO policy_benefit_rules
@@ -10236,32 +10721,34 @@ class Database:
                      review_status, confidence, raw_text, created_at, updated_at)
                     VALUES (:id, :vid, :bk, :bc, :ct, :av, :au, :cur, :freq, :desc, :meta, {ag_sql}, :rs, :conf, :raw, :now, :now)
                 """),
-                {
-                    "id": rid,
-                    "vid": rule["policy_version_id"],
-                    "bk": rule["benefit_key"],
-                    "bc": rule["benefit_category"],
-                    "ct": rule.get("calc_type"),
-                    "av": rule.get("amount_value"),
-                    "au": rule.get("amount_unit"),
-                    "cur": rule.get("currency"),
-                    "freq": rule.get("frequency"),
-                    "desc": rule.get("description"),
-                    "meta": json.dumps(rule.get("metadata_json")) if rule.get("metadata_json") else None,
-                    "ag": _policy_bool_bind(rule.get("auto_generated", True)),
-                    "rs": rule.get("review_status", "pending"),
-                    "conf": rule.get("confidence"),
-                    "raw": rule.get("raw_text"),
-                    "now": now,
-                },
+                bind,
             )
+
+        if connection is not None:
+            _ins(connection)
+        else:
+            with self.engine.begin() as conn:
+                _ins(conn)
         return rid
 
-    def insert_policy_exclusion(self, excl: Dict[str, Any]) -> str:
+    def insert_policy_exclusion(self, excl: Dict[str, Any], *, connection: Any = None) -> str:
         eid = excl.get("id") or str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
         ag_sql = _policy_ag_sql()
-        with self.engine.begin() as conn:
+        bind = {
+            "id": eid,
+            "vid": excl["policy_version_id"],
+            "bk": excl.get("benefit_key"),
+            "dom": excl["domain"],
+            "desc": excl.get("description"),
+            "ag": _policy_bool_bind(excl.get("auto_generated", True)),
+            "rs": excl.get("review_status", "pending"),
+            "conf": excl.get("confidence"),
+            "raw": excl.get("raw_text"),
+            "now": now,
+        }
+
+        def _ins(conn: Any) -> None:
             conn.execute(
                 text(f"""
                     INSERT INTO policy_exclusions
@@ -10269,26 +10756,34 @@ class Database:
                      review_status, confidence, raw_text, created_at, updated_at)
                     VALUES (:id, :vid, :bk, :dom, :desc, {ag_sql}, :rs, :conf, :raw, :now, :now)
                 """),
-                {
-                    "id": eid,
-                    "vid": excl["policy_version_id"],
-                    "bk": excl.get("benefit_key"),
-                    "dom": excl["domain"],
-                    "desc": excl.get("description"),
-                    "ag": _policy_bool_bind(excl.get("auto_generated", True)),
-                    "rs": excl.get("review_status", "pending"),
-                    "conf": excl.get("confidence"),
-                    "raw": excl.get("raw_text"),
-                    "now": now,
-                },
+                bind,
             )
+
+        if connection is not None:
+            _ins(connection)
+        else:
+            with self.engine.begin() as conn:
+                _ins(conn)
         return eid
 
-    def insert_policy_evidence_requirement(self, ev: Dict[str, Any]) -> str:
+    def insert_policy_evidence_requirement(self, ev: Dict[str, Any], *, connection: Any = None) -> str:
         eid = ev.get("id") or str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
         ag_sql = _policy_ag_sql()
-        with self.engine.begin() as conn:
+        bind = {
+            "id": eid,
+            "vid": ev["policy_version_id"],
+            "brid": ev.get("benefit_rule_id"),
+            "items": json.dumps(ev.get("evidence_items_json") or []),
+            "desc": ev.get("description"),
+            "ag": _policy_bool_bind(ev.get("auto_generated", True)),
+            "rs": ev.get("review_status", "pending"),
+            "conf": ev.get("confidence"),
+            "raw": ev.get("raw_text"),
+            "now": now,
+        }
+
+        def _ins(conn: Any) -> None:
             conn.execute(
                 text(f"""
                     INSERT INTO policy_evidence_requirements
@@ -10296,26 +10791,34 @@ class Database:
                      auto_generated, review_status, confidence, raw_text, created_at, updated_at)
                     VALUES (:id, :vid, :brid, :items, :desc, {ag_sql}, :rs, :conf, :raw, :now, :now)
                 """),
-                {
-                    "id": eid,
-                    "vid": ev["policy_version_id"],
-                    "brid": ev.get("benefit_rule_id"),
-                    "items": json.dumps(ev.get("evidence_items_json") or []),
-                    "desc": ev.get("description"),
-                    "ag": _policy_bool_bind(ev.get("auto_generated", True)),
-                    "rs": ev.get("review_status", "pending"),
-                    "conf": ev.get("confidence"),
-                    "raw": ev.get("raw_text"),
-                    "now": now,
-                },
+                bind,
             )
+
+        if connection is not None:
+            _ins(connection)
+        else:
+            with self.engine.begin() as conn:
+                _ins(conn)
         return eid
 
-    def insert_policy_rule_condition(self, cond: Dict[str, Any]) -> str:
+    def insert_policy_rule_condition(self, cond: Dict[str, Any], *, connection: Any = None) -> str:
         cid = cond.get("id") or str(uuid.uuid4())
         now = datetime.utcnow().isoformat()
         ag_sql = _policy_ag_sql()
-        with self.engine.begin() as conn:
+        bind = {
+            "id": cid,
+            "vid": cond["policy_version_id"],
+            "ot": cond["object_type"],
+            "oid": cond["object_id"],
+            "ct": cond["condition_type"],
+            "val": json.dumps(cond.get("condition_value_json") or {}),
+            "ag": _policy_bool_bind(cond.get("auto_generated", True)),
+            "rs": cond.get("review_status", "pending"),
+            "conf": cond.get("confidence"),
+            "now": now,
+        }
+
+        def _ins(conn: Any) -> None:
             conn.execute(
                 text(f"""
                     INSERT INTO policy_rule_conditions
@@ -10323,77 +10826,96 @@ class Database:
                      auto_generated, review_status, confidence, created_at, updated_at)
                     VALUES (:id, :vid, :ot, :oid, :ct, :val, {ag_sql}, :rs, :conf, :now, :now)
                 """),
-                {
-                    "id": cid,
-                    "vid": cond["policy_version_id"],
-                    "ot": cond["object_type"],
-                    "oid": cond["object_id"],
-                    "ct": cond["condition_type"],
-                    "val": json.dumps(cond.get("condition_value_json") or {}),
-                    "ag": _policy_bool_bind(cond.get("auto_generated", True)),
-                    "rs": cond.get("review_status", "pending"),
-                    "conf": cond.get("confidence"),
-                    "now": now,
-                },
+                bind,
             )
+
+        if connection is not None:
+            _ins(connection)
+        else:
+            with self.engine.begin() as conn:
+                _ins(conn)
         return cid
 
-    def insert_policy_assignment_applicability(self, app: Dict[str, Any]) -> str:
+    def insert_policy_assignment_applicability(self, app: Dict[str, Any], *, connection: Any = None) -> str:
         aid = app.get("id") or str(uuid.uuid4())
-        with self.engine.begin() as conn:
+        bind = {
+            "id": aid,
+            "vid": app["policy_version_id"],
+            "brid": app["benefit_rule_id"],
+            "at": app["assignment_type"],
+        }
+
+        def _ins(conn: Any) -> None:
             conn.execute(
                 text("""
                     INSERT INTO policy_assignment_type_applicability
                     (id, policy_version_id, benefit_rule_id, assignment_type)
                     VALUES (:id, :vid, :brid, :at)
                 """),
-                {
-                    "id": aid,
-                    "vid": app["policy_version_id"],
-                    "brid": app["benefit_rule_id"],
-                    "at": app["assignment_type"],
-                },
+                bind,
             )
+
+        if connection is not None:
+            _ins(connection)
+        else:
+            with self.engine.begin() as conn:
+                _ins(conn)
         return aid
 
-    def insert_policy_family_applicability(self, app: Dict[str, Any]) -> str:
+    def insert_policy_family_applicability(self, app: Dict[str, Any], *, connection: Any = None) -> str:
         fid = app.get("id") or str(uuid.uuid4())
-        with self.engine.begin() as conn:
+        bind = {
+            "id": fid,
+            "vid": app["policy_version_id"],
+            "brid": app["benefit_rule_id"],
+            "fs": app["family_status"],
+        }
+
+        def _ins(conn: Any) -> None:
             conn.execute(
                 text("""
                     INSERT INTO policy_family_status_applicability
                     (id, policy_version_id, benefit_rule_id, family_status)
                     VALUES (:id, :vid, :brid, :fs)
                 """),
-                {
-                    "id": fid,
-                    "vid": app["policy_version_id"],
-                    "brid": app["benefit_rule_id"],
-                    "fs": app["family_status"],
-                },
+                bind,
             )
+
+        if connection is not None:
+            _ins(connection)
+        else:
+            with self.engine.begin() as conn:
+                _ins(conn)
         return fid
 
-    def insert_policy_source_link(self, link: Dict[str, Any]) -> str:
+    def insert_policy_source_link(self, link: Dict[str, Any], *, connection: Any = None) -> str:
         lid = link.get("id") or str(uuid.uuid4())
-        with self.engine.begin() as conn:
+        bind = {
+            "id": lid,
+            "vid": link["policy_version_id"],
+            "ot": link["object_type"],
+            "oid": link["object_id"],
+            "cid": link["clause_id"],
+            "ps": link.get("source_page_start"),
+            "pe": link.get("source_page_end"),
+            "anchor": link.get("source_anchor"),
+        }
+
+        def _ins(conn: Any) -> None:
             conn.execute(
                 text("""
                     INSERT INTO policy_source_links
                     (id, policy_version_id, object_type, object_id, clause_id, source_page_start, source_page_end, source_anchor)
                     VALUES (:id, :vid, :ot, :oid, :cid, :ps, :pe, :anchor)
                 """),
-                {
-                    "id": lid,
-                    "vid": link["policy_version_id"],
-                    "ot": link["object_type"],
-                    "oid": link["object_id"],
-                    "cid": link["clause_id"],
-                    "ps": link.get("source_page_start"),
-                    "pe": link.get("source_page_end"),
-                    "anchor": link.get("source_anchor"),
-                },
+                bind,
             )
+
+        if connection is not None:
+            _ins(connection)
+        else:
+            with self.engine.begin() as conn:
+                _ins(conn)
         return lid
 
     def update_policy_benefit_rule(

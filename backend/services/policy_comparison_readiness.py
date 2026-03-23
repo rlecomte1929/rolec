@@ -49,7 +49,7 @@ def _parse_metadata(rule: Dict[str, Any]) -> Dict[str, Any]:
     return raw if isinstance(raw, dict) else {}
 
 
-def _rule_has_decision_signal(rule: Dict[str, Any]) -> bool:
+def benefit_rule_has_decision_signal(rule: Dict[str, Any]) -> bool:
     """
     True if the rule can drive a non-vacuous comparison outcome:
     numeric cap/limit, percent/amount on rule, or explicit approval flag in metadata.
@@ -86,7 +86,7 @@ def evaluate_version_comparison_readiness(db: Any, policy_version_id: Optional[s
       - policy_version_id is set
       - published row exists with that id and status == 'published'
       - for every benefit_key in EMPLOYEE_COMPARISON_REQUIRED_BENEFIT_KEYS, at least one benefit_rule exists
-        for that key with _rule_has_decision_signal (numeric / approval / explicit exclusion)
+        for that key with benefit_rule_has_decision_signal (numeric / approval / explicit exclusion)
 
     Results are cached in-process per policy_version_id for ~120s to reduce duplicate work on
     employee policy + budget + services calls in the same session.
@@ -129,9 +129,21 @@ def evaluate_version_comparison_readiness(db: Any, policy_version_id: Optional[s
 
     try:
         rules = db.list_policy_benefit_rules(str(policy_version_id))
+        try:
+            from .policy_hr_rule_override_layer import merge_benefit_rules_for_comparison_engine
+
+            rules = merge_benefit_rules_for_comparison_engine(db, str(policy_version_id), rules)
+        except Exception:
+            pass
     except Exception as exc:
         log.warning("comparison_readiness list_policy_benefit_rules failed version_id=%s exc=%s", policy_version_id, exc)
         rules = []
+
+    try:
+        exclusions = db.list_policy_exclusions(str(policy_version_id))
+    except Exception as exc:
+        log.warning("comparison_readiness list_policy_exclusions failed version_id=%s exc=%s", policy_version_id, exc)
+        exclusions = []
 
     keys_found: Set[str] = set()
     keys_with_signal: Set[str] = set()
@@ -142,7 +154,7 @@ def evaluate_version_comparison_readiness(db: Any, policy_version_id: Optional[s
         if bk not in EMPLOYEE_COMPARISON_REQUIRED_BENEFIT_KEYS:
             continue
         keys_found.add(bk)
-        if _rule_has_decision_signal(r):
+        if benefit_rule_has_decision_signal(r):
             keys_with_signal.add(bk)
 
     for req in sorted(EMPLOYEE_COMPARISON_REQUIRED_BENEFIT_KEYS):
@@ -152,10 +164,17 @@ def evaluate_version_comparison_readiness(db: Any, policy_version_id: Optional[s
             blockers.append(f"COVERED_WITHOUT_DECISION_FIELDS:{req}")
 
     ready = len(blockers) == 0
-    out = {
+    out: Dict[str, Any] = {
         "comparison_ready": ready,
         "comparison_blockers": blockers,
         "partial_numeric_coverage": False,
     }
+    try:
+        from .policy_rule_comparison_readiness import merge_version_comparison_readiness
+
+        out = merge_version_comparison_readiness(out, benefit_rules=rules, exclusions=exclusions)
+    except Exception as exc:
+        log.warning("comparison_readiness merge rule readiness failed version_id=%s exc=%s", policy_version_id, exc)
+
     _readiness_cache[cache_key] = (now, out)
     return out

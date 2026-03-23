@@ -64,15 +64,21 @@ BENEFIT_TAXONOMY: Dict[str, Dict[str, Any]] = {
         "default_calc_type": "other",
         "keywords": ["tax equalization", "hypothetical tax", "tax protection", "tax assistance"],
     },
+    # Match before generic "housing" so phrases like "temporary accommodation" map here, not to housing.
+    "temporary_housing": {
+        "group": "housing",
+        "default_calc_type": "unit_cap",
+        "keywords": [
+            "temporary housing",
+            "temporary accommodation",
+            "interim housing",
+            "temporary lodging",
+        ],
+    },
     "housing": {
         "group": "housing",
         "default_calc_type": "flat_amount",
         "keywords": ["housing", "accommodation", "rental", "rent"],
-    },
-    "temporary_housing": {
-        "group": "housing",
-        "default_calc_type": "unit_cap",
-        "keywords": ["temporary housing", "temporary accommodation", "interim housing"],
     },
     "movers": {
         "group": "relocation",
@@ -92,7 +98,14 @@ BENEFIT_TAXONOMY: Dict[str, Dict[str, Any]] = {
     "schooling": {
         "group": "education",
         "default_calc_type": "reimbursement",
-        "keywords": ["school", "schooling", "education", "tuition", "international school"],
+        "keywords": [
+            "school",
+            "schooling",
+            "school search",
+            "education",
+            "tuition",
+            "international school",
+        ],
     },
     "transport": {
         "group": "travel",

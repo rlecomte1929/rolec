@@ -47,7 +47,7 @@ Allowed `clause_type` values align with `upsert_policy_document_clauses` in `dat
 
 ## 3. Validation rules
 
-### 3.1 Blocking (HTTP **422**, `error_code: normalization_input_invalid`)
+### 3.1 Blocking (HTTP **422**, `error_code: NORMALIZATION_NOT_READY`, `outcome: normalization_not_ready`)
 
 Processing **stops**; **no** `policy_versions` / benefit rows are written.
 
@@ -110,7 +110,7 @@ After `normalize_clauses_to_objects`:
 
 | Outcome | HTTP | `error_code` |
 |---------|------|----------------|
-| Input invalid | 422 | `normalization_input_invalid` |
+| Input invalid | 422 | `NORMALIZATION_NOT_READY` (legacy: `normalization_input_invalid`) |
 | Business rule (`ValueError`) | 400 | (FastAPI default) |
 | DB / logic error | 500 | `normalization_failed` or `publish_failed_after_normalize` |
 

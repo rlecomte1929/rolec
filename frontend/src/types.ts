@@ -1186,6 +1186,18 @@ export interface PolicyServiceComparisonItem {
   currency?: string;
 }
 
+/** Row from effective-entitlement engine (GET policy-service-comparison). */
+export interface EffectiveServiceComparisonRow {
+  service_key: string;
+  coverage_status: string;
+  comparison_status: string;
+  policy_limit_snapshot: Record<string, unknown>;
+  selected_value_snapshot: Record<string, unknown>;
+  delta: number | null;
+  explanation: string;
+  approval_required: boolean;
+}
+
 export interface PolicyServiceComparisonResponse {
   comparisons: PolicyServiceComparisonItem[];
   resolved_policy: { id: string; policy_version_id: string; resolved_at: string } | null;
@@ -1199,5 +1211,7 @@ export interface PolicyServiceComparisonResponse {
     partial_numeric_coverage?: boolean;
   };
   diagnostics?: { benefits_count: number; services_count: number; answers_keys: string[] };
+  /** Canonical per-selected-service comparison; present for employee calls even when legacy comparisons are gated. */
+  effective_service_comparison?: EffectiveServiceComparisonRow[];
 }
 

@@ -2,47 +2,12 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { trackRouteEntry, trackShellRender, trackPolicyStage } from '../perf/pagePerf';
-import { Alert, Button, Card, Input } from '../components/antigravity';
-import { employeeAPI, companyPolicyAPI, policyDocumentsAPI } from '../api/client';
-import { EmployeeResolvedPolicyView } from '../features/policy/EmployeeResolvedPolicyView';
-import {
-  EMPLOYEE_HR_POLICY_WAIT_PRIMARY,
-  EMPLOYEE_HR_POLICY_WAIT_SECONDARY,
-  EMPLOYEE_POLICY_LOADING_ASSIGNMENT,
-} from '../features/policy/employeePolicyMessages';
-import { HrPolicyOverview } from '../features/policy/HrPolicyOverview';
+import { Alert, Button, Card } from '../components/antigravity';
+import { employeeAPI, policyDocumentsAPI } from '../api/client';
+import { EmployeePolicyPanel } from '../features/policy/EmployeePolicyPanel';
 import { HrPolicyReviewWorkspace } from '../features/policy/HrPolicyReviewWorkspace';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
-
-/** Aligned with EmployeeResolvedPolicyView local shape */
-type EmployeeResolvedPolicySnapshot = {
-  has_policy?: boolean;
-  policy: { id: string; title: string; version: number; effective_date: string; company_name?: string | null } | null;
-  benefits: Array<{
-    benefit_key: string;
-    included: boolean;
-    min_value?: number | null;
-    standard_value?: number | null;
-    max_value?: number | null;
-    currency?: string;
-    amount_unit?: string;
-    frequency?: string;
-    approval_required: boolean;
-    evidence_required_json?: string[];
-    exclusions_json?: Array<{ domain?: string; description?: string }>;
-    condition_summary?: string;
-  }>;
-  exclusions: Array<{ benefit_key?: string; domain: string; description?: string }>;
-  resolved_at?: string;
-  resolution_context?: {
-    assignment_type?: string;
-    family_status?: string;
-    tier?: string;
-  };
-  message?: string;
-  comparison_available?: boolean;
-};
 
 function EmployeePolicyContent() {
   const [pack, setPack] = useState<Awaited<ReturnType<typeof employeeAPI.getMyAssignmentPackagePolicy>> | null>(null);
@@ -79,69 +44,7 @@ function EmployeePolicyContent() {
     };
   }, []);
 
-  if (loading) {
-    return (
-      <Card padding="lg" className="border-[#e2e8f0]">
-        <div role="status" aria-live="polite">
-          <p className="text-sm font-medium text-[#0b2b43]">{EMPLOYEE_POLICY_LOADING_ASSIGNMENT}</p>
-          <p className="text-xs text-[#6b7280] mt-2">
-            No assignment, missing published policy, and network errors are handled explicitly—this is not stuck
-            loading.
-          </p>
-        </div>
-      </Card>
-    );
-  }
-
-  if (!pack || pack.status === 'error') {
-    return (
-      <Alert variant="error">
-        {pack?.message || "We couldn't load your policy right now. Please try again shortly."}
-      </Alert>
-    );
-  }
-
-  if (pack.status === 'no_assignment') {
-    return (
-      <Card padding="lg">
-        <p className="text-[#4b5563]">
-          You don&apos;t have an active assignment yet. Once your case is assigned, your applicable policy and benefit limits will appear here.
-        </p>
-      </Card>
-    );
-  }
-
-  if (pack.status === 'no_policy_found') {
-    return (
-      <Card padding="lg" className="border-[#e2e8f0] bg-[#fafbfc]">
-        <p className="text-[#4b5563] font-medium">
-          {pack.message || EMPLOYEE_HR_POLICY_WAIT_PRIMARY}
-        </p>
-        <p className="text-sm text-[#6b7280] mt-2">
-          {pack.message_secondary || EMPLOYEE_HR_POLICY_WAIT_SECONDARY}
-        </p>
-      </Card>
-    );
-  }
-
-  const snapshot: EmployeeResolvedPolicySnapshot = {
-    has_policy: true,
-    comparison_available: pack.comparison_available,
-    policy: pack.policy as EmployeeResolvedPolicySnapshot['policy'],
-    benefits: (pack.benefits || []) as EmployeeResolvedPolicySnapshot['benefits'],
-    exclusions: (pack.exclusions || []) as EmployeeResolvedPolicySnapshot['exclusions'],
-    resolved_at: pack.resolved_at ?? undefined,
-    resolution_context: pack.resolution_context as EmployeeResolvedPolicySnapshot['resolution_context'],
-  };
-
-  return (
-    <div className="space-y-4">
-      <EmployeeResolvedPolicyView resolvedSnapshot={snapshot} />
-      <Link to={buildRoute('services')}>
-        <Button variant="outline">Back to Services</Button>
-      </Link>
-    </div>
-  );
+  return <EmployeePolicyPanel pack={pack} loading={loading} />;
 }
 
 export const HrPolicy: React.FC = () => {
@@ -157,14 +60,9 @@ export const HrPolicy: React.FC = () => {
 
   const [workspaceRefreshTrigger, setWorkspaceRefreshTrigger] = useState(0);
   const [postNormalizePolicyId, setPostNormalizePolicyId] = useState<string | null>(null);
-  /** Document upload/intake UI shown only after user explicitly requests it. */
-  const [showDocumentWorkflow, setShowDocumentWorkflow] = useState(false);
-
   useEffect(() => {
-    if (showDocumentWorkflow) {
-      trackPolicyStage('upload_ui_shown');
-    }
-  }, [showDocumentWorkflow]);
+    trackPolicyStage('upload_ui_shown');
+  }, []);
 
   const handleNormalized = useCallback((policyId: string) => {
     setPostNormalizePolicyId(policyId);
@@ -198,30 +96,17 @@ export const HrPolicy: React.FC = () => {
           </p>
         )}
 
-        {!showDocumentWorkflow ? (
-          <HrPolicyOverview onOpenUpload={() => setShowDocumentWorkflow(true)} />
-        ) : (
-          <>
-            <div className="flex items-center justify-between mb-4">
-              <button
-                type="button"
-                onClick={() => setShowDocumentWorkflow(false)}
-                className="text-sm text-[#6b7280] hover:text-[#0b2b43]"
-              >
-                ← Back to overview
-              </button>
-            </div>
-            <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} adminCompanyId={adminCompanyId} />
-            <div className="mt-8">
-              <HrPolicyReviewWorkspace
-                refreshTrigger={workspaceRefreshTrigger}
-                postNormalizePolicyId={postNormalizePolicyId}
-                onBindComplete={() => setPostNormalizePolicyId(null)}
-                adminCompanyId={adminCompanyId}
-              />
-            </div>
-          </>
-        )}
+        <div id="hr-policy-document-intake" className="scroll-mt-4">
+          <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} adminCompanyId={adminCompanyId} />
+        </div>
+        <div className="mt-8">
+          <HrPolicyReviewWorkspace
+            refreshTrigger={workspaceRefreshTrigger}
+            postNormalizePolicyId={postNormalizePolicyId}
+            onBindComplete={() => setPostNormalizePolicyId(null)}
+            adminCompanyId={adminCompanyId}
+          />
+        </div>
       </div>
     </AppShell>
   );
@@ -331,8 +216,8 @@ function DetectedMetadataDisplay({ metadata }: { metadata: PolicyDocumentMetadat
 
   const layer1Note = (
     <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-3">
-      These fields are <strong>document metadata</strong> (Layer 1) for triage only. Employee eligibility and
-      cost comparison use the <strong>published normalized policy</strong> (Layer 2), not this list.
+      These fields come from automatic document extraction and are for triage only. What employees see is driven by
+      your <strong>published policy</strong> after you build and publish it in the policy workspace—not this preview list.
     </p>
   );
 
@@ -385,7 +270,7 @@ function DetectedMetadataDisplay({ metadata }: { metadata: PolicyDocumentMetadat
   );
 }
 
-/** Compact display of normalized hints (Layer 1 — non-authoritative clause heuristics). */
+/** Compact display of early clause heuristics from extraction (not authoritative for employees). */
 function NormalizedHintsDisplay({ hints }: { hints: Record<string, unknown> }) {
   if (!hints || typeof hints !== 'object') return null;
   const entries = Object.entries(hints).filter(([, v]) => v != null && v !== '');
@@ -399,7 +284,7 @@ function NormalizedHintsDisplay({ hints }: { hints: Record<string, unknown> }) {
     k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return (
     <div className="mt-2 px-2 py-1.5 rounded bg-[#f0fdf4] border border-[#bbf7d0] text-xs">
-      <span className="text-[#166534] font-medium">Clause hints (Layer 1): </span>
+      <span className="text-[#166534] font-medium">Early clause hints: </span>
       <span className="text-[#15803d]">
         {entries.map(([k, v]) => `${label(k)}=${fmt(v)}`).join(' · ')}
       </span>
@@ -553,230 +438,6 @@ function DocumentStructureTab({ docId }: { docId: string }) {
   );
 }
 
-// Legacy: superseded by HrPolicyReviewWorkspace. Exported to satisfy noUnusedLocals.
-export function NormalizedPolicySectionLegacy() {
-  const [policies, setPolicies] = useState<any[]>([]);
-  const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
-  const [normalized, setNormalized] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [editingRule, setEditingRule] = useState<any | null>(null);
-
-  useEffect(() => {
-    companyPolicyAPI.list().then((res) => {
-      setPolicies(res.policies || []);
-      if (!selectedPolicyId && res.policies?.length) setSelectedPolicyId(res.policies[0].id);
-    }).catch(() => setPolicies([]));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedPolicyId) { setNormalized(null); return; }
-    setLoading(true);
-    companyPolicyAPI.getNormalized(selectedPolicyId).then(setNormalized).catch(() => setNormalized(null)).finally(() => setLoading(false));
-  }, [selectedPolicyId]);
-
-  const handlePatchBenefit = async (ruleId: string, patch: Record<string, any>) => {
-    if (!selectedPolicyId) return;
-    setMessage('');
-    try {
-      await companyPolicyAPI.patchBenefitRule(selectedPolicyId, ruleId, patch);
-      const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
-      setNormalized(res);
-      setEditingRule(null);
-    } catch (err: any) {
-      setMessage(err?.response?.data?.detail || 'Update failed');
-    }
-  };
-
-  const getSourceLink = (objectType: string, objectId: string) => {
-    const links = normalized?.source_links || [];
-    return links.find((l: any) => l.object_type === objectType && l.object_id === objectId);
-  };
-
-  const groupedBenefits = (normalized?.benefit_rules || []).reduce(
-    (acc: Record<string, any[]>, r: any) => {
-      const cat = r.benefit_category || 'other';
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(r);
-      return acc;
-    },
-    {} as Record<string, any[]>
-  );
-
-  return (
-    <Card padding="lg">
-      <div className="text-lg font-semibold text-[#0b2b43]">Normalized policy</div>
-      <div className="text-sm text-[#6b7280] mt-1">
-        Canonical benefit rules, exclusions, evidence, and conditions from normalized documents.
-      </div>
-      {message && <Alert variant="error" className="mt-2">{message}</Alert>}
-      <div className="mt-4 flex items-center gap-3">
-        <label className="text-sm text-[#6b7280]">Policy:</label>
-        <select
-          value={selectedPolicyId || ''}
-          onChange={(e) => setSelectedPolicyId(e.target.value || null)}
-          className="border border-[#e2e8f0] rounded px-2 py-1 text-sm"
-        >
-          <option value="">Select policy</option>
-          {policies.map((p) => (
-            <option key={p.id} value={p.id}>{p.title || p.id}</option>
-          ))}
-        </select>
-      </div>
-      {loading && <div className="text-sm text-[#6b7280] mt-4">Loading…</div>}
-      {!loading && selectedPolicyId && !normalized?.version && (
-        <div className="text-sm text-[#6b7280] mt-4">
-          No released version yet. Upload a document, Reprocess, then Normalize & publish.
-        </div>
-      )}
-      {!loading && normalized?.version && (
-        <div className="mt-6 space-y-6">
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="px-2 py-1 rounded bg-[#e2e8f0]">
-              {normalized.benefit_rules?.length ?? 0} benefits
-            </span>
-            <span className="px-2 py-1 rounded bg-[#e2e8f0]">
-              {normalized.exclusions?.length ?? 0} exclusions
-            </span>
-            <span className="px-2 py-1 rounded bg-[#e2e8f0]">
-              {normalized.evidence_requirements?.length ?? 0} evidence
-            </span>
-            <span className="px-2 py-1 rounded bg-[#e2e8f0]">
-              {normalized.conditions?.length ?? 0} conditions
-            </span>
-          </div>
-
-          {/* Benefit rules grouped */}
-          <div>
-            <div className="text-sm font-medium text-[#0b2b43] mb-2">Benefit rules</div>
-            <div className="space-y-4">
-              {Object.entries(groupedBenefits).map(([cat, rules]) => (
-                <div key={cat} className="border border-[#e2e8f0] rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-[#f1f5f9] text-sm font-medium text-[#0b2b43]">
-                    {cat}
-                  </div>
-                  <div className="divide-y divide-[#e2e8f0]">
-                    {(rules as any[]).map((r: any) => {
-                      const link = getSourceLink('benefit_rule', r.id);
-                      const isEditing = editingRule?.id === r.id;
-                      return (
-                        <div key={r.id} className="px-3 py-2 bg-white">
-                          <div className="flex justify-between gap-3">
-                            <div>
-                              <span className="font-medium text-[#0b2b43]">{r.benefit_key}</span>
-                              <span className="ml-2 text-xs text-[#6b7280]">
-                                {r.calc_type} {r.amount_value != null ? `${r.amount_value}` : ''} {r.amount_unit || ''} {r.currency || ''} {r.frequency || ''}
-                              </span>
-                              {link && (
-                                <span className="ml-2 text-xs text-[#059669]">
-                                  p.{link.source_page_start ?? '?'}
-                                </span>
-                              )}
-                            </div>
-                            <Button variant="outline" size="sm" onClick={() => setEditingRule(isEditing ? null : r)}>
-                              {isEditing ? 'Cancel' : 'Edit'}
-                            </Button>
-                          </div>
-                          {r.description && (
-                            <div className="text-xs text-[#6b7280] mt-1 truncate max-w-xl">{r.description}</div>
-                          )}
-                          {isEditing && (
-                            <div className="mt-3 pt-3 border-t border-[#e2e8f0] grid grid-cols-2 md:grid-cols-4 gap-2">
-                              <Input
-                                label="Amount"
-                                type="number"
-                                value={editingRule.amount_value ?? ''}
-                                onChange={(val) => setEditingRule({ ...editingRule, amount_value: val ? Number(val) : null })}
-                              />
-                              <Input
-                                label="Unit"
-                                value={editingRule.amount_unit ?? ''}
-                                onChange={(val) => setEditingRule({ ...editingRule, amount_unit: val })}
-                              />
-                              <Input
-                                label="Currency"
-                                value={editingRule.currency ?? ''}
-                                onChange={(val) => setEditingRule({ ...editingRule, currency: val })}
-                              />
-                              <Input
-                                label="Frequency"
-                                value={editingRule.frequency ?? ''}
-                                onChange={(val) => setEditingRule({ ...editingRule, frequency: val })}
-                              />
-                              <div className="col-span-2">
-                                <Input
-                                  label="Description"
-                                  value={editingRule.description ?? ''}
-                                  onChange={(val) => setEditingRule({ ...editingRule, description: val })}
-                                />
-                              </div>
-                              <div className="col-span-2 flex gap-2">
-                                <Button size="sm" onClick={() => handlePatchBenefit(r.id, { amount_value: editingRule.amount_value, amount_unit: editingRule.amount_unit, currency: editingRule.currency, frequency: editingRule.frequency, description: editingRule.description })}>Save</Button>
-                                <Button variant="outline" size="sm" onClick={() => setEditingRule(null)}>Cancel</Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Exclusions */}
-          {normalized.exclusions?.length > 0 && (
-            <div>
-              <div className="text-sm font-medium text-[#0b2b43] mb-2">Exclusions</div>
-              <div className="border border-[#e2e8f0] rounded-lg divide-y divide-[#e2e8f0]">
-                {normalized.exclusions.map((e: any) => (
-                  <div key={e.id} className="px-3 py-2">
-                    <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800">{e.domain}</span>
-                    {e.benefit_key && <span className="ml-2 text-xs text-[#6b7280]">{e.benefit_key}</span>}
-                    <div className="text-sm text-[#4b5563] mt-1">{e.description || e.raw_text?.slice(0, 100)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Evidence */}
-          {normalized.evidence_requirements?.length > 0 && (
-            <div>
-              <div className="text-sm font-medium text-[#0b2b43] mb-2">Evidence requirements</div>
-              <div className="border border-[#e2e8f0] rounded-lg divide-y divide-[#e2e8f0]">
-                {normalized.evidence_requirements.map((ev: any) => (
-                  <div key={ev.id} className="px-3 py-2">
-                    <span className="text-xs text-[#6b7280]">
-                      {(Array.isArray(ev.evidence_items_json) ? ev.evidence_items_json : []).join(', ')}
-                    </span>
-                    {ev.description && <div className="text-sm mt-1">{ev.description}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Conditions */}
-          {normalized.conditions?.length > 0 && (
-            <div>
-              <div className="text-sm font-medium text-[#0b2b43] mb-2">Conditions</div>
-              <div className="flex flex-wrap gap-2">
-                {normalized.conditions.map((c: any) => (
-                  <span key={c.id} className="px-2 py-1 rounded bg-[#f0fdf4] text-xs text-[#166534]">
-                    {c.condition_type}: {JSON.stringify(c.condition_value_json || {})}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </Card>
-  );
-}
-
 const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
   upload_missing_file: 'Choose a file first.',
   upload_invalid_mime_type: 'Only PDF or DOCX files are supported.',
@@ -801,11 +462,26 @@ const UPLOAD_ERROR_MESSAGES: Record<string, string> = {
   db_insert_failed: 'The uploaded file could not be registered in the database.',
   upload_company_required: 'Company is required for upload. When viewing a company\'s policy workspace, uploads are scoped to that company.',
   invalid_file_type: 'Only PDF or DOCX files are supported.',
-  normalization_failed: 'Normalization failed because of an invalid policy_versions payload.',
+  normalization_failed:
+    'Normalization failed unexpectedly. Your extraction data is unchanged—try Reprocess, then normalize again.',
+  NORMALIZATION_NOT_READY:
+    'This document is not ready to normalize yet. Fix the listed issues, then use Reprocess if needed.',
+  NORMALIZATION_BLOCKED:
+    'Normalization cannot produce a meaningful draft (failed extraction, unknown policy scope with no mapped benefits/exclusions, or similar). Reprocess or upload a fuller policy.',
+  INVALID_POLICY_VERSION_SCHEMA:
+    'Schema validation failed on assembled policy data—this usually indicates an internal mapping or taxonomy issue, not vague policy wording. Retry after reprocess; contact support with request_id if it persists.',
+  INVALID_POLICY_VERSIONS_PAYLOAD:
+    'Schema validation failed on assembled policy data (legacy code; same as INVALID_POLICY_VERSION_SCHEMA).',
+  PERSISTENCE_FAILED:
+    'The database rejected a normalized row after validation. Try again or apply pending migrations.',
+  POLICY_VERSION_PERSISTENCE_FAILED:
+    'The database rejected the policy_versions row (legacy code; same as PERSISTENCE_FAILED).',
+  POLICY_LAYER2_PERSISTENCE_FAILED:
+    'The database rejected a benefit rule, exclusion, or link row (legacy code; same as PERSISTENCE_FAILED).',
   publish_failed_after_normalize:
     'Policy was saved but could not be published. Use “Publish version” in the HR Policy review workspace.',
   normalization_input_invalid:
-    'This document is not ready to normalize. See details below, then try Reprocess if needed.',
+    'This document is not ready to normalize yet (legacy code; same as NORMALIZATION_NOT_READY).',
   // Download-url and policy errors
   policy_policy_not_found: 'Policy not found.',
   policy_file_missing: 'Policy file not found in storage.',
@@ -826,7 +502,12 @@ function getUploadErrorMessage(err: unknown): string {
     if (detail && !message.includes(detail.slice(0, 50))) return `${message} ${detail}`;
     return message;
   }
-  if (code && UPLOAD_ERROR_MESSAGES[code] && !message) return UPLOAD_ERROR_MESSAGES[code];
+  if (code && UPLOAD_ERROR_MESSAGES[code]) {
+    if (!message) return UPLOAD_ERROR_MESSAGES[code];
+    if (code === 'INVALID_POLICY_VERSION_SCHEMA' || code === 'PERSISTENCE_FAILED') {
+      return `${UPLOAD_ERROR_MESSAGES[code]} ${message}`.trim();
+    }
+  }
   if (message) return message;
   if (detail) return detail;
   return 'Something went wrong. Try again.';
@@ -974,10 +655,39 @@ function PolicyDocumentIntakeSection({
     setNormalizingId(docId);
     try {
       const res = await policyDocumentsAPI.normalize(docId);
-      const pubNote = res.published ? ' Published to employees.' : '';
-      setMessage(
-        `Normalize & publish complete. ${res.summary?.benefit_rules ?? 0} benefits, ${res.summary?.exclusions ?? 0} exclusions.${pubNote}`
-      );
+      const br = res.summary?.benefit_rules ?? 0;
+      const ex = res.summary?.exclusions ?? 0;
+      const drc =
+        (res.summary && typeof res.summary === 'object' && 'draft_rule_candidates' in res.summary
+          ? (res.summary as { draft_rule_candidates?: number }).draft_rule_candidates
+          : undefined) ?? res.rule_candidates_summary?.draft_rule_candidates;
+
+      if (res.normalization_result_code === 'NORMALIZED_DRAFT_ONLY' || res.outcome === 'normalized_but_not_publishable') {
+        const draftHint =
+          typeof drc === 'number' && drc > 0 && br + ex === 0
+            ? ' The document was normalized into a draft (clause-level signals retained) and requires HR review before employee use.'
+            : '';
+        setMessage(
+          'The document was analyzed, but it does not contain enough structured benefit or exclusion rules to publish automatically.' +
+            draftHint +
+            ` Draft saved: ${br} benefits, ${ex} exclusions. Review in the policy workspace or upload a fuller policy, then publish when ready.`
+        );
+      } else if (res.normalization_result_code === 'NORMALIZED_PUBLISH_BLOCKED' || res.outcome === 'publish_blocked') {
+        const codeSuffix = res.publish_block_code ? ` [${res.publish_block_code}]` : '';
+        setMessage(
+          `Draft saved (${br} benefits, ${ex} exclusions) but automatic publish was blocked${codeSuffix}. ${
+            res.publish_block_detail || 'Use Publish version in the review workspace when requirements are met.'
+          }`
+        );
+      } else {
+        const pubNote = res.published ? ' Published to employees.' : '';
+        let msg = `Normalize complete. ${br} benefits, ${ex} exclusions.${pubNote}`;
+        if (res.comparison_readiness_code === 'COMPARISON_NOT_READY') {
+          msg +=
+            ' The document contains policy signals, but not enough structured limits for automatic budget checks yet.';
+        }
+        setMessage(msg);
+      }
       await loadDocs();
       if (res.policy_id) onNormalized?.(res.policy_id);
     } catch (err: unknown) {
@@ -995,11 +705,21 @@ function PolicyDocumentIntakeSection({
           }).response?.data
         : null;
       const code = data?.error_code;
-      let msg = (code && UPLOAD_ERROR_MESSAGES[code]) || data?.message || data?.detail;
+      let msg = data?.message || (code && UPLOAD_ERROR_MESSAGES[code]) || data?.detail;
       const issues = data?.errors;
       if (Array.isArray(issues) && issues.length) {
         const detail = issues
           .map((e) => (e.path && e.message ? `${e.path}: ${e.message}` : e.message || e.code || ''))
+          .filter(Boolean)
+          .join(' · ');
+        if (detail) {
+          msg = msg ? `${msg} ${detail}` : detail;
+        }
+      }
+      const normDetails = (data as { details?: Array<{ field?: string; issue?: string }> } | null)?.details;
+      if (Array.isArray(normDetails) && normDetails.length) {
+        const detail = normDetails
+          .map((d) => (d.field && d.issue ? `${d.field}: ${d.issue}` : d.issue || d.field || ''))
           .filter(Boolean)
           .join(' · ');
         if (detail) {

@@ -1998,6 +1998,14 @@ export const companyPolicyAPI = {
       comparison_ready?: boolean;
       comparison_blockers?: string[];
     };
+    /** Normalization vs publish vs comparison tiers (backend policy_processing_readiness). */
+    policy_readiness?: {
+      normalization_readiness?: { status?: string; issues?: Array<{ code?: string; message?: string; field?: string }> };
+      publish_readiness?: { status?: string; issues?: Array<{ code?: string; message?: string; field?: string }> };
+      comparison_readiness?: { status?: string; issues?: Array<{ code?: string; message?: string; field?: string }> };
+    };
+    /** Persisted draft snapshot (policy_versions.normalization_draft_json). */
+    normalization_draft?: Record<string, unknown> | null;
     detail?: string;
   }> => {
     const params: Record<string, string | boolean> = {};
@@ -2023,6 +2031,37 @@ export const companyPolicyAPI = {
     }
   ): Promise<{ benefit_rule: any }> => {
     const response = await api.patch(`/api/company-policies/${policyId}/benefits/${benefitRuleId}`, body);
+    return response.data;
+  },
+  /** HR override layer — does not change extracted Layer-2 rows; adjusts effective entitlements. */
+  patchHrBenefitOverride: async (
+    policyId: string,
+    versionId: string,
+    benefitRuleId: string,
+    body: {
+      service_visibility?: 'force_included' | 'force_excluded' | null;
+      amount_value_override?: number | null;
+      amount_unit_override?: string | null;
+      currency_override?: string | null;
+      duration_quantity_json?: { quantity?: number; unit?: string } | null;
+      approval_required_override?: boolean | null;
+      hr_notes?: string | null;
+    }
+  ): Promise<{ hr_override: any }> => {
+    const response = await api.patch(
+      `/api/company-policies/${policyId}/versions/${versionId}/benefits/${benefitRuleId}/hr-override`,
+      body
+    );
+    return response.data;
+  },
+  deleteHrBenefitOverride: async (
+    policyId: string,
+    versionId: string,
+    benefitRuleId: string
+  ): Promise<{ ok?: boolean }> => {
+    const response = await api.delete(
+      `/api/company-policies/${policyId}/versions/${versionId}/benefits/${benefitRuleId}/hr-override`
+    );
     return response.data;
   },
   patchVersionStatus: async (
@@ -2061,6 +2100,29 @@ export const companyPolicyAPI = {
     body: { condition_value_json?: Record<string, any>; review_status?: string }
   ): Promise<{ condition: any }> => {
     const response = await api.patch(`/api/company-policies/${policyId}/conditions/${condId}`, body);
+    return response.data;
+  },
+  /** Platform starter baseline (only when company has no policy yet). */
+  initializeFromTemplate: async (body: {
+    template_key: string;
+    comparison_ready_structure?: boolean;
+  }): Promise<{
+    ok?: boolean;
+    policy_id?: string;
+    policy_version_id?: string;
+    version_status?: string;
+    benefit_rules_created?: number;
+    message?: string;
+  }> => {
+    const response = await api.post('/api/hr/company-policy/initialize-from-template', body);
+    return response.data;
+  },
+};
+
+/** HR aggregate review payload (document + policy + draft + readiness). */
+export const hrPolicyReviewAPI = {
+  get: async (params: { document_id?: string; policy_id?: string }): Promise<Record<string, unknown>> => {
+    const response = await api.get('/api/hr/policy-review', { params });
     return response.data;
   },
 };
@@ -2133,11 +2195,36 @@ export const policyDocumentsAPI = {
   normalize: async (
     docId: string
   ): Promise<{
+    ok?: boolean;
+    normalized?: boolean;
+    publishable?: boolean;
+    published?: boolean;
+    outcome?: string;
+    /** Stable semantic code for success path (draft-only, published, publish blocked). */
+    normalization_result_code?: string;
+    readiness_status?: string;
+    readiness_issues?: Array<Record<string, unknown>>;
+    publish_block_code?: string;
+    publish_block_detail?: string;
+    comparison_readiness_code?: string;
+    rule_candidates_summary?: {
+      benefit_rules?: number;
+      exclusions?: number;
+      evidence_requirements?: number;
+      conditions?: number;
+      draft_rule_candidates?: number;
+    };
     policy_id: string;
     policy_version_id: string;
     summary: any;
-    published?: boolean;
     version?: Record<string, unknown>;
+    input_repairs?: Array<Record<string, string>>;
+    policy_readiness?: {
+      normalization_readiness?: { status?: string; issues?: Array<Record<string, unknown>> };
+      publish_readiness?: { status?: string; issues?: Array<Record<string, unknown>> };
+      comparison_readiness?: { status?: string; issues?: Array<Record<string, unknown>> };
+    };
+    normalization_draft?: Record<string, unknown> | null;
   }> => {
     const response = await api.post(`/api/hr/policy-documents/${docId}/normalize`);
     return response.data;

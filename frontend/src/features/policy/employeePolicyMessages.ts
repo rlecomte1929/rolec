@@ -1,30 +1,29 @@
-/** Aligned with backend EMPLOYEE_POLICY_FALLBACK_* (employee HR Policy / package page). */
+/** Employee HR Policy / package page — operational tone. */
 export const EMPLOYEE_HR_POLICY_WAIT_PRIMARY =
-  "Your HR team has not published your company's assignment policy in ReloPass yet.";
+  "Your HR team hasn't published your assignment policy in ReloPass yet.";
 
 export const EMPLOYEE_HR_POLICY_WAIT_SECONDARY =
-  'This page will show your package and limits after HR publishes the policy from the HR Policy workspace.';
+  'When they publish it, your package summary and policy-driven limits will appear here.';
 
-/** When a policy exists but is not yet in a comparison-ready shape (employee cost comparison / badges). */
+/** Published policy exists but cost comparison is not fully available yet. */
 export const EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY =
-  "Your company policy has not yet been published in a form that supports cost comparison.";
+  'Your live policy is still missing a few details for automated cost comparison.';
 
 export const EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY =
-  'You can still review service costs, but company coverage and limits are not available yet.';
+  'You can still open services and review costs. HR can add the remaining limits in the policy workspace.';
 
-/** Loading copy — avoid vague spinners on policy pages. */
+/** Loading copy — concrete, not a bare spinner. */
 export const EMPLOYEE_POLICY_LOADING_ASSIGNMENT =
-  'Checking your assignment and published company policy…';
+  'Loading your assignment and the published company policy…';
 
-/** Shown when policy exists but comparison is off — clarifies “partial” vs broken. */
-export const EMPLOYEE_POLICY_PARTIAL_INFO_LABEL =
-  'Partial policy information';
+/** Policy exists but comparison is off — clarifies partial vs broken. */
+export const EMPLOYEE_POLICY_PARTIAL_INFO_LABEL = 'Some comparison features are off';
 
 export const EMPLOYEE_POLICY_PARTIAL_INFO_DETAIL =
-  'Your company has a published policy on file, but detailed benefit cards and cost comparison are not shown until the policy meets comparison requirements. You can still review costs on Services; HR can complete missing rules in the Policy workspace.';
+  'Your employer published a policy, but a few benefit rows need clearer limits before ReloPass can run full side-by-side comparisons. What you see below is still grounded in the published policy where we have enough detail.';
 
-/** When comparison is fully available (resolved + comparison gate passed). */
-export const EMPLOYEE_POLICY_COMPARISON_ACTIVE_TITLE = 'Policy comparison is available';
+/** Comparison available for supported flows. */
+export const EMPLOYEE_POLICY_COMPARISON_ACTIVE_TITLE = 'Cost comparison is on';
 
 export const EMPLOYEE_POLICY_COMPARISON_ACTIVE_BODY =
-  'Benefit summaries below use your published assignment policy. Supported flows can compare selections to policy limits.';
+  'The summaries below follow your published assignment policy. Where you enter costs, ReloPass can compare them to your policy limits on supported services.';

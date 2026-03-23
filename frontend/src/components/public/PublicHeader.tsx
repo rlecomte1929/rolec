@@ -21,9 +21,11 @@ export const PublicHeader: React.FC = () => {
   const dashboardPath =
     role === 'EMPLOYEE'
       ? ROUTE_DEFS.employeeDashboard.path
-      : role === 'HR' || role === 'ADMIN'
-        ? ROUTE_DEFS.hrDashboard.path
-        : null;
+      : role === 'ADMIN'
+        ? ROUTE_DEFS.adminConsole.path
+        : role === 'HR'
+          ? ROUTE_DEFS.hrDashboard.path
+          : null;
 
   const isActive = (path: string) =>
     path === '/'

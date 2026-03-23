@@ -135,7 +135,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             <div className="text-right text-sm text-slate-600">
               {identity && (
                 <Link
-                  to={role === 'EMPLOYEE' ? buildRoute('employeeDashboard') : role === 'HR' || role === 'ADMIN' ? buildRoute('hrDashboard') : buildRoute('landing')}
+                  to={
+                    role === 'EMPLOYEE'
+                      ? buildRoute('employeeDashboard')
+                      : role === 'ADMIN'
+                        ? buildRoute('adminConsole')
+                        : role === 'HR'
+                          ? buildRoute('hrDashboard')
+                          : buildRoute('landing')
+                  }
                   className="inline-flex flex-col items-end rounded-lg px-3 py-2 font-medium text-[#0f172a] hover:bg-[#eef4f8] hover:text-[#0b2b43] transition-colors"
                 >
                   {identity}

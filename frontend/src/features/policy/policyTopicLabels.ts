@@ -1,0 +1,42 @@
+/** Topic order and labels — aligned with backend POLICY_THEMES / benefit groupings. */
+
+export const POLICY_TOPIC_ORDER: string[] = [
+  'immigration',
+  'travel',
+  'temporary_housing',
+  'household_goods',
+  'schooling',
+  'spouse_support',
+  'family_support',
+  'banking',
+  'tax',
+  'allowances',
+  'medical',
+  'home_leave',
+  'repatriation',
+  'compliance',
+  'documentation',
+  'misc',
+];
+
+export const POLICY_TOPIC_LABELS: Record<string, string> = {
+  immigration: 'Immigration',
+  travel: 'Travel',
+  temporary_housing: 'Temporary housing',
+  household_goods: 'Household goods',
+  schooling: 'Schooling',
+  spouse_support: 'Spouse support',
+  family_support: 'Family support',
+  banking: 'Banking',
+  tax: 'Tax',
+  allowances: 'Allowances',
+  medical: 'Medical',
+  home_leave: 'Home leave',
+  repatriation: 'Repatriation',
+  compliance: 'Compliance',
+  documentation: 'Documentation',
+  misc: 'Miscellaneous',
+  cash: 'Cash benefits',
+  in_kind: 'In-kind benefits',
+  general: 'General',
+};

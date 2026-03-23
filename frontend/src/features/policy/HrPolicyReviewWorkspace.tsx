@@ -1,8 +1,23 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
-import { companyPolicyAPI, policyDocumentsAPI } from '../../api/client';
+import { companyPolicyAPI, hrPolicyReviewAPI, policyDocumentsAPI } from '../../api/client';
 import { deriveHrPolicyPipelineState } from './hrPolicyDegradedState';
 import { HrPolicyPipelineBanner } from './HrPolicyPipelineBanner';
+import { deriveHrPolicyLifecycleContext, isTemplatePolicy } from './hrPolicyLifecycle';
+import { buildEmployeePreviewCompare } from './hrPolicyEmployeePreviewCompare';
+import { HrPolicyWorkspaceLayout } from './HrPolicyWorkspaceLayout';
+import { PublishPreflightModal } from './PublishPreflightModal';
+import {
+  derivePublishedComparisonSummary,
+  deriveWorkingVersionComparisonSummary,
+  resolveHrPolicyWorkspaceState,
+  type HrPolicyWorkspacePhase,
+} from './hrPolicyWorkspaceState';
+import { StarterPolicyDraftGuidance } from './StarterPolicyDraftGuidance';
+import { STARTER_TEMPLATE_OPTIONS, type StarterTemplateKey } from './starterPolicyCopy';
+import { HrPolicyDraftReviewPanel } from './HrPolicyDraftReviewPanel';
+import { HrBenefitOverrideSection } from './HrBenefitOverrideSection';
+import { POLICY_TOPIC_LABELS, POLICY_TOPIC_ORDER } from './policyTopicLabels';
 
 const VERSION_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
@@ -27,6 +42,18 @@ function formatBenefitLabel(r: any): string {
   return (meta(r, 'benefit_label') as string) || r?.benefit_key || '-';
 }
 
+/** FastAPI may return `detail` as a string or `{ code, message }` (e.g. publish gate). */
+function formatApiDetail(detail: unknown): string {
+  if (detail && typeof detail === 'object' && !Array.isArray(detail) && 'message' in detail) {
+    const o = detail as { message?: string; code?: string };
+    const prefix = o.code ? `[${o.code}] ` : '';
+    return `${prefix}${o.message || ''}`.trim() || 'Request failed';
+  }
+  if (typeof detail === 'string') return detail;
+  if (detail == null) return '';
+  return String(detail);
+}
+
 function formatDateTime(val: string | null | undefined): string {
   if (!val) return '-';
   try {
@@ -37,31 +64,6 @@ function formatDateTime(val: string | null | undefined): string {
     return String(val);
   }
 }
-
-/** Topic labels and display order (must match backend POLICY_THEMES). */
-const TOPIC_ORDER: string[] = [
-  'immigration', 'travel', 'temporary_housing', 'household_goods', 'schooling',
-  'spouse_support', 'family_support', 'banking', 'tax', 'allowances', 'medical',
-  'home_leave', 'repatriation', 'compliance', 'documentation', 'misc',
-];
-const TOPIC_LABELS: Record<string, string> = {
-  immigration: 'Immigration',
-  travel: 'Travel',
-  temporary_housing: 'Temporary housing',
-  household_goods: 'Household goods',
-  schooling: 'Schooling',
-  spouse_support: 'Spouse support',
-  family_support: 'Family support',
-  banking: 'Banking',
-  tax: 'Tax',
-  allowances: 'Allowances',
-  medical: 'Medical',
-  home_leave: 'Home leave',
-  repatriation: 'Repatriation',
-  compliance: 'Compliance',
-  documentation: 'Documentation',
-  misc: 'Miscellaneous',
-};
 
 type HrPolicyReviewWorkspaceProps = {
   refreshTrigger?: number;
@@ -94,6 +96,12 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
   const [renormalizeBusy, setRenormalizeBusy] = useState(false);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [expandAll, setExpandAll] = useState(false);
+  const [policyReview, setPolicyReview] = useState<Record<string, unknown> | null>(null);
+  const [starterTemplateBusy, setStarterTemplateBusy] = useState<StarterTemplateKey | null>(null);
+  const [starterError, setStarterError] = useState<string | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [dataRefreshNonce, setDataRefreshNonce] = useState(0);
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
 
   const downloadCacheRef = React.useRef<{ policyId: string; url: string | null; noFile: boolean } | null>(null);
 
@@ -103,7 +111,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       ? Promise.resolve(cached.noFile ? { ok: false, url: null } : { ok: true, url: cached.url })
       : companyPolicyAPI.getDownloadUrl(policyId).then((r: { ok?: boolean; url?: string; reason?: string }) => ({ ok: r?.ok ?? false, url: r?.url ?? null }));
     const [normRes, dlResult] = await Promise.all([
-      companyPolicyAPI.getNormalized(policyId).catch(() => null),
+      companyPolicyAPI.getNormalized(policyId, { includeReadiness: true }).catch(() => null),
       fetchDownload.then((r) => {
         const url = r.ok && r.url ? r.url : null;
         downloadCacheRef.current = { policyId, url, noFile: !r.ok };
@@ -171,7 +179,47 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     return () => {
       cancelled = true;
     };
-  }, [selectedPolicyId, loadWorkspaceData]);
+  }, [selectedPolicyId, loadWorkspaceData, dataRefreshNonce]);
+
+  useEffect(() => {
+    if (!selectedPolicyId) {
+      setPolicyReview(null);
+      setReviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const docId = normalized?.version?.source_policy_document_id as string | undefined;
+    const params: { policy_id: string; document_id?: string } = { policy_id: selectedPolicyId };
+    if (docId) params.document_id = docId;
+    setReviewLoading(true);
+    setPolicyReview(null);
+    hrPolicyReviewAPI
+      .get(params)
+      .then((payload) => {
+        if (!cancelled) setPolicyReview(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setPolicyReview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setReviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedPolicyId,
+    normalized?.version?.source_policy_document_id,
+    normalized?.version?.id,
+    refreshTrigger,
+    dataRefreshNonce,
+  ]);
+
+  const bumpPolicyDataRefresh = React.useCallback(() => {
+    setDataRefreshNonce((n) => n + 1);
+  }, []);
+
+  const publishInFlightRef = useRef(false);
 
   const sourceDocId = normalized?.version?.source_policy_document_id;
   const versionStatus = normalized?.version?.status || 'draft';
@@ -238,7 +286,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       setMessage(
         statusCode === 404
           ? 'This version is no longer current. The page has been refreshed to the latest version.'
-          : err?.response?.data?.detail || 'Status update failed'
+          : formatApiDetail(err?.response?.data?.detail) || 'Status update failed'
       );
       setMessageVariant('error');
     } finally {
@@ -246,22 +294,30 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     }
   };
 
-  const handlePublish = async () => {
-    if (!selectedPolicyId) return;
+  const performPublish = async () => {
+    if (!selectedPolicyId || publishInFlightRef.current) return;
+    publishInFlightRef.current = true;
     setPublishBusy(true);
     setMessage('');
     try {
       await companyPolicyAPI.publishLatestVersion(selectedPolicyId);
-      const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
+      const res = await companyPolicyAPI.getNormalized(selectedPolicyId, { includeReadiness: true });
       setNormalized(res);
-      setMessage('Version published. Employees will see this policy.');
+      bumpPolicyDataRefresh();
+      setPublishModalOpen(false);
+      setMessage('Published. Employees now see this version on their assignments (within eligibility).');
       setMessageVariant('success');
+      void loadDocumentsAndPolicies();
     } catch (err: any) {
       const statusCode = err?.response?.status;
       if (statusCode === 404) {
-        const res = await companyPolicyAPI.getNormalized(selectedPolicyId).catch(() => null);
+        const res = await companyPolicyAPI
+          .getNormalized(selectedPolicyId, { includeReadiness: true })
+          .catch(() => null);
         if (res?.version) {
           setNormalized(res);
+          bumpPolicyDataRefresh();
+          setPublishModalOpen(false);
           setMessage('This version is no longer current. The page has been refreshed to the latest version.');
           setMessageVariant('success');
           return;
@@ -270,10 +326,11 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       setMessage(
         statusCode === 404
           ? 'This version is no longer current. The page has been refreshed to the latest version.'
-          : err?.response?.data?.detail || 'Publish failed'
+          : formatApiDetail(err?.response?.data?.detail) || 'Publish failed'
       );
       setMessageVariant('error');
     } finally {
+      publishInFlightRef.current = false;
       setPublishBusy(false);
     }
   };
@@ -286,12 +343,15 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       await policyDocumentsAPI.normalize(sourceDocId);
       const res = await companyPolicyAPI.getNormalized(selectedPolicyId);
       setNormalized(res);
-      setMessage('Re-normalization complete. Review the updated benefit matrix.');
+      setMessage('Policy rebuilt from your source file. Review the benefit table for changes.');
       setMessageVariant('success');
       loadDocumentsAndPolicies();
     } catch (err: any) {
       const data = err?.response?.data;
-      let m = data?.message || data?.detail || 'Re-normalization failed';
+      let m =
+        (data?.message && typeof data.message === 'string' ? data.message : null) ||
+        formatApiDetail(data?.detail) ||
+        'Could not rebuild policy from the file';
       const issues = data?.errors;
       if (Array.isArray(issues) && issues.length) {
         const detail = issues
@@ -300,6 +360,14 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           .filter(Boolean)
           .join(' · ');
         if (detail) m = `${m} ${detail}`;
+      }
+      const normDetails = data?.details as Array<{ field?: string; issue?: string }> | undefined;
+      if (Array.isArray(normDetails) && normDetails.length) {
+        const nd = normDetails
+          .map((d) => (d.field && d.issue ? `${d.field}: ${d.issue}` : d.issue || d.field || ''))
+          .filter(Boolean)
+          .join(' · ');
+        if (nd) m = `${m} ${nd}`;
       }
       if (data?.hint) m = `${m} ${data.hint}`;
       setMessage(m);
@@ -322,10 +390,10 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     );
     // Return in display order, only topics that have rules
     const ordered: [string, any[]][] = [];
-    for (const cat of TOPIC_ORDER) {
+    for (const cat of POLICY_TOPIC_ORDER) {
       if (byCat[cat]?.length) ordered.push([cat, byCat[cat]]);
     }
-    const others = Object.keys(byCat).filter((c) => !TOPIC_ORDER.includes(c));
+    const others = Object.keys(byCat).filter((c) => !POLICY_TOPIC_ORDER.includes(c));
     for (const c of others) ordered.push([c, byCat[c]]);
     return ordered;
   }, [normalized?.benefit_rules]);
@@ -372,14 +440,258 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     [documents, normalized]
   );
 
+  const workspaceResolved = useMemo(
+    () =>
+      resolveHrPolicyWorkspaceState({
+        policies,
+        normalized,
+        policyReview,
+      }),
+    [policies, normalized, policyReview]
+  );
+
+  const reviewUnavailable = Boolean(
+    selectedPolicyId && normalized && !reviewLoading && policyReview === null
+  );
+
+  const policyLifecycle = useMemo(
+    () => deriveHrPolicyLifecycleContext(normalized, workspaceResolved),
+    [normalized, workspaceResolved]
+  );
+
+  const entitlementPreview = useMemo(() => {
+    const raw = policyReview?.entitlement_effective_preview;
+    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+  }, [policyReview]);
+
+  const publishedComparison = useMemo(
+    () => derivePublishedComparisonSummary(normalized),
+    [normalized]
+  );
+  const workingComparison = useMemo(
+    () => deriveWorkingVersionComparisonSummary(normalized),
+    [normalized]
+  );
+
+  const employeePreviewCompare = useMemo(() => {
+    if (workspaceResolved.phase === 'no_policy') return null;
+    return buildEmployeePreviewCompare({
+      resolved: workspaceResolved,
+      draftEntitlementPreview: entitlementPreview,
+      publishedComparison,
+      workingComparison,
+    });
+  }, [workspaceResolved, entitlementPreview, publishedComparison, workingComparison]);
+
+  const publishDataReady = Boolean(selectedPolicyId && normalized && !loading && !reviewLoading);
+
+  const preflightActiveSummary = useMemo(() => {
+    const pub = normalized?.published_version;
+    if (!pub || String(pub.status || '').toLowerCase() !== 'published') {
+      return 'No published policy is live yet.';
+    }
+    if (pub.source_policy_document_id) return 'Published policy from an uploaded company document.';
+    if (isTemplatePolicy(normalized?.policy as Record<string, unknown> | null)) {
+      return 'Published ReloPass standard baseline.';
+    }
+    return 'Published company policy.';
+  }, [normalized]);
+
+  const preflightDraftSummary = useMemo(() => {
+    const v = normalized?.version;
+    if (!v) return 'Working version in this workspace.';
+    if (v.source_policy_document_id) {
+      return 'Working version from your uploaded document (includes HR adjustments if saved).';
+    }
+    return 'Working version in this workspace (includes HR adjustments if saved).';
+  }, [normalized]);
+
+  const preflightWillReplaceActive = useMemo(() => {
+    const pub = normalized?.published_version;
+    return Boolean(pub && String(pub.status || '').toLowerCase() === 'published');
+  }, [normalized]);
+
+  const preflightActiveVersionLabel = useMemo(() => {
+    const pub = normalized?.published_version;
+    if (!pub || String(pub.status || '').toLowerCase() !== 'published') return null;
+    const n = pub.version_number;
+    return n != null ? String(n) : null;
+  }, [normalized]);
+
+  const preflightDraftVersionLabel = useMemo(() => {
+    const n = normalized?.version?.version_number;
+    return n != null ? String(n) : null;
+  }, [normalized]);
+
+  const starterBaselineMeta = useMemo(() => {
+    const pol = normalized?.policy as { template_source?: string; template_name?: string } | undefined;
+    if (!pol) return { isStarter: false as const, templateKey: null as StarterTemplateKey | null };
+    const ts = String(pol.template_source || '');
+    const tn = String(pol.template_name || '');
+    const isStarter = ts === 'default_platform_template' || tn.startsWith('starter_');
+    const m = tn.match(/^starter_(conservative|standard|premium)$/);
+    const k = m?.[1];
+    const templateKey =
+      k === 'conservative' || k === 'standard' || k === 'premium' ? (k as StarterTemplateKey) : null;
+    return { isStarter, templateKey };
+  }, [normalized?.policy]);
+
+  const starterGuidancePhase: HrPolicyWorkspacePhase = useMemo(() => {
+    if (workspaceResolved.phase === 'published' && workspaceResolved.hasUnpublishedDraftAhead) {
+      const st = String(
+        (normalized?.policy_readiness as { publish_readiness?: { status?: string } } | undefined)?.publish_readiness
+          ?.status || ''
+      )
+        .trim()
+        .toLowerCase();
+      return st === 'ready' ? 'ready_to_publish' : 'draft_not_publishable';
+    }
+    return workspaceResolved.phase;
+  }, [
+    workspaceResolved.phase,
+    workspaceResolved.hasUnpublishedDraftAhead,
+    normalized?.policy_readiness,
+  ]);
+
+  const showStarterDraftGuidance =
+    starterBaselineMeta.isStarter &&
+    Boolean(selectedPolicyId && normalized?.version) &&
+    (workspaceResolved.phase !== 'published' || workspaceResolved.hasUnpublishedDraftAhead);
+
+  const scrollToIntake = () => {
+    document.getElementById('hr-policy-document-intake')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const scrollToMatrix = () => {
+    document.getElementById('hr-policy-benefit-matrix')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const scrollToDraftPanel = () => {
+    document.getElementById('hr-policy-draft-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const scrollToStarterBaselines = () => {
+    document.getElementById('hr-policy-starter-onboarding')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const scrollToDraftReviewFull = () => {
+    document.getElementById('hr-policy-draft-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleSelectStarterTemplate = async (key: StarterTemplateKey) => {
+    setStarterError(null);
+    setStarterTemplateBusy(key);
+    try {
+      const out = await companyPolicyAPI.initializeFromTemplate({
+        template_key: key,
+        comparison_ready_structure: true,
+      });
+      const newPid = out?.policy_id;
+      const pols = await loadDocumentsAndPolicies();
+      if (newPid && pols.some((p: { id?: string }) => p.id === newPid)) {
+        setSelectedPolicyId(newPid);
+      }
+      const label = STARTER_TEMPLATE_OPTIONS.find((o) => o.key === key)?.label ?? key;
+      setMessage(out?.message || `${label} baseline created. Review below and publish when ready.`);
+      setMessageVariant('success');
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { detail?: unknown } } };
+      const d = ax?.response?.data?.detail;
+      const msg =
+        d && typeof d === 'object' && d !== null && 'message' in d
+          ? String((d as { message?: string }).message)
+          : typeof d === 'string'
+            ? d
+            : 'Could not create baseline policy.';
+      setStarterError(msg);
+    } finally {
+      setStarterTemplateBusy(null);
+    }
+  };
+
   return (
     <div className="space-y-6" data-hr-policy-workspace="v2">
-      <div className="text-xl font-semibold text-[#0b2b43]">HR Policy Review Workspace</div>
+      <HrPolicyWorkspaceLayout
+        resolved={workspaceResolved}
+        lifecycle={policyLifecycle}
+        documentsCount={documents.length}
+        loading={Boolean(selectedPolicyId && loading)}
+        reviewUnavailable={reviewUnavailable}
+        starterTemplateBusy={starterTemplateBusy}
+        starterError={starterError}
+        onSelectStarterTemplate={handleSelectStarterTemplate}
+        onUploadDocument={scrollToIntake}
+        onReviewDraft={scrollToMatrix}
+        onReviewDraftReplacement={scrollToDraftPanel}
+        onScrollToStarterBaselines={scrollToStarterBaselines}
+        onAdjustBenefits={scrollToMatrix}
+        onRequestPublishPreflight={() => setPublishModalOpen(true)}
+        publishBusy={publishBusy}
+        publishDataReady={publishDataReady}
+        employeePreviewCompare={employeePreviewCompare}
+        onScrollToDraftReviewPanel={scrollToDraftReviewFull}
+      />
+
+      <PublishPreflightModal
+        open={publishModalOpen}
+        onClose={() => !publishBusy && setPublishModalOpen(false)}
+        onConfirm={performPublish}
+        publishBusy={publishBusy}
+        dataLoading={Boolean(loading || reviewLoading)}
+        activeSummary={preflightActiveSummary}
+        activeVersionLabel={preflightActiveVersionLabel}
+        activeComparison={publishedComparison}
+        draftSummary={preflightDraftSummary}
+        draftVersionLabel={preflightDraftVersionLabel}
+        comparisonAfterPublish={workingComparison}
+        willReplaceActive={preflightWillReplaceActive}
+      />
+
+      {showStarterDraftGuidance && (
+        <StarterPolicyDraftGuidance
+          templateKey={starterBaselineMeta.templateKey}
+          phase={starterGuidancePhase}
+          onReviewDraft={scrollToMatrix}
+          onPublishPolicy={() => setPublishModalOpen(true)}
+          publishBusy={publishBusy}
+          publishDataReady={publishDataReady}
+        />
+      )}
+
+      <div id="hr-policy-detailed-review" className="scroll-mt-4 pt-2 border-t border-[#e5e7eb]">
+        <div className="text-xl font-semibold text-[#0b2b43]">Detailed review</div>
+        <p className="text-sm text-[#6b7280] mt-1 mb-4 max-w-3xl">
+          Document summary, readiness, and rule-level context. Use this before large edits in the benefit table.
+        </p>
+      </div>
+
+      {selectedPolicyId && (
+        <HrPolicyDraftReviewPanel
+          policyReview={policyReview}
+          workspaceResolved={workspaceResolved}
+          versionStatus={String(versionStatus || '')}
+          reviewLoading={reviewLoading}
+        />
+      )}
+
+      {selectedPolicyId && normalized?.version?.id && Array.isArray(normalized?.benefit_rules) && (
+        <HrBenefitOverrideSection
+          policyId={selectedPolicyId}
+          versionId={String(normalized.version.id)}
+          benefitRules={normalized.benefit_rules}
+          hrOverrides={policyReview?.hr_overrides}
+          entitlementPreview={policyReview?.entitlement_effective_preview}
+          onDataRefresh={bumpPolicyDataRefresh}
+        />
+      )}
+
+      <div className="text-xl font-semibold text-[#0b2b43]">Benefit table &amp; publish</div>
       <div className="text-sm text-[#6b7280] mb-2">
-        Review extracted policy content, edit benefit rules, and publish for employee visibility.
+        Edit rules below; use overrides above when you need HR-only adjustments without changing baseline rows.
       </div>
       <div className="rounded-lg bg-[#f0fdf4] border border-[#bbf7d0] px-4 py-2 text-xs text-[#166534]">
-        <strong>Workflow:</strong> Upload document → Reprocess (if needed) → Normalize & publish (releases to employees) → Optional: review/edit matrix → Publish again after edits
+        <strong>Tip:</strong> Upload or reprocess files in Documents &amp; processing, then build the policy. After you
+        edit rules, choose <strong>Publish version</strong> so employee assignments pick up the live version.
       </div>
 
       <HrPolicyPipelineBanner derived={pipelineDerived} loading={Boolean(selectedPolicyId && loading)} />
@@ -396,7 +708,8 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           <select
             value={selectedPolicyId || ''}
             onChange={(e) => setSelectedPolicyId(e.target.value || null)}
-            className="border border-[#e2e8f0] rounded px-2 py-1.5 text-sm"
+            disabled={Boolean(loading && policies.length > 0)}
+            className="border border-[#e2e8f0] rounded px-2 py-1.5 text-sm disabled:opacity-60"
           >
             <option value="">Select policy</option>
             {policies.map((p) => (
@@ -418,17 +731,17 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               <span className="text-xs px-2 py-1 rounded bg-[#e2e8f0]">
                 Version {normalized.version.version_number} · {VERSION_STATUS_LABELS[versionStatus] || versionStatus}
               </span>
-              <span className="text-xs text-[#6b7280]" title="Normalized at">
-                Normalized: {formatDateTime(normalized.version.created_at)}
+              <span className="text-xs text-[#6b7280]" title="When this version was built">
+                Version saved: {formatDateTime(normalized.version.created_at)}
               </span>
               {versionStatus === 'published' && normalized.version.updated_at && (
-                <span className="text-xs text-[#6b7280]" title="Published at">
-                  Published: {formatDateTime(normalized.version.updated_at)}
+                <span className="text-xs text-[#6b7280]" title="When this version went live">
+                  Went live: {formatDateTime(normalized.version.updated_at)}
                 </span>
               )}
               {avgConfidence != null && (
                 <span className={`text-xs px-2 py-1 rounded ${avgConfidence >= 70 ? 'bg-[#d1fae5] text-[#065f46]' : avgConfidence >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-[#e2e8f0]'}`}>
-                  Avg confidence: {avgConfidence}%
+                  Avg match strength: {avgConfidence}%
                 </span>
               )}
               <span className="text-xs text-[#6b7280]">
@@ -441,7 +754,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                   onClick={handleRenormalize}
                   disabled={renormalizeBusy}
                 >
-                  {renormalizeBusy ? 'Re-running…' : 'Re-run normalize & publish'}
+                  {renormalizeBusy ? 'Rebuilding…' : 'Rebuild policy from source file'}
                 </Button>
               )}
             </>
@@ -449,7 +762,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         </div>
         {loading && (
           <div className="text-sm text-[#6b7280] mt-2" role="status" aria-live="polite">
-            Loading policy version, benefit matrix, and publish status…
+            Loading this policy version, benefit table, and publish status…
           </div>
         )}
         {documents.length > 0 && (
@@ -461,7 +774,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
 
       {/* Grouped policy matrix by topic */}
       {normalized?.version && (
-        <Card padding="lg">
+        <Card padding="lg" id="hr-policy-benefit-matrix">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-[#0b2b43]">Benefit rules by topic</div>
             <button type="button" onClick={handleExpandAll} className="text-xs text-[#059669] hover:underline">
@@ -470,13 +783,14 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           </div>
           {groupedBenefits.length === 0 ? (
             <div className="text-sm text-[#6b7280] py-4">
-              No benefit rules. Upload a document, Reprocess, then Normalize & publish from document intake.
+              No benefit rules yet. Upload a file, reprocess if needed, then build the policy from Documents &amp;
+              processing.
             </div>
           ) : (
           <div className="space-y-2">
             {groupedBenefits.map(([cat, rules]) => {
               const isExpanded = expandedTopics.has(cat);
-              const label = TOPIC_LABELS[cat] ?? cat;
+              const label = POLICY_TOPIC_LABELS[cat] ?? cat;
               const autoCount = (rules as any[]).filter((r: any) => r.auto_generated).length;
               const manualCount = rules.length - autoCount;
               const ruleList = rules as any[];
@@ -697,7 +1011,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
       {/* Panel F: Publish controls */}
       {normalized?.version && (
         <Card padding="lg">
-          <div className="text-sm font-semibold text-[#0b2b43] mb-2">F. Publish controls</div>
+          <div className="text-sm font-semibold text-[#0b2b43] mb-2">Publish controls</div>
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="outline" size="sm" onClick={() => handleSaveStatus('draft')} disabled={statusBusy}>
               {statusBusy ? 'Saving…' : 'Save draft'}
@@ -708,15 +1022,26 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
             <Button variant="outline" size="sm" onClick={() => handleSaveStatus('reviewed')} disabled={statusBusy}>
               {statusBusy ? 'Saving…' : 'Mark reviewed'}
             </Button>
-            <Button size="sm" onClick={handlePublish} disabled={publishBusy || statusBusy || versionStatus === 'published'}>
+            <Button
+              size="sm"
+              onClick={() => setPublishModalOpen(true)}
+              disabled={
+                publishBusy ||
+                statusBusy ||
+                versionStatus === 'published' ||
+                !publishDataReady
+              }
+            >
               {publishBusy ? 'Publishing…' : 'Publish version'}
             </Button>
             {versionStatus === 'published' && (
-              <span className="text-sm text-[#059669] font-medium">Published (visible to employees)</span>
+              <span className="text-sm text-[#059669] font-medium">Live for employees</span>
             )}
           </div>
           <div className="text-xs text-[#6b7280] mt-2">
-            Status: {VERSION_STATUS_LABELS[versionStatus] || versionStatus}. New versions from document intake are published automatically; use Publish after edits to replace the live version.
+            Status: {VERSION_STATUS_LABELS[versionStatus] || versionStatus}. After you change rules here, use{' '}
+            <strong>Publish version</strong> to replace what employees see. New uploads from document intake stay as
+            drafts until you publish them.
           </div>
         </Card>
       )}

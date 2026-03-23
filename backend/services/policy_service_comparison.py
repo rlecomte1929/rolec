@@ -5,8 +5,10 @@ against the resolved assignment policy.
 **Layer 2 only:** Uses `resolved_assignment_policy_*` / benefits keyed by `benefit_key`.
 Never use `extracted_metadata` or document-level `mentioned_*` lists for comparison logic.
 
-Employee calls use `employee_gate=True` so comparisons run only when
-`policy_comparison_readiness.evaluate_version_comparison_readiness` is satisfied.
+Employee calls use `employee_gate=True`: legacy ``comparisons`` are omitted unless
+``evaluate_version_comparison_readiness`` is satisfied, but ``effective_service_comparison``
+still runs (excluded / informational / not_enough_policy_data remain truthful; numeric
+within/exceed is withheld when the version or rule is not comparison-ready).
 HR calls omit the gate so HR can always inspect diagnostics.
 """
 from __future__ import annotations
@@ -15,6 +17,11 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from .policy_taxonomy import get_benefit_meta
+from .service_comparison_engine import (
+    build_entitlements_by_benefit_key,
+    compare_selected_services_effective_entitlements,
+    map_case_service_to_canonical_selection,
+)
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +133,9 @@ def _compare_single(
             {},
         )
 
+    cr = benefit.get("rule_comparison_readiness") if isinstance(benefit.get("rule_comparison_readiness"), dict) else {}
+    cr_level = cr.get("level")
+
     approval = bool(benefit.get("approval_required", False))
     max_val = benefit.get("max_value")
     std_val = benefit.get("standard_value")
@@ -137,6 +147,27 @@ def _compare_single(
     policy_cap = max_val if max_val is not None else std_val
 
     variance: Dict[str, Any] = {}
+
+    if (
+        cr_level == "not_ready"
+        and requested_amount is None
+        and policy_cap is None
+    ):
+        return (
+            "uncertain",
+            "Policy wording is too ambiguous for automated comparison; confirm limits with HR.",
+            variance,
+        )
+    if (
+        cr_level == "partial"
+        and policy_cap is None
+        and requested_amount is None
+    ):
+        return (
+            "informational",
+            "Included under policy; numeric comparison is not available (coverage-only or non-cap rule).",
+            variance,
+        )
 
     if requested_amount is not None and policy_cap is not None:
         try:
@@ -194,6 +225,7 @@ def compute_policy_service_comparison(
     include_diagnostics: bool = False,
     *,
     employee_gate: bool = False,
+    selected_services_override: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Compute comparison between selected services + answers and resolved policy.
@@ -202,7 +234,12 @@ def compute_policy_service_comparison(
     """
     assignment = assignment or db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
     if not assignment:
-        out: Dict[str, Any] = {"comparisons": [], "message": "Assignment not found.", "resolved_policy": None}
+        out: Dict[str, Any] = {
+            "comparisons": [],
+            "message": "Assignment not found.",
+            "resolved_policy": None,
+            "effective_service_comparison": [],
+        }
         if employee_gate:
             out["comparison_available"] = False
         return out
@@ -231,37 +268,28 @@ def compute_policy_service_comparison(
             "comparisons": [],
             "message": "No published policy for this assignment. Cannot compare services.",
             "resolved_policy": None,
+            "effective_service_comparison": [],
         }
         if employee_gate:
             out["comparison_available"] = False
         return out
 
     comparison_readiness = None
+    legacy_comparisons_suppressed = False
     if employee_gate:
         from .policy_comparison_readiness import evaluate_version_comparison_readiness
 
         pvid = resolved.get("policy_version_id")
         comparison_readiness = evaluate_version_comparison_readiness(db, str(pvid) if pvid else None)
         if not comparison_readiness.get("comparison_ready"):
-            return {
-                "comparisons": [],
-                "comparison_available": False,
-                "comparison_readiness": comparison_readiness,
-                "message": (
-                    "Policy comparison is not available yet. You can still review service costs; "
-                    "company coverage and limits will appear here after your policy is published in a comparison-ready form."
-                ),
-                "resolved_policy": {
-                    "id": resolved.get("id"),
-                    "policy_version_id": resolved.get("policy_version_id"),
-                    "resolved_at": resolved.get("resolved_at"),
-                },
-                "assignment_id": assignment_id,
-                "case_id": case_id,
-                "canonical_case_id": canonical_case_id,
-            }
+            legacy_comparisons_suppressed = True
 
     benefits = db.list_resolved_policy_benefits(resolved["id"])
+    pvid = resolved.get("policy_version_id")
+    if pvid:
+        from .policy_rule_comparison_readiness import enrich_resolved_benefits_with_rule_comparison
+
+        benefits = enrich_resolved_benefits_with_rule_comparison(db, str(pvid), benefits)
     benefits_by_key: Dict[str, Dict] = {b.get("benefit_key"): b for b in benefits if b.get("benefit_key")}
 
     # Selected services and answers
@@ -296,41 +324,44 @@ def compute_policy_service_comparison(
     comparisons: List[Dict[str, Any]] = []
     seen_cats: set = set()
 
-    for cat, case_svc in services_by_cat.items():
-        if cat in seen_cats:
-            continue
-        seen_cats.add(cat)
-        benefit_key = _map_service_to_benefit(cat)
-        requested = _extract_requested_values(cat, answers_flat, case_svc)
-        benefit = benefits_by_key.get(benefit_key) if benefit_key else None
+    if not legacy_comparisons_suppressed:
+        for cat, case_svc in services_by_cat.items():
+            if cat in seen_cats:
+                continue
+            seen_cats.add(cat)
+            benefit_key = _map_service_to_benefit(cat)
+            requested = _extract_requested_values(cat, answers_flat, case_svc)
+            benefit = benefits_by_key.get(benefit_key) if benefit_key else None
 
-        status, explanation, variance = _compare_single(cat, requested, benefit)
+            status, explanation, variance = _compare_single(cat, requested, benefit)
 
-        meta = get_benefit_meta(benefit_key or cat)
-        label = (meta.get("keywords") or [cat.replace("_", " ")])[0].replace("_", " ").title()
+            meta = get_benefit_meta(benefit_key or cat)
+            label = (meta.get("keywords") or [cat.replace("_", " ")])[0].replace("_", " ").title()
 
-        rec: Dict[str, Any] = {
-            "service_category": cat,
-            "benefit_key": benefit_key or "out_of_scope",
-            "label": label,
-            "requested_value_json": requested,
-            "policy_status": status,
-            "explanation": explanation,
-            "variance_json": variance,
-            "approval_required": bool(benefit.get("approval_required")) if benefit else False,
-            "evidence_required_json": list(benefit.get("evidence_required_json") or []) if benefit else [],
-            "source_rule_ids_json": list(benefit.get("source_rule_ids_json") or []) if benefit else [],
-        }
-        if benefit:
-            rec["policy_min_value"] = benefit.get("min_value")
-            rec["policy_standard_value"] = benefit.get("standard_value")
-            rec["policy_max_value"] = benefit.get("max_value")
-            rec["currency"] = benefit.get("currency") or "USD"
-            rec["amount_unit"] = benefit.get("amount_unit")
-        else:
-            rec["currency"] = requested.get("currency") or "USD"
+            rec: Dict[str, Any] = {
+                "service_category": cat,
+                "benefit_key": benefit_key or "out_of_scope",
+                "label": label,
+                "requested_value_json": requested,
+                "policy_status": status,
+                "explanation": explanation,
+                "variance_json": variance,
+                "approval_required": bool(benefit.get("approval_required")) if benefit else False,
+                "evidence_required_json": list(benefit.get("evidence_required_json") or []) if benefit else [],
+                "source_rule_ids_json": list(benefit.get("source_rule_ids_json") or []) if benefit else [],
+            }
+            if benefit:
+                rec["policy_min_value"] = benefit.get("min_value")
+                rec["policy_standard_value"] = benefit.get("standard_value")
+                rec["policy_max_value"] = benefit.get("max_value")
+                rec["currency"] = benefit.get("currency") or "USD"
+                rec["amount_unit"] = benefit.get("amount_unit")
+                if isinstance(benefit.get("rule_comparison_readiness"), dict):
+                    rec["rule_comparison_readiness"] = benefit["rule_comparison_readiness"]
+            else:
+                rec["currency"] = requested.get("currency") or "USD"
 
-        comparisons.append(rec)
+            comparisons.append(rec)
 
     result: Dict[str, Any] = {
         "comparisons": comparisons,
@@ -344,13 +375,48 @@ def compute_policy_service_comparison(
         "canonical_case_id": canonical_case_id,
     }
     if employee_gate:
-        result["comparison_available"] = True
+        result["comparison_available"] = not legacy_comparisons_suppressed
         if comparison_readiness is not None:
             result["comparison_readiness"] = comparison_readiness
+        if legacy_comparisons_suppressed:
+            result["message"] = (
+                "Policy comparison is not available yet. You can still review service costs; "
+                "company coverage and limits will appear here after your policy is published in a comparison-ready form."
+            )
     if include_diagnostics:
         result["diagnostics"] = {
             "benefits_count": len(benefits),
             "services_count": len(case_services),
             "answers_keys": list(answers_flat.keys()),
         }
+
+    # Effective-entitlement comparison engine (canonical service_key slice; rule_comparison_readiness-aware)
+    version_ready = True
+    if employee_gate and comparison_readiness is not None:
+        version_ready = bool(comparison_readiness.get("comparison_ready"))
+    engine_selections: List[Dict[str, Any]] = []
+    if selected_services_override is not None:
+        engine_selections = list(selected_services_override)
+    else:
+        for s in case_services:
+            if not s.get("selected", True):
+                continue
+            mapped = map_case_service_to_canonical_selection(s)
+            if mapped:
+                engine_selections.append(mapped)
+    by_sk: Dict[str, Dict[str, Any]] = {}
+    for m in engine_selections:
+        sk = m["service_key"]
+        prev = by_sk.get(sk)
+        if prev is None:
+            by_sk[sk] = m
+            continue
+        if m.get("estimated_cost") is not None and prev.get("estimated_cost") is None:
+            by_sk[sk] = m
+    ent_by_bk = build_entitlements_by_benefit_key(benefits)
+    result["effective_service_comparison"] = compare_selected_services_effective_entitlements(
+        selected_services=list(by_sk.values()),
+        entitlements_by_benefit_key=ent_by_bk,
+        version_comparison_ready=version_ready,
+    )
     return result

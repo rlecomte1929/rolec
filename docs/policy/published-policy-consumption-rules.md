@@ -27,7 +27,7 @@ Implementation touchpoints:
 - Normalization **input** validated by `normalization_input.validate_and_prepare_normalization_input` before `run_normalization` (blocking issues → 422, no new version).
 - **Publish** validated by `require_employee_publishable_policy_version`: non-empty structured output (≥1 benefit rule or exclusion), provenance (`source_policy_document_id` and/or `auto_generated`), and source document not `processing_status = failed` when linked.
 
-Failed normalization that **does not** create a publishable version never becomes employee-visible. If normalization persists a version but **publish** fails (e.g. empty rules), the publish gate returns **400**; auto-publish after normalize propagates that **HTTPException** to the client.
+Failed normalization that **does not** create a publishable version never becomes employee-visible. If normalization persists a version but **publish** fails (e.g. empty rules), the publish gate returns **400** with `detail: { "code": "<PUBLISH_BLOCKED_*>" , "message": "..." }`; auto-publish after normalize catches that and returns **HTTP 200** with `publish_blocked` plus the same code in `publish_block_code`.
 
 **Comparison-ready** vs **explicitly non-ready**:
 

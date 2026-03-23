@@ -4,6 +4,7 @@ import { signInSupabase } from '../api/supabaseAuth';
 import type { LoginRequest, RegisterRequest, UserRole } from '../types';
 import { setAuthItem } from '../utils/demo';
 import { safeNavigate } from '../navigation/safeNavigate';
+import type { RouteKey } from '../navigation/routes';
 import { trackAuthPerf } from '../perf/authPerf';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
 import type { PostSignupReconciliation } from '../types';
@@ -32,8 +33,14 @@ export const useAuth = () => {
     setAuthItem('relopass_role', user.role);
   };
 
+  const postAuthRouteKey = (role: UserRole): RouteKey => {
+    if (role === 'EMPLOYEE') return 'employeeDashboard';
+    if (role === 'ADMIN') return 'adminConsole';
+    return 'hrDashboard';
+  };
+
   const redirectByRole = (role: UserRole) => {
-    safeNavigate(navigate, role === 'EMPLOYEE' ? 'employeeDashboard' : 'hrDashboard');
+    safeNavigate(navigate, postAuthRouteKey(role));
   };
 
   const login = async (payload: LoginRequest) => {
@@ -63,7 +70,7 @@ export const useAuth = () => {
       trackAuthPerf({ stage: 'token_refresh_start' });
       trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
         role: response.user.role,
-        targetRouteKey: response.user.role === 'EMPLOYEE' ? 'employeeDashboard' : 'hrDashboard',
+        targetRouteKey: postAuthRouteKey(response.user.role),
         source: 'login',
       });
       redirectByRole(response.user.role);
@@ -74,7 +81,7 @@ export const useAuth = () => {
     } else {
       trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
         role: response.user.role,
-        targetRouteKey: response.user.role === 'EMPLOYEE' ? 'employeeDashboard' : 'hrDashboard',
+        targetRouteKey: postAuthRouteKey(response.user.role),
         source: 'login',
       });
       redirectByRole(response.user.role);
@@ -101,7 +108,7 @@ export const useAuth = () => {
     const emailForSb = response.user.email ?? payload.email?.trim() ?? null;
     trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
       role: response.user.role,
-      targetRouteKey: response.user.role === 'EMPLOYEE' ? 'employeeDashboard' : 'hrDashboard',
+      targetRouteKey: postAuthRouteKey(response.user.role),
       source: 'register',
     });
     redirectByRole(response.user.role);

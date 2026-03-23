@@ -88,32 +88,32 @@ export const HR_POLICY_PIPELINE_COPY: Record<
 > = {
   workspace_empty: {
     variant: 'neutral',
-    title: 'No policy workspace data yet',
-    body: 'Upload a company policy document, or ensure a company policy exists. Employees only see content after you normalize and publish a version.',
+    title: 'No policy to work with yet',
+    body: 'Upload a company policy file or create a baseline from the options above, then build and publish a version. Employees only see benefits after a version is published.',
   },
   uploaded_not_normalized: {
     variant: 'info',
-    title: 'Document uploaded — normalization not complete',
-    body: 'Text extraction or classification is still in progress, or you have not run Normalize & publish yet. Layer‑1 metadata on the document is not employee-facing until you produce a published policy version.',
+    title: 'File received—policy build not finished',
+    body: 'We may still be reading the file, or you have not finished “build policy from document” in Documents & processing. Until you publish, employees keep seeing the previous live policy—or none if this is your first one.',
   },
   normalized_failed: {
     variant: 'error',
-    title: 'Document processing failed',
-    body: 'Fix the issue (try Reprocess), then normalize again. Failed documents cannot be published for employees.',
+    title: 'We could not finish processing this file',
+    body: 'Fix the source file if needed, choose Reprocess, then build the policy again. Employees cannot use a policy that did not finish processing.',
   },
   normalized_partial: {
     variant: 'warning',
-    title: 'Structured policy exists — not published to employees',
-    body: 'Review the benefit matrix, then use Publish version. Until a version is published, employees will not see this policy on Package & limits or Services.',
+    title: 'Draft policy on file—not live yet',
+    body: 'ReloPass saved benefit rules you can edit. Review the table and publish when the workspace shows you can. Until then, employees do not see this draft on Package & limits or Services.',
   },
   published_not_comparison_ready: {
     variant: 'warning',
-    title: 'Published — employee cost comparison not active',
-    body: 'Employees see resolved benefits where applicable, but comparison bars and gated comparisons stay off until required benefit rules are complete. Use blockers below to fix gaps.',
+    title: 'Live policy—cost comparison not fully on',
+    body: 'Employees see benefits from what you published, but some comparison bars stay off until a few services have clearer limits. Use the checklist in the draft review panel to close the gaps.',
   },
   published_comparison_ready: {
     variant: 'success',
-    title: 'Published — comparison-ready for employees',
-    body: 'Employees with a matching assignment can use policy-backed comparison on supported services and package summary, subject to resolution context.',
+    title: 'Live policy—cost comparison available',
+    body: 'Employees on a matching assignment can compare costs to policy limits on supported services where your caps are defined.',
   },
 };

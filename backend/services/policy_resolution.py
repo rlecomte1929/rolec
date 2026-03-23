@@ -14,6 +14,12 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from .policy_hr_rule_override_layer import (
+    compute_entitlement_value_trace,
+    force_excluded_by_hr_override,
+    index_hr_overrides_by_benefit_rule_id,
+    load_merged_benefit_rule_for_resolution,
+)
 from .policy_taxonomy import ASSIGNMENT_TYPE_MAP, FAMILY_STATUS_MAP, get_benefit_meta
 
 log = logging.getLogger(__name__)
@@ -319,50 +325,32 @@ def _meta(r: Dict[str, Any], key: str, default: Any = None) -> Any:
     return m.get(key, default)
 
 
-def resolve_policy_for_assignment(
+def resolve_benefits_matrix_for_version(
     db: Any,
     assignment_id: str,
     assignment: Dict[str, Any],
     case: Optional[Dict[str, Any]],
     profile: Optional[Dict[str, Any]],
     employee_profile: Optional[Dict[str, Any]],
+    *,
+    company_id: str,
+    policy_row: Dict[str, Any],
+    version_row: Dict[str, Any],
+    persist_resolution: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """
-    Resolve published policy for assignment. Returns resolved policy dict or None if no policy.
+    Resolve benefit matrix for a specific policy version (published or draft preview).
+
+    When persist_resolution=True, upserts resolved_assignment_policies and returns the same shape as
+    the historical resolve_policy_for_assignment output. When False, returns benefits/exclusions in-memory
+    only (employee entitlement preview before publish).
     """
     ctx = extract_resolution_context(assignment, case, profile, employee_profile)
     case_id = assignment.get("case_id")
     canonical_case_id = assignment.get("canonical_case_id") or case_id
 
-    candidates = collect_company_id_candidates_for_assignment(db, assignment, case)
-    if not candidates:
-        log.warning(
-            "policy_resolution: no company_id for assignment %s (case=%s, hr_user=%s, emp_user=%s)",
-            assignment_id,
-            bool(case),
-            assignment.get("hr_user_id"),
-            assignment.get("employee_user_id"),
-        )
-        return None
-
-    pub = find_first_published_company_policy(db, candidates)
-    if not pub:
-        company_id = None
-        result = None
-    else:
-        company_id, policy, version = pub
-        result = (policy, version)
-    if not result or not company_id:
-        log.info(
-            "policy_resolution: no published policy for any of companies %s (assignment %s)",
-            candidates,
-            assignment_id,
-        )
-        return None
-
-    policy, version = result
-    policy_id = (policy or {}).get("id")
-    vid = (version or {}).get("id")
+    policy_id = (policy_row or {}).get("id")
+    vid = (version_row or {}).get("id")
     if not policy_id or not vid:
         log.warning("policy_resolution: policy or version missing id assignment_id=%s", assignment_id)
         return None
@@ -373,6 +361,11 @@ def resolve_policy_for_assignment(
     assignment_applicability = db.list_policy_assignment_applicability(vid)
     family_applicability = db.list_policy_family_applicability(vid)
     tier_overrides = db.list_policy_tier_overrides(vid)
+    try:
+        hr_ov_rows = db.list_hr_benefit_rule_overrides(str(vid))
+    except Exception:
+        hr_ov_rows = []
+    hr_ov_by = index_hr_overrides_by_benefit_rule_id(list(hr_ov_rows))
 
     # Build evidence by benefit_rule_id
     evidence_by_rule: Dict[str, List[str]] = {}
@@ -415,6 +408,11 @@ def resolve_policy_for_assignment(
         if not bk:
             continue
 
+        ov = hr_ov_by.get(str(rid)) if rid is not None else None
+        merged, ent_trace = load_merged_benefit_rule_for_resolution(
+            db, str(vid), rule, overrides_by_rule_id=hr_ov_by
+        )
+
         # Check assignment type applicability
         if not _rule_applies_by_assignment_type(rid, assignment_type, assignment_applicability):
             continue
@@ -428,6 +426,26 @@ def resolve_policy_for_assignment(
         if conds:
             if not all(_evaluate_condition(cond, ctx) for cond in conds):
                 continue  # Skip this rule - at least one condition failed
+
+        # HR envelope: force excluded without mutating stored Layer-2 row
+        if force_excluded_by_hr_override(ov):
+            resolved_benefits.append({
+                "benefit_key": bk,
+                "included": False,
+                "min_value": None,
+                "standard_value": None,
+                "max_value": None,
+                "currency": merged.get("currency") or rule.get("currency"),
+                "amount_unit": merged.get("amount_unit") or rule.get("amount_unit"),
+                "frequency": merged.get("frequency") or rule.get("frequency"),
+                "approval_required": False,
+                "evidence_required_json": [],
+                "exclusions_json": [{"domain": "excluded", "description": "Excluded by HR policy override"}],
+                "condition_summary": "HR override: excluded",
+                "source_rule_ids_json": [rid],
+                "entitlement_value_trace": ent_trace,
+            })
+            continue
 
         # Check exclusions
         excluded = _is_benefit_excluded(bk, "general", exclusions, ctx)
@@ -446,11 +464,12 @@ def resolve_policy_for_assignment(
                 "exclusions_json": [{"domain": "excluded", "description": "Excluded by policy"}],
                 "condition_summary": "Excluded",
                 "source_rule_ids_json": [rid],
+                "entitlement_value_trace": compute_entitlement_value_trace(rule, ov),
             })
             continue
 
-        # Allowed - compute values
-        allowed = _meta(rule, "allowed", True)
+        # Allowed - compute values (merged applies HR cap / approval / duration overrides)
+        allowed = _meta(merged, "allowed", True)
         if not allowed:
             resolved_benefits.append({
                 "benefit_key": bk,
@@ -458,22 +477,23 @@ def resolve_policy_for_assignment(
                 "min_value": None,
                 "standard_value": None,
                 "max_value": None,
-                "currency": rule.get("currency"),
-                "amount_unit": rule.get("amount_unit"),
-                "frequency": rule.get("frequency"),
+                "currency": merged.get("currency") or rule.get("currency"),
+                "amount_unit": merged.get("amount_unit") or rule.get("amount_unit"),
+                "frequency": merged.get("frequency") or rule.get("frequency"),
                 "approval_required": False,
                 "evidence_required_json": [],
                 "exclusions_json": [],
                 "condition_summary": "Not allowed",
                 "source_rule_ids_json": [rid],
+                "entitlement_value_trace": ent_trace,
             })
             continue
 
         # Base values
-        std = rule.get("amount_value") or _meta(rule, "standard_value")
-        minv = _meta(rule, "min_value")
-        maxv = _meta(rule, "max_value")
-        approval = _meta(rule, "approval_required", False) or rule.get("review_status") == "edited"
+        std = merged.get("amount_value") or _meta(merged, "standard_value")
+        minv = _meta(merged, "min_value")
+        maxv = _meta(merged, "max_value")
+        approval = _meta(merged, "approval_required", False) or rule.get("review_status") == "edited"
         ev_items = evidence_by_rule.get(rid, [])
 
         # Tier override
@@ -493,15 +513,29 @@ def resolve_policy_for_assignment(
             "min_value": minv,
             "standard_value": std,
             "max_value": maxv,
-            "currency": rule.get("currency") or "USD",
-            "amount_unit": rule.get("amount_unit"),
-            "frequency": rule.get("frequency"),
+            "currency": merged.get("currency") or rule.get("currency") or "USD",
+            "amount_unit": merged.get("amount_unit") or rule.get("amount_unit"),
+            "frequency": merged.get("frequency") or rule.get("frequency"),
             "approval_required": bool(approval),
             "evidence_required_json": ev_items if isinstance(ev_items, list) else list(ev_items),
             "exclusions_json": [],
             "condition_summary": ", ".join(cond_summary_parts),
             "source_rule_ids_json": [rid],
+            "entitlement_value_trace": ent_trace,
         })
+
+    if not persist_resolution:
+        return {
+            "benefits": resolved_benefits,
+            "exclusions": resolved_exclusions,
+            "policy": policy_row,
+            "version": version_row,
+            "resolution_context": ctx,
+            "resolution_company_id": company_id,
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "persisted": False,
+        }
 
     # Persist
     rid = db.upsert_resolved_assignment_policy(
@@ -523,8 +557,54 @@ def resolve_policy_for_assignment(
         return None
     resolved["benefits"] = db.list_resolved_policy_benefits(rid)
     resolved["exclusions"] = db.list_resolved_policy_exclusions(rid)
-    resolved["policy"] = policy
-    resolved["version"] = version
+    resolved["policy"] = policy_row
+    resolved["version"] = version_row
     resolved["resolution_context"] = ctx
     resolved["resolution_company_id"] = company_id
     return resolved
+
+
+def resolve_policy_for_assignment(
+    db: Any,
+    assignment_id: str,
+    assignment: Dict[str, Any],
+    case: Optional[Dict[str, Any]],
+    profile: Optional[Dict[str, Any]],
+    employee_profile: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """
+    Resolve published policy for assignment. Returns resolved policy dict or None if no policy.
+    """
+    candidates = collect_company_id_candidates_for_assignment(db, assignment, case)
+    if not candidates:
+        log.warning(
+            "policy_resolution: no company_id for assignment %s (case=%s, hr_user=%s, emp_user=%s)",
+            assignment_id,
+            bool(case),
+            assignment.get("hr_user_id"),
+            assignment.get("employee_user_id"),
+        )
+        return None
+
+    pub = find_first_published_company_policy(db, candidates)
+    if not pub:
+        log.info(
+            "policy_resolution: no published policy for any of companies %s (assignment %s)",
+            candidates,
+            assignment_id,
+        )
+        return None
+
+    company_id, policy, version = pub
+    return resolve_benefits_matrix_for_version(
+        db,
+        assignment_id,
+        assignment,
+        case,
+        profile,
+        employee_profile,
+        company_id=str(company_id),
+        policy_row=policy,
+        version_row=version,
+        persist_resolution=True,
+    )

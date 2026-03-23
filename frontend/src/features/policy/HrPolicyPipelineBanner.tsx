@@ -24,9 +24,9 @@ export const HrPolicyPipelineBanner: React.FC<{
         role="status"
         aria-live="polite"
       >
-        <div className="font-medium text-[#0b2b43]">Loading policy workspace…</div>
+        <div className="font-medium text-[#0b2b43]">Loading your policy workspace…</div>
         <p className="text-xs text-[#78350f] mt-1">
-          Fetching company policy, published version, and comparison readiness. This should only take a moment.
+          Pulling the latest published version, working draft, and cost-comparison status. This usually takes a moment.
         </p>
       </div>
     );
@@ -40,8 +40,8 @@ export const HrPolicyPipelineBanner: React.FC<{
       <div className="font-semibold">{copy.title}</div>
       <p className="mt-1 opacity-95 leading-snug">{copy.body}</p>
       {derived.detail && (
-        <p className="mt-2 text-xs font-mono opacity-90 break-words border-t border-black/10 pt-2">
-          {derived.detail}
+        <p className="mt-2 text-xs text-[#64748b] break-words border-t border-black/10 pt-2 leading-snug">
+          {derived.detail.replace(/_/g, ' ')}
         </p>
       )}
     </div>

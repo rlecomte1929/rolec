@@ -10,11 +10,19 @@ See docs/policy/published-policy-consumption-rules.md.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Dict, Optional, Tuple
 
 from fastapi import HTTPException
 
+from .policy_normalization_states import NORMALIZATION_STATE_BLOCK_PUBLISH
+
 log = logging.getLogger(__name__)
+
+# Stable API codes (normalize + publish endpoints, analytics)
+PUBLISH_BLOCKED_NO_LAYER2_RULES = "PUBLISH_BLOCKED_NO_LAYER2_RULES"
+PUBLISH_BLOCKED_INCOMPLETE_METADATA = "PUBLISH_BLOCKED_INCOMPLETE_METADATA"
+PUBLISH_BLOCKED_SOURCE_DOCUMENT_FAILED = "PUBLISH_BLOCKED_SOURCE_DOCUMENT_FAILED"
+PUBLISH_BLOCKED_NORMALIZATION_INCOMPLETE = "PUBLISH_BLOCKED_NORMALIZATION_INCOMPLETE"
 
 
 def _truthy_auto_generated(raw: Any) -> bool:
@@ -29,20 +37,22 @@ def _truthy_auto_generated(raw: Any) -> bool:
     return bool(raw)
 
 
-def require_employee_publishable_policy_version(db: Any, policy_version_id: str) -> None:
+def evaluate_employee_publish_blockers(db: Any, policy_version_id: str) -> Optional[Tuple[str, str]]:
     """
-    Raise HTTPException if this version must not be published for employee consumption.
-
-    Rules:
-    - Version row must exist.
-    - At least one policy_benefit_rules OR policy_exclusions row for this version (non-empty Layer-2 output).
-    - Provenance: source_policy_document_id set (document normalization path) OR auto_generated true
-      (includes normalize + default template seed).
-    - If linked to a policy_document, that document must not be processing_status == 'failed'.
+    If the version must not be published for employee consumption, return (error_code, message).
+    Otherwise return None.
     """
     v = db.get_policy_version(str(policy_version_id))
     if not v:
-        raise HTTPException(status_code=404, detail="Policy version not found")
+        return ("NOT_FOUND", "Policy version not found")
+
+    ns = (v.get("normalization_state") or "").strip().lower()
+    if ns and ns in {s.lower() for s in NORMALIZATION_STATE_BLOCK_PUBLISH}:
+        return (
+            PUBLISH_BLOCKED_NORMALIZATION_INCOMPLETE,
+            "This version is marked as normalization_in_progress or normalization_failed and cannot be "
+            "published for employees until normalization completes successfully.",
+        )
 
     vid = str(policy_version_id)
     try:
@@ -53,25 +63,21 @@ def require_employee_publishable_policy_version(db: Any, policy_version_id: str)
         rules, excl = [], []
 
     if len(rules) == 0 and len(excl) == 0:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "This version cannot be published for employees: it has no benefit rules or exclusions. "
-                "Normalize the document or add structured rules in the HR Policy workspace first."
-            ),
+        return (
+            PUBLISH_BLOCKED_NO_LAYER2_RULES,
+            "This version cannot be published for employees: it has no benefit rules or exclusions. "
+            "Normalize the document or add structured rules in the HR Policy workspace first.",
         )
 
     doc_id = v.get("source_policy_document_id")
     ag = _truthy_auto_generated(v.get("auto_generated"))
     has_provenance = bool(doc_id) or ag
     if not has_provenance:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "This version cannot be published: it is not linked to a source policy document and is not "
-                "marked as auto-generated from normalization or template. Only structured, traceable versions "
-                "may be exposed to employees."
-            ),
+        return (
+            PUBLISH_BLOCKED_INCOMPLETE_METADATA,
+            "This version cannot be published: it is not linked to a source policy document and is not "
+            "marked as auto-generated from normalization or template. Only structured, traceable versions "
+            "may be exposed to employees.",
         )
 
     if doc_id:
@@ -81,10 +87,26 @@ def require_employee_publishable_policy_version(db: Any, policy_version_id: str)
             log.warning("publish_gate get_policy_document failed doc_id=%s exc=%s", doc_id, exc)
             doc = None
         if doc and (doc.get("processing_status") or "").lower() == "failed":
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "The source policy document is in a failed processing state. Fix extraction or reprocess "
-                    "before publishing."
-                ),
+            return (
+                PUBLISH_BLOCKED_SOURCE_DOCUMENT_FAILED,
+                "The source policy document is in a failed processing state. Fix extraction or reprocess "
+                "before publishing.",
             )
+
+    return None
+
+
+def require_employee_publishable_policy_version(db: Any, policy_version_id: str) -> None:
+    """
+    Raise HTTPException if this version must not be published for employee consumption.
+
+    HTTPException.detail is a dict: {"code": <stable code>, "message": <human text>} when blocked,
+    so callers can classify failures without parsing strings.
+    """
+    block = evaluate_employee_publish_blockers(db, policy_version_id)
+    if not block:
+        return
+    code, message = block
+    if code == "NOT_FOUND":
+        raise HTTPException(status_code=404, detail={"code": code, "message": message})
+    raise HTTPException(status_code=400, detail={"code": code, "message": message})
