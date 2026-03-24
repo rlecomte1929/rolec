@@ -19,6 +19,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
   const navigate = useNavigate();
   const [local, setLocal] = useState(draft.relocationBasics);
   const [error, setError] = useState('');
+  const [draftExitSaving, setDraftExitSaving] = useState(false);
 
   useEffect(() => {
     setLocal(draft.relocationBasics || {});

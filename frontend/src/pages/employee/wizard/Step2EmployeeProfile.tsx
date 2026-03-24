@@ -21,6 +21,7 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
   const [pendingPassport, setPendingPassport] = useState(false);
   const [ocrMessage, setOcrMessage] = useState('');
   const [error, setError] = useState('');
+  const [draftExitSaving, setDraftExitSaving] = useState(false);
 
   useEffect(() => {
     setLocal(draft.employeeProfile || {});
