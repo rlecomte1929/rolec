@@ -60,7 +60,7 @@ export function PolicyAssistantSideSheet({
             onClick={() => onOpenChange(false)}
           />
           <div
-            className="relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col rounded-none border-0 border-slate-200 bg-white shadow-[0_-8px_30px_rgba(15,23,42,0.12)] sm:h-auto sm:max-h-[92vh] sm:rounded-t-2xl sm:border sm:border-b-0 lg:h-full lg:max-h-none lg:w-[min(440px,96vw)] lg:max-w-[min(440px,96vw)] lg:rounded-none lg:rounded-l-xl lg:border lg:border-b lg:border-r-0 lg:shadow-xl"
+            className="relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col rounded-none border-0 border-slate-200 bg-white shadow-[0_-8px_30px_rgba(15,23,42,0.12)] sm:h-auto sm:max-h-[92vh] sm:rounded-t-2xl sm:border sm:border-b-0 lg:h-full lg:max-h-none lg:w-[min(480px,96vw)] lg:max-w-[min(480px,96vw)] lg:rounded-none lg:rounded-l-xl lg:border lg:border-b lg:border-r-0 lg:shadow-xl"
           >
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 bg-white">
               <div className="min-w-0">

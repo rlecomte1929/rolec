@@ -133,11 +133,15 @@ export const EmployeeCaseSummary: React.FC = () => {
           loadingLabel="Opening wizard…"
           onClick={async () => {
             setWizardNavLoading(true);
-            await new Promise((r) => setTimeout(r, 120));
-            if (assignmentId) {
-              navigate(`/employee/case/${assignmentId}/wizard/1`);
-            } else {
-              navigate('/employee/journey');
+            try {
+              await new Promise((r) => setTimeout(r, 120));
+              if (assignmentId) {
+                navigate(`/employee/case/${assignmentId}/wizard/1`);
+              } else {
+                navigate('/employee/journey');
+              }
+            } finally {
+              setWizardNavLoading(false);
             }
           }}
         >

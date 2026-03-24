@@ -55,6 +55,10 @@ export const HrComplianceCheck: React.FC = () => {
   const [report, setReport] = useState<ComplianceCaseReport | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  /** Re-run compliance API in flight. */
+  const [complianceRunPending, setComplianceRunPending] = useState(false);
+  /** Single in-flight compliance mutation: `exception:${checkId}` or `${checkId}|${actionType}`. */
+  const [complianceMutationKey, setComplianceMutationKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('requirements');
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('ALL');
   const [showBlockingOnly, setShowBlockingOnly] = useState(true);
@@ -112,30 +116,61 @@ export const HrComplianceCheck: React.FC = () => {
     if (caseId) loadCompliance(caseId);
   }, [caseId]);
 
+  const complianceMutationsBusy = complianceRunPending || complianceMutationKey !== null;
+
   const handleRunCompliance = async () => {
-    if (!caseId) return;
+    if (!caseId || complianceMutationsBusy) return;
     setError('');
+    setComplianceRunPending(true);
     try {
       const complianceData = await hrAPI.runCaseCompliance(caseId);
       setReport(complianceData);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to run compliance.');
+    } finally {
+      setComplianceRunPending(false);
     }
   };
 
   const handleAction = async (checkId: string, actionType: string, notes?: string) => {
-    if (!caseId) return;
-    await hrAPI.recordComplianceAction(caseId, { checkId, actionType, notes });
+    if (!caseId || complianceMutationsBusy) return;
+    const key = `${checkId}|${actionType}`;
+    setComplianceMutationKey(key);
+    setError('');
+    try {
+      await hrAPI.recordComplianceAction(caseId, { checkId, actionType, notes });
+    } catch (err: any) {
+      setError(
+        typeof err.response?.data?.detail === 'string'
+          ? err.response.data.detail
+          : 'Unable to record action.'
+      );
+    } finally {
+      setComplianceMutationKey(null);
+    }
   };
 
   const handleRequestException = async (checkId: string) => {
-    if (!caseId) return;
-    const category = categoryFromCheck(checkId);
-    await hrAPI.requestPolicyException(caseId, {
-      category,
-      reason: 'Auto-requested from Compliance Check.',
-    });
-    loadCompliance(caseId);
+    if (!caseId || complianceMutationsBusy) return;
+    const key = `exception:${checkId}`;
+    setComplianceMutationKey(key);
+    setError('');
+    try {
+      const category = categoryFromCheck(checkId);
+      await hrAPI.requestPolicyException(caseId, {
+        category,
+        reason: 'Auto-requested from Compliance Check.',
+      });
+      await loadCompliance(caseId);
+    } catch (err: any) {
+      setError(
+        typeof err.response?.data?.detail === 'string'
+          ? err.response.data.detail
+          : 'Unable to request exception.'
+      );
+    } finally {
+      setComplianceMutationKey(null);
+    }
   };
 
   const exportSummary = () => {
@@ -245,8 +280,12 @@ export const HrComplianceCheck: React.FC = () => {
               Compliance checks aligned to HR Policy and case data.
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={exportSummary}>Export Summary</Button>
-              <Button onClick={handleRunCompliance}>Re-run Checks</Button>
+              <Button variant="outline" onClick={exportSummary} disabled={complianceMutationsBusy}>
+                Export Summary
+              </Button>
+              <Button onClick={() => void handleRunCompliance()} disabled={complianceMutationsBusy}>
+                {complianceRunPending ? 'Running checks…' : 'Re-run Checks'}
+              </Button>
             </div>
           </div>
 
@@ -359,25 +398,35 @@ export const HrComplianceCheck: React.FC = () => {
                             <div className="text-xs text-[#6b7280]">Confidence: {check.confidence}</div>
                           </div>
                           <div className="flex flex-col items-end gap-2">
-                            {check.fixActions.map((action) => (
-                              <Button
-                                key={action}
-                                variant={action.toLowerCase().includes('request') ? 'outline' : 'primary'}
-                                onClick={() => {
-                                  if (action.toLowerCase().includes('request')) {
-                                    handleRequestException(check.checkId);
-                                    return;
-                                  }
-                                  const actionType = action.toUpperCase().replace(' ', '_');
-                                  handleAction(check.checkId, actionType);
-                                }}
-                              >
-                                {actionLabel(action, employeeName.split(' ')[0])}
-                              </Button>
-                            ))}
+                            {check.fixActions.map((action) => {
+                              const isReq = action.toLowerCase().includes('request');
+                              const actionType = action.toUpperCase().replace(' ', '_');
+                              const pendKey = isReq ? `exception:${check.checkId}` : `${check.checkId}|${actionType}`;
+                              const showPending = complianceMutationKey === pendKey;
+                              return (
+                                <Button
+                                  key={action}
+                                  variant={isReq ? 'outline' : 'primary'}
+                                  disabled={complianceMutationsBusy}
+                                  onClick={() => {
+                                    if (isReq) {
+                                      void handleRequestException(check.checkId);
+                                      return;
+                                    }
+                                    void handleAction(check.checkId, actionType);
+                                  }}
+                                >
+                                  {showPending ? (isReq ? 'Requesting…' : 'Applying…') : actionLabel(action, employeeName.split(' ')[0])}
+                                </Button>
+                              );
+                            })}
                             {check.fixActions.length === 0 && (
-                              <Button variant="outline" onClick={() => handleAction(check.checkId, 'MARK_REVIEWED')}>
-                                Mark Reviewed
+                              <Button
+                                variant="outline"
+                                disabled={complianceMutationsBusy}
+                                onClick={() => void handleAction(check.checkId, 'MARK_REVIEWED')}
+                              >
+                                {complianceMutationKey === `${check.checkId}|MARK_REVIEWED` ? 'Saving…' : 'Mark Reviewed'}
                               </Button>
                             )}
                           </div>
@@ -436,8 +485,12 @@ export const HrComplianceCheck: React.FC = () => {
                   This case has high-risk indicators. Request a manual review by legal.
                 </div>
                 <div className="mt-3">
-                  <Button variant="outline" onClick={() => handleAction('human_review', 'REQUEST_HUMAN_REVIEW')}>
-                    Request Human Review
+                  <Button
+                    variant="outline"
+                    disabled={complianceMutationsBusy}
+                    onClick={() => void handleAction('human_review', 'REQUEST_HUMAN_REVIEW')}
+                  >
+                    {complianceMutationKey === 'human_review|REQUEST_HUMAN_REVIEW' ? 'Submitting…' : 'Request Human Review'}
                   </Button>
                 </div>
               </Card>

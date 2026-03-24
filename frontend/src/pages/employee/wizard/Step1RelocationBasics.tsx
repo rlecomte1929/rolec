@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card } from '../../../components/antigravity';
+import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
 import { COUNTRY_OPTIONS, getCitiesForCountry, isCityInList } from '../../../utils/countries';
@@ -200,24 +200,31 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
       </div>
 
       <div className="mt-6 flex items-center justify-between">
-        <Button
+        <LoadingButton
           variant="outline"
+          loading={draftExitSaving}
+          loadingLabel="Saving…"
+          disabled={isSaving}
           onClick={async () => {
+            setDraftExitSaving(true);
+            setError('');
             try {
               await onSave(nextDraft);
-                if (import.meta.env.DEV) {
-                  console.debug('Save & Exit -> /employee/dashboard');
-                }
-                navigate(ROUTES.EMP_DASH);
+              if (import.meta.env.DEV) {
+                console.debug('Save & Exit -> /employee/dashboard');
+              }
+              navigate(ROUTES.EMP_DASH);
             } catch (err: any) {
               setError(err?.message || "Couldn't save draft. Try again.");
+            } finally {
+              setDraftExitSaving(false);
             }
           }}
         >
           Save as draft & exit
-        </Button>
+        </LoadingButton>
         <Button
-          disabled={isSaving}
+          disabled={isSaving || draftExitSaving}
           onClick={() => {
             if (hasMissing) {
               setError('Complete required fields (marked with *).');

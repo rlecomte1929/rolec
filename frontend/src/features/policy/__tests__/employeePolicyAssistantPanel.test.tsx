@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { EmployeePolicyAssistantPanel } from '../EmployeePolicyAssistantPanel';
@@ -6,6 +6,7 @@ import {
   EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER,
   EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY,
   EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT,
+  EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUBTITLE,
   EMPLOYEE_POLICY_ASSISTANT_TITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS,
@@ -46,9 +47,32 @@ function entitlementAnswer(overrides: Partial<PolicyAssistantAnswer> = {}): Poli
   };
 }
 
+const lsStore: Record<string, string> = {};
+
+beforeEach(() => {
+  for (const k of Object.keys(lsStore)) delete lsStore[k];
+  vi.stubGlobal('localStorage', {
+    getItem: (k: string) => (Object.prototype.hasOwnProperty.call(lsStore, k) ? lsStore[k] : null),
+    setItem: (k: string, v: string) => {
+      lsStore[k] = String(v);
+    },
+    removeItem: (k: string) => {
+      delete lsStore[k];
+    },
+    clear: () => {
+      for (const k of Object.keys(lsStore)) delete lsStore[k];
+    },
+    key: (i: number) => Object.keys(lsStore)[i] ?? null,
+    get length() {
+      return Object.keys(lsStore).length;
+    },
+  } as Storage);
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('EmployeePolicyAssistantPanel', () => {
@@ -88,8 +112,8 @@ describe('EmployeePolicyAssistantPanel', () => {
   it('shows response region label and empty placeholder before first answer', () => {
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
     expect(screen.getByRole('region', { name: /published policy answer/i })).toBeInTheDocument();
-    expect(screen.getByText(/answer from published policy/i)).toBeInTheDocument();
-    expect(screen.getByText(/policy answer appears here/i)).toBeInTheDocument();
+    expect(screen.getByText(/answers from your policy/i)).toBeInTheDocument();
+    expect(screen.getByText(/no answers yet/i)).toBeInTheDocument();
   });
 
   it('shows Checking published policy while the request is in flight', async () => {
@@ -118,8 +142,8 @@ describe('EmployeePolicyAssistantPanel', () => {
     await waitFor(() => {
       expect(screen.getByText(/included \(published policy\)/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/source reference/i)).toBeInTheDocument();
-    expect(screen.getByText(/published benefit rule/i)).toBeInTheDocument();
+    expect(screen.getByText(/where this comes from/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/published benefit rule/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/related policy questions/i)).toBeInTheDocument();
     expect(screen.getByText(/home leave cap/i)).toBeInTheDocument();
   });
@@ -164,5 +188,34 @@ describe('EmployeePolicyAssistantPanel', () => {
     await waitFor(() => expect(screen.getByText(/no policy answer/i)).toBeInTheDocument());
     expect(screen.getByText(/policy questions you can ask/i)).toBeInTheDocument();
     expect(screen.getByText('What is my housing cap?')).toBeInTheDocument();
+  });
+
+  it('shows friendly error when API returns generic policy assistant failed', async () => {
+    postPolicyAssistantQuery.mockRejectedValue({
+      response: { data: { detail: 'Policy assistant failed' } },
+    });
+    render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
+    fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
+      target: { value: 'Test question' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    await waitFor(() => {
+      expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE)).toBeInTheDocument();
+    });
+  });
+
+  it('restores saved Q&A from localStorage for this assignment', () => {
+    const stored = [
+      {
+        id: 'saved-1',
+        question: 'Previously saved question?',
+        answer: entitlementAnswer({ answer_text: '**Saved** answer.' }),
+      },
+    ];
+    globalThis.localStorage.setItem('relopass_employee_policy_assistant_v1:asg-1', JSON.stringify(stored));
+    render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
+    expect(screen.getByText('Previously saved question?')).toBeInTheDocument();
+    const card = screen.getByRole('article', { name: /policy q&a/i });
+    expect(within(card).getByText('Saved')).toBeInTheDocument();
   });
 });

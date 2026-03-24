@@ -58,8 +58,12 @@ export const ServicesEstimate: React.FC = () => {
           disabled={!hasShortlist}
           onClick={async () => {
             setRfqNavLoading(true);
-            await new Promise((r) => setTimeout(r, 120));
-            go(buildRoute('servicesRfqNew'));
+            try {
+              await new Promise((r) => setTimeout(r, 120));
+              go(buildRoute('servicesRfqNew'));
+            } finally {
+              setRfqNavLoading(false);
+            }
           }}
         >
           Request quotations

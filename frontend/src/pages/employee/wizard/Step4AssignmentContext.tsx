@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card } from '../../../components/antigravity';
+import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
 
@@ -19,6 +19,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
   const navigate = useNavigate();
   const [local, setLocal] = useState(draft.assignmentContext);
   const [error, setError] = useState('');
+  const [draftExitSaving, setDraftExitSaving] = useState(false);
 
   useEffect(() => {
     setLocal(draft.assignmentContext || {});
@@ -127,9 +128,14 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
       <div className="mt-6 flex items-center justify-between">
         <Button variant="outline" onClick={onBack}>Back</Button>
         <div className="flex gap-2">
-          <Button
+          <LoadingButton
             variant="outline"
+            loading={draftExitSaving}
+            loadingLabel="Saving…"
+            disabled={isSaving}
             onClick={async () => {
+              setDraftExitSaving(true);
+              setError('');
               try {
                 await onSave(nextDraft);
                 if (import.meta.env.DEV) {
@@ -138,13 +144,15 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
                 navigate(ROUTES.EMP_DASH);
               } catch (err: any) {
                 setError(err?.message || "Couldn't save draft. Try again.");
+              } finally {
+                setDraftExitSaving(false);
               }
             }}
           >
             Save as draft & exit
-          </Button>
+          </LoadingButton>
           <Button
-            disabled={isSaving}
+            disabled={isSaving || draftExitSaving}
             onClick={() => {
               if (hasMissing) {
                 setError('Complete required fields (marked with *).');

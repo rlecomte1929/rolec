@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card } from '../../../components/antigravity';
+import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import type { CaseDraftDTO, FamilyMemberDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
 
@@ -22,6 +22,7 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
     maritalStatus: draft.familyMembers.maritalStatus || 'Single',
   });
   const [children, setChildren] = useState<FamilyMemberDTO[]>(local.children || []);
+  const [draftExitSaving, setDraftExitSaving] = useState(false);
 
   const update = (key: keyof typeof local, value: any) => {
     setLocal({ ...local, [key]: value });
@@ -149,9 +150,14 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
       <div className="mt-6 flex items-center justify-between">
         <Button variant="outline" onClick={onBack}>Back</Button>
         <div className="flex gap-2">
-          <Button
+          <LoadingButton
             variant="outline"
+            loading={draftExitSaving}
+            loadingLabel="Saving…"
+            disabled={isSaving}
             onClick={async () => {
+              setDraftExitSaving(true);
+              setError('');
               try {
                 await onSave(nextDraft);
                 if (import.meta.env.DEV) {
@@ -160,13 +166,15 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
                 navigate(ROUTES.EMP_DASH);
               } catch (err: any) {
                 setError(err?.message || "Couldn't save draft. Try again.");
+              } finally {
+                setDraftExitSaving(false);
               }
             }}
           >
             Save as draft & exit
-          </Button>
+          </LoadingButton>
           <Button
-            disabled={isSaving}
+            disabled={isSaving || draftExitSaving}
             onClick={() => {
               if (maritalMissing) {
                 setError('Select a marital status.');

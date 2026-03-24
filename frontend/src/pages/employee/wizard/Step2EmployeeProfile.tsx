@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card } from '../../../components/antigravity';
+import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
 import { COUNTRY_OPTIONS } from '../../../utils/countries';
@@ -176,9 +176,14 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
       <div className="mt-6 flex items-center justify-between">
         <Button variant="outline" onClick={onBack}>Back</Button>
         <div className="flex gap-2">
-          <Button
+          <LoadingButton
             variant="outline"
+            loading={draftExitSaving}
+            loadingLabel="Saving…"
+            disabled={isSaving}
             onClick={async () => {
+              setDraftExitSaving(true);
+              setError('');
               try {
                 await onSave(nextDraft);
                 if (import.meta.env.DEV) {
@@ -187,13 +192,15 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
                 navigate(ROUTES.EMP_DASH);
               } catch (err: any) {
                 setError(err?.message || "Couldn't save draft. Try again.");
+              } finally {
+                setDraftExitSaving(false);
               }
             }}
           >
             Save as draft & exit
-          </Button>
+          </LoadingButton>
           <Button
-            disabled={isSaving}
+            disabled={isSaving || draftExitSaving}
             onClick={() => {
               if (hasMissing) {
                 setError('Complete required fields (marked with *).');
