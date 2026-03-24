@@ -244,12 +244,13 @@ export const HrCaseSummary: React.FC = () => {
               step={3}
               id="op-step-plan"
               title="Shared relocation plan"
-              subtitle="Same ordered tasks the employee sees: owner, due dates, status, urgency. Use for follow-up; overdue and blocked highlight risk."
+              subtitle="Same phased roadmap the employee sees (flattened here for HR edits). Owner, due dates, and status stay in sync; overdue and blocked highlight risk."
             >
               <CaseTimeline
                 assignmentId={assignment.id}
                 ensureDefaults
                 hideMainTitle
+                planViewRole="hr"
                 title="Relocation plan & actions"
               />
             </CaseOperationalSection>

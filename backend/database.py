@@ -3877,6 +3877,30 @@ class Database:
             ).fetchone()
         return self._row_to_dict(row)
 
+    def get_mobility_case_id_for_assignment(
+        self, assignment_id: str, request_id: Optional[str] = None
+    ) -> Optional[str]:
+        """Forward lookup: case_assignments.id -> mobility_cases.id via assignment_mobility_links."""
+        aid = (assignment_id or "").strip()
+        if not aid:
+            return None
+        try:
+            with self.engine.connect() as conn:
+                row = self._exec(
+                    conn,
+                    "SELECT mobility_case_id FROM assignment_mobility_links WHERE assignment_id = :aid LIMIT 1",
+                    {"aid": aid},
+                    op_name="get_mobility_case_id_for_assignment",
+                    request_id=request_id,
+                ).mappings().first()
+            if not row:
+                return None
+            mid = row.get("mobility_case_id")
+            return str(mid).strip() if mid is not None else None
+        except Exception as e:
+            log.debug("get_mobility_case_id_for_assignment failed: %s", e)
+            return None
+
     def get_assignment_id_for_mobility_case(
         self, mobility_case_id: str, request_id: Optional[str] = None
     ) -> Optional[str]:

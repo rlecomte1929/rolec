@@ -106,6 +106,8 @@ from .agents.compliance_engine import ComplianceEngine
 from .policy_engine import PolicyEngine
 from .app.db import init_db, SessionLocal
 from .app import crud as app_crud
+from .relocation_plan_view_schemas import RelocationPlanViewResponse
+from .services.relocation_plan_view_service import get_relocation_plan_view_for_case_assignment
 from .app.seed import seed_demo_cases
 from .app.seed_suppliers import seed_suppliers_from_recommendation_datasets
 from .app.routers import cases as cases_router
@@ -5617,6 +5619,26 @@ def _require_case_id_assignment_visible(case_id: str, user: Dict[str, Any]) -> D
     return _require_assignment_visibility(assignment["id"], user)
 
 
+def _relocation_plan_view_query_role(user: Dict[str, Any], role: Optional[str]) -> str:
+    """
+    Default lens from the authenticated principal; optional ``role`` must match that principal
+    (HR cannot claim employee, employee cannot claim HR). Admin is treated as HR for defaults.
+    """
+    token_role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, token_role)
+    is_hr = effective.get("role") == UserRole.HR.value or bool(effective.get("is_admin"))
+    if not role or not str(role).strip():
+        return "hr" if is_hr else "employee"
+    want = str(role).strip().lower()
+    if want not in ("employee", "hr"):
+        raise HTTPException(status_code=400, detail="role must be employee or hr")
+    if want == "hr" and not is_hr:
+        raise HTTPException(status_code=403, detail="Not allowed to use role=hr")
+    if want == "employee" and effective.get("role") != UserRole.EMPLOYEE.value:
+        raise HTTPException(status_code=403, detail="Not allowed to use role=employee")
+    return want
+
+
 def _require_assignment_visibility(
     assignment_id: str,
     user: Dict[str, Any],
@@ -7624,6 +7646,42 @@ def get_case_timeline(
             m["links"] = []
     summary = compute_timeline_summary(milestones)
     return {"case_id": case_id, "milestones": milestones, "summary": summary}
+
+
+@app.get(
+    "/api/relocation-plans/{case_id}/view",
+    response_model=RelocationPlanViewResponse,
+    summary="Phased relocation plan (canonical view)",
+)
+def get_relocation_plan_view(
+    case_id: str,
+    request: Request,
+    role: Optional[str] = Query(
+        None,
+        description="Optional UX lens; must match caller (employee or hr). Defaults from auth.",
+    ),
+    debug: bool = Query(False, description="Include internal derivation diagnostics when true."),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Canonical phased plan + derived statuses + primary next action.
+    Authorization matches other case routes: employee (own assignment) or HR (owner or same company).
+    """
+    assignment = _require_case_id_assignment_visible(case_id, user)
+    eff_case_id = _effective_relocation_case_id(assignment)
+    if not eff_case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    viewer_role = _relocation_plan_view_query_role(user, role)
+    return get_relocation_plan_view_for_case_assignment(
+        db=db,
+        session_factory=SessionLocal,
+        case_id_effective=eff_case_id,
+        assignment=assignment,
+        viewer_role=viewer_role,
+        debug=debug,
+        request_id=request_id,
+    )
 
 
 @app.patch("/api/cases/{case_id}/timeline/milestones/{milestone_id}")

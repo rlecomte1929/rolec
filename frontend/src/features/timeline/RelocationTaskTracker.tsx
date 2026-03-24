@@ -1,12 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, Button, Badge, LoadingButton } from '../../components/antigravity';
 import {
   timelineAPI,
   type TimelineMilestone,
   type TimelineTaskSummary,
 } from '../../api/client';
+import { fetchRelocationPlanView } from '../../api/relocationPlanView';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../../utils/apiDetail';
+import type { RelocationPlanViewResponseDTO } from '../../types/relocationPlanView';
 import { getTaskUrgency, sortTasksForTracker, parseYmd } from './taskTrackerSort';
+import { planPhasesToMilestones, planSummaryToTimelineSummary } from './planViewToMilestones';
 
 const STATUS_OPTIONS = [
   { value: 'pending', label: 'Not started' },
@@ -76,100 +79,115 @@ const emptySummary: TimelineTaskSummary = {
   in_progress: 0,
 };
 
+export type RelocationPlanDataSource = 'phased' | 'timeline';
+
+function resolvePlanDataSource(explicit?: RelocationPlanDataSource): RelocationPlanDataSource {
+  if (explicit) return explicit;
+  return import.meta.env.VITE_USE_LEGACY_RELOCATION_PLAN === 'true' ? 'timeline' : 'phased';
+}
+
 export interface RelocationTaskTrackerProps {
   assignmentId: string;
   /** HR / flows that should persist default milestones on first load. */
   ensureDefaults?: boolean;
   /**
-   * Employee My Case: first fetch is read-only; one deferred ensure if still empty (session-scoped).
+   * `phased` (default): GET /api/relocation-plans/{id}/view.
+   * `timeline`: legacy flat milestones (assignments or cases timeline).
+   * Override with `VITE_USE_LEGACY_RELOCATION_PLAN=true` when unset.
    */
-  deferredEnsureWhenEmpty?: boolean;
+  planDataSource?: RelocationPlanDataSource;
+  /** Forwarded as `role=` query param when using phased API; optional — server defaults from auth. */
+  planViewRole?: 'employee' | 'hr';
   /** Shown in card header */
   title?: string;
   /** When embedded under a page section title, hide duplicate H3 */
   hideMainTitle?: boolean;
 }
 
-function timelineEnsureSessionKey(aid: string) {
-  return `rolec_timeline_ensured:${aid}`;
-}
-
 export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
   assignmentId,
   ensureDefaults = false,
-  deferredEnsureWhenEmpty = false,
+  planDataSource: planDataSourceProp,
+  planViewRole,
   title = 'Relocation plan & actions',
   hideMainTitle = false,
 }) => {
+  const planDataSource = resolvePlanDataSource(planDataSourceProp);
   const [caseId, setCaseId] = useState<string | null>(null);
   const [milestones, setMilestones] = useState<TimelineMilestone[]>([]);
   const [summary, setSummary] = useState<TimelineTaskSummary>(emptySummary);
+  const [phasedSnapshot, setPhasedSnapshot] = useState<RelocationPlanViewResponseDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
-  const deferredRanForAssignment = useRef<string | null>(null);
 
   const load = useCallback(
     async (opts?: { forceEnsure?: boolean }) => {
       if (!assignmentId) return;
       setLoading(true);
       setError(null);
-      const useEnsure = deferredEnsureWhenEmpty
-        ? Boolean(opts?.forceEnsure)
-        : Boolean(ensureDefaults);
+      const useEnsure = Boolean(ensureDefaults || opts?.forceEnsure);
       try {
-        const data = await timelineAPI.getByAssignment(assignmentId, {
-          ensureDefaults: useEnsure,
-          includeLinks: false,
-        });
-        setCaseId(data.case_id);
-        const ms = data.milestones || [];
-        setMilestones(ms);
-        setSummary(data.summary ?? emptySummary);
-        setSelectedId((prev) => {
-          if (!ms.length) return null;
-          if (prev && ms.some((m) => m.id === prev)) return prev;
-          return sortTasksForTracker(ms)[0]?.id ?? null;
-        });
+        if (planDataSource === 'phased') {
+          const loadPhasedOnce = async () =>
+            fetchRelocationPlanView(assignmentId, { role: planViewRole });
+
+          let view = await loadPhasedOnce();
+          if (view.summary.total_tasks === 0 && useEnsure) {
+            await timelineAPI.getByAssignment(assignmentId, {
+              ensureDefaults: true,
+              includeLinks: false,
+            });
+            view = await loadPhasedOnce();
+          }
+          setPhasedSnapshot(view);
+          setCaseId(view.case_id);
+          const ms = planPhasesToMilestones(view.phases || [], view.case_id);
+          setMilestones(ms);
+          setSummary(planSummaryToTimelineSummary(view.summary));
+          setSelectedId((prev) => {
+            if (!ms.length) return null;
+            if (view.next_action?.task_id && ms.some((m) => m.id === view.next_action!.task_id)) {
+              return view.next_action.task_id;
+            }
+            if (prev && ms.some((m) => m.id === prev)) return prev;
+            return sortTasksForTracker(ms)[0]?.id ?? null;
+          });
+        } else {
+          setPhasedSnapshot(null);
+          const data = await timelineAPI.getByAssignment(assignmentId, {
+            ensureDefaults: useEnsure,
+            includeLinks: false,
+          });
+          setCaseId(data.case_id);
+          const ms = data.milestones || [];
+          setMilestones(ms);
+          setSummary(data.summary ?? emptySummary);
+          setSelectedId((prev) => {
+            if (!ms.length) return null;
+            if (prev && ms.some((m) => m.id === prev)) return prev;
+            return sortTasksForTracker(ms)[0]?.id ?? null;
+          });
+        }
       } catch (err: unknown) {
         const transport = getClientTransportErrorMessage(err);
         const msg = transport ?? getApiErrorMessage(err, (err as Error)?.message || '');
         setError(msg.trim() ? msg : 'Failed to load tasks');
         setMilestones([]);
         setSummary(emptySummary);
+        setPhasedSnapshot(null);
       } finally {
         setLoading(false);
       }
     },
-    [assignmentId, deferredEnsureWhenEmpty, ensureDefaults]
+    [assignmentId, ensureDefaults, planDataSource, planViewRole]
   );
 
   useEffect(() => {
-    deferredRanForAssignment.current = null;
     void load();
   }, [load]);
-
-  useEffect(() => {
-    if (!deferredEnsureWhenEmpty || loading || milestones.length > 0) return;
-    if (deferredRanForAssignment.current === assignmentId) return;
-    const key = timelineEnsureSessionKey(assignmentId);
-    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(key)) {
-      return;
-    }
-    const t = window.setTimeout(() => {
-      deferredRanForAssignment.current = assignmentId;
-      void load({ forceEnsure: true }).then(() => {
-        try {
-          sessionStorage.setItem(key, '1');
-        } catch {
-          // ignore quota / private mode
-        }
-      });
-    }, 350);
-    return () => window.clearTimeout(t);
-  }, [deferredEnsureWhenEmpty, loading, milestones.length, assignmentId, load]);
 
   const sorted = useMemo(() => sortTasksForTracker(milestones), [milestones]);
   const selected = milestones.find((m) => m.id === selectedId);
@@ -217,16 +235,7 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
   if (loading && milestones.length === 0) {
     return (
       <Card padding="lg">
-        <div className="text-sm text-[#6b7280]">
-          {deferredEnsureWhenEmpty
-            ? 'Loading your relocation plan…'
-            : 'Loading relocation plan…'}
-        </div>
-        {deferredEnsureWhenEmpty && (
-          <p className="text-xs text-[#94a3b8] mt-2">
-            Timeline will appear after we load your case. Default tasks may be created once if none exist yet.
-          </p>
-        )}
+        <div className="text-sm text-[#6b7280]">Loading relocation plan…</div>
       </Card>
     );
   }
@@ -235,11 +244,6 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
     return (
       <Card padding="lg">
         <div className="text-sm text-red-600">{error}</div>
-        {deferredEnsureWhenEmpty && (
-          <p className="text-xs text-[#64748b] mt-2">
-            Timeline will appear after basic case details are completed. You can retry or create a default plan below.
-          </p>
-        )}
         <LoadingButton
           variant="outline"
           size="sm"
@@ -259,6 +263,9 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
       <Card padding="lg">
         <h3 className="text-base font-semibold text-[#0b2b43] mb-2">{title}</h3>
         <div className="text-sm text-[#6b7280]">No tasks yet.</div>
+        {planDataSource === 'phased' && phasedSnapshot?.empty_state_reason && (
+          <p className="text-xs text-[#64748b] mt-2">{phasedSnapshot.empty_state_reason}</p>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -285,13 +292,30 @@ export const RelocationTaskTracker: React.FC<RelocationTaskTrackerProps> = ({
         </div>
       </div>
 
-      {nextCritical && (
+      {(phasedSnapshot?.next_action || nextCritical) && (
         <div className="mb-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm">
           <span className="font-semibold text-[#9a3412]">Next focus: </span>
-          <span className="text-[#0b2b43]">{nextCritical.title}</span>
-          <span className="text-[#6b7280] text-xs ml-2">
-            ({OWNER_OPTIONS.find((o) => o.value === (nextCritical.owner || 'joint'))?.label ?? 'Joint'})
+          <span className="text-[#0b2b43]">
+            {phasedSnapshot?.next_action?.title ?? nextCritical?.title}
           </span>
+          <span className="text-[#6b7280] text-xs ml-2">
+            (
+            {OWNER_OPTIONS.find(
+              (o) =>
+                o.value ===
+                (phasedSnapshot?.next_action?.owner || nextCritical?.owner || 'joint')
+            )?.label ?? 'Joint'}
+            )
+          </span>
+          {phasedSnapshot?.next_action?.reason && (
+            <div className="text-xs text-[#64748b] mt-1">{phasedSnapshot.next_action.reason}</div>
+          )}
+        </div>
+      )}
+
+      {planDataSource === 'phased' && phasedSnapshot && !phasedSnapshot.next_action && phasedSnapshot.empty_state_reason && (
+        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-[#64748b]">
+          {phasedSnapshot.empty_state_reason}
         </div>
       )}
 

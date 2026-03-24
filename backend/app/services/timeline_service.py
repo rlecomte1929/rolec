@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 # Practical relocation tasks (stored as case_milestones; linked to same case as readiness/checklist).
 # milestone_type is stable for future sync with readiness checklist keys if needed.
+# Phased plan metadata (task_code, phase_key, deps) lives in relocation_plan_task_library — keep types aligned.
 OPERATIONAL_TASK_DEFAULTS: List[Dict[str, Any]] = [
     {
         "milestone_type": "task_profile_core",
