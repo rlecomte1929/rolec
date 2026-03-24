@@ -75,6 +75,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             ? `/employee/case/${assignmentIdFromPath}/summary`
             : myAssignmentsHref;
   const myCaseNavLabel = linkedCount > 1 ? 'My assignments' : 'My case';
+  const relocationPlanHref =
+    employeeAssignmentLoading && !assignmentIdFromPath
+      ? myAssignmentsHref
+      : linkedCount > 1
+        ? myAssignmentsHref
+        : linkedCount === 1 && assignmentIdFromContext
+          ? buildRoute('employeeCasePlan', { caseId: assignmentIdFromContext })
+          : assignmentIdFromPath
+            ? buildRoute('employeeCasePlan', { caseId: assignmentIdFromPath })
+            : myAssignmentsHref;
+  const isRelocationPlanRoute = /\/employee\/case\/[^/]+\/plan\/?$/.test(location.pathname);
   const { context: adminContext, refresh: refreshAdminContext } = useAdminContext();
 
   const isActiveRoute = (path: string) => {
@@ -182,6 +193,21 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   }`}
                 >
                   {myCaseNavLabel}
+                </Link>
+                <Link
+                  to={relocationPlanHref}
+                  title={
+                    linkedCount > 1
+                      ? 'Choose an assignment on your dashboard to open your relocation plan'
+                      : undefined
+                  }
+                  className={`px-3 py-1 rounded-full border ${
+                    isRelocationPlanRoute
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Relocation plan
                 </Link>
                 <Link
                   to={buildRoute('services')}

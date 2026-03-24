@@ -1,7 +1,8 @@
 /**
  * Bounded policy Q&A for employees: single-turn answers from published policy data (no chat UI).
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { MessageCircle, X } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
@@ -179,11 +180,26 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   assignmentId: string | null | undefined;
   /** When true, hide “no assignment” until parent finished loading. */
   assignmentLoading?: boolean;
-}> = ({ assignmentId, assignmentLoading = false }) => {
+  /**
+   * `card` — full-width panel (legacy My case placement).
+   * `fab` — floating action button that opens a slide-over (HR Policy page).
+   */
+  variant?: 'card' | 'fab';
+}> = ({ assignmentId, assignmentLoading = false, variant = 'card' }) => {
   const [message, setMessage] = useState('');
   const [turns, setTurns] = useState<PolicyAssistantTurn[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+
+  useEffect(() => {
+    if (!fabOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFabOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [fabOpen]);
 
   const trimmed = message.trim();
   const canSubmit = Boolean(assignmentId && trimmed && !submitting);
@@ -239,27 +255,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     setError('');
   };
 
-  if (assignmentLoading && !assignmentId) {
-    return (
-      <Card padding="md" className="mb-6 border-slate-200 bg-slate-50/40">
-        <div className="text-base font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</div>
-        <p className="text-sm text-slate-500 mt-2">Loading your assignment…</p>
-      </Card>
-    );
-  }
+  const questionId = variant === 'fab' ? 'policy-assistant-question-fab' : 'policy-assistant-question';
+  const suggestionsHintId =
+    variant === 'fab' ? 'policy-assistant-suggestions-hint-fab' : 'policy-assistant-suggestions-hint';
 
-  if (!assignmentId) {
-    return (
-      <Card padding="md" className="mb-6 border-slate-200 bg-slate-50/50">
-        <div className="text-base font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</div>
-        <p className="text-sm text-slate-600 mt-1">{EMPLOYEE_POLICY_ASSISTANT_SUBTITLE}</p>
-        <p className="text-sm text-slate-500 mt-3">{EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT}</p>
-      </Card>
-    );
-  }
-
-  return (
-    <Card padding="md" className="mb-6 border-slate-200">
+  const mainForm = (
+    <>
       <div className="mb-1">
         <h2 className="text-base font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</h2>
         <p className="text-sm text-slate-600 mt-0.5">{EMPLOYEE_POLICY_ASSISTANT_SUBTITLE}</p>
@@ -267,11 +268,11 @@ export const EmployeePolicyAssistantPanel: React.FC<{
       <p className="text-xs text-slate-500 mt-2 leading-relaxed">{EMPLOYEE_POLICY_ASSISTANT_SCOPE_NOTE}</p>
 
       <div className="mt-4 space-y-2">
-        <label htmlFor="policy-assistant-question" className="sr-only">
+        <label htmlFor={questionId} className="sr-only">
           Policy question
         </label>
         <textarea
-          id="policy-assistant-question"
+          id={questionId}
           rows={3}
           maxLength={8000}
           placeholder={EMPLOYEE_POLICY_ASSISTANT_PLACEHOLDER}
@@ -279,9 +280,9 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           disabled={submitting}
-          aria-describedby="policy-assistant-suggestions-hint"
+          aria-describedby={suggestionsHintId}
         />
-        <div id="policy-assistant-suggestions-hint" className="text-xs text-slate-500">
+        <div id={suggestionsHintId} className="text-xs text-slate-500">
           Suggested questions (tap to fill the box, then get answer):
         </div>
         <div className="flex flex-wrap gap-2">
@@ -324,6 +325,76 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           ))}
         </div>
       ) : null}
-    </Card>
+    </>
   );
+
+  if (assignmentLoading && !assignmentId) {
+    if (variant === 'fab') {
+      return null;
+    }
+    return (
+      <Card padding="md" className="mb-6 border-slate-200 bg-slate-50/40">
+        <div className="text-base font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</div>
+        <p className="text-sm text-slate-500 mt-2">Loading your assignment…</p>
+      </Card>
+    );
+  }
+
+  if (!assignmentId) {
+    if (variant === 'fab') {
+      return null;
+    }
+    return (
+      <Card padding="md" className="mb-6 border-slate-200 bg-slate-50/50">
+        <div className="text-base font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</div>
+        <p className="text-sm text-slate-600 mt-1">{EMPLOYEE_POLICY_ASSISTANT_SUBTITLE}</p>
+        <p className="text-sm text-slate-500 mt-3">{EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT}</p>
+      </Card>
+    );
+  }
+
+  if (variant === 'fab') {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setFabOpen(true)}
+          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#0b2b43] bg-[#0b2b43] text-white shadow-lg transition hover:bg-[#123651] focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-2 md:bottom-8 md:right-8"
+          aria-label={`Open ${EMPLOYEE_POLICY_ASSISTANT_TITLE}`}
+          title={EMPLOYEE_POLICY_ASSISTANT_TITLE}
+        >
+          <MessageCircle className="h-7 w-7" aria-hidden />
+        </button>
+        {fabOpen ? (
+          <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={EMPLOYEE_POLICY_ASSISTANT_TITLE}>
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/40"
+              aria-label="Close policy assistant"
+              onClick={() => setFabOpen(false)}
+            />
+            <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 shrink-0">
+                <div>
+                  <div className="text-sm font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</div>
+                  <div className="text-xs text-slate-500">Ask about your published assignment policy</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFabOpen(false)}
+                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">{mainForm}</div>
+            </div>
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
+  return <Card padding="md" className="mb-6 border-slate-200">{mainForm}</Card>;
 };

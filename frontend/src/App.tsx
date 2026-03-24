@@ -27,6 +27,7 @@ import { HrPolicyConfigPage } from './pages/HrPolicyConfigPage';
 import { EmployeePolicyPage } from './pages/employee/EmployeePolicyPage';
 import { CaseWizardPage } from './pages/employee/CaseWizardPage';
 import { EmployeeCaseSummary } from './pages/employee/EmployeeCaseSummary';
+import { EmployeeRelocationPlanPage } from './pages/employee/EmployeeRelocationPlanPage';
 import { CountriesPage } from './pages/admin/CountriesPage';
 import { CountryDetailPage } from './pages/admin/CountryDetailPage';
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
@@ -184,6 +185,7 @@ function App() {
         <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<CaseWizardPage />} />
         <Route path={WIZARD_ROUTES.CASE_SUMMARY} element={<EmployeeCaseSummary />} />
+        <Route path={WIZARD_ROUTES.CASE_PLAN} element={<EmployeeRelocationPlanPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />

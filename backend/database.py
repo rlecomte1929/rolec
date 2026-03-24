@@ -9432,6 +9432,10 @@ class Database:
         policies_raw = self.list_company_policies(company_id)
         docs = self.list_policy_documents(company_id)
         source_document_count = len(docs)
+        latest_source_document_title: Optional[str] = None
+        if docs:
+            fn = str(docs[0].get("filename") or "").strip()
+            latest_source_document_title = fn or None
         policies: List[Dict[str, Any]] = []
         for cp in policies_raw:
             pid = cp.get("id")
@@ -9457,6 +9461,7 @@ class Database:
             "company_id": company_id,
             "company_name": company.get("name"),
             "source_document_count": source_document_count,
+            "latest_source_document_title": latest_source_document_title,
             "policies": policies,
         }
 

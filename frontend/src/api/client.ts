@@ -2040,6 +2040,11 @@ export const policyConfigMatrixAPI = {
     const response = await api.get('/api/admin/policy-config', { params: { companyId } });
     return response.data;
   },
+  /**
+   * POST /api/admin/policy-config/draft — ensures a company draft (idempotent if draft exists).
+   * Backend clones from latest published when present, otherwise seeds canonical rows.
+   * (Product names like “clone published” / “create empty” map to this single route today.)
+   */
   adminPostDraft: async (companyId: string): Promise<Record<string, unknown>> => {
     const response = await api.post('/api/admin/policy-config/draft', {}, { params: { companyId } });
     return response.data;

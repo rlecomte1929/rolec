@@ -282,15 +282,15 @@ export const AdminCompanyDetail: React.FC = () => {
         )}
       </Card>
 
-      {/* Policies */}
+      {/* Policy workspace */}
       <Card padding="lg" className="mb-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h3 className="text-sm font-semibold text-[#0b2b43]">Policies ({policyCount})</h3>
+          <h3 className="text-sm font-semibold text-[#0b2b43]">Policy records ({policyCount})</h3>
           <Link
             to={`${buildRoute('adminPolicies')}?company_id=${encodeURIComponent(company.id)}`}
             className="text-sm text-[#0b2b43] underline"
           >
-            Open policies
+            Open Policy Workspace
           </Link>
         </div>
         {policies.length === 0 ? (
@@ -343,7 +343,7 @@ export const AdminCompanyDetail: React.FC = () => {
             <Button variant="outline" size="sm">Assignments</Button>
           </Link>
           <Link to={`${buildRoute('adminPolicies')}?company_id=${encodeURIComponent(company.id)}`}>
-            <Button variant="outline" size="sm">Policies</Button>
+            <Button variant="outline" size="sm">Policy Workspace</Button>
           </Link>
           <Link to={buildRoute('adminCompanies')}>
             <Button variant="outline" size="sm">Edit company (Companies list)</Button>

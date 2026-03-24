@@ -134,7 +134,7 @@ export const AdminOverviewPage: React.FC = () => {
               {cardInner(
                 'Companies with policy',
                 stats.companiesWithPolicy,
-                'View policies'
+                'Open Policy Workspace'
               )}
             </Card>
           </Link>

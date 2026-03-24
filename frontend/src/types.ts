@@ -969,6 +969,8 @@ export interface AdminPoliciesByCompany {
   company_id: string;
   company_name?: string;
   source_document_count: number;
+  /** Most recently uploaded policy document filename (same ordering as admin list). */
+  latest_source_document_title?: string | null;
   policies: AdminPolicySummary[];
 }
 

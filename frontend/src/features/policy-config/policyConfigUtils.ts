@@ -94,6 +94,46 @@ export function patchBenefitInPayload(
   return { ...payload, categories: nextCategories };
 }
 
+const targetingSig = (r: PolicyConfigBenefitRow) => r.targeting_signature || 'global';
+
+/**
+ * Insert or replace a benefit row (e.g. Policy Workspace editing a canonical placeholder not yet in the draft).
+ */
+export function upsertBenefitInPayload(
+  payload: PolicyConfigWorkingPayload,
+  categoryKey: string,
+  prev: PolicyConfigBenefitRow | null,
+  next: PolicyConfigBenefitRow
+): PolicyConfigWorkingPayload {
+  const cats = normalizeCategoryBlocks(payload.categories);
+  const bi = cats.findIndex((c) => c.category_key === categoryKey);
+  if (bi < 0) return payload;
+  const benefits = [...(cats[bi].benefits ?? [])];
+  const cleanNext: PolicyConfigBenefitRow = { ...next, category: categoryKey };
+  let ri = -1;
+  if (prev) {
+    ri = benefits.findIndex(
+      (b) => b.benefit_key === prev.benefit_key && targetingSig(b) === targetingSig(prev)
+    );
+  }
+  if (ri < 0) {
+    ri = benefits.findIndex(
+      (b) => b.benefit_key === cleanNext.benefit_key && targetingSig(b) === targetingSig(cleanNext)
+    );
+  }
+  const nextBenefits = [...benefits];
+  if (ri >= 0) {
+    nextBenefits[ri] = cleanNext;
+  } else {
+    nextBenefits.push({
+      ...cleanNext,
+      display_order: typeof cleanNext.display_order === 'number' ? cleanNext.display_order : nextBenefits.length,
+    });
+  }
+  const nextCategories = cats.map((c, i) => (i === bi ? { ...c, benefits: nextBenefits } : c));
+  return { ...payload, categories: nextCategories };
+}
+
 export function statusBadgeVariant(
   status: string | undefined,
   source: string | undefined

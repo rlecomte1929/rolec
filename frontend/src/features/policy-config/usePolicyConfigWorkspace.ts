@@ -5,6 +5,7 @@ import {
   buildPutBody,
   normalizeCategoryBlocks,
   patchBenefitInPayload,
+  upsertBenefitInPayload,
 } from './policyConfigUtils';
 import { validatePolicyConfigForPublish, validatePolicyConfigPayload } from './benefitRowValidation';
 import { parsePolicyMatrixValidationDetail } from './policyMatrixApiErrors';
@@ -121,6 +122,21 @@ export function usePolicyConfigWorkspace(args: {
     []
   );
 
+  const upsertBenefit = useCallback(
+    (categoryKey: string, prev: PolicyConfigBenefitRow | null, next: PolicyConfigBenefitRow) => {
+      const bk = next.benefit_key || prev?.benefit_key;
+      if (bk) {
+        setServerErrorsByBenefitKey((m) => {
+          if (!m[bk]) return m;
+          const { [bk]: _, ...rest } = m;
+          return rest;
+        });
+      }
+      setPayload((p) => (p ? upsertBenefitInPayload(p, categoryKey, prev, next) : p));
+    },
+    []
+  );
+
   const setEffectiveDate = useCallback((v: string) => {
     setServerFieldErrors((m) => {
       const next = { ...m };
@@ -130,62 +146,73 @@ export function usePolicyConfigWorkspace(args: {
     setPayload((p) => (p ? { ...p, effective_date: v } : p));
   }, []);
 
-  const saveDraft = useCallback(async () => {
-    if (!payload?.policy_version) {
-      setError('Create a draft before saving.');
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    const rowErrors = validatePolicyConfigPayload(payload);
-    if (rowErrors.length) {
-      setError(rowErrors.map((e) => e.message).join('\n'));
-      setSaving(false);
-      return;
-    }
-    try {
-      const body = buildPutBody(payload);
-      const raw =
-        mode === 'admin'
-          ? await policyConfigMatrixAPI.adminPutDraft(adminCompanyId as string, body)
-          : await policyConfigMatrixAPI.hrPutDraft(body, hrQuery);
-      const next = normalizePayload(raw as PolicyConfigWorkingPayload);
-      setPayload(next);
-      setBaselineSig(sigForDirty(next));
-      setServerErrorsByBenefitKey({});
-      setServerFieldErrors({});
-      const ts = next.updated_at || next.created_at;
-      if (ts) setLastSavedAt(ts);
-    } catch (err: unknown) {
-      const ax = err as { response?: { data?: { detail?: unknown } } };
-      const d = ax.response?.data?.detail;
-      const parsed = parsePolicyMatrixValidationDetail(d);
-      setServerErrorsByBenefitKey(parsed.byBenefitKey);
-      setServerFieldErrors(parsed.byField);
-      const msg =
-        parsed.messages.length > 0
-          ? parsed.messages.join('\n')
-          : typeof d === 'string'
-            ? d
-            : 'Save failed.';
-      setError(msg);
-    } finally {
-      setSaving(false);
-    }
-  }, [payload, mode, adminCompanyId, hrQuery]);
+  const saveDraft = useCallback(
+    async (overridePayload?: PolicyConfigWorkingPayload): Promise<PolicyConfigWorkingPayload | null> => {
+      const toSave = overridePayload ?? payload;
+      if (!toSave?.policy_version) {
+        setError('Create a draft before saving.');
+        return null;
+      }
+      setSaving(true);
+      setError(null);
+      const rowErrors = validatePolicyConfigPayload(toSave);
+      if (rowErrors.length) {
+        setError(rowErrors.map((e) => e.message).join('\n'));
+        setSaving(false);
+        return null;
+      }
+      try {
+        const body = buildPutBody(toSave);
+        const raw =
+          mode === 'admin'
+            ? await policyConfigMatrixAPI.adminPutDraft(adminCompanyId as string, body)
+            : await policyConfigMatrixAPI.hrPutDraft(body, hrQuery);
+        const next = normalizePayload(raw as PolicyConfigWorkingPayload);
+        setPayload(next);
+        setBaselineSig(sigForDirty(next));
+        setServerErrorsByBenefitKey({});
+        setServerFieldErrors({});
+        const ts = next.updated_at || next.created_at;
+        if (ts) setLastSavedAt(ts);
+        return next;
+      } catch (err: unknown) {
+        const ax = err as { response?: { data?: { detail?: unknown } } };
+        const d = ax.response?.data?.detail;
+        const parsed = parsePolicyMatrixValidationDetail(d);
+        setServerErrorsByBenefitKey(parsed.byBenefitKey);
+        setServerFieldErrors(parsed.byField);
+        const msg =
+          parsed.messages.length > 0
+            ? parsed.messages.join('\n')
+            : typeof d === 'string'
+              ? d
+              : 'Save failed.';
+        setError(msg);
+        return null;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [payload, mode, adminCompanyId, hrQuery]
+  );
 
-  const publish = useCallback(async () => {
+  const publish = useCallback(
+    async (forValidation?: PolicyConfigWorkingPayload): Promise<PolicyConfigWorkingPayload | null> => {
     if (!payload?.policy_version) {
       setError('No draft to publish.');
-      return;
+      return null;
     }
     setPublishing(true);
     setError(null);
-    const pubErrors = validatePolicyConfigForPublish(payload);
+    const validateAgainst =
+      forValidation && typeof forValidation === 'object'
+        ? { ...forValidation, policy_version: payload.policy_version }
+        : payload;
+    const pubErrors = validatePolicyConfigForPublish(validateAgainst);
     if (pubErrors.length) {
       setError(`Fix validation issues before publishing:\n${pubErrors.map((e) => e.message).join('\n')}`);
       setPublishing(false);
-      return;
+      return null;
     }
     try {
       const body = { policy_version: payload.policy_version };
@@ -201,6 +228,7 @@ export function usePolicyConfigWorkspace(args: {
       setServerFieldErrors({});
       const ts = next.published_at || next.updated_at;
       if (ts) setLastSavedAt(ts);
+      return next;
     } catch (err: unknown) {
       const ax = err as { response?: { data?: { detail?: unknown } } };
       const d = ax.response?.data?.detail;
@@ -214,10 +242,13 @@ export function usePolicyConfigWorkspace(args: {
             ? d
             : 'Publish failed.';
       setError(msg);
+      return null;
     } finally {
       setPublishing(false);
     }
-  }, [payload, mode, adminCompanyId, hrQuery]);
+  },
+  [payload, mode, adminCompanyId, hrQuery]
+);
 
   const startEditing = useCallback(async () => {
     setError(null);
@@ -346,6 +377,7 @@ export function usePolicyConfigWorkspace(args: {
     openHistoryVersion,
     backToDraft,
     patchBenefit,
+    upsertBenefit,
     setEffectiveDate,
     historyOpen,
     historyRows,

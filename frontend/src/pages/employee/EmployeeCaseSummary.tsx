@@ -1,21 +1,17 @@
 /**
- * Employee Case Summary - Read-only view of intake wizard responses.
- * Shown when the user clicks "My Case" in the nav.
+ * Employee Case Summary — intake snapshot: instructions, then profile/relocation basics (read-only).
+ * Relocation tasks → Relocation plan tab. Policy Q&A → HR Policy (FAB). Policy Assistant removed from here.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Card, LoadingButton } from '../../components/antigravity';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
-import { employeeAPI } from '../../api/client';
 import { getAuthItem } from '../../utils/demo';
 import { AssignmentDebugPanel } from '../AssignmentDebugPanel';
-import { RelocationTaskTracker } from '../../features/timeline/RelocationTaskTracker';
-import { MobilityCasePanels } from '../../components/employee/MobilityCasePanels';
-import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import type { CaseDTO, CaseDraftDTO } from '../../types';
-import { resolveMobilityCaseIdForSummary } from './mobilityCaseIdResolution';
+import { buildRoute } from '../../navigation/routes';
 
 function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -79,11 +75,8 @@ function caseToWizardDraft(caseData: CaseDTO | null): CaseDraftDTO {
 export const EmployeeCaseSummary: React.FC = () => {
   const navigate = useNavigate();
   const { caseId } = useParams<{ caseId: string }>();
-  const [searchParams] = useSearchParams();
   const assignmentId = caseId;
   const [draft, setDraft] = useState<CaseDraftDTO | null>(null);
-  const [assignmentMobilityCaseId, setAssignmentMobilityCaseId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [wizardNavLoading, setWizardNavLoading] = useState(false);
   const [error, setError] = useState('');
@@ -96,7 +89,6 @@ export const EmployeeCaseSummary: React.FC = () => {
       const { data, error: loadError } = await getCaseDetailsByAssignmentId(assignmentId);
       if (loadError) {
         setDraft(buildDefaultDraft());
-        setAssignmentMobilityCaseId(null);
         setError(
           loadError.includes('Case row missing')
             ? loadError
@@ -104,23 +96,13 @@ export const EmployeeCaseSummary: React.FC = () => {
         );
       } else if (data?.case) {
         setDraft(caseToWizardDraft(data.case));
-        setAssignmentMobilityCaseId(data.assignment?.mobility_case_id?.trim() || null);
       } else {
         setDraft(buildDefaultDraft());
-        setAssignmentMobilityCaseId(null);
         setError('Assignment not found or not visible under RLS.');
       }
     } catch {
       setDraft(buildDefaultDraft());
-      setAssignmentMobilityCaseId(null);
       setError('Assignment not found or not visible under RLS.');
-    }
-
-    try {
-      const fb = await employeeAPI.getFeedback(assignmentId);
-      setFeedback((fb ?? []).map((f) => ({ id: f.id, message: f.message, created_at: f.created_at })));
-    } catch {
-      setFeedback([]);
     }
     setIsLoading(false);
   }, [assignmentId]);
@@ -134,25 +116,16 @@ export const EmployeeCaseSummary: React.FC = () => {
   const fm = draft?.familyMembers || {};
   const ac = draft?.assignmentContext || {};
 
-  const mobilityCaseId = useMemo(
-    () =>
-      resolveMobilityCaseIdForSummary({
-        backendMobilityCaseId: assignmentMobilityCaseId,
-        debugQueryMcid: searchParams.get('mcid'),
-        devDemoEnvMobilityCaseId: import.meta.env.VITE_DEMO_MOBILITY_CASE_ID as string | undefined,
-        isDev: import.meta.env.DEV,
-      }),
-    [assignmentMobilityCaseId, searchParams],
-  );
-
   const hasAnyData =
     (b.originCountry || b.originCity || b.destCountry || b.destCity || b.purpose || b.targetMoveDate != null) ||
     (ep.fullName || ep.email || ep.nationality) ||
     (fm.spouse?.fullName || (fm.children?.length ?? 0) > 0) ||
     (ac.employerName || ac.jobTitle || ac.contractStartDate);
 
+  const planHref = assignmentId ? buildRoute('employeeCasePlan', { caseId: assignmentId }) : buildRoute('employeeDashboard');
+
   return (
-    <AppShell title="My case" subtitle="Intake summary.">
+    <AppShell title="My case" subtitle="Intake summary — what you’ve shared so far.">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <LoadingButton
           variant="outline"
@@ -171,16 +144,45 @@ export const EmployeeCaseSummary: React.FC = () => {
           Continue editing
         </LoadingButton>
         {assignmentId && (
-          <LoadingButton
-            variant="outline"
-            loading={isLoading}
-            loadingLabel="Refreshing…"
-            onClick={() => load()}
-          >
+          <LoadingButton variant="outline" loading={isLoading} loadingLabel="Refreshing…" onClick={() => load()}>
             Refresh
           </LoadingButton>
         )}
       </div>
+
+      {assignmentId && !isLoading && (
+        <Card padding="md" className="mb-6 border-[#bfdbfe] bg-[#eff6ff]">
+          <h2 className="text-sm font-semibold text-[#0b2b43] mb-2">What to do next</h2>
+          <ul className="text-sm text-[#1e3a5f] space-y-2 list-disc pl-5 leading-relaxed">
+            <li>
+              <strong>Already in the intake wizard?</strong> Use <strong>Continue editing</strong> above to pick up where
+              you left off.
+            </li>
+            <li>
+              <strong>Not started yet?</strong> Use <strong>Continue editing</strong> to begin — you’ll go through
+              relocation basics, your profile, family, and assignment details step by step. You can also start from your{' '}
+              <Link to={buildRoute('employeeDashboard')} className="font-medium text-[#0b2b43] underline">
+                Dashboard
+              </Link>
+              .
+            </li>
+            <li>
+              <strong>Policy &amp; benefits</strong> from your employer (read-only) are on{' '}
+              <Link to={buildRoute('hrPolicy')} className="font-medium text-[#0b2b43] underline">
+                HR Policy
+              </Link>
+              . Tap the <strong>blue chat icon</strong> there to ask what your published policy covers.
+            </li>
+            <li>
+              <strong>Tasks with HR</strong> (checklist, due dates) are on the{' '}
+              <Link to={planHref} className="font-medium text-[#0b2b43] underline">
+                Relocation plan
+              </Link>{' '}
+              tab.
+            </li>
+          </ul>
+        </Card>
+      )}
 
       {error && (
         <Alert variant="error">
@@ -193,97 +195,45 @@ export const EmployeeCaseSummary: React.FC = () => {
       {isLoading && (
         <div className="space-y-4 mb-6" aria-busy="true">
           <div className="text-sm font-medium text-[#0b2b43]">Loading your saved case data…</div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-pulse">
-            <div className="lg:col-span-2 space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-24 rounded-lg bg-[#e2e8f0]" />
-              ))}
-            </div>
-            <div className="h-40 rounded-lg bg-[#e2e8f0]" />
+          <div className="grid grid-cols-1 gap-4 animate-pulse max-w-3xl">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-24 rounded-lg bg-[#e2e8f0]" />
+            ))}
           </div>
-        </div>
-      )}
-
-      {assignmentId && (
-        <div className="mb-6">
-          <EmployeePolicyAssistantPanel assignmentId={assignmentId} />
-          <div className="text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
-            Relocation plan
-          </div>
-          <RelocationTaskTracker
-            assignmentId={assignmentId}
-            deferredEnsureWhenEmpty
-            title="Your relocation plan & actions"
-          />
         </div>
       )}
 
       {!isLoading && draft && (
-        <>
-        <div className="mb-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
-            Case status & next steps
-          </div>
-          <MobilityCasePanels
-            mobilityCaseId={mobilityCaseId}
-            relocationBasics={b}
-            familyMembers={fm}
-          />
+        <div className="max-w-3xl space-y-2">
+          <SummarySection title="Relocation Basics">
+            <div>Origin: {[b.originCity, b.originCountry].filter(Boolean).join(', ') || '-'}</div>
+            <div>Destination: {[b.destCity, b.destCountry].filter(Boolean).join(', ') || '-'}</div>
+            <div>Purpose: {b.purpose || '-'}</div>
+            <div>Target move date: {b.targetMoveDate || '-'}</div>
+            <div>Duration: {b.durationMonths != null ? `${b.durationMonths} months` : '-'}</div>
+          </SummarySection>
+          <SummarySection title="Employee Profile">
+            <div>Name: {ep.fullName || '-'}</div>
+            <div>Email: {ep.email || '-'}</div>
+            <div>Nationality: {ep.nationality || '-'}</div>
+            <div>Passport country: {ep.passportCountry || '-'}</div>
+            <div>Residence country: {ep.residenceCountry || '-'}</div>
+          </SummarySection>
+          <SummarySection title="Family Members">
+            <div>Spouse: {fm.spouse?.fullName ? fm.spouse.fullName : '-'}</div>
+            <div>Children: {fm.children?.length ? `${fm.children.length} child(ren)` : '-'}</div>
+          </SummarySection>
+          <SummarySection title="Assignment / Context">
+            <div>Employer: {ac.employerName || '-'}</div>
+            <div>Job title: {ac.jobTitle || '-'}</div>
+            <div>Contract start: {ac.contractStartDate || '-'}</div>
+            <div>Contract type: {ac.contractType || '-'}</div>
+          </SummarySection>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-2">
-            <SummarySection title="Relocation Basics">
-              <div>Origin: {[b.originCity, b.originCountry].filter(Boolean).join(', ') || '-'}</div>
-              <div>Destination: {[b.destCity, b.destCountry].filter(Boolean).join(', ') || '-'}</div>
-              <div>Purpose: {b.purpose || '-'}</div>
-              <div>Target move date: {b.targetMoveDate || '-'}</div>
-              <div>Duration: {b.durationMonths != null ? `${b.durationMonths} months` : '-'}</div>
-            </SummarySection>
-            <SummarySection title="Employee Profile">
-              <div>Name: {ep.fullName || '-'}</div>
-              <div>Email: {ep.email || '-'}</div>
-              <div>Nationality: {ep.nationality || '-'}</div>
-              <div>Passport country: {ep.passportCountry || '-'}</div>
-              <div>Residence country: {ep.residenceCountry || '-'}</div>
-            </SummarySection>
-            <SummarySection title="Family Members">
-              <div>Spouse: {fm.spouse?.fullName ? fm.spouse.fullName : '-'}</div>
-              <div>Children: {fm.children?.length ? `${fm.children.length} child(ren)` : '-'}</div>
-            </SummarySection>
-            <SummarySection title="Assignment / Context">
-              <div>Employer: {ac.employerName || '-'}</div>
-              <div>Job title: {ac.jobTitle || '-'}</div>
-              <div>Contract start: {ac.contractStartDate || '-'}</div>
-              <div>Contract type: {ac.contractType || '-'}</div>
-            </SummarySection>
-          </div>
-
-          <div>
-            <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43] mb-3">Feedback from HR</div>
-              {feedback.length === 0 ? (
-                <div className="text-sm text-[#9ca3af]">No feedback yet.</div>
-              ) : (
-                <div className="space-y-3">
-                  {feedback.map((f) => (
-                    <div key={f.id} className="text-sm">
-                      <div className="text-[#6b7280] text-xs">
-                        {new Date(f.created_at).toLocaleString()}
-                      </div>
-                      <div className="text-[#0b2b43] mt-0.5">{f.message}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
-        </div>
-        </>
       )}
 
       {!isLoading && draft && !hasAnyData && (
-        <p className="text-sm text-[#6b7280]">No intake yet. Use Continue editing to complete it.</p>
+        <p className="text-sm text-[#6b7280] mt-4">No intake saved yet. Use Continue editing to complete it.</p>
       )}
 
       {(import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') && assignmentId && (

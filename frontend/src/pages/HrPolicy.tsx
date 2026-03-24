@@ -46,10 +46,14 @@ function EmployeePolicyContent() {
   }, []);
 
   return (
-    <>
-      <EmployeePolicyAssistantPanel assignmentId={pack?.assignment_id} assignmentLoading={loading} />
+    <div className="relative pb-20 md:pb-8">
       <EmployeePolicyPanel pack={pack} loading={loading} />
-    </>
+      <EmployeePolicyAssistantPanel
+        assignmentId={pack?.assignment_id}
+        assignmentLoading={loading}
+        variant="fab"
+      />
+    </div>
   );
 }
 
@@ -81,7 +85,10 @@ export const HrPolicy: React.FC = () => {
 
   if (role === 'EMPLOYEE') {
     return (
-      <AppShell title="Package and limits" subtitle="Policy and benefit caps for this assignment.">
+      <AppShell
+        title="HR policy"
+        subtitle="Published assignment policy and benefits from your employer (read-only). Use the chat icon to ask questions."
+      >
         <EmployeePolicyContent />
       </AppShell>
     );
@@ -98,7 +105,7 @@ export const HrPolicy: React.FC = () => {
         {adminCompanyId && (
           <p className="text-sm text-[#6b7280] mb-4">
             Admin mode: viewing policy for company <code className="bg-[#f1f5f9] px-1 rounded">{adminCompanyId}</code>.{' '}
-            <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policies overview</Link>
+            <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policy Workspace</Link>
           </p>
         )}
 
