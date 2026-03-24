@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .policy_document_intake import SCOPE_LONG_TERM
 from .policy_normalization import normalize_clauses_to_objects
+from .policy_grouped_comparison_readiness import build_comparison_engine_grouped_readiness_payload
+from .policy_grouped_policy_model import build_grouped_policy_review_view
 from .policy_normalization_draft import build_normalization_draft_model, parse_stored_normalization_draft
 from .policy_normalization_errors import PolicyNormalizationFieldIssue
 from .policy_normalization_validate import NormalizationReadinessResult, evaluate_normalization_readiness
@@ -18,6 +20,8 @@ from .policy_hr_rule_override_layer import (
     merge_benefit_rules_for_effective_readiness,
 )
 from .policy_processing_readiness import evaluate_stored_policy_readiness
+from .policy_hr_grouped_review import build_grouped_hr_review
+from .policy_template_first_import import build_template_first_import_payload
 
 
 def _strip_layer2_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -342,6 +346,30 @@ def build_hr_policy_review_payload(
         )
         draft_readiness = normalization_draft.get("readiness")
 
+    draft_list = mapped.get("draft_rule_candidates") or []
+    grouped_policy_items, comparison_subrules = build_grouped_policy_review_view(clauses, draft_list)
+    template_first_import = build_template_first_import_payload(
+        clauses,
+        draft_list,
+        grouped_policy_items_count=len(grouped_policy_items),
+    )
+    grouped_review = build_grouped_hr_review(
+        grouped_policy_items,
+        clauses,
+        draft_list,
+        template_first_import=template_first_import,
+    )
+    normalization_draft_out: Dict[str, Any] = dict(normalization_draft) if isinstance(normalization_draft, dict) else {}
+    grouped_policy_comparison_engine_input = build_comparison_engine_grouped_readiness_payload(
+        grouped_policy_items
+    )
+    if isinstance(normalization_draft, dict):
+        normalization_draft_out["grouped_policy_items"] = grouped_policy_items
+        normalization_draft_out["comparison_subrules"] = comparison_subrules
+        normalization_draft_out["grouped_policy_comparison_engine_input"] = grouped_policy_comparison_engine_input
+        normalization_draft_out["template_first_import"] = template_first_import
+        normalization_draft_out["grouped_review"] = grouped_review
+
     source_enriched = enrich_policy_document_for_hr(doc) if doc else None
     detected = {
         "detected_document_type": (doc or policy_document).get("detected_document_type"),
@@ -379,10 +407,15 @@ def build_hr_policy_review_payload(
         },
         "source_document": source_enriched,
         "detected_classification": detected,
-        "normalization_draft": normalization_draft,
-        "clause_candidates": normalization_draft.get("clause_candidates") or [],
-        "rule_candidates": normalization_draft.get("rule_candidates") or {},
-        "draft_rule_candidates": normalization_draft.get("draft_rule_candidates") or [],
+        "normalization_draft": normalization_draft_out,
+        "clause_candidates": normalization_draft_out.get("clause_candidates") or [],
+        "rule_candidates": normalization_draft_out.get("rule_candidates") or {},
+        "draft_rule_candidates": normalization_draft_out.get("draft_rule_candidates") or [],
+        "grouped_policy_items": grouped_policy_items,
+        "grouped_policy_comparison_engine_input": grouped_policy_comparison_engine_input,
+        "template_first_import": template_first_import,
+        "grouped_review": grouped_review,
+        "comparison_subrules": comparison_subrules,
         "layer2_publishable": layer2_pub,
         "readiness": policy_readiness,
         "issues": issues,
@@ -393,6 +426,8 @@ def build_hr_policy_review_payload(
                 "benefit_rules_count": len(mapped.get("benefit_rules") or []),
                 "exclusions_count": len(mapped.get("exclusions") or []),
                 "draft_rule_candidates_count": len(mapped.get("draft_rule_candidates") or []),
+                "grouped_policy_items_count": len(grouped_policy_items),
+                "comparison_subrules_count": len(comparison_subrules),
             },
             "from_database_layer2": layer2_pub["counts"],
         },

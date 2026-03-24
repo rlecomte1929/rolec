@@ -13,6 +13,7 @@ import { getAuthItem } from '../../utils/demo';
 import { AssignmentDebugPanel } from '../AssignmentDebugPanel';
 import { RelocationTaskTracker } from '../../features/timeline/RelocationTaskTracker';
 import { MobilityCasePanels } from '../../components/employee/MobilityCasePanels';
+import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import type { CaseDTO, CaseDraftDTO } from '../../types';
 import { resolveMobilityCaseIdForSummary } from './mobilityCaseIdResolution';
 
@@ -205,6 +206,7 @@ export const EmployeeCaseSummary: React.FC = () => {
 
       {assignmentId && (
         <div className="mb-6">
+          <EmployeePolicyAssistantPanel assignmentId={assignmentId} />
           <div className="text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
             Relocation plan
           </div>

@@ -12,6 +12,10 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from .policy_pipeline_layers import layer1_fields_for_company_policy_shell
 from .policy_taxonomy import resolve_benefit_key, resolve_theme, get_benefit_meta
+from .policy_grouped_comparison_readiness import build_comparison_engine_grouped_readiness_payload
+from .policy_grouped_policy_model import build_grouped_policy_review_view
+from .policy_hr_grouped_review import build_grouped_hr_review
+from .policy_template_first_import import build_template_first_import_payload
 from .policy_processing_readiness import build_processing_readiness_envelope
 from .policy_normalization_validate import NormalizationReadinessResult
 
@@ -159,6 +163,20 @@ def build_normalization_draft_model(
     )
     em = policy_document.get("extracted_metadata") if isinstance(policy_document.get("extracted_metadata"), dict) else {}
     readiness = build_processing_readiness_envelope(policy_document, clauses, mapped, norm_core)
+    draft_list = list(mapped.get("draft_rule_candidates") or [])
+    grouped_items, comparison_subrules = build_grouped_policy_review_view(clauses, draft_list)
+    grouped_policy_comparison_engine_input = build_comparison_engine_grouped_readiness_payload(grouped_items)
+    template_first_import = build_template_first_import_payload(
+        clauses,
+        draft_list,
+        grouped_policy_items_count=len(grouped_items),
+    )
+    grouped_review = build_grouped_hr_review(
+        grouped_items,
+        clauses,
+        draft_list,
+        template_first_import=template_first_import,
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "document_metadata": {
@@ -177,6 +195,11 @@ def build_normalization_draft_model(
         "clause_candidates": build_clause_candidates(clauses),
         "rule_candidates": build_rule_candidates(mapped),
         "draft_rule_candidates": list(mapped.get("draft_rule_candidates") or []),
+        "grouped_policy_items": grouped_items,
+        "comparison_subrules": comparison_subrules,
+        "grouped_policy_comparison_engine_input": grouped_policy_comparison_engine_input,
+        "template_first_import": template_first_import,
+        "grouped_review": grouped_review,
         "readiness": readiness,
     }
 

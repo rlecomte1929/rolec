@@ -12,6 +12,8 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+from .policy_source_provenance import filter_candidate_numeric_values
+
 log = logging.getLogger(__name__)
 
 # Clause types
@@ -155,7 +157,9 @@ def _extract_normalized_hints(
         except ValueError:
             pass
     if nums:
-        hints["candidate_numeric_values"] = list(dict.fromkeys(nums))[:10]
+        nums = filter_candidate_numeric_values(list(dict.fromkeys(nums))[:12], text)
+        if nums:
+            hints["candidate_numeric_values"] = nums[:10]
 
     # candidate_frequency
     for pat, freq in FREQUENCY_PATTERNS:
@@ -434,14 +438,22 @@ def segment_into_clauses(
 
 
 def segment_document_from_raw_text(
-    raw_text: str, mime_type: str, data: Optional[bytes] = None
+    raw_text: str,
+    mime_type: str,
+    data: Optional[bytes] = None,
+    policy_context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
     """
     Segment a document. Prefer data for page-aware extraction; fallback to raw_text lines.
-    Returns (clauses, error).
+
+    For gated summary-style documents (see policy_summary_row_parser), builds one clause per
+    logical table row with section references in hints only; otherwise uses legacy line/clause
+    segmentation.
     """
     if data:
-        items, err = extract_lines_with_pages(data, mime_type)
+        from .policy_structural_parse import parse_policy_document_to_elements
+
+        items, err = parse_policy_document_to_elements(data, mime_type, fallback_on_error=True)
         if err:
             return [], err
     else:
@@ -449,4 +461,16 @@ def segment_document_from_raw_text(
         lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
         items = [{"text": l, "page": 1, "is_table_row": " | " in l and len(l) > 20}
                  for l in lines]
+
+    from .policy_summary_row_parser import try_build_clauses_via_summary_rows
+
+    row_clauses = try_build_clauses_via_summary_rows(items, policy_context)
+    if row_clauses is not None:
+        log.info(
+            "policy_segment strategy=summary_row_candidates items=%d clauses=%d document_id=%s",
+            len(items),
+            len(row_clauses),
+            (policy_context or {}).get("id") or (policy_context or {}).get("document_id") or "?",
+        )
+        return row_clauses, None
     return segment_into_clauses(items), None

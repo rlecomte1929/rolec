@@ -133,6 +133,8 @@ class PolicyHRReviewTests(unittest.TestCase):
         payload = build_hr_policy_review_payload(db, document_id=doc_id)
         out = serialize_hr_policy_review_payload(payload)
         self.assertEqual(out["schema_version"], HR_POLICY_REVIEW_SCHEMA_VERSION)
+        self.assertIn("grouped_review", out)
+        self.assertIn("template_domains", out["grouped_review"])
         self.assertEqual(out["review"]["normalization_draft_source"], "synthesized")
         self.assertTrue(out["review"]["has_persisted_version"])
         self.assertEqual(out["detected_classification"]["detected_document_type"], DOC_TYPE_POLICY_SUMMARY)

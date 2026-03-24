@@ -5,6 +5,7 @@ import { trackRouteEntry, trackShellRender, trackPolicyStage } from '../perf/pag
 import { Alert, Button, Card } from '../components/antigravity';
 import { employeeAPI, policyDocumentsAPI } from '../api/client';
 import { EmployeePolicyPanel } from '../features/policy/EmployeePolicyPanel';
+import { EmployeePolicyAssistantPanel } from '../features/policy/EmployeePolicyAssistantPanel';
 import { HrPolicyReviewWorkspace } from '../features/policy/HrPolicyReviewWorkspace';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
@@ -44,7 +45,12 @@ function EmployeePolicyContent() {
     };
   }, []);
 
-  return <EmployeePolicyPanel pack={pack} loading={loading} />;
+  return (
+    <>
+      <EmployeePolicyAssistantPanel assignmentId={pack?.assignment_id} assignmentLoading={loading} />
+      <EmployeePolicyPanel pack={pack} loading={loading} />
+    </>
+  );
 }
 
 export const HrPolicy: React.FC = () => {

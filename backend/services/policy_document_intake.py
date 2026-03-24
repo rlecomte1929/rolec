@@ -41,6 +41,8 @@ STATUS_FAILED = "failed"
 # Document types
 DOC_TYPE_ASSIGNMENT_POLICY = "assignment_policy"
 DOC_TYPE_POLICY_SUMMARY = "policy_summary"
+DOC_TYPE_SUMMARY_TABLE = "summary_table"
+DOC_TYPE_COMPACT_BENEFIT_MATRIX = "compact_benefit_matrix"
 DOC_TYPE_TAX_POLICY = "tax_policy"
 DOC_TYPE_COUNTRY_ADDENDUM = "country_addendum"
 DOC_TYPE_UNKNOWN = "unknown"

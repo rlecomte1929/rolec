@@ -45,6 +45,7 @@ import type {
   DossierQuestionsResponse,
   DossierSearchSuggestionsResponse,
 } from '../types';
+import type { EmployeePolicyAssistantQueryResponse, HrPolicyAssistantQueryResponse } from '../types/policyAssistant';
 
 // VITE_API_URL must be set for every environment:
 //   - Development:  http://localhost:8000         (via frontend/.env.development)
@@ -595,6 +596,21 @@ export const hrAPI = {
   },
   getCommandCenterCaseDetail: async (assignmentId: string): Promise<{ id: string; employeeIdentifier: string; destCountry?: string; status: string; riskStatus: string; budgetLimit?: number; budgetEstimated?: number; expectedStartDate?: string; tasksTotal: number; tasksDone: number; tasksOverdue: number; phases: Array<{ phase: string; tasks: Array<{ title: string; status: string; due_date?: string }> }>; events: Array<{ event_type: string; description?: string; created_at: string }> }> => {
     const response = await api.get(`/api/hr/command-center/cases/${assignmentId}`);
+    return response.data;
+  },
+  /** Bounded policy Q&A for the HR policy workspace (draft + published context). */
+  postPolicyAssistantQuery: async (
+    policyId: string,
+    message: string,
+    documentId?: string | null
+  ): Promise<HrPolicyAssistantQueryResponse> => {
+    const body: { policy_id: string; message: string; document_id?: string } = {
+      policy_id: policyId,
+      message,
+    };
+    const d = documentId?.trim();
+    if (d) body.document_id = d;
+    const response = await api.post('/api/hr/policy-assistant/query', body);
     return response.data;
   },
 };
@@ -1683,6 +1699,17 @@ export const employeeAPI = {
   /** Compare selected services vs resolved policy (read-only, explanatory) */
   getPolicyServiceComparison: async (assignmentId: string): Promise<PolicyServiceComparisonResponse> => {
     const response = await api.get(`/api/employee/assignments/${assignmentId}/policy-service-comparison`);
+    return response.data;
+  },
+  /** Bounded policy Q&A from published policy data for this assignment. */
+  postPolicyAssistantQuery: async (
+    assignmentId: string,
+    message: string
+  ): Promise<EmployeePolicyAssistantQueryResponse> => {
+    const response = await api.post('/api/employee/policy-assistant/query', {
+      assignment_id: assignmentId,
+      message,
+    });
     return response.data;
   },
 };

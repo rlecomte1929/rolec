@@ -196,6 +196,16 @@ export function mockPolicyReviewPayload(options: MockReviewOptions = {}): Record
     readiness,
     entitlement_effective_preview,
     draft_rule_candidates: [],
+    schema_version: 2,
+    grouped_review: {
+      template_domains: {},
+      domain_order: [],
+      import_summary: {},
+      duplicate_merge_summary: {},
+      counts: {},
+      items_needing_review: { grouped_rows: 0, template_fields: 0 },
+      empty_template_slots_by_domain: {},
+    },
   };
 }
 

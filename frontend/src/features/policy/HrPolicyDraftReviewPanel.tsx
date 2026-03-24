@@ -125,6 +125,16 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
     return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
   }, [policyReview?.draft_rule_candidates]);
 
+  const groupedPolicyItems = useMemo(() => {
+    const raw = policyReview?.grouped_policy_items;
+    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+  }, [policyReview?.grouped_policy_items]);
+
+  const comparisonSubrules = useMemo(() => {
+    const raw = policyReview?.comparison_subrules;
+    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
+  }, [policyReview?.comparison_subrules]);
+
   const layer2 = (policyReview?.layer2_publishable || null) as Record<string, unknown> | null;
   const benefitRules = useMemo(() => {
     const raw = layer2?.benefit_rules;
@@ -233,6 +243,76 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           the publishable section below.
         </p>
 
+        {groupedPolicyItems.length > 0 && (
+          <div className="mb-6">
+            <div className="text-xs font-medium text-[#374151] mb-2">
+              Grouped policy items ({groupedPolicyItems.length})
+            </div>
+            <p className="text-xs text-[#6b7280] mb-2 max-w-3xl">
+              One row per business topic for HR review (tiers and variants stay nested). Atomic comparison pieces are
+              derived separately when needed — see technical count below.
+            </p>
+            <div className="space-y-2 max-h-72 overflow-y-auto border border-[#e5e7eb] rounded-md divide-y divide-[#f3f4f6]">
+              {groupedPolicyItems.slice(0, 40).map((g, i) => {
+                const title = String(g.title || 'Policy item');
+                const summary = String(g.summary || '').trim() || '—';
+                const ref = g.source_ref != null && String(g.source_ref).trim() ? String(g.source_ref) : null;
+                const ck = g.canonical_key != null ? String(g.canonical_key) : null;
+                const merged = g.merged_draft_candidate_count;
+                const display = g.business_display as Record<string, unknown> | undefined;
+                const chips = Array.isArray(display?.variant_chips)
+                  ? (display.variant_chips as string[]).slice(0, 8)
+                  : [];
+                const tierLines = Array.isArray(display?.tier_lines)
+                  ? (display.tier_lines as string[]).slice(0, 8)
+                  : [];
+                return (
+                  <div key={String(g.grouped_item_id ?? i)} className="p-3 text-sm bg-white">
+                    <div className="flex flex-wrap gap-2 text-xs text-[#6b7280] mb-1">
+                      {ck && (
+                        <span className="px-1.5 py-0.5 rounded bg-slate-100 font-mono text-[10px]">{ck}</span>
+                      )}
+                      {ref && <span>Ref {ref}</span>}
+                      {typeof merged === 'number' && merged > 1 && (
+                        <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded">
+                          Merged {merged} draft rows
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm font-medium text-[#0b2b43]">{title}</div>
+                    <div className="text-[#374151] whitespace-pre-wrap text-xs leading-snug mt-1">{summary}</div>
+                    {chips.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {chips.map((c) => (
+                          <span
+                            key={c}
+                            className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#f1f5f9] text-[#334155]"
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {tierLines.length > 0 && (
+                      <ul className="mt-2 text-xs text-[#374151] list-disc list-inside">
+                        {tierLines.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {comparisonSubrules.length > 0 && (
+              <p className="text-[11px] text-[#9ca3af] mt-2">
+                Comparison engine subrules (derived): {comparisonSubrules.length} atomic piece
+                {comparisonSubrules.length === 1 ? '' : 's'} — not shown as primary HR rows.
+              </p>
+            )}
+          </div>
+        )}
+
         {clauseCandidates.length > 0 && (
           <div className="mb-6">
             <div className="text-xs font-medium text-[#374151] mb-2">Clause highlights ({clauseCandidates.length})</div>
@@ -266,6 +346,9 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           <div>
             <div className="text-xs font-medium text-[#374151] mb-2">
               Draft rule candidates ({draftRuleCandidates.length})
+              {groupedPolicyItems.length > 0 && (
+                <span className="font-normal text-[#6b7280] ml-1">— technical traces; prefer grouped items above</span>
+              )}
             </div>
             <div className="space-y-2 max-h-80 overflow-y-auto border border-[#e5e7eb] rounded-md divide-y divide-[#f3f4f6]">
               {draftRuleCandidates.slice(0, 50).map((r, i) => {
@@ -295,7 +378,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           </div>
         )}
 
-        {clauseCandidates.length === 0 && draftRuleCandidates.length === 0 && (
+        {clauseCandidates.length === 0 && draftRuleCandidates.length === 0 && groupedPolicyItems.length === 0 && (
           <p className="text-sm text-[#6b7280]">
             No clause highlights or pre-rule items for this version—common for a baseline created without a source file.
           </p>

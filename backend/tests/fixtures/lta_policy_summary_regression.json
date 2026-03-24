@@ -1,0 +1,57 @@
+{
+  "description": "Synthetic Long Term Assignment Policy Summary table (pipe columns). Mirrors typical section refs 2.1 / 3.2 / 4.1 / 5.2 / 6.5 / 7.1 / 8.3 without embedding refs in benefit text.",
+  "policy_context": {
+    "id": "fixture-lta-summary-regression",
+    "detected_document_type": "policy_summary",
+    "extracted_metadata": {
+      "likely_table_heavy": true
+    }
+  },
+  "items": [
+    {
+      "text": "Immigration and visas | Company supports work permits and visa processing for the assignee and accompanying family members. | 2.1",
+      "page": 1,
+      "is_table_row": true
+    },
+    {
+      "text": "Relocation allowance | Assignee USD 8000 / each dependant USD 2000 one-time lump sum. | 3.2",
+      "page": 1,
+      "is_table_row": true
+    },
+    {
+      "text": "Spouse career support | Dual career coaching allowance paid per global mobility policy (not a housing benefit). | 4.1",
+      "page": 1,
+      "is_table_row": true
+    },
+    {
+      "text": "Child education | Tuition difference reimbursement for dependent children where eligible under the program. | 5.2",
+      "page": 1,
+      "is_table_row": true
+    },
+    {
+      "text": "Temporary living | Temporary accommodation in the host location up to 30 days maximum. | 6.5",
+      "page": 1,
+      "is_table_row": true
+    },
+    {
+      "text": "Home leave | Home leave: standard assignment / split family / dependant in education / rest and recuperation | 7.1",
+      "page": 1,
+      "is_table_row": true
+    },
+    {
+      "text": "Host housing | Host country housing benefit capped using third party benchmark data (no fixed cash stipend). | 8.3",
+      "page": 1,
+      "is_table_row": true
+    }
+  ],
+  "expected_canonical_keys": [
+    "work_permits_and_visas",
+    "relocation_allowance",
+    "spouse_support",
+    "child_education",
+    "temporary_living_outbound",
+    "home_leave",
+    "host_housing"
+  ],
+  "section_references_under_test": ["2.1", "3.2", "4.1", "5.2", "6.5", "7.1", "8.3"]
+}

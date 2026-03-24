@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime, date
 import re
 import json
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -75,6 +75,8 @@ from .identity_observability import (
 )
 from .services.assignment_claim_link_service import reconcile_pending_assignment_claims
 from .services.employee_assignment_overview import build_employee_assignment_overview
+from .services.employee_policy_assistant_service import employee_policy_assistant_query_response_dict
+from .services.hr_policy_assistant_service import hr_policy_assistant_query_response_dict
 from .services.explicit_pending_link_service import (
     execute_pending_explicit_link,
     finalize_assignment_claim_attach,
@@ -973,6 +975,28 @@ class ReadinessChecklistPatchRequest(BaseModel):
 class ReadinessMilestonePatchRequest(BaseModel):
     completed: bool
     notes: Optional[str] = None
+
+
+class EmployeePolicyAssistantQueryRequest(BaseModel):
+    assignment_id: str
+    message: str
+    session: Optional[Dict[str, Any]] = None
+
+
+class HrPolicyAssistantQueryRequest(BaseModel):
+    policy_id: str
+    message: str
+    document_id: Optional[str] = None
+    session: Optional[Dict[str, Any]] = None
+
+
+class PolicyAssistantAnalyticsBeaconRequest(BaseModel):
+    """Non-PII client beacon (e.g. follow-up chip). No free-text beyond whitelisted fields."""
+
+    event: str
+    follow_up_intent: Optional[str] = Field(None, max_length=80)
+    follow_up_index: int = Field(..., ge=0, le=20)
+    canonical_topic: Optional[str] = Field(None, max_length=64)
 
 
 def _require_reason(reason: Optional[str]) -> None:
@@ -7204,6 +7228,118 @@ def get_assignment_policy_budget(
     }
 
 
+@app.post("/api/employee/policy-assistant/query")
+def post_employee_policy_assistant_query(
+    body: EmployeePolicyAssistantQueryRequest,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Employee-facing policy Q&A: classifies the message, resolves **published** policy for the assignment,
+    and returns a structured assistant answer or refusal. Draft or unpublished HR data is never used.
+    """
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    aid = (body.assignment_id or "").strip()
+    if not aid:
+        raise HTTPException(status_code=400, detail="assignment_id is required")
+    msg = (body.message or "").strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="message is required")
+    if len(msg) > 8000:
+        raise HTTPException(status_code=400, detail="message too long")
+    try:
+        return employee_policy_assistant_query_response_dict(
+            aid,
+            msg,
+            user,
+            request_id=request_id,
+            session=body.session,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("employee policy assistant query failed assignment_id=%s", aid)
+        raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
+
+
+@app.post("/api/hr/policy-assistant/query")
+def post_hr_policy_assistant_query(
+    body: HrPolicyAssistantQueryRequest,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    HR-facing policy Q&A over the same review aggregate as policy review: working draft, published matrix
+    signals, and Layer-2 rows. Refuses out-of-domain strategy, legal advice, and unrelated authoring.
+    """
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    pid = (body.policy_id or "").strip()
+    if not pid:
+        raise HTTPException(status_code=400, detail="policy_id is required")
+    msg = (body.message or "").strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="message is required")
+    if len(msg) > 8000:
+        raise HTTPException(status_code=400, detail="message too long")
+
+    pol_row = db.get_company_policy(pid)
+    if not pol_row:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, pol_row)
+
+    did = str(body.document_id).strip() if body.document_id else None
+    if did:
+        doc_row = db.get_policy_document(did, request_id=request_id)
+        if not doc_row:
+            raise HTTPException(status_code=404, detail="Document not found")
+        _require_document_access(user, doc_row)
+        if pol_row.get("company_id") and doc_row.get("company_id") != pol_row.get("company_id"):
+            raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        return hr_policy_assistant_query_response_dict(
+            msg,
+            user,
+            pid,
+            document_id=did,
+            request_id=request_id,
+            session=body.session,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("hr policy assistant query failed policy_id=%s", pid)
+        raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
+
+
+@app.post("/api/policy-assistant/analytics/beacon")
+def post_policy_assistant_analytics_beacon(
+    body: PolicyAssistantAnalyticsBeaconRequest,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Lightweight client-side policy assistant signals (no question text).
+    Currently supports: assistant_follow_up_clicked.
+    """
+    if body.event != "assistant_follow_up_clicked":
+        raise HTTPException(status_code=400, detail="Unsupported analytics event")
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    from .services.policy_assistant_analytics import emit_assistant_follow_up_clicked
+    from .services.policy_assistant_contract import PolicyAssistantRoleScope
+
+    role_upper = (user.get("role") or "").upper()
+    rs = PolicyAssistantRoleScope.HR if role_upper == "HR" else PolicyAssistantRoleScope.EMPLOYEE
+    emit_assistant_follow_up_clicked(
+        role=rs,
+        request_id=request_id,
+        follow_up_intent=body.follow_up_intent,
+        follow_up_index=body.follow_up_index,
+        canonical_topic=body.canonical_topic,
+    )
+    return {"ok": True}
+
+
 @app.post("/api/assignments/{assignment_id}/evidence", response_model=AddEvidenceResponse)
 def add_assignment_evidence(
     assignment_id: str,
@@ -8618,8 +8754,15 @@ async def upload_policy_document(
         if result.get("raw_text") and result.get("processing_status") != "failed":
             try:
                 from .services.policy_document_clauses import segment_document_from_raw_text
+                policy_segment_ctx = {
+                    "id": doc_id,
+                    "document_id": doc_id,
+                    "detected_document_type": result.get("detected_document_type"),
+                    "extracted_metadata": result.get("extracted_metadata") or {},
+                    "filename": filename,
+                }
                 clauses, seg_err = segment_document_from_raw_text(
-                    result["raw_text"], mime, data=content
+                    result["raw_text"], mime, data=content, policy_context=policy_segment_ctx
                 )
                 if not seg_err and clauses:
                     db.upsert_policy_document_clauses(doc_id, clauses, request_id=request_id)
@@ -8972,8 +9115,15 @@ async def reprocess_policy_document(
         if result.get("raw_text") and result.get("processing_status") != "failed":
             try:
                 from .services.policy_document_clauses import segment_document_from_raw_text
+                policy_segment_ctx = {
+                    "id": doc_id,
+                    "document_id": doc_id,
+                    "detected_document_type": result.get("detected_document_type"),
+                    "extracted_metadata": result.get("extracted_metadata") or {},
+                    "filename": doc.get("filename") or "",
+                }
                 clauses, seg_err = segment_document_from_raw_text(
-                    result["raw_text"], doc.get("mime_type", ""), data=data
+                    result["raw_text"], doc.get("mime_type", ""), data=data, policy_context=policy_segment_ctx
                 )
                 if not seg_err and clauses:
                     db.upsert_policy_document_clauses(doc_id, clauses, request_id=request_id)

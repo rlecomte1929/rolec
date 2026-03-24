@@ -4,6 +4,8 @@
 **Audience:** Product, engineering, external testers.  
 **Note:** Automated frontend tests cover core rendering and publish flow; this pack targets **end-to-end behavior**, copy, and edge cases in real environments.
 
+**See also:** [Policy Assistant QA & red team](./policy-assistant-qa-pack.md) (bounded Q&A, jailbreak/mixed-scope, draft vs published).
+
 **Before you start**
 
 - Use a **dedicated test company** and named **test assignments** where possible.

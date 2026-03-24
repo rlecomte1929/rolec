@@ -40,6 +40,9 @@ EVENT_POLICY_EMPLOYEE_RESOLUTION = "policy_employee_resolution"
 EVENT_EMPLOYEE_POLICY_FALLBACK = "employee_policy_fallback_triggered"
 EVENT_EMPLOYEE_POLICY_COMPARISON = "employee_policy_comparison_triggered"
 
+# Policy Assistant (bounded payloads; see policy_assistant_analytics.record_policy_assistant_turn)
+EVENT_ASSISTANT_QUESTION_ASKED = "assistant_question_asked"
+
 
 def emit_event(
     event_name: str,

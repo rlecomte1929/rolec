@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
@@ -39,8 +40,23 @@ from .policy_taxonomy import (
     resolve_theme,
 )
 from .policy_pipeline_layers import layer1_fields_for_company_policy_shell
+from .policy_pipeline_diagnostics import raw_text_diagnostic_flags
+from .policy_source_provenance import (
+    apply_numeric_filter_to_hints,
+    build_source_provenance,
+    merge_provenance_into_metadata,
+    resolve_section_reference,
+    scrub_amount_if_section_reference,
+    strip_section_reference_tokens_for_display,
+)
 
 log = logging.getLogger(__name__)
+
+_POLICY_PIPELINE_DIAG = os.environ.get("RELOPASS_POLICY_PIPELINE_DIAG", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 # Must match policy_benefit_rules.calc_type CHECK in migrations
 ALLOWED_CALC_TYPES = frozenset(
@@ -359,20 +375,33 @@ def normalize_clauses_to_objects(
     draft_rule_candidates: List[Dict[str, Any]] = []
 
     for i, clause in enumerate(clauses):
+        _br0 = len(benefit_rules)
+        _ex0 = len(exclusions)
+        _cd0 = len(conditions)
+        _ev0 = len(evidence_requirements)
         cid = clause.get("id")
         raw = clause.get("raw_text") or ""
         ctype = clause.get("clause_type", "unknown")
         hints = clause.get("normalized_hint_json") or {}
+        if not isinstance(hints, dict):
+            hints = {}
+        hints_work = dict(hints)
+        apply_numeric_filter_to_hints(hints_work, raw)
         section = clause.get("section_label")
         page_start = clause.get("source_page_start")
         page_end = clause.get("source_page_end")
         anchor = clause.get("source_anchor")
         conf = clause.get("confidence", 0.5)
 
+        section_ref = resolve_section_reference(hints, raw)
+        value_description = (strip_section_reference_tokens_for_display(raw) or raw).strip()
+        if not value_description:
+            value_description = raw.strip()
+
         benefit_key = resolve_benefit_key(
-            hints.get("candidate_benefit_key"),
+            hints_work.get("candidate_benefit_key"),
             section,
-            raw,
+            value_description,
         )
         theme_guess: Optional[str] = None
         if benefit_key:
@@ -381,22 +410,23 @@ def normalize_clauses_to_objects(
 
         exclusion_intent = (
             ctype == "exclusion"
-            or bool(hints.get("candidate_exclusion_flag"))
+            or bool(hints_work.get("candidate_exclusion_flag"))
             or _text_suggests_exclusion_language(raw)
         )
-        has_cap = _has_structured_monetary_cap(raw, hints)
+        has_cap = _has_structured_monetary_cap(raw, hints_work)
         vague = _is_vague_coverage_framing(raw, has_cap)
         cov_status = _coverage_status(exclusion_intent, has_cap, vague, benefit_key)
 
-        amount_value = _extract_amount_value(hints, raw)
-        currency = hints.get("candidate_currency") or _extract_currency_hint(raw, hints)
-        amount_unit = hints.get("candidate_unit")
+        amount_value = _extract_amount_value(hints_work, raw)
+        amount_value = scrub_amount_if_section_reference(amount_value, raw, hints)
+        currency = hints_work.get("candidate_currency") or _extract_currency_hint(raw, hints_work)
+        amount_unit = hints_work.get("candidate_unit")
         dur_frag = _duration_quantity_fragment(raw)
-        ats = _normalize_assignment_types(hints)
+        ats = _normalize_assignment_types(hints_work)
         for at in _assignment_types_from_text(raw):
             if at not in ats:
                 ats.append(at)
-        fts_hint = _normalize_family_status(hints)
+        fts_hint = _normalize_family_status(hints_work)
         fts_text = _family_terms_from_text(raw)
         role_hints = _role_hints_from_text(raw)
 
@@ -404,7 +434,7 @@ def normalize_clauses_to_objects(
         pub_assessment = "draft_only"
 
         exclusion_published = False
-        if _should_publish_exclusion_row(ctype, hints, raw, benefit_key, has_cap):
+        if _should_publish_exclusion_row(ctype, hints_work, raw, benefit_key, has_cap):
             domain = "scope"
             rl = raw.lower()
             if any(s in rl for s in ["tax", "tax equalization", "hypothetical"]):
@@ -414,12 +444,21 @@ def normalize_clauses_to_objects(
             exclusions.append({
                 "benefit_key": benefit_key if domain == "benefit" else None,
                 "domain": domain,
-                "description": raw[:500],
+                "description": value_description[:500],
                 "auto_generated": True,
                 "review_status": "pending",
                 "confidence": conf,
                 "raw_text": raw[:2000],
                 "_clause_id": cid,
+                "_source_provenance": build_source_provenance(
+                    document_id=doc_id,
+                    page_start=page_start,
+                    page_end=page_end,
+                    section_ref=section_ref,
+                    source_label=section,
+                    source_excerpt=value_description[:500],
+                    clause_id=str(cid) if cid else None,
+                ),
             })
             exclusion_published = True
             publish_targets.append("exclusions")
@@ -429,8 +468,20 @@ def normalize_clauses_to_objects(
         if _should_publish_benefit_row(ctype, benefit_key, exclusion_published, vague, has_cap):
             meta = get_benefit_meta(benefit_key or "")
             theme = resolve_theme(benefit_key or "", meta.get("group"))
-            calc_type = _detect_calc_type(raw, hints, benefit_key or "")
-            frequency = hints.get("candidate_frequency") or "per_assignment"
+            calc_type = _detect_calc_type(raw, hints_work, benefit_key or "")
+            frequency = hints_work.get("candidate_frequency") or "per_assignment"
+            prov = build_source_provenance(
+                document_id=doc_id,
+                page_start=page_start,
+                page_end=page_end,
+                section_ref=section_ref,
+                source_label=section,
+                source_excerpt=value_description[:500],
+                clause_id=str(cid) if cid else None,
+            )
+            meta_base: Dict[str, Any] = {}
+            if calc_type == "difference_only" and benefit_key == "schooling":
+                meta_base["reimbursement_logic"] = "difference_only"
             rule = {
                 "benefit_key": benefit_key,
                 "benefit_category": theme,
@@ -439,8 +490,8 @@ def normalize_clauses_to_objects(
                 "amount_unit": amount_unit,
                 "currency": currency if isinstance(currency, str) else None,
                 "frequency": frequency,
-                "description": raw[:500],
-                "metadata_json": {},
+                "description": value_description[:500],
+                "metadata_json": merge_provenance_into_metadata(meta_base, prov),
                 "auto_generated": True,
                 "review_status": "pending",
                 "confidence": conf,
@@ -448,8 +499,6 @@ def normalize_clauses_to_objects(
                 "_clause_idx": i,
                 "_clause_id": cid,
             }
-            if calc_type == "difference_only" and benefit_key == "schooling":
-                rule["metadata_json"] = {"reimbursement_logic": "difference_only"}
             benefit_rules.append(rule)
             benefit_emitted = True
             publish_targets.append("benefit_rules")
@@ -513,20 +562,29 @@ def normalize_clauses_to_objects(
                     pub_assessment = "publish_benefit_rule_with_conditions"
 
         # Evidence (unchanged heuristics)
-        if ctype == "evidence_rule" or hints.get("candidate_evidence_items"):
-            items = hints.get("candidate_evidence_items") or []
+        if ctype == "evidence_rule" or hints_work.get("candidate_evidence_items"):
+            items = hints_work.get("candidate_evidence_items") or []
             if not items and "receipt" in raw.lower():
                 items = ["receipts"]
             if items:
                 evidence_requirements.append({
                     "benefit_rule_id": None,
                     "evidence_items_json": items,
-                    "description": raw[:300],
+                    "description": value_description[:300],
                     "auto_generated": True,
                     "review_status": "pending",
                     "confidence": conf,
                     "raw_text": raw[:2000],
                     "_clause_id": cid,
+                    "_source_provenance": build_source_provenance(
+                        document_id=doc_id,
+                        page_start=page_start,
+                        page_end=page_end,
+                        section_ref=section_ref,
+                        source_label=section,
+                        source_excerpt=value_description[:500],
+                        clause_id=str(cid) if cid else None,
+                    ),
                 })
                 publish_targets.append("evidence_requirements")
                 if pub_assessment == "draft_only":
@@ -536,7 +594,7 @@ def normalize_clauses_to_objects(
             benefit_key
             or exclusion_intent
             or has_cap
-            or (hints and len(hints) > 0)
+            or (hints_work and len(hints_work) > 0)
             or len(raw.strip()) >= 24
             or ats
             or fts_hint
@@ -545,9 +603,18 @@ def normalize_clauses_to_objects(
             or dur_frag
         )
         if wants_draft:
-            nums = hints.get("candidate_numeric_values") or []
+            nums = hints_work.get("candidate_numeric_values") or []
             if not isinstance(nums, list):
                 nums = []
+            draft_prov = build_source_provenance(
+                document_id=doc_id,
+                page_start=page_start,
+                page_end=page_end,
+                section_ref=section_ref,
+                source_label=section,
+                source_excerpt=value_description[:500],
+                clause_id=str(cid) if cid else None,
+            )
             draft_rule_candidates.append(
                 {
                     "clause_index": i,
@@ -570,16 +637,43 @@ def normalize_clauses_to_objects(
                         "role_hints": role_hints,
                     },
                     "source_trace": {
+                        "document_id": doc_id,
                         "source_page_start": page_start,
                         "source_page_end": page_end,
                         "source_anchor": anchor,
                         "section_label": section,
+                        "section_ref": section_ref,
                     },
-                    "source_excerpt": raw[:500],
+                    "source_provenance": draft_prov,
+                    "source_excerpt": value_description[:500],
                     "confidence": conf,
                     "publishability_assessment": pub_assessment,
                     "publish_layer_targets": publish_targets,
                 }
+            )
+
+        if _POLICY_PIPELINE_DIAG:
+            is_tbl = " | " in raw and len(raw) < 1200
+            hdict = hints_work if isinstance(hints_work, dict) else {}
+            d_flags = ",".join(raw_text_diagnostic_flags(raw, hdict, section, is_table_row_shape=is_tbl))
+            log.info(
+                "policy_pipeline_diag doc_id=%s clause_idx=%s clause_id=%s ctype=%s "
+                "section_label=%s benefit_key=%s wants_draft=%s br+=%s ex+=%s cond+=%s ev+=%s "
+                "ats=%s publish_targets=%s flags=%s",
+                doc_id,
+                i,
+                cid,
+                ctype,
+                (section or "")[:100],
+                benefit_key,
+                str(wants_draft).lower(),
+                len(benefit_rules) - _br0,
+                len(exclusions) - _ex0,
+                len(conditions) - _cd0,
+                len(evidence_requirements) - _ev0,
+                ats,
+                publish_targets,
+                d_flags,
             )
 
     return {
@@ -613,6 +707,14 @@ def _sanitize_benefit_rules_for_db(rules: List[Dict[str, Any]], request_id: Opti
                 f = float(av)
                 if math.isnan(f) or math.isinf(f):
                     r["amount_value"] = None
+                else:
+                    meta = r.get("metadata_json") if isinstance(r.get("metadata_json"), dict) else {}
+                    scrubbed = scrub_amount_if_section_reference(
+                        f,
+                        str(r.get("raw_text") or r.get("description") or ""),
+                        meta,
+                    )
+                    r["amount_value"] = scrubbed
             except (TypeError, ValueError):
                 r["amount_value"] = None
 

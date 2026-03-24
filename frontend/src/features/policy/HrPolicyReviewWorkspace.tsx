@@ -16,8 +16,10 @@ import {
 import { StarterPolicyDraftGuidance } from './StarterPolicyDraftGuidance';
 import { STARTER_TEMPLATE_OPTIONS, type StarterTemplateKey } from './starterPolicyCopy';
 import { HrPolicyDraftReviewPanel } from './HrPolicyDraftReviewPanel';
+import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
 import { HrBenefitOverrideSection } from './HrBenefitOverrideSection';
 import { POLICY_TOPIC_LABELS, POLICY_TOPIC_ORDER } from './policyTopicLabels';
+import { formatPolicySourceCitation, getSourceProvenance } from './policySourceProvenance';
 
 const VERSION_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
@@ -632,6 +634,12 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         onScrollToDraftReviewPanel={scrollToDraftReviewFull}
       />
 
+      <HrPolicyAssistantPanel
+        policyId={selectedPolicyId}
+        documentId={typeof sourceDocId === 'string' ? sourceDocId : null}
+        contextLoading={Boolean(selectedPolicyId && loading)}
+      />
+
       <PublishPreflightModal
         open={publishModalOpen}
         onClose={() => !publishBusy && setPublishModalOpen(false)}
@@ -831,6 +839,7 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                   const approvalReq = metaVal('approval_required', false);
                   const evidenceReq = metaVal('evidence_required', false);
                   const notes = metaVal('hr_notes') ?? r.description ?? '';
+                  const sourceCitation = formatPolicySourceCitation(getSourceProvenance(r.metadata_json));
                   const unitStr = [r.currency, r.amount_unit].filter(Boolean).join(' ') || '-';
                   const hasNumericCap = typeof capVal === 'number' && capVal > 0;
 
@@ -922,18 +931,23 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
                           )}
                         </td>
                       )}
-                      <td className="py-2 px-2">
-                        {link ? (
-                          <button
-                            type="button"
-                            onClick={() => openSourceClause(link.clause_id)}
-                            className="text-xs text-[#059669] hover:underline"
-                          >
-                            p.{link.source_page_start ?? '?'}
-                          </button>
-                        ) : (
-                          '-'
-                        )}
+                      <td className="py-2 px-2 align-top">
+                        <div className="flex flex-col gap-1">
+                          {link ? (
+                            <button
+                              type="button"
+                              onClick={() => openSourceClause(link.clause_id)}
+                              className="text-xs text-[#059669] hover:underline text-left"
+                            >
+                              p.{link.source_page_start ?? '?'}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-[#9ca3af]">-</span>
+                          )}
+                          {sourceCitation ? (
+                            <span className="text-xs text-[#6b7280]">{sourceCitation}</span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="py-2 px-2">
                         {isEditing ? (

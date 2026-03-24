@@ -58,6 +58,11 @@ def workflow_overview(
     quote_compared = counts.get("quote_compared", 0)
     quote_accepted = counts.get("quote_accepted", 0)
     case_created = counts.get("case_created", 0)
+    assistant_questions = counts.get("assistant_question_asked", 0)
+    assistant_supported = counts.get("assistant_question_supported", 0)
+    assistant_unsupported = counts.get("assistant_question_unsupported", 0)
+    assistant_refusals = counts.get("assistant_refusal_shown", 0)
+    assistant_follow_ups = counts.get("assistant_follow_up_clicked", 0)
     services_selected = counts.get("services_selected", 0)
     services_answers_saved = counts.get("services_answers_saved", 0)
 
@@ -79,11 +84,20 @@ def workflow_overview(
             "quote_received": quote_received,
             "quote_compared": quote_compared,
             "quote_accepted": quote_accepted,
+            "assistant_question_asked": assistant_questions,
+            "assistant_question_supported": assistant_supported,
+            "assistant_question_unsupported": assistant_unsupported,
+            "assistant_refusal_shown": assistant_refusals,
+            "assistant_follow_up_clicked": assistant_follow_ups,
         },
         "rates": {
             "supplier_selection_rate_pct": round(supplier_selection_rate, 1),
             "rfq_conversion_rate_pct": round(rfq_conversion_rate, 1),
             "quote_response_rate_pct": round(quote_response_rate, 1),
+            "assistant_unsupported_rate_pct": round(
+                (assistant_unsupported / assistant_questions * 100) if assistant_questions else 0,
+                1,
+            ),
         },
     }
 
