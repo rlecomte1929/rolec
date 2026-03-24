@@ -89,7 +89,7 @@ export function usePolicyConfigWorkspace(args: {
       setError(null);
       return;
     }
-    load();
+    void load().catch(() => undefined);
   }, [load, mode, adminCompanyId]);
 
   const isReadOnly = Boolean(readOnlySnapshot);

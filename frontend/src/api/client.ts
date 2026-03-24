@@ -890,9 +890,15 @@ export const adminAPI = {
     const response = await api.patch(`/api/admin/policies/${policyId}`, payload);
     return response.data;
   },
+  /** Legacy / optional. Never throws — callers must not tie page load to this result. */
   listAdminPolicyTemplates: async (): Promise<AdminPolicyTemplatesResponse> => {
-    const response = await api.get('/api/admin/policies/templates');
-    return response.data;
+    try {
+      const response = await api.get('/api/admin/policies/templates');
+      return response.data ?? { templates: [] };
+    } catch (e) {
+      console.warn('[adminAPI] listAdminPolicyTemplates failed (non-blocking)', e);
+      return { templates: [] };
+    }
   },
   applyDefaultTemplateToCompany: async (
     companyId: string,

@@ -36,3 +36,13 @@ def test_admin_context_available():
     res = client.get("/api/admin/context", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     assert res.json().get("isAdmin") is True
+
+
+def test_admin_policy_templates_returns_200_with_list_shape():
+    """Regression: must not 500 when default_policy_templates is missing or empty (structured policy UI is separate)."""
+    token = _login("admin@relopass.com", "Passw0rd!")
+    res = client.get("/api/admin/policies/templates", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    body = res.json()
+    assert "templates" in body
+    assert isinstance(body["templates"], list)

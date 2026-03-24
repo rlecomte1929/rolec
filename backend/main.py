@@ -232,6 +232,28 @@ if env_origins:
 # Match apex + subdomains (fullmatch). A plain `https://.*\.relopass\.com` misses https://relopass.com.
 origin_regex = os.getenv("CORS_ORIGIN_REGEX") or r"^https://([\w-]+\.)*relopass\.com$"
 
+_cors_origin_pattern = re.compile(origin_regex) if origin_regex else None
+
+
+def cors_headers_for_request_origin(request: Request) -> Dict[str, str]:
+    """
+    Duplicate CORSMiddleware origin checks for JSONResponse paths (e.g. unhandled 500).
+    Without this, some browsers report a CORS failure when the real issue is a server error.
+    """
+    origin = request.headers.get("origin")
+    if not origin:
+        return {}
+    allowed = origin in default_origins or bool(_cors_origin_pattern and _cors_origin_pattern.fullmatch(origin))
+    if not allowed:
+        return {}
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Expose-Headers": "X-Request-ID",
+        "Vary": "Origin",
+    }
+
+
 # NOTE: Register HTTP middleware before CORSMiddleware. Starlette prepends each
 # add_middleware / @app.middleware at index 0, so registering CORS *after* the
 # request-id middleware yields stack ServerError → CORS → RequestID → routes.
@@ -256,13 +278,15 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         repr(exc),
         _traceback.format_exc(),
     )
+    hdrs: Dict[str, str] = {"X-Request-ID": req_id}
+    hdrs.update(cors_headers_for_request_origin(request))
     return JSONResponse(
         status_code=500,
         content={
             "detail": "Internal server error",
             "request_id": req_id,
         },
-        headers={"X-Request-ID": req_id},
+        headers=hdrs,
     )
 
 
@@ -2564,10 +2588,15 @@ def patch_admin_policy(
 
 @app.get("/api/admin/policies/templates")
 def list_admin_policy_templates(user: Dict[str, Any] = Depends(require_admin)):
-    """Admin: list default platform policy templates."""
-    templates = db.list_default_policy_templates()
-    db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {})
-    return {"templates": templates}
+    """Admin: list default platform policy templates (empty list if table or data is unavailable)."""
+    try:
+        templates = db.list_default_policy_templates()
+        db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {})
+        return {"templates": templates}
+    except Exception as e:
+        log.warning("list_admin_policy_templates handler failed (returning empty): %s", e)
+        db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {"error": "fallback_empty"})
+        return {"templates": []}
 
 
 @app.post("/api/admin/policies/apply-default-template")

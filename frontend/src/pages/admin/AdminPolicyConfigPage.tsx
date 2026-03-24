@@ -5,6 +5,7 @@ import { Card, Select } from '../../components/antigravity';
 import { adminAPI } from '../../api/client';
 import type { AdminCompany } from '../../types';
 import { PolicyConfigPage } from '../../features/policy-config/PolicyConfigPage';
+import { PolicyConfigRouteErrorBoundary } from '../../features/policy-config/PolicyConfigRouteErrorBoundary';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
 export const AdminPolicyConfigPage: React.FC = () => {
@@ -62,7 +63,9 @@ export const AdminPolicyConfigPage: React.FC = () => {
         />
       </Card>
       {companyId ? (
-        <PolicyConfigPage mode="admin" adminCompanyId={companyId} />
+        <PolicyConfigRouteErrorBoundary>
+          <PolicyConfigPage mode="admin" adminCompanyId={companyId} />
+        </PolicyConfigRouteErrorBoundary>
       ) : (
         <Card padding="lg">
           <p className="text-sm text-[#64748b]">Choose a company to load or edit its compensation configuration.</p>
