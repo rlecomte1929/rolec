@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/client';
 import { signInSupabase } from '../api/supabaseAuth';
 import type { LoginRequest, RegisterRequest, UserRole } from '../types';
-import { setAuthItem } from '../utils/demo';
+import { normalizeStoredRole, setAuthItem } from '../utils/demo';
 import { safeNavigate } from '../navigation/safeNavigate';
 import type { RouteKey } from '../navigation/routes';
 import { trackAuthPerf } from '../perf/authPerf';
@@ -30,12 +30,13 @@ export const useAuth = () => {
     if (user.email) setAuthItem('relopass_email', user.email);
     if (user.username) setAuthItem('relopass_username', user.username);
     if (user.name) setAuthItem('relopass_name', user.name);
-    setAuthItem('relopass_role', user.role);
+    setAuthItem('relopass_role', normalizeStoredRole(user.role));
   };
 
-  const postAuthRouteKey = (role: UserRole): RouteKey => {
-    if (role === 'EMPLOYEE') return 'employeeDashboard';
-    if (role === 'ADMIN') return 'adminConsole';
+  const postAuthRouteKey = (role: UserRole | string): RouteKey => {
+    const n = normalizeStoredRole(role);
+    if (n === 'EMPLOYEE') return 'employeeDashboard';
+    if (n === 'ADMIN') return 'adminConsole';
     return 'hrDashboard';
   };
 

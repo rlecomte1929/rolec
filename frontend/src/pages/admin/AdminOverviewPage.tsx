@@ -4,7 +4,7 @@ import { Card } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { adminAPI, suppliersAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
-import { getAuthItem } from '../../utils/demo';
+import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
 type OverviewStats = {
   companies: number;
@@ -18,7 +18,7 @@ type OverviewStats = {
 };
 
 export const AdminOverviewPage: React.FC = () => {
-  const role = getAuthItem('relopass_role');
+  const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const [stats, setStats] = useState<OverviewStats>({
     companies: 0,
     hrUsers: 0,

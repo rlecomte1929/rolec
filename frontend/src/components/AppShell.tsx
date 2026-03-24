@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Container } from './antigravity';
-import { getAuthItem } from '../utils/demo';
+import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { getNavigationError } from '../navigation/safeNavigate';
 import { buildRoute, ROUTE_DEFS } from '../navigation/routes';
@@ -45,7 +45,7 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle }) => {
   const name = getAuthItem('relopass_name');
-  const role = getAuthItem('relopass_role');
+  const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
   const location = useLocation();
   const [navError, setNavError] = useState<string | null>(getNavigationError());
@@ -139,7 +139,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     role === 'EMPLOYEE'
                       ? buildRoute('employeeDashboard')
                       : role === 'ADMIN'
-                        ? buildRoute('adminConsole')
+                        ? buildRoute('adminOverview')
                         : role === 'HR'
                           ? buildRoute('hrDashboard')
                           : buildRoute('landing')

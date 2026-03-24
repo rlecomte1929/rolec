@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Container } from '../antigravity';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
-import { getAuthItem } from '../../utils/demo';
+import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
 const logoUrl = '/relopass-logo.png?v=1';
 
@@ -15,14 +15,14 @@ const PUBLIC_NAV = [
 
 export const PublicHeader: React.FC = () => {
   const location = useLocation();
-  const role = getAuthItem('relopass_role');
+  const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const dashboardPath =
     role === 'EMPLOYEE'
       ? ROUTE_DEFS.employeeDashboard.path
       : role === 'ADMIN'
-        ? ROUTE_DEFS.adminConsole.path
+        ? ROUTE_DEFS.adminOverview.path
         : role === 'HR'
           ? ROUTE_DEFS.hrDashboard.path
           : null;

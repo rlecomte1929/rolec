@@ -10,7 +10,7 @@ import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
-import { getAuthItem } from '../utils/demo';
+import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -243,7 +243,7 @@ export const HrDashboard: React.FC = () => {
             className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
           />
           <Button variant="outline" onClick={() => setIsFilterOpen(true)}>Filter</Button>
-          {getAuthItem('relopass_role') === 'ADMIN' ? (
+          {normalizeStoredRole(getAuthItem('relopass_role')) === 'ADMIN' ? (
             <Link to={buildRoute('adminAssignments')}>
               <Button>Add assignment</Button>
             </Link>
@@ -348,7 +348,7 @@ export const HrDashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-[#0b2b43]">Active relocation cases</span>
-              {getAuthItem('relopass_role') === 'ADMIN' && (
+              {normalizeStoredRole(getAuthItem('relopass_role')) === 'ADMIN' && (
                 <Link to={buildRoute('adminAssignments')} className="text-xs text-[#0b2b43] hover:underline">
                   Admin Assignments →
                 </Link>

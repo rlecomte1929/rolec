@@ -3,7 +3,8 @@ import { Card } from './antigravity';
 import { TEST_ACCOUNTS, type TestAccount } from '../config/testAccounts';
 import { authAPI } from '../api/client';
 import { signInSupabase, signOutSupabase } from '../api/supabaseAuth';
-import { clearAuthItems, setAuthItem } from '../utils/demo';
+import { clearAuthItems, normalizeStoredRole, setAuthItem } from '../utils/demo';
+import { buildRoute } from '../navigation/routes';
 
 interface Props {
   open: boolean;
@@ -31,12 +32,18 @@ export const SwitchUserModal: React.FC<Props> = ({ open, onClose }) => {
 
       // Establish Supabase session so tokens auto-refresh
       await signInSupabase(account.email, account.password);
-      setAuthItem('relopass_role', response.user.role);
+      setAuthItem('relopass_role', normalizeStoredRole(response.user.role));
       if (response.user.name) setAuthItem('relopass_name', response.user.name);
       if (response.user.email) setAuthItem('relopass_email', response.user.email);
       if (response.user.username) setAuthItem('relopass_username', response.user.username);
 
-      const target = response.user.role === 'EMPLOYEE' ? '/employee/journey' : '/hr/dashboard';
+      const r = normalizeStoredRole(response.user.role);
+      const target =
+        r === 'EMPLOYEE'
+          ? '/employee/journey'
+          : r === 'ADMIN'
+            ? buildRoute('adminOverview')
+            : '/hr/dashboard';
       window.location.href = target;
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || 'Login failed. Make sure the account exists.');
