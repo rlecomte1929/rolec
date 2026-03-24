@@ -82,6 +82,7 @@ export const AdminAssignments: React.FC = () => {
   const [hrUsersForAdd, setHrUsersForAdd] = useState<Array<{ id: string; label: string }>>([]);
   const [employeesForAdd, setEmployeesForAdd] = useState<Array<{ id: string; label: string }>>([]);
   const [createSuccess, setCreateSuccess] = useState<{ assignmentId: string } | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');

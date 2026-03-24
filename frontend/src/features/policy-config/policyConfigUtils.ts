@@ -4,7 +4,6 @@ import type {
   PolicyConfigWorkingPayload,
 } from './types';
 import { POLICY_CONFIG_CATEGORIES } from './constants';
-import { rowMatchesTargetingPreview } from './policyTargeting';
 
 /** Deterministic JSON shape for saves and dirty comparison (sorted object keys recursively). */
 export function stableJsonNormalize(v: unknown): unknown {
