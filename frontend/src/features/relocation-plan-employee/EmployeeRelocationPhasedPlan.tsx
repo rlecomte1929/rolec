@@ -96,12 +96,12 @@ export const EmployeeRelocationPhasedPlan: React.FC<EmployeeRelocationPhasedPlan
             Create default plan
           </Button>
         </Card>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div>
+    <main aria-label="Relocation plan" className="min-w-0">
       <RelocationPlanPageHeader backToSummaryHref={backToSummaryHref} />
 
       <NextActionCard
