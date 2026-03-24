@@ -41,6 +41,94 @@ def _normalize_family_status(raw: Optional[str]) -> str:
     return FAMILY_STATUS_MAP.get(key, key)
 
 
+def _deep_merge_dict(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(base)
+    for k, v in update.items():
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = _deep_merge_dict(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def _intake_overlay_from_case_draft(draft: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Flatten CaseWizard / relocation_cases.profile_json (CaseDraftDTO) into the loose profile
+    shape expected by extract_resolution_context (maritalStatus, spouse, dependents, movePlan, assignmentType).
+    """
+    if not draft or not isinstance(draft, dict):
+        return {}
+    if draft.get("relocationBasics") is None and draft.get("familyMembers") is None:
+        return {}
+
+    out: Dict[str, Any] = {}
+    fm = draft.get("familyMembers") or {}
+    if fm.get("maritalStatus"):
+        out["maritalStatus"] = fm["maritalStatus"]
+    sp = fm.get("spouse") or {}
+    if isinstance(sp, dict) and (sp.get("fullName") or "").strip():
+        out["spouse"] = {"fullName": sp.get("fullName"), "accompanying": True}
+    ch = fm.get("children") or []
+    if isinstance(ch, list) and ch:
+        deps = []
+        for c in ch:
+            if not isinstance(c, dict):
+                continue
+            entry: Dict[str, Any] = {}
+            if c.get("fullName"):
+                entry["fullName"] = c.get("fullName")
+            if c.get("dateOfBirth"):
+                entry["dateOfBirth"] = c.get("dateOfBirth")
+            if c.get("age") is not None:
+                try:
+                    entry["age"] = int(c["age"])
+                except (TypeError, ValueError):
+                    pass
+            deps.append(entry)
+        if deps:
+            out["dependents"] = deps
+
+    rb = draft.get("relocationBasics") or {}
+    oc = ", ".join(filter(None, [rb.get("originCity"), rb.get("originCountry")]))
+    dc = ", ".join(filter(None, [rb.get("destCity"), rb.get("destCountry")]))
+    if oc or dc:
+        mp = out.setdefault("movePlan", {})
+        if oc:
+            mp["origin"] = oc
+        if dc:
+            mp["destination"] = dc
+    dm = rb.get("durationMonths")
+    if dm is not None:
+        try:
+            n = int(dm)
+            mp = out.setdefault("movePlan", {})
+            mp["duration"] = f"{n} months"
+        except (TypeError, ValueError):
+            pass
+
+    ac = draft.get("assignmentContext") or {}
+    if isinstance(ac, dict):
+        explicit_at = (ac.get("assignmentType") or ac.get("assignment_type") or "").strip()
+        if explicit_at:
+            out["assignmentType"] = explicit_at
+        else:
+            ct = str(ac.get("contractType") or "").strip().lower()
+            if ct == "permanent":
+                out["assignmentType"] = "permanent"
+            elif ct == "assignment":
+                out["assignmentType"] = "long_term"
+            elif ct == "contract":
+                out["assignmentType"] = "short_term"
+        if ac.get("jobTitle") or ac.get("salaryBand"):
+            pa = out.setdefault("primaryApplicant", {})
+            emp = pa.setdefault("employer", {})
+            if ac.get("jobTitle"):
+                emp["roleTitle"] = ac.get("jobTitle")
+            if ac.get("salaryBand"):
+                emp["salaryBand"] = ac.get("salaryBand")
+    return out
+
+
 def extract_resolution_context(
     assignment: Dict[str, Any],
     case: Optional[Dict[str, Any]],
@@ -64,8 +152,17 @@ def extract_resolution_context(
         "school_age_children": False,
     }
 
-    # Prefer employee_profile (from employee_profiles) over case profile_json
-    p = employee_profile or (profile or {})
+    # Merge wizard case draft (profile_json) with employee_profiles row; latter wins on conflicts.
+    p_merged: Dict[str, Any] = {}
+    if profile and isinstance(profile, dict):
+        if profile.get("relocationBasics") is not None or profile.get("familyMembers") is not None:
+            p_merged.update(_intake_overlay_from_case_draft(profile))
+        else:
+            p_merged.update(profile)
+    if employee_profile and isinstance(employee_profile, dict):
+        p = _deep_merge_dict(p_merged, employee_profile)
+    else:
+        p = p_merged
 
     # Assignment type: from employees table, profile, or assignment metadata
     at = (
@@ -87,12 +184,15 @@ def extract_resolution_context(
     ctx["family_size"] = 1 + (1 if ctx["has_spouse"] else 0) + ctx["children_count"]
     ctx["accompanied_family"] = ctx["family_size"] > 1
 
-    fs = (
-        p.get("maritalStatus")
-        or p.get("familyStatus")
-        or ("accompanied" if ctx["accompanied_family"] else "single")
-    )
-    ctx["family_status"] = _normalize_family_status(fs)
+    if ctx["children_count"] > 0:
+        fs_raw = "dependents"
+    else:
+        fs_raw = (
+            p.get("maritalStatus")
+            or p.get("familyStatus")
+            or ("accompanied" if ctx["accompanied_family"] else "single")
+        )
+    ctx["family_status"] = _normalize_family_status(fs_raw)
 
     # School age: check dependents ages
     for d in deps if isinstance(deps, list) else []:

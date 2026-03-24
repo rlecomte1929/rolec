@@ -1608,6 +1608,19 @@ export const employeeAPI = {
       }
     >;
     source?: string;
+    policy_surface?: {
+      id?: string;
+      title?: string;
+      version?: number;
+      effective_date?: string | null;
+      company_name?: string | null;
+    };
+    resolution_context?: {
+      assignment_type?: string | null;
+      family_status?: string | null;
+      tier?: string | null;
+      source?: string | null;
+    };
   }> => {
     const response = await api.get(`/api/employee/assignments/${assignmentId}/services-policy-context`);
     return response.data;

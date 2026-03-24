@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { Card, Input, Select, Alert, LoadingButton } from '../components/antigravity';
 import { AppShell } from '../components/AppShell';
 import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
+import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
+import { getAuthItem } from '../utils/demo';
 
 export const Auth: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -134,6 +136,13 @@ export const Auth: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  if (getAuthItem('relopass_token')) {
+    const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
+    if (key !== 'landing') {
+      return <Navigate to={buildRoute(key)} replace />;
+    }
+  }
 
   return (
     <AppShell>

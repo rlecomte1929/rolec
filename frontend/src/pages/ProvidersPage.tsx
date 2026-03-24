@@ -25,6 +25,12 @@ import {
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
 } from '../features/policy/employeePolicyMessages';
+import {
+  humanizeAssignmentTypeLabel,
+  humanizeFamilyStatusLabel,
+  normalizeAssignmentType,
+  normalizeFamilyStatus,
+} from '../features/policy-config/policyTargeting';
 
 type ServicesCategoryEntry = NonNullable<
   Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>>['categories']
@@ -315,6 +321,41 @@ export const ProvidersPage: React.FC = () => {
                   <p className="text-xs text-[#15803d] mt-1">
                     Supported categories show limits from your published assignment policy (resolved benefits). Partial
                     or out-of-scope categories are labeled on each card.
+                  </p>
+                </div>
+              )}
+              {svcPolicy?.has_policy && svcPolicy.policy_surface && (
+                <div className="mt-4 p-3 rounded-lg border border-[#e2e8f0] bg-white">
+                  <p className="text-sm font-semibold text-[#0b2b43]">
+                    {svcPolicy.policy_surface.title || 'Published policy'}
+                  </p>
+                  <div className="text-xs text-[#64748b] mt-1 space-y-0.5">
+                    {svcPolicy.policy_surface.company_name && (
+                      <div>Company: {svcPolicy.policy_surface.company_name}</div>
+                    )}
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                      {svcPolicy.policy_surface.version != null && (
+                        <span>Version {svcPolicy.policy_surface.version}</span>
+                      )}
+                      {svcPolicy.policy_surface.effective_date && (
+                        <span>Effective {String(svcPolicy.policy_surface.effective_date).slice(0, 10)}</span>
+                      )}
+                    </div>
+                    {svcPolicy.resolution_context && (
+                      <div className="mt-2 text-[#475569]">
+                        Your profile for policy matching:{' '}
+                        {humanizeAssignmentTypeLabel(
+                          normalizeAssignmentType(svcPolicy.resolution_context.assignment_type ?? '') ?? undefined
+                        )}
+                        {' · '}
+                        {humanizeFamilyStatusLabel(
+                          normalizeFamilyStatus(svcPolicy.resolution_context.family_status ?? '') ?? undefined
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#64748b] mt-2 leading-relaxed">
+                    Service cards below use the same published policy as Compensation &amp; Allowance and HR Policy.
                   </p>
                 </div>
               )}

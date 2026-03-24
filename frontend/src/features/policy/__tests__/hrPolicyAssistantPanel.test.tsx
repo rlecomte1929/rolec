@@ -53,7 +53,7 @@ describe('HrPolicyAssistantPanel', () => {
     render(<HrPolicyAssistantPanel policyId="pol-1" />);
     expect(screen.getByText(HR_POLICY_ASSISTANT_TITLE)).toBeInTheDocument();
     expect(screen.getByText(HR_POLICY_ASSISTANT_SUBTITLE)).toBeInTheDocument();
-    expect(screen.getByText(/same policy review data/i)).toBeInTheDocument();
+    expect(screen.getByText(/normalized policy data/i)).toBeInTheDocument();
   });
 
   it('shows no-policy guidance when policy id missing', () => {
@@ -82,7 +82,7 @@ describe('HrPolicyAssistantPanel', () => {
     await waitFor(() =>
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('pol-1', 'What changes if I publish?', undefined)
     );
-    const region = await screen.findByRole('region', { name: /HR policy assistant result/i });
+    const region = await screen.findByRole('region', { name: /HR policy answer/i });
     expect(within(region).getByText(/policy data scope/i)).toBeInTheDocument();
     expect(within(region).getByText('Draft vs published:')).toBeInTheDocument();
     expect(within(region).getByText(/source reference/i)).toBeInTheDocument();
@@ -120,7 +120,7 @@ describe('HrPolicyAssistantPanel', () => {
       target: { value: 'Why informational?' },
     });
     fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
-    const region = await screen.findByRole('region', { name: /HR policy assistant result/i });
+    const region = await screen.findByRole('region', { name: /HR policy answer/i });
     expect(within(region).getByText('Comparison readiness:')).toBeInTheDocument();
     expect(within(region).getByText('informational only', { exact: false })).toBeInTheDocument();
   });
@@ -141,7 +141,7 @@ describe('HrPolicyAssistantPanel', () => {
         follow_up_options: [],
         refusal: {
           refusal_code: 'out_of_scope_general',
-          refusal_text: 'That is outside this assistant’s scope.',
+          refusal_text: 'That is outside this policy Q&A scope.',
           supported_examples: ['What do employees see for temporary housing?'],
         },
         role_scope: 'hr',
@@ -152,8 +152,8 @@ describe('HrPolicyAssistantPanel', () => {
       target: { value: 'How should we beat competitors on benefits?' },
     });
     fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
-    await waitFor(() => expect(screen.getByText(/not answered/i)).toBeInTheDocument());
-    expect(screen.getByText(/in-scope examples/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/no policy answer/i)).toBeInTheDocument());
+    expect(screen.getByText(/within-policy examples/i)).toBeInTheDocument();
     expect(screen.getByText('What do employees see for temporary housing?')).toBeInTheDocument();
   });
 });

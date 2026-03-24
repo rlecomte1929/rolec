@@ -300,13 +300,15 @@ export const EmployeePolicyPanel: React.FC<{
     return (
       <div className="space-y-4">
         <MaturityBanner maturity="no_policy" />
+        <div>
+          <Link to={buildRoute('services')}>
+            <Button variant="outline">Back to Services</Button>
+          </Link>
+        </div>
         <Card padding="lg" className="border-slate-200 bg-white">
           <p className="text-slate-700">{pack.message || EMPLOYEE_HR_POLICY_WAIT_PRIMARY}</p>
           <p className="text-sm text-slate-600 mt-2">{pack.message_secondary || EMPLOYEE_HR_POLICY_WAIT_SECONDARY}</p>
         </Card>
-        <Link to={buildRoute('services')}>
-          <Button variant="outline">Back to Services</Button>
-        </Link>
       </div>
     );
   }
@@ -329,6 +331,12 @@ export const EmployeePolicyPanel: React.FC<{
     <div className="space-y-6">
       <MaturityBanner maturity={maturity} />
 
+      <div>
+        <Link to={buildRoute('services')}>
+          <Button variant="outline">Back to Services</Button>
+        </Link>
+      </div>
+
       {compLoading && (
         <p className="text-xs text-slate-500" role="status">
           Updating selections and comparisons…
@@ -347,32 +355,6 @@ export const EmployeePolicyPanel: React.FC<{
           <p className="text-sm text-slate-600 mt-3">
             Read-only summary for your assignment. For questions about interpretation or exceptions, contact HR through
             Messages.
-          </p>
-        </Card>
-      )}
-
-      {benefits.length > 0 && (
-        <section aria-labelledby="employee-policy-entitlements-heading">
-          <h2 id="employee-policy-entitlements-heading" className="text-sm font-semibold text-slate-900 mb-3">
-            Entitlements from your policy
-          </h2>
-          {showInfoStamp && (
-            <p className="text-xs text-slate-600 mb-3">{EMPLOYEE_POLICY_PANEL_INFO_ONLY_HINT}</p>
-          )}
-          <div className="space-y-3">
-            {benefits.map((b) => (
-              <BenefitEntitlementRow key={b.benefit_key} b={b} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {benefits.length === 0 && maturity !== 'no_policy' && (
-        <Card padding="lg" className="border-slate-200 bg-white">
-          <p className="text-sm text-slate-700">
-            {maturity === 'under_review'
-              ? 'Detailed benefit rows are not shown yet because your policy is not in a comparison-ready shape in ReloPass. HR can complete the required categories and limits.'
-              : 'No individual benefit rows were returned for your profile in this view. If you believe this is wrong, contact HR.'}
           </p>
         </Card>
       )}
@@ -418,9 +400,31 @@ export const EmployeePolicyPanel: React.FC<{
         <p className="text-xs text-slate-600">{comp.message}</p>
       )}
 
-      <Link to={buildRoute('services')}>
-        <Button variant="outline">Back to Services</Button>
-      </Link>
+      {benefits.length > 0 && (
+        <section aria-labelledby="employee-policy-entitlements-heading">
+          <h2 id="employee-policy-entitlements-heading" className="text-sm font-semibold text-slate-900 mb-3">
+            Entitlements from your policy
+          </h2>
+          {showInfoStamp && (
+            <p className="text-xs text-slate-600 mb-3">{EMPLOYEE_POLICY_PANEL_INFO_ONLY_HINT}</p>
+          )}
+          <div className="space-y-3">
+            {benefits.map((b) => (
+              <BenefitEntitlementRow key={b.benefit_key} b={b} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {benefits.length === 0 && maturity !== 'no_policy' && (
+        <Card padding="lg" className="border-slate-200 bg-white">
+          <p className="text-sm text-slate-700">
+            {maturity === 'under_review'
+              ? 'Detailed benefit rows are not shown yet because your policy is not in a comparison-ready shape in ReloPass. HR can complete the required categories and limits.'
+              : 'No individual benefit rows were returned for your profile in this view. If you believe this is wrong, contact HR.'}
+          </p>
+        </Card>
+      )}
     </div>
   );
 };

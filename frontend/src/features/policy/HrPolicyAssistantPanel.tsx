@@ -3,6 +3,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { Alert, Button, Card } from '../../components/antigravity';
+import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 import { hrAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
@@ -67,10 +68,10 @@ function HrAnswerResultCard({
     <div
       className="rounded-lg border border-slate-200 bg-white shadow-sm"
       role="region"
-      aria-label="HR policy assistant result"
+      aria-label="HR policy answer"
     >
       <div className="border-b border-slate-100 px-4 py-2.5 bg-slate-50/80">
-        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Your question</div>
+        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Question</div>
         <p className="text-sm text-slate-800 mt-0.5">{question}</p>
       </div>
       <div className="px-4 py-3 space-y-3">
@@ -86,7 +87,7 @@ function HrAnswerResultCard({
             </div>
             {answer.refusal.supported_examples.length > 0 && (
               <div>
-                <div className="text-xs font-semibold text-slate-600 mb-1.5">In-scope examples</div>
+                <div className="text-xs font-semibold text-slate-600 mb-1.5">Within-policy examples</div>
                 <ul className="text-sm text-slate-700 list-disc pl-5 space-y-1">
                   {answer.refusal.supported_examples.map((ex, i) => (
                     <li key={i}>{ex}</li>
@@ -158,7 +159,7 @@ function HrAnswerResultCard({
               <div className="rounded-md bg-amber-50/90 border border-amber-200 px-3 py-2">
                 <div className="text-xs font-semibold text-amber-950">Approval & conditions</div>
                 {answer.approval_required ? (
-                  <p className="text-sm text-amber-950 mt-1">Policy indicates an approval path may apply.</p>
+                  <p className="text-sm text-amber-950 mt-1">Published policy may require approval.</p>
                 ) : null}
                 {answer.conditions?.map((c, i) => (
                   <p key={i} className="text-sm text-amber-950 mt-1">
@@ -206,11 +207,18 @@ export const HrPolicyAssistantPanel: React.FC<{
   documentId?: string | null;
   /** True while normalized policy payload for the selected policy is loading. */
   contextLoading?: boolean;
-}> = ({ policyId, documentId, contextLoading = false }) => {
+  /**
+   * `card` — full-width block in page flow (tests, legacy).
+   * `sideSheet` — top-right trigger; right panel on large screens, full-width sheet on small screens.
+   */
+  variant?: 'card' | 'sideSheet';
+}> = ({ policyId, documentId, contextLoading = false, variant = 'card' }) => {
   const [message, setMessage] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const layoutSheet = variant === 'sideSheet';
 
   const pid = policyId?.trim() || null;
   const trimmed = message.trim();
@@ -243,7 +251,7 @@ export const HrPolicyAssistantPanel: React.FC<{
           ? d
           : d && typeof d === 'object' && 'message' in d
             ? String((d as { message?: string }).message)
-            : ax.message || 'Could not get an answer. Try again.';
+            : ax.message || 'Could not load a policy answer. Try again.';
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -273,6 +281,7 @@ export const HrPolicyAssistantPanel: React.FC<{
   };
 
   if (contextLoading && !pid) {
+    if (layoutSheet) return null;
     return (
       <Card padding="md" className="border-slate-200 bg-slate-50/40" id="hr-policy-assistant">
         <div className="text-base font-semibold text-[#0b2b43]">{HR_POLICY_ASSISTANT_TITLE}</div>
@@ -282,6 +291,7 @@ export const HrPolicyAssistantPanel: React.FC<{
   }
 
   if (!pid) {
+    if (layoutSheet) return null;
     return (
       <Card padding="md" className="border-slate-200 bg-slate-50/50" id="hr-policy-assistant">
         <div className="text-base font-semibold text-[#0b2b43]">{HR_POLICY_ASSISTANT_TITLE}</div>
@@ -291,31 +301,33 @@ export const HrPolicyAssistantPanel: React.FC<{
     );
   }
 
-  return (
-    <Card padding="md" className="border-slate-200" id="hr-policy-assistant">
-      <div className="mb-1">
-        <h2 className="text-base font-semibold text-[#0b2b43]">{HR_POLICY_ASSISTANT_TITLE}</h2>
-        <p className="text-sm text-slate-600 mt-0.5">{HR_POLICY_ASSISTANT_SUBTITLE}</p>
-      </div>
-      <p className="text-xs text-slate-500 mt-2 leading-relaxed">{HR_POLICY_ASSISTANT_SCOPE_NOTE}</p>
+  const questionId = layoutSheet ? 'hr-policy-assistant-question-sheet' : 'hr-policy-assistant-question';
+
+  const coreForm = (
+    <>
+      <p
+        className={`text-xs text-slate-500 leading-relaxed ${layoutSheet ? 'mt-0' : 'mt-2'}`}
+      >
+        {HR_POLICY_ASSISTANT_SCOPE_NOTE}
+      </p>
 
       <div className="mt-4 space-y-2">
-        <label htmlFor="hr-policy-assistant-question" className="sr-only">
+        <label htmlFor={questionId} className="sr-only">
           Policy question
         </label>
         <textarea
-          id="hr-policy-assistant-question"
-          rows={3}
+          id={questionId}
+          rows={layoutSheet ? 5 : 3}
           maxLength={8000}
           placeholder={HR_POLICY_ASSISTANT_PLACEHOLDER}
-          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300"
+          className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 disabled:opacity-60${layoutSheet ? ' min-h-[5rem]' : ''}`}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           disabled={submitting || contextLoading}
           aria-describedby="hr-policy-assistant-suggestions-hint"
         />
         <div id="hr-policy-assistant-suggestions-hint" className="text-xs text-slate-500">
-          Suggested questions (fills the box; then use Get answer):
+          Use a sample below or type a policy question, then submit.
         </div>
         <div className="flex flex-wrap gap-2">
           {HR_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
@@ -332,7 +344,7 @@ export const HrPolicyAssistantPanel: React.FC<{
         </div>
         <div className="flex items-center gap-2 pt-1">
           <Button type="button" onClick={() => void submit()} disabled={!canSubmit || contextLoading}>
-            {submitting ? 'Working…' : HR_POLICY_ASSISTANT_SUBMIT}
+            {submitting ? 'Checking policy…' : HR_POLICY_ASSISTANT_SUBMIT}
           </Button>
           {contextLoading ? <span className="text-xs text-slate-500">Workspace still loading…</span> : null}
         </div>
@@ -346,7 +358,7 @@ export const HrPolicyAssistantPanel: React.FC<{
 
       {turns.length > 0 ? (
         <div className="mt-5 space-y-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Results</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Policy answers</div>
           {[...turns].reverse().map((t) => (
             <HrAnswerResultCard
               key={t.id}
@@ -358,6 +370,45 @@ export const HrPolicyAssistantPanel: React.FC<{
           ))}
         </div>
       ) : null}
+    </>
+  );
+
+  if (layoutSheet) {
+    return (
+      <PolicyAssistantSideSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        title={HR_POLICY_ASSISTANT_TITLE}
+        subtitle={HR_POLICY_ASSISTANT_SUBTITLE}
+        titleId="hr-policy-assistant-sheet-title"
+        trigger={
+          <div className="sticky top-0 z-10 -mx-1 mb-4 flex flex-col items-end gap-1 bg-gradient-to-b from-white from-80% to-transparent pb-1 pt-1 px-1 sm:-mx-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0 border-slate-300 text-[#0b2b43] font-medium shadow-sm"
+              onClick={() => setSheetOpen(true)}
+            >
+              {HR_POLICY_ASSISTANT_TITLE}
+            </Button>
+            <p className="hidden max-w-[15rem] text-right text-xs leading-snug text-slate-500 md:block">
+              Opens as a side panel. Workspace stays open.
+            </p>
+          </div>
+        }
+      >
+        {coreForm}
+      </PolicyAssistantSideSheet>
+    );
+  }
+
+  return (
+    <Card padding="md" className="border-slate-200" id="hr-policy-assistant">
+      <div className="mb-1">
+        <h2 className="text-base font-semibold text-[#0b2b43]">{HR_POLICY_ASSISTANT_TITLE}</h2>
+        <p className="text-sm text-slate-600 mt-0.5">{HR_POLICY_ASSISTANT_SUBTITLE}</p>
+      </div>
+      {coreForm}
     </Card>
   );
 };

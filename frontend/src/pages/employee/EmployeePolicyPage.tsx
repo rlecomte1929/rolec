@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Alert, Card, Container } from '../../components/antigravity';
 import { policyConfigMatrixAPI } from '../../api/client';
+import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import type { PolicyConfigBenefitRow, PolicyConfigCategoryBlock } from '../../features/policy-config/types';
 import { POLICY_CONFIG_CATEGORIES } from '../../features/policy-config/constants';
 import {
@@ -91,7 +92,8 @@ function BenefitReadOnlyCard({ b }: { b: PolicyConfigBenefitRow }) {
  */
 export const EmployeePolicyPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const assignmentId = searchParams.get('assignmentId') || undefined;
+  const { assignmentId: contextAssignmentId } = useEmployeeAssignment();
+  const assignmentId = searchParams.get('assignmentId') || contextAssignmentId || undefined;
   const caseId = searchParams.get('caseId') || undefined;
   const assignmentTypeRaw = searchParams.get('assignmentType');
   const familyStatusRaw = searchParams.get('familyStatus');

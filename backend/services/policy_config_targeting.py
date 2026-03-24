@@ -38,10 +38,13 @@ _FAMILY_ALIASES = {
     "partner": "spouse_partner",
     "couple": "spouse_partner",
     "married": "spouse_partner",
+    "accompanied": "spouse_partner",
+    "accompanying": "spouse_partner",
     "dependents": "dependents",
     "dependent": "dependents",
     "with_dependents": "dependents",
     "with dependents": "dependents",
+    "with_children": "dependents",
     "family": "dependents",
     "children": "dependents",
 }

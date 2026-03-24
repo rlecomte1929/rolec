@@ -26,7 +26,6 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
     { to: buildRoute('adminCompanies'), label: 'Companies', path: ROUTE_DEFS.adminCompanies.path },
     { to: buildRoute('adminPeople'), label: 'People', path: ROUTE_DEFS.adminPeople.path },
     { to: buildRoute('adminAssignments'), label: 'Assignments', path: ROUTE_DEFS.adminAssignments.path },
-    { to: buildRoute('adminMobilityCases'), label: 'Mobility case', path: ROUTE_DEFS.adminMobilityCases.path },
     { to: buildRoute('adminPolicies'), label: 'Policy Workspace', path: ROUTE_DEFS.adminPolicies.path },
     {
       to: buildRoute('adminPolicyConfig'),
@@ -54,8 +53,7 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
           const active =
             (pathToCheck === '/admin' ? isActive('/admin', true) : isActive(pathToCheck)) ||
             (pathToCheck === '/admin/suppliers' && isActive('/admin/suppliers/')) ||
-            (pathToCheck === '/admin/resources' && (isActive('/admin/resources/') || isActive('/admin/events'))) ||
-            (pathToCheck === '/admin/mobility/cases' && isActive('/admin/mobility/cases'));
+            (pathToCheck === '/admin/resources' && (isActive('/admin/resources/') || isActive('/admin/events')));
           return (
             <Link key={label} to={to} className={navLinkClass(active)}>
               {label}

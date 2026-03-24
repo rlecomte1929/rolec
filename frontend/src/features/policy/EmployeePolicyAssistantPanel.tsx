@@ -1,8 +1,9 @@
 /**
- * Bounded policy Q&A for employees: single-turn answers from published policy data (no chat UI).
+ * Bounded policy Q&A for employees: single-turn answers from published policy data.
+ * HR Policy page: `sideSheet` — right anchored panel (desktop) / sheet (mobile), not a floating chat bubble.
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { MessageCircle, X } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
@@ -14,14 +15,18 @@ import {
 } from './employeePolicyAssistantModel';
 import { trackPolicyAssistantFollowUpClicked } from './policyAssistantAnalytics';
 import {
+  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER,
+  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY,
+  EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT,
   EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT,
   EMPLOYEE_POLICY_ASSISTANT_PLACEHOLDER,
-  EMPLOYEE_POLICY_ASSISTANT_SCOPE_NOTE,
+  EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUBMIT,
   EMPLOYEE_POLICY_ASSISTANT_SUBTITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS,
   EMPLOYEE_POLICY_ASSISTANT_TITLE,
 } from './employeePolicyAssistantCopy';
+import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 
 const MAX_TURNS = 5;
 
@@ -65,10 +70,10 @@ function AnswerResultCard({
     <div
       className="rounded-lg border border-slate-200 bg-white shadow-sm"
       role="region"
-      aria-label="Policy assistant result"
+      aria-label="Answer from published policy"
     >
       <div className="border-b border-slate-100 px-4 py-2.5 bg-slate-50/80">
-        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Your question</div>
+        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Question</div>
         <p className="text-sm text-slate-800 mt-0.5">{question}</p>
       </div>
       <div className="px-4 py-3 space-y-3">
@@ -84,7 +89,7 @@ function AnswerResultCard({
             </div>
             {answer.refusal.supported_examples.length > 0 && (
               <div>
-                <div className="text-xs font-semibold text-slate-600 mb-1.5">Try asking</div>
+                <div className="text-xs font-semibold text-slate-600 mb-1.5">Policy questions you can ask</div>
                 <ul className="text-sm text-slate-700 list-disc pl-5 space-y-1">
                   {answer.refusal.supported_examples.map((ex, i) => (
                     <li key={i}>{ex}</li>
@@ -134,7 +139,7 @@ function AnswerResultCard({
               <div className="rounded-md bg-amber-50/90 border border-amber-200 px-3 py-2">
                 <div className="text-xs font-semibold text-amber-950">Approval & conditions</div>
                 {answer.approval_required ? (
-                  <p className="text-sm text-amber-950 mt-1">This benefit may require approval per policy.</p>
+                  <p className="text-sm text-amber-950 mt-1">Published policy may require approval for this benefit.</p>
                 ) : null}
                 {answer.conditions?.map((c, i) => (
                   <p key={i} className="text-sm text-amber-950 mt-1">
@@ -145,7 +150,7 @@ function AnswerResultCard({
             )}
             {answer.follow_up_options && answer.follow_up_options.length > 0 ? (
               <div>
-                <div className="text-xs font-semibold text-slate-600 mb-1.5">Related questions</div>
+                <div className="text-xs font-semibold text-slate-600 mb-1.5">Related policy questions</div>
                 <ul className="flex flex-wrap gap-2">
                   {answer.follow_up_options.map((opt, i) => (
                     <li key={i}>
@@ -181,36 +186,54 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   /** When true, hide “no assignment” until parent finished loading. */
   assignmentLoading?: boolean;
   /**
-   * `card` — full-width panel (legacy My case placement).
-   * `fab` — floating action button that opens a slide-over (HR Policy page).
+   * `card` — full-width panel (legacy in-page placement).
+   * `sideSheet` — HR Policy: triggers beside/near content; panel from the right (desktop) or sheet (mobile).
+   * @deprecated Use `sideSheet`. `fab` is treated as `sideSheet`.
    */
-  variant?: 'card' | 'fab';
+  variant?: 'card' | 'fab' | 'sideSheet';
 }> = ({ assignmentId, assignmentLoading = false, variant = 'card' }) => {
+  const layoutVariant = variant === 'fab' ? 'sideSheet' : variant;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const responseSectionRef = useRef<HTMLElement | null>(null);
+  const scrollToResponseAfterAnswerRef = useRef(false);
   const [message, setMessage] = useState('');
   const [turns, setTurns] = useState<PolicyAssistantTurn[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [fabOpen, setFabOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [emptySubmitHint, setEmptySubmitHint] = useState(false);
+
+  const focusQuestionInput = useCallback(() => {
+    window.setTimeout(() => {
+      textareaRef.current?.focus({ preventScroll: false });
+    }, 0);
+  }, []);
 
   useEffect(() => {
-    if (!fabOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setFabOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [fabOpen]);
+    if (!scrollToResponseAfterAnswerRef.current || submitting) return;
+    scrollToResponseAfterAnswerRef.current = false;
+    const el = responseSectionRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      if (typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    });
+  }, [turns, submitting]);
 
   const trimmed = message.trim();
-  const canSubmit = Boolean(assignmentId && trimmed && !submitting);
+  const inputEmpty = trimmed.length === 0;
+  const buttonInactiveLook = Boolean(assignmentId && !submitting && inputEmpty);
 
   const submit = useCallback(async () => {
     if (!assignmentId || !trimmed) return;
     setSubmitting(true);
+    setEmptySubmitHint(false);
     setError('');
     try {
       const res = await employeeAPI.postPolicyAssistantQuery(assignmentId, trimmed);
       const answer = res.answer;
+      scrollToResponseAfterAnswerRef.current = true;
       setTurns((prev) => {
         const next = [
           ...prev,
@@ -227,7 +250,7 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { detail?: string } }; message?: string };
       const d = ax.response?.data?.detail;
-      setError(typeof d === 'string' ? d : ax.message || 'Could not get an answer. Try again.');
+      setError(typeof d === 'string' ? d : ax.message || 'Could not load a policy answer. Try again.');
     } finally {
       setSubmitting(false);
     }
@@ -236,6 +259,19 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   const applySuggestion = (q: string) => {
     setMessage(q);
     setError('');
+    setEmptySubmitHint(false);
+    focusQuestionInput();
+  };
+
+  const handlePrimaryAction = () => {
+    if (!assignmentId || submitting) return;
+    if (!message.trim()) {
+      setEmptySubmitHint(true);
+      focusQuestionInput();
+      return;
+    }
+    setEmptySubmitHint(false);
+    void submit();
   };
 
   const handleFollowUpFromAnswer = (
@@ -253,95 +289,169 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     });
     setMessage(text);
     setError('');
+    setEmptySubmitHint(false);
+    focusQuestionInput();
   };
 
-  const questionId = variant === 'fab' ? 'policy-assistant-question-fab' : 'policy-assistant-question';
-  const suggestionsHintId =
-    variant === 'fab' ? 'policy-assistant-suggestions-hint-fab' : 'policy-assistant-suggestions-hint';
+  const questionId =
+    layoutVariant === 'sideSheet' ? 'policy-assistant-question-sheet' : 'policy-assistant-question';
+  const shortcutsSectionId =
+    layoutVariant === 'sideSheet' ? 'policy-assistant-shortcuts-sheet' : 'policy-assistant-shortcuts';
+
+  const shortcuts = EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS.slice(0, 4);
+
+  const questionDescribedBy = [shortcutsSectionId, emptySubmitHint ? 'policy-assistant-empty-hint' : '']
+    .filter(Boolean)
+    .join(' ');
 
   const mainForm = (
     <>
-      <div className="mb-1">
-        <h2 className="text-base font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</h2>
-        <p className="text-sm text-slate-600 mt-0.5">{EMPLOYEE_POLICY_ASSISTANT_SUBTITLE}</p>
-      </div>
-      <p className="text-xs text-slate-500 mt-2 leading-relaxed">{EMPLOYEE_POLICY_ASSISTANT_SCOPE_NOTE}</p>
+      {layoutVariant !== 'sideSheet' ? (
+        <header className="mb-8 space-y-1.5">
+          <h2 className="text-lg font-semibold tracking-tight text-[#0b2b43]">
+            {EMPLOYEE_POLICY_ASSISTANT_TITLE}
+          </h2>
+          <p className="text-xs text-slate-500 leading-relaxed max-w-md">
+            {EMPLOYEE_POLICY_ASSISTANT_SUBTITLE}
+          </p>
+        </header>
+      ) : null}
 
-      <div className="mt-4 space-y-2">
-        <label htmlFor={questionId} className="sr-only">
-          Policy question
-        </label>
-        <textarea
-          id={questionId}
-          rows={3}
-          maxLength={8000}
-          placeholder={EMPLOYEE_POLICY_ASSISTANT_PLACEHOLDER}
-          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          disabled={submitting}
-          aria-describedby={suggestionsHintId}
-        />
-        <div id={suggestionsHintId} className="text-xs text-slate-500">
-          Suggested questions (tap to fill the box, then get answer):
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => applySuggestion(s)}
-              disabled={submitting}
-              className="text-left text-xs rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 pt-1">
-          <Button type="button" onClick={() => void submit()} disabled={!canSubmit}>
-            {submitting ? 'Working…' : EMPLOYEE_POLICY_ASSISTANT_SUBMIT}
+      <div className="flex flex-col gap-8">
+        {/* Input + primary action */}
+        <div className="flex flex-col gap-2" aria-busy={submitting}>
+          <label htmlFor={questionId} className="sr-only">
+            Policy question
+          </label>
+          <textarea
+            ref={textareaRef}
+            id={questionId}
+            rows={6}
+            maxLength={8000}
+            placeholder={EMPLOYEE_POLICY_ASSISTANT_PLACEHOLDER}
+            className="w-full resize-y min-h-[10rem] rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 focus:shadow-[0_1px_2px_rgba(15,23,42,0.06)] disabled:opacity-60"
+            value={message}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              if (emptySubmitHint) setEmptySubmitHint(false);
+            }}
+            onFocus={() => {
+              if (emptySubmitHint) setEmptySubmitHint(false);
+            }}
+            disabled={submitting}
+            aria-describedby={questionDescribedBy}
+          />
+          <Button
+            type="button"
+            variant="primary"
+            size="lg"
+            fullWidth
+            onClick={handlePrimaryAction}
+            disabled={!assignmentId || submitting}
+            className={`mt-1 font-semibold shadow-sm transition-colors ${
+              buttonInactiveLook
+                ? '!bg-slate-200 !text-slate-600 hover:!bg-slate-300/90 focus:!ring-slate-400/50 !shadow-none'
+                : ''
+            }`}
+            aria-busy={submitting}
+          >
+            {submitting ? (
+              <span className="inline-flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                Checking published policy…
+              </span>
+            ) : (
+              EMPLOYEE_POLICY_ASSISTANT_SUBMIT
+            )}
           </Button>
+          {emptySubmitHint ? (
+            <p
+              id="policy-assistant-empty-hint"
+              className="text-xs text-slate-500"
+              role="status"
+            >
+              {EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT}
+            </p>
+          ) : null}
+          {error ? (
+            <Alert variant="error" className="mt-0.5">
+              {error}
+            </Alert>
+          ) : null}
         </div>
+
+        <section
+          id={shortcutsSectionId}
+          className="flex flex-col gap-2.5"
+          aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
+        >
+          <h3 className="text-xs font-medium text-slate-600">{EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}</h3>
+          <div className="flex flex-wrap gap-2">
+            {shortcuts.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => applySuggestion(s)}
+                disabled={submitting}
+                className="inline-flex h-9 min-h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 py-0 text-left text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:max-w-[280px]"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="pt-1 border-t border-slate-200/80 space-y-1">
+          <p className="text-[11px] leading-relaxed text-slate-400">{EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER}</p>
+          <p className="text-[11px] leading-relaxed text-slate-400">{EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY}</p>
+        </div>
+
+        {/* POLICY RESPONSE AREA — grounded policy output (not chat UI) */}
+        <section
+          ref={responseSectionRef}
+          className="rounded-xl border border-slate-200/95 bg-slate-50/90 p-4 -mt-1 ring-1 ring-slate-200/60"
+          aria-label="Published policy answer"
+        >
+          <h3 className="text-xs font-semibold text-slate-700 mb-3 tracking-wide">Answer from published policy</h3>
+          {turns.length > 0 ? (
+            <div className="space-y-3">
+              {[...turns].reverse().map((t) => (
+                <AnswerResultCard
+                  key={t.id}
+                  question={t.question}
+                  answer={t.answer}
+                  assistantTurnRequestId={t.assistantRequestId}
+                  onFollowUpSelect={handleFollowUpFromAnswer}
+                />
+              ))}
+            </div>
+          ) : (
+            <div
+              className="flex min-h-[4.5rem] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white px-3 py-5 text-center text-xs text-slate-400"
+              aria-hidden
+            >
+              Policy answer appears here.
+            </div>
+          )}
+        </section>
       </div>
-
-      {error ? (
-        <Alert variant="error" className="mt-3">
-          {error}
-        </Alert>
-      ) : null}
-
-      {turns.length > 0 ? (
-        <div className="mt-5 space-y-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Results</div>
-          {[...turns].reverse().map((t) => (
-            <AnswerResultCard
-              key={t.id}
-              question={t.question}
-              answer={t.answer}
-              assistantTurnRequestId={t.assistantRequestId}
-              onFollowUpSelect={handleFollowUpFromAnswer}
-            />
-          ))}
-        </div>
-      ) : null}
     </>
   );
 
   if (assignmentLoading && !assignmentId) {
-    if (variant === 'fab') {
+    if (layoutVariant === 'sideSheet') {
       return null;
     }
     return (
       <Card padding="md" className="mb-6 border-slate-200 bg-slate-50/40">
         <div className="text-base font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</div>
-        <p className="text-sm text-slate-500 mt-2">Loading your assignment…</p>
+        <p className="text-sm text-slate-500 mt-2">Loading assignment for policy context…</p>
       </Card>
     );
   }
 
   if (!assignmentId) {
-    if (variant === 'fab') {
+    if (layoutVariant === 'sideSheet') {
       return null;
     }
     return (
@@ -353,46 +463,32 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     );
   }
 
-  if (variant === 'fab') {
+  if (layoutVariant === 'sideSheet') {
     return (
-      <>
-        <button
-          type="button"
-          onClick={() => setFabOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#0b2b43] bg-[#0b2b43] text-white shadow-lg transition hover:bg-[#123651] focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-2 md:bottom-8 md:right-8"
-          aria-label={`Open ${EMPLOYEE_POLICY_ASSISTANT_TITLE}`}
-          title={EMPLOYEE_POLICY_ASSISTANT_TITLE}
-        >
-          <MessageCircle className="h-7 w-7" aria-hidden />
-        </button>
-        {fabOpen ? (
-          <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={EMPLOYEE_POLICY_ASSISTANT_TITLE}>
-            <button
+      <PolicyAssistantSideSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        title={EMPLOYEE_POLICY_ASSISTANT_TITLE}
+        subtitle={EMPLOYEE_POLICY_ASSISTANT_SUBTITLE}
+        titleId="policy-assistant-sheet-title"
+        trigger={
+          <div className="sticky top-0 z-10 -mx-1 mb-4 flex flex-col items-end gap-1 bg-gradient-to-b from-white from-80% to-transparent pb-1 pt-1 px-1 sm:-mx-0">
+            <Button
               type="button"
-              className="absolute inset-0 bg-black/40"
-              aria-label="Close policy assistant"
-              onClick={() => setFabOpen(false)}
-            />
-            <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
-              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 shrink-0">
-                <div>
-                  <div className="text-sm font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</div>
-                  <div className="text-xs text-slate-500">Ask about your published assignment policy</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFabOpen(false)}
-                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">{mainForm}</div>
-            </div>
+              variant="outline"
+              className="shrink-0 border-slate-300 text-[#0b2b43] font-medium shadow-sm"
+              onClick={() => setSheetOpen(true)}
+            >
+              {EMPLOYEE_POLICY_ASSISTANT_TITLE}
+            </Button>
+            <p className="hidden max-w-[15rem] text-right text-xs leading-snug text-slate-500 md:block">
+              Opens as a side panel. This page stays open.
+            </p>
           </div>
-        ) : null}
-      </>
+        }
+      >
+        {mainForm}
+      </PolicyAssistantSideSheet>
     );
   }
 

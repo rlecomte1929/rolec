@@ -118,8 +118,16 @@ export const PackageSummary: React.FC<Props> = ({
     if (item) packageItems.push({ category, item });
   }
 
-  const comparison: { category: string; label: string; total: number; cap: number; covered: number; extra: number }[] =
-    [];
+  const comparison: {
+    category: string;
+    label: string;
+    total: number;
+    cap: number;
+    covered: number;
+    extra: number;
+    /** Published policy exists but no mapped numeric cap for this service category — treat as uncovered for estimates. */
+    noPublishedCapForCategory: boolean;
+  }[] = [];
   if (policyCaps) {
     for (const { category, item } of packageItems) {
       const capKey = CATEGORY_TO_CAP[category];
@@ -133,6 +141,7 @@ export const PackageSummary: React.FC<Props> = ({
             : capKey === 'schools_usd'
               ? policyCaps.schools_usd
               : 0;
+      const noPublishedCapForCategory = Boolean(hasPublishedPolicy && capKey && cap <= 0);
       const covered = Math.min(total, cap);
       const extra = Math.max(0, total - cap);
       comparison.push({
@@ -142,6 +151,7 @@ export const PackageSummary: React.FC<Props> = ({
         cap,
         covered,
         extra,
+        noPublishedCapForCategory,
       });
     }
   }
@@ -218,8 +228,18 @@ export const PackageSummary: React.FC<Props> = ({
                 Caps below are from your company&apos;s published policy. See how much your company covers vs. what you may pay out of pocket.
               </p>
               <p className="text-sm text-[#6b7280] mb-6">
-                For full policy details, go to <strong>Assignment Package &amp; Limits</strong> in the menu.
+                For full policy details, open <strong>Compensation &amp; Allowance</strong> or <strong>HR Policy</strong> in
+                the menu. Limits below use the same published policy as those pages when a numeric cap is available for
+                this service type.
               </p>
+
+              {comparison.some((c) => c.noPublishedCapForCategory) && (
+                <p className="text-sm text-[#92400e] bg-[#fffbeb] border border-[#fde68a] rounded-lg px-3 py-2 mb-4">
+                  Where your employer has not published a matching numeric limit for a selected service category, we treat
+                  the employer-covered amount as zero for this estimate so you can see the full cost. See your policy
+                  pages for benefits that use allowances or non-cash support.
+                </p>
+              )}
 
               <div className="space-y-6 mb-8">
                 {comparison.map((c) => (
@@ -235,6 +255,12 @@ export const PackageSummary: React.FC<Props> = ({
                         )}
                       </span>
                     </div>
+                    {c.noPublishedCapForCategory && (
+                      <p className="text-xs text-[#b45309] mb-2">
+                        No employer cap is modeled in ReloPass for this category — estimate shown as out-of-pocket unless
+                        your formal policy says otherwise.
+                      </p>
+                    )}
                     <div className="h-8 flex rounded-lg overflow-hidden bg-[#e2e8f0]">
                       <div
                         className="bg-[#22c55e] flex items-center justify-end pr-2 transition-all"

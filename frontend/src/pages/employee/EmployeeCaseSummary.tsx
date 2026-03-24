@@ -1,6 +1,6 @@
 /**
  * Employee Case Summary — intake snapshot: instructions, then profile/relocation basics (read-only).
- * Relocation tasks → Relocation plan tab. Policy Q&A → HR Policy (FAB). Policy Assistant removed from here.
+ * Relocation tasks → Relocation plan tab. Policy Q&A → HR Policy (Policy Assistant). Not on this page.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -15,7 +15,7 @@ import { buildRoute } from '../../navigation/routes';
 
 function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Card padding="md" className="mb-4">
+    <Card padding="md" className="h-full border-[#e2e8f0] shadow-sm">
       <div className="text-sm font-semibold text-[#0b2b43] mb-2">{title}</div>
       <div className="text-sm text-[#4b5563] space-y-1">{children}</div>
     </Card>
@@ -171,7 +171,7 @@ export const EmployeeCaseSummary: React.FC = () => {
               <Link to={buildRoute('hrPolicy')} className="font-medium text-[#0b2b43] underline">
                 HR Policy
               </Link>
-              . Tap the <strong>blue chat icon</strong> there to ask what your published policy covers.
+              . Use <strong>Policy Assistant</strong> on that page for questions tied to your published policy.
             </li>
             <li>
               <strong>Tasks with HR</strong> (checklist, due dates) are on the{' '}
@@ -195,16 +195,16 @@ export const EmployeeCaseSummary: React.FC = () => {
       {isLoading && (
         <div className="space-y-4 mb-6" aria-busy="true">
           <div className="text-sm font-medium text-[#0b2b43]">Loading your saved case data…</div>
-          <div className="grid grid-cols-1 gap-4 animate-pulse max-w-3xl">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 rounded-lg bg-[#e2e8f0]" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-28 rounded-lg bg-[#e2e8f0] animate-pulse" />
             ))}
           </div>
         </div>
       )}
 
       {!isLoading && draft && (
-        <div className="max-w-3xl space-y-2">
+        <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
           <SummarySection title="Relocation Basics">
             <div>Origin: {[b.originCity, b.originCountry].filter(Boolean).join(', ') || '-'}</div>
             <div>Destination: {[b.destCity, b.destCountry].filter(Boolean).join(', ') || '-'}</div>

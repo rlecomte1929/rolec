@@ -106,4 +106,13 @@ export type RouteKey = keyof typeof ROUTE_DEFS;
 export const buildRoute = (key: RouteKey, params?: Record<string, string>) =>
   generatePath(ROUTE_DEFS[key].path, params);
 
+/** In-app home for a stored role (used after login, logo link, and auth/landing redirects). */
+export function homeRouteKeyForRole(role: string | null | undefined): RouteKey {
+  const r = (role ?? '').trim().toUpperCase();
+  if (r === 'EMPLOYEE') return 'employeeDashboard';
+  if (r === 'ADMIN') return 'adminConsole';
+  if (r === 'HR') return 'hrDashboard';
+  return 'landing';
+}
+
 export const routeKeys = Object.keys(ROUTE_DEFS) as RouteKey[];

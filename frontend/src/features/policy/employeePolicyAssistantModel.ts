@@ -40,11 +40,11 @@ export function deriveSupportStatus(answer: PolicyAssistantAnswer): EmployeePoli
 }
 
 const STATUS_LABELS: Record<EmployeePolicyAssistantSupportStatus, string> = {
-  included: 'Included (per published policy data)',
-  excluded: 'Not included (per published policy data)',
-  informational: 'Informational',
+  included: 'Included (published policy)',
+  excluded: 'Not included (published policy)',
+  informational: 'Policy information',
   clarification: 'Needs detail',
-  refused: 'Not answered',
+  refused: 'No policy answer',
 };
 
 export function supportStatusLabel(status: EmployeePolicyAssistantSupportStatus): string {

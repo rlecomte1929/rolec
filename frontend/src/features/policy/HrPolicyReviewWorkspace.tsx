@@ -613,6 +613,13 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
 
   return (
     <div className="space-y-6" data-hr-policy-workspace="v2">
+      <HrPolicyAssistantPanel
+        variant="sideSheet"
+        policyId={selectedPolicyId}
+        documentId={typeof sourceDocId === 'string' ? sourceDocId : null}
+        contextLoading={Boolean(selectedPolicyId && loading)}
+      />
+
       <HrPolicyWorkspaceLayout
         resolved={workspaceResolved}
         lifecycle={policyLifecycle}
@@ -632,12 +639,6 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         publishDataReady={publishDataReady}
         employeePreviewCompare={employeePreviewCompare}
         onScrollToDraftReviewPanel={scrollToDraftReviewFull}
-      />
-
-      <HrPolicyAssistantPanel
-        policyId={selectedPolicyId}
-        documentId={typeof sourceDocId === 'string' ? sourceDocId : null}
-        contextLoading={Boolean(selectedPolicyId && loading)}
       />
 
       <PublishPreflightModal

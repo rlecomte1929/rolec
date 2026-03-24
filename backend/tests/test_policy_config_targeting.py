@@ -18,6 +18,7 @@ from backend.schemas_compensation_allowance import (
 )
 from backend.services.policy_config_targeting import (
     normalize_assignment_type,
+    normalize_family_status,
     row_matches_targeting,
     validate_optional_query_assignment_type,
 )
@@ -27,6 +28,10 @@ class PolicyConfigTargetingTests(unittest.TestCase):
     def test_normalize_assignment_legacy(self) -> None:
         self.assertEqual(normalize_assignment_type("LTA"), "long_term")
         self.assertEqual(normalize_assignment_type("long-term"), "long_term")
+
+    def test_normalize_family_intake_aliases(self) -> None:
+        self.assertEqual(normalize_family_status("with_children"), "dependents")
+        self.assertEqual(normalize_family_status("accompanied"), "spouse_partner")
 
     def test_row_matches_strict_vs_relaxed(self) -> None:
         row = {"assignment_types": ["long_term"], "family_statuses": []}

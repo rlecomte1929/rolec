@@ -4,7 +4,7 @@ import { signInSupabase } from '../api/supabaseAuth';
 import type { LoginRequest, RegisterRequest, UserRole } from '../types';
 import { normalizeStoredRole, setAuthItem } from '../utils/demo';
 import { safeNavigate } from '../navigation/safeNavigate';
-import type { RouteKey } from '../navigation/routes';
+import { homeRouteKeyForRole, type RouteKey } from '../navigation/routes';
 import { trackAuthPerf } from '../perf/authPerf';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
 import type { PostSignupReconciliation } from '../types';
@@ -33,12 +33,7 @@ export const useAuth = () => {
     setAuthItem('relopass_role', normalizeStoredRole(user.role));
   };
 
-  const postAuthRouteKey = (role: UserRole | string): RouteKey => {
-    const n = normalizeStoredRole(role);
-    if (n === 'EMPLOYEE') return 'employeeDashboard';
-    if (n === 'ADMIN') return 'adminConsole';
-    return 'hrDashboard';
-  };
+  const postAuthRouteKey = (role: UserRole | string): RouteKey => homeRouteKeyForRole(normalizeStoredRole(role));
 
   const redirectByRole = (role: UserRole) => {
     safeNavigate(navigate, postAuthRouteKey(role));

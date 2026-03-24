@@ -1,4 +1,5 @@
 import React from 'react';
+import { Navigate } from 'react-router-dom';
 import { PublicLayout } from '../components/public';
 import {
   Section,
@@ -10,8 +11,9 @@ import {
   TrustDifferentiation,
   LandingProductStrip,
 } from '../components/marketing';
-import { buildRoute } from '../navigation/routes';
+import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
+import { getAuthItem } from '../utils/demo';
 import { landingContent } from './landing/landingContent';
 
 export const Landing: React.FC = () => {
@@ -21,6 +23,13 @@ export const Landing: React.FC = () => {
   ]);
 
   const c = landingContent;
+
+  if (getAuthItem('relopass_token')) {
+    const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
+    if (key !== 'landing') {
+      return <Navigate to={buildRoute(key)} replace />;
+    }
+  }
 
   return (
     <PublicLayout>

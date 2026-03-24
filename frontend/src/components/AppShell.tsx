@@ -4,7 +4,7 @@ import { Container } from './antigravity';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { getNavigationError } from '../navigation/safeNavigate';
-import { buildRoute, ROUTE_DEFS } from '../navigation/routes';
+import { buildRoute, homeRouteKeyForRole, ROUTE_DEFS } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
@@ -129,11 +129,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
     setPreferredEmployeeAssignmentId(id);
   }, [location.pathname, showEmployeeNav]);
 
+  const logoHref = buildRoute(
+    getAuthItem('relopass_token') ? homeRouteKeyForRole(getAuthItem('relopass_role')) : 'landing'
+  );
+
   return (
     <div className="min-h-screen bg-[#f5f7fa] text-[#1f2937] flex flex-col">
       <header className="border-b border-[#e2e8f0] bg-white">
         <Container maxWidth="xl" className="py-4 flex items-center justify-between">
-          <Link to={buildRoute('landing')} className="flex items-center gap-3">
+          <Link to={logoHref} className="flex items-center gap-3">
             <img
               src={logoUrl}
               alt="ReloPass logo"

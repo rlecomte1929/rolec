@@ -6426,7 +6426,8 @@ EMPLOYEE_POLICY_FALLBACK_PRIMARY = (
     "Your HR team has not published your company's assignment policy in ReloPass yet."
 )
 EMPLOYEE_POLICY_FALLBACK_SECONDARY = (
-    "This page will show your package and limits after HR publishes the policy from the HR Policy workspace."
+    "This page will show your package and limits after HR publishes from the HR Policy workspace "
+    "or publishes your company's Compensation & Allowance matrix in ReloPass."
 )
 
 
@@ -6512,6 +6513,7 @@ def _resolve_published_policy_for_employee(
         resolve_policy_for_assignment,
         collect_company_id_candidates_for_assignment,
         find_first_published_company_policy,
+        extract_resolution_context,
     )
     from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
 
@@ -6583,6 +6585,64 @@ def _resolve_published_policy_for_employee(
     candidates = collect_company_id_candidates_for_assignment(db, assignment, case)
     pub = find_first_published_company_policy(db, candidates) if candidates else None
     if not pub:
+        from .services.employee_policy_matrix_bridge import find_published_matrix_version, build_matrix_assignment_package
+
+        ctx = extract_resolution_context(assignment, case, profile, employee_profile)
+        search_company_ids = list(candidates) if candidates else []
+        seen_cids = {str(x) for x in search_company_ids if x is not None}
+
+        def _push_matrix_company(cid: Optional[Any]) -> None:
+            if cid is None:
+                return
+            s = str(cid).strip()
+            if not s or s in seen_cids:
+                return
+            seen_cids.add(s)
+            search_company_ids.append(s)
+
+        _push_matrix_company(company_id_used)
+        _push_matrix_company(profile_company_id)
+        if emp_user_id:
+            try:
+                er = db.get_profile_record(emp_user_id)
+                _push_matrix_company((er or {}).get("company_id"))
+            except Exception:
+                pass
+        mid, mver = find_published_matrix_version(db, search_company_ids)
+        if mver and mid:
+            comp = db.get_company(mid) if mid else None
+            cname = (comp or {}).get("name") if comp else None
+            resolved, precalc = build_matrix_assignment_package(
+                db,
+                company_id=mid,
+                pub_version=mver,
+                assignment_type_ctx=ctx.get("assignment_type"),
+                family_status_ctx=ctx.get("family_status"),
+                company_name=cname,
+                assignment_id=assignment_id,
+                case_id=case_id,
+            )
+            if resolved.get("has_policy"):
+                log.info(
+                    "employee_policy matrix_fallback request_id=%s assignment_id=%s company_id=%s version_id=%s",
+                    request_id,
+                    assignment_id,
+                    mid,
+                    mver.get("id"),
+                )
+                return _finalize_employee_policy_resolution(
+                    db,
+                    resolved,
+                    comparison_readiness_precalc=precalc,
+                    telemetry={
+                        "request_id": request_id,
+                        "assignment_id": assignment_id,
+                        "case_id": case_id,
+                        "user_id": user.get("id"),
+                        "user_role": user.get("role"),
+                        "resolution_cache_hit": False,
+                    },
+                )
         try:
             with_policy = db.list_company_ids_with_published_policy()
             log.info(
@@ -7172,7 +7232,14 @@ def get_employee_services_policy_context(
 
     from .services.employee_services_policy_context import build_employee_services_policy_context
 
-    return build_employee_services_policy_context(result)
+    payload = build_employee_services_policy_context(result)
+    pol = result.get("policy")
+    if isinstance(pol, dict) and pol:
+        payload["policy_surface"] = pol
+    rc = result.get("resolution_context")
+    if isinstance(rc, dict) and rc:
+        payload["resolution_context"] = rc
+    return payload
 
 
 @app.get("/api/employee/assignments/{assignment_id}/policy-budget")
@@ -11242,6 +11309,7 @@ def employee_get_policy_config(
     if not cid:
         raise HTTPException(status_code=400, detail="Employee missing company")
     atype, fstat = assignment_type, family_status
+    assign_for_ctx: Optional[Dict[str, Any]] = None
     if assignment_id:
         a = db.get_assignment_by_id(str(assignment_id))
         if not a:
@@ -11254,7 +11322,8 @@ def employee_get_policy_config(
         coid = db.get_company_id_for_assignment_id(str(assignment_id))
         if coid and coid != cid:
             raise HTTPException(status_code=403, detail="Assignment company mismatch")
-    if case_id:
+        assign_for_ctx = a
+    elif case_id:
         a = db.get_assignment_by_case_id(str(case_id))
         if not a:
             raise HTTPException(status_code=404, detail="Case not found")
@@ -11266,6 +11335,39 @@ def employee_get_policy_config(
         coid = db.get_company_id_for_assignment_id(str(a.get("id")))
         if coid and coid != cid:
             raise HTTPException(status_code=403, detail="Case company mismatch")
+        assign_for_ctx = a
+    else:
+        fa = db.get_assignment_for_employee(effective.get("id"), request_id=None)
+        if fa:
+            coid = db.get_company_id_for_assignment_id(str(fa.get("id")))
+            if not coid or coid == cid:
+                assign_for_ctx = fa
+
+    if assign_for_ctx and (not atype or not fstat):
+        from .services.policy_resolution import extract_resolution_context
+
+        aid = str(assign_for_ctx.get("id") or "").strip()
+        case_id_inner = assign_for_ctx.get("case_id")
+        case_row = db.get_relocation_case(case_id_inner) if case_id_inner else None
+        prof_j = None
+        if case_row and case_row.get("profile_json"):
+            try:
+                raw_pj = case_row["profile_json"]
+                prof_j = json.loads(raw_pj) if isinstance(raw_pj, str) else raw_pj
+            except Exception:
+                prof_j = None
+        emp_pf = None
+        if aid:
+            try:
+                emp_pf = db.get_employee_profile(aid)
+            except Exception:
+                emp_pf = None
+        ctx = extract_resolution_context(assign_for_ctx, case_row, prof_j, emp_pf)
+        if not atype:
+            atype = ctx.get("assignment_type")
+        if not fstat:
+            fstat = ctx.get("family_status")
+
     return policy_config_matrix_svc.employee_grouped_payload(
         cid, assignment_type=atype, family_status=fstat
     )

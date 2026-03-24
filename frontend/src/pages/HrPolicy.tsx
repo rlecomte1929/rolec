@@ -46,13 +46,15 @@ function EmployeePolicyContent() {
   }, []);
 
   return (
-    <div className="relative pb-20 md:pb-8">
-      <EmployeePolicyPanel pack={pack} loading={loading} />
+    <div className="pb-6">
       <EmployeePolicyAssistantPanel
         assignmentId={pack?.assignment_id}
         assignmentLoading={loading}
-        variant="fab"
+        variant="sideSheet"
       />
+      <div className="min-w-0">
+        <EmployeePolicyPanel pack={pack} loading={loading} />
+      </div>
     </div>
   );
 }
@@ -87,7 +89,7 @@ export const HrPolicy: React.FC = () => {
     return (
       <AppShell
         title="HR policy"
-        subtitle="Published assignment policy and benefits from your employer (read-only). Use the chat icon to ask questions."
+        subtitle="Published policy from your employer (read-only). Use Policy Assistant (top right) to open a side panel without leaving this page."
       >
         <EmployeePolicyContent />
       </AppShell>
