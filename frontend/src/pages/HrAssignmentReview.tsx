@@ -8,6 +8,7 @@ import type { AssignmentDetail, AssignmentSummary, CaseDraftDTO, ComplianceRepor
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { AssignmentDebugPanel } from './AssignmentDebugPanel';
+import { HrAssignmentServicesCapPanel } from '../features/policy-config/HrAssignmentServicesCapPanel';
 
 type TabKey = 'timeline' | 'intake' | 'documents' | 'providers' | 'messages';
 
@@ -570,21 +571,11 @@ export const HrAssignmentReview: React.FC = () => {
 
               {activeTab === 'providers' && (
                 <Card padding="lg">
-                  <div className="text-sm font-semibold text-[#0b2b43] mb-4">Services</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { title: 'Housing partner', status: 'Shortlist', owner: 'HR' },
-                      { title: 'Immigration counsel', status: 'Specialist Required', owner: 'HR' },
-                      { title: 'Movers & logistics', status: 'Quotes pending', owner: 'Employee' },
-                      { title: 'Schooling advisor', status: 'On hold', owner: 'HR' },
-                    ].map((item) => (
-                      <div key={item.title} className="border border-[#e2e8f0] rounded-lg p-4 bg-white">
-                        <div className="text-sm font-semibold text-[#0b2b43]">{item.title}</div>
-                        <div className="text-xs text-[#6b7280] mt-1">Owner: {item.owner}</div>
-                        <div className="text-xs text-[#6b7280] mt-3">Status: {item.status}</div>
-                      </div>
-                    ))}
+                  <div className="text-sm font-semibold text-[#0b2b43] mb-2">Services & provider estimates</div>
+                  <div className="text-xs text-[#6b7280] mb-4">
+                    Relocation services and employee-entered estimates, with policy cap comparison for HR.
                   </div>
+                  {assignment?.id ? <HrAssignmentServicesCapPanel assignmentId={assignment.id} /> : null}
                 </Card>
               )}
 

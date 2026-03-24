@@ -204,6 +204,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   HR Policy
                 </Link>
                 <Link
+                  to={buildRoute('employeePolicy')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.employeePolicy.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Compensation &amp; Allowance
+                </Link>
+                <Link
                   to={buildRoute('messages')}
                   className={`px-3 py-1 rounded-full border ${
                     isActiveRoute(ROUTE_DEFS.messages.path)
@@ -261,6 +271,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     }`}
                   >
                     Policy
+                  </Link>
+                  <Link
+                    to={buildRoute('hrPolicyConfig')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrPolicyConfig.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Compensation &amp; Allowance
                   </Link>
                   <Link
                     to={buildRoute('hrDashboard')}

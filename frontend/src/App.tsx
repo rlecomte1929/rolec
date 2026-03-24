@@ -23,6 +23,8 @@ import { HrComplianceCheck } from './pages/HrComplianceCheck';
 import { HrAssignmentPackageReview } from './pages/HrAssignmentPackageReview';
 import { HrPreferredSuppliers } from './pages/HrPreferredSuppliers';
 import { HrPolicy } from './pages/HrPolicy';
+import { HrPolicyConfigPage } from './pages/HrPolicyConfigPage';
+import { EmployeePolicyPage } from './pages/employee/EmployeePolicyPage';
 import { CaseWizardPage } from './pages/employee/CaseWizardPage';
 import { EmployeeCaseSummary } from './pages/employee/EmployeeCaseSummary';
 import { CountriesPage } from './pages/admin/CountriesPage';
@@ -30,6 +32,7 @@ import { CountryDetailPage } from './pages/admin/CountryDetailPage';
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
 import { AdminMobilityCaseInspectPage } from './pages/admin/AdminMobilityCaseInspectPage';
 import { AdminPoliciesPage } from './pages/admin/AdminPoliciesPage';
+import { AdminPolicyConfigPage } from './pages/admin/AdminPolicyConfigPage';
 import { AdminCompanies } from './pages/admin/AdminCompanies';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminAssignments } from './pages/admin/AdminAssignments';
@@ -173,6 +176,8 @@ function App() {
         <Route path={ROUTE_DEFS.vendorRfq.path} element={<VendorRfq />} />
         <Route path={ROUTE_DEFS.hrPreferredSuppliers.path} element={<HrPreferredSuppliers />} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
+        <Route path={ROUTE_DEFS.hrPolicyConfig.path} element={<HrPolicyConfigPage />} />
+        <Route path={ROUTE_DEFS.employeePolicy.path} element={<EmployeePolicyPage />} />
         <Route path={ROUTE_DEFS.employeeHrPolicy.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
         <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<CaseWizardPage />} />
@@ -188,6 +193,14 @@ function App() {
         <Route path={ROUTE_DEFS.adminMobilityCases.path} element={<RequireAdminRoute><AdminMobilityCaseInspectPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminMobilityCaseInspect.path} element={<RequireAdminRoute><AdminMobilityCaseInspectPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPolicies.path} element={<RequireAdminRoute><AdminPoliciesPage /></RequireAdminRoute>} />
+        <Route
+          path={ROUTE_DEFS.adminPolicyConfig.path}
+          element={
+            <RequireAdminRoute>
+              <AdminPolicyConfigPage />
+            </RequireAdminRoute>
+          }
+        />
         <Route path={ROUTE_DEFS.adminMessages.path} element={<RequireAdminRoute><AdminMessages /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResearch.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminOverview.path} replace /></RequireAdminRoute>} />
         <Route path="/admin/companies/:companyId" element={<RequireAdminRoute><AdminCompanyDetail /></RequireAdminRoute>} />

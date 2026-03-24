@@ -6,6 +6,7 @@ import type { AdminAssignment, AdminAssignmentDetail, AdminCompany } from '../..
 import { buildRoute } from '../../navigation/routes';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { COUNTRY_OPTIONS } from '../../utils/countries';
+import { getApiErrorMessage, getClientTransportErrorMessage } from '../../utils/apiDetail';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -198,6 +199,7 @@ export const AdminAssignments: React.FC = () => {
       destination_country: '',
     });
     setCreateSuccess(null);
+    setCreateError(null);
     setShowAddModal(true);
   };
 
@@ -205,6 +207,7 @@ export const AdminAssignments: React.FC = () => {
     if (!addForm.company_id || !addForm.hr_user_id) return;
     setAddSaving(true);
     setCreateSuccess(null);
+    setCreateError(null);
     try {
       const res = await adminAPI.createAssignment({
         company_id: addForm.company_id,
@@ -223,6 +226,9 @@ export const AdminAssignments: React.FC = () => {
           setCreateSuccess(null);
         }, 2500);
       }
+    } catch (err: unknown) {
+      const transport = getClientTransportErrorMessage(err);
+      setCreateError(transport ?? getApiErrorMessage(err, 'Could not create assignment.'));
     } finally {
       setAddSaving(false);
     }
@@ -452,6 +458,11 @@ export const AdminAssignments: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[#0b2b43] mb-4">Add assignment</h3>
+            {createError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-900 whitespace-pre-wrap">
+                {createError}
+              </div>
+            )}
             {createSuccess && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-900 space-y-2">
                 <div className="font-semibold">Assignment created</div>

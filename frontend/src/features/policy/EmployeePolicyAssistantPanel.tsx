@@ -28,6 +28,7 @@ export type PolicyAssistantTurn = {
   id: string;
   question: string;
   answer: PolicyAssistantAnswer;
+  assistantRequestId?: string | null;
 };
 
 function newTurnId(): string {
@@ -37,11 +38,19 @@ function newTurnId(): string {
 function AnswerResultCard({
   question,
   answer,
+  assistantTurnRequestId,
   onFollowUpSelect,
 }: {
   question: string;
   answer: PolicyAssistantAnswer;
-  onFollowUpSelect: (text: string, index: number, intent: string | undefined, canonicalTopic: string | null) => void;
+  assistantTurnRequestId?: string | null;
+  onFollowUpSelect: (
+    text: string,
+    index: number,
+    intent: string | undefined,
+    canonicalTopic: string | null,
+    turnRequestId: string | null | undefined
+  ) => void;
 }) {
   const status = deriveSupportStatus(answer);
   const isRefusal = status === 'refused';
@@ -147,7 +156,8 @@ function AnswerResultCard({
                             (opt.query_hint || opt.label).trim(),
                             i,
                             opt.intent,
-                            answer.canonical_topic ?? null
+                            answer.canonical_topic ?? null,
+                            assistantTurnRequestId
                           )
                         }
                       >
@@ -186,7 +196,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
       const res = await employeeAPI.postPolicyAssistantQuery(assignmentId, trimmed);
       const answer = res.answer;
       setTurns((prev) => {
-        const next = [...prev, { id: newTurnId(), question: trimmed, answer }];
+        const next = [
+          ...prev,
+          {
+            id: newTurnId(),
+            question: trimmed,
+            answer,
+            assistantRequestId: res.request_id ?? null,
+          },
+        ];
         return next.length > MAX_TURNS ? next.slice(-MAX_TURNS) : next;
       });
       setMessage('');
@@ -208,12 +226,14 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     text: string,
     index: number,
     intent: string | undefined,
-    canonicalTopic: string | null
+    canonicalTopic: string | null,
+    turnRequestId: string | null | undefined
   ) => {
     trackPolicyAssistantFollowUpClicked({
       follow_up_intent: intent ?? undefined,
       follow_up_index: index,
       canonical_topic: canonicalTopic,
+      assistant_turn_request_id: turnRequestId ?? undefined,
     });
     setMessage(text);
     setError('');
@@ -298,6 +318,7 @@ export const EmployeePolicyAssistantPanel: React.FC<{
               key={t.id}
               question={t.question}
               answer={t.answer}
+              assistantTurnRequestId={t.assistantRequestId}
               onFollowUpSelect={handleFollowUpFromAnswer}
             />
           ))}

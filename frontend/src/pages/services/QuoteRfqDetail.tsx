@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card } from '../../components/antigravity';
-import { rfqAPI } from '../../api/client';
+import { hrAPI, rfqAPI } from '../../api/client';
 import type { RfqDetail, QuoteDetail } from '../../api/client';
+import { HrRfqQuotesPolicyCapsSection } from '../../features/policy-config/HrRfqQuotesPolicyCapsSection';
+import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
 export const QuoteRfqDetail: React.FC = () => {
   const navigate = useNavigate();
@@ -14,6 +16,11 @@ export const QuoteRfqDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [comparison, setComparison] = useState(false);
+  const [policyAssignmentType, setPolicyAssignmentType] = useState<string | null>(null);
+  const [policyFamilyStatus, setPolicyFamilyStatus] = useState<string | null>(null);
+
+  const sessionRole = normalizeStoredRole(getAuthItem('relopass_role'));
+  const showHrCapComparison = sessionRole === 'HR' || sessionRole === 'ADMIN';
 
   const load = useCallback(async (forComparison = false) => {
     if (!rfqId) return;
@@ -43,6 +50,35 @@ export const QuoteRfqDetail: React.FC = () => {
   useEffect(() => {
     load();
   }, [rfqId]);
+
+  useEffect(() => {
+    if (!showHrCapComparison || !rfq?.assignment_id) {
+      setPolicyAssignmentType(null);
+      setPolicyFamilyStatus(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const pol = await hrAPI.getResolvedPolicy(rfq.assignment_id!);
+        if (cancelled) return;
+        const rc = (pol.resolution_context || {}) as {
+          assignment_type?: string;
+          family_status?: string;
+        };
+        setPolicyAssignmentType(rc.assignment_type ?? null);
+        setPolicyFamilyStatus(rc.family_status ?? null);
+      } catch {
+        if (!cancelled) {
+          setPolicyAssignmentType(null);
+          setPolicyFamilyStatus(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showHrCapComparison, rfq?.assignment_id]);
 
   const handleAccept = async (quoteId: string) => {
     if (!rfqId) return;
@@ -111,6 +147,15 @@ export const QuoteRfqDetail: React.FC = () => {
             ))}
           </ul>
         </div>
+
+        {showHrCapComparison && quotes.length > 0 ? (
+          <HrRfqQuotesPolicyCapsSection
+            rfq={rfq}
+            quotes={quotes}
+            assignmentType={policyAssignmentType}
+            familyStatus={policyFamilyStatus}
+          />
+        ) : null}
 
         <div>
           <div className="flex items-center justify-between">

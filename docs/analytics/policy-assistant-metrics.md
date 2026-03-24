@@ -1,41 +1,48 @@
-# Policy Assistant analytics — HR value and privacy
+# Policy Assistant analytics — HR value & privacy
 
-## What we record
+## What we collect
 
-Server-side events (via `analytics_events` / `emit_event`) on each policy assistant query:
+Events are emitted via `emit_event` → optional `analytics_events` row (`event_name` + JSON `payload_json`). **We do not store question text**, assignment/policy IDs, or user IDs in policy-assistant payloads. Correlating fields:
 
-| Event | When |
-|--------|------|
-| `assistant_question_asked` | Every turn (no question text) |
-| `assistant_question_supported` | Classifier accepted the question as in-scope |
-| `assistant_question_unsupported` | Classifier rejected (includes `refusal_code`) |
-| `assistant_answer_generated` | Always after an answer is built |
-| `assistant_answer_topic` | Only when `canonical_topic` is set |
-| `assistant_answer_readiness` | Every turn (`comparison_readiness` + `answer_type`) |
-| `assistant_refusal_shown` | Answer is a refusal with a refusal code |
-| `assistant_follow_up_clicked` | Client beacon when user taps a **Related questions** chip |
+- `request_id` — per HTTP request (or per assistant turn where returned to the client).
+- `user_role` — `HR` or `employee`.
+- `extra.*` — bounded enums/buckets only (topics, readiness, refusal codes, intent, answer shape).
 
-Payloads are intentionally small: `user_role` (HR / employee), `request_id`, and `extra` with **enums and buckets only** — e.g. `canonical_topic`, `comparison_readiness`, `policy_readiness_bucket`, `message_length_bucket`, `refusal_code`. We **do not** store raw user messages, policy excerpts, or assignment/policy UUIDs in these events (assignment id is omitted from assistant payloads).
+Event names (see `backend/services/policy_assistant_analytics.py`):
 
-## Summary metrics (how to compute)
+| Event | Purpose |
+|-------|---------|
+| `assistant_question_asked` | One row per turn; includes length bucket, policy readiness bucket, comparison readiness, topic/intent when known. |
+| `assistant_question_supported` / `assistant_question_unsupported` | Classifier outcome. |
+| `assistant_answer_generated` | Answer shape + `answer_value_bucket` + `policy_grounding_bucket` + `resolved_from_published`. |
+| `assistant_answer_topic` | Topic-attributed answers (for “top topics”). |
+| `assistant_answer_readiness` | Comparison readiness × answer type (for informational-only rate). |
+| `assistant_refusal_shown` | Refusal surfaced to user. |
+| `assistant_follow_up_clicked` | Client beacon; optional `assistant_turn_request_id` links to the query `request_id` that showed the chip. |
 
-Using `analytics_events` for a time window:
+## Summary metrics (example definitions)
 
-1. **Top policy topics** — Count `assistant_answer_topic` grouped by `payload.extra.canonical_topic` (filter `user_role` = `employee` vs `HR` as needed).
+Use `payload_json` as JSON (SQLite: `json_extract`, Postgres: `payload::jsonb`). Paths assume `emit_event` shape: top-level `user_role`, nested `extra` for assistant fields.
 
-2. **Unsupported rate** — `assistant_question_unsupported / assistant_question_asked`, or use admin `GET /api/admin/workflow/overview` field `rates.assistant_unsupported_rate_pct`.
+1. **Top policy topics** — Count `assistant_answer_topic` grouped by `extra.canonical_topic` (filter `user_role = 'HR'` or `'employee'` as needed).
 
-3. **% questions resolved from published policy** — Share of turns where `assistant_answer_generated` has `answer_type` in `entitlement_summary`, `comparison_summary`, `status_summary`, `draft_published_summary` (HR) and **not** `refusal` / `clarification_needed`, scoped to `policy_readiness_bucket` = published-ready buckets for employees.
+2. **Unsupported rate** —  
+   `assistant_question_unsupported / assistant_question_asked` over a time window (same role filter).
 
-4. **% informational-only answers** — Among substantive answers, share where `assistant_answer_readiness` has `comparison_readiness` = `informational_only` or `external_reference_partial` (tune to your product definition).
+3. **% questions “resolved” from published policy** — Share of `assistant_answer_generated` where `extra.resolved_from_published = true` (strict: published grounding only). For HR, also report `policy_grounding_bucket` mix (`published` / `draft` / `mixed`).
 
-5. **Likely repetitive HR question areas** — For `user_role` = `HR`, group `assistant_answer_topic` or `assistant_question_supported.extra.detected_intent` with high volume; cross-check `policy_readiness_bucket` = `draft_with_published` to spot draft-vs-published friction.
+4. **% informational-only answers** — Share of `assistant_answer_generated` where `extra.answer_value_bucket = 'informational_only'` (add `partial_numeric` / `review_required` if you want a broader “non-comparison-ready” band).
 
-## Demonstrating HR time saved
+5. **Likely repetitive HR question areas** — For `user_role = 'HR'`, group `assistant_answer_topic` by `canonical_topic` and rank; optionally weight by `assistant_follow_up_clicked` on the same `canonical_topic` to see which topics drive follow-up churn.
 
-- **Deflection before ticket**: Rising `assistant_question_asked` for employees with stable HR case volume suggests self-serve policy clarification.
-- **Lower unsupported over time** (with stable traffic) suggests clearer policies or UX.
-- **High follow-up click rate** (`assistant_follow_up_clicked` / `assistant_answer_generated`) indicates users are staying inside guided flows rather than retyping.
-- **HR concentration on `draft_with_published`** plus topic clusters highlights where HR spends cognitive load before publish — good targets for docs or product copy.
+## How this demonstrates HR time saved (narrative)
 
-This is **directional** evidence; pair with HR interviews or ticket tags for a full story.
+- **High** `resolved_from_published` + **low** unsupported rate → employees and HR are getting grounded answers without escalation.
+- **Top topics** + **follow-up clicks** → shows where policy language is unclear or where HR repeatedly clarifies the same benefit (prioritize doc or UI improvements).
+- **Informational-only / partial_numeric** share → quantifies how often the assistant correctly refuses invented dollar comparisons—reducing bad self-service answers without claiming false precision.
+
+## Privacy
+
+- No raw messages, no PII in `extra`.  
+- Do not join `request_id` to PII in reporting unless your data governance explicitly allows it.  
+- `assistant_turn_request_id` on the beacon is only for correlating a click to a prior assistant response, not for identifying users.

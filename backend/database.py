@@ -380,6 +380,153 @@ class Database:
         except Exception as ex:
             log.warning("policy_benefit_rule_hr_overrides ensure failed (run Supabase migration): %s", ex)
 
+    def _maybe_ensure_compensation_allowance_policy_config(self) -> None:
+        """
+        Structured Compensation & Allowance matrix (policy_configs / versions / benefits).
+        Supabase: supabase/migrations/20260425100000_compensation_allowance_policy_config.sql
+
+        Idempotent CREATE TABLE for dev DBs without migrations; production RLS lives in the migration.
+        """
+        if _is_sqlite:
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS public.policy_configs (
+                          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                          company_id text NOT NULL,
+                          name text NOT NULL DEFAULT 'Compensation & Allowance',
+                          config_key text NOT NULL DEFAULT 'compensation_allowance',
+                          description text,
+                          is_active boolean NOT NULL DEFAULT true,
+                          created_by text,
+                          created_at timestamptz NOT NULL DEFAULT now(),
+                          updated_at timestamptz NOT NULL DEFAULT now(),
+                          UNIQUE (company_id, config_key)
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS public.policy_config_versions (
+                          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                          policy_config_id uuid NOT NULL REFERENCES public.policy_configs (id) ON DELETE CASCADE,
+                          version_number int NOT NULL,
+                          status text NOT NULL DEFAULT 'draft',
+                          effective_date date NOT NULL,
+                          published_at timestamptz,
+                          created_by text,
+                          created_at timestamptz NOT NULL DEFAULT now(),
+                          updated_at timestamptz NOT NULL DEFAULT now(),
+                          UNIQUE (policy_config_id, version_number),
+                          CHECK (status IN ('draft', 'approved', 'published', 'archived'))
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE IF NOT EXISTS public.policy_config_benefits (
+                          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                          policy_config_version_id uuid NOT NULL
+                            REFERENCES public.policy_config_versions (id) ON DELETE CASCADE,
+                          benefit_key text NOT NULL,
+                          benefit_label text NOT NULL,
+                          category text NOT NULL,
+                          covered boolean NOT NULL DEFAULT false,
+                          value_type text NOT NULL DEFAULT 'none',
+                          amount_value numeric,
+                          currency_code text,
+                          percentage_value numeric,
+                          unit_frequency text NOT NULL DEFAULT 'one_time',
+                          cap_rule_json jsonb NOT NULL DEFAULT '{}',
+                          notes text,
+                          conditions_json jsonb NOT NULL DEFAULT '{}',
+                          assignment_types jsonb NOT NULL DEFAULT '[]',
+                          family_statuses jsonb NOT NULL DEFAULT '[]',
+                          targeting_signature text NOT NULL DEFAULT 'global',
+                          is_active boolean NOT NULL DEFAULT true,
+                          display_order int NOT NULL DEFAULT 0,
+                          created_at timestamptz NOT NULL DEFAULT now(),
+                          updated_at timestamptz NOT NULL DEFAULT now(),
+                          UNIQUE (policy_config_version_id, benefit_key, targeting_signature)
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_policy_configs_company ON public.policy_configs (company_id)"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_pc_versions_config "
+                        "ON public.policy_config_versions (policy_config_id)"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_pc_versions_status "
+                        "ON public.policy_config_versions (policy_config_id, status)"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_pc_versions_effective "
+                        "ON public.policy_config_versions (effective_date)"
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS uq_policy_config_one_published
+                        ON public.policy_config_versions (policy_config_id)
+                        WHERE status = 'published'
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        CREATE UNIQUE INDEX IF NOT EXISTS uq_policy_config_one_draft
+                        ON public.policy_config_versions (policy_config_id)
+                        WHERE status = 'draft'
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_pc_benefits_version "
+                        "ON public.policy_config_benefits (policy_config_version_id)"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_pc_benefits_key "
+                        "ON public.policy_config_benefits (benefit_key)"
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_pc_benefits_category
+                        ON public.policy_config_benefits (policy_config_version_id, category)
+                        """
+                    )
+                )
+            log.info(
+                "Ensured compensation_allowance policy_config tables exist (idempotent). "
+                "Apply supabase/migrations/20260425100000_compensation_allowance_policy_config.sql for RLS."
+            )
+        except Exception as ex:
+            log.warning("compensation_allowance policy_config ensure failed (run Supabase migration): %s", ex)
+
     def _maybe_ensure_postgres_case_assignments_employee_link_mode(self) -> None:
         """
         case_assignments.employee_link_mode is required for create_assignment INSERT and pending-claim flows.
@@ -672,6 +819,7 @@ class Database:
             self._maybe_ensure_policy_versions_normalization_draft_json()
             self._maybe_ensure_policy_versions_normalization_state()
             self._maybe_ensure_policy_benefit_rule_hr_overrides()
+            self._maybe_ensure_compensation_allowance_policy_config()
 
         # In production (Render), avoid runtime DDL. Use Supabase migrations instead.
         if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):
@@ -900,6 +1048,81 @@ class Database:
                     updated_by TEXT,
                     updated_at TEXT NOT NULL
                 )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_configs (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    name TEXT NOT NULL DEFAULT 'Compensation & Allowance',
+                    config_key TEXT NOT NULL DEFAULT 'compensation_allowance',
+                    description TEXT,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    created_by TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(company_id, config_key)
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_config_versions (
+                    id TEXT PRIMARY KEY,
+                    policy_config_id TEXT NOT NULL REFERENCES policy_configs(id) ON DELETE CASCADE,
+                    version_number INTEGER NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'draft',
+                    effective_date TEXT NOT NULL,
+                    published_at TEXT,
+                    created_by TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(policy_config_id, version_number)
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_sqlite_pc_one_published
+                ON policy_config_versions(policy_config_id)
+                WHERE status = 'published'
+            """))
+
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_sqlite_pc_one_draft
+                ON policy_config_versions(policy_config_id)
+                WHERE status = 'draft'
+            """))
+
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_config_benefits (
+                    id TEXT PRIMARY KEY,
+                    policy_config_version_id TEXT NOT NULL
+                        REFERENCES policy_config_versions(id) ON DELETE CASCADE,
+                    benefit_key TEXT NOT NULL,
+                    benefit_label TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    covered INTEGER NOT NULL DEFAULT 0,
+                    value_type TEXT NOT NULL DEFAULT 'none',
+                    amount_value REAL,
+                    currency_code TEXT,
+                    percentage_value REAL,
+                    unit_frequency TEXT NOT NULL DEFAULT 'one_time',
+                    cap_rule_json TEXT NOT NULL DEFAULT '{}',
+                    notes TEXT,
+                    conditions_json TEXT NOT NULL DEFAULT '{}',
+                    assignment_types TEXT NOT NULL DEFAULT '[]',
+                    family_statuses TEXT NOT NULL DEFAULT '[]',
+                    targeting_signature TEXT NOT NULL DEFAULT 'global',
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    display_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(policy_config_version_id, benefit_key, targeting_signature)
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_sqlite_pc_benefits_version
+                ON policy_config_benefits(policy_config_version_id)
             """))
 
             conn.execute(text("""
@@ -11563,6 +11786,403 @@ class Database:
                     ),
                     {"aid": assignment_id, "mid": template_milestone_id, "cat": completed_at, "notes": notes, "ua": now},
                 )
+
+    # ------------------------------------------------------------------
+    # Compensation & Allowance — policy_configs / policy_config_versions / policy_config_benefits
+    # ------------------------------------------------------------------
+    def _normalize_policy_config_benefit_row(self, d: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not d:
+            return None
+        for k in ("cap_rule_json", "conditions_json", "assignment_types", "family_statuses"):
+            self._parse_json_col(d, k)
+        for bk in ("covered", "is_active"):
+            v = d.get(bk)
+            if v is not None and not isinstance(v, bool):
+                try:
+                    d[bk] = bool(int(v))
+                except (TypeError, ValueError):
+                    d[bk] = bool(v)
+        return d
+
+    def get_policy_config(self, company_id: str, config_key: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT * FROM policy_configs WHERE company_id = :cid AND config_key = :ck"
+                ),
+                {"cid": str(company_id), "ck": str(config_key)},
+            ).fetchone()
+        d = self._row_to_dict(row)
+        if not d:
+            return None
+        for bk in ("is_active",):
+            v = d.get(bk)
+            if v is not None and not isinstance(v, bool):
+                try:
+                    d[bk] = bool(int(v))
+                except (TypeError, ValueError):
+                    d[bk] = bool(v)
+        return d
+
+    def ensure_policy_config(
+        self, company_id: str, config_key: str, *, created_by: Optional[str] = None
+    ) -> Dict[str, Any]:
+        existing = self.get_policy_config(company_id, config_key)
+        if existing:
+            return existing
+        pid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_configs
+                    (id, company_id, name, config_key, description, is_active, created_by, created_at, updated_at)
+                    VALUES (:id, :cid, :name, :ck, NULL, :ia, :cb, :ca, :ua)
+                    """
+                ),
+                {
+                    "id": pid,
+                    "cid": str(company_id),
+                    "name": "Compensation & Allowance",
+                    "ck": str(config_key),
+                    "ia": 1 if _is_sqlite else True,
+                    "cb": created_by,
+                    "ca": now,
+                    "ua": now,
+                },
+            )
+        got = self.get_policy_config(company_id, config_key)
+        assert got
+        return got
+
+    def get_policy_config_version_row(self, version_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM policy_config_versions WHERE id = :id"),
+                {"id": str(version_id)},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_policy_config_version_with_config(self, version_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT v.*, c.company_id AS _company_id, c.config_key AS _config_key
+                    FROM policy_config_versions v
+                    JOIN policy_configs c ON c.id = v.policy_config_id
+                    WHERE v.id = :id
+                    """
+                ),
+                {"id": str(version_id)},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def archive_policy_config_drafts(self, policy_config_id: str) -> int:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            r = conn.execute(
+                text(
+                    """
+                    UPDATE policy_config_versions
+                    SET status = 'archived', updated_at = :now
+                    WHERE policy_config_id = :pid AND status = 'draft'
+                    """
+                ),
+                {"pid": str(policy_config_id), "now": now},
+            )
+            try:
+                return int(r.rowcount or 0)
+            except Exception:
+                return 0
+
+    def max_policy_config_version_number(self, policy_config_id: str) -> int:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT MAX(version_number) AS m FROM policy_config_versions WHERE policy_config_id = :pid"
+                ),
+                {"pid": str(policy_config_id)},
+            ).fetchone()
+        m = row._mapping.get("m") if row else None
+        if m is None:
+            return 0
+        try:
+            return int(m)
+        except (TypeError, ValueError):
+            return 0
+
+    def insert_policy_config_version(
+        self,
+        policy_config_id: str,
+        version_number: int,
+        status: str,
+        effective_date: str,
+        *,
+        created_by: Optional[str] = None,
+    ) -> str:
+        vid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_config_versions
+                    (id, policy_config_id, version_number, status, effective_date, published_at,
+                     created_by, created_at, updated_at)
+                    VALUES (:id, :pid, :vn, :st, :ed, NULL, :cb, :ca, :ua)
+                    """
+                ),
+                {
+                    "id": vid,
+                    "pid": str(policy_config_id),
+                    "vn": int(version_number),
+                    "st": str(status),
+                    "ed": str(effective_date),
+                    "cb": created_by,
+                    "ca": now,
+                    "ua": now,
+                },
+            )
+        return vid
+
+    def list_policy_config_benefits(self, policy_config_version_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT * FROM policy_config_benefits
+                    WHERE policy_config_version_id = :vid
+                    ORDER BY display_order, benefit_key, targeting_signature
+                    """
+                ),
+                {"vid": str(policy_config_version_id)},
+            ).fetchall()
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            d = self._row_to_dict(row)
+            if d:
+                out.append(self._normalize_policy_config_benefit_row(d) or d)
+        return out
+
+    def delete_policy_config_benefits_for_version(self, policy_config_version_id: str) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM policy_config_benefits WHERE policy_config_version_id = :vid"),
+                {"vid": str(policy_config_version_id)},
+            )
+
+    def insert_policy_config_benefit_row(self, row: Dict[str, Any]) -> str:
+        bid = str(row.get("id") or uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        cap_j = row.get("cap_rule_json")
+        if isinstance(cap_j, dict):
+            cap_j = json.dumps(cap_j)
+        elif cap_j is None:
+            cap_j = "{}"
+        cond_j = row.get("conditions_json")
+        if isinstance(cond_j, dict):
+            cond_j = json.dumps(cond_j)
+        elif cond_j is None:
+            cond_j = "{}"
+        at_j = row.get("assignment_types")
+        if isinstance(at_j, list):
+            at_j = json.dumps(at_j)
+        elif at_j is None:
+            at_j = "[]"
+        fs_j = row.get("family_statuses")
+        if isinstance(fs_j, list):
+            fs_j = json.dumps(fs_j)
+        elif fs_j is None:
+            fs_j = "[]"
+        cov = row.get("covered", False)
+        if _is_sqlite:
+            cov = 1 if cov else 0
+        iact = row.get("is_active", True)
+        if _is_sqlite:
+            iact = 1 if iact else 0
+        params = {
+            "id": bid,
+            "vid": str(row["policy_config_version_id"]),
+            "bk": str(row["benefit_key"]),
+            "bl": str(row["benefit_label"]),
+            "cat": str(row["category"]),
+            "cov": cov,
+            "vt": str(row.get("value_type") or "none"),
+            "av": row.get("amount_value"),
+            "cc": row.get("currency_code"),
+            "pv": row.get("percentage_value"),
+            "uf": str(row.get("unit_frequency") or "one_time"),
+            "crj": cap_j,
+            "notes": row.get("notes"),
+            "cj": cond_j,
+            "atj": at_j,
+            "fsj": fs_j,
+            "tsig": str(row.get("targeting_signature") or "global"),
+            "ia": iact,
+            "do": int(row.get("display_order") or 0),
+            "ca": now,
+            "ua": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_config_benefits
+                    (id, policy_config_version_id, benefit_key, benefit_label, category, covered,
+                     value_type, amount_value, currency_code, percentage_value, unit_frequency,
+                     cap_rule_json, notes, conditions_json, assignment_types, family_statuses,
+                     targeting_signature, is_active, display_order, created_at, updated_at)
+                    VALUES
+                    (:id, :vid, :bk, :bl, :cat, :cov, :vt, :av, :cc, :pv, :uf, :crj, :notes, :cj,
+                     :atj, :fsj, :tsig, :ia, :do, :ca, :ua)
+                    """
+                ),
+                params,
+            )
+        return bid
+
+    def publish_policy_config_version_atomic(self, version_id: str) -> None:
+        vid = str(version_id)
+        meta = self.get_policy_config_version_with_config(vid)
+        if not meta:
+            raise ValueError("policy_config_version not found")
+        st = str(meta.get("status") or "")
+        if st not in ("draft", "approved"):
+            raise ValueError(f"cannot publish version in status {st!r}")
+        cfg_id = str(meta.get("policy_config_id") or "")
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_config_versions
+                    SET status = 'archived', updated_at = :now
+                    WHERE policy_config_id = :cid AND status = 'published'
+                    """
+                ),
+                {"cid": cfg_id, "now": now},
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_config_versions
+                    SET status = 'published', published_at = :now, updated_at = :now
+                    WHERE id = :vid AND status IN ('draft', 'approved')
+                    """
+                ),
+                {"vid": vid, "now": now},
+            )
+        check = self.get_policy_config_version_row(vid)
+        if not check or str(check.get("status")) != "published":
+            raise ValueError("publish failed (version missing or not published)")
+
+    def get_latest_published_policy_config_version(
+        self, company_id: str, config_key: str
+    ) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT v.*
+                    FROM policy_config_versions v
+                    JOIN policy_configs c ON c.id = v.policy_config_id
+                    WHERE c.company_id = :cid AND c.config_key = :ck AND v.status = 'published'
+                    ORDER BY v.effective_date DESC, v.version_number DESC
+                    LIMIT 1
+                    """
+                ),
+                {"cid": str(company_id), "ck": str(config_key)},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def get_policy_config_draft_for_config(self, policy_config_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT * FROM policy_config_versions
+                    WHERE policy_config_id = :pid AND status = 'draft'
+                    LIMIT 1
+                    """
+                ),
+                {"pid": str(policy_config_id)},
+            ).fetchone()
+        return self._row_to_dict(row)
+
+    def list_policy_config_versions_history(self, policy_config_id: str) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    """
+                    SELECT id, policy_config_id, version_number, status, effective_date,
+                           published_at, created_by, created_at, updated_at
+                    FROM policy_config_versions
+                    WHERE policy_config_id = :pid
+                    ORDER BY version_number DESC, created_at DESC
+                    """
+                ),
+                {"pid": str(policy_config_id)},
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def update_policy_config_version_effective_date(
+        self, version_id: str, effective_date: str, *, only_if_draft: bool = True
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        vid = str(version_id)
+        ed = str(effective_date)[:10]
+        with self.engine.begin() as conn:
+            if only_if_draft:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_config_versions
+                        SET effective_date = :ed, updated_at = :now
+                        WHERE id = :vid AND status = 'draft'
+                        """
+                    ),
+                    {"ed": ed, "now": now, "vid": vid},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_config_versions
+                        SET effective_date = :ed, updated_at = :now
+                        WHERE id = :vid
+                        """
+                    ),
+                    {"ed": ed, "now": now, "vid": vid},
+                )
+
+    def get_company_id_for_assignment_id(self, assignment_id: str) -> Optional[str]:
+        """Resolve relocation_cases.company_id linked to a case_assignments row (if bridged)."""
+        aid = (assignment_id or "").strip()
+        if not aid:
+            return None
+        join_on = _relocation_cases_join_on("a", style="standard")
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        f"""
+                        SELECT rc.company_id AS company_id
+                        FROM case_assignments a
+                        LEFT JOIN relocation_cases rc ON {join_on}
+                        WHERE a.id = :aid
+                        LIMIT 1
+                        """
+                    ),
+                    {"aid": aid},
+                ).fetchone()
+        except Exception:
+            return None
+        if not row:
+            return None
+        cid = row._mapping.get("company_id") if hasattr(row, "_mapping") else dict(row).get("company_id")
+        return str(cid).strip() if cid else None
 
     # ==================================================================
     # Debug KV operations

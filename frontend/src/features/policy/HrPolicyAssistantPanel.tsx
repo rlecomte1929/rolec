@@ -29,7 +29,7 @@ import {
 
 const MAX_TURNS = 5;
 
-type Turn = { id: string; question: string; answer: PolicyAssistantAnswer };
+type Turn = { id: string; question: string; answer: PolicyAssistantAnswer; assistantRequestId?: string | null };
 
 function newTurnId(): string {
   return `hr-pa-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -38,11 +38,19 @@ function newTurnId(): string {
 function HrAnswerResultCard({
   question,
   answer,
+  assistantTurnRequestId,
   onFollowUpSelect,
 }: {
   question: string;
   answer: PolicyAssistantAnswer;
-  onFollowUpSelect: (text: string, index: number, intent: string | undefined, canonicalTopic: string | null) => void;
+  assistantTurnRequestId?: string | null;
+  onFollowUpSelect: (
+    text: string,
+    index: number,
+    intent: string | undefined,
+    canonicalTopic: string | null,
+    turnRequestId: string | null | undefined
+  ) => void;
 }) {
   const status = deriveSupportStatus(answer);
   const isRefusal = status === 'refused';
@@ -174,7 +182,8 @@ function HrAnswerResultCard({
                             (opt.query_hint || opt.label).trim(),
                             i,
                             opt.intent,
-                            answer.canonical_topic ?? null
+                            answer.canonical_topic ?? null,
+                            assistantTurnRequestId
                           )
                         }
                       >
@@ -214,7 +223,15 @@ export const HrPolicyAssistantPanel: React.FC<{
     try {
       const res = await hrAPI.postPolicyAssistantQuery(pid, trimmed, documentId?.trim() || undefined);
       setTurns((prev) => {
-        const next = [...prev, { id: newTurnId(), question: trimmed, answer: res.answer }];
+        const next = [
+          ...prev,
+          {
+            id: newTurnId(),
+            question: trimmed,
+            answer: res.answer,
+            assistantRequestId: res.request_id ?? null,
+          },
+        ];
         return next.length > MAX_TURNS ? next.slice(-MAX_TURNS) : next;
       });
       setMessage('');
@@ -242,12 +259,14 @@ export const HrPolicyAssistantPanel: React.FC<{
     text: string,
     index: number,
     intent: string | undefined,
-    canonicalTopic: string | null
+    canonicalTopic: string | null,
+    turnRequestId: string | null | undefined
   ) => {
     trackPolicyAssistantFollowUpClicked({
       follow_up_intent: intent ?? undefined,
       follow_up_index: index,
       canonical_topic: canonicalTopic,
+      assistant_turn_request_id: turnRequestId ?? undefined,
     });
     setMessage(text);
     setError('');
@@ -333,6 +352,7 @@ export const HrPolicyAssistantPanel: React.FC<{
               key={t.id}
               question={t.question}
               answer={t.answer}
+              assistantTurnRequestId={t.assistantRequestId}
               onFollowUpSelect={handleFollowUpFromAnswer}
             />
           ))}

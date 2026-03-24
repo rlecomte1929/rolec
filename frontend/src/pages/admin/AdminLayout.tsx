@@ -28,6 +28,11 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
     { to: buildRoute('adminAssignments'), label: 'Assignments', path: ROUTE_DEFS.adminAssignments.path },
     { to: buildRoute('adminMobilityCases'), label: 'Mobility case', path: ROUTE_DEFS.adminMobilityCases.path },
     { to: buildRoute('adminPolicies'), label: 'Policies', path: ROUTE_DEFS.adminPolicies.path },
+    {
+      to: buildRoute('adminPolicyConfig'),
+      label: 'Compensation & Allowance',
+      path: ROUTE_DEFS.adminPolicyConfig.path,
+    },
     { to: buildRoute('adminSuppliers'), label: 'Suppliers', path: ROUTE_DEFS.adminSuppliers.path },
     { to: buildRoute('adminMessages'), label: 'Messages', path: ROUTE_DEFS.adminMessages.path },
   ];

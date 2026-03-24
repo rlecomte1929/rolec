@@ -22,6 +22,7 @@ from backend.services.policy_assistant_contract import (
     PolicyAssistantRoleScope,
 )
 from backend.services.policy_assistant_answer_engine import ResolvedPolicyContext, generate_policy_assistant_answer
+from backend.services.employee_policy_assistant_service import execute_employee_policy_assistant_query
 from backend.services.policy_assistant_session_service import (
     SESSION_TOPIC_MENU_MARKER,
     PolicyAssistantSessionState,
@@ -187,6 +188,153 @@ class PolicyAssistantSessionServiceTests(unittest.TestCase):
         self.assertIsNone(refined.canonical_topic)
         self.assertIn("Name one benefit", refined.ambiguity_reason or "")
         self.assertEqual(refined.guardrail_note, SESSION_TOPIC_MENU_MARKER)
+
+    def test_relaxed_topic_recovery_after_supported_turn(self) -> None:
+        """Topic switch / follow-up phrasing: strong relaxed score overrides ambiguous classifier."""
+        state = PolicyAssistantSessionState.for_scope("employee_assignment", "asg-1")
+        state.had_supported_policy_turn = True
+        refined = apply_bounded_session_memory(
+            "household goods cap under my policy",
+            PolicyAssistantRoleScope.EMPLOYEE,
+            state,
+            _ambig(),
+        )
+        self.assertTrue(refined.supported)
+        self.assertEqual(refined.canonical_topic, PolicyAssistantCanonicalTopic.SHIPMENT)
+
+    def test_one_valid_follow_up_end_to_end(self) -> None:
+        """Pronoun follow-up resolves via session (bounded continuity)."""
+
+        def fake_resolve(aid: str, user: dict, rid, *, read_only: bool = False):
+            return {
+                "has_policy": True,
+                "benefits": [
+                    {
+                        "benefit_key": "temporary_housing",
+                        "included": True,
+                        "max_value": 5000,
+                        "currency": "USD",
+                        "approval_required": False,
+                        "rule_comparison_readiness": {
+                            "level": "full",
+                            "supports_budget_delta": True,
+                            "reasons": [],
+                        },
+                    },
+                ],
+                "exclusions": [],
+                "comparison_readiness": {"comparison_ready": True},
+            }
+
+        user = {"id": "u1", "role": "EMPLOYEE"}
+        ans1, _, sess1 = execute_employee_policy_assistant_query(
+            "asg-1",
+            "What is my temporary housing cap?",
+            user,
+            resolve_published_policy=fake_resolve,
+        )
+        self.assertEqual(ans1.canonical_topic, PolicyAssistantCanonicalTopic.TEMPORARY_HOUSING)
+        ans2, _, _sess2 = execute_employee_policy_assistant_query(
+            "asg-1",
+            "What about it?",
+            user,
+            session=sess1,
+            resolve_published_policy=fake_resolve,
+        )
+        self.assertEqual(ans2.canonical_topic, PolicyAssistantCanonicalTopic.TEMPORARY_HOUSING)
+
+    def test_topic_switch_within_policy_end_to_end(self) -> None:
+        def fake_resolve(aid: str, user: dict, rid, *, read_only: bool = False):
+            return {
+                "has_policy": True,
+                "benefits": [
+                    {
+                        "benefit_key": "temporary_housing",
+                        "included": True,
+                        "max_value": 5000,
+                        "currency": "USD",
+                        "approval_required": False,
+                        "rule_comparison_readiness": {
+                            "level": "full",
+                            "supports_budget_delta": True,
+                            "reasons": [],
+                        },
+                    },
+                    {
+                        "benefit_key": "shipment",
+                        "included": True,
+                        "max_value": 8000,
+                        "currency": "USD",
+                        "approval_required": False,
+                        "rule_comparison_readiness": {
+                            "level": "full",
+                            "supports_budget_delta": True,
+                            "reasons": [],
+                        },
+                    },
+                ],
+                "exclusions": [],
+                "comparison_readiness": {"comparison_ready": True},
+            }
+
+        user = {"id": "u1", "role": "EMPLOYEE"}
+        _, _, sess1 = execute_employee_policy_assistant_query(
+            "asg-1",
+            "Temporary housing limit?",
+            user,
+            resolve_published_policy=fake_resolve,
+        )
+        ans2, _, sess2 = execute_employee_policy_assistant_query(
+            "asg-1",
+            "What is my shipment cap?",
+            user,
+            session=sess1,
+            resolve_published_policy=fake_resolve,
+        )
+        self.assertEqual(ans2.canonical_topic, PolicyAssistantCanonicalTopic.SHIPMENT)
+        self.assertEqual(sess2.get("last_canonical_topic"), "shipment")
+
+    def test_drift_to_unsupported_resets_session(self) -> None:
+        def fake_resolve(aid: str, user: dict, rid, *, read_only: bool = False):
+            return {
+                "has_policy": True,
+                "benefits": [
+                    {
+                        "benefit_key": "temporary_housing",
+                        "included": True,
+                        "max_value": 5000,
+                        "currency": "USD",
+                        "approval_required": False,
+                        "rule_comparison_readiness": {
+                            "level": "full",
+                            "supports_budget_delta": True,
+                            "reasons": [],
+                        },
+                    },
+                ],
+                "exclusions": [],
+                "comparison_readiness": {"comparison_ready": True},
+            }
+
+        user = {"id": "u1", "role": "EMPLOYEE"}
+        _, _, sess1 = execute_employee_policy_assistant_query(
+            "asg-1",
+            "What is my temporary housing cap?",
+            user,
+            resolve_published_policy=fake_resolve,
+        )
+        self.assertTrue(sess1.get("had_supported_policy_turn"))
+        ans2, _, sess2 = execute_employee_policy_assistant_query(
+            "asg-1",
+            "yeah whatever",
+            user,
+            session=sess1,
+            resolve_published_policy=fake_resolve,
+        )
+        self.assertEqual(ans2.answer_type, PolicyAssistantAnswerType.REFUSAL)
+        assert ans2.refusal is not None
+        self.assertEqual(ans2.refusal.refusal_code, PolicyAssistantRefusalCode.OUT_OF_SCOPE_UNRELATED_CHAT)
+        self.assertFalse(sess2.get("had_supported_policy_turn"))
 
 
 if __name__ == "__main__":

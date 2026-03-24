@@ -37,7 +37,7 @@ In **Render → Web Service → Environment**:
 
 - Set `CORS_ORIGINS` if you use **preview URLs** or another frontend host, e.g.  
   `https://relopass.com,https://www.relopass.com,https://your-preview.onrender.com`
-- Optional: `CORS_ORIGIN_REGEX` for subdomains (default already matches `https://*.relopass.com`).
+- Optional: `CORS_ORIGIN_REGEX` overrides the default (which matches **apex and** subdomains: `https://relopass.com` and `https://*.relopass.com`).
 
 Redeploy the API after changes.
 

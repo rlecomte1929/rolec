@@ -423,6 +423,24 @@ export const hrAPI = {
     const response = await api.get(`/api/hr/assignments/${assignmentId}/policy-service-comparison`);
     return response.data;
   },
+  /** Same payload as employee route; allowed for HR via `require_hr_or_employee`. */
+  getAssignmentServices: async (assignmentId: string): Promise<{
+    assignment_id: string;
+    case_id: string;
+    services: Array<{
+      id: string;
+      assignment_id: string;
+      case_id: string;
+      service_key: string;
+      category: string;
+      selected: number | boolean;
+      estimated_cost: number | null;
+      currency: string | null;
+    }>;
+  }> => {
+    const response = await api.get(`/api/employee/assignments/${encodeURIComponent(assignmentId)}/services`);
+    return response.data;
+  },
   getPolicy: async (caseId: string): Promise<PolicyResponse> => {
     const response = await api.get('/api/hr/policy', { params: { caseId } });
     return response.data;
@@ -1815,6 +1833,8 @@ export interface RfqSummary {
   id: string;
   rfq_ref: string;
   case_id: string;
+  /** Populated by GET /api/rfqs/{id} when the case is linked to an assignment */
+  assignment_id?: string;
   status: string;
   created_at: string;
   items?: Array<{ service_key: string; requirements: Record<string, unknown> }>;
@@ -1968,6 +1988,115 @@ export const hrPolicyAPI = {
   },
   delete: async (policyId: string): Promise<void> => {
     await api.delete(`/api/hr/policies/${policyId}`);
+  },
+};
+
+/** Structured Compensation & Allowance matrix (policy_configs / versions / benefits). */
+export const policyConfigMatrixAPI = {
+  hrGet: async (companyId?: string): Promise<Record<string, unknown>> => {
+    const response = await api.get('/api/hr/policy-config', {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
+  hrPostDraft: async (companyId?: string): Promise<Record<string, unknown>> => {
+    const response = await api.post('/api/hr/policy-config/draft', {}, {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
+  hrPutDraft: async (body: Record<string, unknown>, companyId?: string): Promise<Record<string, unknown>> => {
+    const response = await api.put('/api/hr/policy-config/draft', body, {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
+  hrPublish: async (body: Record<string, unknown> | undefined, companyId?: string): Promise<Record<string, unknown>> => {
+    const response = await api.post('/api/hr/policy-config/publish', body ?? {}, {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
+  hrHistory: async (companyId?: string): Promise<{ versions: unknown[] }> => {
+    const response = await api.get('/api/hr/policy-config/history', {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
+  hrPublished: async (companyId?: string): Promise<Record<string, unknown>> => {
+    const response = await api.get('/api/hr/policy-config/published', {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
+  hrGetVersion: async (versionId: string, companyId?: string): Promise<Record<string, unknown>> => {
+    const response = await api.get(`/api/hr/policy-config/versions/${encodeURIComponent(versionId)}`, {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
+
+  adminGet: async (companyId: string): Promise<Record<string, unknown>> => {
+    const response = await api.get('/api/admin/policy-config', { params: { companyId } });
+    return response.data;
+  },
+  adminPostDraft: async (companyId: string): Promise<Record<string, unknown>> => {
+    const response = await api.post('/api/admin/policy-config/draft', {}, { params: { companyId } });
+    return response.data;
+  },
+  adminPutDraft: async (companyId: string, body: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    const response = await api.put('/api/admin/policy-config/draft', body, { params: { companyId } });
+    return response.data;
+  },
+  adminPublish: async (companyId: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    const response = await api.post('/api/admin/policy-config/publish', body ?? {}, { params: { companyId } });
+    return response.data;
+  },
+  adminHistory: async (companyId: string): Promise<{ versions: unknown[] }> => {
+    const response = await api.get('/api/admin/policy-config/history', { params: { companyId } });
+    return response.data;
+  },
+  adminPublished: async (companyId: string): Promise<Record<string, unknown>> => {
+    const response = await api.get('/api/admin/policy-config/published', { params: { companyId } });
+    return response.data;
+  },
+  adminGetVersion: async (companyId: string, versionId: string): Promise<Record<string, unknown>> => {
+    const response = await api.get(`/api/admin/policy-config/versions/${encodeURIComponent(versionId)}`, {
+      params: { companyId },
+    });
+    return response.data;
+  },
+
+  employeeGet: async (params?: {
+    assignmentId?: string;
+    caseId?: string;
+    assignmentType?: string;
+    familyStatus?: string;
+  }): Promise<Record<string, unknown>> => {
+    const response = await api.get('/api/employee/policy-config', {
+      params: {
+        assignmentId: params?.assignmentId,
+        caseId: params?.caseId,
+        assignmentType: params?.assignmentType,
+        familyStatus: params?.familyStatus,
+      },
+    });
+    return response.data;
+  },
+
+  /** HR / Admin: compare provider monetary estimates to published normalized caps. */
+  hrCompareProviderEstimates: async (
+    body: {
+      assignment_type?: string;
+      family_status?: string;
+      estimates: Array<{ benefit_key: string; amount: number; currency: string }>;
+    },
+    companyId?: string
+  ): Promise<{ metadata?: Record<string, unknown>; results: unknown[] }> => {
+    const response = await api.post('/api/hr/policy-config/caps/compare', body, {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
   },
 };
 

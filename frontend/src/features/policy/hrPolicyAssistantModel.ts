@@ -16,7 +16,10 @@ export function draftVsPublishedHint(answer: PolicyAssistantAnswer): string | nu
     return 'Explains **draft vs published** visibility for employees in ReloPass.';
   }
   if (answer.policy_status === 'draft_and_published') {
-    return 'This answer may contrast **working** changes with what is **published** today.';
+    return '**Employee view** follows **published** data today; **working draft** may differ until you publish.';
+  }
+  if (answer.policy_status === 'draft') {
+    return 'Uses **working draft** data; **published** employee view may differ until you publish.';
   }
   return null;
 }

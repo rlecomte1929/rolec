@@ -14,10 +14,12 @@ from backend.services.policy_assistant_analytics import (
     EVENT_ASSISTANT_ANSWER_GENERATED,
     EVENT_ASSISTANT_ANSWER_READINESS,
     EVENT_ASSISTANT_ANSWER_TOPIC,
+    EVENT_ASSISTANT_FOLLOW_UP_CLICKED,
     EVENT_ASSISTANT_QUESTION_ASKED,
     EVENT_ASSISTANT_QUESTION_SUPPORTED,
     EVENT_ASSISTANT_QUESTION_UNSUPPORTED,
     EVENT_ASSISTANT_REFUSAL_SHOWN,
+    emit_assistant_follow_up_clicked,
     record_policy_assistant_turn,
 )
 from backend.services.policy_assistant_answer_engine import ResolvedPolicyContext
@@ -77,6 +79,16 @@ class PolicyAssistantAnalyticsTests(unittest.TestCase):
         self.assertIn(EVENT_ASSISTANT_ANSWER_READINESS, names)
         self.assertNotIn(EVENT_ASSISTANT_REFUSAL_SHOWN, names)
 
+        gen_kw = next(c.kwargs for c in mock_emit.call_args_list if c.args[0] == EVENT_ASSISTANT_ANSWER_GENERATED)
+        ex = gen_kw.get("extra") or {}
+        self.assertEqual(ex.get("canonical_topic"), "shipment")
+        self.assertEqual(ex.get("answer_value_bucket"), "comparison_ready")
+        self.assertEqual(ex.get("policy_grounding_bucket"), "published")
+        self.assertTrue(ex.get("resolved_from_published"))
+
+        asked_kw = next(c.kwargs for c in mock_emit.call_args_list if c.args[0] == EVENT_ASSISTANT_QUESTION_ASKED)
+        self.assertEqual((asked_kw.get("extra") or {}).get("canonical_topic"), "shipment")
+
     @patch("backend.services.policy_assistant_analytics.emit_event")
     def test_refusal_emits_refusal_shown(self, mock_emit) -> None:
         ctx = ResolvedPolicyContext(has_published_benefits=False)
@@ -101,6 +113,21 @@ class PolicyAssistantAnalyticsTests(unittest.TestCase):
         names = [c.args[0] for c in mock_emit.call_args_list]
         self.assertIn(EVENT_ASSISTANT_QUESTION_UNSUPPORTED, names)
         self.assertIn(EVENT_ASSISTANT_REFUSAL_SHOWN, names)
+
+    @patch("backend.services.policy_assistant_analytics.emit_event")
+    def test_follow_up_beacon_extra_includes_turn_correlation(self, mock_emit) -> None:
+        emit_assistant_follow_up_clicked(
+            role=PolicyAssistantRoleScope.HR,
+            request_id="http-rid",
+            follow_up_intent="policy_entitlement_question",
+            follow_up_index=0,
+            canonical_topic="shipment",
+            assistant_turn_request_id="turn-uuid-1",
+        )
+        mock_emit.assert_called_once()
+        self.assertEqual(mock_emit.call_args[0][0], EVENT_ASSISTANT_FOLLOW_UP_CLICKED)
+        ex = (mock_emit.call_args[1].get("extra") or {})
+        self.assertEqual(ex.get("assistant_turn_request_id"), "turn-uuid-1")
 
 
 if __name__ == "__main__":

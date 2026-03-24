@@ -1,9 +1,18 @@
 """
 Bounded in-request session memory for policy assistant turns.
 
-Stores only policy-scoped continuity (assignment/policy id, last topic, last answer snippet,
-comparison surface). No persona or open-ended chat memory. Client round-trips ``session`` JSON;
-server rejects mismatched ``scope_id`` to prevent cross-context leakage.
+**Allowed (serialized in ``session`` JSON):** scope kind + id (assignment or HR policy),
+last canonical topic, last answer summary, last intent / comparison mode, ambiguous-turn
+counter, and whether a substantive policy answer occurred. Clients must echo ``session`` back;
+``scope_id`` mismatches reset state to prevent cross-context leakage.
+
+**Disallowed:** persona memory, unrelated topic carry-over, or storing raw chat beyond the
+truncated last-answer summary.
+
+**Behavior:** pronoun-style follow-ups reuse the last topic; strong relaxed topic scores can
+recover after a policy turn when the strict classifier is ambiguous; vague drift after a
+policy turn without policy/topic signal is refused; repeated ambiguity yields a bounded
+topic menu; employees cannot pivot into HR draft threads even after a valid policy turn.
 """
 from __future__ import annotations
 
@@ -14,6 +23,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .policy_assistant_classifier import (
     PolicyAssistantClassificationResult,
+    _best_topic_from_scores,
+    _COMPARISON_READINESS_Q,
     _normalize_message,
     score_policy_assistant_topics,
 )
@@ -32,6 +43,7 @@ SESSION_TOPIC_MENU_MARKER = "_rp_session_topic_menu_v1"
 
 _MAX_SUMMARY_LEN = 400
 _MAX_AMBIGUOUS_STREAK_BEFORE_MENU = 2
+_MIN_TOPIC_SCORE_MARGIN_FOR_SESSION_RECOVERY = 3
 
 _PRONOUN_FOLLOWUP = re.compile(
     r"\bwhat\s+about\s+it\b|"
@@ -150,6 +162,26 @@ def apply_bounded_session_memory(
                 supported=True,
                 intent=intent,
                 canonical_topic=topic,
+                ambiguity_reason=None,
+                refusal_code=None,
+                normalized_question=base_classification.normalized_question,
+            )
+
+    # Strong relaxed topic signal after a policy turn, but primary classifier returned ambiguous
+    # (e.g. phrasing that misses strict topic rules). Bounded: only after had_supported_policy_turn.
+    if state.had_supported_policy_turn and _is_ambiguous_unsupported(base_classification):
+        relaxed = score_policy_assistant_topics(message, available_topics, relaxed=True)
+        bt, bs, sec = _best_topic_from_scores(relaxed)
+        if bt is not None and bs >= 4 and (bs - sec) >= _MIN_TOPIC_SCORE_MARGIN_FOR_SESSION_RECOVERY:
+            intent = (
+                PolicyAssistantIntent.POLICY_COMPARISON_QUESTION
+                if _COMPARISON_READINESS_Q.search(norm)
+                else PolicyAssistantIntent.POLICY_ENTITLEMENT_QUESTION
+            )
+            return PolicyAssistantClassificationResult(
+                supported=True,
+                intent=intent,
+                canonical_topic=bt,
                 ambiguity_reason=None,
                 refusal_code=None,
                 normalized_question=base_classification.normalized_question,
