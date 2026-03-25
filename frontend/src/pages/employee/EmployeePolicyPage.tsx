@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { Alert, Card, Container } from '../../components/antigravity';
-import { policyConfigMatrixAPI } from '../../api/client';
+import { Alert, Button, Card, Container } from '../../components/antigravity';
+import { employeeAPI, policyConfigMatrixAPI } from '../../api/client';
+import { buildRoute } from '../../navigation/routes';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import type { PolicyConfigBenefitRow, PolicyConfigCategoryBlock } from '../../features/policy-config/types';
 import { POLICY_CONFIG_CATEGORIES } from '../../features/policy-config/constants';
@@ -21,6 +22,8 @@ import {
 import { glossaryIdForBenefitKey } from '../../features/policy-config/compensationGlossary';
 import { PolicyGlossarySection } from '../../features/policy-config/PolicyGlossarySection';
 import { TermHelpIcon } from '../../features/policy-config/TermHelpIcon';
+
+type ServicesPolicyContext = Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>>;
 
 const EMPTY_UNPUBLISHED =
   'Your company has not yet published a policy for this assignment.';
@@ -103,6 +106,7 @@ export const EmployeePolicyPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<EmployeePolicyPayload | null>(null);
+  const [servicesPolicyCtx, setServicesPolicyCtx] = useState<ServicesPolicyContext | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,6 +130,25 @@ export const EmployeePolicyPage: React.FC = () => {
   useEffect(() => {
     load().catch(() => undefined);
   }, [load]);
+
+  useEffect(() => {
+    if (!assignmentId) {
+      setServicesPolicyCtx(null);
+      return;
+    }
+    let cancelled = false;
+    employeeAPI
+      .getServicesPolicyContext(assignmentId)
+      .then((ctx) => {
+        if (!cancelled) setServicesPolicyCtx(ctx);
+      })
+      .catch(() => {
+        if (!cancelled) setServicesPolicyCtx(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId]);
 
   const categoryOrder = useMemo(
     () => new Map(POLICY_CONFIG_CATEGORIES.map((c, i) => [c.key, i])),
@@ -240,6 +263,53 @@ export const EmployeePolicyPage: React.FC = () => {
                 </dl>
               </div>
             </Card>
+
+            {servicesPolicyCtx?.has_policy && servicesPolicyCtx.policy_surface && (
+              <Card padding="lg" className="border border-[#e2e8f0] bg-white">
+                <h2 className="text-base font-semibold text-[#0b2b43]">
+                  {servicesPolicyCtx.policy_surface.title?.trim() || 'Compensation & allowance (published)'}
+                </h2>
+                <div className="text-xs text-[#64748b] mt-2 space-y-0.5">
+                  {servicesPolicyCtx.policy_surface.company_name && (
+                    <div>Company: {servicesPolicyCtx.policy_surface.company_name}</div>
+                  )}
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                    {servicesPolicyCtx.policy_surface.version != null && (
+                      <span>Version {servicesPolicyCtx.policy_surface.version}</span>
+                    )}
+                    {servicesPolicyCtx.policy_surface.effective_date && (
+                      <span>Effective {String(servicesPolicyCtx.policy_surface.effective_date).slice(0, 10)}</span>
+                    )}
+                  </div>
+                  {servicesPolicyCtx.resolution_context && (
+                    <div className="mt-2 text-[#475569]">
+                      Your profile for policy matching:{' '}
+                      {humanizeAssignmentTypeLabel(
+                        normalizeAssignmentType(servicesPolicyCtx.resolution_context.assignment_type ?? '') ?? undefined
+                      )}
+                      {' · '}
+                      {humanizeFamilyStatusLabel(
+                        normalizeFamilyStatus(servicesPolicyCtx.resolution_context.family_status ?? '') ?? undefined
+                      )}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-[#64748b] mt-2 leading-relaxed">
+                  This matrix, the Services flow, and HR Policy use the same published policy snapshot where available.
+                </p>
+                <div className="mt-4 p-3 bg-[#eef4f8] border border-[#0b2b43]/20 rounded-lg">
+                  <p className="text-sm text-[#4b5563] mb-2">
+                    Full policy wording and benefit details are on the HR Policy page. For questions, contact your
+                    company HR.
+                  </p>
+                  <Link to={buildRoute('hrPolicy')}>
+                    <Button variant="outline" className="mt-1">
+                      View HR Policy &amp; limits
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            )}
 
             <PolicyGlossarySection variant="employee" />
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { EmployeeScopedAssignmentPicker } from '../components/employee/EmployeeScopedAssignmentPicker';
 import { Alert, Button, Card } from '../components/antigravity';
@@ -25,13 +25,6 @@ import {
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
 } from '../features/policy/employeePolicyMessages';
-import {
-  humanizeAssignmentTypeLabel,
-  humanizeFamilyStatusLabel,
-  normalizeAssignmentType,
-  normalizeFamilyStatus,
-} from '../features/policy-config/policyTargeting';
-
 type ServicesCategoryEntry = NonNullable<
   Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>>['categories']
 >[string];
@@ -287,6 +280,19 @@ export const ProvidersPage: React.FC = () => {
 
   return (
     <AppShell title="Services" subtitle="Select what you need for this move.">
+      <div className="mb-6">
+        <p className="text-[#6b7280]">Select what you need. We save it for the next steps.</p>
+        <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
+        {svcPolicy?.comparison_available && (
+          <div className="mt-4 p-3 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4]">
+            <p className="text-sm font-medium text-[#166534]">Company policy comparison is active</p>
+            <p className="text-xs text-[#15803d] mt-1">
+              Supported categories show limits from your published assignment policy (resolved benefits). Partial or
+              out-of-scope categories are labeled on each card.
+            </p>
+          </div>
+        )}
+      </div>
       <ServicesNavRibbon />
       {loadError && (
         <Alert variant="error" className="mb-6">
@@ -312,53 +318,6 @@ export const ProvidersPage: React.FC = () => {
       <div className="w-full">
         <Card padding="lg">
             <div className="mb-6">
-              <h1 className="text-2xl font-semibold text-[#0b2b43] mb-2">Your relocation plan</h1>
-              <p className="text-[#6b7280]">Select what you need. We save it for the next steps.</p>
-              <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
-              {svcPolicy?.comparison_available && (
-                <div className="mt-4 p-3 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4]">
-                  <p className="text-sm font-medium text-[#166534]">Company policy comparison is active</p>
-                  <p className="text-xs text-[#15803d] mt-1">
-                    Supported categories show limits from your published assignment policy (resolved benefits). Partial
-                    or out-of-scope categories are labeled on each card.
-                  </p>
-                </div>
-              )}
-              {svcPolicy?.has_policy && svcPolicy.policy_surface && (
-                <div className="mt-4 p-3 rounded-lg border border-[#e2e8f0] bg-white">
-                  <p className="text-sm font-semibold text-[#0b2b43]">
-                    {svcPolicy.policy_surface.title || 'Published policy'}
-                  </p>
-                  <div className="text-xs text-[#64748b] mt-1 space-y-0.5">
-                    {svcPolicy.policy_surface.company_name && (
-                      <div>Company: {svcPolicy.policy_surface.company_name}</div>
-                    )}
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                      {svcPolicy.policy_surface.version != null && (
-                        <span>Version {svcPolicy.policy_surface.version}</span>
-                      )}
-                      {svcPolicy.policy_surface.effective_date && (
-                        <span>Effective {String(svcPolicy.policy_surface.effective_date).slice(0, 10)}</span>
-                      )}
-                    </div>
-                    {svcPolicy.resolution_context && (
-                      <div className="mt-2 text-[#475569]">
-                        Your profile for policy matching:{' '}
-                        {humanizeAssignmentTypeLabel(
-                          normalizeAssignmentType(svcPolicy.resolution_context.assignment_type ?? '') ?? undefined
-                        )}
-                        {' · '}
-                        {humanizeFamilyStatusLabel(
-                          normalizeFamilyStatus(svcPolicy.resolution_context.family_status ?? '') ?? undefined
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-[#64748b] mt-2 leading-relaxed">
-                    Service cards below use the same published policy as Compensation &amp; Allowance and HR Policy.
-                  </p>
-                </div>
-              )}
               {svcPolicy && svcPolicy.has_policy === false && (
                 <div className="mt-4 p-3 bg-[#fafbfc] border border-[#e2e8f0] rounded-lg">
                   <p className="text-sm text-[#4b5563] font-medium">{EMPLOYEE_HR_POLICY_WAIT_PRIMARY}</p>
@@ -371,17 +330,6 @@ export const ProvidersPage: React.FC = () => {
                   <p className="text-sm text-[#6b7280] mt-2">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY}</p>
                 </div>
               )}
-              <div className="mt-4 p-3 bg-[#eef4f8] border border-[#0b2b43]/20 rounded-lg">
-                <p className="text-sm text-[#4b5563] mb-2">
-                  Full policy wording and benefit details are on the HR Policy page. For questions, contact your company
-                  HR.
-                </p>
-                <Link to={buildRoute('hrPolicy')}>
-                  <Button variant="outline" className="mt-1">
-                    View HR Policy &amp; limits
-                  </Button>
-                </Link>
-              </div>
             </div>
             <TrustBlock className="mb-8" />
             <div className="flex flex-wrap items-center gap-3 mb-6">
