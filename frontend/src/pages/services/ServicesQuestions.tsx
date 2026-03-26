@@ -309,6 +309,20 @@ export const ServicesQuestions: React.FC = () => {
   return (
     <AppShell title="Service questions" subtitle="Refine your provider matches.">
       <ServicesNavRibbon />
+      {workflow.state === 'loading_recommendations' && (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          className="mb-4 flex items-center gap-3 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-sm text-[#1e3a5f]"
+        >
+          <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[#0b2b43] border-t-transparent" />
+          <span>
+            <strong>Working in the background:</strong> we&apos;re building your recommendations. This usually takes a
+            few seconds—please keep this page open.
+          </span>
+        </div>
+      )}
       {workflow.errorMessage && (
         <Alert variant="error" className="mb-4">
           {workflow.errorMessage}

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { Button, Card } from '../../components/antigravity';
+import { Alert, Button, Card } from '../../components/antigravity';
+import { Link } from 'react-router-dom';
 import { RecommendationResults } from '../../features/recommendations/RecommendationResults';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
@@ -27,7 +28,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 export const ServicesRecommendations: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { recommendations, shortlist, setShortlist } = useServicesFlow();
+  const { recommendations, shortlist, setShortlist, displayCurrency } = useServicesFlow();
   const debugMode = new URLSearchParams(location.search).get('debug') === '1';
   const go = (path: string) => navigate({ pathname: path, search: location.search });
 
@@ -52,6 +53,15 @@ export const ServicesRecommendations: React.FC = () => {
           Next steps: 1) Select vendors  2) Request quotations  3) Receive offers  4) Decide
         </div>
       </Card>
+      <Alert variant="info" className="mb-4">
+        <p className="text-sm">
+          Estimates on this page are shown in <strong>{displayCurrency}</strong>. To change currency, go back to{' '}
+          <Link to={{ pathname: buildRoute('services'), search: location.search }} className="font-medium underline">
+            Select services
+          </Link>
+          .
+        </p>
+      </Alert>
       <RecommendationResults
         results={recommendations}
         categoryLabels={CATEGORY_LABELS}
@@ -60,6 +70,7 @@ export const ServicesRecommendations: React.FC = () => {
         onStartOver={() => go(buildRoute('services'))}
         onViewSummary={() => go(buildRoute('servicesEstimate'))}
         debugMode={debugMode}
+        displayCurrency={displayCurrency}
       />
     </AppShell>
   );

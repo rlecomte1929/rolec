@@ -9,6 +9,12 @@ import {
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
 } from '../policy/employeePolicyMessages';
+import {
+  convertUsdToDisplay,
+  formatEstimationFromUsd,
+  formatServicesMoney,
+  SERVICES_CURRENCY_FOOTNOTE,
+} from '../services/servicesCurrency';
 
 /** Category key to policy-budget cap key (from resolved HR policy) */
 const CATEGORY_TO_CAP: Record<string, string> = {
@@ -43,6 +49,8 @@ interface Props {
   categoryLabels: Record<string, string>;
   onBack: () => void;
   onStartOver: () => void;
+  /** Employee-chosen display currency (services flow). Amounts convert from USD baseline. */
+  displayCurrency: string;
 }
 
 export const PackageSummary: React.FC<Props> = ({
@@ -51,10 +59,12 @@ export const PackageSummary: React.FC<Props> = ({
   categoryLabels,
   onBack,
   onStartOver,
+  displayCurrency,
 }) => {
   const [policyCaps, setPolicyCaps] = useState<PolicyCaps | null>(null);
   const [comparisonAvailable, setComparisonAvailable] = useState<boolean | null>(null);
   const [hasPublishedPolicy, setHasPublishedPolicy] = useState(false);
+  const [capsLoading, setCapsLoading] = useState(true);
   const location = useLocation();
   const {
     assignmentId: primaryAssignmentId,
@@ -72,42 +82,64 @@ export const PackageSummary: React.FC<Props> = ({
   );
 
   useEffect(() => {
-    if (assignmentId) {
-      employeeAPI
-        .getPolicyBudget(assignmentId)
-        .then((res) => {
-          const hp = res?.has_policy === true;
-          setHasPublishedPolicy(hp);
-          const cmp = res?.comparison_available !== false;
-          setComparisonAvailable(cmp);
-          if (!cmp) {
-            setPolicyCaps(null);
-            return;
+    let cancelled = false;
+    setCapsLoading(true);
+
+    const run = async () => {
+      try {
+        if (assignmentId) {
+          try {
+            const res = await employeeAPI.getPolicyBudget(assignmentId);
+            if (cancelled) return;
+            const hp = res?.has_policy === true;
+            setHasPublishedPolicy(hp);
+            const cmp = res?.comparison_available !== false;
+            setComparisonAvailable(cmp);
+            if (!cmp) {
+              setPolicyCaps(null);
+              return;
+            }
+            const caps = res?.caps || {};
+            if (Object.keys(caps).length > 0) {
+              setPolicyCaps({
+                housing_monthly_usd: caps.housing ?? 0,
+                movers_usd: caps.movers ?? 0,
+                schools_usd: caps.schools ?? 0,
+              });
+              return;
+            }
+            const c = await employeeAPI.getPolicyCaps();
+            if (!cancelled) setPolicyCaps(c);
+          } catch {
+            if (cancelled) return;
+            setComparisonAvailable(null);
+            setHasPublishedPolicy(false);
+            try {
+              const c = await employeeAPI.getPolicyCaps();
+              if (!cancelled) setPolicyCaps(c);
+            } catch {
+              if (!cancelled) setPolicyCaps(null);
+            }
           }
-          const caps = res?.caps || {};
-          if (Object.keys(caps).length > 0) {
-            setPolicyCaps({
-              housing_monthly_usd: caps.housing ?? 0,
-              movers_usd: caps.movers ?? 0,
-              schools_usd: caps.schools ?? 0,
-            });
-            return;
-          }
-          return employeeAPI.getPolicyCaps().then(setPolicyCaps);
-        })
-        .catch(() => {
+        } else {
           setComparisonAvailable(null);
           setHasPublishedPolicy(false);
-          employeeAPI.getPolicyCaps().then(setPolicyCaps).catch(() => setPolicyCaps(null));
-        });
-    } else {
-      setComparisonAvailable(null);
-      setHasPublishedPolicy(false);
-      employeeAPI
-        .getPolicyCaps()
-        .then(setPolicyCaps)
-        .catch(() => setPolicyCaps(null));
-    }
+          try {
+            const c = await employeeAPI.getPolicyCaps();
+            if (!cancelled) setPolicyCaps(c);
+          } catch {
+            if (!cancelled) setPolicyCaps(null);
+          }
+        }
+      } finally {
+        if (!cancelled) setCapsLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [assignmentId]);
 
   const packageItems: { category: string; item: RecommendationItem }[] = [];
@@ -160,8 +192,21 @@ export const PackageSummary: React.FC<Props> = ({
   const totalCovered = comparison.reduce((s, c) => s + c.covered, 0);
   const totalExtra = comparison.reduce((s, c) => s + c.extra, 0);
 
+  const fmt = (usd: number) => formatServicesMoney(convertUsdToDisplay(usd, displayCurrency), displayCurrency);
+
   return (
     <div className="space-y-8">
+      {capsLoading && (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          className="flex items-center gap-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#475569]"
+        >
+          <div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[#0b2b43] border-t-transparent" />
+          <span>Loading policy caps and cost comparison…</span>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-[#0b2b43]">My Relocation Service Package</h2>
         <div className="flex gap-2">
@@ -192,13 +237,7 @@ export const PackageSummary: React.FC<Props> = ({
                 const cost = item.metadata?.estimated_cost_usd;
                 const costType = item.metadata?.cost_type || 'one_time';
                 const costLabel =
-                  costType === 'monthly'
-                    ? `USD ${cost?.toLocaleString()}/mo`
-                    : costType === 'annual'
-                      ? `USD ${cost?.toLocaleString()}/yr`
-                      : cost != null
-                        ? `USD ${cost.toLocaleString()}`
-                        : '-';
+                  formatEstimationFromUsd(cost, costType, displayCurrency) ?? '-';
                 return (
                   <li key={`${category}-${item.item_id}`} className="flex justify-between py-2 border-b border-[#e2e8f0] last:border-0">
                     <span>
@@ -247,10 +286,10 @@ export const PackageSummary: React.FC<Props> = ({
                     <div className="flex justify-between text-sm mb-2">
                       <span className="font-medium text-[#0b2b43]">{c.label}</span>
                       <span>
-                        Total: USD {c.total.toLocaleString()}
+                        Total: {fmt(c.total)}
                         {c.cap > 0 && (
                           <span className="ml-2 text-[#6b7280]">
-                            (Cap: USD {c.cap.toLocaleString()})
+                            (Cap: {fmt(c.cap)})
                           </span>
                         )}
                       </span>
@@ -286,11 +325,9 @@ export const PackageSummary: React.FC<Props> = ({
                       </div>
                     </div>
                     <div className="flex justify-between text-xs text-[#6b7280] mt-1">
-                      <span>Company covers: USD {c.covered.toLocaleString()}</span>
+                      <span>Company covers: {fmt(c.covered)}</span>
                       {c.extra > 0 && (
-                        <span className="text-[#f97316] font-medium">
-                          You pay: USD {c.extra.toLocaleString()}
-                        </span>
+                        <span className="text-[#f97316] font-medium">You pay: {fmt(c.extra)}</span>
                       )}
                     </div>
                   </div>
@@ -300,26 +337,29 @@ export const PackageSummary: React.FC<Props> = ({
               <div className="pt-6 border-t border-[#e2e8f0] space-y-2">
                 <div className="flex justify-between font-semibold text-[#0b2b43]">
                   <span>Total package cost</span>
-                  <span>USD {totalPackage.toLocaleString()}</span>
+                  <span>{fmt(totalPackage)}</span>
                 </div>
                 <div className="flex justify-between text-[#22c55e]">
                   <span>Company covered</span>
-                  <span>USD {totalCovered.toLocaleString()}</span>
+                  <span>{fmt(totalCovered)}</span>
                 </div>
                 {totalExtra > 0 && (
                   <div className="flex justify-between text-[#f97316] font-medium">
                     <span>Your out-of-pocket</span>
-                    <span>USD {totalExtra.toLocaleString()}</span>
+                    <span>{fmt(totalExtra)}</span>
                   </div>
                 )}
               </div>
             </Card>
           )}
 
-          {!policyCaps && comparisonAvailable !== false && (
+          {!policyCaps && comparisonAvailable !== false && !capsLoading && (
             <p className="text-sm text-[#6b7280]">
               Policy caps could not be loaded. Cost comparison is based on estimated values from recommendations. View &quot;Assignment Package &amp; Limits&quot; for your company&apos;s policy summary.
             </p>
+          )}
+          {!capsLoading && packageItems.length > 0 && (
+            <p className="text-xs text-[#94a3b8]">{SERVICES_CURRENCY_FOOTNOTE}</p>
           )}
         </>
       )}

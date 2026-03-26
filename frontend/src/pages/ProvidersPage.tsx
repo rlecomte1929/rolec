@@ -18,6 +18,10 @@ import { StickyContinueBar } from '../features/services/StickyContinueBar';
 import { ServicesNavRibbon } from '../features/services/ServicesNavRibbon';
 import { SERVICE_CONFIG, type ServiceItem, type ServiceKey } from '../features/services/serviceConfig';
 import { useServicesFlow } from '../features/services/ServicesFlowContext';
+import {
+  SERVICES_DISPLAY_CURRENCIES,
+  SERVICES_DISPLAY_CURRENCY_STORAGE_KEY,
+} from '../features/services/servicesCurrency';
 import type { ServicePolicyHint } from '../features/services/ServiceCard';
 import {
   EMPLOYEE_HR_POLICY_WAIT_PRIMARY,
@@ -106,8 +110,18 @@ export const ProvidersPage: React.FC = () => {
   const [message, setMessage] = useState('');
   const [loadError, setLoadError] = useState('');
   const [loadErrorDetails, setLoadErrorDetails] = useState('');
-  const { setSelectedServices } = useServicesFlow();
+  const { setSelectedServices, displayCurrency, setDisplayCurrency } = useServicesFlow();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!svcPolicy?.currency) return;
+    try {
+      if (localStorage.getItem(SERVICES_DISPLAY_CURRENCY_STORAGE_KEY)) return;
+      setDisplayCurrency(String(svcPolicy.currency));
+    } catch {
+      // ignore
+    }
+  }, [svcPolicy?.currency, setDisplayCurrency]);
 
   useEffect(() => {
     if (assignmentLoading) return;
@@ -201,7 +215,7 @@ export const ProvidersPage: React.FC = () => {
           category: CATEGORY_MAP[svc.key] || 'other',
           selected: state.selected,
           estimated_cost: state.estimated_cost ? Number(state.estimated_cost) : null,
-          currency: svcPolicy?.currency || 'EUR',
+          currency: displayCurrency,
         };
       });
       await employeeAPI.saveAssignmentServices(assignmentId, payload);
@@ -237,7 +251,7 @@ export const ProvidersPage: React.FC = () => {
 
   if (assignmentLoading || isLoading) {
     return (
-      <AppShell title="Services" subtitle="Select what you need for this move.">
+      <AppShell title="Services">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0b2b43] mx-auto mb-4" />
           <p className="text-[#0b2b43] font-medium">Loading services and policy context…</p>
@@ -279,10 +293,31 @@ export const ProvidersPage: React.FC = () => {
   }
 
   return (
-    <AppShell title="Services" subtitle="Select what you need for this move.">
+    <AppShell title="Services">
       <div className="mb-6">
         <p className="text-[#6b7280]">Select what you need. We save it for the next steps.</p>
         <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>
+        <div className="mt-4 rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-4 py-3">
+          <label className="block">
+            <span className="text-sm font-medium text-[#0b2b43]">Estimate currency</span>
+            <p className="text-xs text-[#64748b] mt-0.5 mb-2">
+              Choose once for this flow—Recommendations and Review &amp; budget use the same currency (converted from
+              USD using indicative rates).
+            </p>
+            <select
+              className="w-full max-w-xs rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm text-[#0b2b43]"
+              value={displayCurrency}
+              onChange={(e) => setDisplayCurrency(e.target.value)}
+              aria-label="Currency for service estimates"
+            >
+              {SERVICES_DISPLAY_CURRENCIES.map((o) => (
+                <option key={o.code} value={o.code}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         {svcPolicy?.comparison_available && (
           <div className="mt-4 p-3 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4]">
             <p className="text-sm font-medium text-[#166534]">Company policy comparison is active</p>
@@ -331,11 +366,13 @@ export const ProvidersPage: React.FC = () => {
                 </div>
               )}
             </div>
-            <TrustBlock className="mb-8" />
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-              <Button variant="outline" onClick={handleSave} disabled={isLoading || isSaving}>
-                {isSaving ? 'Saving...' : 'Save'}
-              </Button>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+              <TrustBlock className="mb-0 flex-1 min-w-0" />
+              <div className="shrink-0 self-end sm:self-auto">
+                <Button variant="outline" onClick={handleSave} disabled={isLoading || isSaving}>
+                  {isSaving ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
             </div>
             <ServiceGroupSection
               group="before"

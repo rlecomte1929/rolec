@@ -70,6 +70,98 @@ def _eq_text(lhs_sql: str, rhs_sql: str) -> str:
     return f"CAST({lhs_sql} AS TEXT) = CAST({rhs_sql} AS TEXT)"
 
 
+def _coerce_json_dict(value: Any) -> Dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return {}
+        try:
+            out = json.loads(s)
+            return dict(out) if isinstance(out, dict) else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return {}
+
+
+def _sqlite_ensure_policy_import_columns(conn: Any) -> None:
+    """Add assistant-import columns to policy_documents when upgrading older SQLite DBs."""
+    try:
+        rows = conn.execute(text("PRAGMA table_info(policy_documents)")).fetchall()
+    except Exception:
+        return
+    names = {r[1] for r in rows}
+    if not names:
+        return
+    for col, typ in (
+        ("file_size_bytes", "INTEGER"),
+        ("archived_at", "TEXT"),
+        ("assistant_import_status", "TEXT"),
+        ("processed_at", "TEXT"),
+    ):
+        if col in names:
+            continue
+        try:
+            conn.execute(text(f"ALTER TABLE policy_documents ADD COLUMN {col} {typ}"))
+        except Exception:
+            pass
+
+
+def _sqlite_ensure_policy_hardening_columns(conn: Any) -> None:
+    """Add hardening columns to policy_knowledge_snapshots / policy_document_chunks on older SQLite DBs."""
+    try:
+        r = conn.execute(
+            text(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='policy_knowledge_snapshots'"
+            )
+        ).fetchone()
+        if not r:
+            return
+        names = {row[1] for row in conn.execute(text("PRAGMA table_info(policy_knowledge_snapshots)")).fetchall()}
+        for col, typ, default in (
+            ("revision_number", "INTEGER", "1"),
+            ("parent_snapshot_id", "TEXT", None),
+            ("superseded_by_snapshot_id", "TEXT", None),
+            ("activation_state", "TEXT", "'failed'"),
+            ("activated_at", "TEXT", None),
+            ("activated_by_user_id", "TEXT", None),
+        ):
+            if col in names:
+                continue
+            try:
+                if default is None:
+                    conn.execute(text(f"ALTER TABLE policy_knowledge_snapshots ADD COLUMN {col} {typ}"))
+                else:
+                    conn.execute(
+                        text(f"ALTER TABLE policy_knowledge_snapshots ADD COLUMN {col} {typ} DEFAULT {default}")
+                    )
+            except Exception:
+                pass
+        # Backfill activation_state from status when possible
+        try:
+            conn.execute(
+                text(
+                    "UPDATE policy_knowledge_snapshots SET activation_state = "
+                    "CASE WHEN status = 'active_for_assistant' THEN 'active_for_assistant' "
+                    "WHEN status = 'superseded' THEN 'superseded' WHEN status = 'failed' THEN 'failed' "
+                    "ELSE 'failed' END WHERE activation_state IS NULL OR activation_state = ''"
+                )
+            )
+        except Exception:
+            pass
+        cnames = {row[1] for row in conn.execute(text("PRAGMA table_info(policy_document_chunks)")).fetchall()}
+        if "snapshot_id" not in cnames:
+            try:
+                conn.execute(text("ALTER TABLE policy_document_chunks ADD COLUMN snapshot_id TEXT"))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 # NOTE: Production Postgres currently has no profiles.status column.
 # To avoid schema drift issues we do not reference profiles.status at all.
 _profiles_has_status_column = False
@@ -1323,7 +1415,11 @@ class Database:
                     extraction_error TEXT,
                     extracted_metadata TEXT,
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    file_size_bytes INTEGER,
+                    archived_at TEXT,
+                    assistant_import_status TEXT,
+                    processed_at TEXT
                 )
             """))
             conn.execute(text("""
@@ -1360,6 +1456,158 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_policy_document_clauses_type
                 ON policy_document_clauses(clause_type)
             """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_knowledge_snapshots (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    policy_document_id TEXT NOT NULL,
+                    version_label TEXT,
+                    status TEXT NOT NULL DEFAULT 'failed',
+                    extraction_method TEXT NOT NULL DEFAULT 'deterministic_v1',
+                    created_at TEXT NOT NULL,
+                    superseded_at TEXT,
+                    revision_number INTEGER NOT NULL DEFAULT 1,
+                    parent_snapshot_id TEXT,
+                    superseded_by_snapshot_id TEXT,
+                    activation_state TEXT NOT NULL DEFAULT 'failed',
+                    activated_at TEXT,
+                    activated_by_user_id TEXT,
+                    FOREIGN KEY (policy_document_id) REFERENCES policy_documents(id) ON DELETE CASCADE,
+                    FOREIGN KEY (parent_snapshot_id) REFERENCES policy_knowledge_snapshots(id) ON DELETE SET NULL,
+                    FOREIGN KEY (superseded_by_snapshot_id) REFERENCES policy_knowledge_snapshots(id) ON DELETE SET NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_policy_knowledge_snapshots_company
+                ON policy_knowledge_snapshots(company_id)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_document_chunks (
+                    id TEXT PRIMARY KEY,
+                    policy_document_id TEXT NOT NULL,
+                    chunk_index INTEGER NOT NULL,
+                    page_number INTEGER,
+                    section_title TEXT,
+                    text_content TEXT NOT NULL,
+                    token_count INTEGER,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    snapshot_id TEXT,
+                    FOREIGN KEY (policy_document_id) REFERENCES policy_documents(id) ON DELETE CASCADE
+                )
+            """))
+            # Must run before indexes on policy_document_chunks.snapshot_id (upgrade path for older SQLite files).
+            _sqlite_ensure_policy_hardening_columns(conn)
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_policy_document_chunks_doc
+                ON policy_document_chunks(policy_document_id)
+            """))
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS policy_document_chunks_snapshot_chunk_idx
+                ON policy_document_chunks(snapshot_id, chunk_index)
+                WHERE snapshot_id IS NOT NULL
+            """))
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS policy_document_chunks_doc_chunk_legacy_idx
+                ON policy_document_chunks(policy_document_id, chunk_index)
+                WHERE snapshot_id IS NULL
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_processing_runs (
+                    id TEXT PRIMARY KEY,
+                    policy_document_id TEXT NOT NULL,
+                    run_type TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    started_at TEXT NOT NULL,
+                    finished_at TEXT,
+                    error_message TEXT,
+                    metrics_json TEXT,
+                    FOREIGN KEY (policy_document_id) REFERENCES policy_documents(id) ON DELETE CASCADE
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_policy_processing_runs_doc
+                ON policy_processing_runs(policy_document_id)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_facts (
+                    id TEXT PRIMARY KEY,
+                    snapshot_id TEXT NOT NULL,
+                    fact_type TEXT NOT NULL,
+                    category TEXT NOT NULL DEFAULT '',
+                    subcategory TEXT,
+                    normalized_value_json TEXT NOT NULL DEFAULT '{}',
+                    applicability_json TEXT NOT NULL DEFAULT '{}',
+                    ambiguity_flag INTEGER NOT NULL DEFAULT 0,
+                    confidence_score REAL,
+                    source_chunk_id TEXT NOT NULL,
+                    source_page INTEGER,
+                    source_section TEXT,
+                    source_quote TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (snapshot_id) REFERENCES policy_knowledge_snapshots(id) ON DELETE CASCADE,
+                    FOREIGN KEY (source_chunk_id) REFERENCES policy_document_chunks(id) ON DELETE RESTRICT
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_policy_facts_snapshot ON policy_facts(snapshot_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_policy_facts_chunk ON policy_facts(source_chunk_id)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS company_policy_assistant_bindings (
+                    company_id TEXT PRIMARY KEY,
+                    active_snapshot_id TEXT,
+                    policy_document_id TEXT,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (active_snapshot_id) REFERENCES policy_knowledge_snapshots(id) ON DELETE SET NULL,
+                    FOREIGN KEY (policy_document_id) REFERENCES policy_documents(id) ON DELETE SET NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_extraction_locks (
+                    id TEXT PRIMARY KEY,
+                    policy_document_id TEXT NOT NULL UNIQUE,
+                    company_id TEXT NOT NULL,
+                    locked_by_user_id TEXT NOT NULL,
+                    lock_token TEXT NOT NULL,
+                    acquired_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    metadata_json TEXT,
+                    FOREIGN KEY (policy_document_id) REFERENCES policy_documents(id) ON DELETE CASCADE
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_assistant_answer_audits (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    case_id TEXT,
+                    asked_by_user_id TEXT NOT NULL,
+                    question_session_id TEXT,
+                    policy_document_id TEXT,
+                    snapshot_id TEXT,
+                    extraction_run_id TEXT,
+                    question_text TEXT NOT NULL,
+                    normalized_question_topic TEXT,
+                    answer_text TEXT NOT NULL,
+                    evidence_status TEXT NOT NULL,
+                    fact_ids_json TEXT NOT NULL DEFAULT '[]',
+                    chunk_ids_json TEXT NOT NULL DEFAULT '[]',
+                    applicability_decision_json TEXT NOT NULL DEFAULT '{}',
+                    ambiguity_flags_json TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (policy_document_id) REFERENCES policy_documents(id) ON DELETE SET NULL,
+                    FOREIGN KEY (snapshot_id) REFERENCES policy_knowledge_snapshots(id) ON DELETE SET NULL,
+                    FOREIGN KEY (extraction_run_id) REFERENCES policy_processing_runs(id) ON DELETE SET NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_policy_answer_audits_company
+                ON policy_assistant_answer_audits(company_id, created_at)
+            """))
+            _sqlite_ensure_policy_import_columns(conn)
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS policy_versions (
                     id TEXT PRIMARY KEY,
@@ -10122,28 +10370,59 @@ class Database:
         mime_type: str,
         storage_path: str,
         checksum: Optional[str] = None,
+        file_size_bytes: Optional[int] = None,
+        assistant_import_status: Optional[str] = None,
         request_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         now = datetime.utcnow().isoformat()
+        ais = assistant_import_status if assistant_import_status is not None else "uploaded"
         with self.engine.begin() as conn:
-            conn.execute(
-                text("""
-                    INSERT INTO policy_documents
-                    (id, company_id, uploaded_by_user_id, filename, mime_type, storage_path,
-                     checksum, uploaded_at, processing_status, created_at, updated_at)
-                    VALUES (:id, :cid, :uid, :fn, :mt, :sp, :cs, :now, 'uploaded', :now, :now)
-                """),
-                {
-                    "id": doc_id,
-                    "cid": company_id,
-                    "uid": uploaded_by_user_id,
-                    "fn": filename,
-                    "mt": mime_type,
-                    "sp": storage_path,
-                    "cs": checksum,
-                    "now": now,
-                },
-            )
+            if _is_sqlite:
+                conn.execute(
+                    text("""
+                        INSERT INTO policy_documents
+                        (id, company_id, uploaded_by_user_id, filename, mime_type, storage_path,
+                         checksum, uploaded_at, processing_status, created_at, updated_at,
+                         file_size_bytes, assistant_import_status)
+                        VALUES (:id, :cid, :uid, :fn, :mt, :sp, :cs, :now, 'uploaded', :now, :now,
+                         :fsz, :ais)
+                    """),
+                    {
+                        "id": doc_id,
+                        "cid": company_id,
+                        "uid": uploaded_by_user_id,
+                        "fn": filename,
+                        "mt": mime_type,
+                        "sp": storage_path,
+                        "cs": checksum,
+                        "now": now,
+                        "fsz": file_size_bytes,
+                        "ais": ais,
+                    },
+                )
+            else:
+                conn.execute(
+                    text("""
+                        INSERT INTO policy_documents
+                        (id, company_id, uploaded_by_user_id, filename, mime_type, storage_path,
+                         checksum, uploaded_at, processing_status, created_at, updated_at,
+                         file_size_bytes, assistant_import_status)
+                        VALUES (:id, :cid, :uid, :fn, :mt, :sp, :cs, :now::timestamptz, 'uploaded',
+                         :now::timestamptz, :now::timestamptz, :fsz, :ais)
+                    """),
+                    {
+                        "id": doc_id,
+                        "cid": company_id,
+                        "uid": uploaded_by_user_id,
+                        "fn": filename,
+                        "mt": mime_type,
+                        "sp": storage_path,
+                        "cs": checksum,
+                        "now": now,
+                        "fsz": file_size_bytes,
+                        "ais": ais,
+                    },
+                )
         return self.get_policy_document(doc_id, request_id=request_id) or {}
 
     def get_policy_document(
@@ -10201,6 +10480,9 @@ class Database:
         raw_text: Optional[str] = None,
         extraction_error: Optional[str] = None,
         extracted_metadata: Optional[Dict[str, Any]] = None,
+        assistant_import_status: Optional[str] = None,
+        processed_at: Optional[str] = None,
+        file_size_bytes: Optional[int] = None,
         request_id: Optional[str] = None,
     ) -> None:
         now = datetime.utcnow().isoformat()
@@ -10230,11 +10512,816 @@ class Database:
         if extracted_metadata is not None:
             fields.append("extracted_metadata = :em")
             params["em"] = json.dumps(extracted_metadata)
+        if assistant_import_status is not None:
+            fields.append("assistant_import_status = :ais")
+            params["ais"] = assistant_import_status
+        if processed_at is not None:
+            fields.append("processed_at = :pat")
+            params["pat"] = processed_at
+        if file_size_bytes is not None:
+            fields.append("file_size_bytes = :fsz")
+            params["fsz"] = file_size_bytes
         with self.engine.begin() as conn:
             conn.execute(
                 text(f"UPDATE policy_documents SET {', '.join(fields)} WHERE id = :id"),
                 params,
             )
+
+    def policy_assistant_tables_available(self) -> bool:
+        """True when policy assistant import tables exist (migration applied)."""
+        try:
+            with self.engine.connect() as conn:
+                if _is_sqlite:
+                    r = conn.execute(
+                        text(
+                            "SELECT name FROM sqlite_master WHERE type='table' AND name='policy_document_chunks'"
+                        )
+                    ).fetchone()
+                    return r is not None
+                r = conn.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = 'policy_document_chunks'"
+                    )
+                ).fetchone()
+                return r is not None
+        except Exception:
+            return False
+
+    def clear_policy_assistant_pipeline_for_document(self, doc_id: str) -> None:
+        """
+        Append-only pipeline: snapshots and chunks are not bulk-deleted here.
+        Each extraction creates a new snapshot revision and new chunk rows linked by snapshot_id.
+        """
+        return
+
+    def insert_policy_processing_run(
+        self,
+        doc_id: str,
+        run_type: str,
+        status: str = "running",
+    ) -> str:
+        rid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_processing_runs
+                    (id, policy_document_id, run_type, status, started_at)
+                    VALUES (:id, :doc, :rt, :st, :now)
+                    """
+                ),
+                {"id": rid, "doc": doc_id, "rt": run_type, "st": status, "now": now},
+            )
+        return rid
+
+    def finish_policy_processing_run(
+        self,
+        run_id: str,
+        status: str,
+        error_message: Optional[str] = None,
+        metrics_json: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_processing_runs
+                    SET status = :st, finished_at = :now, error_message = :em, metrics_json = :mj
+                    WHERE id = :id
+                    """
+                ),
+                {
+                    "id": run_id,
+                    "st": status,
+                    "now": now,
+                    "em": error_message,
+                    "mj": json.dumps(metrics_json) if metrics_json is not None else None,
+                },
+            )
+
+    def insert_policy_document_chunk(
+        self,
+        doc_id: str,
+        chunk_index: int,
+        text_content: str,
+        *,
+        page_number: Optional[int] = None,
+        section_title: Optional[str] = None,
+        token_count: Optional[int] = None,
+        metadata_json: Optional[Dict[str, Any]] = None,
+        snapshot_id: Optional[str] = None,
+    ) -> str:
+        cid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        meta = metadata_json if metadata_json is not None else {}
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_document_chunks
+                    (id, policy_document_id, chunk_index, page_number, section_title,
+                     text_content, token_count, metadata_json, created_at, snapshot_id)
+                    VALUES (:id, :doc, :idx, :pn, :st, :tx, :tc, :mj, :now, :snap)
+                    """
+                ),
+                {
+                    "id": cid,
+                    "doc": doc_id,
+                    "idx": chunk_index,
+                    "pn": page_number,
+                    "st": section_title,
+                    "tx": text_content,
+                    "tc": token_count,
+                    "mj": json.dumps(meta),
+                    "now": now,
+                    "snap": snapshot_id,
+                },
+            )
+        return cid
+
+    def list_policy_document_chunks(self, doc_id: str) -> List[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return []
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM policy_document_chunks WHERE policy_document_id = :id "
+                    "ORDER BY chunk_index ASC"
+                ),
+                {"id": doc_id},
+            ).fetchall()
+        out = self._rows_to_list(rows)
+        for d in out:
+            d["metadata_json"] = _coerce_json_dict(d.get("metadata_json"))
+        return out
+
+    def list_policy_document_chunks_for_snapshot(self, doc_id: str, snapshot_id: str) -> List[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return []
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM policy_document_chunks WHERE policy_document_id = :id "
+                    "AND snapshot_id = :sid ORDER BY chunk_index ASC"
+                ),
+                {"id": doc_id, "sid": snapshot_id},
+            ).fetchall()
+        out = self._rows_to_list(rows)
+        for d in out:
+            d["metadata_json"] = _coerce_json_dict(d.get("metadata_json"))
+        return out
+
+    def insert_policy_knowledge_snapshot(
+        self,
+        company_id: str,
+        doc_id: str,
+        *,
+        version_label: Optional[str] = None,
+        status: str = "failed",
+        extraction_method: str = "deterministic_v1",
+        revision_number: int = 1,
+        parent_snapshot_id: Optional[str] = None,
+        activation_state: str = "candidate",
+    ) -> str:
+        sid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_knowledge_snapshots
+                    (id, company_id, policy_document_id, version_label, status, extraction_method, created_at,
+                     revision_number, parent_snapshot_id, activation_state)
+                    VALUES (:id, :cid, :doc, :vl, :st, :em, :now, :rn, :par, :as)
+                    """
+                ),
+                {
+                    "id": sid,
+                    "cid": company_id,
+                    "doc": doc_id,
+                    "vl": version_label,
+                    "st": status,
+                    "em": extraction_method,
+                    "now": now,
+                    "rn": revision_number,
+                    "par": parent_snapshot_id,
+                    "as": activation_state,
+                },
+            )
+        return sid
+
+    def update_policy_knowledge_snapshot(
+        self,
+        snapshot_id: str,
+        *,
+        status: Optional[str] = None,
+        superseded_at: Optional[str] = None,
+    ) -> None:
+        fields = []
+        params: Dict[str, Any] = {"id": snapshot_id}
+        if status is not None:
+            fields.append("status = :st")
+            params["st"] = status
+        if superseded_at is not None:
+            fields.append("superseded_at = :sa")
+            params["sa"] = superseded_at
+        if not fields:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE policy_knowledge_snapshots SET {', '.join(fields)} WHERE id = :id"),
+                params,
+            )
+
+    def supersede_active_snapshots_for_company(self, company_id: str, except_snapshot_id: Optional[str] = None) -> None:
+        """Mark active_for_assistant snapshots as superseded for this company."""
+        if not self.policy_assistant_tables_available():
+            return
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            if except_snapshot_id:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_knowledge_snapshots
+                        SET status = 'superseded', superseded_at = :now
+                        WHERE company_id = :cid AND status = 'active_for_assistant'
+                          AND id <> :ex
+                        """
+                    ),
+                    {"cid": company_id, "now": now, "ex": except_snapshot_id},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE policy_knowledge_snapshots
+                        SET status = 'superseded', superseded_at = :now
+                        WHERE company_id = :cid AND status = 'active_for_assistant'
+                        """
+                    ),
+                    {"cid": company_id, "now": now},
+                )
+
+    def insert_policy_fact(
+        self,
+        snapshot_id: str,
+        fact_type: str,
+        category: str,
+        *,
+        subcategory: Optional[str] = None,
+        normalized_value_json: Optional[Dict[str, Any]] = None,
+        applicability_json: Optional[Dict[str, Any]] = None,
+        ambiguity_flag: bool = False,
+        confidence_score: Optional[float] = None,
+        source_chunk_id: str = "",
+        source_page: Optional[int] = None,
+        source_section: Optional[str] = None,
+        source_quote: Optional[str] = None,
+    ) -> str:
+        fid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        nv = normalized_value_json if normalized_value_json is not None else {}
+        ap = applicability_json if applicability_json is not None else {}
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_facts
+                    (id, snapshot_id, fact_type, category, subcategory, normalized_value_json,
+                     applicability_json, ambiguity_flag, confidence_score, source_chunk_id,
+                     source_page, source_section, source_quote, created_at)
+                    VALUES (:id, :sid, :ft, :cat, :sub, :nv, :ap, :af, :cs, :ch, :pg, :sec, :sq, :now)
+                    """
+                ),
+                {
+                    "id": fid,
+                    "sid": snapshot_id,
+                    "ft": fact_type,
+                    "cat": category,
+                    "sub": subcategory,
+                    "nv": json.dumps(nv),
+                    "ap": json.dumps(ap),
+                    "af": (1 if ambiguity_flag else 0) if _is_sqlite else bool(ambiguity_flag),
+                    "cs": confidence_score,
+                    "ch": source_chunk_id,
+                    "pg": source_page,
+                    "sec": source_section,
+                    "sq": source_quote,
+                    "now": now,
+                },
+            )
+        return fid
+
+    def count_policy_document_chunks(self, doc_id: str) -> int:
+        if not self.policy_assistant_tables_available():
+            return 0
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT COUNT(*) AS n FROM policy_document_chunks WHERE policy_document_id = :id"),
+                {"id": doc_id},
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    def count_policy_facts_for_snapshot(self, snapshot_id: str) -> int:
+        if not self.policy_assistant_tables_available():
+            return 0
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT COUNT(*) AS n FROM policy_facts WHERE snapshot_id = :id"),
+                {"id": snapshot_id},
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    def policy_fact_counts_by_type(self, snapshot_id: str) -> Dict[str, int]:
+        if not self.policy_assistant_tables_available():
+            return {}
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT fact_type, COUNT(*) AS n FROM policy_facts "
+                    "WHERE snapshot_id = :id GROUP BY fact_type"
+                ),
+                {"id": snapshot_id},
+            ).fetchall()
+        out: Dict[str, int] = {}
+        for r in rows:
+            m = dict(r._mapping) if hasattr(r, "_mapping") else dict(r)
+            out[str(m["fact_type"])] = int(m["n"])
+        return out
+
+    def list_policy_facts_for_snapshot(self, snapshot_id: str) -> List[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return []
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text("SELECT * FROM policy_facts WHERE snapshot_id = :id ORDER BY created_at"),
+                {"id": snapshot_id},
+            ).fetchall()
+        items = self._rows_to_list(rows)
+        for d in items:
+            d["normalized_value_json"] = _coerce_json_dict(d.get("normalized_value_json"))
+            d["applicability_json"] = _coerce_json_dict(d.get("applicability_json"))
+            if "ambiguity_flag" in d and d["ambiguity_flag"] in (0, 1):
+                d["ambiguity_flag"] = bool(d["ambiguity_flag"])
+        return items
+
+    def get_policy_document_chunks_by_ids(self, chunk_ids: List[str]) -> List[Dict[str, Any]]:
+        if not chunk_ids or not self.policy_assistant_tables_available():
+            return []
+        placeholders = ",".join([f":c{i}" for i in range(len(chunk_ids))])
+        params: Dict[str, Any] = {f"c{i}": chunk_ids[i] for i in range(len(chunk_ids))}
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(f"SELECT * FROM policy_document_chunks WHERE id IN ({placeholders})"),
+                params,
+            ).fetchall()
+        items = self._rows_to_list(rows)
+        for d in items:
+            d["metadata_json"] = _coerce_json_dict(d.get("metadata_json"))
+        return items
+
+    def get_company_policy_assistant_binding(self, company_id: str) -> Optional[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM company_policy_assistant_bindings WHERE company_id = :cid"),
+                {"cid": company_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def upsert_company_policy_assistant_binding(
+        self,
+        company_id: str,
+        active_snapshot_id: Optional[str],
+        policy_document_id: Optional[str],
+    ) -> None:
+        if not self.policy_assistant_tables_available():
+            return
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            if _is_sqlite:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO company_policy_assistant_bindings
+                        (company_id, active_snapshot_id, policy_document_id, updated_at)
+                        VALUES (:cid, :sid, :doc, :now)
+                        ON CONFLICT(company_id) DO UPDATE SET
+                          active_snapshot_id = excluded.active_snapshot_id,
+                          policy_document_id = excluded.policy_document_id,
+                          updated_at = excluded.updated_at
+                        """
+                    ),
+                    {"cid": company_id, "sid": active_snapshot_id, "doc": policy_document_id, "now": now},
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO company_policy_assistant_bindings
+                        (company_id, active_snapshot_id, policy_document_id, updated_at)
+                        VALUES (:cid, :sid, :doc, :now::timestamptz)
+                        ON CONFLICT (company_id) DO UPDATE SET
+                          active_snapshot_id = EXCLUDED.active_snapshot_id,
+                          policy_document_id = EXCLUDED.policy_document_id,
+                          updated_at = EXCLUDED.updated_at
+                        """
+                    ),
+                    {"cid": company_id, "sid": active_snapshot_id, "doc": policy_document_id, "now": now},
+                )
+
+    def get_active_policy_knowledge_snapshot_for_company(self, company_id: str) -> Optional[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT s.* FROM policy_knowledge_snapshots s
+                    WHERE s.company_id = :cid
+                      AND COALESCE(
+                        NULLIF(TRIM(s.activation_state), ''),
+                        CASE WHEN s.status = 'active_for_assistant' THEN 'active_for_assistant' ELSE s.status END
+                      ) = 'active_for_assistant'
+                    ORDER BY s.created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"cid": company_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def get_latest_policy_knowledge_snapshot_for_document(self, policy_document_id: str) -> Optional[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT * FROM policy_knowledge_snapshots
+                    WHERE policy_document_id = :id
+                    ORDER BY COALESCE(revision_number, 0) DESC, created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"id": policy_document_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def count_policy_facts_for_document_via_snapshots(self, policy_document_id: str) -> int:
+        """Count facts tied to this document through any snapshot (latest snapshot row used in UI)."""
+        snap = self.get_latest_policy_knowledge_snapshot_for_document(policy_document_id)
+        if not snap:
+            return 0
+        return self.count_policy_facts_for_snapshot(str(snap.get("id")))
+
+    def policy_hardening_tables_available(self) -> bool:
+        try:
+            with self.engine.connect() as conn:
+                if _is_sqlite:
+                    r = conn.execute(
+                        text(
+                            "SELECT name FROM sqlite_master WHERE type='table' AND name='policy_extraction_locks'"
+                        )
+                    ).fetchone()
+                    return r is not None
+                r = conn.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = 'policy_extraction_locks'"
+                    )
+                ).fetchone()
+                return r is not None
+        except Exception:
+            return False
+
+    def get_policy_knowledge_snapshot_by_id(self, snapshot_id: str) -> Optional[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM policy_knowledge_snapshots WHERE id = :id"),
+                {"id": snapshot_id},
+            ).fetchone()
+        return self._row_to_dict(row) if row else None
+
+    def next_snapshot_revision_number(self, policy_document_id: str) -> int:
+        if not self.policy_assistant_tables_available():
+            return 1
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT COALESCE(MAX(revision_number), 0) AS m FROM policy_knowledge_snapshots "
+                    "WHERE policy_document_id = :id"
+                ),
+                {"id": policy_document_id},
+            ).fetchone()
+        m = int(row[0]) if row and row[0] is not None else 0
+        return m + 1
+
+    def activate_policy_knowledge_snapshot(
+        self,
+        new_snapshot_id: str,
+        company_id: str,
+        policy_document_id: str,
+        activated_by_user_id: str,
+    ) -> None:
+        """Supersede prior active snapshot for company; activate new snapshot and update binding."""
+        if not self.policy_assistant_tables_available():
+            return
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_knowledge_snapshots
+                    SET activation_state = 'superseded', status = 'superseded', superseded_at = :now,
+                        superseded_by_snapshot_id = :new_id
+                    WHERE company_id = :cid
+                      AND CAST(id AS TEXT) <> CAST(:new_id AS TEXT)
+                      AND COALESCE(activation_state, CASE WHEN status = 'active_for_assistant' THEN 'active_for_assistant' ELSE status END) = 'active_for_assistant'
+                    """
+                ),
+                {"now": now, "new_id": new_snapshot_id, "cid": company_id},
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_knowledge_snapshots
+                    SET activation_state = 'active_for_assistant', status = 'active_for_assistant',
+                        activated_at = :now, activated_by_user_id = :uid
+                    WHERE id = :sid
+                    """
+                ),
+                {"now": now, "uid": activated_by_user_id, "sid": new_snapshot_id},
+            )
+        self.upsert_company_policy_assistant_binding(company_id, new_snapshot_id, policy_document_id)
+
+    def mark_policy_snapshot_failed(self, snapshot_id: str) -> None:
+        if not self.policy_assistant_tables_available():
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_knowledge_snapshots
+                    SET activation_state = 'failed', status = 'failed'
+                    WHERE id = :id
+                    """
+                ),
+                {"id": snapshot_id},
+            )
+
+    def try_acquire_policy_extraction_lock(
+        self,
+        policy_document_id: str,
+        company_id: str,
+        locked_by_user_id: str,
+        *,
+        ttl_seconds: int = 900,
+    ) -> Optional[str]:
+        """
+        Returns lock_token if acquired; None if table missing.
+        Caller should check for active lock and raise 409 if row exists and not expired.
+        """
+        if not self.policy_hardening_tables_available():
+            return str(uuid.uuid4())
+        token = str(uuid.uuid4())
+        now = datetime.utcnow()
+        expires = datetime.utcfromtimestamp(now.timestamp() + ttl_seconds).isoformat()
+        now_iso = now.isoformat()
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT id, expires_at, status FROM policy_extraction_locks WHERE policy_document_id = :doc"
+                ),
+                {"doc": policy_document_id},
+            ).fetchone()
+            if row:
+                d = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
+                exp = d.get("expires_at")
+                st = (d.get("status") or "").strip()
+                if st == "active" and exp:
+                    try:
+                        from datetime import datetime as dt
+
+                        ex = dt.fromisoformat(str(exp).replace("Z", "+00:00"))
+                        if ex.timestamp() > now.timestamp():
+                            return None
+                    except Exception:
+                        if st == "active":
+                            return None
+                conn.execute(
+                    text("DELETE FROM policy_extraction_locks WHERE policy_document_id = :doc"),
+                    {"doc": policy_document_id},
+                )
+            lid = str(uuid.uuid4())
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_extraction_locks
+                    (id, policy_document_id, company_id, locked_by_user_id, lock_token, acquired_at, expires_at, status)
+                    VALUES (:id, :doc, :cid, :uid, :tok, :acq, :exp, 'active')
+                    """
+                ),
+                {
+                    "id": lid,
+                    "doc": policy_document_id,
+                    "cid": company_id,
+                    "uid": locked_by_user_id,
+                    "tok": token,
+                    "acq": now_iso,
+                    "exp": expires,
+                },
+            )
+        return token
+
+    def release_policy_extraction_lock(self, policy_document_id: str, lock_token: str) -> None:
+        if not self.policy_hardening_tables_available():
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    UPDATE policy_extraction_locks
+                    SET status = 'released'
+                    WHERE policy_document_id = :doc AND lock_token = :tok AND status = 'active'
+                    """
+                ),
+                {"doc": policy_document_id, "tok": lock_token},
+            )
+
+    def insert_policy_assistant_answer_audit(
+        self,
+        *,
+        company_id: str,
+        asked_by_user_id: str,
+        question_text: str,
+        answer_text: str,
+        evidence_status: str,
+        case_id: Optional[str] = None,
+        question_session_id: Optional[str] = None,
+        policy_document_id: Optional[str] = None,
+        snapshot_id: Optional[str] = None,
+        extraction_run_id: Optional[str] = None,
+        normalized_question_topic: Optional[str] = None,
+        fact_ids: Optional[List[str]] = None,
+        chunk_ids: Optional[List[str]] = None,
+        applicability_decision_json: Optional[Dict[str, Any]] = None,
+        ambiguity_flags_json: Optional[List[Any]] = None,
+    ) -> str:
+        if not self.policy_hardening_tables_available():
+            return ""
+        aid = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_assistant_answer_audits
+                    (id, company_id, case_id, asked_by_user_id, question_session_id, policy_document_id,
+                     snapshot_id, extraction_run_id, question_text, normalized_question_topic, answer_text,
+                     evidence_status, fact_ids_json, chunk_ids_json, applicability_decision_json,
+                     ambiguity_flags_json, created_at)
+                    VALUES (:id, :cid, :case_id, :uid, :qs, :pd, :snap, :run, :qt, :nt, :at, :ev,
+                     :fj, :cj, :adj, :afj, :now)
+                    """
+                ),
+                {
+                    "id": aid,
+                    "cid": company_id,
+                    "case_id": case_id,
+                    "uid": asked_by_user_id,
+                    "qs": question_session_id,
+                    "pd": policy_document_id,
+                    "snap": snapshot_id,
+                    "run": extraction_run_id,
+                    "qt": question_text,
+                    "nt": normalized_question_topic,
+                    "at": answer_text,
+                    "ev": evidence_status,
+                    "fj": json.dumps(fact_ids or []),
+                    "cj": json.dumps(chunk_ids or []),
+                    "adj": json.dumps(applicability_decision_json or {}),
+                    "afj": json.dumps(ambiguity_flags_json or []),
+                    "now": now,
+                },
+            )
+        return aid
+
+    def list_policy_assistant_answer_audits(
+        self,
+        *,
+        company_id: Optional[str] = None,
+        case_id: Optional[str] = None,
+        snapshot_id: Optional[str] = None,
+        evidence_status: Optional[str] = None,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        if not self.policy_hardening_tables_available():
+            return []
+        where = ["1=1"]
+        params: Dict[str, Any] = {"lim": limit}
+        if company_id:
+            where.append("company_id = :cid")
+            params["cid"] = company_id
+        if case_id:
+            where.append("case_id = :case_id")
+            params["case_id"] = case_id
+        if snapshot_id:
+            where.append("snapshot_id = :sid")
+            params["sid"] = snapshot_id
+        if evidence_status:
+            where.append("evidence_status = :ev")
+            params["ev"] = evidence_status
+        if created_after:
+            where.append("created_at >= :ca")
+            params["ca"] = created_after
+        if created_before:
+            where.append("created_at <= :cb")
+            params["cb"] = created_before
+        sql = (
+            "SELECT * FROM policy_assistant_answer_audits WHERE "
+            + " AND ".join(where)
+            + " ORDER BY created_at DESC LIMIT :lim"
+        )
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+        items = self._rows_to_list(rows)
+        for d in items:
+            d["fact_ids_json"] = _coerce_json_dict(d.get("fact_ids_json"))
+            d["chunk_ids_json"] = _coerce_json_dict(d.get("chunk_ids_json"))
+            d["applicability_decision_json"] = _coerce_json_dict(d.get("applicability_decision_json"))
+            d["ambiguity_flags_json"] = _coerce_json_dict(d.get("ambiguity_flags_json"))
+        return items
+
+    def list_policy_knowledge_snapshots_for_document(self, policy_document_id: str) -> List[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return []
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM policy_knowledge_snapshots WHERE policy_document_id = :id "
+                    "ORDER BY revision_number DESC, created_at DESC"
+                ),
+                {"id": policy_document_id},
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_policy_knowledge_snapshots_for_company(self, company_id: str) -> List[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return []
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM policy_knowledge_snapshots WHERE company_id = :cid "
+                    "ORDER BY created_at DESC"
+                ),
+                {"cid": company_id},
+            ).fetchall()
+        return self._rows_to_list(rows)
+
+    def list_policy_processing_runs_for_document(self, policy_document_id: str) -> List[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return []
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM policy_processing_runs WHERE policy_document_id = :id "
+                    "ORDER BY started_at DESC"
+                ),
+                {"id": policy_document_id},
+            ).fetchall()
+        items = self._rows_to_list(rows)
+        for d in items:
+            if d.get("metrics_json"):
+                d["metrics_json"] = _coerce_json_dict(d.get("metrics_json"))
+        return items
+
+    def latest_policy_processing_run(self, doc_id: str, run_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        if not self.policy_assistant_tables_available():
+            return None
+        sql = (
+            "SELECT * FROM policy_processing_runs WHERE policy_document_id = :id "
+        )
+        params: Dict[str, Any] = {"id": doc_id}
+        if run_type:
+            sql += " AND run_type = :rt "
+            params["rt"] = run_type
+        sql += " ORDER BY started_at DESC LIMIT 1"
+        with self.engine.connect() as conn:
+            row = conn.execute(text(sql), params).fetchone()
+        d = self._row_to_dict(row) if row else None
+        if d and d.get("metrics_json"):
+            d["metrics_json"] = _coerce_json_dict(d.get("metrics_json"))
+        return d
 
     def policy_version_references_document(self, doc_id: str) -> bool:
         """True if any policy_version has source_policy_document_id = doc_id."""

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { RecommendationResponse } from '../recommendations/types';
 import type { ServiceKey } from './serviceConfig';
+import { normalizeServicesCurrency, SERVICES_DISPLAY_CURRENCY_STORAGE_KEY } from './servicesCurrency';
 
 interface ServicesFlowState {
   selectedServices: Set<ServiceKey>;
@@ -11,6 +12,9 @@ interface ServicesFlowState {
   setRecommendations: (next: Record<string, RecommendationResponse> | null) => void;
   shortlist: Map<string, string>;
   setShortlist: (next: Map<string, string>) => void;
+  /** ISO 4217 code — used for all service-flow estimates (converted from USD baseline). */
+  displayCurrency: string;
+  setDisplayCurrency: (code: string) => void;
 }
 
 const ServicesFlowContext = createContext<ServicesFlowState | null>(null);
@@ -48,6 +52,24 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return new Map();
     }
   });
+  const [displayCurrency, setDisplayCurrencyState] = useState<string>(() => {
+    try {
+      const raw = localStorage.getItem(SERVICES_DISPLAY_CURRENCY_STORAGE_KEY);
+      return normalizeServicesCurrency(raw || 'USD');
+    } catch {
+      return 'USD';
+    }
+  });
+
+  const setDisplayCurrency = useCallback((code: string) => {
+    const next = normalizeServicesCurrency(code);
+    setDisplayCurrencyState(next);
+    try {
+      localStorage.setItem(SERVICES_DISPLAY_CURRENCY_STORAGE_KEY, next);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -91,8 +113,10 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setRecommendations,
       shortlist,
       setShortlist,
+      displayCurrency,
+      setDisplayCurrency,
     }),
-    [selectedServices, answers, recommendations, shortlist]
+    [selectedServices, answers, recommendations, shortlist, displayCurrency, setDisplayCurrency]
   );
 
   return (

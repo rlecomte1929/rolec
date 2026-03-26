@@ -24,6 +24,16 @@ export function useEmployeeRelocationPlanPageData(assignmentId: string | undefin
     deferredRanForAssignment.current = null;
   }, [assignmentId]);
 
+  // If the plan stayed open in a background tab while draft changed elsewhere, refetch when the tab is shown again.
+  useEffect(() => {
+    if (!enabled || !assignmentId) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refetch();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [enabled, assignmentId, refetch]);
+
   const ensureDefaultsAndReload = useCallback(async () => {
     if (!assignmentId) return;
     await timelineAPI.getByAssignment(assignmentId, { ensureDefaults: true, includeLinks: false });

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
-import { Button, Card, LoadingButton } from '../../components/antigravity';
+import { Alert, Button, Card } from '../../components/antigravity';
+import { Link } from 'react-router-dom';
 import { PackageSummary } from '../../features/recommendations/PackageSummary';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
@@ -19,8 +20,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 export const ServicesEstimate: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { recommendations, shortlist } = useServicesFlow();
-  const [rfqNavLoading, setRfqNavLoading] = useState(false);
+  const { recommendations, shortlist, displayCurrency } = useServicesFlow();
   const go = (path: string) => navigate({ pathname: path, search: location.search });
 
   if (!recommendations) {
@@ -44,30 +44,27 @@ export const ServicesEstimate: React.FC = () => {
           Next steps: 1) Select vendors  2) Request quotations  3) Receive offers  4) Decide
         </div>
       </Card>
+      <Alert variant="info" className="mb-4">
+        <p className="text-sm">
+          Estimates and policy comparison below use <strong>{displayCurrency}</strong>. To change currency, go back to{' '}
+          <Link to={{ pathname: buildRoute('services'), search: location.search }} className="font-medium underline">
+            Select services
+          </Link>
+          .
+        </p>
+      </Alert>
       <PackageSummary
         results={recommendations}
         selectedPackage={shortlist}
         categoryLabels={CATEGORY_LABELS}
+        displayCurrency={displayCurrency}
         onBack={() => go(buildRoute('servicesRecommendations'))}
         onStartOver={() => go(buildRoute('services'))}
       />
       <div className="mt-6 flex items-center justify-end">
-        <LoadingButton
-          loading={rfqNavLoading}
-          loadingLabel="Opening next step…"
-          disabled={!hasShortlist}
-          onClick={async () => {
-            setRfqNavLoading(true);
-            try {
-              await new Promise((r) => setTimeout(r, 120));
-              go(buildRoute('servicesRfqNew'));
-            } finally {
-              setRfqNavLoading(false);
-            }
-          }}
-        >
+        <Button disabled={!hasShortlist} onClick={() => go(buildRoute('servicesRfqNew'))}>
           Request quotations
-        </LoadingButton>
+        </Button>
       </div>
     </AppShell>
   );

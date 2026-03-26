@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Badge, Button } from '../../components/antigravity';
 import type { RecommendationItem, RecommendationResponse } from './types';
+import { formatEstimationFromUsd } from '../services/servicesCurrency';
 
 const TIER_LABELS: Record<string, string> = {
   best_match: 'Best match',
@@ -74,6 +75,7 @@ function RecCard({
   defaultShowDebug = false,
   isInPackage,
   onTogglePackage,
+  displayCurrency,
 }: {
   item: RecommendationItem;
   category: string;
@@ -82,6 +84,7 @@ function RecCard({
   defaultShowDebug?: boolean;
   isInPackage: boolean;
   onTogglePackage: () => void;
+  displayCurrency: string;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [showDebug, setShowDebug] = useState(defaultShowDebug);
@@ -91,19 +94,9 @@ function RecCard({
   const matchReasons = expl?.match_reasons?.length ? expl.match_reasons : item.pros;
   const warningFlags = expl?.warning_flags ?? [];
   const isScarce = avail === 'low' || avail === 'scarce';
-  const costLocal = item.metadata?.estimated_cost_local;
-  const currency = item.metadata?.currency || 'USD';
   const costUsd = item.metadata?.estimated_cost_usd;
   const costType = item.metadata?.cost_type;
-  const cost = costLocal ?? costUsd;
-  const costLabel =
-    cost != null
-      ? costType === 'monthly'
-        ? `${currency} ${cost.toLocaleString()}/mo`
-        : costType === 'annual'
-          ? `${currency} ${cost.toLocaleString()}/yr`
-          : `${currency} ${cost.toLocaleString()}`
-      : null;
+  const costLabel = formatEstimationFromUsd(costUsd, costType, displayCurrency);
 
   const mapQuery = item.metadata?.map_query as string | undefined;
   const officeAddress = (criteriaEcho?.office_address as string) || '';
@@ -253,6 +246,7 @@ interface Props {
   onStartOver: () => void;
   onViewSummary: () => void;
   debugMode?: boolean;
+  displayCurrency: string;
 }
 
 export const RecommendationResults: React.FC<Props> = ({
@@ -263,6 +257,7 @@ export const RecommendationResults: React.FC<Props> = ({
   onStartOver,
   onViewSummary,
   debugMode = false,
+  displayCurrency,
 }) => {
   const entries = Object.entries(results);
   const [activeTab, setActiveTab] = useState(entries[0]?.[0] ?? '');
@@ -323,8 +318,8 @@ export const RecommendationResults: React.FC<Props> = ({
               {categoryLabels[category] || category}
             </h3>
             <p className="text-sm text-[#6b7280] mb-4">
-              Choose one option per service to build your relocation package. You can compare costs
-              with your HR policy in the summary.
+              Choose one option per service to build your relocation package. Estimates use your selected currency
+              (set on Select services). You can compare costs with your HR policy in the summary.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {res.recommendations.map((item, idx) => (
@@ -337,6 +332,7 @@ export const RecommendationResults: React.FC<Props> = ({
                   defaultShowDebug={debugMode && idx === 0}
                   isInPackage={selectedPackage.get(category) === item.item_id}
                   onTogglePackage={() => togglePackage(category, item.item_id)}
+                  displayCurrency={displayCurrency}
                 />
               ))}
             </div>

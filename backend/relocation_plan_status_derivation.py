@@ -253,7 +253,9 @@ def family_details_satisfied(ctx: RelocationPlanDerivationContext) -> bool:
     fam_ok = (
         _nz(ctx.profile.get("maritalStatus"))
         or _nz(spouse.get("fullName"))
-        or any(_nz(d.get("firstName")) for d in deps if isinstance(d, dict))
+        or any(
+            _nz(d.get("firstName")) or _nz(d.get("fullName")) for d in deps if isinstance(d, dict)
+        )
     )
     return fam_ok
 

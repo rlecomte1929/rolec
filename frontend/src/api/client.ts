@@ -911,6 +911,32 @@ export const adminAPI = {
     });
     return response.data;
   },
+  getPolicyAssistantCompanyHistory: async (companyId: string): Promise<Record<string, unknown>> => {
+    const response = await api.get(`/api/admin/policies/company/${companyId}/history`);
+    return response.data;
+  },
+  getPolicyAssistantSnapshotDiff: async (
+    companyId: string,
+    olderSnapshotId: string,
+    newerSnapshotId: string
+  ): Promise<Record<string, unknown>> => {
+    const response = await api.get(`/api/admin/policies/company/${companyId}/diff`, {
+      params: { older_snapshot_id: olderSnapshotId, newer_snapshot_id: newerSnapshotId },
+    });
+    return response.data;
+  },
+  listPolicyAssistantAnswerAudits: async (params: {
+    company_id: string;
+    case_id?: string;
+    snapshot_id?: string;
+    evidence_status?: string;
+    created_after?: string;
+    created_before?: string;
+    limit?: number;
+  }): Promise<{ audits: Record<string, unknown>[] }> => {
+    const response = await api.get('/api/admin/policies/answers/audits', { params });
+    return response.data;
+  },
   listSupportCases: async (params?: { status?: string; severity?: string; company_id?: string; priority?: string }): Promise<{ support_cases: AdminSupportCase[] }> => {
     const response = await api.get('/api/admin/support-cases', { params });
     return response.data;

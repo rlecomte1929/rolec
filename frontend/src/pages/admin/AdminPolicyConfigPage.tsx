@@ -6,6 +6,7 @@ import { adminAPI } from '../../api/client';
 import type { AdminCompany } from '../../types';
 import { PolicyConfigPage } from '../../features/policy-config/PolicyConfigPage';
 import { PolicyConfigRouteErrorBoundary } from '../../features/policy-config/PolicyConfigRouteErrorBoundary';
+import { AdminPolicyAssistantGroundingSection } from '../../features/admin/policy-workspace/AdminPolicyAssistantGroundingSection';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
 export const AdminPolicyConfigPage: React.FC = () => {
@@ -65,6 +66,7 @@ export const AdminPolicyConfigPage: React.FC = () => {
       {companyId ? (
         <PolicyConfigRouteErrorBoundary>
           <PolicyConfigPage mode="admin" adminCompanyId={companyId} />
+          <AdminPolicyAssistantGroundingSection companyId={companyId} />
         </PolicyConfigRouteErrorBoundary>
       ) : (
         <Card padding="lg">

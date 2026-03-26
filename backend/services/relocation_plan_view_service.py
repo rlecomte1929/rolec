@@ -35,6 +35,7 @@ from ..relocation_plan_service import (
     compute_phase_statuses,
     map_milestone_status_to_plan_status,
 )
+from ..relocation_plan_draft_normalize import profile_for_plan_derivation
 from ..relocation_plan_status_derivation import (
     DerivationThresholds,
     RelocationPlanDerivationContext,
@@ -385,8 +386,9 @@ def build_relocation_plan_view_response(
         except Exception as ex:
             log.debug("list_case_services skipped: %s", ex)
 
+    profile_for_derivation = profile_for_plan_derivation(profile_draft) if profile_draft else {}
     ctx = RelocationPlanDerivationContext(
-        profile=profile_draft if profile_draft else None,
+        profile=profile_for_derivation if profile_for_derivation else None,
         case_documents=doc_rows or None,
         requirement_eval_by_code=eval_by_code or None,
         selected_service_keys=selected_keys or None,

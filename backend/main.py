@@ -8706,6 +8706,9 @@ async def upload_policy_document(
                 request_id=request_id,
             )
         company_id = cid.strip()
+        from .services.policy_assistant_access import require_company_access
+
+        require_company_access(user, company_id, db)
     except HTTPException:
         raise
     except Exception as exc:
@@ -8868,6 +8871,8 @@ async def upload_policy_document(
             mime_type=mime,
             storage_path=path,
             checksum=checksum,
+            file_size_bytes=file_size,
+            assistant_import_status="uploaded",
             request_id=request_id,
         )
         log.info("request_id=%s policy_upload stage=db_insert ok doc_id=%s", request_id, doc_id)
@@ -9753,6 +9758,302 @@ def normalize_policy_document(
                 ),
             },
         )
+
+
+# ---------------------------------------------------------------------------
+# Policy Assistant — document-grounded knowledge (admin + case context)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/admin/policies/upload")
+async def admin_policy_assistant_upload(
+    req: Request,
+    file: Optional[UploadFile] = File(None),
+    company_id: Optional[str] = Query(None, description="Admin override: scope upload to this company"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Multipart upload for policy assistant import. Same storage + policy_documents row as HR upload;
+    use POST /api/admin/policies/{document_id}/extract to run the assistant pipeline.
+    """
+    return await upload_policy_document(req, file, company_id, user)
+
+
+@app.post("/api/admin/policies/{document_id}/extract")
+def admin_policy_assistant_extract(
+    document_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Run text → chunks → facts → snapshot → graph sync (synchronous)."""
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(document_id, request_id=request_id)
+    _require_document_access(user, doc)
+    if not db.policy_assistant_tables_available():
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "policy_assistant_tables_missing",
+                "message": "Apply database migrations for policy assistant import.",
+            },
+        )
+    from .services.policy_assistant_import_pipeline import run_policy_assistant_import_pipeline
+
+    out = run_policy_assistant_import_pipeline(
+        db, document_id, request_id=request_id, user_id=user.get("id")
+    )
+    if not out.get("ok"):
+        if out.get("http_status") == 409:
+            raise HTTPException(status_code=409, detail=out)
+        raise HTTPException(status_code=400, detail=out)
+    return out
+
+
+@app.get("/api/admin/policies/{document_id}/status")
+def admin_policy_assistant_status(
+    document_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Processing status, chunk/fact counts, latest run."""
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(document_id, request_id=request_id)
+    _require_document_access(user, doc)
+    if not db.policy_assistant_tables_available():
+        return {
+            "document_id": document_id,
+            "assistant_import_status": doc.get("assistant_import_status"),
+            "chunks_count": 0,
+            "facts_count": 0,
+            "latest_run": None,
+            "tables_available": False,
+        }
+    snap = db.get_latest_policy_knowledge_snapshot_for_document(document_id)
+    facts_n = db.count_policy_facts_for_snapshot(str(snap["id"])) if snap else 0
+    latest = db.latest_policy_processing_run(document_id)
+    chunks_n = (
+        len(db.list_policy_document_chunks_for_snapshot(document_id, str(snap["id"])))
+        if snap
+        else db.count_policy_document_chunks(document_id)
+    )
+    return {
+        "document_id": document_id,
+        "assistant_import_status": doc.get("assistant_import_status"),
+        "legacy_processing_status": doc.get("processing_status"),
+        "chunks_count": chunks_n,
+        "facts_count": facts_n,
+        "latest_snapshot_id": str(snap["id"]) if snap else None,
+        "latest_run": latest,
+        "extraction_error": doc.get("extraction_error"),
+        "tables_available": True,
+    }
+
+
+@app.get("/api/admin/policies/{document_id}/preview")
+def admin_policy_assistant_preview(
+    document_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Summary for UI: metadata, section list, fact counts by type, readiness."""
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(document_id, request_id=request_id)
+    _require_document_access(user, doc)
+    if not db.policy_assistant_tables_available():
+        return {
+            "document": doc,
+            "ready_for_assistant": False,
+            "sections": [],
+            "fact_counts_by_type": {},
+            "message": "policy_assistant_tables_missing",
+        }
+    snap = db.get_latest_policy_knowledge_snapshot_for_document(document_id)
+    chunks = (
+        db.list_policy_document_chunks_for_snapshot(document_id, str(snap["id"]))
+        if snap
+        else []
+    )
+    sections = sorted(
+        {str(c.get("section_title")) for c in chunks if c.get("section_title")}
+    )
+    fact_counts = db.policy_fact_counts_by_type(str(snap["id"])) if snap else {}
+    ais = doc.get("assistant_import_status")
+    act = (snap or {}).get("activation_state") or (snap or {}).get("status")
+    ready = ais == "ready_for_assistant" and bool(snap and act == "active_for_assistant")
+    return {
+        "document": {
+            "id": doc.get("id"),
+            "company_id": doc.get("company_id"),
+            "filename": doc.get("filename"),
+            "mime_type": doc.get("mime_type"),
+            "uploaded_at": doc.get("uploaded_at"),
+            "file_size_bytes": doc.get("file_size_bytes"),
+            "assistant_import_status": ais,
+            "processed_at": doc.get("processed_at"),
+            "extraction_error": doc.get("extraction_error"),
+        },
+        "ready_for_assistant": ready,
+        "sections": sections,
+        "fact_counts_by_type": fact_counts,
+        "chunks_count": len(chunks),
+        "snapshot": snap,
+    }
+
+
+@app.get("/api/admin/policies/company/{company_id}/assistant-source")
+def admin_policy_assistant_company_source(
+    company_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Active assistant policy source for a company."""
+    from .services.policy_assistant_access import require_company_access
+
+    cid = _resolve_company_for_policy(user, company_id)
+    require_company_access(user, cid, db)
+    if not db.policy_assistant_tables_available():
+        return {
+            "company_id": cid,
+            "active_snapshot": None,
+            "source_document": None,
+            "readiness": {"ready": False, "reason": "tables_missing"},
+        }
+    snap = db.get_active_policy_knowledge_snapshot_for_company(cid)
+    if not snap:
+        return {
+            "company_id": cid,
+            "active_snapshot": None,
+            "source_document": None,
+            "readiness": {"ready": False, "reason": "no_active_snapshot"},
+        }
+    doc = db.get_policy_document(str(snap.get("policy_document_id")))
+    binding = db.get_company_policy_assistant_binding(cid)
+    ready = (snap.get("activation_state") or snap.get("status")) == "active_for_assistant"
+    return {
+        "company_id": cid,
+        "active_snapshot": snap,
+        "source_document": doc,
+        "binding": binding,
+        "readiness": {
+            "ready": ready,
+            "assistant_import_status": (doc or {}).get("assistant_import_status"),
+            "uploaded_at": (doc or {}).get("uploaded_at"),
+        },
+    }
+
+
+@app.get("/api/policy-assistant/cases/{case_id}/context")
+def policy_assistant_case_context(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    PolicyAssistantContext for grounding: company, case profile, applicable facts, supporting chunks.
+    """
+    from .services.policy_assistant_access import require_company_access
+    from .services.policy_assistant_case_context_service import build_policy_assistant_context
+
+    ctx = build_policy_assistant_context(db, case_id)
+    cid = ctx.get("company_id")
+    if cid:
+        require_company_access(user, str(cid), db)
+    return ctx
+
+
+@app.get("/api/admin/policies/company/{company_id}/history")
+def admin_policy_assistant_company_history(
+    company_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Documents, extraction runs, snapshots (append-only), activation metadata."""
+    from .services.policy_assistant_access import require_company_access
+
+    cid = _resolve_company_for_policy(user, company_id)
+    require_company_access(user, cid, db)
+    if not db.policy_assistant_tables_available():
+        return {"company_id": cid, "documents": [], "message": "tables_missing"}
+    docs = db.list_policy_documents(cid)
+    out_docs: list = []
+    for d in docs:
+        did = str(d.get("id"))
+        snaps = db.list_policy_knowledge_snapshots_for_document(did)
+        runs = db.list_policy_processing_runs_for_document(did)
+        out_docs.append(
+            {
+                "document": {
+                    "id": did,
+                    "filename": d.get("filename"),
+                    "uploaded_at": d.get("uploaded_at"),
+                    "uploaded_by_user_id": d.get("uploaded_by_user_id"),
+                    "assistant_import_status": d.get("assistant_import_status"),
+                    "file_size_bytes": d.get("file_size_bytes"),
+                },
+                "snapshots": snaps,
+                "processing_runs": runs,
+            }
+        )
+    binding = db.get_company_policy_assistant_binding(cid)
+    active = db.get_active_policy_knowledge_snapshot_for_company(cid)
+    return {
+        "company_id": cid,
+        "documents": out_docs,
+        "company_binding": binding,
+        "active_snapshot": active,
+    }
+
+
+@app.get("/api/admin/policies/answers/audits")
+def admin_policy_assistant_answer_audits(
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+    company_id: Optional[str] = Query(None),
+    case_id: Optional[str] = Query(None),
+    snapshot_id: Optional[str] = Query(None),
+    evidence_status: Optional[str] = Query(None),
+    created_after: Optional[str] = Query(None, description="ISO8601 lower bound"),
+    created_before: Optional[str] = Query(None, description="ISO8601 upper bound"),
+    limit: int = Query(100, ge=1, le=500),
+):
+    from .services.policy_assistant_access import require_company_access
+
+    if user.get("is_admin"):
+        if not company_id or not str(company_id).strip():
+            raise HTTPException(
+                status_code=400,
+                detail="company_id query parameter is required for admin",
+            )
+        cid = str(company_id).strip()
+    else:
+        cid = _resolve_company_for_policy(user, company_id)
+    if not cid:
+        raise HTTPException(status_code=400, detail="company_id required")
+    require_company_access(user, cid, db)
+    rows = db.list_policy_assistant_answer_audits(
+        company_id=cid,
+        case_id=case_id,
+        snapshot_id=snapshot_id,
+        evidence_status=evidence_status,
+        created_after=created_after,
+        created_before=created_before,
+        limit=limit,
+    )
+    return {"audits": rows}
+
+
+@app.get("/api/admin/policies/company/{company_id}/diff")
+def admin_policy_assistant_snapshot_diff(
+    company_id: str,
+    older_snapshot_id: str = Query(..., description="Earlier snapshot"),
+    newer_snapshot_id: str = Query(..., description="Later snapshot"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    from .services.policy_assistant_access import require_company_access, require_two_snapshots_same_company
+    from .services.policy_snapshot_diff_service import compare_snapshots
+
+    cid = _resolve_company_for_policy(user, company_id)
+    require_company_access(user, cid, db)
+    a, b = require_two_snapshots_same_company(db, older_snapshot_id, newer_snapshot_id)
+    if str(a.get("company_id")) != str(cid) or str(b.get("company_id")) != str(cid):
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return compare_snapshots(db, older_snapshot_id, newer_snapshot_id)
 
 
 # ---------------------------------------------------------------------------

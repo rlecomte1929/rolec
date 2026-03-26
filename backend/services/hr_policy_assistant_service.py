@@ -265,11 +265,11 @@ def execute_hr_policy_assistant_query(
 
     ``resolve_context`` defaults to ``build_hr_resolved_policy_context(db, ...)``; inject for tests.
     """
+    from backend.database import db as app_db
+
     if resolve_context is not None:
         ctx = resolve_context(None, policy_id, document_id, request_id)
     else:
-        from backend.database import db as app_db
-
         ctx = build_hr_resolved_policy_context(
             app_db, policy_id, document_id, request_id=request_id
         )
@@ -295,6 +295,24 @@ def execute_hr_policy_assistant_query(
         request_id=request_id,
         employee_resolution=None,
     )
+    try:
+        from .policy_assistant_answer_audit_service import record_hr_policy_assistant_answer_audit
+
+        pol = app_db.get_company_policy(pid) if pid else None
+        cid = (pol or {}).get("company_id")
+        if cid:
+            record_hr_policy_assistant_answer_audit(
+                app_db,
+                company_id=str(cid),
+                user_id=str(user.get("id") or ""),
+                policy_id=pid,
+                document_id=document_id,
+                message=message,
+                answer=answer,
+                request_id=request_id,
+            )
+    except Exception:
+        pass
     next_sess = update_session_after_turn(sess, classification, answer)
     return answer, request_id, next_sess.to_json_dict()
 
