@@ -22,6 +22,11 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
+# Match bootstrap_backend_database.py: default SQLite file is backend/relopass.db (not cwd-relative ./relopass.db).
+if "DATABASE_URL" not in os.environ:
+    _default_db = os.path.abspath(os.path.join(REPO_ROOT, "backend", "relopass.db"))
+    os.environ["DATABASE_URL"] = f"sqlite:///{_default_db}"
+
 from sqlalchemy import text
 
 from backend.database import Database, db
@@ -169,7 +174,12 @@ def _seed_company_policy(
     *,
     use_fallback: bool,
 ) -> Dict[str, Any]:
-    document = ingest_canonical_policy_document(database, company_id=company_id, file_path=file_path)
+    document = ingest_canonical_policy_document(
+        database,
+        company_id=company_id,
+        file_path=file_path,
+        mime_type="application/pdf",
+    )
     chunk_canonical_policy_document(database, str(document["id"]))
     extract_canonical_policy_facts(database, str(document["id"]), use_fallback=use_fallback)
     return database.get_canonical_policy_document(str(document["id"])) or document

@@ -146,6 +146,8 @@ From the **repository root** (so `PYTHONPATH` and imports resolve):
 python backend/scripts/audit_policy_assistant.py
 ```
 
+If `DATABASE_URL` is unset, the audit script defaults to `sqlite:///<repo>/backend/relopass.db` (same file as `bootstrap_backend_database.py`). To generate minimal test PDFs: `PYTHONPATH=. python backend/scripts/generate_sample_audit_pdfs.py` (writes under `docs/samples/`).
+
 This creates two companies (`company_acme` and `company_beta` by default), seeds HR and employee profiles per company, ingests the GOPS PDF for Acme and the LTA summary for Beta (chunk + extract), sets them as the active canonical policy per company (latest ingested document wins), runs a representative **(role, company_id, question)** matrix, runs RBAC checks, and writes **`audit_report.json`** in the current working directory.
 
 **Common options**

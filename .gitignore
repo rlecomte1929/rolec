@@ -1,5 +1,6 @@
 # Python
 .venv/
+venv/
 __pycache__/
 *.pyc
 relopass.db
@@ -26,3 +27,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local audit output
+audit_report.json

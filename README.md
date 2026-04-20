@@ -301,6 +301,17 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 
 Backend runs at `http://localhost:8000`.
 
+**Policy assistant audit (canonical pipeline):** bootstrap the DB and migrations once, then run the audit:
+
+```bash
+PYTHONPATH=. python backend/scripts/bootstrap_backend_database.py
+export RELOPASS_AUDIT_POLICY_GOPS="/absolute/path/GOPS 12102.pdf"
+export RELOPASS_AUDIT_POLICY_LTA="/absolute/path/Long Term Assignment Policy Summary.pdf"
+PYTHONPATH=. python backend/scripts/audit_policy_assistant.py
+```
+
+`bootstrap_backend_database.py` runs `database.init_db()` then aligns Alembic (on SQLite it typically **stamps** `head` when the DB is fresh, because `init_db()` already created the canonical tables; Postgres uses `alembic upgrade head`). Default DB file: `backend/relopass.db` (absolute path). Override with `DATABASE_URL` if needed. Optional PDF drop-in: `docs/samples/`. Full detail: [docs/policy/canonical-policy-pipeline.md](docs/policy/canonical-policy-pipeline.md).
+
 ### Frontend
 
 ```bash
