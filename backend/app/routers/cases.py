@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from ..db import SessionLocal
 from .. import crud, schemas
 from ...database import db as main_db
+from ...services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.research import run_country_research
 from ..services.requirements_builder import compute_case_requirements
 
@@ -71,6 +72,7 @@ def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
             main_db.apply_wizard_patch_side_effects(case_id, draft, derived)
         except Exception:
             logger.exception("apply_wizard_patch_side_effects failed case_id=%s", case_id)
+        invalidate_relocation_plan_cache(case_id=case_id)
         return _case_dto(case, draft)
 
 

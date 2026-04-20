@@ -1,3 +1,5 @@
+import enum
+
 from sqlalchemy import Column, String, DateTime, Text, Float, Date, Integer, Boolean, Numeric, ForeignKey
 from sqlalchemy.sql import func
 from .db import Base
@@ -163,3 +165,200 @@ class SupplierScoringMetadata(Base):
     manual_priority = Column(Integer, nullable=True)  # relative priority (higher = rank higher)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class AssignmentType(str, enum.Enum):
+    LONG_TERM = "long_term"
+    SHORT_TERM = "short_term"
+    PERMANENT = "permanent"
+    COMMUTER = "commuter"
+    EXTENDED_BUSINESS_TRIP = "extended_business_trip"
+    INTERNATIONAL = "international"
+
+
+class Phase(str, enum.Enum):
+    PRE_ASSIGNMENT = "pre_assignment"
+    ON_ASSIGNMENT = "on_assignment"
+    REPATRIATION = "repatriation"
+    ONGOING = "ongoing"
+    EXCEPTION = "exception"
+
+
+class BenefitCategory(str, enum.Enum):
+    HOUSING = "housing"
+    TEMPORARY_HOUSING = "temporary_housing"
+    TRAVEL = "travel"
+    SHIPMENT = "shipment"
+    IMMIGRATION = "immigration"
+    TAX = "tax"
+    SCHOOLING = "schooling"
+    ALLOWANCE = "allowance"
+    MOBILITY_PREMIUM = "mobility_premium"
+    SPOUSE_SUPPORT = "spouse_support"
+    HOME_LEAVE = "home_leave"
+    TRANSPORTATION = "transportation"
+    MEALS = "meals"
+    MISCELLANEOUS = "miscellaneous"
+
+
+class ValueType(str, enum.Enum):
+    MONETARY = "monetary"
+    PERCENTAGE = "percentage"
+    BOOLEAN = "boolean"
+    DURATION = "duration"
+    QUANTITY = "quantity"
+    TEXT = "text"
+
+
+class Frequency(str, enum.Enum):
+    ONE_TIME = "one_time"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
+    YEARLY = "yearly"
+    PER_ASSIGNMENT = "per_assignment"
+    PER_TRIP = "per_trip"
+    PER_CHILD = "per_child"
+    PER_FAMILY = "per_family"
+    RECURRING = "recurring"
+
+
+class ProviderEntity(str, enum.Enum):
+    COMPANY = "company"
+    EMPLOYEE = "employee"
+    VENDOR = "vendor"
+    PAYROLL = "payroll"
+    HR = "hr"
+    MOBILITY_TEAM = "mobility_team"
+    INSURER = "insurer"
+    TAX_PROVIDER = "tax_provider"
+    IMMIGRATION_PROVIDER = "immigration_provider"
+    UNKNOWN = "unknown"
+
+
+class PolicyDocumentCanonical(Base):
+    __tablename__ = "canonical_policy_documents"
+
+    id = Column(String, primary_key=True, index=True)
+    company_id = Column(String, nullable=False, index=True)
+    source_policy_document_id = Column(String, nullable=True, index=True)
+    source_type = Column(String, nullable=False, default="local_file")
+    source_uri = Column(String, nullable=True)
+    filename = Column(String, nullable=True)
+    mime_type = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    policy_scope = Column(String, nullable=True)
+    document_type = Column(String, nullable=True)
+    version_label = Column(String, nullable=True)
+    effective_date = Column(Date, nullable=True)
+    default_currency = Column(String, nullable=True)
+    assignment_types_json = Column(Text, nullable=False, default="[]")
+    raw_text = Column(Text, nullable=True)
+    normalized_text = Column(Text, nullable=True)
+    metadata_json = Column(Text, nullable=False, default="{}")
+    ingestion_status = Column(String, nullable=False, default="ingested")
+    extraction_status = Column(String, nullable=False, default="pending")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class PolicyDocumentChunkCanonical(Base):
+    __tablename__ = "canonical_policy_document_chunks"
+
+    id = Column(String, primary_key=True, index=True)
+    company_id = Column(String, nullable=False, index=True)
+    canonical_policy_document_id = Column(
+        String,
+        ForeignKey("canonical_policy_documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    chunk_index = Column(Integer, nullable=False)
+    section_path = Column(String, nullable=True)
+    structure_type = Column(String, nullable=True)
+    page_number = Column(Integer, nullable=True)
+    char_start = Column(Integer, nullable=True)
+    char_end = Column(Integer, nullable=True)
+    text_content = Column(Text, nullable=False)
+    metadata_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class PolicyFactCanonical(Base):
+    __tablename__ = "canonical_policy_facts"
+
+    id = Column(String, primary_key=True, index=True)
+    company_id = Column(String, nullable=False, index=True)
+    canonical_policy_document_id = Column(
+        String,
+        ForeignKey("canonical_policy_documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    canonical_policy_document_chunk_id = Column(
+        String,
+        ForeignKey("canonical_policy_document_chunks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_policy_document_id = Column(String, nullable=True, index=True)
+    phase = Column(String, nullable=True, index=True)
+    benefit_category = Column(String, nullable=True, index=True)
+    value_type = Column(String, nullable=False, index=True)
+    frequency = Column(String, nullable=True)
+    provider_entity = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    eligibility_json = Column(Text, nullable=False, default="{}")
+    assignment_types_json = Column(Text, nullable=False, default="[]")
+    amount = Column(Numeric, nullable=True)
+    currency = Column(String, nullable=True)
+    percentage = Column(Float, nullable=True)
+    quantity = Column(Float, nullable=True)
+    duration_value = Column(Integer, nullable=True)
+    duration_unit = Column(String, nullable=True)
+    value_text = Column(Text, nullable=True)
+    is_taxable = Column(Boolean, nullable=True)
+    reimbursement_required = Column(Boolean, nullable=True)
+    source_quote = Column(Text, nullable=True)
+    confidence_score = Column(Float, nullable=True)
+    raw_payload_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class PolicyFactCanonicalValidationError(Base):
+    __tablename__ = "canonical_policy_fact_validation_errors"
+
+    id = Column(String, primary_key=True, index=True)
+    company_id = Column(String, nullable=False, index=True)
+    canonical_policy_document_id = Column(
+        String,
+        ForeignKey("canonical_policy_documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    canonical_policy_document_chunk_id = Column(
+        String,
+        ForeignKey("canonical_policy_document_chunks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    raw_payload_json = Column(Text, nullable=False, default="{}")
+    errors_json = Column(Text, nullable=False, default="[]")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class QueryAuditLog(Base):
+    __tablename__ = "canonical_policy_query_audit_logs"
+
+    id = Column(String, primary_key=True, index=True)
+    company_id = Column(String, nullable=False, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    user_role = Column(String, nullable=False, index=True)
+    canonical_policy_document_id = Column(String, nullable=False, index=True)
+    query_text = Column(Text, nullable=False)
+    redacted_query_text = Column(Text, nullable=False)
+    retrieved_chunk_ids_json = Column(Text, nullable=False, default="[]")
+    answer_preview = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)

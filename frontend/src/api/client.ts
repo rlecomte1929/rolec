@@ -2356,7 +2356,7 @@ export const policyDocumentsAPI = {
     const response = await api.get(`/api/hr/policy-documents/${docId}`);
     return response.data;
   },
-  upload: async (file: File, companyId?: string | null): Promise<{ ok: boolean; document: any; error_code?: string; message?: string; request_id?: string }> => {
+  upload: async (file: File, companyId?: string | null): Promise<{ ok: boolean; document: any; error_code?: string; message?: string; request_id?: string; processing_queued?: boolean }> => {
     // Backend expects field name "file". When admin is viewing a company's policy workspace, pass company_id so the doc is stored for that company.
     const form = new FormData();
     form.append('file', file);

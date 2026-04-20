@@ -12,6 +12,8 @@ number of queries; runs phase engine, status derivation, and next-action selecti
 from __future__ import annotations
 
 import logging
+import time
+from threading import Lock
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
@@ -68,8 +70,63 @@ from ..relocation_plan_view_schemas import (
 log = logging.getLogger(__name__)
 
 _THRESHOLDS = DerivationThresholds()
+_CACHE_TTL_SECONDS = 15.0
+_CACHE_MAX_ENTRIES = 128
+_PLAN_CACHE_LOCK = Lock()
+_PLAN_CACHE: Dict[Tuple[str, str, str], Tuple[float, RelocationPlanViewResponse]] = {}
 
 _SHIPMENT_SERVICE_KEYS = frozenset({"movers", "shipment", "shipping"})
+
+
+def invalidate_relocation_plan_cache(
+    *,
+    case_id: Optional[str] = None,
+    assignment_id: Optional[str] = None,
+) -> None:
+    """Invalidate cached relocation-plan responses for a case and/or assignment."""
+    if not case_id and not assignment_id:
+        with _PLAN_CACHE_LOCK:
+            _PLAN_CACHE.clear()
+        return
+    with _PLAN_CACHE_LOCK:
+        doomed = [
+            key for key in _PLAN_CACHE
+            if (case_id and key[0] == case_id) or (assignment_id and key[1] == assignment_id)
+        ]
+        for key in doomed:
+            _PLAN_CACHE.pop(key, None)
+
+
+def _cache_key(case_id: str, assignment_id: Optional[str], viewer_role: str) -> Tuple[str, str, str]:
+    return (case_id, assignment_id or "", viewer_role.strip().lower())
+
+
+def _get_cached_plan_view(key: Tuple[str, str, str]) -> Optional[RelocationPlanViewResponse]:
+    now = time.monotonic()
+    with _PLAN_CACHE_LOCK:
+        cached = _PLAN_CACHE.get(key)
+        if not cached:
+            return None
+        expires_at, payload = cached
+        if expires_at <= now:
+            _PLAN_CACHE.pop(key, None)
+            return None
+        return payload.model_copy(deep=True)
+
+
+def _store_cached_plan_view(
+    key: Tuple[str, str, str],
+    payload: RelocationPlanViewResponse,
+) -> None:
+    now = time.monotonic()
+    with _PLAN_CACHE_LOCK:
+        expired = [cache_key for cache_key, (expires_at, _) in _PLAN_CACHE.items() if expires_at <= now]
+        for cache_key in expired:
+            _PLAN_CACHE.pop(cache_key, None)
+        if len(_PLAN_CACHE) >= _CACHE_MAX_ENTRIES:
+            oldest_key = min(_PLAN_CACHE.items(), key=lambda item: item[1][0])[0]
+            _PLAN_CACHE.pop(oldest_key, None)
+        _PLAN_CACHE[key] = (now + _CACHE_TTL_SECONDS, payload.model_copy(deep=True))
 
 
 def _move_includes_shipment_from_selected_services(keys: Set[str]) -> Optional[bool]:
@@ -532,12 +589,37 @@ def get_relocation_plan_view_for_case_assignment(
     """
     End-to-end loader for the HTTP handler: milestones, draft, mobility bridge, then assembly.
     """
+    started_at = time.perf_counter()
     assignment_id = str(assignment.get("id") or "").strip() or None
+    cache_key = _cache_key(case_id_effective, assignment_id, viewer_role)
+    if not debug:
+        cached = _get_cached_plan_view(cache_key)
+        if cached is not None:
+            total_ms = (time.perf_counter() - started_at) * 1000
+            log.info(
+                "request_id=%s relocation_plan_view cache=hit case_id=%s assignment_id=%s role=%s total_ms=%.2f",
+                request_id,
+                case_id_effective,
+                assignment_id,
+                viewer_role,
+                total_ms,
+            )
+            return cached
+    milestones_started_at = time.perf_counter()
     milestones = db.list_case_milestones(case_id_effective, request_id=request_id)
+    milestones_ms = (time.perf_counter() - milestones_started_at) * 1000
+
+    mobility_started_at = time.perf_counter()
     mobility_case_id = db.get_mobility_case_id_for_assignment(assignment_id or "", request_id=request_id) if assignment_id else None
+    mobility_ms = (time.perf_counter() - mobility_started_at) * 1000
+
+    profile_started_at = time.perf_counter()
     with session_factory() as session:
         profile = load_profile_draft_for_case(session, case_id_effective)
-    return build_relocation_plan_view_response(
+    profile_ms = (time.perf_counter() - profile_started_at) * 1000
+
+    assembly_started_at = time.perf_counter()
+    response = build_relocation_plan_view_response(
         case_id=case_id_effective,
         assignment_id=assignment_id,
         milestones=milestones,
@@ -548,3 +630,20 @@ def get_relocation_plan_view_for_case_assignment(
         debug=debug,
         request_id=request_id,
     )
+    assembly_ms = (time.perf_counter() - assembly_started_at) * 1000
+    if not debug:
+        _store_cached_plan_view(cache_key, response)
+    total_ms = (time.perf_counter() - started_at) * 1000
+    log.info(
+        "request_id=%s relocation_plan_view cache=miss case_id=%s assignment_id=%s role=%s milestones_ms=%.2f mobility_ms=%.2f profile_ms=%.2f assembly_ms=%.2f total_ms=%.2f",
+        request_id,
+        case_id_effective,
+        assignment_id,
+        viewer_role,
+        milestones_ms,
+        mobility_ms,
+        profile_ms,
+        assembly_ms,
+        total_ms,
+    )
+    return response

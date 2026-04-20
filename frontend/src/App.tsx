@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
@@ -13,89 +13,101 @@ import { TrustPage } from './pages/public/TrustPage';
 import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
 import { AccessPage } from './pages/public/AccessPage';
 import { Auth } from './pages/Auth';
-import { Journey } from './pages/Journey';
-import { Dashboard } from './pages/Dashboard';
-import { EmployeeJourney } from './pages/EmployeeJourney';
-import { HrDashboard } from './pages/HrDashboard';
-import { HrCaseSummary } from './pages/HrCaseSummary';
-import { HrAssignmentReview } from './pages/HrAssignmentReview';
-import { HrComplianceCheck } from './pages/HrComplianceCheck';
-import { HrAssignmentPackageReview } from './pages/HrAssignmentPackageReview';
-import { HrPreferredSuppliers } from './pages/HrPreferredSuppliers';
-import { HrPolicy } from './pages/HrPolicy';
-import { HrPolicyConfigPage } from './pages/HrPolicyConfigPage';
-import { EmployeePolicyPage } from './pages/employee/EmployeePolicyPage';
-import { CaseWizardPage } from './pages/employee/CaseWizardPage';
-import { EmployeeCaseSummary } from './pages/employee/EmployeeCaseSummary';
-import { EmployeeRelocationPlanPage } from './pages/employee/EmployeeRelocationPlanPage';
-import { CountriesPage } from './pages/admin/CountriesPage';
-import { CountryDetailPage } from './pages/admin/CountryDetailPage';
-import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
-import { AdminMobilityCaseInspectPage } from './pages/admin/AdminMobilityCaseInspectPage';
-import { AdminPoliciesPage } from './pages/admin/AdminPoliciesPage';
-import { AdminPolicyConfigPage } from './pages/admin/AdminPolicyConfigPage';
-import { AdminCompanies } from './pages/admin/AdminCompanies';
-import { AdminUsers } from './pages/admin/AdminUsers';
-import { AdminAssignments } from './pages/admin/AdminAssignments';
-import { AdminMessages } from './pages/admin/AdminMessages';
-import { AdminSuppliers } from './pages/admin/AdminSuppliers';
-import { AdminSupplierNew } from './pages/admin/AdminSupplierNew';
-import { AdminSupplierDetail } from './pages/admin/AdminSupplierDetail';
-import { AdminCompanyDetail } from './pages/admin/AdminCompanyDetail';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
-import { AdminResources } from './pages/admin/AdminResources';
-import { AdminResourceEditor } from './pages/admin/AdminResourceEditor';
-import { AdminEvents } from './pages/admin/AdminEvents';
-import { AdminEventEditor } from './pages/admin/AdminEventEditor';
-import { AdminCategories } from './pages/admin/AdminCategories';
-import { AdminTags } from './pages/admin/AdminTags';
-import { AdminSources } from './pages/admin/AdminSources';
-import { AdminStagingDashboard } from './pages/admin/staging/AdminStagingDashboard';
-import { AdminStagingResources } from './pages/admin/staging/AdminStagingResources';
-import { AdminStagingResourceDetail } from './pages/admin/staging/AdminStagingResourceDetail';
-import { AdminStagingEvents } from './pages/admin/staging/AdminStagingEvents';
-import { AdminStagingEventDetail } from './pages/admin/staging/AdminStagingEventDetail';
-import { AdminFreshnessOverview } from './pages/admin/freshness/AdminFreshnessOverview';
-import { AdminFreshnessCountries } from './pages/admin/freshness/AdminFreshnessCountries';
-import { AdminFreshnessCities } from './pages/admin/freshness/AdminFreshnessCities';
-import { AdminFreshnessSources } from './pages/admin/freshness/AdminFreshnessSources';
-import { AdminFreshnessChanges } from './pages/admin/freshness/AdminFreshnessChanges';
-import { AdminFreshnessStaleContent } from './pages/admin/freshness/AdminFreshnessStaleContent';
-import { AdminCrawlSchedules } from './pages/admin/freshness/AdminCrawlSchedules';
-import { AdminCrawlJobRuns } from './pages/admin/freshness/AdminCrawlJobRuns';
-import { AdminCrawlJobRunDetail } from './pages/admin/freshness/AdminCrawlJobRunDetail';
-import { AdminReviewQueuePage } from './pages/admin/review-queue/AdminReviewQueuePage';
-import { AdminReviewQueueDetailPage } from './pages/admin/review-queue/AdminReviewQueueDetailPage';
-import { AdminReviewQueueWorkloadPage } from './pages/admin/review-queue/AdminReviewQueueWorkloadPage';
-import { AdminOpsSlaPage } from './pages/admin/ops/AdminOpsSlaPage';
-import { AdminOpsQueuePage } from './pages/admin/ops/AdminOpsQueuePage';
-import { AdminOpsReviewersPage } from './pages/admin/ops/AdminOpsReviewersPage';
-import { AdminOpsDestinationsPage } from './pages/admin/ops/AdminOpsDestinationsPage';
-import { AdminOpsNotificationsPage } from './pages/admin/ops/AdminOpsNotificationsPage';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
-import { ProvidersPage } from './pages/ProvidersPage';
 import { DebugAuth } from './pages/DebugAuth';
 import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
-import { Messages } from './pages/Messages';
-import { Resources } from './pages/Resources';
-import { ServicesQuestions } from './pages/services/ServicesQuestions';
-import { ServicesRecommendations } from './pages/services/ServicesRecommendations';
-import { ServicesEstimate } from './pages/services/ServicesEstimate';
-import { ServicesRfqNew } from './pages/services/ServicesRfqNew';
-import { ServicesConclusion } from './pages/services/ServicesConclusion';
-import { QuotesInbox } from './pages/services/QuotesInbox';
-import { QuoteRfqDetail } from './pages/services/QuoteRfqDetail';
-import { VendorInbox } from './pages/vendor/VendorInbox';
-import { VendorRfq } from './pages/vendor/VendorRfq';
-import { HrCompanyProfile } from './pages/HrCompanyProfile';
-import { HrEmployees } from './pages/HrEmployees';
-import { HrEmployeeDetail } from './pages/HrEmployeeDetail';
-import { HrCommandCenter } from './pages/HrCommandCenter';
-import { HrCommandCenterCaseDetail } from './pages/HrCommandCenterCaseDetail';
-import { NotificationSettings } from './pages/NotificationSettings';
 import { PerfPanel } from './components/PerfPanel';
+
+const Journey = lazy(() => import('./pages/Journey').then((module) => ({ default: module.Journey })));
+const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
+const EmployeeJourney = lazy(() => import('./pages/EmployeeJourney').then((module) => ({ default: module.EmployeeJourney })));
+const HrDashboard = lazy(() => import('./pages/HrDashboard').then((module) => ({ default: module.HrDashboard })));
+const HrCaseSummary = lazy(() => import('./pages/HrCaseSummary').then((module) => ({ default: module.HrCaseSummary })));
+const HrAssignmentReview = lazy(() => import('./pages/HrAssignmentReview').then((module) => ({ default: module.HrAssignmentReview })));
+const HrComplianceCheck = lazy(() => import('./pages/HrComplianceCheck').then((module) => ({ default: module.HrComplianceCheck })));
+const HrAssignmentPackageReview = lazy(() => import('./pages/HrAssignmentPackageReview').then((module) => ({ default: module.HrAssignmentPackageReview })));
+const HrPreferredSuppliers = lazy(() => import('./pages/HrPreferredSuppliers').then((module) => ({ default: module.HrPreferredSuppliers })));
+const HrPolicy = lazy(() => import('./pages/HrPolicy').then((module) => ({ default: module.HrPolicy })));
+const HrPolicyConfigPage = lazy(() => import('./pages/HrPolicyConfigPage').then((module) => ({ default: module.HrPolicyConfigPage })));
+const EmployeePolicyPage = lazy(() => import('./pages/employee/EmployeePolicyPage').then((module) => ({ default: module.EmployeePolicyPage })));
+const CaseWizardPage = lazy(() => import('./pages/employee/CaseWizardPage').then((module) => ({ default: module.CaseWizardPage })));
+const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
+const EmployeeRelocationPlanPage = lazy(() => import('./pages/employee/EmployeeRelocationPlanPage').then((module) => ({ default: module.EmployeeRelocationPlanPage })));
+const ProvidersPage = lazy(() => import('./pages/ProvidersPage').then((module) => ({ default: module.ProvidersPage })));
+const Messages = lazy(() => import('./pages/Messages').then((module) => ({ default: module.Messages })));
+const Resources = lazy(() => import('./pages/Resources').then((module) => ({ default: module.Resources })));
+const ServicesQuestions = lazy(() => import('./pages/services/ServicesQuestions').then((module) => ({ default: module.ServicesQuestions })));
+const ServicesRecommendations = lazy(() => import('./pages/services/ServicesRecommendations').then((module) => ({ default: module.ServicesRecommendations })));
+const ServicesEstimate = lazy(() => import('./pages/services/ServicesEstimate').then((module) => ({ default: module.ServicesEstimate })));
+const ServicesRfqNew = lazy(() => import('./pages/services/ServicesRfqNew').then((module) => ({ default: module.ServicesRfqNew })));
+const ServicesConclusion = lazy(() => import('./pages/services/ServicesConclusion').then((module) => ({ default: module.ServicesConclusion })));
+const QuotesInbox = lazy(() => import('./pages/services/QuotesInbox').then((module) => ({ default: module.QuotesInbox })));
+const QuoteRfqDetail = lazy(() => import('./pages/services/QuoteRfqDetail').then((module) => ({ default: module.QuoteRfqDetail })));
+const VendorInbox = lazy(() => import('./pages/vendor/VendorInbox').then((module) => ({ default: module.VendorInbox })));
+const VendorRfq = lazy(() => import('./pages/vendor/VendorRfq').then((module) => ({ default: module.VendorRfq })));
+const HrCompanyProfile = lazy(() => import('./pages/HrCompanyProfile').then((module) => ({ default: module.HrCompanyProfile })));
+const HrEmployees = lazy(() => import('./pages/HrEmployees').then((module) => ({ default: module.HrEmployees })));
+const HrEmployeeDetail = lazy(() => import('./pages/HrEmployeeDetail').then((module) => ({ default: module.HrEmployeeDetail })));
+const HrCommandCenter = lazy(() => import('./pages/HrCommandCenter').then((module) => ({ default: module.HrCommandCenter })));
+const HrCommandCenterCaseDetail = lazy(() => import('./pages/HrCommandCenterCaseDetail').then((module) => ({ default: module.HrCommandCenterCaseDetail })));
+const NotificationSettings = lazy(() => import('./pages/NotificationSettings').then((module) => ({ default: module.NotificationSettings })));
+
+const CountriesPage = lazy(() => import('./pages/admin/CountriesPage').then((module) => ({ default: module.CountriesPage })));
+const CountryDetailPage = lazy(() => import('./pages/admin/CountryDetailPage').then((module) => ({ default: module.CountryDetailPage })));
+const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage').then((module) => ({ default: module.AdminOverviewPage })));
+const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobilityCaseInspectPage').then((module) => ({ default: module.AdminMobilityCaseInspectPage })));
+const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
+const AdminPolicyConfigPage = lazy(() => import('./pages/admin/AdminPolicyConfigPage').then((module) => ({ default: module.AdminPolicyConfigPage })));
+const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies').then((module) => ({ default: module.AdminCompanies })));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((module) => ({ default: module.AdminUsers })));
+const AdminAssignments = lazy(() => import('./pages/admin/AdminAssignments').then((module) => ({ default: module.AdminAssignments })));
+const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((module) => ({ default: module.AdminMessages })));
+const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
+const AdminSupplierNew = lazy(() => import('./pages/admin/AdminSupplierNew').then((module) => ({ default: module.AdminSupplierNew })));
+const AdminSupplierDetail = lazy(() => import('./pages/admin/AdminSupplierDetail').then((module) => ({ default: module.AdminSupplierDetail })));
+const AdminCompanyDetail = lazy(() => import('./pages/admin/AdminCompanyDetail').then((module) => ({ default: module.AdminCompanyDetail })));
+const AdminResources = lazy(() => import('./pages/admin/AdminResources').then((module) => ({ default: module.AdminResources })));
+const AdminResourceEditor = lazy(() => import('./pages/admin/AdminResourceEditor').then((module) => ({ default: module.AdminResourceEditor })));
+const AdminEvents = lazy(() => import('./pages/admin/AdminEvents').then((module) => ({ default: module.AdminEvents })));
+const AdminEventEditor = lazy(() => import('./pages/admin/AdminEventEditor').then((module) => ({ default: module.AdminEventEditor })));
+const AdminCategories = lazy(() => import('./pages/admin/AdminCategories').then((module) => ({ default: module.AdminCategories })));
+const AdminTags = lazy(() => import('./pages/admin/AdminTags').then((module) => ({ default: module.AdminTags })));
+const AdminSources = lazy(() => import('./pages/admin/AdminSources').then((module) => ({ default: module.AdminSources })));
+const AdminStagingDashboard = lazy(() => import('./pages/admin/staging/AdminStagingDashboard').then((module) => ({ default: module.AdminStagingDashboard })));
+const AdminStagingResources = lazy(() => import('./pages/admin/staging/AdminStagingResources').then((module) => ({ default: module.AdminStagingResources })));
+const AdminStagingResourceDetail = lazy(() => import('./pages/admin/staging/AdminStagingResourceDetail').then((module) => ({ default: module.AdminStagingResourceDetail })));
+const AdminStagingEvents = lazy(() => import('./pages/admin/staging/AdminStagingEvents').then((module) => ({ default: module.AdminStagingEvents })));
+const AdminStagingEventDetail = lazy(() => import('./pages/admin/staging/AdminStagingEventDetail').then((module) => ({ default: module.AdminStagingEventDetail })));
+const AdminFreshnessOverview = lazy(() => import('./pages/admin/freshness/AdminFreshnessOverview').then((module) => ({ default: module.AdminFreshnessOverview })));
+const AdminFreshnessCountries = lazy(() => import('./pages/admin/freshness/AdminFreshnessCountries').then((module) => ({ default: module.AdminFreshnessCountries })));
+const AdminFreshnessCities = lazy(() => import('./pages/admin/freshness/AdminFreshnessCities').then((module) => ({ default: module.AdminFreshnessCities })));
+const AdminFreshnessSources = lazy(() => import('./pages/admin/freshness/AdminFreshnessSources').then((module) => ({ default: module.AdminFreshnessSources })));
+const AdminFreshnessChanges = lazy(() => import('./pages/admin/freshness/AdminFreshnessChanges').then((module) => ({ default: module.AdminFreshnessChanges })));
+const AdminFreshnessStaleContent = lazy(() => import('./pages/admin/freshness/AdminFreshnessStaleContent').then((module) => ({ default: module.AdminFreshnessStaleContent })));
+const AdminCrawlSchedules = lazy(() => import('./pages/admin/freshness/AdminCrawlSchedules').then((module) => ({ default: module.AdminCrawlSchedules })));
+const AdminCrawlJobRuns = lazy(() => import('./pages/admin/freshness/AdminCrawlJobRuns').then((module) => ({ default: module.AdminCrawlJobRuns })));
+const AdminCrawlJobRunDetail = lazy(() => import('./pages/admin/freshness/AdminCrawlJobRunDetail').then((module) => ({ default: module.AdminCrawlJobRunDetail })));
+const AdminReviewQueuePage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueuePage').then((module) => ({ default: module.AdminReviewQueuePage })));
+const AdminReviewQueueDetailPage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueueDetailPage').then((module) => ({ default: module.AdminReviewQueueDetailPage })));
+const AdminReviewQueueWorkloadPage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueueWorkloadPage').then((module) => ({ default: module.AdminReviewQueueWorkloadPage })));
+const AdminOpsSlaPage = lazy(() => import('./pages/admin/ops/AdminOpsSlaPage').then((module) => ({ default: module.AdminOpsSlaPage })));
+const AdminOpsQueuePage = lazy(() => import('./pages/admin/ops/AdminOpsQueuePage').then((module) => ({ default: module.AdminOpsQueuePage })));
+const AdminOpsReviewersPage = lazy(() => import('./pages/admin/ops/AdminOpsReviewersPage').then((module) => ({ default: module.AdminOpsReviewersPage })));
+const AdminOpsDestinationsPage = lazy(() => import('./pages/admin/ops/AdminOpsDestinationsPage').then((module) => ({ default: module.AdminOpsDestinationsPage })));
+const AdminOpsNotificationsPage = lazy(() => import('./pages/admin/ops/AdminOpsNotificationsPage').then((module) => ({ default: module.AdminOpsNotificationsPage })));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#f5f7fa] px-6">
+      <div className="rounded-2xl border border-[#e2e8f0] bg-white px-6 py-4 text-sm text-[#4b5563] shadow-sm">
+        Loading page...
+      </div>
+    </div>
+  );
+}
 
 function ReviewToEmployeeDashboardRedirect() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -134,6 +146,7 @@ function App() {
       <HrCompanyContextProvider>
       <ServicesFlowProvider>
       <QueryRedirect />
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
         <Route path={ROUTE_DEFS.platform.path} element={<PlatformPage />} />
@@ -278,6 +291,7 @@ function App() {
         )}
         <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
       </Routes>
+      </Suspense>
       </ServicesFlowProvider>
       </HrCompanyContextProvider>
       </EmployeeAssignmentProvider>

@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, Optional
 
 try:
     # Prefer the supabase-py client from site-packages.
@@ -9,6 +9,9 @@ try:
 except Exception:  # pragma: no cover - defensive fallback
     create_client = None  # type: ignore[assignment]
     Client = Any  # type: ignore[assignment]
+
+
+_admin_client: Optional[Client] = None
 
 
 def _ensure_supabase_client_available() -> None:
@@ -51,9 +54,13 @@ def get_supabase_admin_client() -> Client:
     Admin Supabase client (service-role) for backend-only operations.
     Reads SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY as required.
     """
+    global _admin_client
     _ensure_supabase_client_available()
+    if _admin_client is not None:
+        return _admin_client
     supabase_url = os.getenv("SUPABASE_URL")
     service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     if not supabase_url or not service_key:
         raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required")
-    return create_client(supabase_url, service_key)
+    _admin_client = create_client(supabase_url, service_key)
+    return _admin_client

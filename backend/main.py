@@ -10,7 +10,7 @@ import json as _json
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter
+from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any, List, Tuple
@@ -56,7 +56,6 @@ from .services.rkg_resources import (
     get_recommended_resources,
     resources_to_sections,
 )
-from .services.supabase_client import get_supabase_admin_client
 from .app.services.requirements_sufficiency import compute_requirements_sufficiency
 # Import db_config first and log before any DB connection attempt
 # TODO: Remove masked DB log after confirming production connectivity
@@ -107,9 +106,10 @@ from .policy_engine import PolicyEngine
 from .app.db import init_db, SessionLocal
 from .app import crud as app_crud
 from .relocation_plan_view_schemas import RelocationPlanViewResponse
-from .services.relocation_plan_view_service import get_relocation_plan_view_for_case_assignment
-from .app.seed import seed_demo_cases
-from .app.seed_suppliers import seed_suppliers_from_recommendation_datasets
+from .services.relocation_plan_view_service import (
+    get_relocation_plan_view_for_case_assignment,
+    invalidate_relocation_plan_cache,
+)
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
 from .app.routers import admin_resources as admin_resources_router
@@ -122,6 +122,7 @@ from .app.routers import admin_workflow_analytics as admin_workflow_analytics_ro
 from .app.routers import admin_collaboration as admin_collaboration_router
 from .app.routers import mobility_context as mobility_context_router
 from .app.routers import admin_mobility as admin_mobility_router
+from .app.routers import policy_canonical as policy_canonical_router
 from .routes import relocation as relocation_router
 from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
@@ -132,7 +133,6 @@ from .app.routers import suppliers as suppliers_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
-from .services.supabase_client import get_supabase_admin_client
 
 # ---------------------------------------------------------------------------
 # Startup: validate DATABASE_URL and log DB type
@@ -148,8 +148,17 @@ DISABLE_DEMO_RESEED = os.getenv("DISABLE_DEMO_RESEED", "").lower() in ("1", "tru
 DISABLE_STARTUP_SEED = os.getenv("DISABLE_STARTUP_SEED", "").lower() in ("1", "true", "yes")
 
 
+def _get_supabase_admin_client():
+    from .services.supabase_client import get_supabase_admin_client
+
+    return get_supabase_admin_client()
+
+
 def _run_background_startup_seed() -> None:
     """Demo wizard cases + supplier rows; must not block ASGI bind (Render port check)."""
+    from .app.seed import seed_demo_cases
+    from .app.seed_suppliers import seed_suppliers_from_recommendation_datasets
+
     log.info("Background: seeding demo cases…")
     try:
         seed_demo_cases()
@@ -174,8 +183,34 @@ async def _background_seed_task() -> None:
         log.exception("Background startup seed task failed")
 
 
+def _run_runtime_startup_initialization() -> None:
+    log.info("Initializing database schemas...")
+    init_db()
+    db.ensure_initialized()
+    db.log_expected_tables_status()
+    try:
+        from .services.policy_storage_health import log_startup_storage_diagnostic
+
+        log_startup_storage_diagnostic(db)
+    except Exception as e:
+        log.warning("policy_storage startup diagnostic skipped: %s", e)
+
+    if _db_scheme == "sqlite" and ALLOW_LEGACY_DEMO_SEED and not DISABLE_DEMO_RESEED:
+        try:
+            _seed_demo_cases()
+        except Exception as e:
+            log.warning("Legacy demo seed skipped or failed: %s", e)
+
+    if DISABLE_STARTUP_SEED:
+        log.info("Startup seed disabled (DISABLE_STARTUP_SEED).")
+    else:
+        log.info("Demo/supplier seed scheduled in background after listen (Render-safe).")
+    log.info("Startup complete.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await asyncio.to_thread(_run_runtime_startup_initialization)
     if not DISABLE_STARTUP_SEED:
         asyncio.create_task(_background_seed_task())
     yield
@@ -201,19 +236,6 @@ log.info(
     DISABLE_DEMO_RESEED,
     ALLOW_LEGACY_DEMO_SEED,
 )
-log.info("Initializing database schemas...")
-init_db()
-db.log_expected_tables_status()
-try:
-    from .services.policy_storage_health import log_startup_storage_diagnostic
-    log_startup_storage_diagnostic(db)
-except Exception as e:
-    log.warning("policy_storage startup diagnostic skipped: %s", e)
-if DISABLE_STARTUP_SEED:
-    log.info("Startup seed disabled (DISABLE_STARTUP_SEED).")
-else:
-    log.info("Demo/supplier seed scheduled in background after listen (Render-safe).")
-log.info("Startup complete.")
 
 # CORS middleware (include Vite fallback ports 3002–3005 for local dev)
 default_origins = [
@@ -358,6 +380,8 @@ app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
 app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
+app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")
+app.include_router(policy_canonical_router.read_router, prefix="/api")
 app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
 app.include_router(recommendations_router)
@@ -717,15 +741,6 @@ def _seed_default_hr_policy() -> None:
         },
     }
     db.create_hr_policy(policy_id, policy, created_by=None)
-
-
-# Only run legacy demo seed (relocation_cases with string IDs) on SQLite, and only when explicitly allowed.
-# Production Supabase uses UUID for relocation_cases.id; seeding would crash.
-if _db_scheme == "sqlite" and ALLOW_LEGACY_DEMO_SEED and not DISABLE_DEMO_RESEED:
-    try:
-        _seed_demo_cases()
-    except Exception as e:
-        log.warning("Demo seed skipped or failed: %s", e)
 
 
 _CANONICAL_STATUS_VALUES = {s.value for s in AssignmentStatus}
@@ -3302,7 +3317,7 @@ async def upload_company_logo(
         raise HTTPException(status_code=400, detail="Logo must be 2MB or smaller")
 
     try:
-        supabase = get_supabase_admin_client()
+        supabase = _get_supabase_admin_client()
         path = f"companies/{company_id}/logo.{ext}"
         supabase.storage.from_("company-logos").upload(
             path,
@@ -4510,7 +4525,7 @@ def debug_supabase():
         )
 
     try:
-        client = get_supabase_admin_client()
+        client = _get_supabase_admin_client()
         # Lightweight query: try to select a single row (or none) from notifications.
         res = client.table("notifications").select("id").limit(1).execute()
         db_ok = res is not None
@@ -5449,7 +5464,7 @@ def get_assignment_timeline(
 def _get_section_content(country_code: str, city: str, section_key: str) -> Dict[str, Any]:
     """Fetch section content from DB (Supabase) if available, else from Python defaults."""
     try:
-        supabase = get_supabase_admin_client()
+        supabase = _get_supabase_admin_client()
         # Try city-specific first, then country-level (city is null)
         for city_val in ([city] if city else []) + [None]:
             q = (
@@ -5880,6 +5895,142 @@ def _sanitize_storage_error(exc: Exception, bucket: str) -> str:
     return msg
 
 
+def _run_policy_document_ingest_background(
+    *,
+    doc_id: str,
+    content: bytes,
+    mime: str,
+    filename: str,
+    request_id: str,
+    user_id: str,
+    company_id: str,
+) -> None:
+    extraction_failed = False
+    num_clauses = 0
+    try:
+        from .services.policy_document_intake import process_uploaded_document
+        from .services.policy_pipeline_analytics import (
+            emit_policy_classify_completed,
+            emit_policy_classify_failed,
+            emit_policy_classify_started,
+        )
+
+        emit_policy_classify_started(
+            request_id=request_id,
+            user_id=user_id,
+            company_id=company_id,
+            document_id=doc_id,
+            source="upload",
+        )
+        result = process_uploaded_document(content, mime, filename, request_id=request_id)
+        db.update_policy_document(
+            doc_id,
+            processing_status=result.get("processing_status"),
+            detected_document_type=result.get("detected_document_type"),
+            detected_policy_scope=result.get("detected_policy_scope"),
+            version_label=result.get("version_label"),
+            effective_date=result.get("effective_date"),
+            raw_text=result.get("raw_text"),
+            extraction_error=result.get("extraction_error"),
+            extracted_metadata=result.get("extracted_metadata"),
+            assistant_import_status=(
+                "failed"
+                if result.get("processing_status") == "failed"
+                else "classified"
+            ),
+            processed_at=datetime.utcnow().isoformat(),
+            request_id=request_id,
+        )
+        if result.get("processing_status") == "failed":
+            extraction_failed = True
+            try:
+                emit_policy_classify_failed(
+                    request_id=request_id,
+                    user_id=user_id,
+                    company_id=company_id,
+                    document_id=doc_id,
+                    extraction_error=result.get("extraction_error"),
+                    source="upload",
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                emit_policy_classify_completed(
+                    request_id=request_id,
+                    user_id=user_id,
+                    company_id=company_id,
+                    document_id=doc_id,
+                    processing_status=result.get("processing_status"),
+                    detected_document_type=result.get("detected_document_type"),
+                    source="upload",
+                )
+            except Exception:
+                pass
+            if result.get("raw_text"):
+                try:
+                    from .services.policy_document_clauses import segment_document_from_raw_text
+
+                    policy_segment_ctx = {
+                        "id": doc_id,
+                        "document_id": doc_id,
+                        "detected_document_type": result.get("detected_document_type"),
+                        "extracted_metadata": result.get("extracted_metadata") or {},
+                        "filename": filename,
+                    }
+                    clauses, seg_err = segment_document_from_raw_text(
+                        result["raw_text"], mime, data=content, policy_context=policy_segment_ctx
+                    )
+                    if not seg_err and clauses:
+                        db.upsert_policy_document_clauses(doc_id, clauses, request_id=request_id)
+                        num_clauses = len(clauses)
+                except Exception as seg_exc:
+                    log.warning("request_id=%s policy_upload stage=segment failed: %s", request_id, seg_exc)
+    except Exception as exc:
+        extraction_failed = True
+        safe_msg = (str(exc) or type(exc).__name__)[:200]
+        log.error(
+            "request_id=%s policy_pipeline stage=ingest document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
+            request_id, doc_id, company_id, user_id, type(exc).__name__, safe_msg, exc_info=True,
+        )
+        db.update_policy_document(
+            doc_id,
+            processing_status="failed",
+            extraction_error=str(exc),
+            assistant_import_status="failed",
+            processed_at=datetime.utcnow().isoformat(),
+            request_id=request_id,
+        )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_classify_failed
+
+            emit_policy_classify_failed(
+                request_id=request_id,
+                user_id=user_id,
+                company_id=company_id,
+                document_id=doc_id,
+                extraction_error=str(exc),
+                source="upload",
+            )
+        except Exception:
+            pass
+
+    final_doc = db.get_policy_document(doc_id, request_id=request_id) or {}
+    if not num_clauses and final_doc:
+        try:
+            num_clauses = len(db.list_policy_document_clauses(doc_id, request_id=request_id))
+        except Exception:
+            num_clauses = 0
+    log.info(
+        "request_id=%s policy_upload background_complete document_id=%s success=%s clauses=%d status=%s",
+        request_id,
+        doc_id,
+        not extraction_failed,
+        num_clauses,
+        final_doc.get("processing_status"),
+    )
+
+
 @app.get("/api/employee/assignments/{assignment_id}/services")
 def get_assignment_services(
     assignment_id: str,
@@ -5997,6 +6148,7 @@ def upsert_assignment_services(
     try:
         db.upsert_case_services(assignment["id"], case_id, items)
         updated = db.list_case_services(assignment["id"])
+        invalidate_relocation_plan_cache(case_id=case_id, assignment_id=assignment["id"])
         try:
             from .services.analytics_service import emit_event, EVENT_SERVICES_SELECTED
             selected = [s["service_key"] for s in items if s.get("selected")]
@@ -7540,6 +7692,7 @@ def add_assignment_evidence(
             ensure_passport_case_document_for_assignment(db, assignment_id, request_id=request_id)
         except Exception as exc:
             log.warning("mobility graph sync after evidence upload: %s", exc)
+        invalidate_relocation_plan_cache(case_id=case_id, assignment_id=assignment_id)
         return AddEvidenceResponse(evidenceId=evidence_id)
     except IntegrityError:
         raise HTTPException(
@@ -7667,13 +7820,18 @@ def get_relocation_plan_view(
     Canonical phased plan + derived statuses + primary next action.
     Authorization matches other case routes: employee (own assignment) or HR (owner or same company).
     """
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    resolve_started_at = time.perf_counter()
     assignment = _require_case_id_assignment_visible(case_id, user)
+    resolve_visibility_ms = (time.perf_counter() - resolve_started_at) * 1000
     eff_case_id = _effective_relocation_case_id(assignment)
     if not eff_case_id:
         raise HTTPException(status_code=404, detail="Assignment has no linked case")
-    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    viewer_role_started_at = time.perf_counter()
     viewer_role = _relocation_plan_view_query_role(user, role)
-    return get_relocation_plan_view_for_case_assignment(
+    viewer_role_ms = (time.perf_counter() - viewer_role_started_at) * 1000
+    response_started_at = time.perf_counter()
+    response = get_relocation_plan_view_for_case_assignment(
         db=db,
         session_factory=SessionLocal,
         case_id_effective=eff_case_id,
@@ -7682,6 +7840,18 @@ def get_relocation_plan_view(
         debug=debug,
         request_id=request_id,
     )
+    response_ms = (time.perf_counter() - response_started_at) * 1000
+    log.info(
+        "request_id=%s relocation_plan_route case_id=%s assignment_id=%s resolve_visibility_ms=%.2f resolve_role_ms=%.2f response_ms=%.2f total_ms=%.2f",
+        request_id,
+        eff_case_id,
+        assignment.get("id"),
+        resolve_visibility_ms,
+        viewer_role_ms,
+        response_ms,
+        resolve_visibility_ms + viewer_role_ms + response_ms,
+    )
+    return response
 
 
 @app.patch("/api/cases/{case_id}/timeline/milestones/{milestone_id}")
@@ -7729,6 +7899,7 @@ def update_case_milestone(
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Milestone not found")
+    invalidate_relocation_plan_cache(case_id=case_id)
     links = db.list_milestone_links(milestone_id, request_id=request_id)
     updated["links"] = links
     return updated
@@ -8669,14 +8840,15 @@ def policy_documents_health(user: Dict[str, Any] = Depends(require_role(UserRole
 @app.post("/api/hr/policy-documents/upload")
 async def upload_policy_document(
     req: Request,
+    background_tasks: BackgroundTasks,
     file: Optional[UploadFile] = File(None),
     company_id: Optional[str] = Query(None, description="Admin override: scope upload to this company"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """
-    Upload policy PDF/DOCX for intake: extract text, classify, extract metadata.
+    Upload policy PDF/DOCX for intake: store the file and queue background extraction/classification.
     When admin is viewing a company's policy workspace, pass company_id so the document is stored for that company.
-    Stages: A.validate -> B.storage -> C.db_insert -> D.extraction -> E.update_status -> F.return
+    Stages: A.validate -> B.storage -> C.db_insert -> D.queue_background_ingest -> E.return
     """
     from .services.policy_storage_health import (
         check_policy_storage_health,
@@ -8838,7 +9010,7 @@ async def upload_policy_document(
 
     # --- Stage B: Upload to Supabase Storage ---
     try:
-        supabase = get_supabase_admin_client()
+        supabase = _get_supabase_admin_client()
         supabase.storage.from_(BUCKET_HR_POLICIES).upload(
             path, content,
             {"content-type": mime, "upsert": "true"},
@@ -8872,7 +9044,7 @@ async def upload_policy_document(
             storage_path=path,
             checksum=checksum,
             file_size_bytes=file_size,
-            assistant_import_status="uploaded",
+            assistant_import_status="extracting_text",
             request_id=request_id,
         )
         log.info("request_id=%s policy_upload stage=db_insert ok doc_id=%s", request_id, doc_id)
@@ -8883,7 +9055,7 @@ async def upload_policy_document(
             request_id, doc_id, company_id, user_id, type(exc).__name__, safe_msg, exc_info=True,
         )
         try:
-            supabase = get_supabase_admin_client()
+            supabase = _get_supabase_admin_client()
             supabase.storage.from_(BUCKET_HR_POLICIES).remove([path])
             log.info("request_id=%s policy_upload stage=db_insert cleanup ok removed path=%s", request_id, path)
         except Exception as cleanup_exc:
@@ -8895,151 +9067,22 @@ async def upload_policy_document(
             request_id=request_id,
         )
 
-    # --- Stage D: Run extraction/classification ---
-    extraction_failed = False
-    try:
-        from .services.policy_document_intake import process_uploaded_document
-        from .services.policy_pipeline_analytics import (
-            emit_policy_classify_completed,
-            emit_policy_classify_failed,
-            emit_policy_classify_started,
-        )
-
-        emit_policy_classify_started(
-            request_id=request_id,
-            user_id=user_id,
-            company_id=company_id,
-            document_id=doc_id,
-            source="upload",
-        )
-        result = process_uploaded_document(content, mime, filename, request_id=request_id)
-        log.info(
-            "request_id=%s policy_upload stage=extract ok status=%s",
-            request_id, result.get("processing_status"),
-        )
-        # --- Stage E: Update processing_status ---
-        db.update_policy_document(
-            doc_id,
-            processing_status=result.get("processing_status"),
-            detected_document_type=result.get("detected_document_type"),
-            detected_policy_scope=result.get("detected_policy_scope"),
-            version_label=result.get("version_label"),
-            effective_date=result.get("effective_date"),
-            raw_text=result.get("raw_text"),
-            extraction_error=result.get("extraction_error"),
-            extracted_metadata=result.get("extracted_metadata"),
-            request_id=request_id,
-        )
-        if result.get("processing_status") == "failed":
-            extraction_failed = True
-            log.warning(
-                "request_id=%s policy_upload stage=extract failed extraction_error=%s",
-                request_id, (result.get("extraction_error") or "")[:200],
-            )
-            try:
-                emit_policy_classify_failed(
-                    request_id=request_id,
-                    user_id=user_id,
-                    company_id=company_id,
-                    document_id=doc_id,
-                    extraction_error=result.get("extraction_error"),
-                    source="upload",
-                )
-            except Exception:
-                pass
-        else:
-            try:
-                emit_policy_classify_completed(
-                    request_id=request_id,
-                    user_id=user_id,
-                    company_id=company_id,
-                    document_id=doc_id,
-                    processing_status=result.get("processing_status"),
-                    detected_document_type=result.get("detected_document_type"),
-                    source="upload",
-                )
-            except Exception:
-                pass
-        # Segment into clauses when we have raw text
-        if result.get("raw_text") and result.get("processing_status") != "failed":
-            try:
-                from .services.policy_document_clauses import segment_document_from_raw_text
-                policy_segment_ctx = {
-                    "id": doc_id,
-                    "document_id": doc_id,
-                    "detected_document_type": result.get("detected_document_type"),
-                    "extracted_metadata": result.get("extracted_metadata") or {},
-                    "filename": filename,
-                }
-                clauses, seg_err = segment_document_from_raw_text(
-                    result["raw_text"], mime, data=content, policy_context=policy_segment_ctx
-                )
-                if not seg_err and clauses:
-                    db.upsert_policy_document_clauses(doc_id, clauses, request_id=request_id)
-                    log.info("request_id=%s policy_upload stage=segment ok clauses=%d", request_id, len(clauses))
-            except Exception as seg_exc:
-                log.warning("request_id=%s policy_upload stage=segment failed: %s", request_id, seg_exc)
-    except Exception as exc:
-        safe_msg = (str(exc) or type(exc).__name__)[:200]
-        log.error(
-            "request_id=%s policy_pipeline stage=ingest document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
-            request_id, doc_id, company_id, user_id, type(exc).__name__, safe_msg, exc_info=True,
-        )
-        extraction_failed = True
-        db.update_policy_document(
-            doc_id,
-            processing_status="failed",
-            extraction_error=str(exc),
-            request_id=request_id,
-        )
-        try:
-            from .services.policy_pipeline_analytics import emit_policy_classify_failed
-
-            emit_policy_classify_failed(
-                request_id=request_id,
-                user_id=user_id,
-                company_id=company_id,
-                document_id=doc_id,
-                extraction_error=str(exc),
-                source="upload",
-            )
-        except Exception:
-            pass
-
-    doc = db.get_policy_document(doc_id, request_id=request_id)
-    num_clauses = len(db.list_policy_document_clauses(doc_id, request_id=request_id)) if doc_id else 0
-    success = not extraction_failed
-    log.info(
-        "request_id=%s policy_pipeline stage=ingest document_id=%s company_id=%s user_id=%s success=%s rows_document=1 rows_clauses=%d",
-        request_id, doc_id, company_id, user_id, success, num_clauses,
+    background_tasks.add_task(
+        _run_policy_document_ingest_background,
+        doc_id=doc_id,
+        content=content,
+        mime=mime,
+        filename=filename,
+        request_id=request_id,
+        user_id=user_id,
+        company_id=company_id,
     )
-
-    # --- Stage F: Return ---
-    if extraction_failed:
-        try:
-            from .services.policy_pipeline_analytics import emit_policy_upload_completed
-
-            emit_policy_upload_completed(
-                request_id=request_id,
-                user_id=user_id,
-                company_id=company_id,
-                document_id=doc_id,
-                processing_status=doc.get("processing_status"),
-                clause_count=num_clauses,
-                duration_ms=(time.monotonic() - _upload_wall_start) * 1000.0,
-            )
-        except Exception:
-            pass
-        return JSONResponse(
-            status_code=207,
-            content={
-                "ok": False,
-                "error_code": UPLOAD_EXTRACT_FAILED,
-                "message": "The file was uploaded, but extraction failed.",
-                "request_id": request_id,
-                "document": doc,
-            },
-        )
+    doc = db.get_policy_document(doc_id, request_id=request_id)
+    success = True
+    log.info(
+        "request_id=%s policy_pipeline stage=ingest_queued document_id=%s company_id=%s user_id=%s success=%s",
+        request_id, doc_id, company_id, user_id, success,
+    )
     try:
         from .services.policy_pipeline_analytics import emit_policy_upload_completed
 
@@ -9049,20 +9092,25 @@ async def upload_policy_document(
             company_id=company_id,
             document_id=doc_id,
             processing_status=doc.get("processing_status"),
-            clause_count=num_clauses,
+            clause_count=0,
             duration_ms=(time.monotonic() - _upload_wall_start) * 1000.0,
         )
     except Exception:
         pass
     total_ms = (time.monotonic() - _upload_wall_start) * 1000.0
     log.info(
-        "request_id=%s policy_upload stage=complete ok document_id=%s total_ms=%.1f clauses=%d",
+        "request_id=%s policy_upload stage=complete_queued ok document_id=%s total_ms=%.1f",
         request_id,
         doc_id,
         total_ms,
-        num_clauses,
     )
-    return {"ok": True, "document": doc, "request_id": request_id, "ingest_duration_ms": round(total_ms, 1)}
+    return {
+        "ok": True,
+        "document": doc,
+        "request_id": request_id,
+        "processing_queued": True,
+        "ingest_duration_ms": round(total_ms, 1),
+    }
 
 
 @app.get("/api/hr/policy-documents")
@@ -9261,7 +9309,7 @@ async def reprocess_policy_document(
     object_key = normalize_policy_storage_object_key(file_path)
     log.info("request_id=%s policy_document_reprocess bucket=%s object_key=%s", request_id, BUCKET_HR_POLICIES, object_key)
     try:
-        supabase = get_supabase_admin_client()
+        supabase = _get_supabase_admin_client()
         data = supabase.storage.from_(BUCKET_HR_POLICIES).download(object_key)
     except Exception as exc:
         log.warning("request_id=%s policy_document_reprocess download failed: %s", request_id, exc)
@@ -10679,7 +10727,7 @@ def get_company_policy_download_url(
         )
 
     try:
-        supabase = get_supabase_admin_client()
+        supabase = _get_supabase_admin_client()
         signed = supabase.storage.from_(BUCKET_HR_POLICIES).create_signed_url(object_key, 3600)
         url = signed.get("signedURL") or signed.get("signed_url") or ""
         if not url:
@@ -10720,7 +10768,7 @@ async def upload_company_policy(
     path = f"companies/{profile['company_id']}/policies/{policy_id}/{filename}"
     content = await file.read()
     try:
-        supabase = get_supabase_admin_client()
+        supabase = _get_supabase_admin_client()
         supabase.storage.from_(BUCKET_HR_POLICIES).upload(
             path,
             content,
@@ -10777,7 +10825,7 @@ def extract_company_policy(
     object_key = normalize_policy_storage_object_key(file_path)
     log.info("request_id=%s extract bucket=%s object_key=%s", request_id, BUCKET_HR_POLICIES, object_key)
     try:
-        supabase = get_supabase_admin_client()
+        supabase = _get_supabase_admin_client()
         data = supabase.storage.from_(BUCKET_HR_POLICIES).download(object_key)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, BUCKET_HR_POLICIES))

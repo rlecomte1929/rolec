@@ -12,6 +12,7 @@ import { formatRichMessage } from '../utils/richMessage';
 import { logEmployeeEntry } from '../utils/employeeJourneyPerf';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
 import { getApiErrorCode } from '../utils/apiDetail';
+import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
 
 const FLOW_STEPS = [
   '1. Fill your case',
@@ -163,9 +164,23 @@ export const EmployeeJourney: React.FC = () => {
 
   const entryStartedAt = useRef<number | null>(null);
   const loggedAssignmentResolution = useRef(false);
+  const routePerfStartedAt = useRef<number | null>(null);
 
   const signedInPrincipal =
     (getAuthItem('relopass_email') || getAuthItem('relopass_username') || '').trim() || null;
+
+  useEffect(() => {
+    routePerfStartedAt.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackRouteEntry('/employee/journey');
+    trackShellRender('/employee/journey');
+  }, []);
+
+  useEffect(() => {
+    if (assignmentLoading) return;
+    const startedAt = routePerfStartedAt.current;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackFirstMeaningfulContent('/employee/journey', startedAt != null ? now - startedAt : undefined);
+  }, [assignmentLoading]);
 
   useEffect(() => {
     try {

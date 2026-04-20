@@ -8,6 +8,7 @@ import math
 import uuid
 import logging
 import time
+from threading import Lock
 from typing import Optional, Dict, Any, List, Tuple, Set, Callable
 from datetime import datetime
 
@@ -87,6 +88,23 @@ def _coerce_json_dict(value: Any) -> Dict[str, Any]:
     return {}
 
 
+def _coerce_json_list(value: Any) -> List[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return list(value)
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return []
+        try:
+            out = json.loads(s)
+            return list(out) if isinstance(out, list) else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return []
+
+
 def _sqlite_ensure_policy_import_columns(conn: Any) -> None:
     """Add assistant-import columns to policy_documents when upgrading older SQLite DBs."""
     try:
@@ -156,6 +174,57 @@ def _sqlite_ensure_policy_hardening_columns(conn: Any) -> None:
         if "snapshot_id" not in cnames:
             try:
                 conn.execute(text("ALTER TABLE policy_document_chunks ADD COLUMN snapshot_id TEXT"))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def _sqlite_ensure_canonical_policy_tenant_columns(conn: Any) -> None:
+    try:
+        tables = (
+            ("canonical_policy_documents", ("company_id", "TEXT")),
+            ("canonical_policy_document_chunks", ("company_id", "TEXT")),
+            ("canonical_policy_facts", ("company_id", "TEXT")),
+            ("canonical_policy_fact_validation_errors", ("company_id", "TEXT")),
+        )
+        for table, (col, typ) in tables:
+            exists = conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table' AND name = :name"),
+                {"name": table},
+            ).fetchone()
+            if not exists:
+                continue
+            cols = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()}
+            if col not in cols:
+                try:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {typ}"))
+                except Exception:
+                    pass
+        try:
+            conn.execute(
+                text(
+                    "UPDATE canonical_policy_documents "
+                    "SET company_id = COALESCE(company_id, (SELECT company_id FROM policy_documents p WHERE p.id = source_policy_document_id), '') "
+                    "WHERE company_id IS NULL OR company_id = ''"
+                )
+            )
+        except Exception:
+            pass
+        for table in (
+            "canonical_policy_document_chunks",
+            "canonical_policy_facts",
+            "canonical_policy_fact_validation_errors",
+        ):
+            try:
+                conn.execute(
+                    text(
+                        f"UPDATE {table} "
+                        "SET company_id = COALESCE(company_id, (SELECT company_id FROM canonical_policy_documents d "
+                        f"WHERE d.id = {table}.canonical_policy_document_id), '') "
+                        "WHERE company_id IS NULL OR company_id = ''"
+                    )
+                )
             except Exception:
                 pass
     except Exception:
@@ -285,7 +354,17 @@ class Database:
         self.engine = _engine
         # None = unknown; False = readiness_templates not available (migration not applied / wrong DB)
         self._readiness_store_cache: Optional[bool] = None
-        self.init_db()
+        self._init_lock = Lock()
+        self._initialized = False
+
+    def ensure_initialized(self) -> None:
+        if self._initialized:
+            return
+        with self._init_lock:
+            if self._initialized:
+                return
+            self.init_db()
+            self._initialized = True
 
     def _exec(
         self,
@@ -298,6 +377,8 @@ class Database:
         """
         Execute a SQL statement with basic timing and optional request correlation.
         """
+        if not self._initialized:
+            self.ensure_initialized()
         start = time.perf_counter()
         result = conn.execute(text(sql), params)
         dur_ms = (time.perf_counter() - start) * 1000
@@ -1554,6 +1635,163 @@ class Database:
             """))
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_policy_facts_chunk ON policy_facts(source_chunk_id)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS canonical_policy_documents (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    source_policy_document_id TEXT,
+                    source_type TEXT NOT NULL DEFAULT 'local_file',
+                    source_uri TEXT,
+                    filename TEXT,
+                    mime_type TEXT,
+                    title TEXT,
+                    policy_scope TEXT,
+                    document_type TEXT,
+                    version_label TEXT,
+                    effective_date TEXT,
+                    default_currency TEXT,
+                    assignment_types_json TEXT NOT NULL DEFAULT '[]',
+                    raw_text TEXT,
+                    normalized_text TEXT,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    ingestion_status TEXT NOT NULL DEFAULT 'ingested',
+                    extraction_status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (source_policy_document_id) REFERENCES policy_documents(id) ON DELETE SET NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_documents_source_policy
+                ON canonical_policy_documents(source_policy_document_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_documents_company
+                ON canonical_policy_documents(company_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_documents_status
+                ON canonical_policy_documents(extraction_status)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS canonical_policy_document_chunks (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    canonical_policy_document_id TEXT NOT NULL,
+                    chunk_index INTEGER NOT NULL,
+                    section_path TEXT,
+                    structure_type TEXT,
+                    page_number INTEGER,
+                    char_start INTEGER,
+                    char_end INTEGER,
+                    text_content TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (canonical_policy_document_id) REFERENCES canonical_policy_documents(id) ON DELETE CASCADE
+                )
+            """))
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_canonical_policy_document_chunks_doc_chunk
+                ON canonical_policy_document_chunks(canonical_policy_document_id, chunk_index)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_document_chunks_doc
+                ON canonical_policy_document_chunks(canonical_policy_document_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_document_chunks_company
+                ON canonical_policy_document_chunks(company_id)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS canonical_policy_facts (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    canonical_policy_document_id TEXT NOT NULL,
+                    canonical_policy_document_chunk_id TEXT NOT NULL,
+                    source_policy_document_id TEXT,
+                    phase TEXT,
+                    benefit_category TEXT,
+                    value_type TEXT NOT NULL,
+                    frequency TEXT,
+                    provider_entity TEXT,
+                    title TEXT,
+                    description TEXT,
+                    eligibility_json TEXT NOT NULL DEFAULT '{}',
+                    assignment_types_json TEXT NOT NULL DEFAULT '[]',
+                    amount NUMERIC,
+                    currency TEXT,
+                    percentage REAL,
+                    quantity REAL,
+                    duration_value INTEGER,
+                    duration_unit TEXT,
+                    value_text TEXT,
+                    is_taxable INTEGER,
+                    reimbursement_required INTEGER,
+                    source_quote TEXT,
+                    confidence_score REAL,
+                    raw_payload_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (canonical_policy_document_id) REFERENCES canonical_policy_documents(id) ON DELETE CASCADE,
+                    FOREIGN KEY (canonical_policy_document_chunk_id) REFERENCES canonical_policy_document_chunks(id) ON DELETE CASCADE,
+                    FOREIGN KEY (source_policy_document_id) REFERENCES policy_documents(id) ON DELETE SET NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_facts_doc
+                ON canonical_policy_facts(canonical_policy_document_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_facts_company
+                ON canonical_policy_facts(company_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_facts_chunk
+                ON canonical_policy_facts(canonical_policy_document_chunk_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_facts_category_phase
+                ON canonical_policy_facts(benefit_category, phase)
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS canonical_policy_fact_validation_errors (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    canonical_policy_document_id TEXT NOT NULL,
+                    canonical_policy_document_chunk_id TEXT NOT NULL,
+                    raw_payload_json TEXT NOT NULL DEFAULT '{}',
+                    errors_json TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (canonical_policy_document_id) REFERENCES canonical_policy_documents(id) ON DELETE CASCADE,
+                    FOREIGN KEY (canonical_policy_document_chunk_id) REFERENCES canonical_policy_document_chunks(id) ON DELETE CASCADE
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_fact_validation_errors_doc
+                ON canonical_policy_fact_validation_errors(canonical_policy_document_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_fact_validation_errors_company
+                ON canonical_policy_fact_validation_errors(company_id)
+            """))
+            _sqlite_ensure_canonical_policy_tenant_columns(conn)
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS canonical_policy_query_audit_logs (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    user_role TEXT NOT NULL,
+                    canonical_policy_document_id TEXT NOT NULL,
+                    query_text TEXT NOT NULL,
+                    redacted_query_text TEXT NOT NULL,
+                    retrieved_chunk_ids_json TEXT NOT NULL DEFAULT '[]',
+                    answer_preview TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_canonical_policy_query_audit_logs_company
+                ON canonical_policy_query_audit_logs(company_id)
             """))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS company_policy_assistant_bindings (
@@ -9899,10 +10137,7 @@ class Database:
             base_sql = "SELECT * FROM companies WHERE 1=1"
             params: Dict[str, Any] = {}
             if q:
-                if _is_sqlite:
-                    base_sql += " AND (LOWER(name) LIKE :q OR LOWER(COALESCE(legal_name,'')) LIKE :q)"
-                else:
-                    base_sql += " AND (LOWER(name) LIKE :q OR LOWER(COALESCE(legal_name,'')) LIKE :q)"
+                base_sql += " AND (LOWER(name) LIKE :q OR LOWER(COALESCE(legal_name,'')) LIKE :q)"
                 params["q"] = f"%{q}%"
             base_sql += " ORDER BY name ASC"
             rows = conn.execute(text(base_sql), params).fetchall()
@@ -9939,43 +10174,80 @@ class Database:
             if orphan_ids:
                 log.warning("admin_company_index: orphan company_ids (not in registry): %s", sorted(orphan_ids))
 
-            # Enrich each row with hr_users_count, employee_count, assignments_count, primary_contact_name
+            # Enrich each row with grouped counts instead of correlated subqueries per company.
             if result:
                 ids = [r["id"] for r in result]
-                unions = " UNION ALL ".join([f"SELECT :id{i} AS id" for i in range(len(ids))])
+                id_placeholders = ",".join([f":id{i}" for i in range(len(ids))])
                 params_agg = {f"id{i}": ids[i] for i in range(len(ids))}
                 if _is_sqlite:
                     join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
                 else:
                     # Postgres: relocation_cases.id is uuid, case_assignments.case_id / canonical_case_id are text UUIDs.
                     join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
-                agg_sql = f"""
-                SELECT v.id,
-                    (SELECT COUNT(*) FROM hr_users hu WHERE hu.company_id = v.id) AS hr_users_count,
-                    (SELECT COUNT(*) FROM employees e WHERE e.company_id = v.id) AS employee_count,
-                    (SELECT COUNT(*) FROM case_assignments a
-                     LEFT JOIN relocation_cases rc ON {join_on_cases}
-                     LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
-                     WHERE (rc.company_id = v.id OR (rc.company_id IS NULL AND hu.company_id = v.id))) AS assignments_count,
-                    COALESCE(
-                        (SELECT TRIM(c.hr_contact) FROM companies c WHERE c.id = v.id AND c.hr_contact IS NOT NULL AND TRIM(c.hr_contact) <> ''),
-                        (SELECT COALESCE(p.full_name, p.email) FROM hr_users hu2
-                         JOIN profiles p ON p.id = hu2.profile_id
-                         WHERE hu2.company_id = v.id
-                         ORDER BY hu2.created_at
-                         LIMIT 1)
-                    ) AS primary_contact_name
-                FROM ({unions}) v
-                """
                 try:
-                    agg_rows = conn.execute(text(agg_sql), params_agg).fetchall()
-                    by_id = {row._mapping["id"]: dict(row._mapping) for row in agg_rows}
+                    hr_count_rows = conn.execute(
+                        text(
+                            f"""
+                            SELECT company_id AS id, COUNT(*) AS hr_users_count
+                            FROM hr_users
+                            WHERE company_id IN ({id_placeholders})
+                            GROUP BY company_id
+                            """
+                        ),
+                        params_agg,
+                    ).fetchall()
+                    employee_count_rows = conn.execute(
+                        text(
+                            f"""
+                            SELECT company_id AS id, COUNT(*) AS employee_count
+                            FROM employees
+                            WHERE company_id IN ({id_placeholders})
+                            GROUP BY company_id
+                            """
+                        ),
+                        params_agg,
+                    ).fetchall()
+                    assignment_count_rows = conn.execute(
+                        text(
+                            f"""
+                            SELECT
+                                COALESCE(rc.company_id, hu.company_id) AS id,
+                                COUNT(*) AS assignments_count
+                            FROM case_assignments a
+                            LEFT JOIN relocation_cases rc ON {join_on_cases}
+                            LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                            WHERE COALESCE(rc.company_id, hu.company_id) IN ({id_placeholders})
+                            GROUP BY COALESCE(rc.company_id, hu.company_id)
+                            """
+                        ),
+                        params_agg,
+                    ).fetchall()
+                    contact_rows = conn.execute(
+                        text(
+                            f"""
+                            SELECT hu.company_id AS id, COALESCE(p.full_name, p.email) AS contact_name, hu.created_at
+                            FROM hr_users hu
+                            JOIN profiles p ON p.id = hu.profile_id
+                            WHERE hu.company_id IN ({id_placeholders})
+                            ORDER BY hu.company_id ASC, hu.created_at ASC
+                            """
+                        ),
+                        params_agg,
+                    ).fetchall()
+                    hr_counts = {row._mapping["id"]: int(row._mapping["hr_users_count"] or 0) for row in hr_count_rows}
+                    employee_counts = {row._mapping["id"]: int(row._mapping["employee_count"] or 0) for row in employee_count_rows}
+                    assignment_counts = {row._mapping["id"]: int(row._mapping["assignments_count"] or 0) for row in assignment_count_rows}
+                    first_contacts: Dict[str, Optional[str]] = {}
+                    for row in contact_rows:
+                        company_id = row._mapping["id"]
+                        if company_id not in first_contacts:
+                            first_contacts[company_id] = row._mapping.get("contact_name")
                     for r in result:
-                        agg = by_id.get(r["id"]) or {}
-                        r["hr_users_count"] = agg.get("hr_users_count") or 0
-                        r["employee_count"] = agg.get("employee_count") or 0
-                        r["assignments_count"] = agg.get("assignments_count") or 0
-                        r["primary_contact_name"] = agg.get("primary_contact_name")
+                        r["hr_users_count"] = hr_counts.get(r["id"], 0)
+                        r["employee_count"] = employee_counts.get(r["id"], 0)
+                        r["assignments_count"] = assignment_counts.get(r["id"], 0)
+                        explicit_contact = (r.get("hr_contact") or "").strip() if isinstance(r.get("hr_contact"), str) else None
+                        r["primary_contact_name"] = explicit_contact or first_contacts.get(r["id"])
                 except Exception as e:
                     log.warning("admin_company_index: enrich counts failed: %s", e)
                     for r in result:
@@ -11155,6 +11427,532 @@ class Database:
                 ),
                 {"doc": policy_document_id, "tok": lock_token},
             )
+
+    def canonical_policy_tables_available(self) -> bool:
+        try:
+            with self.engine.connect() as conn:
+                if _is_sqlite:
+                    row = conn.execute(
+                        text(
+                            "SELECT name FROM sqlite_master WHERE type='table' AND name='canonical_policy_documents'"
+                        )
+                    ).fetchone()
+                    return row is not None
+                row = conn.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = 'canonical_policy_documents'"
+                    )
+                ).fetchone()
+                return row is not None
+        except Exception:
+            return False
+
+    def insert_canonical_policy_document(
+        self,
+        *,
+        company_id: str,
+        source_policy_document_id: Optional[str] = None,
+        source_type: str = "local_file",
+        source_uri: Optional[str] = None,
+        filename: Optional[str] = None,
+        mime_type: Optional[str] = None,
+        title: Optional[str] = None,
+        policy_scope: Optional[str] = None,
+        document_type: Optional[str] = None,
+        version_label: Optional[str] = None,
+        effective_date: Optional[str] = None,
+        default_currency: Optional[str] = None,
+        assignment_types: Optional[List[str]] = None,
+        raw_text: Optional[str] = None,
+        normalized_text: Optional[str] = None,
+        metadata_json: Optional[Dict[str, Any]] = None,
+        ingestion_status: str = "ingested",
+        extraction_status: str = "pending",
+    ) -> str:
+        doc_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO canonical_policy_documents
+                    (id, company_id, source_policy_document_id, source_type, source_uri, filename, mime_type, title,
+                     policy_scope, document_type, version_label, effective_date, default_currency,
+                     assignment_types_json, raw_text, normalized_text, metadata_json, ingestion_status,
+                     extraction_status, created_at, updated_at)
+                    VALUES (:id, :company_id, :src_doc, :src_type, :src_uri, :filename, :mime_type, :title,
+                     :policy_scope, :document_type, :version_label, :effective_date, :default_currency,
+                     :assignment_types_json, :raw_text, :normalized_text, :metadata_json, :ingestion_status,
+                     :extraction_status, :now, :now)
+                    """
+                ),
+                {
+                    "id": doc_id,
+                    "company_id": company_id,
+                    "src_doc": source_policy_document_id,
+                    "src_type": source_type,
+                    "src_uri": source_uri,
+                    "filename": filename,
+                    "mime_type": mime_type,
+                    "title": title,
+                    "policy_scope": policy_scope,
+                    "document_type": document_type,
+                    "version_label": version_label,
+                    "effective_date": effective_date,
+                    "default_currency": default_currency,
+                    "assignment_types_json": json.dumps(assignment_types or []),
+                    "raw_text": raw_text,
+                    "normalized_text": normalized_text,
+                    "metadata_json": json.dumps(metadata_json or {}),
+                    "ingestion_status": ingestion_status,
+                    "extraction_status": extraction_status,
+                    "now": now,
+                },
+            )
+        return doc_id
+
+    def update_canonical_policy_document(self, document_id: str, **kwargs: Any) -> None:
+        fields = ["updated_at = :updated_at"]
+        params: Dict[str, Any] = {"id": document_id, "updated_at": datetime.utcnow().isoformat()}
+        mapping = {
+            "company_id": "company_id",
+            "title": "title",
+            "policy_scope": "policy_scope",
+            "document_type": "document_type",
+            "version_label": "version_label",
+            "effective_date": "effective_date",
+            "default_currency": "default_currency",
+            "raw_text": "raw_text",
+            "normalized_text": "normalized_text",
+            "ingestion_status": "ingestion_status",
+            "extraction_status": "extraction_status",
+            "filename": "filename",
+            "mime_type": "mime_type",
+        }
+        for key, col in mapping.items():
+            if key in kwargs and kwargs[key] is not None:
+                fields.append(f"{col} = :{key}")
+                params[key] = kwargs[key]
+        if "assignment_types" in kwargs and kwargs["assignment_types"] is not None:
+            fields.append("assignment_types_json = :assignment_types_json")
+            params["assignment_types_json"] = json.dumps(kwargs["assignment_types"])
+        if "metadata_json" in kwargs and kwargs["metadata_json"] is not None:
+            fields.append("metadata_json = :metadata_json")
+            params["metadata_json"] = json.dumps(kwargs["metadata_json"])
+        if len(fields) == 1:
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE canonical_policy_documents SET {', '.join(fields)} WHERE id = :id"),
+                params,
+            )
+
+    def get_canonical_policy_document(self, document_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM canonical_policy_documents WHERE id = :id"),
+                {"id": document_id},
+            ).fetchone()
+        doc = self._row_to_dict(row)
+        if not doc:
+            return None
+        doc["assignment_types_json"] = _coerce_json_list(doc.get("assignment_types_json"))
+        doc["metadata_json"] = _coerce_json_dict(doc.get("metadata_json"))
+        return doc
+
+    def list_canonical_policy_documents(
+        self,
+        *,
+        company_id: Optional[str] = None,
+        source_policy_document_id: Optional[str] = None,
+        extraction_status: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        sql = "SELECT * FROM canonical_policy_documents WHERE 1=1"
+        params: Dict[str, Any] = {}
+        if company_id:
+            sql += " AND company_id = :company_id"
+            params["company_id"] = company_id
+        if source_policy_document_id:
+            sql += " AND source_policy_document_id = :src_doc"
+            params["src_doc"] = source_policy_document_id
+        if extraction_status:
+            sql += " AND extraction_status = :st"
+            params["st"] = extraction_status
+        sql += " ORDER BY created_at DESC"
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["assignment_types_json"] = _coerce_json_list(item.get("assignment_types_json"))
+            item["metadata_json"] = _coerce_json_dict(item.get("metadata_json"))
+        return items
+
+    def delete_canonical_policy_artifacts(self, document_id: str) -> None:
+        if not self.canonical_policy_tables_available():
+            return
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM canonical_policy_fact_validation_errors WHERE canonical_policy_document_id = :id"),
+                {"id": document_id},
+            )
+            conn.execute(
+                text("DELETE FROM canonical_policy_facts WHERE canonical_policy_document_id = :id"),
+                {"id": document_id},
+            )
+            conn.execute(
+                text("DELETE FROM canonical_policy_document_chunks WHERE canonical_policy_document_id = :id"),
+                {"id": document_id},
+            )
+
+    def insert_canonical_policy_document_chunk(
+        self,
+        *,
+        company_id: str,
+        canonical_policy_document_id: str,
+        chunk_index: int,
+        section_path: Optional[str],
+        structure_type: Optional[str],
+        page_number: Optional[int],
+        char_start: Optional[int],
+        char_end: Optional[int],
+        text_content: str,
+        metadata_json: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        chunk_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO canonical_policy_document_chunks
+                    (id, company_id, canonical_policy_document_id, chunk_index, section_path, structure_type,
+                     page_number, char_start, char_end, text_content, metadata_json, created_at)
+                    VALUES (:id, :company_id, :doc_id, :chunk_index, :section_path, :structure_type,
+                     :page_number, :char_start, :char_end, :text_content, :metadata_json, :created_at)
+                    """
+                ),
+                {
+                    "id": chunk_id,
+                    "company_id": company_id,
+                    "doc_id": canonical_policy_document_id,
+                    "chunk_index": chunk_index,
+                    "section_path": section_path,
+                    "structure_type": structure_type,
+                    "page_number": page_number,
+                    "char_start": char_start,
+                    "char_end": char_end,
+                    "text_content": text_content,
+                    "metadata_json": json.dumps(metadata_json or {}),
+                    "created_at": now,
+                },
+            )
+        return chunk_id
+
+    def list_canonical_policy_document_chunks(self, document_id: str, *, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            sql = (
+                "SELECT * FROM canonical_policy_document_chunks "
+                "WHERE canonical_policy_document_id = :id"
+            )
+            params: Dict[str, Any] = {"id": document_id}
+            if company_id:
+                sql += " AND company_id = :company_id"
+                params["company_id"] = company_id
+            sql += " ORDER BY chunk_index ASC"
+            rows = conn.execute(text(sql), params).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["metadata_json"] = _coerce_json_dict(item.get("metadata_json"))
+        return items
+
+    def insert_canonical_policy_fact(
+        self,
+        *,
+        company_id: str,
+        canonical_policy_document_id: str,
+        canonical_policy_document_chunk_id: str,
+        source_policy_document_id: Optional[str] = None,
+        phase: Optional[str] = None,
+        benefit_category: Optional[str] = None,
+        value_type: str,
+        frequency: Optional[str] = None,
+        provider_entity: Optional[str] = None,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        eligibility_json: Optional[Dict[str, Any]] = None,
+        assignment_types_json: Optional[List[str]] = None,
+        amount: Optional[Any] = None,
+        currency: Optional[str] = None,
+        percentage: Optional[float] = None,
+        quantity: Optional[float] = None,
+        duration_value: Optional[int] = None,
+        duration_unit: Optional[str] = None,
+        value_text: Optional[str] = None,
+        is_taxable: Optional[bool] = None,
+        reimbursement_required: Optional[bool] = None,
+        source_quote: Optional[str] = None,
+        confidence_score: Optional[float] = None,
+        raw_payload_json: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        fact_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO canonical_policy_facts
+                    (id, company_id, canonical_policy_document_id, canonical_policy_document_chunk_id, source_policy_document_id,
+                     phase, benefit_category, value_type, frequency, provider_entity, title, description,
+                     eligibility_json, assignment_types_json, amount, currency, percentage, quantity,
+                     duration_value, duration_unit, value_text, is_taxable, reimbursement_required,
+                     source_quote, confidence_score, raw_payload_json, created_at)
+                    VALUES (:id, :company_id, :doc_id, :chunk_id, :src_doc, :phase, :benefit_category, :value_type,
+                     :frequency, :provider_entity, :title, :description, :eligibility_json,
+                     :assignment_types_json, :amount, :currency, :percentage, :quantity, :duration_value,
+                     :duration_unit, :value_text, :is_taxable, :reimbursement_required, :source_quote,
+                     :confidence_score, :raw_payload_json, :created_at)
+                    """
+                ),
+                {
+                    "id": fact_id,
+                    "company_id": company_id,
+                    "doc_id": canonical_policy_document_id,
+                    "chunk_id": canonical_policy_document_chunk_id,
+                    "src_doc": source_policy_document_id,
+                    "phase": phase,
+                    "benefit_category": benefit_category,
+                    "value_type": value_type,
+                    "frequency": frequency,
+                    "provider_entity": provider_entity,
+                    "title": title,
+                    "description": description,
+                    "eligibility_json": json.dumps(eligibility_json or {}),
+                    "assignment_types_json": json.dumps(assignment_types_json or []),
+                    "amount": amount,
+                    "currency": currency,
+                    "percentage": percentage,
+                    "quantity": quantity,
+                    "duration_value": duration_value,
+                    "duration_unit": duration_unit,
+                    "value_text": value_text,
+                    "is_taxable": None if is_taxable is None else _policy_bool_bind(is_taxable),
+                    "reimbursement_required": None if reimbursement_required is None else _policy_bool_bind(reimbursement_required),
+                    "source_quote": source_quote,
+                    "confidence_score": confidence_score,
+                    "raw_payload_json": json.dumps(raw_payload_json or {}),
+                    "created_at": now,
+                },
+            )
+        return fact_id
+
+    def list_canonical_policy_facts(
+        self,
+        document_id: str,
+        *,
+        company_id: Optional[str] = None,
+        phase: Optional[str] = None,
+        benefit_category: Optional[str] = None,
+        value_type: Optional[str] = None,
+        provider_entity: Optional[str] = None,
+        assignment_type: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        sql = "SELECT * FROM canonical_policy_facts WHERE canonical_policy_document_id = :id"
+        params: Dict[str, Any] = {"id": document_id}
+        if company_id:
+            sql += " AND company_id = :company_id"
+            params["company_id"] = company_id
+        if phase:
+            sql += " AND phase = :phase"
+            params["phase"] = phase
+        if benefit_category:
+            sql += " AND benefit_category = :benefit_category"
+            params["benefit_category"] = benefit_category
+        if value_type:
+            sql += " AND value_type = :value_type"
+            params["value_type"] = value_type
+        if provider_entity:
+            sql += " AND provider_entity = :provider_entity"
+            params["provider_entity"] = provider_entity
+        sql += " ORDER BY created_at ASC"
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+        items = self._rows_to_list(rows)
+        out: List[Dict[str, Any]] = []
+        for item in items:
+            item["eligibility_json"] = _coerce_json_dict(item.get("eligibility_json"))
+            item["assignment_types_json"] = _coerce_json_list(item.get("assignment_types_json"))
+            item["raw_payload_json"] = _coerce_json_dict(item.get("raw_payload_json"))
+            if item.get("is_taxable") in (0, 1):
+                item["is_taxable"] = bool(item["is_taxable"])
+            if item.get("reimbursement_required") in (0, 1):
+                item["reimbursement_required"] = bool(item["reimbursement_required"])
+            if assignment_type and assignment_type not in item["assignment_types_json"]:
+                continue
+            out.append(item)
+        return out
+
+    def insert_canonical_policy_validation_error(
+        self,
+        *,
+        company_id: str,
+        canonical_policy_document_id: str,
+        canonical_policy_document_chunk_id: str,
+        raw_payload_json: Optional[Dict[str, Any]] = None,
+        errors_json: Optional[List[str]] = None,
+    ) -> str:
+        error_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO canonical_policy_fact_validation_errors
+                    (id, company_id, canonical_policy_document_id, canonical_policy_document_chunk_id,
+                     raw_payload_json, errors_json, created_at)
+                    VALUES (:id, :company_id, :doc_id, :chunk_id, :raw_payload_json, :errors_json, :created_at)
+                    """
+                ),
+                {
+                    "id": error_id,
+                    "company_id": company_id,
+                    "doc_id": canonical_policy_document_id,
+                    "chunk_id": canonical_policy_document_chunk_id,
+                    "raw_payload_json": json.dumps(raw_payload_json or {}),
+                    "errors_json": json.dumps(errors_json or []),
+                    "created_at": now,
+                },
+            )
+        return error_id
+
+    def list_canonical_policy_validation_errors(self, document_id: str, *, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            sql = (
+                "SELECT * FROM canonical_policy_fact_validation_errors "
+                "WHERE canonical_policy_document_id = :id"
+            )
+            params: Dict[str, Any] = {"id": document_id}
+            if company_id:
+                sql += " AND company_id = :company_id"
+                params["company_id"] = company_id
+            sql += " ORDER BY created_at ASC"
+            rows = conn.execute(text(sql), params).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["raw_payload_json"] = _coerce_json_dict(item.get("raw_payload_json"))
+            item["errors_json"] = _coerce_json_list(item.get("errors_json"))
+        return items
+
+    def get_canonical_policy_audit_summary(self, document_id: str, *, company_id: Optional[str] = None) -> Dict[str, Any]:
+        chunks = self.list_canonical_policy_document_chunks(document_id, company_id=company_id)
+        facts = self.list_canonical_policy_facts(document_id, company_id=company_id)
+        errors = self.list_canonical_policy_validation_errors(document_id, company_id=company_id)
+        by_category: Dict[str, int] = {}
+        by_phase: Dict[str, int] = {}
+        for fact in facts:
+            cat = str(fact.get("benefit_category") or "uncategorized")
+            ph = str(fact.get("phase") or "unspecified")
+            by_category[cat] = by_category.get(cat, 0) + 1
+            by_phase[ph] = by_phase.get(ph, 0) + 1
+        valid = len(facts)
+        total = valid + len(errors)
+        return {
+            "document_id": document_id,
+            "chunks_count": len(chunks),
+            "facts_count": valid,
+            "validation_error_count": len(errors),
+            "validation_pass_rate": (valid / total) if total else 1.0,
+            "counts_by_category": by_category,
+            "counts_by_phase": by_phase,
+        }
+
+    def get_active_canonical_policy_document_for_company(self, company_id: str) -> Optional[Dict[str, Any]]:
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    """
+                    SELECT * FROM canonical_policy_documents
+                    WHERE company_id = :company_id
+                      AND extraction_status IN ('extracted', 'chunked', 'validated_with_errors', 'pending')
+                    ORDER BY updated_at DESC, created_at DESC
+                    LIMIT 1
+                    """
+                ),
+                {"company_id": company_id},
+            ).fetchone()
+        doc = self._row_to_dict(row)
+        if not doc:
+            return None
+        doc["assignment_types_json"] = _coerce_json_list(doc.get("assignment_types_json"))
+        doc["metadata_json"] = _coerce_json_dict(doc.get("metadata_json"))
+        return doc
+
+    def insert_canonical_policy_query_audit_log(
+        self,
+        *,
+        company_id: str,
+        user_id: str,
+        user_role: str,
+        canonical_policy_document_id: str,
+        query_text: str,
+        redacted_query_text: str,
+        retrieved_chunk_ids: List[str],
+        answer_preview: Optional[str],
+    ) -> str:
+        audit_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO canonical_policy_query_audit_logs
+                    (id, company_id, user_id, user_role, canonical_policy_document_id, query_text,
+                     redacted_query_text, retrieved_chunk_ids_json, answer_preview, created_at)
+                    VALUES (:id, :company_id, :user_id, :user_role, :canonical_policy_document_id, :query_text,
+                     :redacted_query_text, :retrieved_chunk_ids_json, :answer_preview, :created_at)
+                    """
+                ),
+                {
+                    "id": audit_id,
+                    "company_id": company_id,
+                    "user_id": user_id,
+                    "user_role": user_role,
+                    "canonical_policy_document_id": canonical_policy_document_id,
+                    "query_text": query_text,
+                    "redacted_query_text": redacted_query_text,
+                    "retrieved_chunk_ids_json": json.dumps(retrieved_chunk_ids),
+                    "answer_preview": answer_preview,
+                    "created_at": now,
+                },
+            )
+        return audit_id
+
+    def list_canonical_policy_query_audit_logs(
+        self,
+        *,
+        company_id: Optional[str] = None,
+        canonical_policy_document_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        sql = "SELECT * FROM canonical_policy_query_audit_logs WHERE 1=1"
+        params: Dict[str, Any] = {"limit": limit}
+        if company_id:
+            sql += " AND company_id = :company_id"
+            params["company_id"] = company_id
+        if canonical_policy_document_id:
+            sql += " AND canonical_policy_document_id = :canonical_policy_document_id"
+            params["canonical_policy_document_id"] = canonical_policy_document_id
+        if user_id:
+            sql += " AND user_id = :user_id"
+            params["user_id"] = user_id
+        sql += " ORDER BY created_at DESC LIMIT :limit"
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(sql), params).fetchall()
+        items = self._rows_to_list(rows)
+        for item in items:
+            item["retrieved_chunk_ids_json"] = _coerce_json_list(item.get("retrieved_chunk_ids_json"))
+        return items
 
     def insert_policy_assistant_answer_audit(
         self,

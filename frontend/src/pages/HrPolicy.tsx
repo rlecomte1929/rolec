@@ -628,7 +628,7 @@ function PolicyDocumentIntakeSection({
         setUploadFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
         setMessage(
-          'Document uploaded and classified. Review the entry below, then use Normalize & publish to create and release a policy version to employees.'
+          'Document uploaded and queued for processing. Review the entry below once classification finishes, then use Normalize & publish to create and release a policy version to employees.'
         );
         await loadDocs();
         onDocumentsChange?.();

@@ -11,6 +11,7 @@ import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
+import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
 
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -45,9 +46,16 @@ export const HrDashboard: React.FC = () => {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const acRef = useRef<AbortController | null>(null);
   const offsetRef = useRef(0);
+  const routePerfStartedAt = useRef<number | null>(null);
   useEffect(() => {
     offsetRef.current = offset;
   }, [offset]);
+
+  useEffect(() => {
+    routePerfStartedAt.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackRouteEntry('/hr/dashboard');
+    trackShellRender('/hr/dashboard');
+  }, []);
 
   const loadAssignments = useCallback(async (append = false, signal?: AbortSignal) => {
     const nextOffset = append ? offsetRef.current : 0;
@@ -76,6 +84,11 @@ export const HrDashboard: React.FC = () => {
       setAssignments((prev) => (append ? [...prev, ...list] : list));
       setTotal(totalCount);
       setOffset(nextOffset + list.length);
+      if (!append && routePerfStartedAt.current != null) {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        trackFirstMeaningfulContent('/hr/dashboard', now - routePerfStartedAt.current);
+        routePerfStartedAt.current = null;
+      }
       const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
       trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments', count: list.length } });
     } catch (err: any) {
@@ -183,8 +196,12 @@ export const HrDashboard: React.FC = () => {
     setIsDeleting(true);
     setError('');
     try {
-      for (const id of selectedForRemoval) {
-        await hrAPI.deleteAssignment(id);
+      const results = await Promise.allSettled(
+        Array.from(selectedForRemoval, (id) => hrAPI.deleteAssignment(id))
+      );
+      const failed = results.filter((result) => result.status === 'rejected');
+      if (failed.length > 0) {
+        throw failed[0];
       }
       setSelectedForRemoval(new Set());
       setIsConfirmingRemoval(false);
