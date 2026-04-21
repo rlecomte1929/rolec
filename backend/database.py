@@ -700,6 +700,36 @@ class Database:
         except Exception as ex:
             log.warning("compensation_allowance policy_config ensure failed (run Supabase migration): %s", ex)
 
+    def _maybe_ensure_hot_path_indexes(self) -> None:
+        """
+        Idempotent indexes for the hot listing paths on case_assignments +
+        relocation_cases. Mirrors supabase/migrations/20260428100000_hot_path_indexes.sql.
+        Runs on both SQLite and Postgres; uses IF NOT EXISTS so repeat boots
+        are safe.
+        """
+        statements_pg = [
+            "CREATE INDEX IF NOT EXISTS idx_case_assignments_hr_user_created_at "
+            "ON case_assignments (hr_user_id, created_at DESC) "
+            "WHERE archived_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_relocation_cases_company_created_at "
+            "ON relocation_cases (company_id, created_at DESC) "
+            "WHERE archived_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_case_assignments_employee_user "
+            "ON case_assignments (employee_user_id) "
+            "WHERE employee_user_id IS NOT NULL AND archived_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_case_assignments_case_id "
+            "ON case_assignments (case_id) "
+            "WHERE archived_at IS NULL",
+        ]
+        # SQLite supports partial indexes via WHERE. Same DDL works on both
+        # engines for our predicates — no dialect split needed.
+        try:
+            with self.engine.begin() as conn:
+                for sql in statements_pg:
+                    conn.execute(text(sql))
+        except Exception as ex:
+            log.warning("hot-path indexes ensure failed (run Supabase migration): %s", ex)
+
     def _maybe_ensure_archived_at_columns(self) -> None:
         """
         Idempotently adds archived_at to case_assignments and relocation_cases
@@ -1031,6 +1061,10 @@ class Database:
         # archived_at is needed on both SQLite dev and Postgres prod. The helper
         # handles both and only runs ALTER TABLE if the column is missing.
         self._maybe_ensure_archived_at_columns()
+        # Hot-path indexes are re-ensured below after CREATE TABLE for SQLite
+        # (since the legacy DDL path below creates the tables if absent). On
+        # Postgres the indexes can be created here too, but we defer to the
+        # end of init_db for consistency.
 
         # In production (Render), avoid runtime DDL. Use Supabase migrations instead.
         if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):
@@ -3060,6 +3094,10 @@ class Database:
 
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
+
+        # Hot-path indexes depend on tables + archived_at column existing.
+        # Safe to run here unconditionally — idempotent via IF NOT EXISTS.
+        self._maybe_ensure_hot_path_indexes()
 
         try:
             self.seed_readiness_templates_if_empty()

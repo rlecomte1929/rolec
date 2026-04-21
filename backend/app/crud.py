@@ -64,8 +64,19 @@ def _parse_date(value: Any) -> Optional[date]:
     return None
 
 
-def list_country_profiles(db: Session) -> List[models.CountryProfile]:
-    return db.query(models.CountryProfile).all()
+# Upper bound on list endpoints that used to return .all() unbounded.
+# Callers that genuinely need more should paginate with offset/limit params.
+_DEFAULT_LIST_LIMIT = 500
+
+
+def list_country_profiles(db: Session, limit: int = _DEFAULT_LIST_LIMIT, offset: int = 0) -> List[models.CountryProfile]:
+    return (
+        db.query(models.CountryProfile)
+        .order_by(models.CountryProfile.country_code.asc())
+        .offset(max(0, offset))
+        .limit(max(1, min(limit, 1000)))
+        .all()
+    )
 
 
 def get_country_profile(db: Session, country_code: str) -> Optional[models.CountryProfile]:
@@ -99,8 +110,15 @@ def create_source_record(db: Session, payload: Dict[str, Any]) -> models.SourceR
     return record
 
 
-def list_sources(db: Session, country_code: str) -> List[models.SourceRecord]:
-    return db.query(models.SourceRecord).filter(models.SourceRecord.country_code == country_code).all()
+def list_sources(db: Session, country_code: str, limit: int = _DEFAULT_LIST_LIMIT, offset: int = 0) -> List[models.SourceRecord]:
+    return (
+        db.query(models.SourceRecord)
+        .filter(models.SourceRecord.country_code == country_code)
+        .order_by(models.SourceRecord.id.desc())
+        .offset(max(0, offset))
+        .limit(max(1, min(limit, 1000)))
+        .all()
+    )
 
 
 def create_requirement_item(db: Session, payload: Dict[str, Any]) -> models.RequirementItem:
@@ -147,6 +165,8 @@ def list_research_candidates(
     db: Session,
     destination_country: Optional[str] = None,
     status: Optional[str] = None,
+    limit: int = _DEFAULT_LIST_LIMIT,
+    offset: int = 0,
 ) -> List[models.ResearchSourceCandidate]:
     query = db.query(models.ResearchSourceCandidate)
     if destination_country:
@@ -156,7 +176,12 @@ def list_research_candidates(
         )
     if status:
         query = query.filter(models.ResearchSourceCandidate.status == status)
-    return query.order_by(models.ResearchSourceCandidate.created_at.desc()).all()
+    return (
+        query.order_by(models.ResearchSourceCandidate.created_at.desc())
+        .offset(max(0, offset))
+        .limit(max(1, min(limit, 1000)))
+        .all()
+    )
 
 
 def update_research_candidate_status(db: Session, candidate_id: str, status: str) -> Optional[models.ResearchSourceCandidate]:
@@ -200,18 +225,39 @@ def update_ingest_job(
     return job
 
 
-def list_ingest_jobs(db: Session, status: Optional[str] = None) -> List[models.KnowledgeDocIngestJob]:
+def list_ingest_jobs(
+    db: Session,
+    status: Optional[str] = None,
+    limit: int = _DEFAULT_LIST_LIMIT,
+    offset: int = 0,
+) -> List[models.KnowledgeDocIngestJob]:
     query = db.query(models.KnowledgeDocIngestJob)
     if status:
         query = query.filter(models.KnowledgeDocIngestJob.status == status)
-    return query.order_by(models.KnowledgeDocIngestJob.created_at.desc()).all()
+    return (
+        query.order_by(models.KnowledgeDocIngestJob.created_at.desc())
+        .offset(max(0, offset))
+        .limit(max(1, min(limit, 1000)))
+        .all()
+    )
 
 
-def list_requirements(db: Session, country_code: str, purpose: Optional[str] = None) -> List[models.RequirementItem]:
+def list_requirements(
+    db: Session,
+    country_code: str,
+    purpose: Optional[str] = None,
+    limit: int = _DEFAULT_LIST_LIMIT,
+    offset: int = 0,
+) -> List[models.RequirementItem]:
     query = db.query(models.RequirementItem).filter(models.RequirementItem.country_code == country_code)
     if purpose:
         query = query.filter(models.RequirementItem.purpose == purpose)
-    return query.all()
+    return (
+        query.order_by(models.RequirementItem.id.desc())
+        .offset(max(0, offset))
+        .limit(max(1, min(limit, 1000)))
+        .all()
+    )
 
 
 def create_snapshot(db: Session, payload: Dict[str, Any]) -> models.CaseRequirementsSnapshot:
