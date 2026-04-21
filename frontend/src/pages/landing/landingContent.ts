@@ -61,7 +61,7 @@ export const landingContent = {
   },
 
   trust: {
-    title: 'Built for teams running real relocations',
+    title: 'Built for mobility operators.',
     body: 'Workflow, policy-aware guidance, and execution in one system.',
     checklist: [
       'Workflow-first, not chat-first',
@@ -72,8 +72,8 @@ export const landingContent = {
   },
 
   finalCta: {
-    headline: 'Structure how you run relocation',
-    microCopy: 'Start with one case.',
+    headline: 'Three ways in.',
+    microCopy: 'Book a demo, sign in, or create an account.',
     options: {
       demo: 'Book a demo',
       platform: 'See the platform',
