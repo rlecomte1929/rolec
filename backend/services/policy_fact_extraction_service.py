@@ -23,7 +23,11 @@ APPROVED_FACT_TYPES = frozenset(
 )
 
 _CURRENCY_RE = re.compile(
-    r"\b(?:USD|EUR|GBP|CHF|CAD|AUD|JPY|\$|€|£)\s*[0-9][0-9,.\s]*(?:per\s+(?:month|year|day|week))?",
+    # Explicit non-word lookbehind + lookahead. Previous version used \b at
+    # the start, which does not match before € / £ (both non-word glyphs),
+    # so EU-denominated caps were silently missed by the deterministic
+    # extractor. See audit-A finding EXTRACT-BUG-1.
+    r"(?<!\w)(?:USD|EUR|GBP|CHF|CAD|AUD|JPY|\$|€|£)\s*[0-9][0-9,.\s]*(?:per\s+(?:month|year|day|week))?(?!\w)",
     re.I,
 )
 _AMOUNT_RE = re.compile(r"\b[0-9][0-9,.\s]*(?:%|percent)\b", re.I)
