@@ -559,10 +559,24 @@ def process_uploaded_document(
     request_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Full intake pipeline: extract text, classify, extract metadata.
-    Returns dict with raw_text, detected_document_type, detected_policy_scope,
-    extracted_metadata, processing_status, extraction_error.
+    Full intake pipeline: validate bytes, extract text, classify, extract metadata.
+
+    Rejection ordering (important — cheaper checks first):
+      1. Size check (DocumentSizeError)
+      2. Magic-byte sniff (UnsupportedFileTypeError)
+      3. PDF encryption check (EncryptedDocumentError)
+      4. Text extraction (MalformedDocumentError on parser failure)
+
+    Rejections from steps 1–4 re-raise as PolicyIntakeError subclasses so
+    callers can map them to typed HTTP responses. Legacy callers that expect
+    only a dict result still work — the result dict contains the same
+    processing_status='failed' + extraction_error fields as before.
+
+    Audit reference: Prompt 0 GAPs 003/004/009/010; Prompt A §9 R1–R4.
     """
+    from .policy_filetype import validate_upload_bytes
+    from .policy_intake_errors import MalformedDocumentError, PolicyIntakeError
+
     result: Dict[str, Any] = {
         "raw_text": None,
         "detected_document_type": DOC_TYPE_UNKNOWN,
@@ -575,21 +589,25 @@ def process_uploaded_document(
     }
 
     try:
-        lines, err = extract_text_from_bytes(data, mime_type)
-        if err:
-            result["processing_status"] = STATUS_FAILED
-            result["extraction_error"] = err
-            log.warning("request_id=%s process_uploaded_document text_extract failed: %s", request_id, err)
-            return result
+        # Steps 1–3: size + magic-byte sniff + encryption gate. Any failure
+        # re-raises as the specific PolicyIntakeError subclass.
+        kind = validate_upload_bytes(data)
 
-        raw_text = "\n".join(lines) if lines else ""
+        # Step 4: extract text using the sniffed kind (claimed mime_type is
+        # ignored — sniff is authoritative). A parser failure becomes
+        # MalformedDocumentError.
+        if kind == "pdf":
+            lines, err = _extract_text_from_pdf(data)
+        else:
+            lines, err = _extract_text_from_docx(data)
+        if err:
+            raise MalformedDocumentError(f"Could not read document: {err}")
+        if not lines:
+            raise MalformedDocumentError("No readable text extracted from document.")
+
+        raw_text = "\n".join(lines)
         result["raw_text"] = raw_text
         result["processing_status"] = STATUS_TEXT_EXTRACTED
-
-        if not lines:
-            result["processing_status"] = STATUS_FAILED
-            result["extraction_error"] = "No text extracted from document"
-            return result
 
         doc_type, scope, needs_review = classify_document(lines, request_id=request_id)
         result["detected_document_type"] = doc_type
@@ -601,7 +619,19 @@ def process_uploaded_document(
         result["version_label"] = meta.get("detected_version")
         result["effective_date"] = meta.get("detected_effective_date")
 
+    except PolicyIntakeError as e:
+        # Typed rejection — record on the result dict so legacy callers see
+        # it, then re-raise so the API layer can map to the right HTTP code.
+        result["processing_status"] = STATUS_FAILED
+        result["extraction_error"] = str(e)
+        log.info(
+            "request_id=%s process_uploaded_document rejected: %s (%s)",
+            request_id, e.error_code, e,
+        )
+        raise
     except Exception as e:
+        # Keep the catch-all for genuinely unexpected errors. Never let a
+        # stray exception crash a background task.
         result["processing_status"] = STATUS_FAILED
         result["extraction_error"] = str(e)
         log.warning(

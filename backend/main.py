@@ -8696,8 +8696,25 @@ async def upload_policy_document(
             request_id=request_id,
         )
 
+    # Typed-rejection pre-gate: size ceiling + magic-byte sniff + PDF
+    # encryption check. Any failure here maps to the specific HTTP status
+    # on the PolicyIntakeError subclass. Fires BEFORE storage upload so
+    # rejected files never leave a trail in Supabase storage.
+    try:
+        from .services.policy_filetype import validate_upload_bytes
+        from .services.policy_intake_errors import PolicyIntakeError
+        sniffed_kind = validate_upload_bytes(content)
+    except PolicyIntakeError as exc:
+        log.info(
+            "request_id=%s policy_upload stage=validate rejection=%s msg=%s",
+            request_id, exc.error_code, exc,
+        )
+        return _upload_error_response(
+            exc.error_code, str(exc), exc.http_status, request_id=request_id
+        )
+
     mime = file.content_type or (
-        "application/pdf" if ext == "pdf"
+        "application/pdf" if sniffed_kind == "pdf"
         else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
     log.info(
