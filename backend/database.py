@@ -3290,6 +3290,73 @@ class Database:
             row = conn.execute(text("SELECT * FROM relocation_cases WHERE id = :id"), {"id": case_id}).fetchone()
         return self._row_to_dict(row)
 
+    def redact_case_identity_data(
+        self,
+        case_id: str,
+        *,
+        actor_id: Optional[str] = None,
+    ) -> bool:
+        """
+        GDPR erasure: replace identity PII in relocation_cases.profile_json with
+        redaction markers. Preserves the row (keeps foreign-key targets intact)
+        but clears passport, nationality, DOB, names, addresses, and family
+        details. Writes an audit_logs row with action_type='erase'.
+
+        Returns True if a row was redacted, False if no such case exists.
+        """
+        from .services.audit_log_service import insert_audit_log, ACTOR_HUMAN, ACTOR_SYSTEM
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT * FROM relocation_cases WHERE id = :id"),
+                {"id": case_id},
+            ).fetchone()
+            if not row:
+                return False
+            snapshot = self._row_to_dict(row) or {}
+            # Top-level PII keys we scrub. Anything not listed is preserved
+            # (origin/destination country, assignment type, etc. are not PII).
+            PII_KEYS = {
+                "employeeProfile", "familyMembers", "identity", "passport",
+                "passports", "nationality", "nationalities", "dateOfBirth",
+                "dob", "homeAddress", "destinationAddress", "phone", "email",
+                "emergencyContact",
+            }
+            try:
+                raw = snapshot.get("profile_json")
+                profile = json.loads(raw) if isinstance(raw, str) else (raw or {})
+            except Exception:
+                profile = {}
+            redacted = dict(profile) if isinstance(profile, dict) else {}
+            for key in list(redacted.keys()):
+                if key in PII_KEYS:
+                    redacted[key] = "[redacted]"
+            redacted["_erased"] = {"at": now, "actor": actor_id or "system"}
+            conn.execute(
+                text(
+                    "UPDATE relocation_cases SET profile_json = :pj, updated_at = :ua "
+                    "WHERE id = :id"
+                ),
+                {"pj": json.dumps(redacted), "ua": now, "id": case_id},
+            )
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="relocation_case",
+                    entity_id=case_id,
+                    action_type="erase",
+                    old_value={"profile_keys": list((profile or {}).keys())},
+                    new_value={"erased_at": now},
+                    actor_type=ACTOR_HUMAN if actor_id else ACTOR_SYSTEM,
+                    actor_id=actor_id,
+                )
+            except Exception as audit_exc:
+                log.warning(
+                    "redact_case_identity_data audit insert failed (cid=%s): %s",
+                    case_id[:8], audit_exc,
+                )
+        return True
+
     def resolve_canonical_case_id(self, case_id: str) -> Optional[str]:
         """If case_id matches wizard_cases.id, return it (canonical). Else return None."""
         if not case_id or not case_id.strip():

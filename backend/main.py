@@ -4499,6 +4499,61 @@ def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(requ
     return {"success": True, "deleted": assignment_id}
 
 
+@app.post("/api/hr/cases/{case_id}/erasure")
+def erase_case_data(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    GDPR right-to-erasure. Soft-deletes all assignments for this case (which
+    also soft-deletes the case via delete_assignment) and redacts passport,
+    nationality, DOB, and family identity fields from relocation_cases.profile_json.
+
+    Authorization: non-admin HR callers must belong to the case's company.
+    Audit: writes a `relocation_case` row with action_type='erase' and a
+    `case_assignment` row with action_type='delete' per soft-deleted assignment.
+    """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    case = db.get_case_by_id(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if not user.get("is_admin"):
+        hr_company = _get_hr_company_id(effective)
+        if not hr_company or hr_company != case.get("company_id"):
+            raise HTTPException(status_code=403, detail="Not authorized for this case")
+
+    # Soft-delete assignments first (each call also soft-deletes the case).
+    with db.engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT id FROM case_assignments WHERE case_id = :cid AND archived_at IS NULL"),
+            {"cid": case_id},
+        ).fetchall()
+    assignment_ids = [r._mapping["id"] for r in rows]
+    for aid in assignment_ids:
+        try:
+            db.delete_assignment(aid, actor_id=effective.get("id"))
+        except Exception as ex:
+            log.warning("erase_case_data: delete_assignment(%s) failed: %s", aid[:8], ex)
+
+    # Redact identity PII on the case row (audit row written inside).
+    db.redact_case_identity_data(case_id, actor_id=effective.get("id"))
+
+    log.info(
+        "gdpr_erasure case_id=%s company_id=%s actor=%s assignments_soft_deleted=%d",
+        case_id[:8],
+        (case.get("company_id") or "")[:8],
+        (effective.get("id") or "")[:8],
+        len(assignment_ids),
+    )
+    return {
+        "success": True,
+        "case_id": case_id,
+        "assignments_soft_deleted": len(assignment_ids),
+        "pii_redacted": True,
+    }
+
+
 def _hr_assignment_case_route_hints(case_row: Optional[Dict[str, Any]]) -> tuple:
     """
     Origin/destination hints from relocation_cases only (existing stored data).
