@@ -4853,9 +4853,21 @@ def dismiss_message_notification(
 
 @app.delete("/api/hr/assignments/{assignment_id}")
 def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    """
+    Soft-delete an assignment + its parent case. Sets archived_at and writes
+    an audit_logs row per entity. Non-admin HR callers must own or share a
+    company with the assignment.
+    """
     _deny_if_impersonating(user)
-    deleted = db.delete_assignment(assignment_id)
+    effective = _effective_user(user, UserRole.HR)
+    assignment = db.get_assignment_by_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    deleted = db.delete_assignment(assignment_id, actor_id=effective.get("id"))
     if not deleted:
+        # Either it was already archived or race with concurrent delete.
         raise HTTPException(status_code=404, detail="Assignment not found")
     return {"success": True, "deleted": assignment_id}
 
