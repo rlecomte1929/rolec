@@ -22,10 +22,12 @@ this is the MVP that stops silent data loss.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
+
+from .._time import utcnow, utcnow_iso_naive
 
 log = logging.getLogger(__name__)
 
@@ -42,8 +44,12 @@ IN_FLIGHT_ASSISTANT_STATUSES = ("extracting_text",)
 
 
 def _build_cutoff_iso(max_age_seconds: int) -> str:
-    """ISO-formatted cutoff timestamp in UTC (schema stores timestamps as ISO strings on SQLite)."""
-    cutoff = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+    """
+    ISO cutoff timestamp. Emitted as naive ISO (no tz offset) to stay
+    comparable with the existing policy_documents.uploaded_at rows which
+    were written as `datetime.utcnow().isoformat()`.
+    """
+    cutoff = utcnow() - timedelta(seconds=max_age_seconds)
     return cutoff.replace(tzinfo=None).isoformat()
 
 
@@ -117,7 +123,7 @@ def reconcile_orphaned_policy_ingest_jobs(
                     f"interrupted_before_completion: reconciler={actor_label} "
                     f"age>{max_age_seconds}s"
                 ),
-                processed_at=datetime.utcnow().isoformat(),
+                processed_at=utcnow_iso_naive(),
             )
             failed.append({
                 "id": doc_id,

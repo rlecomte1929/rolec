@@ -3343,7 +3343,8 @@ class Database:
         Returns True if a row was redacted, False if no such case exists.
         """
         from .services.audit_log_service import insert_audit_log, ACTOR_HUMAN, ACTOR_SYSTEM
-        now = datetime.utcnow().isoformat()
+        from ._time import utcnow_iso_naive
+        now = utcnow_iso_naive()
         with self.engine.begin() as conn:
             row = conn.execute(
                 text("SELECT * FROM relocation_cases WHERE id = :id"),
@@ -7243,7 +7244,8 @@ class Database:
             ACTOR_HUMAN,
             ACTOR_SYSTEM,
         )
-        now = datetime.utcnow().isoformat()
+        from ._time import utcnow_iso_naive
+        now = utcnow_iso_naive()
         with self.engine.begin() as conn:
             row = conn.execute(text(
                 "SELECT * FROM case_assignments WHERE id = :id AND archived_at IS NULL"
