@@ -227,6 +227,65 @@ else:
     log.info("Running with PostgreSQL — data persists across redeploys.")
 
 app = FastAPI(title="ReloPass API", version="1.0.0", lifespan=lifespan)
+
+# ---------------------------------------------------------------------------
+# Rate limiting (abuse protection on auth + claim endpoints).
+# In-memory storage: sufficient for single-worker Render deploy. Counters
+# reset on process restart; multi-worker requires Redis (slowapi supports
+# it via the storage_uri kwarg without route-code changes).
+# Disabled when RELOPASS_DISABLE_RATE_LIMITS=1 (tests set this in conftest).
+# ---------------------------------------------------------------------------
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+
+
+def _real_remote_address(request: Request) -> str:
+    """
+    Client IP for rate-limit keying. Prefers X-Forwarded-For's first hop
+    because Render/Cloudflare proxy traffic — request.client.host would
+    otherwise be the edge IP and all users would share one bucket.
+    Safe on Render because the only ingress path appends to XFF.
+    """
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        first = xff.split(",", 1)[0].strip()
+        if first:
+            return first
+    return get_remote_address(request)
+
+
+_RATE_LIMITS_ENABLED = os.getenv("RELOPASS_DISABLE_RATE_LIMITS", "").lower() not in ("1", "true", "yes")
+limiter = Limiter(key_func=_real_remote_address, enabled=_RATE_LIMITS_ENABLED)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    """429 response that preserves X-Request-ID and CORS headers (matches global 500 handler)."""
+    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    hdrs: Dict[str, str] = {
+        "X-Request-ID": req_id,
+        "Retry-After": "60",
+    }
+    hdrs.update(cors_headers_for_request_origin(request))
+    log.warning(
+        "rate_limit_exceeded request_id=%s path=%s ip=%s limit=%s",
+        req_id,
+        request.url.path,
+        _real_remote_address(request),
+        str(getattr(exc, "detail", "")),
+    )
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": "Too many requests. Wait a moment before trying again.",
+            "request_id": req_id,
+        },
+        headers=hdrs,
+    )
+
+
 admin_graph_build_marker = os.getenv("ADMIN_GRAPH_BUILD_MARKER", "local-dev")
 log.info(
     "ADMIN_GRAPH_BUILD_MARKER=%s db_scheme=%s seed_guard_active=%s DISABLE_DEMO_RESEED=%s ALLOW_LEGACY_DEMO_SEED=%s",
@@ -1150,11 +1209,12 @@ def _best_effort_reconcile_employee_assignments(
 
 
 @app.post("/api/auth/register", response_model=LoginResponse)
-def register(request: RegisterRequest):
+@limiter.limit("5/hour;20/day")
+def register(body: RegisterRequest, request: Request):
     """Register a new user with username or email and role."""
     try:
-        username = request.username.strip() if request.username else None
-        email_raw = request.email.strip() if request.email else None
+        username = body.username.strip() if body.username else None
+        email_raw = body.email.strip() if body.email else None
         email = email_raw.lower() if email_raw else None
 
         if not username and not email:
@@ -1200,16 +1260,16 @@ def register(request: RegisterRequest):
                     ),
                 )
 
-        if not request.password:
+        if not body.password:
             raise HTTPException(status_code=400, detail="Password required")
 
         # Password hashing (placeholder for stronger policy/verification)
         from passlib.context import CryptContext
         # Use PBKDF2 to avoid bcrypt backend issues on Windows.
         pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-        password_hash = pwd_context.hash(request.password)
+        password_hash = pwd_context.hash(body.password)
 
-        role = request.role
+        role = body.role
         if role == UserRole.ADMIN and (not email or not email.endswith("@relopass.com") or not db.is_admin_allowlisted(email)):
             role = UserRole.EMPLOYEE
 
@@ -1220,7 +1280,7 @@ def register(request: RegisterRequest):
             email=email,
             password_hash=password_hash,
             role=role.value,
-            name=request.name,
+            name=body.name,
         )
         if not created:
             identity_event(
@@ -1242,7 +1302,7 @@ def register(request: RegisterRequest):
             user_id=user_id,
             email=email,
             role=role.value,
-            full_name=request.name,
+            full_name=body.name,
             company_id=None,
         )
 
@@ -1304,9 +1364,9 @@ def register(request: RegisterRequest):
 
             sync_relopass_user_to_supabase_auth(
                 email,
-                request.password,
+                body.password,
                 relopass_user_id=user_id,
-                full_name=request.name,
+                full_name=body.name,
             )
         return LoginResponse(
             token=token,
@@ -1315,7 +1375,7 @@ def register(request: RegisterRequest):
                 username=username,
                 email=email,
                 role=role,
-                name=request.name,
+                name=body.name,
                 company=None,
             ),
             reconciliation=reconciliation_payload,
@@ -1323,7 +1383,7 @@ def register(request: RegisterRequest):
     except HTTPException:
         raise
     except Exception as e:
-        log.exception("auth_register unexpected error email=%s", getattr(request, "email", ""))
+        log.exception("auth_register unexpected error email=%s", getattr(body, "email", ""))
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 
@@ -1360,11 +1420,12 @@ def _log_auth_perf(endpoint: str, request_id: Optional[str], user_id: Optional[s
 
 
 @app.post("/api/auth/login", response_model=LoginResponse)
-def login(request: LoginRequest, req: Request):
+@limiter.limit("10/minute;100/hour")
+def login(body: LoginRequest, request: Request):
     """Login with username or email + password."""
     t0 = time.perf_counter()
-    request_id = getattr(req.state, "request_id", None) or ""
-    identifier = (request.identifier or "").strip()
+    request_id = getattr(request.state, "request_id", None) or ""
+    identifier = (body.identifier or "").strip()
     if not identifier:
         log.warning("auth_login fail identifier_empty")
         identity_event(
@@ -1408,7 +1469,7 @@ def login(request: LoginRequest, req: Request):
 
     from passlib.context import CryptContext
     pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-    if not pwd_context.verify(request.password, user["password_hash"]):
+    if not pwd_context.verify(body.password, user["password_hash"]):
         log.warning("auth_login fail wrong_password user_id=%s", user.get("id", "")[:8])
         identity_event(
             "identity.auth.signin.failed",
@@ -1501,7 +1562,7 @@ def login(request: LoginRequest, req: Request):
 
         sync_relopass_user_to_supabase_auth(
             user["email"],
-            request.password,
+            body.password,
             relopass_user_id=user["id"],
             full_name=user.get("name"),
         )
@@ -3905,6 +3966,7 @@ def _validated_employee_claim_identifiers(
 
 
 @app.post("/api/employee/assignments/{assignment_id}/claim")
+@limiter.limit("10/hour;50/day")
 def claim_assignment(
     request: Request,
     assignment_id: str,

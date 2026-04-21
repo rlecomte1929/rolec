@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import os
 
+# Disable auth-endpoint rate limits during tests so repeated logins in a single
+# run don't flake. Must be set before backend.main is imported.
+os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
+
 import pytest
 
 
