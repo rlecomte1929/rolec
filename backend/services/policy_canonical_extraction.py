@@ -64,6 +64,11 @@ class OpenAIPolicyCanonicalExtractor:
     def _client_or_raise(self) -> Any:
         if self._client is not None:
             return self._client
+        from ..core.llm_flags import LLMDisabled, policy_llm_disabled
+        if policy_llm_disabled():
+            # RELOPASS_POLICY_LLM_DISABLED=1 — never build a client, never
+            # egress. Caller must treat this as "no LLM contribution".
+            return LLMDisabled
         try:
             from openai import OpenAI  # type: ignore
         except ImportError as exc:  # pragma: no cover - exercised via tests with mock clients
@@ -80,6 +85,13 @@ class OpenAIPolicyCanonicalExtractor:
         )
 
     def extract(self, llm_input: PolicyFactExtractionLLMInput) -> PolicyFactExtractionLLMOutput:
+        from ..core.llm_flags import LLMDisabled, policy_llm_temperature
+        client = self._client_or_raise()
+        if client is LLMDisabled:
+            # Deterministic short-circuit. Callers will typically route to
+            # the fallback extractor (extract_minimal_policy_facts) and set
+            # review_required=True on the document row.
+            return PolicyFactExtractionLLMOutput(facts=[])
         schema_json = {
             "type": "object",
             "properties": {
@@ -93,9 +105,9 @@ class OpenAIPolicyCanonicalExtractor:
             "required": ["facts"],
             "additionalProperties": False,
         }
-        client = self._client_or_raise()
         response = client.chat.completions.create(
             model=self._model,
+            temperature=policy_llm_temperature(),
             response_format={"type": "json_object"},
             messages=[
                 {
