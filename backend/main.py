@@ -14,7 +14,6 @@ from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any, List, Tuple
-import os
 import uuid
 from datetime import datetime, date
 import re

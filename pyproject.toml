@@ -1,0 +1,28 @@
+[tool.ruff]
+# Python 3.11 is the production runtime (.python-version). Keep this in sync.
+target-version = "py311"
+line-length = 120
+# venv/ is committed to the repo for legacy reasons and is bloat that should
+# be cleaned up separately. Until then, exclude it from lint.
+exclude = [
+    "venv",
+    ".venv",
+    "frontend",
+    "supabase/migrations",
+    "backend/alembic",
+]
+
+[tool.ruff.lint]
+# Start deliberately narrow — the existing codebase has hundreds of pep8
+# style nits that would drown out real signal on a first CI pass. These
+# rules catch things that are almost always real bugs:
+#   E9   — syntax errors
+#   F63  — comparison bugs (is literal, not in, etc.)
+#   F7   — pyflakes errors (undefined name, redefinition, etc.)
+#   F82  — undefined module / local
+# Notably NOT included yet (cosmetic or noisy-for-FastAPI):
+#   F401 (unused imports) — 115 hits, clean up opportunistically
+#   F841 (unused variable) — 25 hits, clean up opportunistically
+#   B008 (Depends() in default)  — idiomatic FastAPI, false positive here
+# Widen the set (E, W, I, UP, SIM, F401) once the current backlog is addressed.
+select = ["E9", "F63", "F7", "F82"]

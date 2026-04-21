@@ -20,6 +20,7 @@ from backend.services.explicit_pending_link_service import (
     execute_pending_explicit_link,
     PENDING_LINK_COMPANY_MISMATCH,
     PENDING_LINK_CONTACT_NOT_LINKED,
+    PENDING_LINK_ELIGIBLE,
     PENDING_LINK_EXTRA_VERIFICATION,
     PENDING_LINK_INVITE_REVOKED,
     PENDING_LINK_NOT_PENDING,

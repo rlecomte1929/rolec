@@ -6343,16 +6343,6 @@ class Database:
             ), row)
         return rule_id
 
-    def list_knowledge_docs_by_destination(self, destination_country: str) -> List[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT d.* FROM knowledge_docs d "
-                "JOIN knowledge_packs p ON p.id = d.pack_id "
-                "WHERE p.destination_country = :dest "
-                "ORDER BY d.created_at DESC"
-            ), {"dest": destination_country}).fetchall()
-        return self._rows_to_list(rows)
-
     def list_knowledge_docs(self, pack_ids: List[str]) -> List[Dict[str, Any]]:
         if not pack_ids:
             return []

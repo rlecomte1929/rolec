@@ -23,6 +23,7 @@ from .policy_assistant_contract import (
     PolicyAssistantFollowUpOption,
     PolicyAssistantIntent,
     PolicyAssistantPolicyStatus,
+    PolicyAssistantRefusal,
     PolicyAssistantRefusalCode,
     PolicyAssistantRoleScope,
 )
