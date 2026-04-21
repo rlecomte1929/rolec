@@ -195,6 +195,20 @@ def _run_runtime_startup_initialization() -> None:
     except Exception as e:
         log.warning("policy_storage startup diagnostic skipped: %s", e)
 
+    # Mark as failed any policy_documents rows that were mid-extraction when
+    # the previous process exited. Without this they stay stuck in-flight
+    # forever and the upload idempotency guard (see #7) blocks retries.
+    try:
+        from .services.policy_ingest_reconciler import reconcile_orphaned_policy_ingest_jobs
+        _reconcile_summary = reconcile_orphaned_policy_ingest_jobs(db, actor_label="startup")
+        if _reconcile_summary.get("failed"):
+            log.warning(
+                "Startup policy-ingest reconciler: failed %d orphaned documents",
+                _reconcile_summary["failed"],
+            )
+    except Exception as e:
+        log.warning("Startup policy-ingest reconciler skipped: %s", e)
+
     if _db_scheme == "sqlite" and ALLOW_LEGACY_DEMO_SEED and not DISABLE_DEMO_RESEED:
         try:
             _seed_demo_cases()
