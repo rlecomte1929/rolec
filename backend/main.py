@@ -8,6 +8,13 @@ import os
 import json as _json
 
 logging.basicConfig(level=logging.INFO)
+
+# Configure observability (Sentry + structured logging) before anything else
+# logs, so early startup lines land in the right format. All of it is no-op
+# unless the relevant env vars are set.
+from .observability import configure_observability  # noqa: E402
+configure_observability()
+
 log = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
