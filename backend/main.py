@@ -9078,6 +9078,36 @@ async def upload_policy_document(
     except Exception as e:
         log.warning("request_id=%s policy_upload checksum failed: %s", request_id, e)
 
+    # --- Idempotency: skip re-upload if the same file (by checksum) was already
+    # processed successfully for this company. Protects against double-clicks,
+    # refresh-resubmits, and LLM-cost duplication. Failed prior attempts fall
+    # through so the user can retry by re-uploading.
+    if checksum:
+        try:
+            existing = db.get_active_policy_document_by_checksum(
+                company_id, checksum, request_id=request_id
+            )
+        except Exception as e:
+            log.warning(
+                "request_id=%s policy_upload idempotency lookup failed: %s",
+                request_id, e,
+            )
+            existing = None
+        if existing:
+            log.info(
+                "request_id=%s policy_upload idempotent_reuse existing_doc_id=%s status=%s",
+                request_id,
+                existing.get("id"),
+                existing.get("processing_status"),
+            )
+            return {
+                "ok": True,
+                "document": existing,
+                "request_id": request_id,
+                "processing_queued": False,
+                "reused": True,
+            }
+
     doc_id = str(uuid.uuid4())
     storage_filename = _sanitize_storage_filename(filename)
     path = f"companies/{company_id}/policy-documents/{doc_id}/{storage_filename}"

@@ -144,7 +144,14 @@ class CanonicalPolicyQueryLLM:
             from openai import OpenAI  # type: ignore
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("openai package is required for policy query answering") from exc
-        return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Explicit timeout + retries — avoids hung requests blocking policy Q&A.
+        timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+        return OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            timeout=timeout_s,
+            max_retries=max_retries,
+        )
 
     def answer(self, *, query: str, context_blocks: List[str]) -> str:
         client = self._client_or_raise()

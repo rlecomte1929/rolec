@@ -68,7 +68,16 @@ class OpenAIPolicyCanonicalExtractor:
             from openai import OpenAI  # type: ignore
         except ImportError as exc:  # pragma: no cover - exercised via tests with mock clients
             raise RuntimeError("openai package is required for canonical policy extraction") from exc
-        return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Explicit timeout + retries — the OpenAI SDK's defaults let a hung
+        # connection block the background task indefinitely. OPENAI_TIMEOUT_SECONDS
+        # and OPENAI_MAX_RETRIES are the env-var overrides for ops tuning.
+        timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+        return OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            timeout=timeout_s,
+            max_retries=max_retries,
+        )
 
     def extract(self, llm_input: PolicyFactExtractionLLMInput) -> PolicyFactExtractionLLMOutput:
         schema_json = {

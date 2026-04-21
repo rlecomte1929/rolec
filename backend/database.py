@@ -10891,6 +10891,36 @@ class Database:
                 )
         return self.get_policy_document(doc_id, request_id=request_id) or {}
 
+    def get_active_policy_document_by_checksum(
+        self,
+        company_id: str,
+        checksum: str,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Idempotency lookup: return the newest non-failed policy_documents row
+        for (company_id, checksum), or None.
+
+        Used by the upload endpoint so double-clicks / refresh-resubmits /
+        network retries don't create duplicate rows and re-run LLM extraction.
+        Rows with processing_status='failed' are excluded so the caller can
+        re-trigger extraction by uploading again.
+        """
+        if not (company_id and checksum):
+            return None
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM policy_documents "
+                "WHERE company_id = :cid AND checksum = :chk "
+                "AND COALESCE(processing_status, '') != 'failed' "
+                "ORDER BY uploaded_at DESC LIMIT 1",
+                {"cid": company_id, "chk": checksum},
+                op_name="get_active_policy_document_by_checksum",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row)
+
     def get_policy_document(
         self, doc_id: str, request_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
