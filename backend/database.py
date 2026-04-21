@@ -5092,14 +5092,34 @@ class Database:
         return self._row_to_dict(row)
 
     def list_assignments_for_hr(self, hr_user_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        FALLBACK path: list assignments owned by an HR user who is NOT yet linked
+        to any company (i.e. has no row in hr_users). Callers normally resolve a
+        company_id first and call list_assignments_for_company; this function is
+        only reached when that resolution returned None.
+
+        The NOT EXISTS guard is a safety floor: if the HR user IS associated with
+        any company (via hr_users), this returns empty instead of leaking across
+        company boundaries. That forces the caller to go through the company-
+        scoped path, where multi-tenant filtering is correct.
+        """
         with self.engine.connect() as conn:
             rows = self._exec(
                 conn,
-                "SELECT * FROM case_assignments WHERE hr_user_id = :hr ORDER BY created_at DESC",
+                "SELECT * FROM case_assignments "
+                "WHERE hr_user_id = :hr "
+                "AND NOT EXISTS (SELECT 1 FROM hr_users WHERE profile_id = :hr) "
+                "ORDER BY created_at DESC",
                 {"hr": hr_user_id},
                 op_name="list_assignments_for_hr",
                 request_id=request_id,
             ).fetchall()
+        if not rows:
+            # Not necessarily an error — just worth a trace when the guard bites.
+            log.info(
+                "list_assignments_for_hr: 0 rows for hr_user_id=%s (guard rejects if user has any hr_users row)",
+                hr_user_id[:8] if hr_user_id else "",
+            )
         return self._rows_to_list(rows)
 
     def list_assignments_for_company(
@@ -6699,8 +6719,16 @@ class Database:
                     """
                     rows = conn.execute(text(sql), {"cid": company_id}).fetchall()
                 elif hr_user_id:
+                    # Fallback only for HR users without a company association.
+                    # NOT EXISTS guard prevents cross-company leakage if the
+                    # user *does* have an hr_users row (see list_assignments_for_hr).
                     rows = conn.execute(
-                        text("SELECT * FROM case_assignments WHERE hr_user_id = :hr ORDER BY created_at DESC"),
+                        text(
+                            "SELECT * FROM case_assignments "
+                            "WHERE hr_user_id = :hr "
+                            "AND NOT EXISTS (SELECT 1 FROM hr_users WHERE profile_id = :hr) "
+                            "ORDER BY created_at DESC"
+                        ),
                         {"hr": hr_user_id},
                     ).fetchall()
                 else:
@@ -6808,7 +6836,13 @@ class Database:
                         {where}
                     """
                 elif hr_user_id:
-                    where = "WHERE ca.hr_user_id = :hr"
+                    # Fallback only for HR users without a company association.
+                    # NOT EXISTS guard: if the user has any hr_users row, this
+                    # returns empty rather than leaking across companies.
+                    where = (
+                        "WHERE ca.hr_user_id = :hr "
+                        "AND NOT EXISTS (SELECT 1 FROM hr_users WHERE profile_id = :hr)"
+                    )
                     params["hr"] = hr_user_id
                     sql = f"""
                         SELECT ca.id, ca.employee_identifier, ca.status,
@@ -6931,7 +6965,14 @@ class Database:
                         WHERE {where}
                     """
                 elif hr_user_id:
-                    where = "ca.id = :aid AND ca.hr_user_id = :hr"
+                    # Fallback only for HR users without a company association.
+                    # NOT EXISTS guard: if the user has any hr_users row, this
+                    # returns nothing rather than leaking an assignment from
+                    # another company (see list_assignments_for_hr).
+                    where = (
+                        "ca.id = :aid AND ca.hr_user_id = :hr "
+                        "AND NOT EXISTS (SELECT 1 FROM hr_users WHERE profile_id = :hr)"
+                    )
                     params["hr"] = hr_user_id
                     sql = f"""
                         SELECT ca.*, {dest_sql} as intake_dest_country,
