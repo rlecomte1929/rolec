@@ -8697,24 +8697,37 @@ async def upload_policy_document(
         )
 
     # Typed-rejection pre-gate: size ceiling + magic-byte sniff + PDF
-    # encryption check. Any failure here maps to the specific HTTP status
-    # on the PolicyIntakeError subclass. Fires BEFORE storage upload so
-    # rejected files never leave a trail in Supabase storage.
+    # encryption check. Any failure here maps to a typed HTTP status;
+    # fires BEFORE storage upload so rejected files never leave a trail
+    # in Supabase storage.
     try:
         from .services.policy_filetype import validate_upload_bytes
-        from .services.policy_intake_errors import PolicyIntakeError
-        sniffed_kind = validate_upload_bytes(content)
+        from .services.policy_intake_errors import (
+            DocumentSizeError,
+            EncryptedDocumentError,
+            MalformedDocumentError,
+            PolicyIntakeError,
+            UnsupportedFileTypeError,
+        )
+        sniff_result = validate_upload_bytes(content)
     except PolicyIntakeError as exc:
+        # Map exception class → HTTP status. Exceptions are transport-agnostic;
+        # the status live here (the API layer) per recipe §4.4.
+        _INTAKE_HTTP_STATUS = {
+            UnsupportedFileTypeError: 415,   # Unsupported Media Type
+            MalformedDocumentError: 422,     # Unprocessable Entity
+            EncryptedDocumentError: 422,
+            DocumentSizeError: 413,          # Payload Too Large (also fires on empty)
+        }
+        status = _INTAKE_HTTP_STATUS.get(type(exc), 422)
         log.info(
-            "request_id=%s policy_upload stage=validate rejection=%s msg=%s",
-            request_id, exc.error_code, exc,
+            "request_id=%s policy_upload stage=validate rejection=%s status=%d msg=%s",
+            request_id, exc.code, status, exc,
         )
-        return _upload_error_response(
-            exc.error_code, str(exc), exc.http_status, request_id=request_id
-        )
+        return _upload_error_response(exc.code, str(exc), status, request_id=request_id)
 
     mime = file.content_type or (
-        "application/pdf" if sniffed_kind == "pdf"
+        "application/pdf" if sniff_result.kind == "pdf"
         else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
     log.info(

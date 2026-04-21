@@ -26,7 +26,7 @@ import logging
 import re
 from datetime import datetime
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
@@ -182,201 +182,282 @@ def _extract_text_from_pdf(data: bytes) -> Tuple[List[str], Optional[str]]:
 @dataclass(frozen=True)
 class DocTypeProfile:
     """
-    Keyword profile for a document-type classifier bucket.
+    Keyword profile for a document-type classifier bucket (regex-based).
 
-    - `primary` keywords MUST appear in the title block (first ~600 chars,
-      which covers the document title, preamble, and Assignment Type line).
-      A doc with no primary hit scores 0 for this type — no body evidence
-      alone promotes a document into this bucket.
-    - `secondary` keywords score in the full body; each hit adds to the score.
-    - `negative` keywords score in the full body; each hit subtracts.
-    - `default_scope` is returned as the second tuple element when this
-      profile wins.
+    - `primary` patterns MUST match in the title block (first ~600 chars +
+      the first markdown/ALL-CAPS heading) to make the profile eligible.
+      A profile without a primary hit scores 0 for that bucket — no amount
+      of body evidence promotes it.
+    - `body` patterns match the full lowercased body; each hit adds 1.
+    - `negative` patterns match the full body; each hit subtracts 2
+      (tunable via _NEGATIVE_WEIGHT).
+    - `default_scope` is returned when this profile wins.
     """
-    doc_type: str
+    name: str
     primary: Tuple[str, ...]
-    secondary: Tuple[str, ...]
-    negative: Tuple[str, ...]
-    default_scope: str
+    body: Tuple[str, ...] = ()
+    negative: Tuple[str, ...] = ()
+    default_scope: str = SCOPE_UNKNOWN
+    min_primary_hits: int = 1
 
 
-# Title-block window: first N characters of the doc. Covers the title line,
-# any subtitle, and the first few structured fields (Assignment Type,
-# Eligible Employees, Family Coverage) for a typical HR policy template.
+@dataclass
+class ClassificationResult:
+    """
+    Result of classify_by_keywords. The classifier returns this rather than
+    a bare tuple so downstream callers can log `reasons` and `scores` for
+    audit without having to re-run the match.
+    """
+    detected_document_type: str
+    detected_policy_scope: str
+    confidence: float
+    review_required: bool
+    scores: Dict[str, float]
+    reasons: List[str]
+
+
+# Title block = first N chars + the first heading (markdown or ALL-CAPS).
+# The ambiguity markers that Prompt A Dummy 3 carries ("not specified" /
+# "not provided" / "support may be provided") land in the body, not the
+# title, so this block intentionally doesn't include them.
 _TITLE_BLOCK_CHARS = 600
+_HEADING_RE = re.compile(r"(?m)^\s{0,3}(#{1,3}\s+.+|[A-Z][A-Z0-9 &/-]{4,}$)")
 
-# Score at which we consider the classifier confident enough to skip review.
-# Below this, needs_review=True even when a type wins.
-_CONFIDENCE_THRESHOLD = 5
+# Scoring constants (recipe §3).
+_PRIMARY_WEIGHT = 3.0
+_BODY_WEIGHT = 1.0
+_NEGATIVE_WEIGHT = 2.0
+# Margin + confidence thresholds for review_required=False.
+_MARGIN_THRESHOLD = 1.5
+_CONFIDENCE_THRESHOLD = 0.35
 
-# Base score a profile gets for a primary hit, before adding secondaries
-# and subtracting negatives.
-_PRIMARY_BASE_SCORE = 3
-
-# Ambiguity markers: presence of many of these demotes the doc to UNKNOWN
-# regardless of which profile otherwise wins. Tuned to catch the "fragmented
-# / missing data" character of audit Dummy 3 without flagging Dummy 2's
-# softer "reasonable costs / case-by-case" language.
+# Ambiguity override — if the body is this "missing data"–heavy, the
+# classifier returns UNKNOWN even when a profile has a primary hit.
+# Preserves Dummy 3's review_required=True + unknown outcome.
 _HIGH_AMBIGUITY_MARKERS = (
-    "not specified",
-    "not defined",
-    "not provided",
-    "no cost clarity",
-    "support may be provided",
-    "handled internally",
-    "no breakdown of services",
-    "no explicit policy",
-    "missing data",
+    r"\bnot\s+specified\b",
+    r"\bnot\s+defined\b",
+    r"\bnot\s+provided\b",
+    r"\bno\s+cost\s+clarity\b",
+    r"\bsupport\s+may\s+be\s+provided\b",
+    r"\bhandled\s+internally\b",
+    r"\bno\s+breakdown\s+of\s+services\b",
+    r"\bmissing\s+data\b",
 )
 _AMBIGUITY_THRESHOLD = 4
 
-# Profiles are evaluated in list order; on a tie the earlier profile wins,
-# which matches the intent that assignment_policy is the most common type
-# and should be the preferred interpretation when signals are balanced.
+
+# Profile order matters for tie-breaking — the first profile to reach a
+# given score wins. assignment_policy is listed first so borderline docs
+# interpret as assignments rather than tax policies or summaries.
 _DOC_TYPE_PROFILES: Tuple[DocTypeProfile, ...] = (
     DocTypeProfile(
-        doc_type=DOC_TYPE_ASSIGNMENT_POLICY,
+        name=DOC_TYPE_ASSIGNMENT_POLICY,
         primary=(
-            "assignment type",
-            "international assignment policy",
-            "international assignment management",
-            "global mobility policy",
-            "long-term assignment",
-            "short-term assignment",
-            "permanent transfer",
-            "mobility policy",
+            r"\bassignment\s+policy\b",
+            r"\bassignment\s+type\b",
+            r"\blong[- ]term\s+assignment\b",
+            r"\bshort[- ]term\s+assignment\b",
+            r"\bpermanent\s+transfer\b",
+            r"\binternational\s+assignment\b",
+            r"\brelocation\s+policy\b",
+            r"\bmobility\s+policy\b",
+            r"\bglobal\s+mobility\s+policy\b",
         ),
-        secondary=(
-            "mobility premium",
-            "home leave",
-            "household goods",
-            "relocation allowance",
-            "housing allowance",
-            "temporary housing",
-            "per diem",
-            "cost of living",
-            "cola",
-            "expat",
-            "relocation assistance",
-            "tax equalization",
-            "schooling",
-            "language training",
-            "repatriation",
+        body=(
+            r"\bmobility\s+premium\b",
+            r"\bhome\s+leave\b",
+            r"\bhousehold\s+goods\b",
+            r"\brelocation\s+assistance\b",
+            r"\bhousing\s+allowance\b",
+            r"\btemporary\s+housing\b",
+            r"\bper\s+diem\b",
+            r"\bcost\s+of\s+living\b",
+            r"\bcola\b",
+            r"\bexpat\b",
+            r"\btax\s+equalization\b",
+            r"\bschooling\b",
+            r"\blanguage\s+training\b",
+            r"\brepatriation\b",
+            r"\bassignee\b",
+            r"\bhost\s+country\b",
         ),
         negative=(
-            "standalone tax policy",
-            "hypothetical tax calculation",
+            r"\bstandalone\s+tax\s+policy\b",
         ),
         default_scope=SCOPE_GLOBAL,
     ),
     DocTypeProfile(
-        doc_type=DOC_TYPE_TAX_POLICY,
+        name=DOC_TYPE_TAX_POLICY,
         primary=(
-            "tax equalization policy",
-            "tax protection policy",
-            "international tax policy",
-            "hypothetical tax policy",
-            "hypothetical social security policy",
+            r"\btax\s+policy\b",
+            r"\btax\s+equalization\s+policy\b",
+            r"\btax\s+protection\s+policy\b",
+            r"\bhypothetical\s+tax\s+policy\b",
+            r"\bhypothetical\s+social\s+security\s+policy\b",
         ),
-        secondary=(
-            "hypothetical tax",
-            "hypothetical social security",
-            "tax gross-up",
-            "tax reimbursement",
-            "tax provider",
+        body=(
+            r"\bhypothetical\s+tax\b",
+            r"\bhypothetical\s+social\s+security\b",
+            r"\btax\s+gross[- ]up\b",
+            r"\btax\s+return\s+preparation\b",
+            r"\btax\s+reimbursement\b",
+            r"\btax\s+provider\b",
         ),
+        # Appearing alongside these strongly suggests this is a tax SECTION
+        # within an assignment policy, not a standalone tax policy.
         negative=(
-            "mobility premium",
-            "relocation assistance",
-            "household goods",
-            "home leave",
-            "assignment type",
+            r"\bassignment\s+policy\b",
+            r"\bassignee\b",
+            r"\brelocation\b",
+            r"\bmobility\s+premium\b",
+            r"\bhousehold\s+goods\b",
+            r"\bhome\s+leave\b",
         ),
         default_scope=SCOPE_TAX_EQUALIZATION,
     ),
     DocTypeProfile(
-        doc_type=DOC_TYPE_POLICY_SUMMARY,
+        name=DOC_TYPE_POLICY_SUMMARY,
         primary=(
-            "long term assignment policy summary",
-            "lta policy summary",
-            "policy summary",
+            r"\blong\s+term\s+assignment\s+policy\s+summary\b",
+            r"\blta\s+policy\s+summary\b",
+            r"\bpolicy\s+summary\b",
         ),
-        secondary=("quick reference", "at a glance"),
+        body=(r"\bquick\s+reference\b", r"\bat\s+a\s+glance\b"),
         negative=(),
         default_scope=SCOPE_LONG_TERM,
     ),
     DocTypeProfile(
-        doc_type=DOC_TYPE_COUNTRY_ADDENDUM,
-        primary=("addendum", "annex", "appendix"),
-        secondary=("host country", "local conditions"),
+        name=DOC_TYPE_COUNTRY_ADDENDUM,
+        primary=(r"\baddendum\b", r"\bannex\b", r"\bappendix\b"),
+        body=(r"\bhost\s+country\b", r"\blocal\s+conditions\b"),
         negative=(),
         default_scope=SCOPE_UNKNOWN,
     ),
 )
 
 
-def classify_by_keywords(lines: List[str]) -> Tuple[str, str, int]:
+def _title_block(text: str, limit: int = _TITLE_BLOCK_CHARS) -> str:
     """
-    Score-based classifier over the configured DocTypeProfile set.
+    Approximate title area: the first H1/H2/ALL-CAPS heading plus the
+    first `limit` chars. Lowercased.
+    """
+    first_heading = _HEADING_RE.search(text)
+    head = first_heading.group(0) if first_heading else ""
+    return (head + "\n" + text[:limit]).lower()
 
-    Returns (doc_type, scope, confidence_score).
+
+def _count_matches(patterns: Iterable[str], blob: str) -> int:
+    return sum(1 for p in patterns if re.search(p, blob, re.IGNORECASE))
+
+
+def classify_by_keywords(text: str) -> ClassificationResult:
+    """
+    Regex + scoring classifier.
 
     Algorithm:
-      1. Build the title block (first _TITLE_BLOCK_CHARS of the joined
-         lowercased text).
-      2. For each profile, require at least one `primary` keyword to appear
-         in the title block; otherwise score 0.
-      3. Score = _PRIMARY_BASE_SCORE + (#secondary hits in full text)
-         − (#negative hits in full text).
-      4. If any `high ambiguity` markers appear ≥ _AMBIGUITY_THRESHOLD
-         times in the body, force UNKNOWN regardless of the winning score.
-      5. Pick the highest-scoring profile. If tied or no profile has a
-         primary hit, return DOC_TYPE_UNKNOWN / SCOPE_UNKNOWN / score=0.
+      1. Ambiguity override — if the body has ≥ _AMBIGUITY_THRESHOLD matches
+         of "missing data" markers, return UNKNOWN immediately. This
+         preserves Dummy 3's review_required=True outcome even though
+         "Permanent transfer" would otherwise match the assignment
+         primary keywords.
+      2. For each profile, require a primary-keyword hit in the title
+         block. No primary hit → score 0 for that profile.
+      3. score = (_PRIMARY_WEIGHT × primary_hits) + (_BODY_WEIGHT × body_hits)
+                 − (_NEGATIVE_WEIGHT × negative_hits), floored at 0.
+      4. Winning profile = highest score. Tie-break: earlier profile
+         (list order is assignment → tax → summary → addendum).
+      5. review_required = margin between top and runner-up < _MARGIN_THRESHOLD
+         or confidence < _CONFIDENCE_THRESHOLD.
     """
-    text_lower = "\n".join(lines).lower()
-    title_block = text_lower[:_TITLE_BLOCK_CHARS]
+    title = _title_block(text)
+    body = text.lower()
 
-    ambiguity_hits = sum(text_lower.count(m) for m in _HIGH_AMBIGUITY_MARKERS)
+    reasons: List[str] = []
+
+    ambiguity_hits = _count_matches(_HIGH_AMBIGUITY_MARKERS, body)
     if ambiguity_hits >= _AMBIGUITY_THRESHOLD:
-        return (DOC_TYPE_UNKNOWN, SCOPE_UNKNOWN, 0)
+        reasons.append(
+            f"ambiguity override: {ambiguity_hits} markers ≥ {_AMBIGUITY_THRESHOLD} threshold"
+        )
+        return ClassificationResult(
+            detected_document_type=DOC_TYPE_UNKNOWN,
+            detected_policy_scope=SCOPE_UNKNOWN,
+            confidence=0.0,
+            review_required=True,
+            scores={},
+            reasons=reasons,
+        )
 
-    best_score = 0
-    best_profile: Optional[DocTypeProfile] = None
-    for profile in _DOC_TYPE_PROFILES:
-        if not any(k in title_block for k in profile.primary):
+    scores: Dict[str, float] = {}
+    for prof in _DOC_TYPE_PROFILES:
+        primary_hits = _count_matches(prof.primary, title)
+        if primary_hits < prof.min_primary_hits:
+            scores[prof.name] = 0.0
             continue
-        secondary_hits = sum(1 for k in profile.secondary if k in text_lower)
-        negative_hits = sum(1 for k in profile.negative if k in text_lower)
-        score = _PRIMARY_BASE_SCORE + secondary_hits - negative_hits
-        if score > best_score:
-            best_score = score
-            best_profile = profile
+        body_hits = _count_matches(prof.body, body)
+        negative_hits = _count_matches(prof.negative, body)
+        score = (
+            _PRIMARY_WEIGHT * primary_hits
+            + _BODY_WEIGHT * body_hits
+            - _NEGATIVE_WEIGHT * negative_hits
+        )
+        scores[prof.name] = max(score, 0.0)
+        reasons.append(
+            f"{prof.name}: primary={primary_hits} body={body_hits} "
+            f"negative={negative_hits} → {scores[prof.name]:.1f}"
+        )
 
-    if best_profile is None:
-        return (DOC_TYPE_UNKNOWN, SCOPE_UNKNOWN, best_score)
-    return (best_profile.doc_type, best_profile.default_scope, best_score)
+    if not any(scores.values()):
+        reasons.append("no document type had a primary keyword hit")
+        return ClassificationResult(
+            detected_document_type=DOC_TYPE_UNKNOWN,
+            detected_policy_scope=SCOPE_UNKNOWN,
+            confidence=0.0,
+            review_required=True,
+            scores=scores,
+            reasons=reasons,
+        )
+
+    ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+    top_name, top_score = ranked[0]
+    runner_up = ranked[1][1] if len(ranked) > 1 else 0.0
+    margin = top_score - runner_up
+    confidence = min(1.0, margin / max(top_score, 1.0))
+    review_required = (margin < _MARGIN_THRESHOLD) or (confidence < _CONFIDENCE_THRESHOLD)
+
+    # Resolve scope from the winning profile.
+    winner = next(p for p in _DOC_TYPE_PROFILES if p.name == top_name)
+
+    return ClassificationResult(
+        detected_document_type=top_name,
+        detected_policy_scope=winner.default_scope,
+        confidence=confidence,
+        review_required=review_required,
+        scores=scores,
+        reasons=reasons,
+    )
 
 
 def classify_document(lines: List[str], request_id: Optional[str] = None) -> Tuple[str, str, bool]:
     """
     Rule-based document classifier. Returns (document_type, policy_scope, needs_review).
 
-    `needs_review` is True when the classifier returns UNKNOWN, or when
-    the winning score is below _CONFIDENCE_THRESHOLD. The caller uses
-    this to set processing_status='review_required' on the document row.
+    Public API preserved for backward compatibility — delegates to
+    `classify_by_keywords` which returns a richer ClassificationResult.
+    Callers that want confidence / scoring trace should use the new API
+    directly.
 
-    Audit reference: EXTRACT-BUG-2 (Prompt A) — this replaces the prior
-    cascade that fired tax_policy as soon as "tax equalization" appeared
-    anywhere in the body, even when the document's title block described
-    an assignment policy.
+    Audit reference: EXTRACT-BUG-2 (Prompt A).
     """
-    doc_type, scope, score = classify_by_keywords(lines)
-    needs_review = (doc_type == DOC_TYPE_UNKNOWN) or (score < _CONFIDENCE_THRESHOLD)
+    text = "\n".join(lines)
+    result = classify_by_keywords(text)
     log.info(
-        "request_id=%s classify_document: type=%s scope=%s score=%d needs_review=%s",
-        request_id or "", doc_type, scope, score, needs_review,
+        "request_id=%s classify_document: type=%s scope=%s confidence=%.2f review_required=%s",
+        request_id or "", result.detected_document_type, result.detected_policy_scope,
+        result.confidence, result.review_required,
     )
-    return (doc_type, scope, needs_review)
+    return (result.detected_document_type, result.detected_policy_scope, result.review_required)
 
 
 def _empty_metadata() -> Dict[str, Any]:
@@ -591,12 +672,12 @@ def process_uploaded_document(
     try:
         # Steps 1–3: size + magic-byte sniff + encryption gate. Any failure
         # re-raises as the specific PolicyIntakeError subclass.
-        kind = validate_upload_bytes(data)
+        sniff = validate_upload_bytes(data)
 
         # Step 4: extract text using the sniffed kind (claimed mime_type is
         # ignored — sniff is authoritative). A parser failure becomes
         # MalformedDocumentError.
-        if kind == "pdf":
+        if sniff.kind == "pdf":
             lines, err = _extract_text_from_pdf(data)
         else:
             lines, err = _extract_text_from_docx(data)
@@ -626,7 +707,7 @@ def process_uploaded_document(
         result["extraction_error"] = str(e)
         log.info(
             "request_id=%s process_uploaded_document rejected: %s (%s)",
-            request_id, e.error_code, e,
+            request_id, e.code, e,
         )
         raise
     except Exception as e:

@@ -1,20 +1,21 @@
 """
 Magic-byte file-type sniff + size + encryption gate for policy uploads.
 
-The legacy upload path trusted the filename extension. That's unsafe:
-a caller can rename a zip of executables to `policy.docx` and the parser
-will trip later, deep in the stack. This module runs the checks in the
-order that matters — size first (cheap), then magic-byte sniff (cheap),
-then encryption check (requires one pdfplumber open on PDFs only).
+Upstream callers never see the raw filename — we sniff the leading bytes
+and refuse anything that isn't clearly a PDF (`%PDF-`) or a DOCX
+(ZIP-wrapped with a `word/document.xml` marker in the first 8 KiB). An
+OLE2 compound-file header for a `.docx`-named upload signals an
+encrypted Office package and is routed to EncryptedDocumentError.
 
-Audit reference: Prompt 0 GAPs 009, 010, 003, 004.
+Audit reference: Prompt 0 GAPs 003, 004, 009, 010.
 """
 from __future__ import annotations
 
 import io
 import logging
 import os
-from typing import Final, Literal
+from dataclasses import dataclass
+from typing import Final, Literal, Optional
 
 from .policy_intake_errors import (
     DocumentSizeError,
@@ -24,107 +25,169 @@ from .policy_intake_errors import (
 
 log = logging.getLogger(__name__)
 
-# Default ceiling: 20 MB. Override via env for large-corpus testing.
+# --- Size bounds -------------------------------------------------------------
+
+# 20 MiB default. Tune via env without code change.
 DEFAULT_MAX_UPLOAD_BYTES: Final[int] = 20 * 1024 * 1024
 MAX_UPLOAD_BYTES_ENV: Final[str] = "RELOPASS_POLICY_UPLOAD_MAX_BYTES"
-
-# PDF always begins with %PDF- in the first 8 bytes.
-_PDF_MAGIC: Final[bytes] = b"%PDF-"
-# DOCX is a zip container; zip signature is "PK\x03\x04" (local file header).
-_ZIP_MAGIC: Final[bytes] = b"PK\x03\x04"
-
-FileKind = Literal["pdf", "docx"]
+# Any payload smaller than this cannot realistically be a valid doc.
+# Tuned to reject `%PDF-` (5 bytes) and other trivially-truncated inputs
+# while still permitting the smallest plausible real document headers.
+MIN_UPLOAD_BYTES: Final[int] = 32
 
 
 def _max_upload_bytes() -> int:
-    raw = os.getenv(MAX_UPLOAD_BYTES_ENV, "").strip()
+    raw = os.environ.get(MAX_UPLOAD_BYTES_ENV, "").strip()
     if not raw:
         return DEFAULT_MAX_UPLOAD_BYTES
     try:
         v = int(raw)
-        return v if v > 0 else DEFAULT_MAX_UPLOAD_BYTES
     except ValueError:
         return DEFAULT_MAX_UPLOAD_BYTES
+    return v if v > 0 else DEFAULT_MAX_UPLOAD_BYTES
+
+
+# --- Magic-byte signatures ---------------------------------------------------
+
+_PDF_MAGIC: Final[bytes] = b"%PDF-"
+_ZIP_MAGIC: Final[bytes] = b"PK\x03\x04"          # .docx (also .xlsx/.pptx)
+_OLE2_MAGIC: Final[bytes] = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"  # legacy .doc, encrypted Office
+
+# Needles peeked in the first 8 KiB of a ZIP-wrapped file to distinguish
+# .docx from .xlsx / .pptx / generic .zip.
+_DOCX_INNER_MARKERS: Final[tuple[bytes, ...]] = (
+    b"word/document.xml",
+    b"word/_rels/document.xml.rels",
+)
+
+FileKind = Literal["pdf", "docx", "doc", "unknown"]
+
+# Only these kinds are accepted into the intake pipeline.
+ALLOWED_KINDS: Final[frozenset] = frozenset({"pdf", "docx"})
+
+
+@dataclass(frozen=True)
+class SniffResult:
+    kind: FileKind
+    confident: bool
+    reason: str
+
+
+# --- Public helpers ----------------------------------------------------------
 
 
 def check_size(data: bytes) -> None:
     """
-    Raises DocumentSizeError if `data` is empty or exceeds the ceiling.
-    Both are mapped to HTTP 413 at the API boundary.
+    Raises DocumentSizeError when `data` is empty, below MIN_UPLOAD_BYTES,
+    or above the configured ceiling.
     """
-    if not data:
-        raise DocumentSizeError("Uploaded file is empty.")
-    ceiling = _max_upload_bytes()
-    if len(data) > ceiling:
+    n = 0 if data is None else len(data)
+    if n < MIN_UPLOAD_BYTES:
         raise DocumentSizeError(
-            f"Uploaded file is {len(data)} bytes; maximum is {ceiling} bytes."
+            "document is empty or too small",
+            detail={"size": n, "min": MIN_UPLOAD_BYTES},
+        )
+    ceiling = _max_upload_bytes()
+    if n > ceiling:
+        raise DocumentSizeError(
+            "document exceeds maximum size",
+            detail={"size": n, "max": ceiling},
         )
 
 
-def sniff_file_kind(data: bytes) -> FileKind:
+def sniff_file_kind(data: bytes) -> SniffResult:
     """
-    Identify file format from leading bytes. Returns 'pdf' or 'docx'.
-    Raises UnsupportedFileTypeError if neither signature matches.
-    The claimed filename / MIME type is intentionally ignored.
+    Identify file format from leading bytes. Never trusts extension /
+    claimed MIME type. Returns SniffResult(kind, confident, reason).
+
+    - PDF: leading `%PDF-` → kind='pdf', confident=True
+    - ZIP: leading `PK\\x03\\x04`; peek first 8 KiB for a docx-only marker.
+      Matches → kind='docx', confident=True. No match → kind='unknown'
+      (could be xlsx / pptx / plain zip — not accepted either way).
+    - OLE2: leading compound-file header → kind='doc', confident=True.
+      This is legacy Word or, more commonly in an HR upload, an
+      encrypted .docx masquerading as a compound file.
+    - Otherwise → kind='unknown'.
     """
+    if not data:
+        return SniffResult("unknown", False, "empty payload")
     head = data[:8]
     if head.startswith(_PDF_MAGIC):
-        return "pdf"
+        return SniffResult("pdf", True, "magic=%PDF-")
     if head.startswith(_ZIP_MAGIC):
-        # DOCX is always a zip. We don't open the zip here — if it turns
-        # out to be a generic zip the downstream parser will raise
-        # MalformedDocumentError.
-        return "docx"
-    # Hex-encode the head for logs; never raise it back to the user
-    # (could be attacker-controlled bytes).
-    head_hex = head.hex() if head else "(empty)"
-    log.info("sniff_file_kind: unrecognized magic bytes head=%s", head_hex)
-    raise UnsupportedFileTypeError(
-        "Unsupported file format. Only PDF and DOCX are accepted."
-    )
+        head_ext = data[:8192]
+        if any(m in head_ext for m in _DOCX_INNER_MARKERS):
+            return SniffResult("docx", True, "zip+word/document.xml")
+        return SniffResult("unknown", False, "zip container but not docx")
+    if head.startswith(_OLE2_MAGIC):
+        return SniffResult("doc", True, "magic=OLE2 (legacy or encrypted office)")
+    return SniffResult("unknown", False, "no known signature")
 
 
-def check_pdf_not_encrypted(data: bytes) -> None:
-    """
-    Raises EncryptedDocumentError if the PDF is password-protected.
-    No-op for non-PDFs (caller is expected to have identified the kind first).
-    """
+def _pdf_is_encrypted(data: bytes) -> bool:
+    """Open the PDF with pdfplumber and classify encryption errors."""
     try:
         import pdfplumber  # type: ignore
-    except ImportError:  # pragma: no cover — pdfplumber is in requirements.txt
-        return
+    except ImportError:  # pragma: no cover — pdfplumber is in requirements
+        return False
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
-            # Probe the first page's metadata — encrypted PDFs raise here
-            # (pdfminer raises PDFPasswordIncorrect / PDFEncryptionError).
-            # Accessing pdf.metadata is fine on both paths.
             _ = pdf.metadata
             if pdf.pages:
                 pdf.pages[0].extract_text()
+            return False
     except Exception as ex:
         msg = (str(ex) or type(ex).__name__).lower()
         if "password" in msg or "encrypted" in msg:
-            raise EncryptedDocumentError(
-                "PDF is password-protected. Upload a decrypted copy."
-            ) from ex
-        # Other parse errors are surfaced as MalformedDocumentError by the
-        # caller (we don't want to raise that here — keep the sniff-stage
-        # concerns separate). Log and return normally.
-        log.info("check_pdf_not_encrypted: non-encryption error surfaced: %s", ex)
+            return True
+        # Other parse failures are caller-concern (→ MalformedDocumentError);
+        # here we only gate on encryption.
+        log.info("_pdf_is_encrypted: non-encryption parser error: %s", ex)
+        return False
 
 
-def validate_upload_bytes(data: bytes) -> FileKind:
+def _docx_is_encrypted(data: bytes) -> bool:
+    """
+    An encrypted Office file is an OLE2 compound file, NOT a ZIP. If we
+    see the OLE2 header on a .docx-named upload, that's the signal.
+    A plain ZIP header means not encrypted.
+    """
+    return data[:8].startswith(_OLE2_MAGIC)
+
+
+def validate_upload_bytes(data: bytes) -> SniffResult:
     """
     One-call gate for upload endpoints. Runs:
-      1. size check
-      2. magic-byte sniff
-      3. PDF encryption check (skipped for DOCX)
+      1. size check  (DocumentSizeError)
+      2. magic-byte sniff (UnsupportedFileTypeError when kind not allowed)
+      3. encryption check (EncryptedDocumentError — PDF + OLE2-as-docx)
 
-    Returns the sniffed FileKind. Raises a PolicyIntakeError subclass on
-    any rejection — the API layer maps the exception's http_status.
+    Returns the SniffResult on success. Raises the appropriate
+    PolicyIntakeError subclass on any failure — the API layer maps the
+    exception type to an HTTP status.
     """
     check_size(data)
-    kind = sniff_file_kind(data)
-    if kind == "pdf":
-        check_pdf_not_encrypted(data)
-    return kind
+    sniff = sniff_file_kind(data)
+
+    # OLE2 with no other context is most likely an encrypted Office doc
+    # (encrypted .docx is OLE2, not ZIP). Surface it as encrypted even
+    # though the filename may say .docx.
+    if sniff.kind == "doc":
+        raise EncryptedDocumentError(
+            "document appears to be an encrypted Office package (OLE2)",
+            detail={"sniff": {"kind": sniff.kind, "reason": sniff.reason}},
+        )
+
+    if sniff.kind not in ALLOWED_KINDS:
+        raise UnsupportedFileTypeError(
+            f"unsupported file type: {sniff.reason}",
+            detail={"sniff": {"kind": sniff.kind, "reason": sniff.reason}},
+        )
+
+    if sniff.kind == "pdf" and _pdf_is_encrypted(data):
+        raise EncryptedDocumentError(
+            "PDF is password-protected",
+            detail={"sniff": {"kind": sniff.kind, "reason": sniff.reason}},
+        )
+
+    return sniff

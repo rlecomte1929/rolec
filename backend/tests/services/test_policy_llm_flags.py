@@ -1,20 +1,19 @@
 """
-Tests for backend.core.llm_flags and its wiring into the two policy LLM
-call sites.
+Tests for backend.core.llm_flags and its wiring into the policy LLM call sites.
 
-Covers audit Prompt 0 GAP-006 / Prompt A §1 rule 1:
-- RELOPASS_POLICY_LLM_DISABLED turns off every policy LLM call without
-  constructing an OpenAI client.
-- RELOPASS_POLICY_LLM_TEMPERATURE flows through to chat.completions.create.
-- Extractor returns empty facts, answerer returns empty string when disabled.
-- No OpenAI() constructor is called when disabled, so no HTTP egress.
+Covers Prompt 0 GAP-006 / Prompt A §1 rule 1 with the recipe shapes:
+- LLMDisabled is a frozen dataclass carrying a `reason` string.
+- policy_llm_temperature(default=0.0) accepts a caller-provided fallback.
+- Extractor returns empty facts; answerer returns "" when disabled.
+- No OpenAI() construction happens when disabled.
+- Temperature flows through to chat.completions.create when enabled.
 """
 from __future__ import annotations
 
 import os
 import sys
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, patch
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -61,22 +60,31 @@ class TestFlagParsing:
     def test_temperature_default_zero(self) -> None:
         assert policy_llm_temperature() == 0.0
 
+    def test_temperature_respects_caller_default(self) -> None:
+        assert policy_llm_temperature(default=0.4) == 0.4
+
     def test_temperature_reads_float(self) -> None:
-        os.environ["RELOPASS_POLICY_LLM_TEMPERATURE"] = "0.7"
-        assert policy_llm_temperature() == 0.7
+        os.environ["RELOPASS_POLICY_LLM_TEMPERATURE"] = "0.35"
+        assert policy_llm_temperature() == 0.35
 
-    def test_temperature_falls_back_on_garbage(self) -> None:
+    def test_temperature_invalid_falls_back(self) -> None:
         os.environ["RELOPASS_POLICY_LLM_TEMPERATURE"] = "not-a-float"
-        assert policy_llm_temperature() == 0.0
+        assert policy_llm_temperature(default=0.1) == 0.1
 
 
-class TestSentinel:
-    def test_repr_stable(self) -> None:
-        assert repr(LLMDisabled) == "<LLMDisabled>"
+class TestLLMDisabledDataclass:
+    def test_carries_reason(self) -> None:
+        d = LLMDisabled(reason="RELOPASS_POLICY_LLM_DISABLED=1")
+        assert d.reason == "RELOPASS_POLICY_LLM_DISABLED=1"
 
     def test_is_falsy(self) -> None:
         # Enables `if client:` branching into the deterministic path.
-        assert bool(LLMDisabled) is False
+        assert bool(LLMDisabled(reason="test")) is False
+
+    def test_isinstance_branch(self) -> None:
+        d = LLMDisabled(reason="x")
+        # `isinstance(client, LLMDisabled)` is the recipe's discriminator.
+        assert isinstance(d, LLMDisabled)
 
 
 class TestExtractorShortCircuit:
@@ -95,18 +103,14 @@ class TestExtractorShortCircuit:
             OpenAIPolicyCanonicalExtractor,
             PolicyFactExtractionLLMInput,
         )
-        # Ensure no API key is set — if the disabled short-circuit fails,
-        # the real OpenAI() constructor would still succeed with api_key=None
-        # but chat.completions.create would raise. Either way, the test
-        # would surface the regression loudly.
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        # Also patch the lazy import so we detect any attempt to reach it.
-        import openai as _openai_pkg  # noqa: F401 — ensures openai is importable
         call_count = {"n": 0}
+
         class _BoomClient:
             def __init__(self, *a, **kw):
                 call_count["n"] += 1
                 raise AssertionError("OpenAI() must not be constructed when disabled")
+
         monkeypatch.setattr("openai.OpenAI", _BoomClient)
 
         llm_input = PolicyFactExtractionLLMInput(chunk_id="chunk-1", text_content="placeholder")
@@ -131,10 +135,12 @@ class TestAnswererShortCircuit:
         from backend.services.policy_query_answering import CanonicalPolicyQueryLLM
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         call_count = {"n": 0}
+
         class _BoomClient:
             def __init__(self, *a, **kw):
                 call_count["n"] += 1
                 raise AssertionError("OpenAI() must not be constructed when disabled")
+
         monkeypatch.setattr("openai.OpenAI", _BoomClient)
 
         llm = CanonicalPolicyQueryLLM()
@@ -144,10 +150,7 @@ class TestAnswererShortCircuit:
 
 
 class TestTemperaturePassthrough:
-    """
-    When LLM is enabled, the configured temperature must reach the OpenAI
-    client. Uses an injected fake client so no network call happens.
-    """
+    """The configured temperature reaches the OpenAI client when LLM is enabled."""
 
     def setup_method(self) -> None:
         self._saved_disabled = os.environ.get("RELOPASS_POLICY_LLM_DISABLED")
@@ -181,10 +184,7 @@ class TestTemperaturePassthrough:
         )
         fake = self._fake_client()
         ext = OpenAIPolicyCanonicalExtractor(client=fake)
-        llm_input = PolicyFactExtractionLLMInput(
-            chunk_id="chunk-1",
-            text_content="placeholder",
-        )
+        llm_input = PolicyFactExtractionLLMInput(chunk_id="chunk-1", text_content="placeholder")
         ext.extract(llm_input)
         assert fake.chat.completions.create.call_args.kwargs["temperature"] == 0.3
 

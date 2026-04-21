@@ -68,7 +68,7 @@ class OpenAIPolicyCanonicalExtractor:
         if policy_llm_disabled():
             # RELOPASS_POLICY_LLM_DISABLED=1 — never build a client, never
             # egress. Caller must treat this as "no LLM contribution".
-            return LLMDisabled
+            return LLMDisabled(reason="RELOPASS_POLICY_LLM_DISABLED=1")
         try:
             from openai import OpenAI  # type: ignore
         except ImportError as exc:  # pragma: no cover - exercised via tests with mock clients
@@ -87,7 +87,7 @@ class OpenAIPolicyCanonicalExtractor:
     def extract(self, llm_input: PolicyFactExtractionLLMInput) -> PolicyFactExtractionLLMOutput:
         from ..core.llm_flags import LLMDisabled, policy_llm_temperature
         client = self._client_or_raise()
-        if client is LLMDisabled:
+        if isinstance(client, LLMDisabled):
             # Deterministic short-circuit. Callers will typically route to
             # the fallback extractor (extract_minimal_policy_facts) and set
             # review_required=True on the document row.

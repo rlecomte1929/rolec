@@ -1,64 +1,56 @@
 """
 Typed error hierarchy for the policy intake pipeline.
 
-Before this module, the upload endpoint returned a generic 500 on any
-extraction failure, with no distinction between "encrypted PDF",
-"corrupt bytes", "wrong MIME", and "file too large". Clients couldn't
-tell the user what went wrong, and logs masked what class of fixture
-problem the upload surfaced.
+Each error carries a stable `code` slug (used by API boundary layers to
+surface a deterministic error identifier to the client) and an optional
+structured `detail` dict (filename, sizes, sniff diagnostics, …) that
+never contains secrets, absolute filesystem paths, or credentials.
 
-Each error carries:
-  - `error_code`: stable machine-readable slug that matches the
-    upload_response UPLOAD_* constants.
-  - `http_status`: the status the API layer SHOULD return (415, 413, 422).
-  - A user-visible message (the `str()` form). Messages never contain
-    secrets, absolute filesystem paths, or db connection strings.
+HTTP status code mapping lives in the API layer (see backend/main.py
+upload endpoint) — the exception itself is transport-agnostic.
 
 Audit reference: Prompt 0 GAPs 003, 004, 009, 010; Prompt A §9 R1–R4.
 """
 from __future__ import annotations
 
+from typing import Optional
+
 
 class PolicyIntakeError(Exception):
-    """Base class for typed intake errors. Default status = 422."""
+    """Base class for typed policy-intake rejection errors."""
 
-    error_code: str = "policy_intake_error"
-    http_status: int = 422
+    code: str = "INTAKE_ERROR"
 
-    def __init__(self, message: str) -> None:
+    def __init__(self, message: str, *, detail: Optional[dict] = None) -> None:
         super().__init__(message)
+        self.detail: dict = detail or {}
 
 
 class UnsupportedFileTypeError(PolicyIntakeError):
-    """Magic-byte sniffing could not identify the file as PDF or DOCX."""
+    """R1 — Magic-byte sniffing could not identify the file as PDF or DOCX."""
 
-    error_code = "unsupported_file_type"
-    http_status = 415  # Unsupported Media Type
+    code = "UNSUPPORTED_FILE_TYPE"
 
 
 class MalformedDocumentError(PolicyIntakeError):
     """
-    Sniffing identified the format but the parser could not produce text.
-    Typically raised when pdfplumber or python-docx throws on truncated
-    or internally-corrupt content.
+    R2 — Sniffing identified the format but the parser failed on truncated
+    or internally-corrupt bytes.
     """
 
-    error_code = "malformed_document"
-    http_status = 422  # Unprocessable Entity
+    code = "MALFORMED_DOCUMENT"
 
 
 class EncryptedDocumentError(PolicyIntakeError):
     """
-    PDF is password-protected (or otherwise encrypted). We refuse to
-    prompt for the password; HR must upload a decrypted version.
+    R3 — Document is password-protected (PDF) or encrypted OLE2 (Office).
+    We refuse to prompt for a password; HR must upload a decrypted copy.
     """
 
-    error_code = "encrypted_document"
-    http_status = 422
+    code = "ENCRYPTED_DOCUMENT"
 
 
 class DocumentSizeError(PolicyIntakeError):
-    """File exceeds the configured upload size ceiling, or is empty."""
+    """R4 — File is empty, too small to be a real document, or exceeds the ceiling."""
 
-    error_code = "document_too_large"
-    http_status = 413  # Payload Too Large
+    code = "DOCUMENT_SIZE_INVALID"
