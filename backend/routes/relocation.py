@@ -6,8 +6,8 @@ from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
-from jose import jwt
 
+from .._jwt_claims import get_unverified_claims as _jwt_unverified_claims
 from ..services.relocation_profile import compute_missing_fields
 from ..services.relocation_classification import (
     compute_case_classification,
@@ -192,7 +192,7 @@ def _get_user_id(client, user_jwt: str) -> str:
         pass
 
     try:
-        claims = jwt.get_unverified_claims(user_jwt)
+        claims = _jwt_unverified_claims(user_jwt)
         sub = claims.get("sub")
         if sub:
             return str(sub)

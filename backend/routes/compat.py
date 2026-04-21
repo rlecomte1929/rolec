@@ -2,9 +2,9 @@ import json
 from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, Header, HTTPException
-from jose import jwt
 from sqlalchemy import text
 
+from .._jwt_claims import get_unverified_claims as _jwt_unverified_claims
 from ..services.relocation_profile import compute_missing_fields
 from ..services.supabase_client import get_supabase_client
 from .relocation import _extract_bearer_token, _is_permission_error
@@ -186,7 +186,7 @@ def compat_admin_context(authorization: Optional[str] = Header(None)):
     claims: Dict[str, Any] = {}
 
     try:
-        claims = jwt.get_unverified_claims(user_jwt)
+        claims = _jwt_unverified_claims(user_jwt)
         email = email or claims.get("email")
         role = role or claims.get("role")
         user_id = user_id or claims.get("sub")
