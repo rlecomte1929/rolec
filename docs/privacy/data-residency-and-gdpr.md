@@ -17,14 +17,20 @@ Identity documents (passport scans, photos) are uploaded to Supabase Storage and
 
 | Data                                | Store                              | Region                                          |
 | ----------------------------------- | ---------------------------------- | ----------------------------------------------- |
-| Relational rows (cases, assignments, profiles, policies) | Supabase Postgres       | Configured per Supabase project — check dashboard → Settings → General |
-| Document uploads (passports, policy PDFs)                | Supabase Storage — bucket `hr-policies`, `employee-uploads` | Same region as Postgres |
-| Session tokens                      | Same Postgres DB (`sessions` table) | Same region                                     |
-| Audit log                           | Same Postgres DB (`audit_logs` table) | Same region                                  |
+| Relational rows (cases, assignments, profiles, policies) | Supabase Postgres (project `nsvefcvpvwwwhuqyuqmp`) | **`eu-west-1` (Ireland, EU)** |
+| Document uploads (passports, policy PDFs)                | Supabase Storage — buckets `hr-policies`, `employee-uploads` | `eu-west-1` (Ireland, EU) |
+| Session tokens                      | Same Postgres DB (`sessions` table) | `eu-west-1`                                      |
+| Audit log                           | Same Postgres DB (`audit_logs` table) | `eu-west-1`                                   |
 | Logs                                | Render platform logs               | US (Render default region unless configured otherwise) |
 | LLM processing (policy extraction, policy Q&A) | OpenAI API             | US (OpenAI infra)                               |
 
-**Important**: confirm the Supabase project region matches the compliance requirements of the EU customers you onboard. For customers with strict EU-data-residency requirements, provision a separate Supabase project in `eu-central-1` / `eu-west-1` and point the backend at it via `SUPABASE_URL` + `DATABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`.
+**EU data residency**: employee PII (cases, identity docs, family data) is stored in Supabase's Ireland region, which satisfies GDPR data-residency requirements for EU employees.
+
+**Two non-EU data flows to disclose in a DPA:**
+1. **Render platform logs** — request paths, log lines, and any structured log payloads sit in Render's US infrastructure by default. PII is actively redacted from logs (see `backend/services/policy_storage_health.py:_SECRET_PATTERN`) and `send_default_pii=False` on Sentry, but timestamps and user_id fingerprints do cross the Atlantic.
+2. **OpenAI API calls** — policy document text (corporate policy content, not employee PII) and policy-assistant query text travel to OpenAI's US endpoints. No passport / nationality / family data is forwarded — see the "What we send to OpenAI" section below.
+
+If an EU customer requires zero non-EU data flow, they must disable LLM features (set `OPENAI_API_KEY=""`) and Sentry (`SENTRY_DSN=""`), and accept degraded platform-log visibility.
 
 ## What we send to OpenAI
 
