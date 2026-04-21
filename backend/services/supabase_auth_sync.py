@@ -97,3 +97,45 @@ def sync_relopass_user_to_supabase_auth(
             ex,
         )
         return False
+
+
+def revoke_supabase_session(access_token: str) -> bool:
+    """
+    Best-effort server-side Supabase sign-out. Called on logout so the
+    Supabase JWT is invalidated alongside the legacy ReloPass session token
+    — previously logout only killed the legacy side and the Supabase JWT
+    stayed valid for its TTL (up to 1 hour).
+
+    Never raises. Returns True on success, False on any failure
+    (missing config, no SDK, admin API rejected the token, etc.).
+    """
+    if not access_token or not access_token.strip():
+        return False
+    if os.getenv("DISABLE_SUPABASE_AUTH_SYNC", "").lower() in ("1", "true", "yes"):
+        return False
+    if get_supabase_admin_client is None:
+        return False
+    try:
+        client = get_supabase_admin_client()
+    except Exception as ex:
+        log.debug("revoke_supabase_session: no admin client: %s", ex)
+        return False
+
+    # supabase-py exposes sign_out on the admin auth surface. The method name
+    # has varied across versions; try the documented one first and fall back
+    # to the legacy path. Both receive a JWT and revoke the backing session.
+    admin = getattr(getattr(client, "auth", None), "admin", None)
+    if admin is None:
+        return False
+    for method_name in ("sign_out", "signOut"):
+        fn = getattr(admin, method_name, None)
+        if callable(fn):
+            try:
+                fn(access_token)
+                log.info("revoke_supabase_session ok via admin.%s", method_name)
+                return True
+            except Exception as ex:
+                log.warning("revoke_supabase_session via admin.%s failed: %s", method_name, ex)
+                return False
+    log.debug("revoke_supabase_session: no sign_out method found on supabase admin client")
+    return False

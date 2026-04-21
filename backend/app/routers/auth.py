@@ -22,7 +22,7 @@ import time
 import uuid
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Body, Header, HTTPException, Request
 
 from ...database import db
 from ...identity_errors import IdentityErrorCode, err_detail
@@ -416,12 +416,35 @@ def login(body: LoginRequest, request: Request):
 
 
 @router.post("/api/auth/logout")
-def logout(authorization: Optional[str] = Header(None)):
-    """Invalidate the current session. Client should also clear localStorage."""
-    if not authorization:
-        return {"success": True}
-    token = authorization.replace("Bearer ", "").strip()
-    if token:
-        db.delete_session_by_token(token)
-        log.info("auth_logout token_invalidated")
+def logout(
+    payload: Optional[Dict[str, Any]] = Body(None),
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Invalidate both auth halves:
+
+      1. Legacy ReloPass session token (Authorization: Bearer <uuid>).
+      2. Supabase JWT, if the client forwards it as
+         `supabase_access_token` in the request body.
+
+    The Supabase revocation is best-effort — a failure there does not block
+    the legacy logout. The client MUST also call supabase.auth.signOut() on
+    its end to clear the Supabase JS client's cached session. This endpoint
+    covers the server-side revocation so a leaked JWT cannot be replayed
+    for the remainder of its TTL.
+    """
+    if authorization:
+        token = authorization.replace("Bearer ", "").strip()
+        if token:
+            db.delete_session_by_token(token)
+            log.info("auth_logout legacy_token_invalidated")
+
+    supabase_access_token = (payload or {}).get("supabase_access_token") if isinstance(payload, dict) else None
+    if supabase_access_token and isinstance(supabase_access_token, str):
+        # Imported lazily to avoid a hard dependency on the Supabase SDK at
+        # module import time in environments without Supabase configured.
+        from ...services.supabase_auth_sync import revoke_supabase_session
+        revoked = revoke_supabase_session(supabase_access_token)
+        log.info("auth_logout supabase_token_revoked=%s", revoked)
+
     return {"success": True}
