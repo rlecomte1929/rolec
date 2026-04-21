@@ -32,3 +32,6 @@ Thumbs.db
 
 # Local audit output
 audit_report.json
+# Generated PDF fixtures (GAP-011; rebuilt at test time, never committed)
+backend/tests/fixtures/generated/
+

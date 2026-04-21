@@ -12,6 +12,7 @@ OLE2 encrypted-docx detection.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -112,29 +113,24 @@ class TestR3Encrypted:
             validate_upload_bytes(ole2)
         assert excinfo.value.code == "ENCRYPTED_DOCUMENT"
 
-    def test_encrypted_pdf_rejected_when_qpdf_available(self) -> None:
+    @pytest.mark.skipif(
+        shutil.which("qpdf") is None,
+        reason="qpdf is required for encrypted-PDF fixtures (GAP-011). "
+               "Install with: brew install qpdf",
+    )
+    def test_encrypted_pdf_rejected(self, generated_pdf_dir) -> None:
         """
-        Builds an encrypted fixture at test time via qpdf. Skipped with a
-        clear reason when qpdf isn't on the host (Prompt 0 GAP-011).
+        The encrypted PDF fixture is built by build_pdf_fixtures.py via qpdf
+        (session-scoped, see conftest.generated_pdf_dir). When qpdf isn't on
+        PATH the class-level skipif catches the whole test; when it is, this
+        loads the pre-built encrypted_dummy1.pdf and asserts validate_upload_bytes
+        raises EncryptedDocumentError.
         """
-        import shutil
-        import subprocess
-
-        if shutil.which("qpdf") is None:
-            pytest.skip("qpdf not installed (Prompt 0 GAP-011). Install via: brew install qpdf")
-        sample = Path(_REPO_ROOT) / "docs" / "samples" / "Long Term Assignment Policy Summary.pdf"
-        if not sample.exists():
-            pytest.skip(f"no sample PDF at {sample}")
-        out = Path(_REPO_ROOT) / ".audit_tmp" / "fixtures" / "encrypted_tmp" / "sample.encrypted.pdf"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        res = subprocess.run(
-            ["qpdf", "--encrypt", "user_pw", "owner_pw", "256", "--", str(sample), str(out)],
-            capture_output=True,
-        )
-        if res.returncode != 0:
-            pytest.skip(f"qpdf failed: {res.stderr.decode(errors='ignore')[:200]}")
+        encrypted = Path(generated_pdf_dir) / "encrypted_dummy1.pdf"
+        if not encrypted.exists():
+            pytest.skip(f"encrypted fixture missing: {encrypted}")
         with pytest.raises(EncryptedDocumentError) as excinfo:
-            validate_upload_bytes(out.read_bytes())
+            validate_upload_bytes(encrypted.read_bytes())
         assert excinfo.value.code == "ENCRYPTED_DOCUMENT"
 
 
