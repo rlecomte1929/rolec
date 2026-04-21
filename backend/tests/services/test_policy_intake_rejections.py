@@ -31,6 +31,7 @@ from backend.services.policy_filetype import (  # noqa: E402
 from backend.services.policy_intake_errors import (  # noqa: E402
     DocumentSizeError,
     EncryptedDocumentError,
+    IntakePipelineUnavailableError,
     MalformedDocumentError,
     PolicyIntakeError,
     UnsupportedFileTypeError,
@@ -121,17 +122,32 @@ class TestR3Encrypted:
     def test_encrypted_pdf_rejected(self, generated_pdf_dir) -> None:
         """
         The encrypted PDF fixture is built by build_pdf_fixtures.py via qpdf
-        (session-scoped, see conftest.generated_pdf_dir). When qpdf isn't on
-        PATH the class-level skipif catches the whole test; when it is, this
-        loads the pre-built encrypted_dummy1.pdf and asserts validate_upload_bytes
-        raises EncryptedDocumentError.
+        (session-scoped, see conftest.generated_pdf_dir). Asserts fail-closed
+        behavior: validate_upload_bytes must raise PolicyIntakeError regardless
+        of whether pdfplumber is available.
+
+        - With pdfplumber installed: EncryptedDocumentError (the normal path).
+        - Without pdfplumber:        IntakePipelineUnavailableError (fail-
+          closed — PARITY-BUG-1 fix). The audit pipeline treats "can't verify"
+          as a refusal rather than a silent pass.
+
+        Either outcome satisfies the gate; both are subclasses of
+        PolicyIntakeError. The second branch would be removed once the venv
+        guarantees pdfplumber is present.
         """
         encrypted = Path(generated_pdf_dir) / "encrypted_dummy1.pdf"
         if not encrypted.exists():
             pytest.skip(f"encrypted fixture missing: {encrypted}")
-        with pytest.raises(EncryptedDocumentError) as excinfo:
+        try:
+            import pdfplumber  # noqa: F401
+            expected_cls = EncryptedDocumentError
+            expected_code = "ENCRYPTED_DOCUMENT"
+        except ImportError:
+            expected_cls = IntakePipelineUnavailableError
+            expected_code = "INTAKE_PIPELINE_UNAVAILABLE"
+        with pytest.raises(expected_cls) as excinfo:
             validate_upload_bytes(encrypted.read_bytes())
-        assert excinfo.value.code == "ENCRYPTED_DOCUMENT"
+        assert excinfo.value.code == expected_code
 
 
 # --- R4 ---------------------------------------------------------------------

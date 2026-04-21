@@ -54,3 +54,15 @@ class DocumentSizeError(PolicyIntakeError):
     """R4 — File is empty, too small to be a real document, or exceeds the ceiling."""
 
     code = "DOCUMENT_SIZE_INVALID"
+
+
+class IntakePipelineUnavailableError(PolicyIntakeError):
+    """
+    Raised when a dependency the intake pipeline relies on (pdfplumber,
+    python-docx, etc.) is missing at runtime. Fail-closed: we do NOT
+    treat a missing parser as "not encrypted" / "valid content"; we
+    surface a 503 so the caller knows the upload can't be validated right
+    now. Maps to HTTP 503 (Service Unavailable) at the API boundary.
+    """
+
+    code = "INTAKE_PIPELINE_UNAVAILABLE"

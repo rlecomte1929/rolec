@@ -8705,6 +8705,7 @@ async def upload_policy_document(
         from .services.policy_intake_errors import (
             DocumentSizeError,
             EncryptedDocumentError,
+            IntakePipelineUnavailableError,
             MalformedDocumentError,
             PolicyIntakeError,
             UnsupportedFileTypeError,
@@ -8712,12 +8713,13 @@ async def upload_policy_document(
         sniff_result = validate_upload_bytes(content)
     except PolicyIntakeError as exc:
         # Map exception class → HTTP status. Exceptions are transport-agnostic;
-        # the status live here (the API layer) per recipe §4.4.
+        # the status lives here (the API layer) per recipe §4.4.
         _INTAKE_HTTP_STATUS = {
-            UnsupportedFileTypeError: 415,   # Unsupported Media Type
-            MalformedDocumentError: 422,     # Unprocessable Entity
+            UnsupportedFileTypeError: 415,        # Unsupported Media Type
+            MalformedDocumentError: 422,          # Unprocessable Entity
             EncryptedDocumentError: 422,
-            DocumentSizeError: 413,          # Payload Too Large (also fires on empty)
+            DocumentSizeError: 413,               # Payload Too Large (also fires on empty)
+            IntakePipelineUnavailableError: 503,  # Service Unavailable (missing parser dep)
         }
         status = _INTAKE_HTTP_STATUS.get(type(exc), 422)
         log.info(

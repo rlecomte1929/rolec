@@ -20,6 +20,7 @@ from typing import Final, Literal, Optional
 from .policy_intake_errors import (
     DocumentSizeError,
     EncryptedDocumentError,
+    IntakePipelineUnavailableError,
     UnsupportedFileTypeError,
 )
 
@@ -125,11 +126,23 @@ def sniff_file_kind(data: bytes) -> SniffResult:
 
 
 def _pdf_is_encrypted(data: bytes) -> bool:
-    """Open the PDF with pdfplumber and classify encryption errors."""
+    """
+    Open the PDF with pdfplumber and classify encryption errors.
+
+    Raises IntakePipelineUnavailableError if pdfplumber is not importable —
+    fail-closed. Previously returned False silently on ImportError, which
+    meant a missing pdfplumber (drifted venv, removed requirement, etc.)
+    let every encrypted PDF pass the gate as "not encrypted". The recipe
+    rejected that pattern explicitly; see PARITY-BUG-1 in the audit report.
+    """
     try:
         import pdfplumber  # type: ignore
-    except ImportError:  # pragma: no cover — pdfplumber is in requirements
-        return False
+    except ImportError as exc:
+        raise IntakePipelineUnavailableError(
+            "PDF intake dependency missing: pdfplumber is not installed. "
+            "Cannot verify encryption status; refusing upload.",
+            detail={"missing_package": "pdfplumber"},
+        ) from exc
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             _ = pdf.metadata
