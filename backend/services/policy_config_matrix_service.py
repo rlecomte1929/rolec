@@ -1025,6 +1025,48 @@ class PolicyConfigMatrixService:
             self._db.insert_policy_config_benefit_row(insert)
         return self.compute_diff(company_id)
 
+    def revert_all_draft_rows_to_live(self, company_id: str) -> Dict[str, Any]:
+        """
+        Drop every row from the current draft and re-seed it from the
+        live published version. Functionally: "discard all my edits
+        against live" — the bulk version of revert_row_to_live.
+
+        Behaviour:
+          * If no draft exists: raise KeyError("no_draft"). Frontend
+            tells HR there's nothing to revert.
+          * If no live version exists: raise KeyError("no_live"). HR
+            can't "revert to live" when live is empty; they should
+            delete the draft explicitly instead (not exposed here —
+            keep the action semantically clean).
+          * Otherwise: delete all draft rows, clone every live row
+            into the draft with a new id, and return the fresh diff
+            (which will have summary.added/removed/changed all zero).
+
+        Idempotent: running it twice is a no-op on the second call —
+        draft is already identical to live.
+        """
+        cfg = self._config(company_id)
+        pid = str(cfg["id"])
+        draft = self._db.get_policy_config_draft_for_config(pid)
+        if not draft:
+            raise KeyError("no_draft")
+        live = self._db.get_latest_published_policy_config_version(
+            str(company_id), CONFIG_KEY
+        )
+        if not live:
+            raise KeyError("no_live")
+        draft_vid = str(draft["id"])
+        live_rows = self._db.list_policy_config_benefits(str(live["id"]))
+        self._db.delete_policy_config_benefits_for_version(draft_vid)
+        for row in live_rows:
+            clone = dict(row)
+            clone["policy_config_version_id"] = draft_vid
+            clone.pop("id", None)
+            clone.pop("created_at", None)
+            clone.pop("updated_at", None)
+            self._db.insert_policy_config_benefit_row(clone)
+        return self.compute_diff(company_id)
+
     # ------------------------------------------------------------------
     # Templates (Phase 3)
     # ------------------------------------------------------------------

@@ -2127,6 +2127,21 @@ export const policyConfigMatrixAPI = {
     });
     return response.data;
   },
+  /**
+   * Discard every change in the current draft by re-seeding it from
+   * the live published version. Returns the refreshed diff (summary
+   * all zero on success). 409 "no_draft" when nothing to revert;
+   * 409 "no_live" when the company has no published version to
+   * revert to.
+   */
+  hrRevertAll: async (companyId?: string): Promise<Record<string, unknown>> => {
+    const response = await api.post(
+      '/api/hr/policy-config/draft/revert-all',
+      {},
+      { params: companyId ? { companyId } : {} }
+    );
+    return response.data;
+  },
 
   adminGet: async (companyId: string): Promise<Record<string, unknown>> => {
     const response = await api.get('/api/admin/policy-config', { params: { companyId } });

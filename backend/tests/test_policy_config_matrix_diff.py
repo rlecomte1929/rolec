@@ -117,6 +117,9 @@ class _FakeDb:
         ]
         return before - len(self.rows_by_version[vid])
 
+    def delete_policy_config_benefits_for_version(self, vid):
+        self.rows_by_version[str(vid)] = []
+
     # Test helpers ----------------------------------------------------
 
     def seed_live(self, rows: list[dict], vid: str = "live-1"):
@@ -292,6 +295,60 @@ class RevertRowTests(unittest.TestCase):
             self.svc.revert_row_to_live(
                 "co-1", benefit_key="", targeting_signature="global"
             )
+
+
+class RevertAllDraftRowsTests(unittest.TestCase):
+    """Bulk-revert: discard every draft change by re-seeding from live."""
+
+    def setUp(self):
+        self.db = _FakeDb()
+        self.svc = PolicyConfigMatrixService(self.db)
+
+    def test_revert_all_replaces_draft_with_live_rows(self):
+        live_rows = [
+            _row(benefit_key="shipment", amount=5000),
+            _row(benefit_key="home_leave_trips", amount=2000),
+        ]
+        self.db.seed_live(live_rows)
+        # Draft has one changed row + one added row + one missing row
+        self.db.seed_draft([
+            _row(benefit_key="shipment", amount=6500),          # changed
+            _row(benefit_key="storage", amount=500),            # added vs live
+            # home_leave_trips missing → removed vs live
+        ])
+        out = self.svc.revert_all_draft_rows_to_live("co-1")
+        # After revert, draft should match live exactly.
+        self.assertEqual(
+            out["diff"]["summary"],
+            {"added": 0, "removed": 0, "changed": 0, "unchanged": 2},
+        )
+        # Every draft row now equals its live counterpart
+        draft_rows = self.db.list_policy_config_benefits("draft-1")
+        draft_keys = sorted(r["benefit_key"] for r in draft_rows)
+        self.assertEqual(draft_keys, ["home_leave_trips", "shipment"])
+        shipment_draft = next(r for r in draft_rows if r["benefit_key"] == "shipment")
+        self.assertEqual(shipment_draft["amount_value"], 5000)
+
+    def test_revert_all_is_idempotent_when_already_matching(self):
+        row = _row(benefit_key="shipment", amount=5000)
+        self.db.seed_live([row])
+        self.db.seed_draft([dict(row)])
+        before = self.svc.compute_diff("co-1")
+        after = self.svc.revert_all_draft_rows_to_live("co-1")
+        self.assertEqual(before["diff"]["summary"], after["diff"]["summary"])
+
+    def test_revert_all_without_draft_raises(self):
+        self.db.seed_live([_row(benefit_key="shipment", amount=5000)])
+        with self.assertRaises(KeyError) as ctx:
+            self.svc.revert_all_draft_rows_to_live("co-1")
+        self.assertEqual(ctx.exception.args[0], "no_draft")
+
+    def test_revert_all_without_live_raises(self):
+        """First-draft scenario: no live to revert to, explicit error."""
+        self.db.seed_draft([_row(benefit_key="shipment", amount=5000)])
+        with self.assertRaises(KeyError) as ctx:
+            self.svc.revert_all_draft_rows_to_live("co-1")
+        self.assertEqual(ctx.exception.args[0], "no_live")
 
 
 if __name__ == "__main__":

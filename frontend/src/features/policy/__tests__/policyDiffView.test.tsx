@@ -11,12 +11,14 @@ import { PolicyDiffView } from '../PolicyDiffView';
 const mocks = vi.hoisted(() => ({
   hrDiff: vi.fn(),
   hrRevertRow: vi.fn(),
+  hrRevertAll: vi.fn(),
 }));
 
 vi.mock('../../../api/client', () => ({
   policyConfigMatrixAPI: {
     hrDiff: (...args: unknown[]) => mocks.hrDiff(...args),
     hrRevertRow: (...args: unknown[]) => mocks.hrRevertRow(...args),
+    hrRevertAll: (...args: unknown[]) => mocks.hrRevertAll(...args),
   },
 }));
 
@@ -39,6 +41,7 @@ afterEach(() => {
   cleanup();
   mocks.hrDiff.mockReset();
   mocks.hrRevertRow.mockReset();
+  mocks.hrRevertAll.mockReset();
 });
 
 describe('PolicyDiffView', () => {
@@ -127,5 +130,64 @@ describe('PolicyDiffView', () => {
     });
     render(<PolicyDiffView />);
     expect(await screen.findByText(/Something broke on the server/i)).toBeInTheDocument();
+  });
+
+  it('does not show "Revert all" button when there are no changes', async () => {
+    // Default mock payload has all-zero summary counts.
+    render(<PolicyDiffView />);
+    await screen.findByText(/Your draft matches the live version/i);
+    expect(screen.queryByRole('button', { name: /Revert all to live/i })).not.toBeInTheDocument();
+  });
+
+  it('shows "Revert all" when changes exist and a live version is present', async () => {
+    mocks.hrDiff.mockResolvedValueOnce(diffPayload({
+      changed: [
+        {
+          before: { benefit_key: 'shipment', amount_value: 5000, targeting_signature: 'global' },
+          after: { benefit_key: 'shipment', amount_value: 6500, targeting_signature: 'global' },
+          changed_fields: ['amount_value'],
+        },
+      ],
+      summary: { added: 0, removed: 0, changed: 1, unchanged: 0 },
+    }));
+    render(<PolicyDiffView />);
+    expect(
+      await screen.findByRole('button', { name: /Revert all to live/i })
+    ).toBeInTheDocument();
+  });
+
+  it('clicking "Revert all" calls hrRevertAll after confirm and refreshes the diff', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mocks.hrDiff.mockResolvedValueOnce(diffPayload({
+      added: [{ benefit_key: 'new_row', amount_value: 1000, targeting_signature: 'global' }],
+      summary: { added: 1, removed: 0, changed: 0, unchanged: 5 },
+    }));
+    // After revert: clean state (draft matches live, no changes).
+    mocks.hrRevertAll.mockResolvedValueOnce(diffPayload());
+    render(<PolicyDiffView />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Revert all to live/i })
+    );
+    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => expect(mocks.hrRevertAll).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByText(/Your draft matches the live version/i)).toBeInTheDocument()
+    );
+    confirmSpy.mockRestore();
+  });
+
+  it('declining the confirm prompt does NOT call hrRevertAll', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    mocks.hrDiff.mockResolvedValueOnce(diffPayload({
+      added: [{ benefit_key: 'new_row', targeting_signature: 'global' }],
+      summary: { added: 1, removed: 0, changed: 0, unchanged: 5 },
+    }));
+    render(<PolicyDiffView />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Revert all to live/i })
+    );
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(mocks.hrRevertAll).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 });

@@ -202,6 +202,7 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [revertingKey, setRevertingKey] = useState<string | null>(null);
+  const [bulkReverting, setBulkReverting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -226,6 +227,33 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
   useEffect(() => {
     void load();
   }, [load, refreshTrigger]);
+
+  const revertAll = useCallback(async () => {
+    // Double confirm — bulk revert nukes every edit in the draft.
+    if (
+      !window.confirm(
+        'Discard every change in this draft and re-seed it from the live version? This cannot be undone row-by-row; you would have to rebuild the draft from scratch or start from a template.'
+      )
+    )
+      return;
+    setBulkReverting(true);
+    setErr(null);
+    try {
+      const res = await policyConfigMatrixAPI.hrRevertAll(adminCompanyId ?? undefined);
+      setPayload(res as DiffPayload);
+    } catch (e: unknown) {
+      const ax = e as { response?: { data?: { detail?: { code?: string; message?: string } | string } } };
+      const d = ax.response?.data?.detail;
+      const message =
+        typeof d === 'string'
+          ? d
+          : (d && typeof d === 'object' && 'message' in d && (d as { message?: string }).message) ||
+            'Could not revert all changes. Try again.';
+      setErr(message);
+    } finally {
+      setBulkReverting(false);
+    }
+  }, [adminCompanyId]);
 
   const revert = useCallback(
     async (row: { benefit_key?: string; targeting_signature?: string }) => {
@@ -306,9 +334,21 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
           </p>
           <SummaryBadges summary={summary} />
         </div>
-        <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          {totalChanges > 0 && payload?.live?.version && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void revertAll()}
+              disabled={bulkReverting || loading || revertingKey !== null}
+            >
+              {bulkReverting ? 'Reverting all…' : 'Revert all to live'}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {err && (

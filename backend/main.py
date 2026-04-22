@@ -11548,6 +11548,43 @@ def hr_post_policy_config_revert_row(
         raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
 
 
+@hr_policy_config_router.post("/policy-config/draft/revert-all")
+def hr_post_policy_config_revert_all(
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Discard every change in the current draft by re-seeding it from the
+    live published version. Returns the refreshed diff (summary counts
+    all zero on success). 409 "no_draft" when there's nothing to revert,
+    409 "no_live" when the company never published anything yet.
+    """
+    cid = _policy_matrix_company_hr(user, companyId)
+    try:
+        return policy_config_matrix_svc.revert_all_draft_rows_to_live(cid)
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        if code == "no_draft":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "no_draft", "message": "No draft exists to revert"},
+            )
+        if code == "no_live":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "no_live",
+                    "message": (
+                        "No published version to revert to. Delete the draft manually or "
+                        "publish a first version before reverting."
+                    ),
+                },
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
+
+
 @hr_policy_config_router.get("/policy-config/history")
 def hr_get_policy_config_history(
     companyId: Optional[str] = Query(None, alias="companyId"),
@@ -11818,6 +11855,31 @@ def admin_post_policy_config_revert_row(
             raise HTTPException(
                 status_code=404,
                 detail={"code": "row_not_found", "message": "Benefit row not found in live or draft"},
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
+
+
+@admin_policy_config_router.post("/policy-config/draft/revert-all")
+def admin_post_policy_config_revert_all(
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin-scoped bulk revert. Mirrors the HR endpoint."""
+    try:
+        return policy_config_matrix_svc.revert_all_draft_rows_to_live(company_id)
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        if code == "no_draft":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "no_draft", "message": "No draft exists to revert"},
+            )
+        if code == "no_live":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "no_live", "message": "No published version to revert to"},
             )
         raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
 
