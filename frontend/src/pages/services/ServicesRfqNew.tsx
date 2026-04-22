@@ -185,11 +185,23 @@ export const ServicesRfqNew: React.FC = () => {
           />
         </div>
       ))}
-      <div className="flex justify-end mt-4">
-        <Button type="button" variant="outline" disabled title="Available when vendor quoting goes live">
-          Send quotation requests (coming soon)
-        </Button>
-      </div>
+      {/*
+        Vendor quoting isn't wired end-to-end yet. Hide the control rather
+        than surface a disabled "coming soon" button, which reads badly in
+        demos. Re-enable once the vendor RFQ flow ships.
+      */}
+      {import.meta.env.DEV && (
+        <div className="flex justify-end mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            disabled
+            title="Available when vendor quoting goes live"
+          >
+            Send quotation requests (dev only — not wired)
+          </Button>
+        </div>
+      )}
     </AppShell>
   );
 };

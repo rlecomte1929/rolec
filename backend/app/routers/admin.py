@@ -412,3 +412,41 @@ def reject_requirement_facts(payload: dict, user: dict = Depends(require_admin))
         raise HTTPException(status_code=400, detail="fact_ids required")
     db.update_requirement_fact_status(fact_ids, "rejected", user.get("id") or "admin")
     return {"ok": True, "count": len(fact_ids)}
+
+
+# ---------------------------------------------------------------------------
+# Policy ingest reconciler — manual orphan cleanup.
+# Startup already runs this once; this endpoint lets ops trigger it on demand
+# without a restart (useful when LLM extraction hangs and a user is stuck).
+# ---------------------------------------------------------------------------
+@router.get("/policy-ingest/orphans")
+def list_policy_ingest_orphans(
+    max_age_seconds: int = 900,
+    user: dict = Depends(require_admin),
+):
+    """Read-only: list policy_documents stuck mid-extraction for > max_age_seconds."""
+    from ...services.policy_ingest_reconciler import find_orphaned_policy_documents
+    rows = find_orphaned_policy_documents(db, max_age_seconds=max_age_seconds)
+    return {"max_age_seconds": max_age_seconds, "count": len(rows), "orphans": rows}
+
+
+@router.post("/policy-ingest/reconcile")
+def reconcile_policy_ingest(
+    payload: Optional[dict] = None,
+    user: dict = Depends(require_admin),
+):
+    """
+    Mark orphaned policy_documents as failed so affected users can retry by
+    re-uploading. Accepts {"max_age_seconds": int}; defaults to 15 minutes.
+    """
+    from ...services.policy_ingest_reconciler import reconcile_orphaned_policy_ingest_jobs
+    max_age = int((payload or {}).get("max_age_seconds") or 900)
+    if max_age < 60:
+        raise HTTPException(status_code=400, detail="max_age_seconds must be >= 60")
+    summary = reconcile_orphaned_policy_ingest_jobs(
+        db,
+        max_age_seconds=max_age,
+        actor_id=user.get("id"),
+        actor_label="admin_manual",
+    )
+    return summary

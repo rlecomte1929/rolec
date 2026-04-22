@@ -8,13 +8,19 @@ import os
 import json as _json
 
 logging.basicConfig(level=logging.INFO)
+
+# Configure observability (Sentry + structured logging) before anything else
+# logs, so early startup lines land in the right format. All of it is no-op
+# unless the relevant env vars are set.
+from .observability import configure_observability  # noqa: E402
+configure_observability()
+
 log = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any, List, Tuple
-import os
 import uuid
 from datetime import datetime, date
 import re
@@ -110,6 +116,7 @@ from .services.relocation_plan_view_service import (
     get_relocation_plan_view_for_case_assignment,
     invalidate_relocation_plan_cache,
 )
+from .app.routers import auth as auth_router
 from .app.routers import cases as cases_router
 from .app.routers import admin as admin_router
 from .app.routers import admin_resources as admin_resources_router
@@ -195,6 +202,20 @@ def _run_runtime_startup_initialization() -> None:
     except Exception as e:
         log.warning("policy_storage startup diagnostic skipped: %s", e)
 
+    # Mark as failed any policy_documents rows that were mid-extraction when
+    # the previous process exited. Without this they stay stuck in-flight
+    # forever and the upload idempotency guard (see #7) blocks retries.
+    try:
+        from .services.policy_ingest_reconciler import reconcile_orphaned_policy_ingest_jobs
+        _reconcile_summary = reconcile_orphaned_policy_ingest_jobs(db, actor_label="startup")
+        if _reconcile_summary.get("failed"):
+            log.warning(
+                "Startup policy-ingest reconciler: failed %d orphaned documents",
+                _reconcile_summary["failed"],
+            )
+    except Exception as e:
+        log.warning("Startup policy-ingest reconciler skipped: %s", e)
+
     if _db_scheme == "sqlite" and ALLOW_LEGACY_DEMO_SEED and not DISABLE_DEMO_RESEED:
         try:
             _seed_demo_cases()
@@ -227,6 +248,46 @@ else:
     log.info("Running with PostgreSQL — data persists across redeploys.")
 
 app = FastAPI(title="ReloPass API", version="1.0.0", lifespan=lifespan)
+
+# ---------------------------------------------------------------------------
+# Rate limiting (abuse protection on auth + claim endpoints).
+# Limiter instance lives in backend/rate_limit.py so routers can decorate
+# their endpoints without pulling main into a circular import. Main owns the
+# RateLimitExceeded exception handler and attaches the limiter to app state.
+# Disabled when RELOPASS_DISABLE_RATE_LIMITS=1 (tests set this in conftest).
+# ---------------------------------------------------------------------------
+from slowapi.errors import RateLimitExceeded
+from .rate_limit import limiter, _real_remote_address
+
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    """429 response that preserves X-Request-ID and CORS headers (matches global 500 handler)."""
+    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    hdrs: Dict[str, str] = {
+        "X-Request-ID": req_id,
+        "Retry-After": "60",
+    }
+    hdrs.update(cors_headers_for_request_origin(request))
+    log.warning(
+        "rate_limit_exceeded request_id=%s path=%s ip=%s limit=%s",
+        req_id,
+        request.url.path,
+        _real_remote_address(request),
+        str(getattr(exc, "detail", "")),
+    )
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": "Too many requests. Wait a moment before trying again.",
+            "request_id": req_id,
+        },
+        headers=hdrs,
+    )
+
+
 admin_graph_build_marker = os.getenv("ADMIN_GRAPH_BUILD_MARKER", "local-dev")
 log.info(
     "ADMIN_GRAPH_BUILD_MARKER=%s db_scheme=%s seed_guard_active=%s DISABLE_DEMO_RESEED=%s ALLOW_LEGACY_DEMO_SEED=%s",
@@ -364,6 +425,7 @@ app.add_middleware(
     max_age=86400,
 )
 
+app.include_router(auth_router.router)
 app.include_router(compat_router.router)
 app.include_router(cases_router.router)
 app.include_router(mobility_context_router.router)
@@ -1149,381 +1211,14 @@ def _best_effort_reconcile_employee_assignments(
         log.warning("%s claim_reconcile skipped error=%s", context, exc)
 
 
-@app.post("/api/auth/register", response_model=LoginResponse)
-def register(request: RegisterRequest):
-    """Register a new user with username or email and role."""
-    try:
-        username = request.username.strip() if request.username else None
-        email_raw = request.email.strip() if request.email else None
-        email = email_raw.lower() if email_raw else None
+# ---------------------------------------------------------------------------
+# Auth endpoints (register, login, logout) moved to backend/app/routers/auth.py
+# in the main.py decomposition effort. See that file for the implementation.
+# ---------------------------------------------------------------------------
 
-        if not username and not email:
-            raise HTTPException(
-                status_code=400,
-                detail=err_detail(IdentityErrorCode.AUTH_IDENTIFIER_REQUIRED, "Provide a username or email"),
-            )
-
-        if username:
-            if not re.match(r"^[A-Za-z0-9_]{3,30}$", username):
-                identity_event("identity.auth.signup.failed", reason="AUTH_USERNAME_INVALID_FORMAT")
-                raise HTTPException(status_code=400, detail="Username must be 3-30 chars, alphanumeric or underscore")
-            if db.get_user_by_username(username):
-                identity_event(
-                    "identity.auth.signup.failed",
-                    reason="AUTH_USERNAME_TAKEN",
-                    principal_fingerprint=principal_fingerprint(None, username),
-                )
-                raise HTTPException(
-                    status_code=400,
-                    detail=err_detail(
-                        IdentityErrorCode.AUTH_USERNAME_TAKEN,
-                        "This username is already taken. Choose another or sign in.",
-                    ),
-                )
-
-        if email:
-            if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-                identity_event("identity.auth.signup.failed", reason="AUTH_EMAIL_INVALID_FORMAT")
-                raise HTTPException(status_code=400, detail="Invalid email format")
-            # Only real auth accounts (public.users) block signup — not employee_contacts / assignments / invites.
-            if db.get_user_by_email(email):
-                identity_event(
-                    "identity.auth.signup.failed",
-                    reason="AUTH_EMAIL_TAKEN",
-                    principal_fingerprint=principal_fingerprint(email, None),
-                )
-                raise HTTPException(
-                    status_code=400,
-                    detail=err_detail(
-                        IdentityErrorCode.AUTH_EMAIL_TAKEN,
-                        "An account with this email already exists. Try logging in instead.",
-                    ),
-                )
-
-        if not request.password:
-            raise HTTPException(status_code=400, detail="Password required")
-
-        # Password hashing (placeholder for stronger policy/verification)
-        from passlib.context import CryptContext
-        # Use PBKDF2 to avoid bcrypt backend issues on Windows.
-        pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-        password_hash = pwd_context.hash(request.password)
-
-        role = request.role
-        if role == UserRole.ADMIN and (not email or not email.endswith("@relopass.com") or not db.is_admin_allowlisted(email)):
-            role = UserRole.EMPLOYEE
-
-        user_id = str(uuid.uuid4())
-        created = db.create_user(
-            user_id=user_id,
-            username=username,
-            email=email,
-            password_hash=password_hash,
-            role=role.value,
-            name=request.name,
-        )
-        if not created:
-            identity_event(
-                "identity.auth.signup.failed",
-                reason="AUTH_USER_CREATE_FAILED",
-                principal_fingerprint=principal_fingerprint(email, username),
-            )
-            raise HTTPException(
-                status_code=400,
-                detail=err_detail(
-                    IdentityErrorCode.AUTH_USER_CREATE_FAILED,
-                    "Could not create this account. The email or username may already be registered.",
-                ),
-            )
-
-        token = str(uuid.uuid4())
-        db.create_session(token, user_id)
-        db.ensure_profile_record(
-            user_id=user_id,
-            email=email,
-            role=role.value,
-            full_name=request.name,
-            company_id=None,
-        )
-
-        reconciliation_payload = None
-        if role == UserRole.EMPLOYEE and (email or username):
-            try:
-                claim_res = reconcile_pending_assignment_claims(
-                    db,
-                    user_id=user_id,
-                    email=email,
-                    username=username,
-                    role=role.value,
-                    request_id=None,
-                    emit_side_effects=True,
-                )
-                identity_event(
-                    "identity.auth.signup.reconcile",
-                    auth_user_id=user_id,
-                    principal_fingerprint=principal_fingerprint(email, username),
-                    linked_contacts=len(claim_res.linked_contact_ids),
-                    new_attachments=len(claim_res.newly_attached_assignment_ids),
-                    skipped_revoked_invites=claim_res.skipped_revoked_invites,
-                    skipped_contacts_linked_to_other_user=claim_res.skipped_contacts_linked_to_other_user,
-                    skipped_assignments_linked_to_other_user=claim_res.skipped_assignments_linked_to_other_user,
-                    skipped_already_linked_same_user=claim_res.skipped_already_linked_same_user,
-                )
-                rec = claim_res.to_api_dict()
-                if rec.get("linkedContactIds") or rec.get("attachedAssignmentIds") or rec.get("message"):
-                    reconciliation_payload = PostSignupReconciliation(
-                        linkedContactIds=rec.get("linkedContactIds") or [],
-                        attachedAssignmentIds=rec.get("attachedAssignmentIds") or [],
-                        skippedContactsLinkedToOtherUser=int(rec.get("skippedContactsLinkedToOtherUser") or 0),
-                        skippedAssignmentsLinkedToOtherUser=int(
-                            rec.get("skippedAssignmentsLinkedToOtherUser") or 0
-                        ),
-                        skippedRevokedInvites=int(rec.get("skippedRevokedInvites") or 0),
-                        skippedAlreadyLinkedSameUser=int(rec.get("skippedAlreadyLinkedSameUser") or 0),
-                        headline=rec.get("headline"),
-                        message=rec.get("message"),
-                    )
-            except Exception as rec_exc:
-                log.warning("signup_reconciliation skipped user_id=%s error=%s", user_id[:8], rec_exc)
-                identity_event(
-                    "identity.auth.signup.reconcile",
-                    auth_user_id=user_id,
-                    outcome="error",
-                    error_type=type(rec_exc).__name__,
-                )
-
-        identity_event(
-            "identity.auth.signup.ok",
-            auth_user_id=user_id,
-            role=role.value,
-            principal_fingerprint=principal_fingerprint(email, username),
-        )
-        log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
-        if email:
-            from .services.supabase_auth_sync import sync_relopass_user_to_supabase_auth
-
-            sync_relopass_user_to_supabase_auth(
-                email,
-                request.password,
-                relopass_user_id=user_id,
-                full_name=request.name,
-            )
-        return LoginResponse(
-            token=token,
-            user=UserResponse(
-                id=user_id,
-                username=username,
-                email=email,
-                role=role,
-                name=request.name,
-                company=None,
-            ),
-            reconciliation=reconciliation_payload,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        log.exception("auth_register unexpected error email=%s", getattr(request, "email", ""))
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
-
-
-@app.post("/api/auth/logout")
-def logout(authorization: Optional[str] = Header(None)):
-    """Invalidate the current session. Client should also clear localStorage."""
-    if not authorization:
-        return {"success": True}
-    token = authorization.replace("Bearer ", "").strip()
-    if token:
-        db.delete_session_by_token(token)
-        log.info("auth_logout token_invalidated")
-    return {"success": True}
-
-
-AUTH_PERF_DEBUG = os.getenv("AUTH_PERF_DEBUG", "").lower() in ("1", "true", "yes")
 PERF_DEBUG = os.getenv("PERF_DEBUG", "").lower() in ("1", "true", "yes")
 
 
-def _log_auth_perf(endpoint: str, request_id: Optional[str], user_id: Optional[str], total_duration_ms: float, status_code: int):
-    """Structured JSON log for auth perf (when AUTH_PERF_DEBUG=1)."""
-    if not AUTH_PERF_DEBUG:
-        return
-    log.info(
-        "[auth-perf] %s",
-        _json.dumps({
-            "endpoint": endpoint,
-            "request_id": request_id or "",
-            "user_id": (user_id or "")[:8] if user_id else "",
-            "total_duration_ms": round(total_duration_ms, 2),
-            "status_code": status_code,
-        }),
-    )
-
-
-@app.post("/api/auth/login", response_model=LoginResponse)
-def login(request: LoginRequest, req: Request):
-    """Login with username or email + password."""
-    t0 = time.perf_counter()
-    request_id = getattr(req.state, "request_id", None) or ""
-    identifier = (request.identifier or "").strip()
-    if not identifier:
-        log.warning("auth_login fail identifier_empty")
-        identity_event(
-            "identity.auth.signin.failed",
-            reason="AUTH_IDENTIFIER_REQUIRED",
-            request_id=request_id or None,
-        )
-        raise HTTPException(
-            status_code=401,
-            detail=err_detail(IdentityErrorCode.AUTH_IDENTIFIER_REQUIRED, "Enter your username or email"),
-        )
-    user = db.get_user_by_identifier(identifier)
-    if not user:
-        log.warning("auth_login fail user_not_found identifier=%s", identifier[:3] + "***")
-        identity_event(
-            "identity.auth.signin.failed",
-            reason="AUTH_USER_NOT_FOUND",
-            request_id=request_id or None,
-            principal_fingerprint=principal_fingerprint_from_login_identifier(identifier),
-        )
-        raise HTTPException(
-            status_code=401,
-            detail=err_detail(
-                IdentityErrorCode.AUTH_USER_NOT_FOUND,
-                "Invalid username or email. Check spelling or create an account.",
-            ),
-        )
-
-    if not user.get("password_hash"):
-        log.warning("auth_login fail no_password user_id=%s", user.get("id", "")[:8])
-        identity_event(
-            "identity.auth.signin.failed",
-            reason="AUTH_NO_PASSWORD",
-            request_id=request_id or None,
-            auth_user_id=user.get("id"),
-        )
-        raise HTTPException(
-            status_code=401,
-            detail=err_detail(IdentityErrorCode.AUTH_NO_PASSWORD, "Invalid credentials"),
-        )
-
-    from passlib.context import CryptContext
-    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-    if not pwd_context.verify(request.password, user["password_hash"]):
-        log.warning("auth_login fail wrong_password user_id=%s", user.get("id", "")[:8])
-        identity_event(
-            "identity.auth.signin.failed",
-            reason="AUTH_WRONG_PASSWORD",
-            request_id=request_id or None,
-            auth_user_id=user.get("id"),
-        )
-        raise HTTPException(
-            status_code=401,
-            detail=err_detail(IdentityErrorCode.AUTH_WRONG_PASSWORD, "Incorrect password. Try again or reset."),
-        )
-
-    token = str(uuid.uuid4())
-    db.create_session(token, user["id"])
-
-    # Ensure profile record is synced
-    db.ensure_profile_record(
-        user_id=user["id"],
-        email=user.get("email"),
-        role=user.get("role", UserRole.EMPLOYEE.value),
-        full_name=user.get("name"),
-        company_id=user.get("company"),
-    )
-    profile = db.get_profile_record(user["id"])
-
-    # Admin override if allowlisted
-    effective_role = UserRole(user["role"])
-    if _is_admin_user(user):
-        effective_role = UserRole.ADMIN
-
-    reconciliation_payload = None
-    if effective_role == UserRole.EMPLOYEE:
-        try:
-            claim_res = reconcile_pending_assignment_claims(
-                db,
-                user_id=user["id"],
-                email=user.get("email"),
-                username=user.get("username"),
-                role=user.get("role") or UserRole.EMPLOYEE.value,
-                request_id=request_id or None,
-                emit_side_effects=True,
-            )
-            identity_event(
-                "identity.auth.signin.reconcile",
-                request_id=request_id or None,
-                auth_user_id=user["id"],
-                principal_fingerprint=principal_fingerprint(user.get("email"), user.get("username")),
-                linked_contacts=len(claim_res.linked_contact_ids),
-                new_attachments=len(claim_res.newly_attached_assignment_ids),
-                skipped_revoked_invites=claim_res.skipped_revoked_invites,
-                skipped_contacts_linked_to_other_user=claim_res.skipped_contacts_linked_to_other_user,
-                skipped_assignments_linked_to_other_user=claim_res.skipped_assignments_linked_to_other_user,
-                skipped_already_linked_same_user=claim_res.skipped_already_linked_same_user,
-            )
-            # Only surface UX payload when we newly attached assignments (avoid repeat banners).
-            if claim_res.newly_attached_assignment_ids:
-                rec = claim_res.to_api_dict()
-                reconciliation_payload = PostSignupReconciliation(
-                    linkedContactIds=rec.get("linkedContactIds") or [],
-                    attachedAssignmentIds=rec.get("attachedAssignmentIds") or [],
-                    skippedContactsLinkedToOtherUser=int(rec.get("skippedContactsLinkedToOtherUser") or 0),
-                    skippedAssignmentsLinkedToOtherUser=int(
-                        rec.get("skippedAssignmentsLinkedToOtherUser") or 0
-                    ),
-                    skippedRevokedInvites=int(rec.get("skippedRevokedInvites") or 0),
-                    skippedAlreadyLinkedSameUser=int(rec.get("skippedAlreadyLinkedSameUser") or 0),
-                    headline=rec.get("headline"),
-                    message=rec.get("message"),
-                )
-        except Exception as rec_exc:
-            log.warning("login claim_link skipped user_id=%s error=%s", user["id"][:8], rec_exc)
-            identity_event(
-                "identity.auth.signin.reconcile",
-                request_id=request_id or None,
-                auth_user_id=user["id"],
-                outcome="error",
-                error_type=type(rec_exc).__name__,
-            )
-
-    identity_event(
-        "identity.auth.signin.ok",
-        request_id=request_id or None,
-        auth_user_id=user["id"],
-        role=effective_role.value,
-        principal_fingerprint=principal_fingerprint(user.get("email"), user.get("username")),
-    )
-    log.info("auth_login success user_id=%s", user["id"][:8])
-    if user.get("email"):
-        from .services.supabase_auth_sync import sync_relopass_user_to_supabase_auth
-
-        sync_relopass_user_to_supabase_auth(
-            user["email"],
-            request.password,
-            relopass_user_id=user["id"],
-            full_name=user.get("name"),
-        )
-    _log_auth_perf(
-        "/api/auth/login",
-        request_id,
-        user["id"],
-        (time.perf_counter() - t0) * 1000,
-        200,
-    )
-    return LoginResponse(
-        token=token,
-        user=UserResponse(
-            id=user["id"],
-            username=user.get("username"),
-            email=user.get("email"),
-            role=effective_role,
-            name=user.get("name"),
-            company=profile.get("company_id") if profile else user.get("company"),
-        ),
-        reconciliation=reconciliation_payload,
-    )
 
 
 def _log_endpoint_perf(endpoint: str, request_id: Optional[str], user_id: Optional[str], total_duration_ms: float, status_code: int, db_duration_ms: Optional[float] = None):
@@ -3905,6 +3600,7 @@ def _validated_employee_claim_identifiers(
 
 
 @app.post("/api/employee/assignments/{assignment_id}/claim")
+@limiter.limit("10/hour;50/day")
 def claim_assignment(
     request: Request,
     assignment_id: str,
@@ -4791,11 +4487,78 @@ def dismiss_message_notification(
 
 @app.delete("/api/hr/assignments/{assignment_id}")
 def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    """
+    Soft-delete an assignment + its parent case. Sets archived_at and writes
+    an audit_logs row per entity. Non-admin HR callers must own or share a
+    company with the assignment.
+    """
     _deny_if_impersonating(user)
-    deleted = db.delete_assignment(assignment_id)
+    effective = _effective_user(user, UserRole.HR)
+    assignment = db.get_assignment_by_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    deleted = db.delete_assignment(assignment_id, actor_id=effective.get("id"))
     if not deleted:
+        # Either it was already archived or race with concurrent delete.
         raise HTTPException(status_code=404, detail="Assignment not found")
     return {"success": True, "deleted": assignment_id}
+
+
+@app.post("/api/hr/cases/{case_id}/erasure")
+def erase_case_data(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    GDPR right-to-erasure. Soft-deletes all assignments for this case (which
+    also soft-deletes the case via delete_assignment) and redacts passport,
+    nationality, DOB, and family identity fields from relocation_cases.profile_json.
+
+    Authorization: non-admin HR callers must belong to the case's company.
+    Audit: writes a `relocation_case` row with action_type='erase' and a
+    `case_assignment` row with action_type='delete' per soft-deleted assignment.
+    """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    case = db.get_case_by_id(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if not user.get("is_admin"):
+        hr_company = _get_hr_company_id(effective)
+        if not hr_company or hr_company != case.get("company_id"):
+            raise HTTPException(status_code=403, detail="Not authorized for this case")
+
+    # Soft-delete assignments first (each call also soft-deletes the case).
+    with db.engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT id FROM case_assignments WHERE case_id = :cid AND archived_at IS NULL"),
+            {"cid": case_id},
+        ).fetchall()
+    assignment_ids = [r._mapping["id"] for r in rows]
+    for aid in assignment_ids:
+        try:
+            db.delete_assignment(aid, actor_id=effective.get("id"))
+        except Exception as ex:
+            log.warning("erase_case_data: delete_assignment(%s) failed: %s", aid[:8], ex)
+
+    # Redact identity PII on the case row (audit row written inside).
+    db.redact_case_identity_data(case_id, actor_id=effective.get("id"))
+
+    log.info(
+        "gdpr_erasure case_id=%s company_id=%s actor=%s assignments_soft_deleted=%d",
+        case_id[:8],
+        (case.get("company_id") or "")[:8],
+        (effective.get("id") or "")[:8],
+        len(assignment_ids),
+    )
+    return {
+        "success": True,
+        "case_id": case_id,
+        "assignments_soft_deleted": len(assignment_ids),
+        "pii_redacted": True,
+    }
 
 
 def _hr_assignment_case_route_hints(case_row: Optional[Dict[str, Any]]) -> tuple:
@@ -8933,8 +8696,40 @@ async def upload_policy_document(
             request_id=request_id,
         )
 
+    # Typed-rejection pre-gate: size ceiling + magic-byte sniff + PDF
+    # encryption check. Any failure here maps to a typed HTTP status;
+    # fires BEFORE storage upload so rejected files never leave a trail
+    # in Supabase storage.
+    try:
+        from .services.policy_filetype import validate_upload_bytes
+        from .services.policy_intake_errors import (
+            DocumentSizeError,
+            EncryptedDocumentError,
+            IntakePipelineUnavailableError,
+            MalformedDocumentError,
+            PolicyIntakeError,
+            UnsupportedFileTypeError,
+        )
+        sniff_result = validate_upload_bytes(content)
+    except PolicyIntakeError as exc:
+        # Map exception class → HTTP status. Exceptions are transport-agnostic;
+        # the status lives here (the API layer) per recipe §4.4.
+        _INTAKE_HTTP_STATUS = {
+            UnsupportedFileTypeError: 415,        # Unsupported Media Type
+            MalformedDocumentError: 422,          # Unprocessable Entity
+            EncryptedDocumentError: 422,
+            DocumentSizeError: 413,               # Payload Too Large (also fires on empty)
+            IntakePipelineUnavailableError: 503,  # Service Unavailable (missing parser dep)
+        }
+        status = _INTAKE_HTTP_STATUS.get(type(exc), 422)
+        log.info(
+            "request_id=%s policy_upload stage=validate rejection=%s status=%d msg=%s",
+            request_id, exc.code, status, exc,
+        )
+        return _upload_error_response(exc.code, str(exc), status, request_id=request_id)
+
     mime = file.content_type or (
-        "application/pdf" if ext == "pdf"
+        "application/pdf" if sniff_result.kind == "pdf"
         else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
     log.info(
@@ -9003,6 +8798,36 @@ async def upload_policy_document(
         checksum = compute_checksum(content)
     except Exception as e:
         log.warning("request_id=%s policy_upload checksum failed: %s", request_id, e)
+
+    # --- Idempotency: skip re-upload if the same file (by checksum) was already
+    # processed successfully for this company. Protects against double-clicks,
+    # refresh-resubmits, and LLM-cost duplication. Failed prior attempts fall
+    # through so the user can retry by re-uploading.
+    if checksum:
+        try:
+            existing = db.get_active_policy_document_by_checksum(
+                company_id, checksum, request_id=request_id
+            )
+        except Exception as e:
+            log.warning(
+                "request_id=%s policy_upload idempotency lookup failed: %s",
+                request_id, e,
+            )
+            existing = None
+        if existing:
+            log.info(
+                "request_id=%s policy_upload idempotent_reuse existing_doc_id=%s status=%s",
+                request_id,
+                existing.get("id"),
+                existing.get("processing_status"),
+            )
+            return {
+                "ok": True,
+                "document": existing,
+                "request_id": request_id,
+                "processing_queued": False,
+                "reused": True,
+            }
 
     doc_id = str(uuid.uuid4())
     storage_filename = _sanitize_storage_filename(filename)

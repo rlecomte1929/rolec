@@ -58,6 +58,40 @@ function SummarySection({
   );
 }
 
+// Bumped whenever the privacy notice changes materially. Stored with the
+// consent timestamp so we can distinguish users who consented under earlier
+// versions of the privacy copy.
+const PRIVACY_CONSENT_VERSION = 'v1-2026-04';
+
+function consentStorageKey(caseId: string): string {
+  return `relopass:privacyConsent:${caseId}`;
+}
+
+function readPersistedConsent(caseId: string): { consentedAt: string; version: string } | null {
+  try {
+    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(consentStorageKey(caseId)) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.consentedAt === 'string' && typeof parsed.version === 'string') {
+      return parsed;
+    }
+  } catch {
+    // Corrupt entry — treat as missing.
+  }
+  return null;
+}
+
+function persistConsent(caseId: string): { consentedAt: string; version: string } {
+  const record = { consentedAt: new Date().toISOString(), version: PRIVACY_CONSENT_VERSION };
+  try {
+    window.localStorage.setItem(consentStorageKey(caseId), JSON.stringify(record));
+  } catch {
+    // localStorage may be disabled (Safari private mode, etc.) — consent is
+    // still captured for this session; user will re-consent next load.
+  }
+  return record;
+}
+
 export const Step5ReviewCreate: React.FC<StepProps> = ({
   caseId,
   draft,
@@ -71,6 +105,13 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  // Consent gates Save — required for GDPR/PII compliance since Step 2
+  // collects passport + nationality. Persisted per-case in localStorage;
+  // re-prompt required if the privacy notice version changes.
+  const [consented, setConsented] = useState<boolean>(() => {
+    const existing = readPersistedConsent(caseId);
+    return !!existing && existing.version === PRIVACY_CONSENT_VERSION;
+  });
   const [dossierQuestions, setDossierQuestions] = useState<DossierQuestion[]>([]);
   const [dossierAnswers, setDossierAnswers] = useState<Record<string, any>>({});
   const [dossierComplete, setDossierComplete] = useState(true);
@@ -198,6 +239,14 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
   const handleSave = async (nextRoute?: string) => {
     setError('');
     setDossierError('');
+    if (!consented) {
+      setError(
+        'Please confirm you have read the privacy notice and consent to the processing of your information before continuing.',
+      );
+      return;
+    }
+    // Record (or refresh) consent timestamp at the point of submission.
+    persistConsent(caseId);
     setIsSaving(true);
     try {
       if (DYNAMIC_DOSSIER_ENABLED && caseId && missingFields.length > 0) {
@@ -533,19 +582,45 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({
         <GuidancePackPanel caseId={caseId} isStep5Complete={dossierComplete} />
       </div>
 
+      <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
+        <label className="flex items-start gap-3 text-sm text-[#0b2b43]">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-[#cbd5e1]"
+            checked={consented}
+            onChange={(e) => setConsented(e.target.checked)}
+            aria-describedby="privacy-consent-desc"
+          />
+          <span id="privacy-consent-desc">
+            I have read the{' '}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#1d4ed8] underline"
+            >
+              privacy notice
+            </a>{' '}
+            and consent to ReloPass processing my personal information — including passport,
+            nationality, and family details — for the purpose of managing my relocation. I
+            understand I can request deletion of my data at any time via HR.
+          </span>
+        </label>
+      </div>
+
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" onClick={onBack}>Back</Button>
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             onClick={() => handleSave(buildRoute('employeeDashboard'))}
-            disabled={isSaving || dossierSaving}
+            disabled={isSaving || dossierSaving || !consented}
           >
             {isSaving || dossierSaving ? 'Saving...' : 'Save & Exit'}
           </Button>
           <Button
             onClick={() => handleSave(buildRoute('services'))}
-            disabled={isSaving || dossierSaving}
+            disabled={isSaving || dossierSaving || !consented}
           >
             {isSaving || dossierSaving ? 'Saving...' : 'Save & go to Services'}
           </Button>

@@ -170,7 +170,9 @@ function App() {
         <Route path={ROUTE_DEFS.hrComplianceIndex.path} element={<HrComplianceCheck />} />
         <Route path={ROUTE_DEFS.hrCompliance.path} element={<HrComplianceCheck />} />
         <Route path={ROUTE_DEFS.hrPackage.path} element={<HrAssignmentPackageReview />} />
-        <Route path={ROUTE_DEFS.auditNavigation.path} element={<NavigationAudit />} />
+        {import.meta.env.DEV && (
+          <Route path={ROUTE_DEFS.auditNavigation.path} element={<NavigationAudit />} />
+        )}
         <Route
           path={ROUTE_DEFS.providers.path}
           element={<Navigate to={ROUTE_DEFS.services.path} replace />}
@@ -271,18 +273,28 @@ function App() {
           path={ROUTE_DEFS.hrMessages.path}
           element={<Messages />}
         />
-        <Route
-          path={ROUTE_DEFS.hrResources.path}
-          element={<PlaceholderPage title="Resources" description="Access HR relocation resources and guides." />}
-        />
+        {/*
+          Placeholder routes kept as dev-only. In prod they fall through to
+          the catch-all (redirect to landing) — better than shipping a visible
+          "coming soon" card during demos. Remove these entirely once the
+          feature ships or the nav entry is retired.
+        */}
+        {import.meta.env.DEV && (
+          <Route
+            path={ROUTE_DEFS.hrResources.path}
+            element={<PlaceholderPage title="Resources" description="Access HR relocation resources and guides." />}
+          />
+        )}
         <Route path={ROUTE_DEFS.hrCompanyProfile.path} element={<HrCompanyProfile />} />
         <Route path={ROUTE_DEFS.hrEmployees.path} element={<HrEmployees />} />
         <Route path={ROUTE_DEFS.hrEmployeeDetail.path} element={<HrEmployeeDetail />} />
         <Route path={ROUTE_DEFS.notificationSettings.path} element={<NotificationSettings />} />
-        <Route
-          path={ROUTE_DEFS.submissionCenter.path}
-          element={<PlaceholderPage title="Submission Center" description="Finalize and submit case documentation." />}
-        />
+        {import.meta.env.DEV && (
+          <Route
+            path={ROUTE_DEFS.submissionCenter.path}
+            element={<PlaceholderPage title="Submission Center" description="Finalize and submit case documentation." />}
+          />
+        )}
         {import.meta.env.DEV && (
           <>
             <Route path="/debug/auth" element={<DebugAuth />} />

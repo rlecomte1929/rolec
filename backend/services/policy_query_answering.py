@@ -140,14 +140,31 @@ class CanonicalPolicyQueryLLM:
     def _client_or_raise(self) -> Any:
         if self._client is not None:
             return self._client
+        from ..core.llm_flags import LLMDisabled, policy_llm_disabled
+        if policy_llm_disabled():
+            # RELOPASS_POLICY_LLM_DISABLED=1 — never build a client, never egress.
+            return LLMDisabled(reason="RELOPASS_POLICY_LLM_DISABLED=1")
         try:
             from openai import OpenAI  # type: ignore
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("openai package is required for policy query answering") from exc
-        return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Explicit timeout + retries — avoids hung requests blocking policy Q&A.
+        timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+        return OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            timeout=timeout_s,
+            max_retries=max_retries,
+        )
 
     def answer(self, *, query: str, context_blocks: List[str]) -> str:
+        from ..core.llm_flags import LLMDisabled, policy_llm_temperature
         client = self._client_or_raise()
+        if isinstance(client, LLMDisabled):
+            # Deterministic short-circuit. Caller is expected to treat an
+            # empty string as "no LLM answer" and route to a template-based
+            # deterministic response (or set review_required=True).
+            return ""
         system = (
             "Answer strictly from the provided policy context. "
             "Do not use outside knowledge. "
@@ -156,6 +173,7 @@ class CanonicalPolicyQueryLLM:
         )
         response = client.chat.completions.create(
             model=self._model,
+            temperature=policy_llm_temperature(),
             messages=[
                 {"role": "system", "content": system},
                 {

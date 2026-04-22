@@ -23,10 +23,15 @@ Thumbs.db
 # Allow non-secret env files to be committed
 !.env.example
 !frontend/.env.production
-!frontend/.env.development
+!frontend/.env.development.example
+# frontend/.env.development is intentionally NOT allowlisted — it contains secrets.
+# Use frontend/.env.development.example as the template.
 
 # Logs
 *.log
 
 # Local audit output
 audit_report.json
+# Generated PDF fixtures (GAP-011; rebuilt at test time, never committed)
+backend/tests/fixtures/generated/
+

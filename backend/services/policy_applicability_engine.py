@@ -3,6 +3,7 @@ Applicability evaluation for imported policy facts vs mobility case profile (det
 """
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional, Set
 
 

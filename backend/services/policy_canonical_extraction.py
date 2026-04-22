@@ -64,13 +64,34 @@ class OpenAIPolicyCanonicalExtractor:
     def _client_or_raise(self) -> Any:
         if self._client is not None:
             return self._client
+        from ..core.llm_flags import LLMDisabled, policy_llm_disabled
+        if policy_llm_disabled():
+            # RELOPASS_POLICY_LLM_DISABLED=1 — never build a client, never
+            # egress. Caller must treat this as "no LLM contribution".
+            return LLMDisabled(reason="RELOPASS_POLICY_LLM_DISABLED=1")
         try:
             from openai import OpenAI  # type: ignore
         except ImportError as exc:  # pragma: no cover - exercised via tests with mock clients
             raise RuntimeError("openai package is required for canonical policy extraction") from exc
-        return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Explicit timeout + retries — the OpenAI SDK's defaults let a hung
+        # connection block the background task indefinitely. OPENAI_TIMEOUT_SECONDS
+        # and OPENAI_MAX_RETRIES are the env-var overrides for ops tuning.
+        timeout_s = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "60"))
+        max_retries = int(os.getenv("OPENAI_MAX_RETRIES", "3"))
+        return OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            timeout=timeout_s,
+            max_retries=max_retries,
+        )
 
     def extract(self, llm_input: PolicyFactExtractionLLMInput) -> PolicyFactExtractionLLMOutput:
+        from ..core.llm_flags import LLMDisabled, policy_llm_temperature
+        client = self._client_or_raise()
+        if isinstance(client, LLMDisabled):
+            # Deterministic short-circuit. Callers will typically route to
+            # the fallback extractor (extract_minimal_policy_facts) and set
+            # review_required=True on the document row.
+            return PolicyFactExtractionLLMOutput(facts=[])
         schema_json = {
             "type": "object",
             "properties": {
@@ -84,9 +105,9 @@ class OpenAIPolicyCanonicalExtractor:
             "required": ["facts"],
             "additionalProperties": False,
         }
-        client = self._client_or_raise()
         response = client.chat.completions.create(
             model=self._model,
+            temperature=policy_llm_temperature(),
             response_format={"type": "json_object"},
             messages=[
                 {

@@ -700,6 +700,70 @@ class Database:
         except Exception as ex:
             log.warning("compensation_allowance policy_config ensure failed (run Supabase migration): %s", ex)
 
+    def _maybe_ensure_hot_path_indexes(self) -> None:
+        """
+        Idempotent indexes for the hot listing paths on case_assignments +
+        relocation_cases. Mirrors supabase/migrations/20260428100000_hot_path_indexes.sql.
+        Runs on both SQLite and Postgres; uses IF NOT EXISTS so repeat boots
+        are safe.
+        """
+        statements_pg = [
+            "CREATE INDEX IF NOT EXISTS idx_case_assignments_hr_user_created_at "
+            "ON case_assignments (hr_user_id, created_at DESC) "
+            "WHERE archived_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_relocation_cases_company_created_at "
+            "ON relocation_cases (company_id, created_at DESC) "
+            "WHERE archived_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_case_assignments_employee_user "
+            "ON case_assignments (employee_user_id) "
+            "WHERE employee_user_id IS NOT NULL AND archived_at IS NULL",
+            "CREATE INDEX IF NOT EXISTS idx_case_assignments_case_id "
+            "ON case_assignments (case_id) "
+            "WHERE archived_at IS NULL",
+        ]
+        # SQLite supports partial indexes via WHERE. Same DDL works on both
+        # engines for our predicates — no dialect split needed.
+        try:
+            with self.engine.begin() as conn:
+                for sql in statements_pg:
+                    conn.execute(text(sql))
+        except Exception as ex:
+            log.warning("hot-path indexes ensure failed (run Supabase migration): %s", ex)
+
+    def _maybe_ensure_archived_at_columns(self) -> None:
+        """
+        Idempotently adds archived_at to case_assignments and relocation_cases
+        for soft-delete support (see delete_assignment). Works on both SQLite
+        dev and Postgres prod.
+        Supabase migration: 20260427100000_case_assignments_archived_at.sql
+        """
+        if _is_sqlite:
+            # SQLite: ADD COLUMN IF NOT EXISTS is not supported in older SQLite;
+            # swallow "duplicate column" errors instead.
+            for table in ("case_assignments", "relocation_cases"):
+                try:
+                    with self.engine.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN archived_at TEXT NULL"))
+                except (OperationalError, ProgrammingError) as ex:
+                    # Already exists — expected on second boot.
+                    if "duplicate column" not in str(ex).lower():
+                        log.warning("%s.archived_at ensure: %s", table, ex)
+            return
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(text("ALTER TABLE case_assignments ADD COLUMN IF NOT EXISTS archived_at timestamptz NULL"))
+                conn.execute(text("ALTER TABLE relocation_cases ADD COLUMN IF NOT EXISTS archived_at timestamptz NULL"))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS idx_case_assignments_archived_at "
+                    "ON case_assignments (archived_at) WHERE archived_at IS NOT NULL"
+                ))
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS idx_relocation_cases_archived_at "
+                    "ON relocation_cases (archived_at) WHERE archived_at IS NOT NULL"
+                ))
+        except Exception as ex:
+            log.warning("archived_at columns ensure failed (run Supabase migration): %s", ex)
+
     def _maybe_ensure_postgres_case_assignments_employee_link_mode(self) -> None:
         """
         case_assignments.employee_link_mode is required for create_assignment INSERT and pending-claim flows.
@@ -994,6 +1058,14 @@ class Database:
             self._maybe_ensure_policy_benefit_rule_hr_overrides()
             self._maybe_ensure_compensation_allowance_policy_config()
 
+        # archived_at is needed on both SQLite dev and Postgres prod. The helper
+        # handles both and only runs ALTER TABLE if the column is missing.
+        self._maybe_ensure_archived_at_columns()
+        # Hot-path indexes are re-ensured below after CREATE TABLE for SQLite
+        # (since the legacy DDL path below creates the tables if absent). On
+        # Postgres the indexes can be created here too, but we defer to the
+        # end of init_db for consistency.
+
         # In production (Render), avoid runtime DDL. Use Supabase migrations instead.
         if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):
             with self.engine.connect() as conn:
@@ -1048,7 +1120,8 @@ class Database:
                     hr_user_id TEXT NOT NULL,
                     profile_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    archived_at TEXT
                 )
             """))
 
@@ -1064,7 +1137,8 @@ class Database:
                     updated_at TEXT NOT NULL,
                     submitted_at TEXT,
                     hr_notes TEXT,
-                    decision TEXT
+                    decision TEXT,
+                    archived_at TEXT
                 )
             """))
 
@@ -1788,6 +1862,28 @@ class Database:
                     answer_preview TEXT,
                     created_at TEXT NOT NULL
                 )
+            """))
+
+            # Generic audit_logs table — used by backend/services/audit_log_service.py
+            # for row-level mutations (e.g. delete_assignment). Postgres prod has
+            # this via Supabase migrations; create on SQLite dev too so audit is
+            # never silently dropped in local testing.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id TEXT PRIMARY KEY,
+                    entity_type TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    action_type TEXT NOT NULL,
+                    old_value_json TEXT,
+                    new_value_json TEXT,
+                    actor_type TEXT NOT NULL DEFAULT 'system',
+                    actor_id TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_audit_logs_entity
+                ON audit_logs (entity_type, entity_id, created_at DESC)
             """))
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_canonical_policy_query_audit_logs_company
@@ -2999,6 +3095,10 @@ class Database:
         log.info("DB schema ensured (legacy tables) — %s",
                  _raw_url.split("@")[-1] if "@" in _raw_url else _raw_url)
 
+        # Hot-path indexes depend on tables + archived_at column existing.
+        # Safe to run here unconditionally — idempotent via IF NOT EXISTS.
+        self._maybe_ensure_hot_path_indexes()
+
         try:
             self.seed_readiness_templates_if_empty()
         except Exception as e:
@@ -3227,6 +3327,74 @@ class Database:
         with self.engine.connect() as conn:
             row = conn.execute(text("SELECT * FROM relocation_cases WHERE id = :id"), {"id": case_id}).fetchone()
         return self._row_to_dict(row)
+
+    def redact_case_identity_data(
+        self,
+        case_id: str,
+        *,
+        actor_id: Optional[str] = None,
+    ) -> bool:
+        """
+        GDPR erasure: replace identity PII in relocation_cases.profile_json with
+        redaction markers. Preserves the row (keeps foreign-key targets intact)
+        but clears passport, nationality, DOB, names, addresses, and family
+        details. Writes an audit_logs row with action_type='erase'.
+
+        Returns True if a row was redacted, False if no such case exists.
+        """
+        from .services.audit_log_service import insert_audit_log, ACTOR_HUMAN, ACTOR_SYSTEM
+        from ._time import utcnow_iso_naive
+        now = utcnow_iso_naive()
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT * FROM relocation_cases WHERE id = :id"),
+                {"id": case_id},
+            ).fetchone()
+            if not row:
+                return False
+            snapshot = self._row_to_dict(row) or {}
+            # Top-level PII keys we scrub. Anything not listed is preserved
+            # (origin/destination country, assignment type, etc. are not PII).
+            PII_KEYS = {
+                "employeeProfile", "familyMembers", "identity", "passport",
+                "passports", "nationality", "nationalities", "dateOfBirth",
+                "dob", "homeAddress", "destinationAddress", "phone", "email",
+                "emergencyContact",
+            }
+            try:
+                raw = snapshot.get("profile_json")
+                profile = json.loads(raw) if isinstance(raw, str) else (raw or {})
+            except Exception:
+                profile = {}
+            redacted = dict(profile) if isinstance(profile, dict) else {}
+            for key in list(redacted.keys()):
+                if key in PII_KEYS:
+                    redacted[key] = "[redacted]"
+            redacted["_erased"] = {"at": now, "actor": actor_id or "system"}
+            conn.execute(
+                text(
+                    "UPDATE relocation_cases SET profile_json = :pj, updated_at = :ua "
+                    "WHERE id = :id"
+                ),
+                {"pj": json.dumps(redacted), "ua": now, "id": case_id},
+            )
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="relocation_case",
+                    entity_id=case_id,
+                    action_type="erase",
+                    old_value={"profile_keys": list((profile or {}).keys())},
+                    new_value={"erased_at": now},
+                    actor_type=ACTOR_HUMAN if actor_id else ACTOR_SYSTEM,
+                    actor_id=actor_id,
+                )
+            except Exception as audit_exc:
+                log.warning(
+                    "redact_case_identity_data audit insert failed (cid=%s): %s",
+                    case_id[:8], audit_exc,
+                )
+        return True
 
     def resolve_canonical_case_id(self, case_id: str) -> Optional[str]:
         """If case_id matches wizard_cases.id, return it (canonical). Else return None."""
@@ -4339,11 +4507,18 @@ class Database:
             log.debug("count_analytics_events_by_name failed: %s", e)
             return {}
 
-    def get_assignment_by_id(self, assignment_id: str, request_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get_assignment_by_id(
+        self,
+        assignment_id: str,
+        request_id: Optional[str] = None,
+        *,
+        include_archived: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        where = "WHERE id = :id" if include_archived else "WHERE id = :id AND archived_at IS NULL"
         with self.engine.connect() as conn:
             row = self._exec(
                 conn,
-                "SELECT * FROM case_assignments WHERE id = :id",
+                f"SELECT * FROM case_assignments {where}",
                 {"id": assignment_id},
                 op_name="get_assignment_by_id",
                 request_id=request_id,
@@ -5092,14 +5267,35 @@ class Database:
         return self._row_to_dict(row)
 
     def list_assignments_for_hr(self, hr_user_id: str, request_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        FALLBACK path: list assignments owned by an HR user who is NOT yet linked
+        to any company (i.e. has no row in hr_users). Callers normally resolve a
+        company_id first and call list_assignments_for_company; this function is
+        only reached when that resolution returned None.
+
+        The NOT EXISTS guard is a safety floor: if the HR user IS associated with
+        any company (via hr_users), this returns empty instead of leaking across
+        company boundaries. That forces the caller to go through the company-
+        scoped path, where multi-tenant filtering is correct.
+        """
         with self.engine.connect() as conn:
             rows = self._exec(
                 conn,
-                "SELECT * FROM case_assignments WHERE hr_user_id = :hr ORDER BY created_at DESC",
+                "SELECT * FROM case_assignments "
+                "WHERE hr_user_id = :hr "
+                "AND archived_at IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM hr_users WHERE profile_id = :hr) "
+                "ORDER BY created_at DESC",
                 {"hr": hr_user_id},
                 op_name="list_assignments_for_hr",
                 request_id=request_id,
             ).fetchall()
+        if not rows:
+            # Not necessarily an error — just worth a trace when the guard bites.
+            log.info(
+                "list_assignments_for_hr: 0 rows for hr_user_id=%s (guard rejects if user has any hr_users row)",
+                hr_user_id[:8] if hr_user_id else "",
+            )
         return self._rows_to_list(rows)
 
     def list_assignments_for_company(
@@ -5144,7 +5340,10 @@ class Database:
         else:
             join_on_cases = "rc.id::text = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
 
-        base_where = "(rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))"
+        base_where = (
+            "(rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))"
+            " AND a.archived_at IS NULL"
+        )
         params: Dict[str, Any] = {"cid": company_id}
         extras: List[str] = []
 
@@ -6250,16 +6449,6 @@ class Database:
             ), row)
         return rule_id
 
-    def list_knowledge_docs_by_destination(self, destination_country: str) -> List[Dict[str, Any]]:
-        with self.engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT d.* FROM knowledge_docs d "
-                "JOIN knowledge_packs p ON p.id = d.pack_id "
-                "WHERE p.destination_country = :dest "
-                "ORDER BY d.created_at DESC"
-            ), {"dest": destination_country}).fetchall()
-        return self._rows_to_list(rows)
-
     def list_knowledge_docs(self, pack_ids: List[str]) -> List[Dict[str, Any]]:
         if not pack_ids:
             return []
@@ -6673,8 +6862,11 @@ class Database:
         return (raw_status or "").strip() or ""
 
     def _command_center_company_where(self) -> str:
-        """WHERE clause for company-scoped assignments (needs rc, hu joins)."""
-        return "(rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))"
+        """WHERE clause for company-scoped, non-archived assignments (needs rc, hu joins)."""
+        return (
+            "(rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid))"
+            " AND ca.archived_at IS NULL"
+        )
 
     def get_command_center_kpis(
         self,
@@ -6699,11 +6891,21 @@ class Database:
                     """
                     rows = conn.execute(text(sql), {"cid": company_id}).fetchall()
                 elif hr_user_id:
+                    # Fallback only for HR users without a company association.
+                    # NOT EXISTS guard prevents cross-company leakage if the
+                    # user *does* have an hr_users row (see list_assignments_for_hr).
                     rows = conn.execute(
-                        text("SELECT * FROM case_assignments WHERE hr_user_id = :hr ORDER BY created_at DESC"),
+                        text(
+                            "SELECT * FROM case_assignments "
+                            "WHERE hr_user_id = :hr "
+                            "AND archived_at IS NULL "
+                            "AND NOT EXISTS (SELECT 1 FROM hr_users WHERE profile_id = :hr) "
+                            "ORDER BY created_at DESC"
+                        ),
                         {"hr": hr_user_id},
                     ).fetchall()
                 else:
+                    # Admin fallback: include archived for investigation visibility.
                     rows = conn.execute(text("SELECT * FROM case_assignments ORDER BY created_at DESC")).fetchall()
                 assignments = self._rows_to_list(rows)
         except Exception:
@@ -6808,7 +7010,14 @@ class Database:
                         {where}
                     """
                 elif hr_user_id:
-                    where = "WHERE ca.hr_user_id = :hr"
+                    # Fallback only for HR users without a company association.
+                    # NOT EXISTS guard: if the user has any hr_users row, this
+                    # returns empty rather than leaking across companies.
+                    where = (
+                        "WHERE ca.hr_user_id = :hr "
+                        "AND ca.archived_at IS NULL "
+                        "AND NOT EXISTS (SELECT 1 FROM hr_users WHERE profile_id = :hr)"
+                    )
                     params["hr"] = hr_user_id
                     sql = f"""
                         SELECT ca.id, ca.employee_identifier, ca.status,
@@ -6931,7 +7140,15 @@ class Database:
                         WHERE {where}
                     """
                 elif hr_user_id:
-                    where = "ca.id = :aid AND ca.hr_user_id = :hr"
+                    # Fallback only for HR users without a company association.
+                    # NOT EXISTS guard: if the user has any hr_users row, this
+                    # returns nothing rather than leaking an assignment from
+                    # another company (see list_assignments_for_hr).
+                    where = (
+                        "ca.id = :aid AND ca.hr_user_id = :hr "
+                        "AND ca.archived_at IS NULL "
+                        "AND NOT EXISTS (SELECT 1 FROM hr_users WHERE profile_id = :hr)"
+                    )
                     params["hr"] = hr_user_id
                     sql = f"""
                         SELECT ca.*, {dest_sql} as intake_dest_country,
@@ -7010,14 +7227,41 @@ class Database:
             log.warning("get_command_center_case_detail: %s", e)
             return None
 
-    def delete_assignment(self, assignment_id: str) -> bool:
+    def delete_assignment(self, assignment_id: str, *, actor_id: Optional[str] = None) -> bool:
+        """
+        Soft-delete an assignment and its parent relocation case.
+
+        Sets archived_at on both rows; revokes the ephemeral invites (those are
+        never customer data). Writes audit_logs rows for both entities so the
+        deletion is investigable.
+
+        Returns True on success, False if the assignment did not exist or was
+        already archived (idempotent).
+        """
+        from .services.audit_log_service import (
+            insert_audit_log,
+            ACTION_DELETE,
+            ACTOR_HUMAN,
+            ACTOR_SYSTEM,
+        )
+        from ._time import utcnow_iso_naive
+        now = utcnow_iso_naive()
         with self.engine.begin() as conn:
             row = conn.execute(text(
-                "SELECT case_id FROM case_assignments WHERE id = :id"
+                "SELECT * FROM case_assignments WHERE id = :id AND archived_at IS NULL"
             ), {"id": assignment_id}).fetchone()
             if not row:
                 return False
-            case_id = row._mapping["case_id"]
+            assignment_snapshot = self._row_to_dict(row) or {}
+            case_id = assignment_snapshot.get("case_id")
+            case_snapshot: Dict[str, Any] = {}
+            if case_id:
+                case_row = conn.execute(text(
+                    "SELECT * FROM relocation_cases WHERE id = :cid AND archived_at IS NULL"
+                ), {"cid": case_id}).fetchone()
+                case_snapshot = self._row_to_dict(case_row) or {}
+
+            # Invites are ephemeral credentials for onboarding; hard-delete is safe.
             try:
                 conn.execute(
                     text("DELETE FROM assignment_claim_invites WHERE assignment_id = :aid"),
@@ -7025,9 +7269,56 @@ class Database:
                 )
             except (OperationalError, ProgrammingError):
                 pass
-            conn.execute(text("DELETE FROM assignment_invites WHERE case_id = :cid"), {"cid": case_id})
-            conn.execute(text("DELETE FROM case_assignments WHERE id = :id"), {"id": assignment_id})
-            conn.execute(text("DELETE FROM relocation_cases WHERE id = :cid"), {"cid": case_id})
+            try:
+                conn.execute(
+                    text("DELETE FROM assignment_invites WHERE case_id = :cid"),
+                    {"cid": case_id},
+                )
+            except (OperationalError, ProgrammingError):
+                pass
+
+            # Soft-delete assignment + parent case.
+            conn.execute(
+                text("UPDATE case_assignments SET archived_at = :now, updated_at = :now WHERE id = :id"),
+                {"now": now, "id": assignment_id},
+            )
+            if case_id:
+                conn.execute(
+                    text("UPDATE relocation_cases SET archived_at = :now, updated_at = :now WHERE id = :cid"),
+                    {"now": now, "cid": case_id},
+                )
+
+            # Audit trail — one row per entity.
+            actor_type = ACTOR_HUMAN if actor_id else ACTOR_SYSTEM
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="case_assignment",
+                    entity_id=assignment_id,
+                    action_type=ACTION_DELETE,
+                    old_value=assignment_snapshot,
+                    new_value={"archived_at": now},
+                    actor_type=actor_type,
+                    actor_id=actor_id,
+                )
+                if case_id and case_snapshot:
+                    insert_audit_log(
+                        conn,
+                        entity_type="relocation_case",
+                        entity_id=case_id,
+                        action_type=ACTION_DELETE,
+                        old_value=case_snapshot,
+                        new_value={"archived_at": now},
+                        actor_type=actor_type,
+                        actor_id=actor_id,
+                    )
+            except Exception as audit_exc:
+                # Audit is best-effort — never block the delete on audit failure,
+                # but log loudly so we can find silent drops.
+                log.warning(
+                    "delete_assignment audit insert failed (aid=%s cid=%s): %s",
+                    assignment_id[:8], (case_id or "")[:8], audit_exc,
+                )
         return True
 
     # ==================================================================
@@ -10696,6 +10987,36 @@ class Database:
                     },
                 )
         return self.get_policy_document(doc_id, request_id=request_id) or {}
+
+    def get_active_policy_document_by_checksum(
+        self,
+        company_id: str,
+        checksum: str,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Idempotency lookup: return the newest non-failed policy_documents row
+        for (company_id, checksum), or None.
+
+        Used by the upload endpoint so double-clicks / refresh-resubmits /
+        network retries don't create duplicate rows and re-run LLM extraction.
+        Rows with processing_status='failed' are excluded so the caller can
+        re-trigger extraction by uploading again.
+        """
+        if not (company_id and checksum):
+            return None
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM policy_documents "
+                "WHERE company_id = :cid AND checksum = :chk "
+                "AND COALESCE(processing_status, '') != 'failed' "
+                "ORDER BY uploaded_at DESC LIMIT 1",
+                {"cid": company_id, "chk": checksum},
+                op_name="get_active_policy_document_by_checksum",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row)
 
     def get_policy_document(
         self, doc_id: str, request_id: Optional[str] = None

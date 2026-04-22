@@ -29,7 +29,7 @@ export const PublicFooter: React.FC = () => {
               Contact
             </h4>
             <p className="text-sm text-marketing-text-muted leading-relaxed max-w-[260px]">
-              Talk to us about your relocation process, current challenges, or how ReloPass could fit your team.
+              Tell us how your relocations run today. We'll show you what changes.
             </p>
             <div className="mt-4">
               <a

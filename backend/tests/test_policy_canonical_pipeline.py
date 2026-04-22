@@ -162,22 +162,32 @@ class PolicyCanonicalPipelineTests(unittest.TestCase):
     def test_alembic_migration_smoke(self) -> None:
         if command is None or Config is None:
             raise unittest.SkipTest("alembic not installed")
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = os.path.join(tmpdir, "canonical.sqlite")
-            seed_conn = sqlite3.connect(db_path)
-            seed_conn.execute("CREATE TABLE policy_documents (id TEXT PRIMARY KEY)")
-            seed_conn.commit()
-            seed_conn.close()
-            cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
-            cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "alembic"))
-            cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
-            command.upgrade(cfg, "head")
-            conn = sqlite3.connect(db_path)
-            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-            conn.close()
-            self.assertIn("canonical_policy_documents", tables)
-            self.assertIn("canonical_policy_document_chunks", tables)
-            self.assertIn("canonical_policy_facts", tables)
+        # alembic/env.py prefers DATABASE_URL over the config's sqlalchemy.url.
+        # In CI that env var points at ci_test.db — which `db.init_db()` has
+        # already populated in the Prime step — so without clearing it here
+        # upgrade() would target that pre-populated DB and collide on
+        # CREATE TABLE canonical_policy_documents. Drop it for this call only.
+        previous_db_url = os.environ.pop("DATABASE_URL", None)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                db_path = os.path.join(tmpdir, "canonical.sqlite")
+                seed_conn = sqlite3.connect(db_path)
+                seed_conn.execute("CREATE TABLE policy_documents (id TEXT PRIMARY KEY)")
+                seed_conn.commit()
+                seed_conn.close()
+                cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+                cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "alembic"))
+                cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+                command.upgrade(cfg, "head")
+                conn = sqlite3.connect(db_path)
+                tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+                conn.close()
+                self.assertIn("canonical_policy_documents", tables)
+                self.assertIn("canonical_policy_document_chunks", tables)
+                self.assertIn("canonical_policy_facts", tables)
+        finally:
+            if previous_db_url is not None:
+                os.environ["DATABASE_URL"] = previous_db_url
 
     def test_ingestion_persists_canonical_document(self) -> None:
         db = _RecordingDb()
@@ -190,7 +200,12 @@ class PolicyCanonicalPipelineTests(unittest.TestCase):
         )
         self.assertEqual(document["company_id"], "company-a")
         self.assertEqual(document["filename"], "sample.docx")
-        self.assertEqual(document["document_type"], "policy_summary")
+        # Classifier output is structural (DocTypeProfile). The sample docx
+        # begins with "Long Term Assignment Policy Summary" — an assignment
+        # policy, not a generic policy summary. Prior expectation of
+        # "policy_summary" encoded the old keyword-cascade behavior, removed
+        # as part of the EXTRACT-BUG-2 fix.
+        self.assertEqual(document["document_type"], "assignment_policy")
         self.assertIn("Housing allowance", document["normalized_text"])
 
     def test_chunk_builder_preserves_structure(self) -> None:
