@@ -42,6 +42,7 @@ import type {
 } from '../policy-config/types';
 import { HrPolicyReviewWorkspace } from './HrPolicyReviewWorkspace';
 import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
+import { PolicyAssistantFab } from './PolicyAssistantFab';
 
 // --- Types ------------------------------------------------------------------
 
@@ -428,51 +429,20 @@ const VersionHistorySection: React.FC<{
 
 // --- Floating Policy Assistant FAB -----------------------------------------
 
+/**
+ * HR-flavored floating assistant. The shared PolicyAssistantFab owns the
+ * button + sheet chrome; this wrapper only provides the HR assistant
+ * panel as the sheet body. Kept inline here so page-scoped props
+ * (policyId) stay local — a future employee equivalent will use the
+ * same PolicyAssistantFab with EmployeePolicyAssistantPanel as body.
+ */
 const FloatingPolicyAssistantButton: React.FC<{
   policyId: string | null;
-}> = ({ policyId }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-[#0b2b43] text-white shadow-lg hover:bg-[#0f3a5a] focus:outline-none focus:ring-4 focus:ring-[#0b2b43]/30 flex items-center justify-center text-2xl"
-        aria-label="Open Policy Assistant"
-        title="Ask the Policy Assistant"
-      >
-        💬
-      </button>
-      {open && (
-        <div
-          className="fixed inset-0 z-50 bg-black/30 flex justify-end"
-          onClick={() => setOpen(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="h-full w-full max-w-md bg-white shadow-2xl overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-              <div className="font-semibold text-[#0b2b43]">Policy Assistant</div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="text-slate-500 hover:text-[#0b2b43]"
-              >
-                Close
-              </button>
-            </div>
-            <div className="p-4">
-              <HrPolicyAssistantPanel policyId={policyId} variant="card" />
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-};
+}> = ({ policyId }) => (
+  <PolicyAssistantFab label="Open Policy Assistant — ask about this HR policy">
+    {() => <HrPolicyAssistantPanel policyId={policyId} variant="card" />}
+  </PolicyAssistantFab>
+);
 
 // --- Main page --------------------------------------------------------------
 
