@@ -337,6 +337,45 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     }
   };
 
+  const performUnpublish = async () => {
+    if (!selectedPolicyId || !normalized?.version?.id) return;
+    const versionId = String(normalized.version.id);
+    // Confirm twice — unpublish is reversible (re-publish puts it back) but
+    // employees stop seeing the policy immediately, so the pause is worth it.
+    if (
+      !window.confirm(
+        'Unpublish this policy version? Employees will stop seeing its benefits immediately.'
+      )
+    )
+      return;
+    if (
+      !window.confirm(
+        'Are you sure? You can re-publish or publish a different version later. This does not delete the version — it archives it for audit.'
+      )
+    )
+      return;
+    setPublishBusy(true);
+    setMessage('');
+    try {
+      await companyPolicyAPI.unpublishVersion(selectedPolicyId, versionId);
+      const res = await companyPolicyAPI.getNormalized(selectedPolicyId, { includeReadiness: true });
+      setNormalized(res);
+      bumpPolicyDataRefresh();
+      setMessage(
+        'Unpublished. Employees no longer see this version. You can now delete the source document, import a new one, or generate a draft from a template — then publish the next version when ready.'
+      );
+      setMessageVariant('success');
+      void loadDocumentsAndPolicies();
+    } catch (err: any) {
+      setMessage(
+        formatApiDetail(err?.response?.data?.detail) || 'Unpublish failed. Try again or contact support.'
+      );
+      setMessageVariant('error');
+    } finally {
+      setPublishBusy(false);
+    }
+  };
+
   const handleRenormalize = async () => {
     if (!sourceDocId || !selectedPolicyId) return;
     setRenormalizeBusy(true);
@@ -1050,9 +1089,27 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
               {publishBusy ? 'Publishing…' : 'Publish version'}
             </Button>
             {versionStatus === 'published' && (
-              <span className="text-sm text-[#059669] font-medium">Live for employees</span>
+              <>
+                <span className="text-sm text-[#059669] font-medium">Live for employees</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={performUnpublish}
+                  disabled={publishBusy || statusBusy}
+                  className="ml-auto"
+                >
+                  {publishBusy ? 'Unpublishing…' : 'Unpublish version'}
+                </Button>
+              </>
             )}
           </div>
+          {versionStatus === 'published' && (
+            <p className="text-xs text-[#6b7280] mt-2">
+              Unpublishing archives this version (audit trail preserved) so employees stop
+              seeing it. You can then delete the source document, import a new one, or start
+              from a template — and publish the replacement when ready.
+            </p>
+          )}
           <div className="text-xs text-[#6b7280] mt-2">
             Status: {VERSION_STATUS_LABELS[versionStatus] || versionStatus}. After you change rules here, use{' '}
             <strong>Publish version</strong> to replace what employees see. New uploads from document intake stay as

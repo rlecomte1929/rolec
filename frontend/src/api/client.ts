@@ -2287,6 +2287,21 @@ export const companyPolicyAPI = {
     const response = await api.post(`/api/company-policies/${policyId}/versions/${versionId}/publish`);
     return response.data;
   },
+  /**
+   * Archive a live (published) version. Employees stop seeing its benefits
+   * immediately; the row stays queryable for audit history. HR can then
+   * import a new document or start from a template, review, and publish
+   * a fresh version.
+   * Returns `{ version, already }`. When `already` is a non-null string
+   * the version was not in "published" status — the call was a no-op.
+   */
+  unpublishVersion: async (
+    policyId: string,
+    versionId: string
+  ): Promise<{ version: any; already: string | null }> => {
+    const response = await api.post(`/api/company-policies/${policyId}/versions/${versionId}/unpublish`);
+    return response.data;
+  },
   /** Publish latest version - avoids version_id mismatch 404s */
   publishLatestVersion: async (policyId: string): Promise<{ version: any }> => {
     const response = await api.post(`/api/company-policies/${policyId}/versions/latest/publish`);

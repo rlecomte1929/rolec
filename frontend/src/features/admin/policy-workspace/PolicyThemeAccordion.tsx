@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { Badge, Button } from '../../../components/antigravity';
 import { TermHelpIcon } from '../../policy-config/TermHelpIcon';
 import { glossaryIdForBenefitKey } from '../../policy-config/compensationGlossary';
@@ -22,7 +21,10 @@ type Props = {
   benefits: WorkspaceDisplayRow[];
   open: boolean;
   onToggle: () => void;
-  policyEditorHref: string;
+  // `policyEditorHref` was the link to the retired /admin/policy-config bulk
+  // editor. Removed: row drawers inside each theme accordion are now the only
+  // editor. Kept the prop name absent from the API; consumers that still pass
+  // it will fail typecheck and be updated at the call site.
   readOnly?: boolean;
   showOnlyIncluded: boolean;
   assignmentFilter: string;
@@ -49,7 +51,6 @@ export const PolicyThemeAccordion: React.FC<Props> = ({
   benefits,
   open,
   onToggle,
-  policyEditorHref,
   readOnly,
   showOnlyIncluded,
   assignmentFilter,
@@ -108,17 +109,6 @@ export const PolicyThemeAccordion: React.FC<Props> = ({
             </div>
           </div>
         </button>
-        {!readOnly ? (
-          <div className="flex items-center pr-2 py-2 shrink-0 border-l border-transparent">
-            <Link
-              to={policyEditorHref}
-              onClick={(e) => e.stopPropagation()}
-              className="text-xs font-medium text-[#0b2b43] hover:underline px-2 py-1 rounded whitespace-nowrap"
-            >
-              Edit theme
-            </Link>
-          </div>
-        ) : null}
       </div>
 
       {open && (

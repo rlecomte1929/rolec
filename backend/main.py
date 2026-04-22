@@ -10393,6 +10393,63 @@ def publish_policy_version(
         raise HTTPException(status_code=500, detail="Publish failed")
 
 
+@app.post("/api/company-policies/{policy_id}/versions/{version_id}/unpublish")
+def unpublish_policy_version(
+    policy_id: str,
+    version_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Archive a currently-published policy version. After unpublish the
+    company has no live canonical policy (the matrix may still be live if
+    published separately). HR can then:
+      - delete the source document the version was built from, or
+      - import a new document / generate a template-based draft, review,
+        and publish a replacement.
+
+    Employees stop seeing this version's benefits as soon as the archive
+    transaction commits; the matrix bridge path keeps working for any
+    matrix that's published separately.
+
+    Audit: no rows are destroyed — status flips draft→archived and the
+    row stays queryable for history.
+    """
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    version = db.get_policy_version(version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    if version.get("policy_id") != policy_id:
+        raise HTTPException(status_code=404, detail="Version not found")
+    status = str(version.get("status") or "").lower()
+    if status != "published":
+        # Idempotent: return current status so the frontend can reconcile.
+        return {"version": version, "already": status}
+    try:
+        db.update_policy_version_status(version_id, "archived")
+        updated = db.get_policy_version(version_id)
+        log.info(
+            "request_id=%s unpublish_policy_version policy_id=%s version_id=%s user_id=%s",
+            request_id,
+            policy_id,
+            version_id,
+            user.get("id"),
+        )
+        return {"version": updated, "already": None}
+    except Exception as exc:
+        log.warning(
+            "request_id=%s unpublish_policy_version failed policy_id=%s version_id=%s exc=%s",
+            request_id,
+            policy_id,
+            version_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Unpublish failed")
+
+
 @app.patch("/api/company-policies/{policy_id}/exclusions/{excl_id}")
 def patch_exclusion(
     policy_id: str,

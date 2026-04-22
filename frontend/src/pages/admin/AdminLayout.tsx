@@ -27,11 +27,9 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
     { to: buildRoute('adminPeople'), label: 'People', path: ROUTE_DEFS.adminPeople.path },
     { to: buildRoute('adminAssignments'), label: 'Assignments', path: ROUTE_DEFS.adminAssignments.path },
     { to: buildRoute('adminPolicies'), label: 'Policy Workspace', path: ROUTE_DEFS.adminPolicies.path },
-    {
-      to: buildRoute('adminPolicyConfig'),
-      label: 'Compensation & Allowance',
-      path: ROUTE_DEFS.adminPolicyConfig.path,
-    },
+    // "Compensation & Allowance" nav item retired — the structured editor now
+    // lives inside the Policy Workspace row drawers (one editor, one source
+    // of truth). /admin/policy-config route removed entirely.
     { to: buildRoute('adminSuppliers'), label: 'Suppliers', path: ROUTE_DEFS.adminSuppliers.path },
     { to: buildRoute('adminMessages'), label: 'Messages', path: ROUTE_DEFS.adminMessages.path },
   ];

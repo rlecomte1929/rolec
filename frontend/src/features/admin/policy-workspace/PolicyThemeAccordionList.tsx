@@ -18,7 +18,6 @@ function snapshotRow(r: WorkspaceDisplayRow): WorkspaceDisplayRow {
 
 type Props = {
   categories: PolicyConfigCategoryBlock[] | undefined;
-  policyEditorHref: string;
   readOnly?: boolean;
   assignmentTypesSupported?: string[];
   familyStatusesSupported?: string[];
@@ -33,7 +32,6 @@ type Props = {
 
 export const PolicyThemeAccordionList: React.FC<Props> = ({
   categories,
-  policyEditorHref,
   readOnly,
   assignmentTypesSupported,
   familyStatusesSupported,
@@ -193,7 +191,6 @@ export const PolicyThemeAccordionList: React.FC<Props> = ({
               benefits={benefits}
               open={openKeys.has(key)}
               onToggle={() => toggle(key)}
-              policyEditorHref={policyEditorHref}
               readOnly={drawerReadOnly}
               showOnlyIncluded={showOnlyIncluded}
               assignmentFilter={assignmentFilter}
