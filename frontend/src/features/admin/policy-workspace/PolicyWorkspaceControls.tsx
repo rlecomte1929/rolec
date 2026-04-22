@@ -38,7 +38,7 @@ type Props = {
   publishDisabled: boolean;
   savingDraft: boolean;
   publishingDraft: boolean;
-  policyConfigHref: string;
+  // policyConfigHref removed — was the link to /admin/policy-config (retired).
   hrPolicyHref: string;
 };
 
@@ -60,7 +60,6 @@ export const PolicyWorkspaceControls: React.FC<Props> = ({
   publishDisabled,
   savingDraft,
   publishingDraft,
-  policyConfigHref,
   hrPolicyHref,
 }) => {
   const badge = workspaceStatusBadge(matrixPayload);
@@ -93,12 +92,13 @@ export const PolicyWorkspaceControls: React.FC<Props> = ({
             <Button variant="outline" onClick={onCreateDraftFromPublished} disabled={draftActionLoading}>
               {draftActionLoading ? 'Working…' : 'Create draft from published'}
             </Button>
-            <Link
-              to={policyConfigHref}
-              className="inline-flex items-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 border-2 border-[#0b2b43] text-[#0b2b43] hover:bg-[#e6f2f4] focus:ring-[#0b2b43] px-4 py-2 text-base cursor-pointer"
-            >
-              New empty structured policy
-            </Link>
+            {/*
+              "New empty structured policy" button retired: it linked to the
+              retired /admin/policy-config bulk editor. Template-based draft
+              creation is deferred to Phase 3 (admin-side template library
+              with level-tiered defaults). Use "Create draft from published"
+              to branch from the current live version in the meantime.
+            */}
             <Button variant="outline" onClick={onViewPublished} disabled={matrixLoading}>
               View published
             </Button>

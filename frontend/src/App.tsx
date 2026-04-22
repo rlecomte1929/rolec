@@ -60,7 +60,10 @@ const CountryDetailPage = lazy(() => import('./pages/admin/CountryDetailPage').t
 const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage').then((module) => ({ default: module.AdminOverviewPage })));
 const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobilityCaseInspectPage').then((module) => ({ default: module.AdminMobilityCaseInspectPage })));
 const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
-const AdminPolicyConfigPage = lazy(() => import('./pages/admin/AdminPolicyConfigPage').then((module) => ({ default: module.AdminPolicyConfigPage })));
+// AdminPolicyConfigPage (/admin/policy-config) was retired: it duplicated the
+// row-by-row editor already living in the Policy Workspace ("Edit structured
+// baseline" bulk editor). Per product direction one editor is the source of
+// truth — the Policy Workspace row drawers. Route + page removed accordingly.
 const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies').then((module) => ({ default: module.AdminCompanies })));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((module) => ({ default: module.AdminUsers })));
 const AdminAssignments = lazy(() => import('./pages/admin/AdminAssignments').then((module) => ({ default: module.AdminAssignments })));
@@ -210,14 +213,6 @@ function App() {
         <Route path={ROUTE_DEFS.adminMobilityCases.path} element={<RequireAdminRoute><AdminMobilityCaseInspectPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminMobilityCaseInspect.path} element={<RequireAdminRoute><AdminMobilityCaseInspectPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPolicies.path} element={<RequireAdminRoute><AdminPoliciesPage /></RequireAdminRoute>} />
-        <Route
-          path={ROUTE_DEFS.adminPolicyConfig.path}
-          element={
-            <RequireAdminRoute>
-              <AdminPolicyConfigPage />
-            </RequireAdminRoute>
-          }
-        />
         <Route path={ROUTE_DEFS.adminMessages.path} element={<RequireAdminRoute><AdminMessages /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResearch.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminOverview.path} replace /></RequireAdminRoute>} />
         <Route path="/admin/companies/:companyId" element={<RequireAdminRoute><AdminCompanyDetail /></RequireAdminRoute>} />

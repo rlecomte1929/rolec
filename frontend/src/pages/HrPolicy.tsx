@@ -6,7 +6,7 @@ import { Alert, Button, Card } from '../components/antigravity';
 import { employeeAPI, policyDocumentsAPI } from '../api/client';
 import { EmployeePolicyPanel } from '../features/policy/EmployeePolicyPanel';
 import { EmployeePolicyAssistantPanel } from '../features/policy/EmployeePolicyAssistantPanel';
-import { HrPolicyReviewWorkspace } from '../features/policy/HrPolicyReviewWorkspace';
+import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
 
@@ -96,32 +96,37 @@ export const HrPolicy: React.FC = () => {
     );
   }
 
+  // HR / Admin branch now renders the redesigned HrPolicyPageV2 (5-section
+  // progressive-disclosure layout). All the legacy review machinery
+  // (PolicyDocumentIntakeSection, HrPolicyReviewWorkspace) is still wired
+  // up — it lives inside the "Detailed review" drawer on the new page so
+  // nothing in the backend flow is lost, just hidden by default.
+  // The local state kept above (workspaceRefreshTrigger, postNormalizePolicyId,
+  // handleNormalized, handleDocumentsChange) is retained so future re-entry
+  // points (e.g. a deep-link from notifications) can still push into the
+  // drawer without a parent rewrite.
+  void workspaceRefreshTrigger;
+  void postNormalizePolicyId;
+  void handleNormalized;
+  void handleDocumentsChange;
+
   return (
     <AppShell
-      title={adminCompanyId ? 'Admin: policy' : 'Policy'}
+      title={adminCompanyId ? 'Admin: policy' : 'HR policy'}
       subtitle={
-        adminCompanyId ? 'View and edit company policy as admin.' : 'Company relocation policies.'
+        adminCompanyId
+          ? 'View and edit company policy as admin.'
+          : 'Current status, build the next version, publish when ready.'
       }
     >
-      <div data-hr-policy-page="v2">
+      <div data-hr-policy-page="v3" id="hr-policy-top">
         {adminCompanyId && (
           <p className="text-sm text-[#6b7280] mb-4">
             Admin mode: viewing policy for company <code className="bg-[#f1f5f9] px-1 rounded">{adminCompanyId}</code>.{' '}
             <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policy Workspace</Link>
           </p>
         )}
-
-        <div id="hr-policy-document-intake" className="scroll-mt-4">
-          <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} adminCompanyId={adminCompanyId} />
-        </div>
-        <div className="mt-8">
-          <HrPolicyReviewWorkspace
-            refreshTrigger={workspaceRefreshTrigger}
-            postNormalizePolicyId={postNormalizePolicyId}
-            onBindComplete={() => setPostNormalizePolicyId(null)}
-            adminCompanyId={adminCompanyId}
-          />
-        </div>
+        <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} />
       </div>
     </AppShell>
   );
@@ -535,7 +540,12 @@ function getUploadRequestId(err: unknown): string | null {
   return (data?.request_id && typeof data.request_id === 'string') ? data.request_id : null;
 }
 
-function PolicyDocumentIntakeSection({
+// Legacy: exported so existing deep-imports keep compiling. The new page
+// no longer renders it directly at the top — the intake now lives inside
+// the Detailed review drawer via HrPolicyReviewWorkspace. Kept to avoid
+// dropping working logic mid-refactor; will be moved to a shared file in
+// a follow-up when the drawer owns its own intake UI.
+export function PolicyDocumentIntakeSection({
   onNormalized,
   onDocumentsChange,
   adminCompanyId = null,
@@ -565,6 +575,7 @@ function PolicyDocumentIntakeSection({
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
+  const [deleteSkippedReason, setDeleteSkippedReason] = useState<string | null>(null);
 
   const loadDocs = async () => {
     try {
@@ -772,7 +783,9 @@ function PolicyDocumentIntakeSection({
                 <span className="text-sm text-green-600">Deleted. List updated.</span>
               )}
               {deleteFeedback === 'error' && (
-                <span className="text-sm text-red-600">Delete failed or some documents could not be removed.</span>
+                <span className="text-sm text-red-600">
+                  {deleteSkippedReason ?? 'Delete failed or some documents could not be removed.'}
+                </span>
               )}
               <Button
                 size="sm"
@@ -795,21 +808,53 @@ function PolicyDocumentIntakeSection({
                   if (!window.confirm('Are you sure? This action cannot be undone. Documents referenced by a policy version cannot be deleted.')) return;
                   const ids = Array.from(selectedDocIds);
                   setDeleteFeedback('deleting');
+                  setDeleteSkippedReason(null);
                   setSelectedDocIds(new Set());
                   try {
                     const res = await policyDocumentsAPI.bulkDelete(ids);
                     await loadDocs();
                     onDocumentsChange?.();
-                    setDeleteFeedback(res.deleted === ids.length ? 'done' : 'error');
-                    if (res.deleted === ids.length) {
+                    const allDeleted = res.deleted === ids.length;
+                    setDeleteFeedback(allDeleted ? 'done' : 'error');
+                    if (!allDeleted) {
+                      // Surface a useful reason instead of the generic
+                      // "Delete failed" — the backend tells us per-doc why it
+                      // was skipped. The common case is a doc that backs a
+                      // published policy version (referential integrity
+                      // gate). Tell HR exactly that so they know the fix
+                      // is "unpublish or supersede the policy version first".
+                      const REASON_LABELS: Record<string, string> = {
+                        referenced_by_version:
+                          'One or more documents back your current published policy version. Unpublish or supersede the version before deleting the source document.',
+                        forbidden:
+                          'You do not have permission to delete one or more of the selected documents.',
+                        not_found:
+                          'One or more selected documents no longer exist (the list will refresh).',
+                      };
+                      const skipped = res.skipped ?? [];
+                      const reasons = Array.from(
+                        new Set(skipped.map((s) => s.reason).filter(Boolean) as string[])
+                      );
+                      const primary = reasons[0];
+                      const keptCount = ids.length - (res.deleted ?? 0);
+                      const label = (primary && REASON_LABELS[primary]) || 'Delete was blocked.';
+                      setDeleteSkippedReason(
+                        `${label} (${keptCount} of ${ids.length} could not be deleted.)`
+                      );
+                    }
+                    if (allDeleted) {
                       setSelectionMode(false);
                       setTimeout(() => setDeleteFeedback('idle'), 3000);
                     } else {
-                      setTimeout(() => setDeleteFeedback('idle'), 5000);
+                      setTimeout(() => {
+                        setDeleteFeedback('idle');
+                        setDeleteSkippedReason(null);
+                      }, 8000);
                     }
                   } catch {
                     await loadDocs();
                     setDeleteFeedback('error');
+                    setDeleteSkippedReason(null);
                     setTimeout(() => setDeleteFeedback('idle'), 5000);
                   }
                 }}

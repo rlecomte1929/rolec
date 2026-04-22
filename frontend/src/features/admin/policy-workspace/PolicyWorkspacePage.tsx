@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Card, Button } from '../../../components/antigravity';
 import { AdminLayout } from '../../../pages/admin/AdminLayout';
 import { adminAPI, policyConfigMatrixAPI } from '../../../api/client';
@@ -149,7 +149,6 @@ export const PolicyWorkspacePage: React.FC = () => {
   const aggregate = deriveWorkspaceAggregate(matrixPayload);
   const sourceModeLabel = deriveSourceModeLabel(sourceDocCount, matrixPayload);
   const matrixInspectOnly = Boolean(matrixPayload && matrixPayload.editable === false);
-  const policyConfigHref = `${buildRoute('adminPolicyConfig')}?companyId=${encodeURIComponent(selectedCompanyId)}`;
   const hrPolicyHref = `${buildRoute('hrPolicy')}?adminCompanyId=${encodeURIComponent(selectedCompanyId)}`;
 
   return (
@@ -217,7 +216,6 @@ export const PolicyWorkspacePage: React.FC = () => {
         }
         savingDraft={pcw.saving}
         publishingDraft={pcw.publishing}
-        policyConfigHref={policyConfigHref}
         hrPolicyHref={hrPolicyHref}
       />
 
@@ -247,7 +245,6 @@ export const PolicyWorkspacePage: React.FC = () => {
           <Card padding="lg" className="mb-6 border-[#e2e8f0]">
             <PolicyThemeAccordionList
               categories={matrixPayload?.categories}
-              policyEditorHref={policyConfigHref}
               assignmentTypesSupported={matrixPayload?.assignment_types_supported}
               familyStatusesSupported={matrixPayload?.family_statuses_supported}
               basePayload={matrixPayload}
@@ -257,17 +254,6 @@ export const PolicyWorkspacePage: React.FC = () => {
               serverErrorsByBenefitKey={pcw.serverErrorsByBenefitKey}
               matrixInspectOnly={matrixInspectOnly}
             />
-            <div className="mt-4 pt-4 border-t border-[#f1f5f9] flex flex-wrap gap-2">
-              <Link
-                to={policyConfigHref}
-                className="inline-flex items-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 border-2 border-[#0b2b43] text-[#0b2b43] hover:bg-[#e6f2f4] focus:ring-[#0b2b43] px-4 py-2 text-base"
-              >
-                Edit structured baseline
-              </Link>
-              <p className="text-xs text-[#64748b] w-full sm:w-auto sm:ml-2 self-center">
-                Use row drawers for most edits; open Compensation &amp; Allowance for bulk work on the same company.
-              </p>
-            </div>
           </Card>
         </>
       ) : null}
@@ -301,7 +287,6 @@ export const PolicyWorkspacePage: React.FC = () => {
                   </p>
                   <PolicyThemeAccordionList
                     categories={publishedPayload.categories}
-                    policyEditorHref={policyConfigHref}
                     readOnly
                     assignmentTypesSupported={publishedPayload.assignment_types_supported}
                     familyStatusesSupported={publishedPayload.family_statuses_supported}
