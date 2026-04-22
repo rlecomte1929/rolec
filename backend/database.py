@@ -622,6 +622,7 @@ class Database:
                           conditions_json jsonb NOT NULL DEFAULT '{}',
                           assignment_types jsonb NOT NULL DEFAULT '[]',
                           family_statuses jsonb NOT NULL DEFAULT '[]',
+                          employee_levels jsonb NOT NULL DEFAULT '[]',
                           targeting_signature text NOT NULL DEFAULT 'global',
                           is_active boolean NOT NULL DEFAULT true,
                           display_order int NOT NULL DEFAULT 0,
@@ -632,6 +633,19 @@ class Database:
                         """
                     )
                 )
+                # Back-compat: idempotent add for tables created before the
+                # employee_levels targeting axis landed (Phase 1). Postgres
+                # "ADD COLUMN IF NOT EXISTS" is safe on 9.6+; this is a no-op
+                # on fresh schemas where the CREATE TABLE above already added it.
+                try:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE public.policy_config_benefits "
+                            "ADD COLUMN IF NOT EXISTS employee_levels jsonb NOT NULL DEFAULT '[]'::jsonb"
+                        )
+                    )
+                except Exception:
+                    pass
                 conn.execute(
                     text(
                         "CREATE INDEX IF NOT EXISTS idx_policy_configs_company ON public.policy_configs (company_id)"
@@ -1358,6 +1372,7 @@ class Database:
                     conditions_json TEXT NOT NULL DEFAULT '{}',
                     assignment_types TEXT NOT NULL DEFAULT '[]',
                     family_statuses TEXT NOT NULL DEFAULT '[]',
+                    employee_levels TEXT NOT NULL DEFAULT '[]',
                     targeting_signature TEXT NOT NULL DEFAULT 'global',
                     is_active INTEGER NOT NULL DEFAULT 1,
                     display_order INTEGER NOT NULL DEFAULT 0,
@@ -1366,6 +1381,17 @@ class Database:
                     UNIQUE(policy_config_version_id, benefit_key, targeting_signature)
                 )
             """))
+            # Back-compat: when this table pre-existed (tests reusing an
+            # older ci_test.db or a dev sqlite), add the new column with the
+            # same "applies to all levels" default so existing rows keep
+            # their effective meaning.
+            try:
+                conn.execute(text(
+                    "ALTER TABLE policy_config_benefits ADD COLUMN employee_levels TEXT NOT NULL DEFAULT '[]'"
+                ))
+            except Exception:
+                # Column already exists or SQLite refuses to re-add — safe to ignore.
+                pass
 
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_sqlite_pc_benefits_version
@@ -14035,7 +14061,7 @@ class Database:
     def _normalize_policy_config_benefit_row(self, d: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         if not d:
             return None
-        for k in ("cap_rule_json", "conditions_json", "assignment_types", "family_statuses"):
+        for k in ("cap_rule_json", "conditions_json", "assignment_types", "family_statuses", "employee_levels"):
             self._parse_json_col(d, k)
         for bk in ("covered", "is_active"):
             v = d.get(bk)
@@ -14238,6 +14264,11 @@ class Database:
             fs_j = json.dumps(fs_j)
         elif fs_j is None:
             fs_j = "[]"
+        el_j = row.get("employee_levels")
+        if isinstance(el_j, list):
+            el_j = json.dumps(el_j)
+        elif el_j is None:
+            el_j = "[]"
         cov = row.get("covered", False)
         if _is_sqlite:
             cov = 1 if cov else 0
@@ -14261,6 +14292,7 @@ class Database:
             "cj": cond_j,
             "atj": at_j,
             "fsj": fs_j,
+            "elj": el_j,
             "tsig": str(row.get("targeting_signature") or "global"),
             "ia": iact,
             "do": int(row.get("display_order") or 0),
@@ -14275,11 +14307,11 @@ class Database:
                     (id, policy_config_version_id, benefit_key, benefit_label, category, covered,
                      value_type, amount_value, currency_code, percentage_value, unit_frequency,
                      cap_rule_json, notes, conditions_json, assignment_types, family_statuses,
-                     targeting_signature, is_active, display_order, created_at, updated_at)
+                     employee_levels, targeting_signature, is_active, display_order, created_at, updated_at)
                     VALUES
                     (:id, :vid, :bk, :bl, :cat, :cov, :vt, :av, :cc, :pv, :uf, :crj, :notes, :cj,
-                     :atj, :fsj, :tsig, :ia, :do, :ca, :ua)
-                    """
+                     :atj, :fsj, :elj, :tsig, :ia, :do, :ca, :ua)
+"""
                 ),
                 params,
             )

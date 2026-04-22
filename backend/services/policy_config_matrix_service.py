@@ -113,12 +113,28 @@ _CANONICAL_KEYS: List[Tuple[str, str, PolicyConfigCategory]] = [
 ]
 
 
-def compute_targeting_signature(assignment_types: Sequence[str], family_statuses: Sequence[str]) -> str:
+def compute_targeting_signature(
+    assignment_types: Sequence[str],
+    family_statuses: Sequence[str],
+    employee_levels: Optional[Sequence[str]] = None,
+) -> str:
+    """
+    Hash the normalized targeting triple. ``employee_levels`` is optional for
+    back-compat: existing rows hashed on 2 axes preserve their "global" or
+    2-axis signature, so the uniqueness constraint
+    (policy_config_version_id, benefit_key, targeting_signature) keeps working.
+    When a caller passes an empty or None sequence, the new axis is omitted
+    from the payload exactly like empty assignment_types / family_statuses.
+    """
     a = sorted({str(x).strip() for x in assignment_types if str(x).strip()})
     f = sorted({str(x).strip() for x in family_statuses if str(x).strip()})
-    if not a and not f:
+    e = sorted({str(x).strip() for x in (employee_levels or []) if str(x).strip()})
+    if not a and not f and not e:
         return "global"
-    payload = json.dumps({"assignment_types": a, "family_statuses": f}, separators=(",", ":"), sort_keys=True)
+    payload_obj: Dict[str, List[str]] = {"assignment_types": a, "family_statuses": f}
+    if e:
+        payload_obj["employee_levels"] = e
+    payload = json.dumps(payload_obj, separators=(",", ":"), sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -146,6 +162,7 @@ def _benefit_row_defaults(benefit_key: str) -> Dict[str, Any]:
         "conditions_json": {},
         "assignment_types": [],
         "family_statuses": [],
+        "employee_levels": [],
         "is_active": True,
     }
     if benefit_key in ("relocation_allowance_assignee_partner", "repatriation_allowance_assignee_partner"):
@@ -191,7 +208,9 @@ def _canonical_seed_rows(version_id: str) -> List[Dict[str, Any]]:
         d = _benefit_row_defaults(bk)
         if bk in ("relocation_allowance_dependent", "repatriation_allowance_dependent"):
             d["unit_frequency"] = "per_dependent"
-        sig = compute_targeting_signature(d["assignment_types"], d["family_statuses"])
+        sig = compute_targeting_signature(
+            d["assignment_types"], d["family_statuses"], d.get("employee_levels") or []
+        )
         rows.append(
             {
                 "policy_config_version_id": version_id,
@@ -270,8 +289,13 @@ class PolicyConfigMatrixService:
         family_status: Optional[str],
         effective_rows_only: bool,
         strict_context: bool,
+        employee_level: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        targeting = assignment_type is not None or family_status is not None
+        targeting = (
+            assignment_type is not None
+            or family_status is not None
+            or employee_level is not None
+        )
         if not targeting and not effective_rows_only:
             return benefits
         out: List[Dict[str, Any]] = []
@@ -281,7 +305,11 @@ class PolicyConfigMatrixService:
                     continue
             if targeting:
                 if not row_matches_targeting(
-                    b, assignment_type, family_status, strict_context=strict_context
+                    b,
+                    assignment_type,
+                    family_status,
+                    strict_context=strict_context,
+                    employee_level=employee_level,
                 ):
                     continue
             out.append(b)
@@ -290,9 +318,12 @@ class PolicyConfigMatrixService:
     def _config(self, company_id: str) -> Dict[str, Any]:
         return self._db.ensure_policy_config(str(company_id), CONFIG_KEY)
 
-    def _collect_supported_lists(self, benefits: List[Dict[str, Any]]) -> Tuple[List[str], List[str]]:
+    def _collect_supported_lists(
+        self, benefits: List[Dict[str, Any]]
+    ) -> Tuple[List[str], List[str], List[str]]:
         at_set: set = set()
         fs_set: set = set()
+        el_set: set = set()
         for b in benefits:
             for x in b.get("assignment_types") or []:
                 if str(x).strip():
@@ -300,7 +331,10 @@ class PolicyConfigMatrixService:
             for x in b.get("family_statuses") or []:
                 if str(x).strip():
                     fs_set.add(str(x).strip())
-        return sorted(at_set), sorted(fs_set)
+            for x in b.get("employee_levels") or []:
+                if str(x).strip():
+                    el_set.add(str(x).strip())
+        return sorted(at_set), sorted(fs_set), sorted(el_set)
 
     def _version_to_metadata(
         self,
@@ -312,7 +346,7 @@ class PolicyConfigMatrixService:
     ) -> Dict[str, Any]:
         if not v:
             today = date.today().isoformat()
-            at, fs = self._collect_supported_lists(benefits)
+            at, fs, el = self._collect_supported_lists(benefits)
             return {
                 "policy_version": None,
                 "version_number": None,
@@ -322,8 +356,9 @@ class PolicyConfigMatrixService:
                 "source": source,
                 "assignment_types_supported": at,
                 "family_statuses_supported": fs,
+                "employee_levels_supported": el,
             }
-        at, fs = self._collect_supported_lists(benefits)
+        at, fs, el = self._collect_supported_lists(benefits)
         st = str(v.get("status") or "")
         raw_id = v.get("id")
         pv = str(raw_id) if raw_id not in (None, "") else None
@@ -339,6 +374,7 @@ class PolicyConfigMatrixService:
             "source": source,
             "assignment_types_supported": at,
             "family_statuses_supported": fs,
+            "employee_levels_supported": el,
         }
 
     def _benefits_to_api(self, rows: List[Dict[str, Any]], *, include_internal: bool) -> List[Dict[str, Any]]:
@@ -359,6 +395,7 @@ class PolicyConfigMatrixService:
                 "conditions_json": b.get("conditions_json") if isinstance(b.get("conditions_json"), dict) else {},
                 "assignment_types": list(b.get("assignment_types") or []),
                 "family_statuses": list(b.get("family_statuses") or []),
+                "employee_levels": list(b.get("employee_levels") or []),
                 "display_order": int(b.get("display_order") or 0),
                 "allowance_cap": allowance_cap_from_row(b),
                 "cap_rule_json": cap,
@@ -408,6 +445,7 @@ class PolicyConfigMatrixService:
         source: str,
         assignment_type: Optional[str] = None,
         family_status: Optional[str] = None,
+        employee_level: Optional[str] = None,
         effective_rows_only: bool = False,
         targeting_strict: bool = False,
     ) -> Dict[str, Any]:
@@ -415,6 +453,7 @@ class PolicyConfigMatrixService:
             benefits,
             assignment_type=assignment_type,
             family_status=family_status,
+            employee_level=employee_level,
             effective_rows_only=effective_rows_only,
             strict_context=targeting_strict,
         )
@@ -426,6 +465,7 @@ class PolicyConfigMatrixService:
             "preview_context": {
                 "assignment_type": assignment_type,
                 "family_status": family_status,
+                "employee_level": employee_level,
                 "effective_rows_only": effective_rows_only,
                 "note": "Selectors filter this response only; the underlying policy is unchanged.",
             },
@@ -437,6 +477,7 @@ class PolicyConfigMatrixService:
         *,
         assignment_type: Optional[str] = None,
         family_status: Optional[str] = None,
+        employee_level: Optional[str] = None,
         effective_rows_only: bool = False,
     ) -> Dict[str, Any]:
         cfg = self._config(company_id)
@@ -452,6 +493,7 @@ class PolicyConfigMatrixService:
                 source="draft",
                 assignment_type=assignment_type,
                 family_status=family_status,
+                employee_level=employee_level,
                 effective_rows_only=effective_rows_only,
                 targeting_strict=False,
             )
@@ -466,6 +508,7 @@ class PolicyConfigMatrixService:
                 source="published_clone",
                 assignment_type=assignment_type,
                 family_status=family_status,
+                employee_level=employee_level,
                 effective_rows_only=effective_rows_only,
                 targeting_strict=False,
             )
@@ -479,6 +522,7 @@ class PolicyConfigMatrixService:
             source="empty_scaffold",
             assignment_type=assignment_type,
             family_status=family_status,
+            employee_level=employee_level,
             effective_rows_only=effective_rows_only,
             targeting_strict=False,
         )
@@ -489,6 +533,7 @@ class PolicyConfigMatrixService:
         *,
         assignment_type: Optional[str] = None,
         family_status: Optional[str] = None,
+        employee_level: Optional[str] = None,
         effective_rows_only: bool = False,
     ) -> Dict[str, Any]:
         pub = self._db.get_latest_published_policy_config_version(str(company_id), CONFIG_KEY)
@@ -503,10 +548,12 @@ class PolicyConfigMatrixService:
                 "source": "none",
                 "assignment_types_supported": [],
                 "family_statuses_supported": [],
+                "employee_levels_supported": [],
                 "categories": [],
                 "preview_context": {
                     "assignment_type": assignment_type,
                     "family_status": family_status,
+                    "employee_level": employee_level,
                     "effective_rows_only": effective_rows_only,
                     "note": "Selectors filter this response only; the underlying policy is unchanged.",
                 },
@@ -520,6 +567,7 @@ class PolicyConfigMatrixService:
             source="published",
             assignment_type=assignment_type,
             family_status=family_status,
+            employee_level=employee_level,
             effective_rows_only=effective_rows_only,
             targeting_strict=False,
         )
@@ -545,7 +593,9 @@ class PolicyConfigMatrixService:
                 row = {k: v for k, v in b.items() if k != "id"}
                 row["policy_config_version_id"] = vid
                 row["targeting_signature"] = compute_targeting_signature(
-                    row.get("assignment_types") or [], row.get("family_statuses") or []
+                    row.get("assignment_types") or [],
+                    row.get("family_statuses") or [],
+                    row.get("employee_levels") or [],
                 )
                 self._db.insert_policy_config_benefit_row(row)
         else:
@@ -607,6 +657,7 @@ class PolicyConfigMatrixService:
                         else {},
                         "assignment_types": ben.get("assignment_types") or [],
                         "family_statuses": ben.get("family_statuses") or [],
+                        "employee_levels": ben.get("employee_levels") or [],
                         "is_active": ben.get("is_active", True),
                         "display_order": ben.get("display_order", 0),
                     }
@@ -617,6 +668,7 @@ class PolicyConfigMatrixService:
             sig = compute_targeting_signature(
                 [t.value for t in m.assignment_types],
                 [t.value for t in m.family_statuses],
+                [t.value for t in m.employee_levels],
             )
             dup_k = (m.benefit_key, sig)
             if dup_k in seen:
@@ -660,6 +712,7 @@ class PolicyConfigMatrixService:
             sig = compute_targeting_signature(
                 [t.value for t in m.assignment_types],
                 [t.value for t in m.family_statuses],
+                [t.value for t in m.employee_levels],
             )
             row = {
                 "policy_config_version_id": vid,
@@ -679,6 +732,7 @@ class PolicyConfigMatrixService:
                 "conditions_json": m.conditions_json,
                 "assignment_types": [t.value for t in m.assignment_types],
                 "family_statuses": [t.value for t in m.family_statuses],
+                "employee_levels": [t.value for t in m.employee_levels],
                 "targeting_signature": sig,
                 "is_active": m.is_active,
                 "display_order": m.display_order,

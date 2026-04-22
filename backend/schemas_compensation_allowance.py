@@ -60,6 +60,15 @@ class PolicyConfigFamilyStatus(str, Enum):
     dependents = "dependents"
 
 
+class PolicyConfigEmployeeLevel(str, Enum):
+    """Employee level band for per-row targeting. Empty array on a row = all levels."""
+    entry = "entry"
+    manager = "manager"
+    director = "director"
+    vp = "vp"
+    c_suite = "c_suite"
+
+
 class PolicyConfigBenefitWrite(BaseModel):
     """Payload for creating/updating one benefit row (batch save)."""
 
@@ -77,6 +86,7 @@ class PolicyConfigBenefitWrite(BaseModel):
     conditions_json: Dict[str, Any] = Field(default_factory=dict)
     assignment_types: List[PolicyConfigAssignmentType] = Field(default_factory=list)
     family_statuses: List[PolicyConfigFamilyStatus] = Field(default_factory=list)
+    employee_levels: List[PolicyConfigEmployeeLevel] = Field(default_factory=list)
     is_active: bool = True
     display_order: int = 0
 
@@ -98,6 +108,7 @@ class PolicyConfigBenefitRead(BaseModel):
     conditions_json: Dict[str, Any] = Field(default_factory=dict)
     assignment_types: List[str] = Field(default_factory=list)
     family_statuses: List[str] = Field(default_factory=list)
+    employee_levels: List[str] = Field(default_factory=list)
     targeting_signature: str = "global"
     is_active: bool = True
     display_order: int = 0
