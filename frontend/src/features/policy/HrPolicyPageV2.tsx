@@ -28,21 +28,19 @@
  *   - "Exclusions & evidence" separate section (exclusions now live on
  *                                  the benefit row itself)
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
 import {
   policyConfigMatrixAPI,
   policyDocumentsAPI,
 } from '../../api/client';
-import type {
-  PolicyConfigBenefitRow,
-  PolicyConfigCategoryBlock,
-  PolicyConfigWorkingPayload,
-} from '../policy-config/types';
+import type { PolicyConfigWorkingPayload } from '../policy-config/types';
 import { HrPolicyReviewWorkspace } from './HrPolicyReviewWorkspace';
 import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
 import { PolicyAssistantFab } from './PolicyAssistantFab';
+import { PolicyDiffView } from './PolicyDiffView';
+import { PolicyTopicSummaryList } from './PolicyTopicSummaryList';
 
 // --- Types ------------------------------------------------------------------
 
@@ -165,91 +163,21 @@ const StatusStrip: React.FC<StatusStripProps> = ({
 };
 
 // --- Topic summary ----------------------------------------------------------
+// Per-theme summary + read-only drill-down now lives in
+// PolicyTopicSummaryList (PR #2). We wrap it in a Card here so Section 2
+// keeps the same visual frame as the rest of the page.
 
-/**
- * Renders the admin matrix summary-by-topics on the HR page, read-only.
- * We avoid importing the admin-scoped PolicyThemeAccordionList directly
- * (it expects a richer editing context); instead the section renders
- * a lightweight one-row-per-theme list that shows included / excluded /
- * conditional counts, since HR told us the per-rule detail wasn't useful.
- * Clicking a theme opens the existing Detailed review drawer scrolled to
- * that section — one door to the power-user view.
- */
 const TopicSummarySection: React.FC<{
   matrixPayload: PolicyConfigWorkingPayload | null;
   onRequestDetails: () => void;
-}> = ({ matrixPayload, onRequestDetails }) => {
-  const themes = useMemo(() => {
-    const cats: PolicyConfigCategoryBlock[] = matrixPayload?.categories ?? [];
-    return cats.map((c) => {
-      const rows: PolicyConfigBenefitRow[] = c.benefits ?? [];
-      const included = rows.filter((r) => r.covered).length;
-      const excluded = rows.filter((r) => r.covered === false).length;
-      // A row is "conditional" when its conditions_json is non-empty — HR
-      // treats these as "applies with strings attached".
-      const conditional = rows.filter(
-        (r) => r.conditions_json && Object.keys(r.conditions_json).length > 0
-      ).length;
-      return {
-        key: c.category_key ?? '',
-        label: c.category_label ?? c.category_key ?? '',
-        included,
-        excluded,
-        conditional,
-        total: rows.length,
-      };
-    });
-  }, [matrixPayload]);
-
-  if (themes.length === 0) {
-    return (
-      <Card padding="lg">
-        <h2 className="text-lg font-semibold text-[#0b2b43]">What employees see today</h2>
-        <p className="text-sm text-slate-600 mt-2">
-          No structured matrix has been published yet. Build your first version below.
-        </p>
-      </Card>
-    );
-  }
-
-  return (
-    <Card padding="lg">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[#0b2b43]">What employees see today</h2>
-        <Button size="sm" variant="outline" onClick={onRequestDetails}>
-          View details
-        </Button>
-      </div>
-      <p className="text-sm text-slate-600 mt-1.5">
-        Summary of the currently live relocation policy by theme. Counts reflect published
-        rules only — drafts and HR adjustments appear in the detailed review.
-      </p>
-      <ul className="mt-4 divide-y divide-slate-200">
-        {themes.map((t) => (
-          <li
-            key={t.key}
-            className="py-2 flex items-center justify-between gap-3 text-sm"
-          >
-            <span className="font-medium text-[#0b2b43]">{t.label}</span>
-            <span className="flex items-center gap-2 text-xs text-slate-600">
-              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium">
-                {t.included} incl
-              </span>
-              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                {t.excluded} excl
-              </span>
-              {t.conditional > 0 && (
-                <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800">
-                  {t.conditional} cond
-                </span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-};
+}> = ({ matrixPayload, onRequestDetails }) => (
+  <Card padding="lg">
+    <PolicyTopicSummaryList
+      matrixPayload={matrixPayload}
+      onRequestDetails={onRequestDetails}
+    />
+  </Card>
+);
 
 // --- Build next version -----------------------------------------------------
 
@@ -343,26 +271,7 @@ const BuildNextVersionSection: React.FC<{
   );
 };
 
-// --- Draft vs Live (stub for follow-up PR) ----------------------------------
-
-const DraftVsLiveSection: React.FC<{ hasDraft: boolean }> = ({ hasDraft }) => (
-  <Card padding="lg" className="border-dashed">
-    <h2 className="text-lg font-semibold text-[#0b2b43]">
-      Draft vs Live {hasDraft && <span className="text-slate-500 font-normal">(in progress)</span>}
-    </h2>
-    <p className="text-sm text-slate-600 mt-1.5">
-      Side-by-side diff of what changed between the live version and your working draft —
-      with color-coded rows (green = new, amber = changed, red = removed) and per-row
-      revert. <strong>Coming in the next release.</strong>
-    </p>
-    {hasDraft && (
-      <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded px-3 py-2 mt-3">
-        Your draft has pending changes. Until the diff view ships, use the Detailed review
-        below to inspect benefit rows before publishing.
-      </p>
-    )}
-  </Card>
-);
+// Draft vs Live section is now the real diff view — see PolicyDiffView.tsx.
 
 // --- Version history --------------------------------------------------------
 
@@ -562,12 +471,10 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         adminCompanyId={adminCompanyId}
       />
 
-      {/* 4. Draft vs Live — placeholder, diff ships in follow-up */}
-      <DraftVsLiveSection
-        hasDraft={
-          String(normalized?.version?.status || '').toLowerCase() === 'draft' ||
-          Boolean(matrixPayload?.editable && matrixPayload?.source !== 'published_clone')
-        }
+      {/* 4. Draft vs Live — live diff view (PR #4) */}
+      <PolicyDiffView
+        adminCompanyId={adminCompanyId ?? null}
+        refreshTrigger={workspaceRefreshTrigger}
       />
 
       {/* 5. Version history */}

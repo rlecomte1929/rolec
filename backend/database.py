@@ -14256,6 +14256,38 @@ class Database:
                 {"vid": str(policy_config_version_id)},
             )
 
+    def delete_policy_config_benefit_by_key(
+        self,
+        policy_config_version_id: str,
+        *,
+        benefit_key: str,
+        targeting_signature: str,
+    ) -> int:
+        """
+        Delete one benefit row from a specific version, matched by the
+        (benefit_key, targeting_signature) pair that uniquely identifies
+        a row within a version. Used by the diff "revert row" flow to
+        replace a single draft row without touching its siblings.
+        Returns the number of rows deleted (0 or 1).
+        """
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    """
+                    DELETE FROM policy_config_benefits
+                    WHERE policy_config_version_id = :vid
+                      AND benefit_key = :bk
+                      AND targeting_signature = :tsig
+                    """
+                ),
+                {
+                    "vid": str(policy_config_version_id),
+                    "bk": str(benefit_key),
+                    "tsig": str(targeting_signature or "global"),
+                },
+            )
+            return int(result.rowcount or 0)
+
     def insert_policy_config_benefit_row(self, row: Dict[str, Any]) -> str:
         bid = str(row.get("id") or uuid.uuid4())
         now = datetime.utcnow().isoformat()

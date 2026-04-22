@@ -11433,6 +11433,54 @@ def hr_post_policy_config_publish(
         )
 
 
+@hr_policy_config_router.get("/policy-config/diff")
+def hr_get_policy_config_diff(
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Draft vs Live snapshot for the HR Policy "Draft vs Live" section.
+    See PolicyConfigMatrixService.compute_diff for the response shape.
+    """
+    cid = _policy_matrix_company_hr(user, companyId)
+    return policy_config_matrix_svc.compute_diff(cid)
+
+
+@hr_policy_config_router.post("/policy-config/draft/revert-row")
+def hr_post_policy_config_revert_row(
+    body: Dict[str, Any] = Body(...),
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Revert one benefit row of the current draft back to the live
+    version. Body: {benefit_key, targeting_signature}. Returns the
+    refreshed diff so the UI can re-render without a second request.
+    """
+    cid = _policy_matrix_company_hr(user, companyId)
+    try:
+        return policy_config_matrix_svc.revert_row_to_live(
+            cid,
+            benefit_key=str(body.get("benefit_key") or "").strip(),
+            targeting_signature=str(body.get("targeting_signature") or "global").strip(),
+        )
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        if code == "no_draft":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "no_draft", "message": "No draft exists to revert"},
+            )
+        if code == "row_not_found":
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "row_not_found", "message": "Benefit row not found in live or draft"},
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
+
+
 @hr_policy_config_router.get("/policy-config/history")
 def hr_get_policy_config_history(
     companyId: Optional[str] = Query(None, alias="companyId"),
@@ -11615,6 +11663,44 @@ def admin_get_policy_config_history(
     user: Dict[str, Any] = Depends(require_admin),
 ):
     return {"versions": policy_config_matrix_svc.history(company_id)}
+
+
+@admin_policy_config_router.get("/policy-config/diff")
+def admin_get_policy_config_diff(
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin-scoped draft vs live snapshot. Mirrors the HR endpoint."""
+    return policy_config_matrix_svc.compute_diff(company_id)
+
+
+@admin_policy_config_router.post("/policy-config/draft/revert-row")
+def admin_post_policy_config_revert_row(
+    body: Dict[str, Any] = Body(...),
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    try:
+        return policy_config_matrix_svc.revert_row_to_live(
+            company_id,
+            benefit_key=str(body.get("benefit_key") or "").strip(),
+            targeting_signature=str(body.get("targeting_signature") or "global").strip(),
+        )
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        if code == "no_draft":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "no_draft", "message": "No draft exists to revert"},
+            )
+        if code == "row_not_found":
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "row_not_found", "message": "Benefit row not found in live or draft"},
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
 
 
 @employee_policy_config_router.get("/policy-config")
