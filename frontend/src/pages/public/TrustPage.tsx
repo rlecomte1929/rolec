@@ -10,9 +10,11 @@ import {
   CTAButton,
 } from '../../components/marketing';
 import { buildRoute } from '../../navigation/routes';
+import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { trustContent } from './trustContent';
 
 export const TrustPage: React.FC = () => {
+  const { open: openDemoBooking } = useDemoBooking();
   const c = trustContent;
 
   return (
@@ -24,7 +26,7 @@ export const TrustPage: React.FC = () => {
           subtitle={c.hero.subheadline}
           actions={
             <>
-              <CTAButton to={buildRoute('access')} variant="primary" size="lg">
+              <CTAButton onClick={() => openDemoBooking('trust-hero')} variant="primary" size="lg">
                 {c.hero.primaryCta}
               </CTAButton>
               <CTAButton to={buildRoute('platform')} variant="outline" size="lg">
@@ -78,7 +80,7 @@ export const TrustPage: React.FC = () => {
           title={c.cta.headline}
           variant="surface"
           primaryAction={
-            <CTAButton to={buildRoute('access')} variant="primary" size="lg">
+            <CTAButton onClick={() => openDemoBooking('trust-final')} variant="primary" size="lg">
               {c.cta.options.demo}
             </CTAButton>
           }

@@ -10,9 +10,11 @@ import {
 } from '../../components/marketing';
 import { CasePreviewMock } from '../../components/CasePreviewMock';
 import { buildRoute } from '../../navigation/routes';
+import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { platformContent } from './platformContent';
 
 export const PlatformPage: React.FC = () => {
+  const { open: openDemoBooking } = useDemoBooking();
   const c = platformContent;
 
   return (
@@ -26,7 +28,7 @@ export const PlatformPage: React.FC = () => {
               subtitle={c.hero.subheadline}
               actions={
                 <>
-                  <CTAButton to={buildRoute('access')} variant="primary" size="lg">
+                  <CTAButton onClick={() => openDemoBooking('platform-hero')} variant="primary" size="lg">
                     {c.hero.primaryCta}
                   </CTAButton>
                   <CTAButton to={buildRoute('trust')} variant="outline" size="lg">
@@ -71,7 +73,7 @@ export const PlatformPage: React.FC = () => {
           title={c.cta.headline}
           variant="surface"
           primaryAction={
-            <CTAButton to={buildRoute('access')} variant="primary" size="lg">
+            <CTAButton onClick={() => openDemoBooking('platform-final')} variant="primary" size="lg">
               {c.cta.options.demo}
             </CTAButton>
           }

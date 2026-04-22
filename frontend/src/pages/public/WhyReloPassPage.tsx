@@ -10,9 +10,11 @@ import {
   CTAButton,
 } from '../../components/marketing';
 import { buildRoute } from '../../navigation/routes';
+import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { whyReloPassContent } from './whyReloPassContent';
 
 export const WhyReloPassPage: React.FC = () => {
+  const { open: openDemoBooking } = useDemoBooking();
   const c = whyReloPassContent;
 
   return (
@@ -24,7 +26,7 @@ export const WhyReloPassPage: React.FC = () => {
           subtitle={c.hero.subheadline}
           actions={
             <>
-              <CTAButton to={buildRoute('access')} variant="primary" size="lg">
+              <CTAButton onClick={() => openDemoBooking('why-hero')} variant="primary" size="lg">
                 {c.hero.primaryCta}
               </CTAButton>
               <CTAButton to={buildRoute('platform')} variant="outline" size="lg">
@@ -88,7 +90,7 @@ export const WhyReloPassPage: React.FC = () => {
           title={c.cta.headline}
           variant="surface"
           primaryAction={
-            <CTAButton to={buildRoute('access')} variant="primary" size="lg">
+            <CTAButton onClick={() => openDemoBooking('why-final')} variant="primary" size="lg">
               {c.cta.options.demo}
             </CTAButton>
           }

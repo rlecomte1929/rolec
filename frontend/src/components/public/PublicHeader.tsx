@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Container } from '../antigravity';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
+import { useDemoBooking } from '../../hooks/useDemoBooking';
 
 const logoUrl = '/relopass-logo.png?v=1';
 
@@ -17,6 +18,7 @@ export const PublicHeader: React.FC = () => {
   const location = useLocation();
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { open: openDemoBooking } = useDemoBooking();
 
   const dashboardPath =
     role === 'EMPLOYEE'
@@ -93,13 +95,16 @@ export const PublicHeader: React.FC = () => {
             >
               Sign in
             </Link>
-            <Link
-              to={buildRoute('access')}
-              onClick={() => setMobileOpen(false)}
+            <button
+              type="button"
+              onClick={() => {
+                setMobileOpen(false);
+                openDemoBooking('public-header');
+              }}
               className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-marketing-primary hover:bg-marketing-primary-muted rounded-lg transition-colors"
             >
               Book a demo
-            </Link>
+            </button>
             <button
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
