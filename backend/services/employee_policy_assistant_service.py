@@ -22,13 +22,34 @@ from .policy_assistant_session_service import (
 )
 from .policy_taxonomy import BENEFIT_TAXONOMY
 
-# Canonical assistant topic -> benefit_key(s) in resolved_assignment_policy_benefits
+# Canonical assistant topic -> benefit_key(s) in resolved_assignment_policy_benefits.
+#
+# Two distinct key sets reach the resolved benefits list depending on the
+# company's published-policy shape:
+#   - legacy taxonomy keys (settling_in_allowance, spouse_support, housing,
+#     schooling, etc.) — produced by the document-normalization pipeline
+#   - compensation-matrix keys (relocation_allowance_assignee_partner,
+#     spouse_partner_assistance, child_education_support, etc.) — produced by
+#     the Admin → Policy Workspace matrix bridge (employee_policy_matrix_bridge.py)
+# Both must appear here or the assistant returns a false-negative
+# "not included" answer for a topic that IS in the published matrix.
 TOPIC_BENEFIT_KEYS: Dict[PolicyAssistantCanonicalTopic, Tuple[str, ...]] = {
     PolicyAssistantCanonicalTopic.TEMPORARY_HOUSING: ("temporary_housing",),
     PolicyAssistantCanonicalTopic.HOME_SEARCH: ("scouting_trip", "relocation_services"),
     PolicyAssistantCanonicalTopic.SHIPMENT: ("shipment", "movers", "household_goods", "storage"),
-    PolicyAssistantCanonicalTopic.SCHOOL_SEARCH: ("schooling", "tuition", "schools"),
-    PolicyAssistantCanonicalTopic.SPOUSE_SUPPORT: ("spouse_support",),
+    PolicyAssistantCanonicalTopic.SCHOOL_SEARCH: (
+        "schooling",
+        "tuition",
+        "schools",
+        # matrix
+        "child_education_support",
+    ),
+    PolicyAssistantCanonicalTopic.SPOUSE_SUPPORT: (
+        "spouse_support",
+        # matrix
+        "spouse_partner_assistance",
+        "dual_career_support",
+    ),
     PolicyAssistantCanonicalTopic.VISA_SUPPORT: ("immigration",),
     PolicyAssistantCanonicalTopic.WORK_PERMIT_SUPPORT: ("immigration",),
     PolicyAssistantCanonicalTopic.TAX_BRIEFING: ("tax",),
@@ -40,6 +61,14 @@ TOPIC_BENEFIT_KEYS: Dict[PolicyAssistantCanonicalTopic, Tuple[str, ...]] = {
         "location_allowance",
         "cola",
         "remote_premium",
+        # matrix — inbound relocation (the reported bug)
+        "relocation_allowance_assignee_partner",
+        "relocation_allowance_dependent",
+        # matrix — return-trip (repatriation) is the same umbrella lump-sum
+        # allowance from the employee's perspective; route it here so the
+        # classifier's relocation topic catches both sides of the assignment.
+        "repatriation_allowance_assignee_partner",
+        "repatriation_allowance_dependent",
     ),
     PolicyAssistantCanonicalTopic.HOST_HOUSING: ("housing",),
 }
