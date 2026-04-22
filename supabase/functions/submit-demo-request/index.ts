@@ -76,15 +76,24 @@ function validate(body: unknown): ValidationResult {
   };
 }
 
-async function sendResendEmail(
-  to: string,
-  subject: string,
-  text: string,
-  html: string,
-  apiKey: string,
-  from: string,
-  replyTo: string | null
-): Promise<{ ok: boolean; error?: string }> {
+interface EmailMessage {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  replyTo?: string | null;
+}
+
+async function sendEmail(msg: EmailMessage): Promise<{ ok: boolean; error?: string }> {
+  const provider = Deno.env.get("EMAIL_PROVIDER") || "stub";
+  const apiKey = Deno.env.get("EMAIL_API_KEY") || "";
+  const from = Deno.env.get("EMAIL_FROM") || "notifications@relopass.com";
+
+  if (provider !== "resend") {
+    console.log("[submit-demo-request] STUB send:", { to: msg.to, subject: msg.subject });
+    return { ok: true };
+  }
+
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -93,11 +102,11 @@ async function sendResendEmail(
     },
     body: JSON.stringify({
       from,
-      to: [to],
-      subject,
-      text,
-      html,
-      ...(replyTo ? { reply_to: replyTo } : {}),
+      to: [msg.to],
+      subject: msg.subject,
+      text: msg.text,
+      html: msg.html,
+      ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
     }),
   });
   if (!res.ok) {
@@ -107,14 +116,10 @@ async function sendResendEmail(
   return { ok: true };
 }
 
-async function notify(
+function buildNotification(
   to: string,
   data: { firstName: string; email: string; company: string; challenge: string; sourcePage: string | null; demoId: string }
-): Promise<{ ok: boolean; error?: string }> {
-  const provider = Deno.env.get("EMAIL_PROVIDER") || "stub";
-  const apiKey = Deno.env.get("EMAIL_API_KEY") || "";
-  const from = Deno.env.get("EMAIL_FROM") || "notifications@relopass.com";
-
+): EmailMessage {
   const subject = `Demo request — ${data.firstName} @ ${data.company}`;
   const text = [
     `${data.firstName} from ${data.company} requested a demo.`,
@@ -139,13 +144,28 @@ async function notify(
     <p style="margin:16px 0 4px;font-family:Inter,system-ui,sans-serif;color:#4a5f73;font-size:13px;">Challenge:</p>
     <blockquote style="margin:0;padding:12px 16px;background:#f8fafb;border-left:3px solid #197b78;font-family:Inter,system-ui,sans-serif;color:#1a2734;white-space:pre-wrap;">${escapeHtml(data.challenge)}</blockquote>
   `;
+  return { to, subject, text, html, replyTo: data.email };
+}
 
-  if (provider === "resend") {
-    return sendResendEmail(to, subject, text, html, apiKey, from, data.email);
-  }
-
-  console.log("[submit-demo-request] STUB notify:", { to, subject });
-  return { ok: true };
+function buildAutoReply(data: { firstName: string; email: string }, replyTo: string): EmailMessage {
+  const firstName = data.firstName;
+  const subject = "We received your demo request";
+  const text = [
+    `Hi ${firstName},`,
+    ``,
+    `Thanks — we received your demo request. We'll be in touch within the next few business days.`,
+    ``,
+    `— ReloPass`,
+  ].join("\n");
+  const html = `
+    <div style="font-family:Inter,system-ui,sans-serif;color:#1a2734;font-size:15px;line-height:1.6;max-width:520px;">
+      <p style="margin:0 0 12px;">Hi ${escapeHtml(firstName)},</p>
+      <p style="margin:0 0 12px;">Thanks — we received your demo request.</p>
+      <p style="margin:0 0 12px;">We'll be in touch within the next few business days.</p>
+      <p style="margin:20px 0 0;color:#4a5f73;">— ReloPass</p>
+    </div>
+  `;
+  return { to: data.email, subject, text, html, replyTo };
 }
 
 function escapeHtml(value: string): string {
@@ -208,15 +228,16 @@ Deno.serve(async (req: Request) => {
   }
 
   const notifyTo = Deno.env.get("DEMO_NOTIFY_TO") || "romain.lecomte@relopass.com";
-  const result = await notify(notifyTo, {
-    ...validation.cleaned,
-    demoId: inserted.id as string,
-  });
+  const data = { ...validation.cleaned, demoId: inserted.id as string };
 
-  if (!result.ok) {
-    console.error("[submit-demo-request] Notify failed:", result.error);
-    // Row is saved; still surface success to the user so the lead isn't lost if email is transiently down.
-  }
+  const [notifyResult, autoReplyResult] = await Promise.all([
+    sendEmail(buildNotification(notifyTo, data)),
+    sendEmail(buildAutoReply({ firstName: data.firstName, email: data.email }, notifyTo)),
+  ]);
+
+  // Row is saved; email failures are logged but do not fail the request so leads aren't lost.
+  if (!notifyResult.ok) console.error("[submit-demo-request] Notify failed:", notifyResult.error);
+  if (!autoReplyResult.ok) console.error("[submit-demo-request] Auto-reply failed:", autoReplyResult.error);
 
   return Response.json(
     { ok: true, demoId: inserted.id },
