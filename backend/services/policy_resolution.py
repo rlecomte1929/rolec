@@ -222,7 +222,7 @@ def extract_resolution_context(
             except ValueError:
                 ctx["duration_months"] = 12
 
-    # Tier / band
+    # Tier / band — free-text breadcrumb (preserved for older resolvers).
     tier = (
         p.get("primaryApplicant", {}).get("employer", {}).get("jobLevel")
         or p.get("band")
@@ -230,6 +230,22 @@ def extract_resolution_context(
         or assignment.get("tier")
     )
     ctx["tier"] = str(tier).strip() if tier else None
+
+    # Employee level — canonical slug for the 3rd matrix targeting axis (Phase 2).
+    # Reads the same sources as `tier` but normalizes through the shared alias
+    # map so "Band3" / "L3" / "senior_manager" / "Director" all resolve to the
+    # canonical 'director' value. Also picks up AssignmentContextDTO.seniorityBand
+    # when the resolver is invoked via the case-draft intake overlay above.
+    from .policy_config_targeting import normalize_employee_level  # local to avoid cycle
+
+    level_raw = (
+        tier
+        or p.get("primaryApplicant", {}).get("employer", {}).get("seniorityBand")
+        or p.get("seniorityBand")
+        or p.get("employee_level")
+        or assignment.get("employee_level")
+    )
+    ctx["employee_level"] = normalize_employee_level(level_raw)
 
     return ctx
 

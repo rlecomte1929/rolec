@@ -74,6 +74,7 @@ from .services.policy_config_targeting import (
     normalize_assignment_type,
     normalize_family_status,
     validate_optional_query_assignment_type,
+    validate_optional_query_employee_level,
     validate_optional_query_family_status,
 )
 
@@ -6555,6 +6556,7 @@ def _resolve_published_policy_for_employee(
                 pub_version=mver,
                 assignment_type_ctx=ctx.get("assignment_type"),
                 family_status_ctx=ctx.get("family_status"),
+                employee_level_ctx=ctx.get("employee_level"),
                 company_name=cname,
                 assignment_id=assignment_id,
                 case_id=case_id,
@@ -11275,6 +11277,7 @@ def hr_get_policy_config(
     companyId: Optional[str] = Query(None, alias="companyId"),
     assignmentType: Optional[str] = Query(None, alias="assignmentType"),
     familyStatus: Optional[str] = Query(None, alias="familyStatus"),
+    employeeLevel: Optional[str] = Query(None, alias="employeeLevel"),
     effectiveRowsOnly: bool = Query(False, alias="effectiveRowsOnly"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
@@ -11282,12 +11285,14 @@ def hr_get_policy_config(
     try:
         at = validate_optional_query_assignment_type(assignmentType)
         fs = validate_optional_query_family_status(familyStatus)
+        el = validate_optional_query_employee_level(employeeLevel)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return policy_config_matrix_svc.get_working_payload(
         cid,
         assignment_type=at,
         family_status=fs,
+        employee_level=el,
         effective_rows_only=effectiveRowsOnly,
     )
 
@@ -11385,6 +11390,7 @@ def hr_get_policy_config_published(
     companyId: Optional[str] = Query(None, alias="companyId"),
     assignmentType: Optional[str] = Query(None, alias="assignmentType"),
     familyStatus: Optional[str] = Query(None, alias="familyStatus"),
+    employeeLevel: Optional[str] = Query(None, alias="employeeLevel"),
     effectiveRowsOnly: bool = Query(False, alias="effectiveRowsOnly"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
@@ -11392,12 +11398,14 @@ def hr_get_policy_config_published(
     try:
         at = validate_optional_query_assignment_type(assignmentType)
         fs = validate_optional_query_family_status(familyStatus)
+        el = validate_optional_query_employee_level(employeeLevel)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return policy_config_matrix_svc.get_published_payload(
         cid,
         assignment_type=at,
         family_status=fs,
+        employee_level=el,
         effective_rows_only=effectiveRowsOnly,
     )
 
@@ -11407,18 +11415,21 @@ def admin_get_policy_config(
     company_id: str = Query(..., alias="companyId"),
     assignmentType: Optional[str] = Query(None, alias="assignmentType"),
     familyStatus: Optional[str] = Query(None, alias="familyStatus"),
+    employeeLevel: Optional[str] = Query(None, alias="employeeLevel"),
     effectiveRowsOnly: bool = Query(False, alias="effectiveRowsOnly"),
     user: Dict[str, Any] = Depends(require_admin),
 ):
     try:
         at = validate_optional_query_assignment_type(assignmentType)
         fs = validate_optional_query_family_status(familyStatus)
+        el = validate_optional_query_employee_level(employeeLevel)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return policy_config_matrix_svc.get_working_payload(
         company_id,
         assignment_type=at,
         family_status=fs,
+        employee_level=el,
         effective_rows_only=effectiveRowsOnly,
     )
 
@@ -11485,18 +11496,21 @@ def admin_get_policy_config_published(
     company_id: str = Query(..., alias="companyId"),
     assignmentType: Optional[str] = Query(None, alias="assignmentType"),
     familyStatus: Optional[str] = Query(None, alias="familyStatus"),
+    employeeLevel: Optional[str] = Query(None, alias="employeeLevel"),
     effectiveRowsOnly: bool = Query(False, alias="effectiveRowsOnly"),
     user: Dict[str, Any] = Depends(require_admin),
 ):
     try:
         at = validate_optional_query_assignment_type(assignmentType)
         fs = validate_optional_query_family_status(familyStatus)
+        el = validate_optional_query_employee_level(employeeLevel)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return policy_config_matrix_svc.get_published_payload(
         company_id,
         assignment_type=at,
         family_status=fs,
+        employee_level=el,
         effective_rows_only=effectiveRowsOnly,
     )
 

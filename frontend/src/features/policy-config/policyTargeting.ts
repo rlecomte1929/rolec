@@ -8,6 +8,9 @@ export type PolicyAssignmentTypeValue = (typeof POLICY_ASSIGNMENT_TYPE_VALUES)[n
 export const POLICY_FAMILY_STATUS_VALUES = ['single', 'spouse_partner', 'dependents'] as const;
 export type PolicyFamilyStatusValue = (typeof POLICY_FAMILY_STATUS_VALUES)[number];
 
+export const POLICY_EMPLOYEE_LEVEL_VALUES = ['entry', 'manager', 'director', 'vp', 'c_suite'] as const;
+export type PolicyEmployeeLevelValue = (typeof POLICY_EMPLOYEE_LEVEL_VALUES)[number];
+
 export const POLICY_ASSIGNMENT_TYPE_OPTIONS: { value: PolicyAssignmentTypeValue; label: string }[] = [
   { value: 'short_term', label: 'Short-term assignment' },
   { value: 'long_term', label: 'Long-term assignment' },
@@ -19,6 +22,14 @@ export const POLICY_FAMILY_STATUS_OPTIONS: { value: PolicyFamilyStatusValue; lab
   { value: 'single', label: 'Employee only (no spouse or dependents)' },
   { value: 'spouse_partner', label: 'Employee with spouse or partner' },
   { value: 'dependents', label: 'Employee with dependents' },
+];
+
+export const POLICY_EMPLOYEE_LEVEL_OPTIONS: { value: PolicyEmployeeLevelValue; label: string }[] = [
+  { value: 'entry', label: 'Entry Level' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'director', label: 'Director' },
+  { value: 'vp', label: 'VP' },
+  { value: 'c_suite', label: 'C-suite' },
 ];
 
 const AT_ALIASES: Record<string, PolicyAssignmentTypeValue> = {
@@ -34,6 +45,41 @@ const AT_ALIASES: Record<string, PolicyAssignmentTypeValue> = {
   global: 'international',
   local_plus: 'international',
   commuter: 'short_term',
+};
+
+const EL_ALIASES: Record<string, PolicyEmployeeLevelValue> = {
+  entry: 'entry',
+  entry_level: 'entry',
+  band1: 'entry',
+  l1: 'entry',
+  ic: 'entry',
+  junior: 'entry',
+  manager: 'manager',
+  band2: 'manager',
+  l2: 'manager',
+  mid: 'manager',
+  mid_level: 'manager',
+  team_lead: 'manager',
+  lead: 'manager',
+  director: 'director',
+  band3: 'director',
+  l3: 'director',
+  senior_manager: 'director',
+  head_of: 'director',
+  vp: 'vp',
+  band4: 'vp',
+  l4: 'vp',
+  vice_president: 'vp',
+  svp: 'vp',
+  evp: 'vp',
+  c_suite: 'c_suite',
+  csuite: 'c_suite',
+  ceo: 'c_suite',
+  cfo: 'c_suite',
+  cto: 'c_suite',
+  coo: 'c_suite',
+  chro: 'c_suite',
+  executive: 'c_suite',
 };
 
 const FS_ALIASES: Record<string, PolicyFamilyStatusValue> = {
@@ -71,6 +117,13 @@ export function normalizeFamilyStatus(raw: string | null | undefined): PolicyFam
   return FS_ALIASES[key] ?? null;
 }
 
+export function normalizeEmployeeLevel(raw: string | null | undefined): PolicyEmployeeLevelValue | null {
+  if (raw == null || !String(raw).trim()) return null;
+  const key = slug(String(raw));
+  if ((POLICY_EMPLOYEE_LEVEL_VALUES as readonly string[]).includes(key)) return key as PolicyEmployeeLevelValue;
+  return EL_ALIASES[key] ?? null;
+}
+
 /** Normalize a list of stored row values to canonical (drops unknown tokens). */
 export function normalizeAssignmentTypeList(raw: string[] | undefined): PolicyAssignmentTypeValue[] {
   const out = new Set<PolicyAssignmentTypeValue>();
@@ -88,6 +141,21 @@ export function normalizeFamilyStatusList(raw: string[] | undefined): PolicyFami
     if (n) out.add(n);
   }
   return Array.from(out).sort();
+}
+
+export function normalizeEmployeeLevelList(raw: string[] | undefined): PolicyEmployeeLevelValue[] {
+  const out = new Set<PolicyEmployeeLevelValue>();
+  for (const x of raw ?? []) {
+    const n = normalizeEmployeeLevel(x);
+    if (n) out.add(n);
+  }
+  return Array.from(out).sort();
+}
+
+export function humanizeEmployeeLevelLabel(canonical: string | null | undefined): string {
+  if (!canonical) return '—';
+  const o = POLICY_EMPLOYEE_LEVEL_OPTIONS.find((x) => x.value === canonical);
+  return o?.label ?? canonical.replace(/_/g, ' ');
 }
 
 export function humanizeAssignmentTypeLabel(canonical: string | null | undefined): string {
