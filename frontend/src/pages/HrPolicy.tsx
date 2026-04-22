@@ -565,6 +565,7 @@ function PolicyDocumentIntakeSection({
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
+  const [deleteSkippedReason, setDeleteSkippedReason] = useState<string | null>(null);
 
   const loadDocs = async () => {
     try {
@@ -772,7 +773,9 @@ function PolicyDocumentIntakeSection({
                 <span className="text-sm text-green-600">Deleted. List updated.</span>
               )}
               {deleteFeedback === 'error' && (
-                <span className="text-sm text-red-600">Delete failed or some documents could not be removed.</span>
+                <span className="text-sm text-red-600">
+                  {deleteSkippedReason ?? 'Delete failed or some documents could not be removed.'}
+                </span>
               )}
               <Button
                 size="sm"
@@ -795,21 +798,53 @@ function PolicyDocumentIntakeSection({
                   if (!window.confirm('Are you sure? This action cannot be undone. Documents referenced by a policy version cannot be deleted.')) return;
                   const ids = Array.from(selectedDocIds);
                   setDeleteFeedback('deleting');
+                  setDeleteSkippedReason(null);
                   setSelectedDocIds(new Set());
                   try {
                     const res = await policyDocumentsAPI.bulkDelete(ids);
                     await loadDocs();
                     onDocumentsChange?.();
-                    setDeleteFeedback(res.deleted === ids.length ? 'done' : 'error');
-                    if (res.deleted === ids.length) {
+                    const allDeleted = res.deleted === ids.length;
+                    setDeleteFeedback(allDeleted ? 'done' : 'error');
+                    if (!allDeleted) {
+                      // Surface a useful reason instead of the generic
+                      // "Delete failed" — the backend tells us per-doc why it
+                      // was skipped. The common case is a doc that backs a
+                      // published policy version (referential integrity
+                      // gate). Tell HR exactly that so they know the fix
+                      // is "unpublish or supersede the policy version first".
+                      const REASON_LABELS: Record<string, string> = {
+                        referenced_by_version:
+                          'One or more documents back your current published policy version. Unpublish or supersede the version before deleting the source document.',
+                        forbidden:
+                          'You do not have permission to delete one or more of the selected documents.',
+                        not_found:
+                          'One or more selected documents no longer exist (the list will refresh).',
+                      };
+                      const skipped = res.skipped ?? [];
+                      const reasons = Array.from(
+                        new Set(skipped.map((s) => s.reason).filter(Boolean) as string[])
+                      );
+                      const primary = reasons[0];
+                      const keptCount = ids.length - (res.deleted ?? 0);
+                      const label = (primary && REASON_LABELS[primary]) || 'Delete was blocked.';
+                      setDeleteSkippedReason(
+                        `${label} (${keptCount} of ${ids.length} could not be deleted.)`
+                      );
+                    }
+                    if (allDeleted) {
                       setSelectionMode(false);
                       setTimeout(() => setDeleteFeedback('idle'), 3000);
                     } else {
-                      setTimeout(() => setDeleteFeedback('idle'), 5000);
+                      setTimeout(() => {
+                        setDeleteFeedback('idle');
+                        setDeleteSkippedReason(null);
+                      }, 8000);
                     }
                   } catch {
                     await loadDocs();
                     setDeleteFeedback('error');
+                    setDeleteSkippedReason(null);
                     setTimeout(() => setDeleteFeedback('idle'), 5000);
                   }
                 }}

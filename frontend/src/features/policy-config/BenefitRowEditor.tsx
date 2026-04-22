@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Input, Select } from '../../components/antigravity';
 import type { PolicyConfigBenefitRow } from './types';
+import { POLICY_CURRENCY_OPTIONS, normalizeCurrencyCode } from './currencyOptions';
 import { getBenefitDefinition, getBenefitTitle } from './benefitRowRegistry';
 import { BenefitRowHelperFields } from './BenefitRowHelperFields';
 import { glossaryIdForBenefitKey } from './compensationGlossary';
@@ -284,14 +285,27 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
                   )}
                 </div>
                 <div>
-                  <Input
+                  <Select
                     label="Currency"
-                    value={row.currency_code ?? ''}
+                    value={normalizeCurrencyCode(row.currency_code)}
                     onChange={(v) => onChange({ ...row, currency_code: v || null })}
+                    options={[
+                      { value: '', label: 'Select a currency…' },
+                      ...POLICY_CURRENCY_OPTIONS,
+                    ]}
                   />
                   {issueByField.get('currency_code') && (
                     <p className="text-xs text-[#7a2a2a] mt-1">{issueByField.get('currency_code')}</p>
                   )}
+                  {row.currency_code &&
+                    normalizeCurrencyCode(row.currency_code) !== row.currency_code &&
+                    !POLICY_CURRENCY_OPTIONS.find((o) => o.value === row.currency_code) && (
+                      <p className="text-xs text-amber-700 mt-1">
+                        Legacy value <code className="bg-amber-50 px-1 rounded">{row.currency_code}</code>{' '}
+                        is being displayed as{' '}
+                        <strong>{normalizeCurrencyCode(row.currency_code)}</strong>. Save the row to normalize it.
+                      </p>
+                    )}
                 </div>
               </div>
             )}
