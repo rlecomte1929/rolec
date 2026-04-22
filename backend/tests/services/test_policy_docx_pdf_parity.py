@@ -20,11 +20,26 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Dict, Iterable, Set, Tuple
 
 import pytest
+
+# Skip the whole module on hosts without the PDF toolchain. GitHub Actions
+# ubuntu-latest has no soffice; the per-fixture skip inside generated_pdf_dir
+# doesn't propagate cleanly through parametrized module fixtures so we gate
+# at collection time instead. Keep this aligned with test_policy_pdf_ingestion.
+pytestmark = pytest.mark.skipif(
+    shutil.which("soffice") is None
+    or shutil.which("qpdf") is None
+    or not __import__("importlib.util").util.find_spec("pdfplumber"),
+    reason=(
+        "PDF toolchain (soffice + qpdf + pdfplumber) required for §8 parity "
+        "tests — not present on this host. See VERIFY_PDF_TOOLS.sh."
+    ),
+)
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if _REPO_ROOT not in sys.path:

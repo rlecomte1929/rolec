@@ -13,11 +13,26 @@ Run with:
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Dict
 
 import pytest
+
+# Skip the whole module on hosts that don't have the PDF toolchain — CI
+# runners (ubuntu-latest in GitHub Actions) don't ship soffice. We also
+# skip when pdfplumber isn't importable so a drifted venv surfaces cleanly
+# rather than as an error in every parametrized test.
+pytestmark = pytest.mark.skipif(
+    shutil.which("soffice") is None
+    or shutil.which("qpdf") is None
+    or not __import__("importlib.util").util.find_spec("pdfplumber"),
+    reason=(
+        "PDF toolchain (soffice + qpdf + pdfplumber) required for §7 ingestion "
+        "tests — not present on this host. See VERIFY_PDF_TOOLS.sh."
+    ),
+)
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if _REPO_ROOT not in sys.path:

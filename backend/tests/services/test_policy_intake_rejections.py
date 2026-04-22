@@ -84,6 +84,14 @@ class TestR1UnsupportedFileType:
 # --- R2 ---------------------------------------------------------------------
 
 class TestR2Malformed:
+    @pytest.mark.skipif(
+        __import__("importlib.util").util.find_spec("pdfplumber") is None,
+        reason=(
+            "pdfplumber required to reach the PDF parser step — when it's "
+            "missing the earlier PARITY-BUG-1 fail-closed path raises "
+            "IntakePipelineUnavailableError before we ever try to parse."
+        ),
+    )
     def test_truncated_pdf_sniffs_then_fails_parse(self) -> None:
         payload = b"%PDF-1.4\n" + b"\x00" * 128  # truncated, no xref table
         assert sniff_file_kind(payload).kind == "pdf"
