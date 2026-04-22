@@ -6,7 +6,7 @@ import { Alert, Button, Card } from '../components/antigravity';
 import { employeeAPI, policyDocumentsAPI } from '../api/client';
 import { EmployeePolicyPanel } from '../features/policy/EmployeePolicyPanel';
 import { EmployeePolicyAssistantPanel } from '../features/policy/EmployeePolicyAssistantPanel';
-import { HrPolicyReviewWorkspace } from '../features/policy/HrPolicyReviewWorkspace';
+import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
 
@@ -96,32 +96,37 @@ export const HrPolicy: React.FC = () => {
     );
   }
 
+  // HR / Admin branch now renders the redesigned HrPolicyPageV2 (5-section
+  // progressive-disclosure layout). All the legacy review machinery
+  // (PolicyDocumentIntakeSection, HrPolicyReviewWorkspace) is still wired
+  // up — it lives inside the "Detailed review" drawer on the new page so
+  // nothing in the backend flow is lost, just hidden by default.
+  // The local state kept above (workspaceRefreshTrigger, postNormalizePolicyId,
+  // handleNormalized, handleDocumentsChange) is retained so future re-entry
+  // points (e.g. a deep-link from notifications) can still push into the
+  // drawer without a parent rewrite.
+  void workspaceRefreshTrigger;
+  void postNormalizePolicyId;
+  void handleNormalized;
+  void handleDocumentsChange;
+
   return (
     <AppShell
-      title={adminCompanyId ? 'Admin: policy' : 'Policy'}
+      title={adminCompanyId ? 'Admin: policy' : 'HR policy'}
       subtitle={
-        adminCompanyId ? 'View and edit company policy as admin.' : 'Company relocation policies.'
+        adminCompanyId
+          ? 'View and edit company policy as admin.'
+          : 'Current status, build the next version, publish when ready.'
       }
     >
-      <div data-hr-policy-page="v2">
+      <div data-hr-policy-page="v3" id="hr-policy-top">
         {adminCompanyId && (
           <p className="text-sm text-[#6b7280] mb-4">
             Admin mode: viewing policy for company <code className="bg-[#f1f5f9] px-1 rounded">{adminCompanyId}</code>.{' '}
             <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policy Workspace</Link>
           </p>
         )}
-
-        <div id="hr-policy-document-intake" className="scroll-mt-4">
-          <PolicyDocumentIntakeSection onNormalized={handleNormalized} onDocumentsChange={handleDocumentsChange} adminCompanyId={adminCompanyId} />
-        </div>
-        <div className="mt-8">
-          <HrPolicyReviewWorkspace
-            refreshTrigger={workspaceRefreshTrigger}
-            postNormalizePolicyId={postNormalizePolicyId}
-            onBindComplete={() => setPostNormalizePolicyId(null)}
-            adminCompanyId={adminCompanyId}
-          />
-        </div>
+        <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} />
       </div>
     </AppShell>
   );
@@ -535,7 +540,12 @@ function getUploadRequestId(err: unknown): string | null {
   return (data?.request_id && typeof data.request_id === 'string') ? data.request_id : null;
 }
 
-function PolicyDocumentIntakeSection({
+// Legacy: exported so existing deep-imports keep compiling. The new page
+// no longer renders it directly at the top — the intake now lives inside
+// the Detailed review drawer via HrPolicyReviewWorkspace. Kept to avoid
+// dropping working logic mid-refactor; will be moved to a shared file in
+// a follow-up when the drawer owns its own intake UI.
+export function PolicyDocumentIntakeSection({
   onNormalized,
   onDocumentsChange,
   adminCompanyId = null,
