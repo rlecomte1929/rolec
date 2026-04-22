@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { submitDemoBooking } from '../../api/demoBooking';
+import { track } from '../../analytics';
 
 const MAX_CHALLENGE = 500;
 const MIN_CHALLENGE = 10;
@@ -119,6 +120,7 @@ export const BookDemoModal: React.FC = () => {
     });
 
     if (result.ok) {
+      track('demo_request_submitted', { source_page: sourcePage, demo_id: result.demoId });
       setState('success');
       setTimeout(() => close(), 3500);
       return;
