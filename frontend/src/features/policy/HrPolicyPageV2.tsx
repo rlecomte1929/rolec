@@ -43,6 +43,7 @@ import type {
 import { HrPolicyReviewWorkspace } from './HrPolicyReviewWorkspace';
 import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
 import { PolicyAssistantFab } from './PolicyAssistantFab';
+import { PolicyDiffView } from './PolicyDiffView';
 
 // --- Types ------------------------------------------------------------------
 
@@ -343,26 +344,7 @@ const BuildNextVersionSection: React.FC<{
   );
 };
 
-// --- Draft vs Live (stub for follow-up PR) ----------------------------------
-
-const DraftVsLiveSection: React.FC<{ hasDraft: boolean }> = ({ hasDraft }) => (
-  <Card padding="lg" className="border-dashed">
-    <h2 className="text-lg font-semibold text-[#0b2b43]">
-      Draft vs Live {hasDraft && <span className="text-slate-500 font-normal">(in progress)</span>}
-    </h2>
-    <p className="text-sm text-slate-600 mt-1.5">
-      Side-by-side diff of what changed between the live version and your working draft —
-      with color-coded rows (green = new, amber = changed, red = removed) and per-row
-      revert. <strong>Coming in the next release.</strong>
-    </p>
-    {hasDraft && (
-      <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded px-3 py-2 mt-3">
-        Your draft has pending changes. Until the diff view ships, use the Detailed review
-        below to inspect benefit rows before publishing.
-      </p>
-    )}
-  </Card>
-);
+// Draft vs Live section is now the real diff view — see PolicyDiffView.tsx.
 
 // --- Version history --------------------------------------------------------
 
@@ -562,12 +544,10 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         adminCompanyId={adminCompanyId}
       />
 
-      {/* 4. Draft vs Live — placeholder, diff ships in follow-up */}
-      <DraftVsLiveSection
-        hasDraft={
-          String(normalized?.version?.status || '').toLowerCase() === 'draft' ||
-          Boolean(matrixPayload?.editable && matrixPayload?.source !== 'published_clone')
-        }
+      {/* 4. Draft vs Live — live diff view (PR #4) */}
+      <PolicyDiffView
+        adminCompanyId={adminCompanyId ?? null}
+        refreshTrigger={workspaceRefreshTrigger}
       />
 
       {/* 5. Version history */}

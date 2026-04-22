@@ -2080,6 +2080,29 @@ export const policyConfigMatrixAPI = {
     });
     return response.data;
   },
+  /**
+   * Draft-vs-Live snapshot for the HR Policy "Draft vs Live" section.
+   * Returns {live, draft, diff: {added, removed, changed, unchanged_count, summary}}.
+   */
+  hrDiff: async (companyId?: string): Promise<Record<string, unknown>> => {
+    const response = await api.get('/api/hr/policy-config/diff', {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
+  /**
+   * Revert one benefit row of the current draft back to the live version.
+   * Body: { benefit_key, targeting_signature }. Returns the refreshed diff.
+   */
+  hrRevertRow: async (
+    body: { benefit_key: string; targeting_signature: string },
+    companyId?: string
+  ): Promise<Record<string, unknown>> => {
+    const response = await api.post('/api/hr/policy-config/draft/revert-row', body, {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
 
   adminGet: async (companyId: string): Promise<Record<string, unknown>> => {
     const response = await api.get('/api/admin/policy-config', { params: { companyId } });

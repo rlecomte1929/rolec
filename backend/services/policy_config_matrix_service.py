@@ -803,6 +803,228 @@ class PolicyConfigMatrixService:
         benefits = self._db.list_policy_config_benefits(vid)
         return self.build_payload(company_id, version=pub, benefits=benefits, editable=False, source="published")
 
+    # ------------------------------------------------------------------
+    # Draft vs Live diff
+    # ------------------------------------------------------------------
+    # Fields compared field-by-field for "changed" rows. targeting is
+    # part of the row identity (targeting_signature), so it is not listed
+    # here — a change in targeting becomes a remove+add, not a field
+    # change on the same row.
+    _DIFF_COMPARE_FIELDS: Tuple[str, ...] = (
+        "benefit_label",
+        "category",
+        "covered",
+        "value_type",
+        "amount_value",
+        "currency_code",
+        "percentage_value",
+        "unit_frequency",
+        "cap_rule_json",
+        "conditions_json",
+        "notes",
+        "is_active",
+        "display_order",
+    )
+
+    def _row_diff_key(self, row: Dict[str, Any]) -> Tuple[str, str]:
+        """Identity for pairing live vs draft rows in the diff."""
+        return (
+            str(row.get("benefit_key") or ""),
+            str(row.get("targeting_signature") or "global"),
+        )
+
+    def _row_field_changes(
+        self, live: Dict[str, Any], draft: Dict[str, Any]
+    ) -> List[str]:
+        changed: List[str] = []
+        for f in self._DIFF_COMPARE_FIELDS:
+            lv = live.get(f)
+            dv = draft.get(f)
+            # Normalise dicts → stable JSON string so dict key order
+            # doesn't show up as a false "changed". Same for missing vs
+            # null — treat them the same.
+            if isinstance(lv, dict) or isinstance(dv, dict):
+                ls = json.dumps(lv or {}, sort_keys=True)
+                ds = json.dumps(dv or {}, sort_keys=True)
+                if ls != ds:
+                    changed.append(f)
+                continue
+            if (lv or None) != (dv or None):
+                changed.append(f)
+        return changed
+
+    def compute_diff(self, company_id: str) -> Dict[str, Any]:
+        """
+        Snapshot of {live, draft, diff} for the HR "Draft vs Live" view.
+
+        Semantics:
+          - live.rows   — the currently-published matrix, or empty if none
+          - draft.rows  — the active draft, or empty if none
+          - diff.added     — rows keyed in draft but not in live
+          - diff.removed   — rows keyed in live but not in draft
+          - diff.changed   — same (benefit_key, targeting_signature) in
+                             both but at least one compared field differs;
+                             each entry includes `changed_fields` so the
+                             UI can highlight the exact cells that moved
+          - diff.unchanged — paired rows with no field-level changes
+
+        Pairs are stable: adding a new targeting variant creates an
+        `added` entry; removing one creates a `removed` entry.
+        """
+        cfg = self._config(company_id)
+        pid = str(cfg["id"])
+        draft = self._db.get_policy_config_draft_for_config(pid)
+        live = self._db.get_latest_published_policy_config_version(str(company_id), CONFIG_KEY)
+
+        draft_rows = (
+            self._db.list_policy_config_benefits(str(draft["id"])) if draft else []
+        )
+        live_rows = (
+            self._db.list_policy_config_benefits(str(live["id"])) if live else []
+        )
+
+        draft_index = {self._row_diff_key(r): r for r in draft_rows}
+        live_index = {self._row_diff_key(r): r for r in live_rows}
+        all_keys = set(draft_index) | set(live_index)
+
+        added: List[Dict[str, Any]] = []
+        removed: List[Dict[str, Any]] = []
+        changed: List[Dict[str, Any]] = []
+        unchanged: List[Dict[str, Any]] = []
+
+        for k in sorted(all_keys, key=lambda x: (x[0], x[1])):
+            lv = live_index.get(k)
+            dv = draft_index.get(k)
+            if lv is None and dv is not None:
+                added.append(dv)
+            elif dv is None and lv is not None:
+                removed.append(lv)
+            elif lv is not None and dv is not None:
+                diffs = self._row_field_changes(lv, dv)
+                if diffs:
+                    changed.append({"before": lv, "after": dv, "changed_fields": diffs})
+                else:
+                    unchanged.append(dv)
+
+        def _version_meta(v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+            if not v:
+                return None
+            return {
+                "id": str(v.get("id")) if v.get("id") else None,
+                "version_number": int(v.get("version_number") or 0),
+                "status": str(v.get("status") or ""),
+                "effective_date": _iso_date(v.get("effective_date")),
+                "published_at": v.get("published_at"),
+                "updated_at": v.get("updated_at"),
+            }
+
+        return {
+            "live": {
+                "version": _version_meta(live),
+                "rows": self._benefits_to_api(live_rows, include_internal=True),
+            },
+            "draft": {
+                "version": _version_meta(draft),
+                "rows": self._benefits_to_api(draft_rows, include_internal=True),
+            },
+            "diff": {
+                "added": self._benefits_to_api(added, include_internal=True),
+                "removed": self._benefits_to_api(removed, include_internal=True),
+                "changed": [
+                    {
+                        "before": self._benefits_to_api([c["before"]], include_internal=True)[0],
+                        "after": self._benefits_to_api([c["after"]], include_internal=True)[0],
+                        "changed_fields": c["changed_fields"],
+                    }
+                    for c in changed
+                ],
+                "unchanged_count": len(unchanged),
+                "summary": {
+                    "added": len(added),
+                    "removed": len(removed),
+                    "changed": len(changed),
+                    "unchanged": len(unchanged),
+                },
+            },
+        }
+
+    def revert_row_to_live(
+        self,
+        company_id: str,
+        *,
+        benefit_key: str,
+        targeting_signature: str,
+    ) -> Dict[str, Any]:
+        """
+        Bring one row of the current draft back to whatever the live
+        version has for that (benefit_key, targeting_signature).
+
+        Three cases, mirroring the diff semantics:
+          * row exists in both live + draft → draft row is overwritten
+            with the live row's values (field-level revert).
+          * row exists only in draft (user added it) → draft row is
+            deleted.
+          * row exists only in live (user removed it from draft) →
+            live row is re-inserted into the draft.
+
+        Idempotent: reverting a row that already matches live is a
+        no-op and returns the fresh diff unchanged.
+        """
+        cfg = self._config(company_id)
+        pid = str(cfg["id"])
+        draft = self._db.get_policy_config_draft_for_config(pid)
+        if not draft:
+            raise KeyError("no_draft")
+        live = self._db.get_latest_published_policy_config_version(str(company_id), CONFIG_KEY)
+        draft_vid = str(draft["id"])
+        draft_rows = self._db.list_policy_config_benefits(draft_vid)
+        live_rows = (
+            self._db.list_policy_config_benefits(str(live["id"])) if live else []
+        )
+        bk = str(benefit_key or "").strip()
+        ts = str(targeting_signature or "global").strip()
+        if not bk:
+            raise ValueError(json.dumps({"code": "validation_error", "errors": [
+                {"field": "benefit_key", "message": "benefit_key is required"}
+            ]}))
+        draft_row = next(
+            (r for r in draft_rows if str(r.get("benefit_key")) == bk
+             and str(r.get("targeting_signature") or "global") == ts),
+            None,
+        )
+        live_row = next(
+            (r for r in live_rows if str(r.get("benefit_key")) == bk
+             and str(r.get("targeting_signature") or "global") == ts),
+            None,
+        )
+        if draft_row is None and live_row is None:
+            raise KeyError("row_not_found")
+        if live_row is not None and draft_row is not None:
+            # Overwrite draft row with live row's fields (preserving id + vid).
+            self._db.delete_policy_config_benefit_by_key(
+                draft_vid, benefit_key=bk, targeting_signature=ts
+            )
+            insert = dict(live_row)
+            insert["policy_config_version_id"] = draft_vid
+            insert.pop("id", None)
+            insert.pop("created_at", None)
+            insert.pop("updated_at", None)
+            self._db.insert_policy_config_benefit_row(insert)
+        elif draft_row is not None and live_row is None:
+            # Row added in draft; revert = remove.
+            self._db.delete_policy_config_benefit_by_key(
+                draft_vid, benefit_key=bk, targeting_signature=ts
+            )
+        elif live_row is not None and draft_row is None:
+            # Row removed in draft; revert = re-insert from live.
+            insert = dict(live_row)
+            insert["policy_config_version_id"] = draft_vid
+            insert.pop("id", None)
+            insert.pop("created_at", None)
+            insert.pop("updated_at", None)
+            self._db.insert_policy_config_benefit_row(insert)
+        return self.compute_diff(company_id)
+
     def history(self, company_id: str) -> List[Dict[str, Any]]:
         cfg = self._config(company_id)
         rows = self._db.list_policy_config_versions_history(str(cfg["id"]))
