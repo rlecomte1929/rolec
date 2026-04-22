@@ -150,7 +150,25 @@ def _pdf_is_encrypted(data: bytes) -> bool:
                 pdf.pages[0].extract_text()
             return False
     except Exception as ex:
-        msg = (str(ex) or type(ex).__name__).lower()
+        # PARITY-BUG-2: recent pdfminer.six versions raise
+        # PdfminerException(PDFPasswordIncorrect()) where str(ex) is empty
+        # and only the wrapped inner exception carries the "password" hint.
+        # Previously we matched on str(ex)/type name alone and let encrypted
+        # PDFs through. Walk repr, class-name chain, and args/causes so the
+        # password signal survives exception wrapping across library versions.
+        parts: list[str] = [repr(ex), type(ex).__name__]
+        for arg in getattr(ex, "args", ()) or ():
+            parts.append(repr(arg))
+            parts.append(type(arg).__name__)
+        cur = ex
+        for _ in range(4):  # bounded chain walk
+            nxt = getattr(cur, "__cause__", None) or getattr(cur, "__context__", None)
+            if nxt is None or nxt is cur:
+                break
+            parts.append(repr(nxt))
+            parts.append(type(nxt).__name__)
+            cur = nxt
+        msg = " ".join(p for p in parts if p).lower()
         if "password" in msg or "encrypted" in msg:
             return True
         # Other parse failures are caller-concern (→ MalformedDocumentError);
