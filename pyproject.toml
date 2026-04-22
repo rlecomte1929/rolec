@@ -1,3 +1,25 @@
+# NOTE: This root pyproject.toml is used ONLY for tool config (ruff).
+# The repo is a monorepo, not a Python package. Cloudflare Pages, however,
+# auto-detects pyproject.toml and runs `pip install .`; without the
+# [build-system] + [project] + [tool.setuptools] blocks below, setuptools
+# would trip over the flat layout ("Multiple top-level packages discovered:
+# ['backend', 'frontend', 'supabase']") and fail the build. Declaring an
+# empty package set makes `pip install .` a deliberate no-op.
+# The real backend install lives in backend/requirements.txt.
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "relopass-monorepo"
+version = "0.0.0"
+description = "Monorepo root — backend deps install via backend/requirements.txt; no Python package here."
+requires-python = ">=3.11"
+
+[tool.setuptools]
+packages = []
+
 [tool.ruff]
 # Python 3.11 is the production runtime (.python-version). Keep this in sync.
 target-version = "py311"
