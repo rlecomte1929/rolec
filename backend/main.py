@@ -6600,6 +6600,24 @@ def _resolve_published_policy_for_employee(
                 case_id,
                 candidates,
             )
+        # Surface why resolution failed so HR/admin testers can fix the
+        # linkage without trawling backend logs. Employees never see this
+        # block — the frontend only renders it for role in (HR, ADMIN).
+        # We deliberately include only non-sensitive shape info (presence
+        # flags + counts), never the raw IDs of other companies.
+        diagnostics = {
+            "assignment_present": True,  # we'd have 404'd earlier otherwise
+            "case_linked": bool(case_id),
+            "case_has_company_id": bool(case_company_id),
+            "hr_owner_present": bool(hr_user_id),
+            "hr_owner_company_resolved": bool(hr_company_id),
+            "employee_profile_present": bool(emp_profile),
+            "employee_profile_company_id_present": bool(profile_company_id),
+            "company_id_candidates_count": len(list(candidates or [])),
+            "matrix_searched_company_ids_count": len(search_company_ids),
+            "published_matrix_found": bool(mver and mid),
+            "canonical_policy_found": False,  # we only reach this branch when pub is None
+        }
         return _finalize_employee_policy_resolution(
             db,
             {
@@ -6609,6 +6627,7 @@ def _resolve_published_policy_for_employee(
                 "assignment_id": assignment_id,
                 "case_id": case_id,
                 "company_id_used": company_id_used,
+                "resolution_diagnostics": diagnostics,
             },
             telemetry={
                 "request_id": request_id,

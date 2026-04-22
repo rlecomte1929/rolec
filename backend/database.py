@@ -5767,7 +5767,17 @@ class Database:
                 COALESCE(emp.company_id, emp_p.company_id) AS employee_company_id,
                 ep.profile_json,
                 rap.id AS resolved_policy_id,
-                (SELECT COUNT(*) FROM company_policies cp WHERE cp.company_id = COALESCE(rc.company_id, hu.company_id) AND cp.extraction_status = 'extracted') AS company_policy_count
+                (SELECT COUNT(*) FROM company_policies cp WHERE cp.company_id = COALESCE(rc.company_id, hu.company_id) AND cp.extraction_status = 'extracted') AS company_policy_count,
+                -- Count matrix-published policies too so the admin Policy
+                -- column shows "Available" for companies that publish via
+                -- the Compensation & Allowance matrix (policy_config_versions)
+                -- and haven't uploaded a document-normalized policy. Without
+                -- this, every matrix-only company reads as "None" even when
+                -- employees already resolve against a published matrix.
+                (SELECT COUNT(*) FROM policy_config_versions pcv
+                    JOIN policy_configs pcfg ON pcfg.id = pcv.policy_config_id
+                    WHERE pcfg.company_id = COALESCE(rc.company_id, hu.company_id)
+                      AND pcv.status = 'published') AS matrix_policy_count
             FROM case_assignments a
             LEFT JOIN relocation_cases rc ON {join_on_cases}
             LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
@@ -5800,7 +5810,12 @@ class Database:
             r["family_status"] = "family" if (has_spouse or dep) else "single"
             r["destination_from_profile"] = mp.get("destination") if isinstance(mp.get("destination"), str) else None
             r["policy_resolved"] = bool(r.get("resolved_policy_id"))
-            r["company_has_policy"] = (r.get("company_policy_count") or 0) > 0
+            # Both canonical (document-normalized) and matrix-published
+            # policies count as "company has a policy" for admin visibility.
+            canon_count = r.get("company_policy_count") or 0
+            matrix_count = r.get("matrix_policy_count") or 0
+            r["company_has_policy"] = (canon_count + matrix_count) > 0
+            r["company_has_matrix_policy"] = matrix_count > 0
             # Normalized fields for admin list
             r["assignment_id"] = r.get("id")
             r["company_id"] = r.get("case_company_id") or r.get("hr_company_id")

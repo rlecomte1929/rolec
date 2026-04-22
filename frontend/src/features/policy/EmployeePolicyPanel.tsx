@@ -7,6 +7,7 @@ import { Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import type { EffectiveServiceComparisonRow, PolicyServiceComparisonItem } from '../../types';
 import { buildRoute } from '../../navigation/routes';
+import { getAuthItem } from '../../utils/demo';
 import { formatBenefitLabel } from './benefitCategories';
 import {
   EMPLOYEE_POLICY_LOADING_ASSIGNMENT,
@@ -79,6 +80,82 @@ function MaturityBanner({
       <div className="text-sm font-semibold">{titles[maturity]}</div>
       <p className="text-sm mt-1.5 leading-relaxed opacity-95">{bodies[maturity]}</p>
     </div>
+  );
+}
+
+/**
+ * HR/ADMIN-only diagnostics for the "No live relocation policy yet" state.
+ * The backend's /employee/assignments/:id/policy endpoint returns a
+ * `resolution_diagnostics` block (booleans + counts, no sensitive IDs)
+ * on the no-policy branch. Surface those flags here so an HR or Admin
+ * user impersonating the employee can see exactly which linkage step
+ * failed without opening dev tools or trawling server logs.
+ *
+ * Employees never see this panel — it renders only for role ∈ {HR, ADMIN}.
+ */
+function NoPolicyDiagnosticsPanel({ pack }: { pack: AssignmentPackagePolicyPayload | null | undefined }) {
+  const role = getAuthItem('relopass_role');
+  if (role !== 'HR' && role !== 'ADMIN') return null;
+  const diag = pack && (pack as { resolution_diagnostics?: Record<string, unknown> }).resolution_diagnostics;
+  if (!diag || typeof diag !== 'object') return null;
+  const d = diag as {
+    assignment_present?: boolean;
+    case_linked?: boolean;
+    case_has_company_id?: boolean;
+    hr_owner_present?: boolean;
+    hr_owner_company_resolved?: boolean;
+    employee_profile_present?: boolean;
+    employee_profile_company_id_present?: boolean;
+    company_id_candidates_count?: number;
+    matrix_searched_company_ids_count?: number;
+    published_matrix_found?: boolean;
+    canonical_policy_found?: boolean;
+  };
+
+  // Pick the first failing precondition as the headline problem.
+  const issues: string[] = [];
+  if (!d.case_linked) issues.push('This assignment is not linked to a case.');
+  else if (!d.case_has_company_id) issues.push('The linked case has no company_id set.');
+  if (!d.employee_profile_company_id_present)
+    issues.push('Employee profile is missing company_id (backfill from admin).');
+  if ((d.company_id_candidates_count ?? 0) === 0 && (d.matrix_searched_company_ids_count ?? 0) === 0)
+    issues.push('No company candidates to search — assignment has no company linkage at all.');
+  if (!d.published_matrix_found && (d.matrix_searched_company_ids_count ?? 0) > 0)
+    issues.push('Searched candidate companies but none had a published compensation matrix.');
+
+  const headline =
+    issues[0] ??
+    'Assignment linkage is valid but neither a canonical policy nor a published matrix was found for the employee\'s company.';
+
+  const Flag = ({ ok, label }: { ok: boolean; label: string }) => (
+    <li className="flex items-start gap-2">
+      <span className={ok ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>
+        {ok ? '✓' : '✗'}
+      </span>
+      <span className="text-slate-700">{label}</span>
+    </li>
+  );
+
+  return (
+    <Card padding="lg" className="border-amber-200 bg-amber-50/60">
+      <div className="text-sm font-semibold text-amber-900">Why this employee sees no policy (HR/Admin view)</div>
+      <p className="text-sm text-amber-900 mt-1.5">{headline}</p>
+      <ul className="text-sm mt-3 space-y-1">
+        <Flag ok={!!d.case_linked} label="Assignment is linked to a case" />
+        <Flag ok={!!d.case_has_company_id} label="Case has a company_id set" />
+        <Flag ok={!!d.hr_owner_company_resolved} label="HR owner's company resolved" />
+        <Flag ok={!!d.employee_profile_company_id_present} label="Employee profile has company_id" />
+        <Flag
+          ok={(d.matrix_searched_company_ids_count ?? 0) > 0}
+          label={`Company candidates searched: ${d.matrix_searched_company_ids_count ?? 0}`}
+        />
+        <Flag ok={!!d.published_matrix_found} label="Published compensation matrix found for a candidate company" />
+        <Flag ok={!!d.canonical_policy_found} label="Canonical (document-normalized) policy found" />
+      </ul>
+      <p className="text-xs text-amber-800 mt-3">
+        This diagnostic block is only visible to HR/Admin users. Employees see the plain &quot;No live relocation policy yet&quot; card above.
+      </p>
+    </Card>
   );
 }
 
@@ -309,6 +386,7 @@ export const EmployeePolicyPanel: React.FC<{
           <p className="text-slate-700">{pack.message || EMPLOYEE_HR_POLICY_WAIT_PRIMARY}</p>
           <p className="text-sm text-slate-600 mt-2">{pack.message_secondary || EMPLOYEE_HR_POLICY_WAIT_SECONDARY}</p>
         </Card>
+        <NoPolicyDiagnosticsPanel pack={pack} />
       </div>
     );
   }

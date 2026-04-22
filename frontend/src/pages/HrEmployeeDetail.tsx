@@ -6,8 +6,17 @@ import { hrAPI } from '../api/client';
 import type { HrCompanyEmployee } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
+import {
+  POLICY_EMPLOYEE_LEVEL_OPTIONS,
+  normalizeEmployeeLevel,
+} from '../features/policy-config/policyTargeting';
 
-const BANDS = ['Band1', 'Band2', 'Band3', 'Band4'];
+// Canonical employee-level options mirror the admin Policy Workspace
+// row editor so HR uses the same vocabulary everywhere. The previous
+// "Band1..Band4" values are absorbed through normalizeEmployeeLevel so
+// a profile saved before this rename still resolves to the right option
+// on load — the employee's existing band is not lost, it's just
+// re-labelled.
 const ASSIGNMENT_TYPES = ['Long-Term', 'Permanent', 'Short-Term'];
 const STATUSES = ['active', 'inactive', 'on_assignment'];
 
@@ -30,7 +39,11 @@ export const HrEmployeeDetail: React.FC = () => {
     try {
       const { employee: emp } = await hrAPI.getEmployee(id);
       setEmployee(emp);
-      setBand(emp.band || '');
+      // Back-compat: absorb legacy Band1..Band4 (and L1..L4, job-title
+      // synonyms) into the canonical slug so the select shows the right
+      // option instead of an empty "Select…" for pre-existing rows.
+      const storedBand = emp.band || '';
+      setBand(normalizeEmployeeLevel(storedBand) ?? '');
       setAssignmentType(emp.assignment_type || '');
       setStatus(emp.status || '');
     } catch (err: any) {
@@ -125,17 +138,21 @@ export const HrEmployeeDetail: React.FC = () => {
                 <div className="text-[#0b2b43]">{employee.email || '-'}</div>
               </div>
               <div>
-                <div className="text-xs text-[#6b7280] uppercase tracking-wide">Band</div>
+                <div className="text-xs text-[#6b7280] uppercase tracking-wide">Employee level</div>
                 <select
                   value={band}
                   onChange={(e) => setBand(e.target.value)}
                   className="mt-1 block w-full max-w-xs rounded-lg border border-[#d1d5db] px-3 py-2 text-sm"
                 >
                   <option value="">Select…</option>
-                  {BANDS.map((b) => (
-                    <option key={b} value={b}>{b}</option>
+                  {POLICY_EMPLOYEE_LEVEL_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
+                <p className="mt-1 text-xs text-[#6b7280]">
+                  Used by the compensation matrix to apply level-specific caps (e.g. different
+                  relocation allowance for Directors vs Entry Level).
+                </p>
               </div>
               <div>
                 <div className="text-xs text-[#6b7280] uppercase tracking-wide">Assignment type</div>
