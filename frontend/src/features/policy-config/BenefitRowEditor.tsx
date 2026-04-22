@@ -10,11 +10,15 @@ import { patchAdditionalTerms, readAdditionalTerms } from './benefitProgramDetai
 import {
   normalizeAssignmentType,
   normalizeAssignmentTypeList,
+  normalizeEmployeeLevel,
+  normalizeEmployeeLevelList,
   normalizeFamilyStatus,
   normalizeFamilyStatusList,
   POLICY_ASSIGNMENT_TYPE_OPTIONS,
+  POLICY_EMPLOYEE_LEVEL_OPTIONS,
   POLICY_FAMILY_STATUS_OPTIONS,
   type PolicyAssignmentTypeValue,
+  type PolicyEmployeeLevelValue,
   type PolicyFamilyStatusValue,
 } from './policyTargeting';
 
@@ -68,6 +72,7 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
     [row.assignment_types]
   );
   const familySelected = useMemo(() => normalizeFamilyStatusList(row.family_statuses), [row.family_statuses]);
+  const levelSelected = useMemo(() => normalizeEmployeeLevelList(row.employee_levels), [row.employee_levels]);
 
   const droppedAssignmentTokens = useMemo(
     () => (row.assignment_types ?? []).filter((x) => !normalizeAssignmentType(x)),
@@ -76,6 +81,10 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
   const droppedFamilyTokens = useMemo(
     () => (row.family_statuses ?? []).filter((x) => !normalizeFamilyStatus(x)),
     [row.family_statuses]
+  );
+  const droppedLevelTokens = useMemo(
+    () => (row.employee_levels ?? []).filter((x) => !normalizeEmployeeLevel(x)),
+    [row.employee_levels]
   );
 
   const toggleAssignment = (v: PolicyAssignmentTypeValue, checked: boolean) => {
@@ -90,6 +99,13 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
     if (checked) s.add(v);
     else s.delete(v);
     onChange({ ...row, family_statuses: Array.from(s).sort() });
+  };
+
+  const toggleLevel = (v: PolicyEmployeeLevelValue, checked: boolean) => {
+    const s = new Set(levelSelected);
+    if (checked) s.add(v);
+    else s.delete(v);
+    onChange({ ...row, employee_levels: Array.from(s).sort() });
   };
 
   const onValueTypeChange = (v: string) => {
@@ -194,6 +210,28 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
               {droppedFamilyTokens.length > 0 && (
                 <p className="text-xs text-[#7a2a2a]">
                   Legacy values not recognized: {droppedFamilyTokens.join(', ')}. Re-select and save to update.
+                </p>
+              )}
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <p className="text-xs font-medium text-[#64748b] uppercase tracking-wide">Employee level</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {POLICY_EMPLOYEE_LEVEL_OPTIONS.map((opt) => (
+                  <label key={opt.value} className="flex items-start gap-2 text-sm text-[#374151] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="rounded border-[#cbd5e1] mt-0.5"
+                      checked={levelSelected.includes(opt.value)}
+                      onChange={(e) => toggleLevel(opt.value, e.target.checked)}
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-[#94a3b8]">Leave all unchecked to mean every employee level.</p>
+              {droppedLevelTokens.length > 0 && (
+                <p className="text-xs text-[#7a2a2a]">
+                  Legacy values not recognized: {droppedLevelTokens.join(', ')}. Re-select and save to update.
                 </p>
               )}
             </div>

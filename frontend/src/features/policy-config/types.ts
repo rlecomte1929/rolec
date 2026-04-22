@@ -17,6 +17,7 @@ export type PolicyConfigBenefitRow = {
   conditions_json?: Record<string, unknown>;
   assignment_types?: string[];
   family_statuses?: string[];
+  employee_levels?: string[];
   display_order?: number;
   cap_rule_json?: Record<string, unknown>;
   allowance_cap?: Record<string, unknown> | null;
@@ -43,10 +44,12 @@ export type PolicyConfigWorkingPayload = {
   source?: string;
   assignment_types_supported?: string[];
   family_statuses_supported?: string[];
+  employee_levels_supported?: string[];
   categories?: PolicyConfigCategoryBlock[];
   preview_context?: {
     assignment_type?: string | null;
     family_status?: string | null;
+    employee_level?: string | null;
     effective_rows_only?: boolean;
     note?: string;
   };
