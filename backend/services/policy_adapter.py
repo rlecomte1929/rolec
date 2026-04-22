@@ -5,7 +5,19 @@ DEFAULT_CURRENCY = "USD"
 # Map resolved benefit_key to cap key used by frontend (Services page, policy-budget).
 # Align with policy_service_comparison.SERVICE_TO_BENEFIT and frontend service keys.
 # Cap keys match frontend service categories (case_services.category, EmployeeJourney caps[category]).
+#
+# Two key families can reach this map depending on which publish path the
+# company used:
+#   1. Legacy document-normalized policy keys (temporary_housing, shipment,
+#      schooling, …) — produced by the Normalize & Publish flow.
+#   2. Compensation matrix keys (relocation_allowance_assignee_partner,
+#      spouse_partner_assistance, child_education_support, …) — produced by
+#      the Admin → Policy Workspace matrix via employee_policy_matrix_bridge.
+# Missing either family here silently hides the employee Services budget bar
+# (PackageSummary.tsx) because caps_from_resolved_benefits returns an empty
+# caps dict when no benefit_key matches. Keep the two families in sync.
 BENEFIT_KEY_TO_CAP_KEY: Dict[str, str] = {
+    # --- legacy taxonomy ---
     "temporary_housing": "housing",
     "temporary_living": "housing",
     "host_housing_cap": "housing",
@@ -29,6 +41,16 @@ BENEFIT_KEY_TO_CAP_KEY: Dict[str, str] = {
     "transport": "travel",
     "home_leave": "travel",
     "scouting_trip": "travel",
+    # --- compensation matrix keys ---
+    # Relocation/repatriation allowances are lump-sum cash the employee spends
+    # against the move; route them to the "movers" service bucket so the
+    # employee budget bar compares shipment/packing costs against this cap.
+    # Known semantic compromise — a dedicated "allowance" category on the bar
+    # would be cleaner; this is the minimal unblock.
+    "relocation_allowance_assignee_partner": "movers",
+    "relocation_allowance_dependent": "movers",
+    "repatriation_allowance_assignee_partner": "movers",
+    "repatriation_allowance_dependent": "movers",
 }
 
 

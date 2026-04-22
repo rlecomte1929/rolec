@@ -110,6 +110,55 @@ class EmployeePolicyAssistantServiceTests(unittest.TestCase):
         self.assertIn("Temporary", ans.answer_text)
         self.assertEqual(ans.role_scope, PolicyAssistantRoleScope.EMPLOYEE)
 
+    def test_matrix_relocation_allowance_resolves_to_included(self) -> None:
+        """
+        Regression: when a company publishes via the Admin Policy Workspace
+        (compensation matrix bridge), benefit rows arrive with matrix keys
+        like 'relocation_allowance_assignee_partner' / '_dependent'. The
+        assistant's TOPIC_BENEFIT_KEYS table must recognise those keys or it
+        falsely returns "not included" even though the matrix has the
+        benefit with an explicit cap — the exact production bug reported
+        against the ReloPass Policy Assistant on the employee HR Policy page.
+        """
+        def fake_resolve(aid: str, user: dict, rid, *, read_only: bool = False):
+            return {
+                "has_policy": True,
+                "benefits": [
+                    {
+                        "benefit_key": "relocation_allowance_assignee_partner",
+                        "included": True,
+                        "max_value": 5000,
+                        "standard_value": 5000,
+                        "currency": "EUR",
+                        "frequency": "one_time",
+                        "approval_required": False,
+                    },
+                    {
+                        "benefit_key": "relocation_allowance_dependent",
+                        "included": True,
+                        "max_value": 1000,
+                        "standard_value": 1000,
+                        "currency": "EUR",
+                        "frequency": "per_dependent",
+                        "approval_required": False,
+                    },
+                ],
+                "exclusions": [],
+                "comparison_readiness": {"comparison_ready": True},
+                "policy": {"title": "Mobility Policy", "version": 1, "company_name": "Test"},
+            }
+
+        ans, _, _sess = execute_employee_policy_assistant_query(
+            "assignment-1",
+            "what is the relocation allowance ?",
+            {"id": "u1", "role": "EMPLOYEE"},
+            request_id=None,
+            resolve_published_policy=fake_resolve,
+        )
+        self.assertEqual(ans.canonical_topic, PolicyAssistantCanonicalTopic.RELOCATION_ALLOWANCE)
+        self.assertEqual(ans.answer_type, PolicyAssistantAnswerType.ENTITLEMENT_SUMMARY)
+        self.assertNotIn("not included", ans.answer_text.lower())
+
     def test_unsupported_employee_question(self) -> None:
         def fake_resolve(aid: str, user: dict, rid, *, read_only: bool = False):
             return {"has_policy": True, "benefits": [], "exclusions": []}
