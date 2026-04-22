@@ -2081,6 +2081,30 @@ export const policyConfigMatrixAPI = {
     return response.data;
   },
   /**
+   * List admin-curated starter templates. Metadata only
+   * — { templates: [{ key, label, description }] }.
+   */
+  hrListTemplates: async (): Promise<{ templates: Array<{ key: string; label: string; description: string }> }> => {
+    const response = await api.get('/api/hr/policy-config/templates');
+    return response.data;
+  },
+  /**
+   * Apply a starter template to the company's draft. Body:
+   *   { template_key, replace_existing_draft? }
+   * On success returns the fresh working payload. On 409
+   * ("draft_has_rows") the UI should offer to retry with
+   * replace_existing_draft=true.
+   */
+  hrApplyTemplate: async (
+    body: { template_key: string; replace_existing_draft?: boolean },
+    companyId?: string
+  ): Promise<Record<string, unknown>> => {
+    const response = await api.post('/api/hr/policy-config/draft/apply-template', body, {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
+  /**
    * Draft-vs-Live snapshot for the HR Policy "Draft vs Live" section.
    * Returns {live, draft, diff: {added, removed, changed, unchanged_count, summary}}.
    */

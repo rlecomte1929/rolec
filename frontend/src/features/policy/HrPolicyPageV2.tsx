@@ -40,6 +40,7 @@ import { HrPolicyReviewWorkspace } from './HrPolicyReviewWorkspace';
 import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
 import { PolicyAssistantFab } from './PolicyAssistantFab';
 import { PolicyDiffView } from './PolicyDiffView';
+import { PolicyTemplatePicker } from './PolicyTemplatePicker';
 import { PolicyTopicSummaryList } from './PolicyTopicSummaryList';
 
 // --- Types ------------------------------------------------------------------
@@ -185,8 +186,9 @@ const BuildNextVersionSection: React.FC<{
   documents: PolicyDocumentListItem[];
   hasLivePolicy: boolean;
   onImportClick: () => void;
+  onTemplateClick: () => void;
   adminCompanyId?: string | null;
-}> = ({ documents, hasLivePolicy, onImportClick, adminCompanyId: _adminCompanyId }) => {
+}> = ({ documents, hasLivePolicy, onImportClick, onTemplateClick, adminCompanyId: _adminCompanyId }) => {
   const [docsOpen, setDocsOpen] = useState(false);
   return (
     <Card padding="lg">
@@ -211,18 +213,23 @@ const BuildNextVersionSection: React.FC<{
             Best when you already have an approved company policy document. →
           </div>
         </button>
-        <div className="text-left p-4 rounded-lg border border-dashed border-slate-300 bg-slate-50/50">
+        <button
+          type="button"
+          onClick={onTemplateClick}
+          className="text-left p-4 rounded-lg border border-slate-200 hover:border-[#0b2b43] hover:bg-slate-50 transition"
+          data-testid="start-from-template-card"
+        >
           <div className="text-2xl" aria-hidden>✨</div>
-          <div className="font-semibold text-slate-700 mt-2">Start from a template</div>
+          <div className="font-semibold text-[#0b2b43] mt-2">Start from a template</div>
           <p className="text-sm text-slate-600 mt-1">
             Pick Conservative, Standard, or Premium. ReloPass pre-fills the compensation
-            matrix with level-tiered caps (C-suite/VP/Director/Manager/Entry).
+            matrix with level-tiered caps (Entry&nbsp;Level / Manager / Director / VP /
+            C-suite).
           </p>
-          <div className="mt-3 text-xs font-medium text-slate-500">
-            Coming in Phase 3. For now, import a document or edit the matrix directly in
-            the admin Policy Workspace.
+          <div className="mt-3 text-xs font-medium text-[#0b2b43]">
+            Best when starting fresh or stress-testing limits. →
           </div>
-        </div>
+        </button>
       </div>
       {hasLivePolicy && (
         <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">
@@ -367,6 +374,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
   const [detailedReviewOpen, setDetailedReviewOpen] = useState(false);
   const [postNormalizePolicyId, setPostNormalizePolicyId] = useState<string | null>(null);
   const [workspaceRefreshTrigger, setWorkspaceRefreshTrigger] = useState(0);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -468,6 +476,18 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         documents={documents}
         hasLivePolicy={hasLivePolicy}
         onImportClick={handleImportClick}
+        onTemplateClick={() => setTemplatePickerOpen(true)}
+        adminCompanyId={adminCompanyId}
+      />
+
+      <PolicyTemplatePicker
+        open={templatePickerOpen}
+        onClose={() => setTemplatePickerOpen(false)}
+        onApplied={() => {
+          // Reload the page data so Section 2 (topics) and Section 4
+          // (diff) pick up the new draft without a hard refresh.
+          bump();
+        }}
         adminCompanyId={adminCompanyId}
       />
 
