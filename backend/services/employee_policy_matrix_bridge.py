@@ -9,7 +9,12 @@ import json
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from .policy_config_targeting import normalize_assignment_type, normalize_family_status, row_matches_targeting
+from .policy_config_targeting import (
+    normalize_assignment_type,
+    normalize_employee_level,
+    normalize_family_status,
+    row_matches_targeting,
+)
 
 log = logging.getLogger(__name__)
 
@@ -99,9 +104,18 @@ def build_matrix_assignment_package(
     company_name: Optional[str],
     assignment_id: str,
     case_id: Optional[str],
+    employee_level_ctx: Any = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Returns (resolved_out, comparison_readiness_precalc) for _finalize_employee_policy_resolution.
+
+    ``employee_level_ctx`` is the third targeting axis (Phase 1). It's a
+    keyword-only argument with default None for back-compat: callers that
+    haven't been updated behave as before (rows that narrow to specific
+    levels still apply to all, since strict_context=True + missing ctx
+    treats the axis as "no match" — see row_matches_targeting). Matrix
+    rows that leave employee_levels empty (the post-migration default for
+    pre-existing rows) always match regardless of the employee's level.
     """
     vid = str(pub_version.get("id") or "").strip()
     raw_benefits: List[Dict[str, Any]] = []
@@ -114,12 +128,15 @@ def build_matrix_assignment_package(
 
     at_m = normalize_assignment_type(assignment_type_ctx)
     fs_m = normalize_family_status(family_status_ctx)
+    el_m = normalize_employee_level(employee_level_ctx)
 
     pack_benefits: List[Dict[str, Any]] = []
     for b in raw_benefits:
         if not b.get("is_active", True):
             continue
-        if not row_matches_targeting(b, at_m, fs_m, strict_context=True):
+        if not row_matches_targeting(
+            b, at_m, fs_m, strict_context=True, employee_level=el_m
+        ):
             continue
         pack_benefits.append(_matrix_row_to_pack_benefit(b))
 
@@ -167,6 +184,7 @@ def build_matrix_assignment_package(
         "resolution_context": {
             "assignment_type": assignment_type_ctx,
             "family_status": family_status_ctx,
+            "employee_level": employee_level_ctx,
             "source": "policy_config_matrix",
         },
     }
