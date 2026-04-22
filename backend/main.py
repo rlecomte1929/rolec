@@ -11433,6 +11433,73 @@ def hr_post_policy_config_publish(
         )
 
 
+@hr_policy_config_router.get("/policy-config/templates")
+def hr_get_policy_config_templates(
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    List the admin-curated starter templates available to HR for the
+    "Start from a template" card. Returns lightweight metadata only;
+    the full row expansion happens server-side when HR applies one.
+    """
+    from .services.policy_config_templates import list_templates
+
+    _ = user  # auth already enforced by require_role
+    return {"templates": list_templates()}
+
+
+@hr_policy_config_router.post("/policy-config/draft/apply-template")
+def hr_post_policy_config_apply_template(
+    body: Dict[str, Any] = Body(...),
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Apply a starter template to the company's draft. Body:
+      { template_key: "conservative"|"standard"|"premium",
+        replace_existing_draft?: bool }
+
+    Returns the fresh working payload on success. Live published
+    version is NOT touched — employees continue seeing the current
+    policy until HR publishes the replacement.
+    """
+    cid = _policy_matrix_company_hr(user, companyId)
+    template_key = str(body.get("template_key") or "").strip().lower()
+    replace = bool(body.get("replace_existing_draft", False))
+    if not template_key:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "validation_error", "message": "template_key is required"},
+        )
+    try:
+        return policy_config_matrix_svc.apply_template_to_draft(
+            cid,
+            template_key=template_key,
+            replace_existing_draft=replace,
+            created_by=user.get("id"),
+        )
+    except KeyError as exc:
+        code = exc.args[0] if exc.args else ""
+        if isinstance(code, str) and code.startswith("unknown_template:"):
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "unknown_template", "message": "Unknown template"},
+            )
+        if code == "draft_has_rows":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "draft_has_rows",
+                    "message": (
+                        "A draft with existing rows is already in progress. "
+                        "Confirm to replace it with the template, or edit the "
+                        "current draft in the row drawer."
+                    ),
+                },
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
+
+
 @hr_policy_config_router.get("/policy-config/diff")
 def hr_get_policy_config_diff(
     companyId: Optional[str] = Query(None, alias="companyId"),
@@ -11663,6 +11730,58 @@ def admin_get_policy_config_history(
     user: Dict[str, Any] = Depends(require_admin),
 ):
     return {"versions": policy_config_matrix_svc.history(company_id)}
+
+
+@admin_policy_config_router.get("/policy-config/templates")
+def admin_get_policy_config_templates(
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    from .services.policy_config_templates import list_templates
+
+    _ = user
+    return {"templates": list_templates()}
+
+
+@admin_policy_config_router.post("/policy-config/draft/apply-template")
+def admin_post_policy_config_apply_template(
+    body: Dict[str, Any] = Body(...),
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    template_key = str(body.get("template_key") or "").strip().lower()
+    replace = bool(body.get("replace_existing_draft", False))
+    if not template_key:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "validation_error", "message": "template_key is required"},
+        )
+    try:
+        return policy_config_matrix_svc.apply_template_to_draft(
+            company_id,
+            template_key=template_key,
+            replace_existing_draft=replace,
+            created_by=user.get("id"),
+        )
+    except KeyError as exc:
+        code = exc.args[0] if exc.args else ""
+        if isinstance(code, str) and code.startswith("unknown_template:"):
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "unknown_template", "message": "Unknown template"},
+            )
+        if code == "draft_has_rows":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "draft_has_rows",
+                    "message": (
+                        "A draft with existing rows is already in progress. "
+                        "Confirm to replace it with the template, or edit the "
+                        "current draft in the row drawer."
+                    ),
+                },
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
 
 
 @admin_policy_config_router.get("/policy-config/diff")

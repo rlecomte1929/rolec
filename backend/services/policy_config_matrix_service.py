@@ -1025,6 +1025,106 @@ class PolicyConfigMatrixService:
             self._db.insert_policy_config_benefit_row(insert)
         return self.compute_diff(company_id)
 
+    # ------------------------------------------------------------------
+    # Templates (Phase 3)
+    # ------------------------------------------------------------------
+    def apply_template_to_draft(
+        self,
+        company_id: str,
+        *,
+        template_key: str,
+        replace_existing_draft: bool = False,
+        created_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Populate the company's draft from a starter template
+        (Conservative / Standard / Premium). Live published version is
+        untouched — employees keep seeing the current policy until HR
+        publishes the replacement.
+
+        Flow:
+          1. Ensure a draft version exists. If one already has rows,
+             refuse unless replace_existing_draft=True (product
+             requested "flexibility" with a confirmation UX on the
+             frontend — the flag is the confirmation).
+          2. Delete any existing draft rows.
+          3. Insert the expanded template rows (tiered rows expand
+             into one row per employee level).
+          4. Return the fresh working payload so the UI can re-render
+             without a second GET.
+
+        Raises:
+          KeyError("unknown_template:<key>")  — bad template_key
+          KeyError("draft_has_rows")          — draft exists with rows
+                                                and replace_existing_draft=False
+        """
+        from .policy_config_templates import expand_template_rows, get_template
+
+        tpl = get_template(template_key)
+        if tpl is None:
+            raise KeyError(f"unknown_template:{template_key}")
+
+        cfg = self._config(company_id)
+        pid = str(cfg["id"])
+        draft = self._db.get_policy_config_draft_for_config(pid)
+        if not draft:
+            # Seed a fresh draft — start from published if one exists so
+            # the template overwrites a known baseline cleanly.
+            pub = self._db.get_latest_published_policy_config_version(
+                str(company_id), CONFIG_KEY
+            )
+            if pub:
+                next_n = int(pub.get("version_number") or 0) + 1
+                eff = _iso_date(pub.get("effective_date"))
+            else:
+                next_n = 1
+                eff = date.today().isoformat()
+            vid = self._db.insert_policy_config_version(
+                pid, next_n, "draft", eff, created_by=created_by
+            )
+        else:
+            vid = str(draft["id"])
+            existing_rows = self._db.list_policy_config_benefits(vid)
+            if existing_rows and not replace_existing_draft:
+                raise KeyError("draft_has_rows")
+
+        # Wipe current draft rows and replace with template rows. Safe
+        # for the "fresh draft" branch too — list_policy_config_benefits
+        # on a brand-new draft returns [].
+        self._db.delete_policy_config_benefits_for_version(vid)
+
+        rows = expand_template_rows(template_key)
+        for row in rows:
+            sig = compute_targeting_signature(
+                row.get("assignment_types") or [],
+                row.get("family_statuses") or [],
+                row.get("employee_levels") or [],
+            )
+            # benefit_label comes from the canonical registry rather than
+            # the template — keeps HR-visible labels consistent with the
+            # row drawer and the topic drill-down.
+            label = next(
+                (lbl for bk, lbl, _cat in _CANONICAL_KEYS if bk == row["benefit_key"]),
+                row["benefit_key"],
+            )
+            row_payload = {
+                "policy_config_version_id": vid,
+                "benefit_label": label,
+                "targeting_signature": sig,
+                **row,
+            }
+            self._db.insert_policy_config_benefit_row(row_payload)
+
+        vrow = self._db.get_policy_config_version_row(vid)
+        benefits = self._db.list_policy_config_benefits(vid)
+        return self.build_payload(
+            company_id,
+            version=vrow,
+            benefits=benefits,
+            editable=True,
+            source="template_applied",
+        )
+
     def history(self, company_id: str) -> List[Dict[str, Any]]:
         cfg = self._config(company_id)
         rows = self._db.list_policy_config_versions_history(str(cfg["id"]))
