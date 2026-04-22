@@ -6,6 +6,8 @@ import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
 import { HrCompanyContextProvider } from './contexts/HrCompanyContext';
 import { ServicesFlowProvider } from './features/services/ServicesFlowContext';
+import { DemoBookingProvider } from './hooks/useDemoBooking';
+import { BookDemoModal } from './components/marketing/BookDemoModal';
 import { ROUTE_DEFS } from './navigation/routes';
 import { Landing } from './pages/Landing';
 import { PlatformPage } from './pages/public/PlatformPage';
@@ -144,6 +146,7 @@ function App() {
     <ErrorBoundary>
     <Router>
       <ScrollToTop />
+      <DemoBookingProvider>
       <SelectedCaseProvider>
       <EmployeeAssignmentProvider>
       <HrCompanyContextProvider>
@@ -303,6 +306,8 @@ function App() {
       </HrCompanyContextProvider>
       </EmployeeAssignmentProvider>
       </SelectedCaseProvider>
+      <BookDemoModal />
+      </DemoBookingProvider>
       <PerfPanel />
     </Router>
     </ErrorBoundary>

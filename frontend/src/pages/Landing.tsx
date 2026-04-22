@@ -14,6 +14,7 @@ import {
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { getAuthItem } from '../utils/demo';
+import { useDemoBooking } from '../hooks/useDemoBooking';
 import { landingContent } from './landing/landingContent';
 
 export const Landing: React.FC = () => {
@@ -22,6 +23,7 @@ export const Landing: React.FC = () => {
     { label: 'See the platform', routeKey: 'platform' },
   ]);
 
+  const { open: openDemoBooking } = useDemoBooking();
   const c = landingContent;
 
   if (getAuthItem('relopass_token')) {
@@ -41,7 +43,7 @@ export const Landing: React.FC = () => {
           subtitle={c.hero.subheadline}
           actions={
             <>
-              <CTAButton to={buildRoute('access')} variant="primary" size="lg">
+              <CTAButton onClick={() => openDemoBooking('landing-hero')} variant="primary" size="lg">
                 {c.hero.primaryCta}
               </CTAButton>
               <CTAButton to={buildRoute('platform')} variant="outline" size="lg">
@@ -106,7 +108,7 @@ export const Landing: React.FC = () => {
           subtitle={c.finalCta.microCopy}
           variant="surface"
           primaryAction={
-            <CTAButton to={buildRoute('access')} variant="primary" size="lg">
+            <CTAButton onClick={() => openDemoBooking('landing-final')} variant="primary" size="lg">
               {c.finalCta.options.demo}
             </CTAButton>
           }

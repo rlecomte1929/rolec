@@ -6,12 +6,11 @@ import {
   AccessOptionCard,
 } from '../../components/marketing';
 import { buildRoute } from '../../navigation/routes';
+import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { accessContent } from './accessContent';
 
-/** Placeholder for demo booking: wire to your flow when ready */
-const DEMO_LINK = 'mailto:contact@relopass.com?subject=ReloPass%20Demo%20Request';
-
 export const AccessPage: React.FC = () => {
+  const { open: openDemoBooking } = useDemoBooking();
   const c = accessContent;
 
   return (
@@ -35,7 +34,7 @@ export const AccessPage: React.FC = () => {
             label={c.options.bookDemo.label}
             description={c.options.bookDemo.description}
             cta={c.options.bookDemo.cta}
-            href={DEMO_LINK}
+            onClick={() => openDemoBooking('access-page')}
             variant="primary"
           />
           <AccessOptionCard

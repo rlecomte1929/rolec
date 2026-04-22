@@ -9,6 +9,8 @@ interface AccessOptionCardProps {
   to?: string;
   /** External URL (e.g. mailto:) - takes precedence over to */
   href?: string;
+  /** Button click handler. Takes precedence over to/href. */
+  onClick?: () => void;
   /** Primary = filled, secondary = outline */
   variant?: 'primary' | 'outline';
 }
@@ -23,10 +25,15 @@ export const AccessOptionCard: React.FC<AccessOptionCardProps> = ({
   cta,
   to,
   href,
+  onClick,
   variant = 'primary',
 }) => {
   const Cta = () =>
-    href ? (
+    onClick ? (
+      <CTAButton onClick={onClick} variant={variant} fullWidth>
+        {cta}
+      </CTAButton>
+    ) : href ? (
       <CTAButton href={href} variant={variant} fullWidth>
         {cta}
       </CTAButton>
