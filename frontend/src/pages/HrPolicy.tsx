@@ -7,6 +7,7 @@ import { employeeAPI, policyDocumentsAPI } from '../api/client';
 import { EmployeePolicyPanel } from '../features/policy/EmployeePolicyPanel';
 import { EmployeePolicyAssistantPanel } from '../features/policy/EmployeePolicyAssistantPanel';
 import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
+import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
 
@@ -45,16 +46,25 @@ function EmployeePolicyContent() {
     };
   }, []);
 
+  // The assistant is a floating FAB — same pattern as the new HR page.
+  // Employees get a single consistent "ask the assistant" affordance in
+  // the bottom-right, never a rectangle competing with policy content.
   return (
     <div className="pb-6">
-      <EmployeePolicyAssistantPanel
-        assignmentId={pack?.assignment_id}
-        assignmentLoading={loading}
-        variant="sideSheet"
-      />
       <div className="min-w-0">
         <EmployeePolicyPanel pack={pack} loading={loading} />
       </div>
+      <PolicyAssistantFab
+        label="Open Policy Assistant — ask about your HR policy"
+      >
+        {() => (
+          <EmployeePolicyAssistantPanel
+            assignmentId={pack?.assignment_id}
+            assignmentLoading={loading}
+            variant="card"
+          />
+        )}
+      </PolicyAssistantFab>
     </div>
   );
 }
