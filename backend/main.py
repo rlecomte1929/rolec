@@ -10393,6 +10393,74 @@ def publish_policy_version(
         raise HTTPException(status_code=500, detail="Publish failed")
 
 
+@app.get("/api/company-policies/{policy_id}/diff")
+def get_canonical_policy_diff(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Draft vs Live diff for a canonical document-normalized policy
+    — parallel of /api/hr/policy-config/diff (the matrix diff from PR #4)
+    but covering company_policies → policy_versions + benefit_rules +
+    policy_exclusions.
+
+    Response shape mirrors the matrix diff: {live, draft, diff:
+    {rules, exclusions, summary}}. Never raises for "no policy" —
+    returns empty summary counts and version=null instead so the UI
+    can render the clean-state message.
+    """
+    from .services.policy_canonical_diff import compute_canonical_diff
+
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    return compute_canonical_diff(db, policy_id)
+
+
+@app.get("/api/hr/canonical-policy/diff")
+def hr_get_canonical_policy_diff_for_company(
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Convenience wrapper: the frontend top-level HR Policy page knows
+    the company_id but not the canonical policy_id. This endpoint
+    resolves the primary company_policy for the HR user's company
+    (or the admin-specified companyId) and returns its diff.
+
+    Returns {has_policy: false, ...} when no canonical policy exists
+    for the company so the frontend can render a neutral "no canonical
+    policy yet" state instead of a 404.
+    """
+    from .services.policy_canonical_diff import (
+        compute_canonical_diff,
+        resolve_primary_policy_id_for_company,
+    )
+
+    cid = _policy_matrix_company_hr(user, companyId)
+    pid = resolve_primary_policy_id_for_company(db, cid)
+    if not pid:
+        return {
+            "has_policy": False,
+            "company_id": cid,
+            "policy_id": None,
+            "live": {"version": None, "rules": [], "exclusions": []},
+            "draft": {"version": None, "rules": [], "exclusions": []},
+            "diff": {
+                "rules": {"added": [], "removed": [], "changed": [], "unchanged_count": 0},
+                "exclusions": {"added": [], "removed": [], "changed": [], "unchanged_count": 0},
+                "summary": {
+                    "rules": {"added": 0, "removed": 0, "changed": 0, "unchanged": 0},
+                    "exclusions": {"added": 0, "removed": 0, "changed": 0, "unchanged": 0},
+                },
+            },
+        }
+    out = compute_canonical_diff(db, pid)
+    out["has_policy"] = True
+    out["company_id"] = cid
+    out["policy_id"] = pid
+    return out
+
+
 @app.post("/api/company-policies/{policy_id}/versions/{version_id}/unpublish")
 def unpublish_policy_version(
     policy_id: str,

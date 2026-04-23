@@ -2349,6 +2349,21 @@ export const companyPolicyAPI = {
     const response = await api.post(`/api/company-policies/${policyId}/versions/${versionId}/unpublish`);
     return response.data;
   },
+  /**
+   * Canonical (document-normalized) policy diff for a company — sibling
+   * of policyConfigMatrixAPI.hrDiff which covers the compensation
+   * matrix. Auto-resolves the primary policy_id server-side; returns
+   * has_policy=false when the company hasn't uploaded a canonical
+   * policy yet (frontend renders a neutral empty state in that case).
+   */
+  hrCanonicalDiffForCompany: async (
+    companyId?: string
+  ): Promise<Record<string, unknown>> => {
+    const response = await api.get('/api/hr/canonical-policy/diff', {
+      params: companyId ? { companyId } : {},
+    });
+    return response.data;
+  },
   /** Publish latest version - avoids version_id mismatch 404s */
   publishLatestVersion: async (policyId: string): Promise<{ version: any }> => {
     const response = await api.post(`/api/company-policies/${policyId}/versions/latest/publish`);

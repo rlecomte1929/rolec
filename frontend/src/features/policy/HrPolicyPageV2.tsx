@@ -39,6 +39,7 @@ import type { PolicyConfigWorkingPayload } from '../policy-config/types';
 import { HrPolicyReviewWorkspace } from './HrPolicyReviewWorkspace';
 import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
 import { PolicyAssistantFab } from './PolicyAssistantFab';
+import { CanonicalPolicyDiffView } from './CanonicalPolicyDiffView';
 import { PolicyDiffView } from './PolicyDiffView';
 import { PolicyTemplatePicker } from './PolicyTemplatePicker';
 import { PolicyTopicSummaryList } from './PolicyTopicSummaryList';
@@ -491,8 +492,17 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         adminCompanyId={adminCompanyId}
       />
 
-      {/* 4. Draft vs Live — live diff view (PR #4) */}
+      {/* 4. Draft vs Live — two diffs, one per pipeline:
+          - matrix (PR #4): compensation & allowance caps
+          - canonical (this PR): document-normalized benefit rules
+          CanonicalPolicyDiffView renders null when the company has no
+          canonical policy at all, so matrix-only deployments don't see
+          a dangling empty section. */}
       <PolicyDiffView
+        adminCompanyId={adminCompanyId ?? null}
+        refreshTrigger={workspaceRefreshTrigger}
+      />
+      <CanonicalPolicyDiffView
         adminCompanyId={adminCompanyId ?? null}
         refreshTrigger={workspaceRefreshTrigger}
       />
