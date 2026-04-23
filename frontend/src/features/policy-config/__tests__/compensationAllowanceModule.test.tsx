@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { HrPolicyConfigPage } from '../../../pages/HrPolicyConfigPage';
-// AdminPolicyConfigPage (/admin/policy-config) retired — the corresponding
-// test case below is deleted. The row-drawer editor inside the Policy
-// Workspace has its own coverage under policy-workspace __tests__.
+// HrPolicyConfigPage (/hr/policy-config) retired — the HR-facing structured
+// matrix page was removed. AdminPolicyConfigPage (/admin/policy-config) was
+// retired earlier. The row-drawer editor inside the Policy Workspace has
+// its own coverage under policy-workspace __tests__.
 import { EmployeePolicyPage } from '../../../pages/employee/EmployeePolicyPage';
 import { PolicyConfigFilters } from '../PolicyConfigFilters';
 import { PolicyConfigHeader } from '../PolicyConfigHeader';
@@ -145,23 +145,6 @@ describe('Compensation & Allowance — routes render', () => {
         },
       ],
     });
-  });
-
-  it('renders /hr/policy-config with matrix heading and category', async () => {
-    render(
-      <MemoryRouter initialEntries={['/hr/policy-config']}>
-        <Routes>
-          <Route path="/hr/policy-config" element={<HrPolicyConfigPage />} />
-        </Routes>
-      </MemoryRouter>
-    );
-    await waitFor(() => expect(apiMocks.hrGet).toHaveBeenCalled());
-    expect(
-      screen.getAllByRole('heading', { name: /Compensation & Allowance/i }).length
-    ).toBeGreaterThanOrEqual(1);
-    expect(await screen.findByText(/Compensation & allowances/i)).toBeInTheDocument();
-    expect(await screen.findByDisplayValue('500')).toBeInTheDocument();
-    expect(screen.getByText('cola')).toBeInTheDocument();
   });
 
   it('renders /employee/policy with covered benefit only', async () => {

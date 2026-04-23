@@ -4,9 +4,8 @@ Short checklist for HR/Admin matrix, publish flow, employee read-only, and provi
 
 ## Smoke (each role)
 
-1. **HR** `/hr/policy-config` — page loads; draft badge; categories and benefit rows visible; Save draft / Publish / Reload present.
-2. **Admin** `/admin/policy-config?companyId=<id>` — company selector works; matrix loads for selected company only.
-3. **Employee** `/employee/policy` — loads published policy; only covered + applicable rows; no edit controls.
+1. **Admin** `/admin/policy-config?companyId=<id>` — company selector works; matrix loads for selected company only.
+2. **Employee** `/employee/policy` — loads published policy; only covered + applicable rows; no edit controls.
 
 ## Draft & publish
 

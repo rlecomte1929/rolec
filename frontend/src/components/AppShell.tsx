@@ -303,16 +303,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     Policy
                   </Link>
                   <Link
-                    to={buildRoute('hrPolicyConfig')}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrPolicyConfig.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    Compensation &amp; Allowance
-                  </Link>
-                  <Link
                     to={buildRoute('hrDashboard')}
                     className={`px-3 py-1 rounded-full border ${
                       isActiveRoute(ROUTE_DEFS.hrDashboard.path)

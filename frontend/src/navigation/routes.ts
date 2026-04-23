@@ -45,7 +45,6 @@ export const ROUTE_DEFS = {
   hrPolicy: { path: '/hr/policy', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeHrPolicy: { path: '/employee/hr-policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrPolicyManagement: { path: '/hr/policy-management', roles: ['HR', 'ADMIN'] as RouteRole[] },
-  hrPolicyConfig: { path: '/hr/policy-config', roles: ['HR', 'ADMIN'] as RouteRole[] },
   employeePolicy: { path: '/employee/policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   submissionCenter: { path: '/submission-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompanyProfile: { path: '/hr/company-profile', roles: ['HR', 'ADMIN'] as RouteRole[] },

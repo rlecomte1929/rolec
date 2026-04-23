@@ -33,7 +33,6 @@ const HrComplianceCheck = lazy(() => import('./pages/HrComplianceCheck').then((m
 const HrAssignmentPackageReview = lazy(() => import('./pages/HrAssignmentPackageReview').then((module) => ({ default: module.HrAssignmentPackageReview })));
 const HrPreferredSuppliers = lazy(() => import('./pages/HrPreferredSuppliers').then((module) => ({ default: module.HrPreferredSuppliers })));
 const HrPolicy = lazy(() => import('./pages/HrPolicy').then((module) => ({ default: module.HrPolicy })));
-const HrPolicyConfigPage = lazy(() => import('./pages/HrPolicyConfigPage').then((module) => ({ default: module.HrPolicyConfigPage })));
 const EmployeePolicyPage = lazy(() => import('./pages/employee/EmployeePolicyPage').then((module) => ({ default: module.EmployeePolicyPage })));
 const CaseWizardPage = lazy(() => import('./pages/employee/CaseWizardPage').then((module) => ({ default: module.CaseWizardPage })));
 const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
@@ -198,7 +197,6 @@ function App() {
         <Route path={ROUTE_DEFS.vendorRfq.path} element={<VendorRfq />} />
         <Route path={ROUTE_DEFS.hrPreferredSuppliers.path} element={<HrPreferredSuppliers />} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
-        <Route path={ROUTE_DEFS.hrPolicyConfig.path} element={<HrPolicyConfigPage />} />
         <Route path={ROUTE_DEFS.employeePolicy.path} element={<EmployeePolicyPage />} />
         <Route path={ROUTE_DEFS.employeeHrPolicy.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
         <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
