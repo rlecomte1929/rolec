@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 import { submitDemoBooking } from '../../api/demoBooking';
+import { track } from '../../analytics';
 
 const MAX_CHALLENGE = 500;
 const MIN_CHALLENGE = 10;
@@ -67,6 +68,24 @@ export const BookDemoModal: React.FC = () => {
       if (e.key === 'Escape') {
         e.stopPropagation();
         requestClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusables = dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || !dialog.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
       }
     };
     window.addEventListener('keydown', handleKey);
@@ -119,6 +138,7 @@ export const BookDemoModal: React.FC = () => {
     });
 
     if (result.ok) {
+      track('demo_request_submitted', { source_page: sourcePage, demo_id: result.demoId });
       setState('success');
       setTimeout(() => close(), 3500);
       return;
@@ -178,7 +198,7 @@ export const BookDemoModal: React.FC = () => {
               <div>
                 <p className="text-base font-medium text-marketing-primary">Request received.</p>
                 <p className="mt-1 text-sm text-marketing-text-muted">
-                  We'll reply within one business day with next steps.
+                  We'll reply within the next few business days.
                 </p>
               </div>
             </div>

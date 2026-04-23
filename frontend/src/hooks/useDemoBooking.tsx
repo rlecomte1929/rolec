@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { track } from '../analytics';
 
 interface DemoBookingContextValue {
   isOpen: boolean;
@@ -14,8 +15,10 @@ export const DemoBookingProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [sourcePage, setSourcePage] = useState<string | null>(null);
 
   const open = useCallback((source?: string) => {
-    setSourcePage(source ?? (typeof window !== 'undefined' ? window.location.pathname : null));
+    const resolvedSource = source ?? (typeof window !== 'undefined' ? window.location.pathname : null);
+    setSourcePage(resolvedSource);
     setIsOpen(true);
+    track('demo_modal_opened', { source_page: resolvedSource });
   }, []);
 
   const close = useCallback(() => {
