@@ -48,6 +48,11 @@ export const whyReloPassContent = {
     supportingLine: 'Less friction, not more software for its own sake.',
   },
 
+  peakCta: {
+    headline: 'Try this on one case.',
+    primaryCta: 'Book a demo',
+  },
+
   cta: {
     headline: 'See why teams switch',
     options: {

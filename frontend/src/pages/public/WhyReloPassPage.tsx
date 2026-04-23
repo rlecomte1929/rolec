@@ -84,6 +84,19 @@ export const WhyReloPassPage: React.FC = () => {
         </div>
       </Section>
 
+      {/* 4b. PEAK-CONVICTION CTA: Strike right after outcomes */}
+      <Section spacing="sm" background="transparent">
+        <CTAPanel
+          title={c.peakCta.headline}
+          variant="accent"
+          primaryAction={
+            <CTAButton onClick={() => openDemoBooking('why-outcomes')} variant="secondary" size="lg">
+              {c.peakCta.primaryCta}
+            </CTAButton>
+          }
+        />
+      </Section>
+
       {/* 5. CTA: See why teams make the switch */}
       <Section spacing="lg" background="transparent">
         <CTAPanel

@@ -33,7 +33,7 @@ export const platformContent = {
   },
 
   cta: {
-    headline: 'See it with your workflow in mind',
+    headline: 'See how it works with your cases',
     options: {
       demo: 'Book a demo',
       howItWorks: 'How it works',

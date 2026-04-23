@@ -83,7 +83,7 @@ export const HrCompanyContextProvider: React.FC<{ children: React.ReactNode }> =
       if (err?.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
-        setError('Failed to load company.');
+        setError('Company profile did not load. Refresh to try again.');
       }
     } finally {
       setLoading(false);

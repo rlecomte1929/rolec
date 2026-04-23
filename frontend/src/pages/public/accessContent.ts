@@ -11,17 +11,17 @@ export const accessContent = {
   options: {
     bookDemo: {
       label: 'Book a demo',
-      description: 'Walk through with our team',
+      description: 'See a case from HR intake to completion',
       cta: 'Book a demo',
     },
     signIn: {
       label: 'Sign in',
-      description: 'Open your workspace',
+      description: 'See your cases and next actions',
       cta: 'Sign in',
     },
     createAccount: {
       label: 'Create account',
-      description: 'Register for ReloPass',
+      description: 'Start with one case, no credit card required',
       cta: 'Create account',
     },
   },
