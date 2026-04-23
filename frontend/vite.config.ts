@@ -12,6 +12,18 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom', 'react-router-dom'],
   },
+  build: {
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'supabase-vendor': ['@supabase/supabase-js'],
+          'axios-vendor': ['axios'],
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     allowedHosts: ['relopass.relopass.com'],

@@ -15,6 +15,8 @@ export interface RequestPerfEntry {
   ok: boolean;
   durationHeadersMs: number;
   durationBodyMs: number;
+  /** Server-side handler time parsed from `Server-Timing: app;dur=...`, when present. */
+  serverMs?: number;
   startedAt: number;
 }
 
@@ -70,12 +72,17 @@ export function recordRequestPerf(entry: RequestPerfEntry) {
     requestLog.splice(0, requestLog.length - MAX_REQUEST_LOGS);
   }
   // Console log for quick inspection
-  // Example: [perf] req <id> GET /api/foo status=200 headers_ms=12.3 body_ms=20.1
+  // Example: [perf] req <id> GET /api/foo status=200 total_ms=32.4 server_ms=12.1 network_ms=20.3
   // eslint-disable-next-line no-console
+  const totalMs = entry.durationBodyMs;
+  const serverStr = typeof entry.serverMs === 'number' ? ` server_ms=${entry.serverMs.toFixed(1)}` : '';
+  const networkStr =
+    typeof entry.serverMs === 'number'
+      ? ` network_ms=${Math.max(0, totalMs - entry.serverMs).toFixed(1)}`
+      : '';
   console.log(
     `[perf] req ${entry.requestId} ${entry.method} ${entry.path} ` +
-      `status=${entry.status} ok=${entry.ok} ` +
-      `headers_ms=${entry.durationHeadersMs.toFixed(1)} body_ms=${entry.durationBodyMs.toFixed(1)}`
+      `status=${entry.status} ok=${entry.ok} total_ms=${totalMs.toFixed(1)}${serverStr}${networkStr}`
   );
   notifyListeners();
 }

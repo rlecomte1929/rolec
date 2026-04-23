@@ -159,7 +159,7 @@ PYTHONPATH=. python backend/scripts/audit_policy_assistant.py
 | ------------- | ---------------------------------------------------------------------- |
 | Runtime       | Python 3.11 (`.python-version`)                                         |
 | Build Command | `pip install -r backend/requirements.txt`                              |
-| Start Command | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --proxy-headers` |
+| Start Command | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers ${WEB_CONCURRENCY:-4} --proxy-headers` |
 
 Required env vars:
 

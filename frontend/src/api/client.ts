@@ -60,8 +60,8 @@ export { API_BASE_URL };
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  /** Avoid hanging UI for minutes when the API/proxy is wedged; large uploads can override per-request. */
-  timeout: 90_000,
+  /** Fast-fail so users see a real error instead of a spinner when the API is slow. Long-running calls (uploads, policy extraction) override per-request. */
+  timeout: 15_000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -149,6 +149,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/** Parse `Server-Timing: app;dur=12.3, db;dur=4.2` → the `app` duration, or undefined. */
+function parseServerTiming(header: string | null | undefined): number | undefined {
+  if (!header) return undefined;
+  for (const part of header.split(',')) {
+    const trimmed = part.trim();
+    if (!trimmed.toLowerCase().startsWith('app')) continue;
+    const match = /dur\s*=\s*([\d.]+)/i.exec(trimmed);
+    if (match) {
+      const n = Number(match[1]);
+      return Number.isFinite(n) ? n : undefined;
+    }
+  }
+  return undefined;
+}
+
 // Global 401 handler + perf logging
 api.interceptors.response.use(
   (res) => {
@@ -161,6 +176,10 @@ api.interceptors.response.use(
         // With axios we don't get a separate "headers" vs "body" hook; treat both as full duration.
         const path = (res.config.url || '').split('?')[0] || '/';
         const method = (res.config.method || 'GET').toUpperCase();
+        const serverTiming =
+          (res.headers && (res.headers['server-timing'] || res.headers['Server-Timing'])) as
+            | string
+            | undefined;
         recordRequestPerf({
           requestId: meta.requestId,
           method,
@@ -169,6 +188,7 @@ api.interceptors.response.use(
           ok: res.status >= 200 && res.status < 300,
           durationHeadersMs: duration,
           durationBodyMs: duration,
+          serverMs: parseServerTiming(serverTiming),
           startedAt: meta.tStart,
         });
       }
@@ -188,6 +208,11 @@ api.interceptors.response.use(
         const duration = tEnd - meta.tStart;
         const path = (cfg.url || '').split('?')[0] || '/';
         const method = (cfg.method || 'GET').toUpperCase();
+        const resHeaders = err?.response?.headers;
+        const serverTiming =
+          (resHeaders && (resHeaders['server-timing'] || resHeaders['Server-Timing'])) as
+            | string
+            | undefined;
         recordRequestPerf({
           requestId: meta.requestId,
           method,
@@ -196,6 +221,7 @@ api.interceptors.response.use(
           ok: false,
           durationHeadersMs: duration,
           durationBodyMs: duration,
+          serverMs: parseServerTiming(serverTiming),
           startedAt: meta.tStart,
         });
       }
@@ -486,7 +512,7 @@ export const hrAPI = {
   uploadCompanyLogo: async (file: File): Promise<{ ok: boolean; logo_url: string }> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/api/hr/company-profile/logo', formData);
+    const response = await api.post('/api/hr/company-profile/logo', formData, { timeout: 120_000 });
     invalidateApiCache('hr:company-profile');
     invalidateApiCache('company:get');
     return response.data;
@@ -628,7 +654,7 @@ export const hrAPI = {
     };
     const d = documentId?.trim();
     if (d) body.document_id = d;
-    const response = await api.post('/api/hr/policy-assistant/query', body);
+    const response = await api.post('/api/hr/policy-assistant/query', body, { timeout: 120_000 });
     return response.data;
   },
 };
@@ -1772,7 +1798,7 @@ export const employeeAPI = {
     const response = await api.post('/api/employee/policy-assistant/query', {
       assignment_id: assignmentId,
       message,
-    });
+    }, { timeout: 120_000 });
     return response.data;
   },
 };
@@ -2028,7 +2054,7 @@ export const hrPolicyAPI = {
   upload: async (file: File): Promise<{ policyId: string; policy: any }> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/api/hr/policies/upload', formData);
+    const response = await api.post('/api/hr/policies/upload', formData, { timeout: 120_000 });
     return response.data;
   },
   delete: async (policyId: string): Promise<void> => {
@@ -2220,11 +2246,11 @@ export const companyPolicyAPI = {
     form.append('title', meta.title);
     if (meta.version) form.append('version', meta.version);
     if (meta.effective_date) form.append('effective_date', meta.effective_date);
-    const response = await api.post('/api/company-policies/upload', form);
+    const response = await api.post('/api/company-policies/upload', form, { timeout: 120_000 });
     return response.data;
   },
   extract: async (policyId: string): Promise<{ policy: any; benefits: any[] }> => {
-    const response = await api.post(`/api/policies/${policyId}/extract`);
+    const response = await api.post(`/api/policies/${policyId}/extract`, undefined, { timeout: 120_000 });
     return response.data;
   },
   saveBenefits: async (policyId: string, benefits: any[]): Promise<{ policy: any; benefits: any[] }> => {
@@ -2448,11 +2474,11 @@ export const policyDocumentsAPI = {
       });
       console.info('policy upload form keys', [...form.keys()]);
     }
-    const response = await api.post('/api/hr/policy-documents/upload', form, { params });
+    const response = await api.post('/api/hr/policy-documents/upload', form, { params, timeout: 120_000 });
     return response.data;
   },
   reprocess: async (docId: string): Promise<{ document: any }> => {
-    const response = await api.post(`/api/hr/policy-documents/${docId}/reprocess`);
+    const response = await api.post(`/api/hr/policy-documents/${docId}/reprocess`, undefined, { timeout: 120_000 });
     return response.data;
   },
   listClauses: async (docId: string, clauseType?: string): Promise<{ clauses: any[] }> => {
@@ -2509,7 +2535,7 @@ export const policyDocumentsAPI = {
     };
     normalization_draft?: Record<string, unknown> | null;
   }> => {
-    const response = await api.post(`/api/hr/policy-documents/${docId}/normalize`);
+    const response = await api.post(`/api/hr/policy-documents/${docId}/normalize`, undefined, { timeout: 120_000 });
     return response.data;
   },
   bulkDelete: async (documentIds: string[]): Promise<{ ok: boolean; deleted: number; skipped?: Array<{ id: string; reason: string }> }> => {
