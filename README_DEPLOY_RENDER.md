@@ -2,12 +2,14 @@
 
 ## Backend — Web Service (Python)
 
-| Setting        | Value                                                   |
-| -------------- | ------------------------------------------------------- |
-| Runtime        | Python                                                  |
-| Build Command  | `pip install -r backend/requirements.txt`               |
-| Start Command  | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT` |
-| Python Version | Controlled by `.python-version` (3.11.7)                |
+| Setting        | Value                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------ |
+| Runtime        | Python                                                                                           |
+| Build Command  | `pip install -r backend/requirements.txt`                                                        |
+| Start Command  | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers ${WEB_CONCURRENCY:-4} --proxy-headers` |
+| Python Version | Controlled by `.python-version` (3.11.7)                                                         |
+
+> The `--workers` flag is required. Without it, Uvicorn runs a single worker and concurrent requests queue serially behind any slow handler (policy extraction, login hashing, LLM calls). Tune `WEB_CONCURRENCY` to the Render instance's CPU count (default 4).
 
 ### Environment Variables
 

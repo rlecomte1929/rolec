@@ -401,6 +401,9 @@ async def request_id_and_timing_middleware(request: Request, call_next):
         raise
     dur_ms = (time.perf_counter() - start) * 1000
     response.headers["X-Request-ID"] = req_id
+    # Server-Timing lets the browser (and our perf.ts) split server handler time
+    # from network time without needing a separate API call.
+    response.headers["Server-Timing"] = f"app;dur={dur_ms:.1f}"
     user_id = getattr(request.state, "user_id", None)
     log.info(
         "request_id=%s method=%s path=%s status=%s dur_ms=%.2f user_id=%s",
@@ -421,7 +424,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID"],
+    expose_headers=["X-Request-ID", "Server-Timing"],
     # Fewer preflight round-trips on repeat requests (helps perceived lag on slow networks).
     max_age=86400,
 )

@@ -23,6 +23,7 @@ import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, Header, HTTPException, Request
+from passlib.context import CryptContext
 
 from ...database import db
 from ...identity_errors import IdentityErrorCode, err_detail
@@ -46,6 +47,11 @@ from ..auth_deps import _is_admin_user
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
+
+# Module-level CryptContext: building this is non-trivial (passlib inspects backends
+# and compiles schemes on first construction). Previously rebuilt per request inside
+# register/login — now reused across requests.
+_pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 AUTH_PERF_DEBUG = os.getenv("AUTH_PERF_DEBUG", "").lower() in ("1", "true", "yes")
 
@@ -126,11 +132,7 @@ def register(body: RegisterRequest, request: Request):
         if not body.password:
             raise HTTPException(status_code=400, detail="Password required")
 
-        from passlib.context import CryptContext
-        # PBKDF2 — avoids bcrypt backend issues on Windows; unmaintained but no
-        # CVE surface. argon2 migration tracked as a follow-up.
-        pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-        password_hash = pwd_context.hash(body.password)
+        password_hash = _pwd_context.hash(body.password)
 
         role = body.role
         if role == UserRole.ADMIN and (not email or not email.endswith("@relopass.com") or not db.is_admin_allowlisted(email)):
@@ -298,9 +300,7 @@ def login(body: LoginRequest, request: Request):
             detail=err_detail(IdentityErrorCode.AUTH_NO_PASSWORD, "Invalid credentials"),
         )
 
-    from passlib.context import CryptContext
-    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-    if not pwd_context.verify(body.password, user["password_hash"]):
+    if not _pwd_context.verify(body.password, user["password_hash"]):
         log.warning("auth_login fail wrong_password user_id=%s", user.get("id", "")[:8])
         identity_event(
             "identity.auth.signin.failed",
