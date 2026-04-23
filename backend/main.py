@@ -475,7 +475,7 @@ def timed(span: str, request_id: Optional[str] = None):
           log.info("span=%s dur_ms=%.2f", span, dur_ms)
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health_check():
     return {
         "status": "ok",
@@ -1185,7 +1185,7 @@ def _require_case_access(case_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
     return {"assignment": assignment, "effective_user": effective}
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "ReloPass API"}
