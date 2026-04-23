@@ -43,7 +43,7 @@ export const Auth: React.FC = () => {
       await login({ identifier, password });
     } catch (err: any) {
       const transport = getClientTransportErrorMessage(err);
-      const msg = transport ?? getApiErrorMessage(err, 'Login failed. Try again.');
+      const msg = transport ?? getApiErrorMessage(err, 'Login failed. Check your email and password, then try again.');
       try {
         localStorage.setItem('debug_last_auth_error', msg);
       } catch {
@@ -116,12 +116,12 @@ export const Auth: React.FC = () => {
         } else if (message) {
           msg = message;
         } else {
-          msg = 'Registration failed. Check your details and try again.';
+          msg = 'Registration failed. Check email and password format, then try again.';
         }
       } else if (err.response?.status === 400 && detail) {
         msg = Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail);
       } else if (!err.response) {
-        msg = 'Cannot reach server. Is the backend running? Check the console for details.';
+        msg = 'Cannot reach the server. Check your connection and try again.';
       } else {
         msg = detail ? (Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail)) : 'Registration failed. Try again.';
       }

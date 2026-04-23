@@ -142,7 +142,7 @@ export const EmployeeAssignmentProvider: React.FC<{ children: React.ReactNode }>
         setPrimaryAssignmentCompany(null);
         setLinkedSummaries([]);
         setPendingSummaries([]);
-        setOverviewError('Check your connection, then refresh.');
+        setOverviewError('Overview did not load. Check your connection and refresh.');
         trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.overviewLookupComplete, {
           pathname: path,
           ok: false,
