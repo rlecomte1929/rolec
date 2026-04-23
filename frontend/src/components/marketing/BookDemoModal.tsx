@@ -180,7 +180,7 @@ export const BookDemoModal: React.FC = () => {
               <div>
                 <p className="text-base font-medium text-marketing-primary">Request received.</p>
                 <p className="mt-1 text-sm text-marketing-text-muted">
-                  We'll reply within one business day with next steps.
+                  We'll reply within the next few business days.
                 </p>
               </div>
             </div>
