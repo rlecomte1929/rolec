@@ -20,11 +20,11 @@ export const landingContent = {
         body: 'Email, spreadsheets, and vendor threads do not share one case view.',
       },
       {
-        title: 'Weak visibility',
+        title: 'No single view',
         body: 'Hard to see what moved, what is blocked, and who owns the next step.',
       },
       {
-        title: 'Heavy follow-up',
+        title: 'Follow-up becomes the work',
         body: 'Too much time on documents, pings, and status checks.',
       },
     ],
