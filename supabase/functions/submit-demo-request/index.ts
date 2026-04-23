@@ -11,6 +11,7 @@ const MAX_FIRST_NAME = 80;
 const MAX_COMPANY = 120;
 const MAX_CHALLENGE = 500;
 const MAX_SOURCE_PAGE = 120;
+const RATE_LIMIT_PER_HOUR = 5;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -177,6 +178,45 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function clientIp(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+}
+
+async function hashIp(ip: string): Promise<string> {
+  const data = new TextEncoder().encode(`demo-request:${ip}`);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// deno-lint-ignore no-explicit-any
+async function checkRateLimit(supabase: any, ipHash: string): Promise<{ ok: boolean; count: number }> {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+  // Opportunistic cleanup: drop records older than 1 hour so the table stays tiny.
+  await supabase.from("demo_request_rate_limits").delete().lt("created_at", oneHourAgo);
+
+  const { count, error } = await supabase
+    .from("demo_request_rate_limits")
+    .select("id", { count: "exact", head: true })
+    .eq("ip_hash", ipHash)
+    .gte("created_at", oneHourAgo);
+
+  if (error) {
+    console.error("[submit-demo-request] Rate-limit query error:", error);
+    // Fail open: never block legitimate users on a counter error.
+    return { ok: true, count: 0 };
+  }
+
+  return { ok: (count ?? 0) < RATE_LIMIT_PER_HOUR, count: count ?? 0 };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS_HEADERS });
@@ -204,6 +244,15 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceKey);
 
+  const ipHash = await hashIp(clientIp(req));
+  const rate = await checkRateLimit(supabase, ipHash);
+  if (!rate.ok) {
+    return Response.json(
+      { ok: false, error: "Too many requests. Please try again later." },
+      { status: 429, headers: CORS_HEADERS }
+    );
+  }
+
   const userAgent = req.headers.get("user-agent")?.slice(0, 300) ?? null;
 
   const { data: inserted, error: insertError } = await supabase
@@ -226,6 +275,10 @@ Deno.serve(async (req: Request) => {
       { status: 500, headers: CORS_HEADERS }
     );
   }
+
+  // Count this submission for rate-limit tracking. Best-effort; a failure
+  // here just means the next request won't "see" this one in the counter.
+  await supabase.from("demo_request_rate_limits").insert({ ip_hash: ipHash });
 
   const notifyTo = Deno.env.get("DEMO_NOTIFY_TO") || "romain.lecomte@relopass.com";
   const data = { ...validation.cleaned, demoId: inserted.id as string };
