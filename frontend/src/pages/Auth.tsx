@@ -152,13 +152,13 @@ export const Auth: React.FC = () => {
             <img src="/relopass-logo.png?v=1" alt="ReloPass logo" className="h-11 w-11 rounded-2xl object-contain" />
             <div>
               <h1 className="text-3xl font-semibold text-[#0b2b43]">ReloPass</h1>
-              <p className="text-[#4b5563]">Guided relocation management for HR and employees.</p>
+              <p className="text-[#4b5563]">Run relocation as one process. Cases, documents, and providers in one place.</p>
             </div>
           </div>
           <div className="space-y-2 text-sm text-[#4b5563]">
-            <div>• Centralized relocation intake and compliance checks.</div>
-            <div>• Track readiness, housing, schooling, and movers.</div>
-            <div>• HR review workflow with clear decisions.</div>
+            <div>• Case intake, readiness, and compliance in one workflow.</div>
+            <div>• Track housing, schooling, and provider work on the case.</div>
+            <div>• HR review with clear decisions on each step.</div>
           </div>
         </div>
 

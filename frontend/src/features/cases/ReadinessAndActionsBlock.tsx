@@ -53,7 +53,7 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
     return (
       <Card padding="md" className="border border-amber-200 bg-amber-50/50">
         <p className="text-sm text-[#7a5e2a]">
-          Readiness summary unavailable. Refresh the page. If it persists, check the API deployment.
+          Readiness summary did not load. Refresh the page; if it persists, contact support.
         </p>
       </Card>
     );
@@ -74,8 +74,8 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
           </div>
           <p className="text-sm text-[#475569] mt-2 max-w-3xl">{ui.completion_basis}</p>
           <p className="text-xs text-[#64748b] mt-2 max-w-3xl leading-relaxed">
-            Checklist items map to <strong>relocation plan</strong> tasks in step 3 (same case). Use the plan for owner
-            and due date. This is not legal advice unless Case readiness cites an official source.
+            Checklist items link to <strong>relocation plan</strong> tasks (step 3, same case). Use the plan for owner
+            and due date. This summary is informational, not legal advice.
           </p>
           {pctExplicit !== null && (
             <p className="text-xs text-[#64748b] mt-1">
