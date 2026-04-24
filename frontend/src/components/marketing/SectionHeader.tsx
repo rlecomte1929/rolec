@@ -8,6 +8,8 @@ interface SectionHeaderProps {
   align?: 'left' | 'center';
   /** Max width of content for readability when centered */
   narrow?: boolean;
+  /** Heading element. Default h2; use h1 when this is the page's primary heading. */
+  as?: 'h1' | 'h2';
   className?: string;
 }
 
@@ -17,6 +19,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   subtitle,
   align = 'left',
   narrow = false,
+  as: Heading = 'h2',
   className = '',
 }) => {
   const alignClass = align === 'center' ? 'text-center' : '';
@@ -30,9 +33,9 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
           {eyebrow}
         </p>
       )}
-      <h2 className="text-marketing-h1 font-semibold text-marketing-primary tracking-tight">
+      <Heading className="text-marketing-h1 font-semibold text-marketing-primary tracking-tight">
         {title}
-      </h2>
+      </Heading>
       {subtitle && (
         <p className="mt-4 text-marketing-body-lg text-marketing-text-muted leading-relaxed">
           {subtitle}

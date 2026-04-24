@@ -24,8 +24,10 @@ export const PlatformPage: React.FC = () => {
         <div className="flex flex-col lg:grid lg:grid-cols-[1.4fr,1fr] lg:items-center gap-10 lg:gap-12">
           <div className="min-w-0">
             <HeroSurface
+              eyebrow={c.hero.eyebrow}
               title={c.hero.headline}
               subtitle={c.hero.subheadline}
+              trustMicrocopy={c.hero.trustMicrocopy}
               actions={
                 <>
                   <CTAButton onClick={() => openDemoBooking('platform-hero')} variant="primary" size="lg">

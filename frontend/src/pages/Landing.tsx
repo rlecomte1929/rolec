@@ -41,6 +41,8 @@ export const Landing: React.FC = () => {
           eyebrow={c.hero.eyebrow}
           title={c.hero.headline}
           subtitle={c.hero.subheadline}
+          brandPromise={c.hero.brandPromise}
+          trustMicrocopy={c.hero.trustMicrocopy}
           actions={
             <>
               <CTAButton onClick={() => openDemoBooking('landing-hero')} variant="primary" size="lg">
@@ -75,6 +77,7 @@ export const Landing: React.FC = () => {
       {/* 3. SOLUTION: 4 blocks */}
       <Section spacing="lg" background="transparent">
         <SectionHeader
+          eyebrow={c.solution.sectionHeader}
           title={c.solution.title}
           align="center"
         />
@@ -93,6 +96,18 @@ export const Landing: React.FC = () => {
       {/* 4. DIFFERENTIATION / TRUST: Left text, right checklist */}
       <Section spacing="lg" background="muted">
         <div className="max-w-5xl mx-auto">
+        {c.trust.categoryBoundary && (
+          <div className="mb-10 text-center">
+            <p className="text-marketing-body-lg font-bold text-marketing-primary">
+              {c.trust.categoryBoundary.positive}
+            </p>
+            {c.trust.categoryBoundary.negatives.map((line) => (
+              <p key={line} className="text-marketing-body text-marketing-text-muted font-medium">
+                {line}
+              </p>
+            ))}
+          </div>
+        )}
         <TrustDifferentiation
           title={c.trust.title}
           body={c.trust.body}

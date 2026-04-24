@@ -4,11 +4,13 @@
 
 export const whyReloPassContent = {
   hero: {
+    eyebrow: 'For HR and mobility teams',
     headline: 'Relocation fails in the handoffs',
     subheadline:
       'Inboxes, spreadsheets, and vendor updates rarely share one picture. ReloPass keeps coordination on the case.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
+    trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
 
   currentReality: {
@@ -26,6 +28,14 @@ export const whyReloPassContent = {
 
   differentiation: {
     title: 'What is different',
+    categoryBoundary: {
+      positive: 'One system of record for every cross-border relocation.',
+      negatives: [
+        'Not a relocation agency.',
+        'Not a vendor marketplace.',
+        'Not an HR add-on.',
+      ],
+    },
     blocks: [
       {
         title: 'Case at the center',
@@ -49,12 +59,12 @@ export const whyReloPassContent = {
   },
 
   peakCta: {
-    headline: 'Try this on one case.',
+    headline: 'Every relocation case is visible, compliant, on-time.',
     primaryCta: 'Book a demo',
   },
 
   cta: {
-    headline: 'See why teams switch',
+    headline: 'Tell us how your relocations run today.',
     options: {
       demo: 'Book a demo',
       howItWorks: 'How it works',

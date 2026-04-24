@@ -4,10 +4,12 @@
 
 export const trustContent = {
   hero: {
+    eyebrow: 'For HR and mobility teams',
     headline: 'Clear case view end to end',
-    subheadline: 'See done work, gaps, and the next action in one place.',
+    subheadline: 'See completed steps, open blockers, and the next action on every case.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
+    trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
 
   process: {

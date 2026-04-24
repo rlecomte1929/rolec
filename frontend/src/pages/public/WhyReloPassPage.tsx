@@ -22,8 +22,10 @@ export const WhyReloPassPage: React.FC = () => {
       {/* 1. HERO: Names the mess, offers a cleaner path */}
       <Section spacing="lg" background="transparent" fillViewport>
         <HeroSurface
+          eyebrow={c.hero.eyebrow}
           title={c.hero.headline}
           subtitle={c.hero.subheadline}
+          trustMicrocopy={c.hero.trustMicrocopy}
           actions={
             <>
               <CTAButton onClick={() => openDemoBooking('why-hero')} variant="primary" size="lg">
@@ -60,6 +62,18 @@ export const WhyReloPassPage: React.FC = () => {
       {/* 3. WHY RELOPASS IS DIFFERENT: Differentiation blocks */}
       <Section spacing="lg" background="transparent">
         <SectionHeader title={c.differentiation.title} align="center" />
+        {c.differentiation.categoryBoundary && (
+          <div className="mt-8 max-w-2xl mx-auto text-center">
+            <p className="text-marketing-body-lg font-bold text-marketing-primary">
+              {c.differentiation.categoryBoundary.positive}
+            </p>
+            {c.differentiation.categoryBoundary.negatives.map((line) => (
+              <p key={line} className="text-marketing-body text-marketing-text-muted font-medium">
+                {line}
+              </p>
+            ))}
+          </div>
+        )}
         <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 max-w-4xl mx-auto">
           {c.differentiation.blocks.map((block, i) => (
             <TrustContentBlock

@@ -19,10 +19,12 @@ export const AccessPage: React.FC = () => {
       <Section spacing="lg" background="transparent" fillViewport>
         <div className="max-w-2xl mx-auto text-center">
           <SectionHeader
+            eyebrow={c.hero.eyebrow}
             title={c.hero.headline}
             subtitle={c.hero.subheadline}
             align="center"
             narrow
+            as="h1"
           />
         </div>
       </Section>
@@ -36,6 +38,7 @@ export const AccessPage: React.FC = () => {
             cta={c.options.bookDemo.cta}
             onClick={() => openDemoBooking('access-page')}
             variant="primary"
+            trustMicrocopy={c.hero.trustMicrocopy}
           />
           <AccessOptionCard
             label={c.options.signIn.label}
@@ -53,8 +56,14 @@ export const AccessPage: React.FC = () => {
           />
         </div>
 
+        {c.closingCta && (
+          <p className="mt-12 sm:mt-14 text-marketing-body-lg font-semibold text-marketing-primary text-center max-w-2xl mx-auto leading-relaxed">
+            {c.closingCta}
+          </p>
+        )}
+
         {/* 3. REASSURANCE */}
-        <p className="mt-12 sm:mt-14 text-base text-marketing-text-muted text-center max-w-xl mx-auto leading-relaxed">
+        <p className="mt-6 text-base text-marketing-text-muted text-center max-w-xl mx-auto leading-relaxed">
           {c.reassurance}
         </p>
       </Section>
