@@ -79,9 +79,14 @@ export const AdminProspects: React.FC = () => {
 
   // Detail drawer state
   const [selected, setSelected] = useState<ProspectRow | null>(null);
+  const [bulkReenriching, setBulkReenriching] = useState(false);
   const [detailBusy, setDetailBusy] = useState(false);
 
   const parsedSeeds = useMemo(() => parseSeedText(seedText), [seedText]);
+  const failedCount = useMemo(
+    () => rows.filter((r) => r.status === 'enrichment_failed').length,
+    [rows],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -212,6 +217,33 @@ export const AdminProspects: React.FC = () => {
     }
   };
 
+  const reenrichAllFailed = async () => {
+    if (bulkReenriching) return;
+    if (failedCount === 0) return;
+    if (!window.confirm(`Re-run enrichment on ${failedCount} failed prospects?`)) return;
+    setBulkReenriching(true);
+    setError(null);
+    try {
+      const res = await adminProspectsAPI.reenrichFailed(enableWebSearch);
+      setLastBatchMsg(
+        `Re-queued ${res.reenriched} prospects${
+          res.enable_web_search
+            ? ` (web search on, est. ~$${res.estimated_web_search_cost_usd.toFixed(2)})`
+            : ''
+        }.`,
+      );
+      await load();
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : (err as Error)?.message;
+      setError(String(msg || 'Bulk re-enrich failed'));
+    } finally {
+      setBulkReenriching(false);
+    }
+  };
+
   const exportApproved = async () => {
     // Fetch the CSV with the admin bearer token, then trigger a client-side
     // download — `window.open` can't carry auth headers.
@@ -301,6 +333,23 @@ export const AdminProspects: React.FC = () => {
           ))}
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-[#6b7280]">{total} total</span>
+            {failedCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={reenrichAllFailed}
+                disabled={bulkReenriching}
+                title={
+                  enableWebSearch
+                    ? 'Web search is ON for this re-run (toggle is in the import form above).'
+                    : 'Web search is OFF for this re-run (toggle is in the import form above).'
+                }
+              >
+                {bulkReenriching
+                  ? 'Re-queuing…'
+                  : `Re-enrich ${failedCount} failed`}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               {loading ? 'Loading…' : 'Refresh'}
             </Button>

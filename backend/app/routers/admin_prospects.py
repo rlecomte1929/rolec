@@ -90,6 +90,12 @@ class ReenrichRequest(BaseModel):
     enable_web_search: bool = False
 
 
+class ReenrichFailedResponse(BaseModel):
+    reenriched: int
+    enable_web_search: bool
+    estimated_web_search_cost_usd: float
+
+
 class ProspectRowOut(BaseModel):
     id: str
     company_name: str
@@ -238,6 +244,51 @@ def ingest_batch(
         estimated_web_search_cost_usd=(
             estimate_batch_cost_usd(len(queued_ids))
             if payload.enable_web_search
+            else 0.0
+        ),
+    )
+
+
+@router.post("/reenrich-failed", response_model=ReenrichFailedResponse)
+def reenrich_failed(
+    body: ReenrichRequest,
+    background_tasks: BackgroundTasks,
+    _: dict = Depends(require_admin),
+) -> ReenrichFailedResponse:
+    """Re-queue every `enrichment_failed` row for enrichment in one call.
+
+    Caps at 500 rows per call to match the batch-ingest limit — if you
+    somehow have more failures than that, run the action a second time.
+    The original `batch_id` on each row is preserved so the prospects
+    stay grouped with their import batch.
+    """
+    queued_ids: List[str] = []
+    with SessionLocal() as db:
+        rows = (
+            db.query(ProspectCandidate)
+            .filter(ProspectCandidate.status == "enrichment_failed")
+            .limit(500)
+            .all()
+        )
+        for row in rows:
+            row.status = "pending_enrichment"
+            row.enrichment_error = None
+            queued_ids.append(row.id)
+        db.commit()
+    for prospect_id in queued_ids:
+        background_tasks.add_task(
+            enrich_prospect,
+            EnrichmentRequest(
+                prospect_id=prospect_id,
+                enable_web_search=body.enable_web_search,
+            ),
+        )
+    return ReenrichFailedResponse(
+        reenriched=len(queued_ids),
+        enable_web_search=body.enable_web_search,
+        estimated_web_search_cost_usd=(
+            estimate_batch_cost_usd(len(queued_ids))
+            if body.enable_web_search
             else 0.0
         ),
     )

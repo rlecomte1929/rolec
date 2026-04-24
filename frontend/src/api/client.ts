@@ -1242,6 +1242,17 @@ export const adminProspectsAPI = {
     api
       .post(`/api/admin/prospects/${prospectId}/reenrich`, { enable_web_search: enableWebSearch })
       .then((r) => r.data as ProspectRow),
+  reenrichFailed: async (enableWebSearch: boolean) =>
+    api
+      .post('/api/admin/prospects/reenrich-failed', { enable_web_search: enableWebSearch })
+      .then(
+        (r) =>
+          r.data as {
+            reenriched: number;
+            enable_web_search: boolean;
+            estimated_web_search_cost_usd: number;
+          },
+      ),
   costEstimate: async (prospectCount: number) =>
     api
       .get('/api/admin/prospects/cost-estimate', { params: { prospect_count: prospectCount } })
