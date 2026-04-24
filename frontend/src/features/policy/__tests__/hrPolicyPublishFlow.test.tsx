@@ -190,7 +190,7 @@ describe('HrPolicyReviewWorkspace publish integration (mocked API)', () => {
     render(<HrPolicyReviewWorkspace refreshTrigger={0} />);
 
     await waitFor(() => expect(screen.getByRole('button', { name: /publish policy/i })).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /publish policy/i })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: /publish policy/i })).toBeDisabled());
     fireEvent.click(screen.getByRole('button', { name: /publish policy/i }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(policyClientMocks.publishLatestVersion).not.toHaveBeenCalled();
