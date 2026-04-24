@@ -1178,6 +1178,86 @@ export const suppliersAPI = {
   },
 };
 
+// Admin HR Prospect Pipeline API (admin only)
+export type ProspectSeedItem = {
+  company_name: string;
+  company_domain?: string;
+  company_linkedin_url?: string;
+  notes?: string;
+};
+
+export type ProspectRow = {
+  id: string;
+  company_name: string;
+  company_domain: string | null;
+  company_linkedin_url: string | null;
+  icp_score: number | null;
+  qualification_band: string | null;
+  suggested_contact_title: string | null;
+  suggested_hook: string | null;
+  status: string;
+  web_search_used: boolean;
+  batch_id: string | null;
+  enrichment_error: string | null;
+  enriched?: Record<string, unknown> | null;
+  raw_input?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  enriched_at: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+};
+
+export const adminProspectsAPI = {
+  list: async (params?: {
+    status?: string;
+    band?: string;
+    batch_id?: string;
+    min_score?: number;
+    limit?: number;
+    offset?: number;
+  }) =>
+    api
+      .get('/api/admin/prospects', { params: params || {} })
+      .then((r) => r.data as { total: number; limit: number; offset: number; prospects: ProspectRow[] }),
+  get: async (prospectId: string) =>
+    api.get(`/api/admin/prospects/${prospectId}`).then((r) => r.data as ProspectRow),
+  ingestBatch: async (payload: { prospects: ProspectSeedItem[]; enable_web_search: boolean }) =>
+    api
+      .post('/api/admin/prospects/batch', payload)
+      .then(
+        (r) =>
+          r.data as {
+            batch_id: string;
+            queued: number;
+            enable_web_search: boolean;
+            estimated_web_search_cost_usd: number;
+          },
+      ),
+  triage: async (prospectId: string, decision: 'approved' | 'maybe' | 'rejected') =>
+    api
+      .post(`/api/admin/prospects/${prospectId}/triage`, { decision })
+      .then((r) => r.data as ProspectRow),
+  reenrich: async (prospectId: string, enableWebSearch: boolean) =>
+    api
+      .post(`/api/admin/prospects/${prospectId}/reenrich`, { enable_web_search: enableWebSearch })
+      .then((r) => r.data as ProspectRow),
+  costEstimate: async (prospectCount: number) =>
+    api
+      .get('/api/admin/prospects/cost-estimate', { params: { prospect_count: prospectCount } })
+      .then(
+        (r) =>
+          r.data as {
+            prospect_count: number;
+            tavily_cost_per_query_usd: number;
+            estimated_web_search_cost_usd: number;
+            notes: string;
+          },
+      ),
+  exportCsvUrl: (status: string = 'approved') =>
+    `${API_BASE_URL}/api/admin/prospects/export.csv?status=${encodeURIComponent(status)}`,
+};
+
 // Admin recommendations debug (admin only)
 export const adminRecommendationsAPI = {
   getDebug: async (assignmentId: string, serviceCategory: string) => {

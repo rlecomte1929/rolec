@@ -70,6 +70,7 @@ const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((module) =
 const AdminAssignments = lazy(() => import('./pages/admin/AdminAssignments').then((module) => ({ default: module.AdminAssignments })));
 const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((module) => ({ default: module.AdminMessages })));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
+const AdminProspects = lazy(() => import('./pages/admin/AdminProspects').then((module) => ({ default: module.AdminProspects })));
 const AdminSupplierNew = lazy(() => import('./pages/admin/AdminSupplierNew').then((module) => ({ default: module.AdminSupplierNew })));
 const AdminSupplierDetail = lazy(() => import('./pages/admin/AdminSupplierDetail').then((module) => ({ default: module.AdminSupplierDetail })));
 const AdminCompanyDetail = lazy(() => import('./pages/admin/AdminCompanyDetail').then((module) => ({ default: module.AdminCompanyDetail })));
@@ -221,6 +222,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminRelocations.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminAssignments.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminMessages.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminProspects.path} element={<RequireAdminRoute><AdminProspects /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliersNew.path} element={<RequireAdminRoute><AdminSupplierNew /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliersDetail.path} element={<RequireAdminRoute><AdminSupplierDetail /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResources.path} element={<RequireAdminRoute><AdminResources /></RequireAdminRoute>} />

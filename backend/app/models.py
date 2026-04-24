@@ -349,6 +349,39 @@ class PolicyFactCanonicalValidationError(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
 
+class ProspectCandidate(Base):
+    """HR prospect pipeline staging row, enriched by the LLM agent.
+
+    Lifecycle: pending_enrichment → enriched → approved | maybe | rejected.
+    `raw_input_json` is what the admin provided (domain, name, notes);
+    `enriched_json` is what the agent produced (company profile, signals,
+    rationale). The top-level score / band / hook columns mirror the most
+    useful fields of enriched_json for list-view filtering.
+    """
+
+    __tablename__ = "prospect_candidates"
+
+    id = Column(String, primary_key=True, index=True)
+    company_name = Column(String, nullable=False)
+    company_domain = Column(String, nullable=True, index=True)
+    company_linkedin_url = Column(String, nullable=True)
+    raw_input_json = Column(Text, nullable=False, default="{}")
+    enriched_json = Column(Text, nullable=False, default="{}")
+    icp_score = Column(Integer, nullable=True, index=True)
+    qualification_band = Column(String, nullable=True)
+    suggested_contact_title = Column(String, nullable=True)
+    suggested_hook = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default="pending_enrichment", index=True)
+    enrichment_error = Column(Text, nullable=True)
+    web_search_used = Column(Boolean, nullable=False, default=False)
+    batch_id = Column(String, nullable=True, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    enriched_at = Column(DateTime, nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    reviewed_by = Column(String, nullable=True)
+
+
 class QueryAuditLog(Base):
     __tablename__ = "canonical_policy_query_audit_logs"
 
