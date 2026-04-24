@@ -3,6 +3,7 @@ FastAPI main application for ReloPass backend.
 """
 import asyncio
 import logging
+import threading
 import time
 import os
 import json as _json
@@ -192,31 +193,86 @@ async def _background_seed_task() -> None:
         log.exception("Background startup seed task failed")
 
 
+def _run_startup_step_with_timeout(step_name: str, fn, timeout_s: int) -> bool:
+    """Run one startup step with a hard wall-clock timeout.
+
+    Each step emits structured `startup_step=...` logs on entry, exit, timeout,
+    and error, so if a deploy hangs you can see exactly which step stopped
+    responding instead of staring at a silent gap. A hung step is *abandoned*
+    (the daemon thread keeps running but the boot proceeds) — this is
+    deliberate: we'd rather serve requests with one degraded probe than fail
+    to bind the port within Render's ~5-min scan deadline. Returns True if
+    the step completed cleanly, False on timeout or exception.
+    """
+    log.info("startup_step=%s status=starting timeout_s=%d", step_name, timeout_s)
+    done = threading.Event()
+    capture: Dict[str, Any] = {"error": None}
+
+    def _runner() -> None:
+        try:
+            fn()
+        except Exception as exc:  # noqa: BLE001 — captured and logged below
+            capture["error"] = exc
+        finally:
+            done.set()
+
+    t = threading.Thread(
+        target=_runner,
+        daemon=True,
+        name=f"startup-{step_name}",
+    )
+    started = time.perf_counter()
+    t.start()
+    completed = done.wait(timeout=timeout_s)
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    if not completed:
+        log.warning(
+            "startup_step=%s status=TIMED_OUT after %ds — continuing boot without it",
+            step_name,
+            timeout_s,
+        )
+        return False
+    if capture["error"] is not None:
+        exc = capture["error"]
+        log.warning(
+            "startup_step=%s status=error elapsed_ms=%d %s: %s",
+            step_name,
+            elapsed_ms,
+            type(exc).__name__,
+            exc,
+        )
+        return False
+    log.info("startup_step=%s status=done elapsed_ms=%d", step_name, elapsed_ms)
+    return True
+
+
 def _run_runtime_startup_initialization() -> None:
     log.info("Initializing database schemas...")
-    init_db()
-    db.ensure_initialized()
-    db.log_expected_tables_status()
-    try:
-        from .services.policy_storage_health import log_startup_storage_diagnostic
+    _run_startup_step_with_timeout("init_db", init_db, timeout_s=60)
+    _run_startup_step_with_timeout("ensure_initialized", db.ensure_initialized, timeout_s=60)
+    _run_startup_step_with_timeout(
+        "log_expected_tables_status", db.log_expected_tables_status, timeout_s=30
+    )
 
+    def _storage_diag() -> None:
+        from .services.policy_storage_health import log_startup_storage_diagnostic
         log_startup_storage_diagnostic(db)
-    except Exception as e:
-        log.warning("policy_storage startup diagnostic skipped: %s", e)
+
+    _run_startup_step_with_timeout("policy_storage_diag", _storage_diag, timeout_s=30)
 
     # Mark as failed any policy_documents rows that were mid-extraction when
     # the previous process exited. Without this they stay stuck in-flight
     # forever and the upload idempotency guard (see #7) blocks retries.
-    try:
+    def _reconcile() -> None:
         from .services.policy_ingest_reconciler import reconcile_orphaned_policy_ingest_jobs
-        _reconcile_summary = reconcile_orphaned_policy_ingest_jobs(db, actor_label="startup")
-        if _reconcile_summary.get("failed"):
+        summary = reconcile_orphaned_policy_ingest_jobs(db, actor_label="startup")
+        if summary.get("failed"):
             log.warning(
                 "Startup policy-ingest reconciler: failed %d orphaned documents",
-                _reconcile_summary["failed"],
+                summary["failed"],
             )
-    except Exception as e:
-        log.warning("Startup policy-ingest reconciler skipped: %s", e)
+
+    _run_startup_step_with_timeout("policy_ingest_reconciler", _reconcile, timeout_s=60)
 
     if _db_scheme == "sqlite" and ALLOW_LEGACY_DEMO_SEED and not DISABLE_DEMO_RESEED:
         try:
