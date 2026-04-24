@@ -157,7 +157,12 @@ export const AdminProspects: React.FC = () => {
       const costNote = res.enable_web_search
         ? ` (web search on, est. ~$${res.estimated_web_search_cost_usd.toFixed(2)})`
         : '';
-      setLastBatchMsg(`Queued ${res.queued} prospects for enrichment${costNote}. Batch ${res.batch_id.slice(0, 8)}…`);
+      const dupeNote = res.skipped_duplicates > 0
+        ? ` Skipped ${res.skipped_duplicates} duplicate${res.skipped_duplicates === 1 ? '' : 's'} (${res.duplicate_domains.slice(0, 5).join(', ')}${res.duplicate_domains.length > 5 ? '…' : ''}).`
+        : '';
+      setLastBatchMsg(
+        `Queued ${res.queued} prospects for enrichment${costNote}.${dupeNote} Batch ${res.batch_id.slice(0, 8)}…`,
+      );
       setSeedText('');
       await load();
     } catch (err: unknown) {
@@ -194,6 +199,25 @@ export const AdminProspects: React.FC = () => {
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : (err as Error)?.message;
       setError(String(msg || 'Triage failed'));
+    } finally {
+      setDetailBusy(false);
+    }
+  };
+
+  const removeSelected = async () => {
+    if (!selected) return;
+    if (!window.confirm(`Delete ${selected.company_name} from the list? This is permanent.`)) return;
+    setDetailBusy(true);
+    try {
+      await adminProspectsAPI.remove(selected.id);
+      setSelected(null);
+      await load();
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : (err as Error)?.message;
+      setError(String(msg || 'Delete failed'));
     } finally {
       setDetailBusy(false);
     }
@@ -522,9 +546,17 @@ export const AdminProspects: React.FC = () => {
               >
                 Reject
               </Button>
-              <div className="ml-auto">
+              <div className="ml-auto flex gap-2">
                 <Button variant="ghost" disabled={detailBusy} onClick={reenrich}>
                   Re-enrich {enableWebSearch ? '(web search on)' : ''}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={detailBusy}
+                  onClick={removeSelected}
+                  title="Delete this prospect row entirely (different from Reject, which keeps it in the list)"
+                >
+                  Delete
                 </Button>
               </div>
             </div>

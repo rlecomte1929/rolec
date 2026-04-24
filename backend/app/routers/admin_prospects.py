@@ -74,6 +74,8 @@ class BatchIngestRequest(BaseModel):
 class BatchIngestResponse(BaseModel):
     batch_id: str
     queued: int
+    skipped_duplicates: int
+    duplicate_domains: List[str]
     enable_web_search: bool
     estimated_web_search_cost_usd: float
 
@@ -208,8 +210,25 @@ def ingest_batch(
         )
     batch_id = str(uuid.uuid4())
     queued_ids: List[str] = []
+    duplicate_domains: List[str] = []
     with SessionLocal() as db:
+        # Collect existing domains once so the dedupe check is O(batch) rather
+        # than one query per row. Lower-cased to match the input normalisation
+        # below — domain comparison is case-insensitive.
+        existing_domains = {
+            (d or "").strip().lower()
+            for (d,) in db.query(ProspectCandidate.company_domain)
+            .filter(ProspectCandidate.company_domain.isnot(None))
+            .all()
+        }
+        seen_in_batch: set[str] = set()
         for item in payload.prospects:
+            normalized_domain = (item.company_domain or "").strip().lower() or None
+            if normalized_domain:
+                if normalized_domain in existing_domains or normalized_domain in seen_in_batch:
+                    duplicate_domains.append(normalized_domain)
+                    continue
+                seen_in_batch.add(normalized_domain)
             row = ProspectCandidate(
                 id=str(uuid.uuid4()),
                 company_name=item.company_name.strip(),
@@ -240,6 +259,8 @@ def ingest_batch(
     return BatchIngestResponse(
         batch_id=batch_id,
         queued=len(queued_ids),
+        skipped_duplicates=len(duplicate_domains),
+        duplicate_domains=duplicate_domains,
         enable_web_search=payload.enable_web_search,
         estimated_web_search_cost_usd=(
             estimate_batch_cost_usd(len(queued_ids))
@@ -396,6 +417,20 @@ def reenrich_prospect(
         ),
     )
     return out
+
+
+@router.delete("/{prospect_id}")
+def delete_prospect(prospect_id: str, _: dict = Depends(require_admin)) -> Dict[str, Any]:
+    """Hard-delete a prospect row. Use for duplicates or rows you don't
+    want cluttering the list — a rejection keeps the row visible under
+    the `rejected` filter, whereas this removes it entirely."""
+    with SessionLocal() as db:
+        row = db.get(ProspectCandidate, prospect_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="prospect not found")
+        db.delete(row)
+        db.commit()
+    return {"deleted": prospect_id}
 
 
 @router.get("/export.csv")

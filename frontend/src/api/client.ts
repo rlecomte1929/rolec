@@ -1230,10 +1230,14 @@ export const adminProspectsAPI = {
           r.data as {
             batch_id: string;
             queued: number;
+            skipped_duplicates: number;
+            duplicate_domains: string[];
             enable_web_search: boolean;
             estimated_web_search_cost_usd: number;
           },
       ),
+  remove: async (prospectId: string) =>
+    api.delete(`/api/admin/prospects/${prospectId}`).then((r) => r.data as { deleted: string }),
   triage: async (prospectId: string, decision: 'approved' | 'maybe' | 'rejected') =>
     api
       .post(`/api/admin/prospects/${prospectId}/triage`, { decision })
