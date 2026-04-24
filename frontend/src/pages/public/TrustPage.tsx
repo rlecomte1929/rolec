@@ -22,8 +22,10 @@ export const TrustPage: React.FC = () => {
       {/* 1. HERO */}
       <Section spacing="lg" background="transparent" fillViewport>
         <HeroSurface
+          eyebrow={c.hero.eyebrow}
           title={c.hero.headline}
           subtitle={c.hero.subheadline}
+          trustMicrocopy={c.hero.trustMicrocopy}
           actions={
             <>
               <CTAButton onClick={() => openDemoBooking('trust-hero')} variant="primary" size="lg">

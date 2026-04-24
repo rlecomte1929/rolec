@@ -1,19 +1,24 @@
 /**
  * Homepage content. Edit here to change marketing copy without layout changes.
+ *
+ * Phase 1 copy update — April 2026
+ * Source: Brand Audit (Phase 0-2) + Branding Blueprint V02
  */
 
 export const landingContent = {
   hero: {
     eyebrow: 'For HR and mobility teams',
-    headline: 'Run relocation as one process',
+    headline: 'The operating layer for cross-border relocation.',
     subheadline:
-      'Cases, documents, providers, and status in one place. Less thread-chasing and spreadsheet glue work.',
+      'Cases, documents, providers, and status on one record. No chased threads, no parallel spreadsheets.',
+    brandPromise: 'Every relocation case is visible, compliant, on-time.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
+    trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
 
   problem: {
-    title: 'Relocation still splits across tools',
+    title: 'Relocation still runs on emails and spreadsheets.',
     cards: [
       {
         title: 'Scattered coordination',
@@ -31,6 +36,7 @@ export const landingContent = {
   },
 
   solution: {
+    sectionHeader: 'Global mobility. Structured.',
     title: 'One structured way to run it',
     blocks: [
       {
@@ -55,12 +61,20 @@ export const landingContent = {
   productStrip: {
     blocks: [
       { title: 'Cases', body: 'One case per relocation' },
-      { title: 'Service providers', body: 'Activity tied to the case' },
-      { title: 'Progress', body: 'See moving, missing, and blocked work' },
+      { title: 'Service providers', body: 'Tasks and updates stay on the case, not in inboxes.' },
+      { title: 'Progress', body: "See what's done, pending, and blocked." },
     ],
   },
 
   trust: {
+    categoryBoundary: {
+      positive: 'One system of record for every cross-border relocation.',
+      negatives: [
+        'Not a relocation agency.',
+        'Not a vendor marketplace.',
+        'Not an HR add-on.',
+      ],
+    },
     title: 'Built for mobility operators.',
     body: 'Workflow, policy-aware guidance, and execution in one system.',
     checklist: [

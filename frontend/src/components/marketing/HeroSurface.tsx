@@ -4,6 +4,8 @@ interface HeroSurfaceProps {
   eyebrow?: string;
   title: string;
   subtitle?: string;
+  brandPromise?: string;
+  trustMicrocopy?: string;
   /** Slot for primary CTA(s) */
   actions?: React.ReactNode;
   /** Slot for secondary content (e.g. stats, trust strip) */
@@ -17,6 +19,8 @@ export const HeroSurface: React.FC<HeroSurfaceProps> = ({
   eyebrow,
   title,
   subtitle,
+  brandPromise,
+  trustMicrocopy,
   actions,
   aside,
   visual,
@@ -39,10 +43,20 @@ export const HeroSurface: React.FC<HeroSurfaceProps> = ({
               {subtitle}
             </p>
           )}
+          {brandPromise && (
+            <p className="mt-4 max-w-xl border-l-[3px] border-marketing-accent pl-3 py-1 text-marketing-body-lg font-medium text-marketing-primary">
+              {brandPromise}
+            </p>
+          )}
           {actions && (
             <div className="mt-8 flex flex-wrap gap-4">
               {actions}
             </div>
+          )}
+          {trustMicrocopy && (
+            <p className="mt-3 text-[11px] text-marketing-text-muted">
+              {trustMicrocopy}
+            </p>
           )}
           {aside && <div className="mt-10">{aside}</div>}
         </div>

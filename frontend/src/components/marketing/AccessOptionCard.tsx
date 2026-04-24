@@ -13,6 +13,8 @@ interface AccessOptionCardProps {
   onClick?: () => void;
   /** Primary = filled, secondary = outline */
   variant?: 'primary' | 'outline';
+  /** Microcopy shown directly under the CTA button. */
+  trustMicrocopy?: string;
 }
 
 /**
@@ -27,6 +29,7 @@ export const AccessOptionCard: React.FC<AccessOptionCardProps> = ({
   href,
   onClick,
   variant = 'primary',
+  trustMicrocopy,
 }) => {
   const Cta = () =>
     onClick ? (
@@ -57,6 +60,11 @@ export const AccessOptionCard: React.FC<AccessOptionCardProps> = ({
       </p>
       <div className="mt-6">
         <Cta />
+        {trustMicrocopy && (
+          <p className="mt-3 text-[11px] text-marketing-text-muted text-center">
+            {trustMicrocopy}
+          </p>
+        )}
       </div>
     </div>
   );
