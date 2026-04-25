@@ -36,7 +36,7 @@ Both entry points call **`create_assignment_with_contact_and_invites`** in `back
 
 ## Database constraints
 
-- Partial unique index **`(company_id, email_normalized)`** where `email_normalized` is non-null (migration `20260321120000_employee_contacts_unique_email_per_company.sql` + SQLite init) enforces **at most one contact per company per normalized email**.
+- Partial unique index **`(company_id, email_normalized)`** where `email_normalized` is non-null (migration `20260321110000_employee_contacts_unique_email_per_company.sql` + SQLite init) enforces **at most one contact per company per normalized email**.
 
 See also [signup-vs-employee-contact.md](./signup-vs-employee-contact.md) for how registration interacts with pre-provisioned contacts.
 

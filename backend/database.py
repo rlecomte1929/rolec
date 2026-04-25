@@ -1064,23 +1064,12 @@ class Database:
     # Schema creation
     # ------------------------------------------------------------------
     def init_db(self) -> None:
-        if not _is_sqlite:
-            self._maybe_ensure_postgres_missing_schemas()
-            self._maybe_ensure_postgres_case_assignments_employee_link_mode()
-            self._maybe_ensure_policy_versions_normalization_draft_json()
-            self._maybe_ensure_policy_versions_normalization_state()
-            self._maybe_ensure_policy_benefit_rule_hr_overrides()
-            self._maybe_ensure_compensation_allowance_policy_config()
-
-        # archived_at is needed on both SQLite dev and Postgres prod. The helper
-        # handles both and only runs ALTER TABLE if the column is missing.
-        self._maybe_ensure_archived_at_columns()
-        # Hot-path indexes are re-ensured below after CREATE TABLE for SQLite
-        # (since the legacy DDL path below creates the tables if absent). On
-        # Postgres the indexes can be created here too, but we defer to the
-        # end of init_db for consistency.
-
-        # In production (Render), avoid runtime DDL. Use Supabase migrations instead.
+        # In production (Render), avoid runtime DDL. Supabase migrations are the
+        # source of truth. The early return must happen BEFORE the per-feature
+        # `_maybe_ensure_*` helpers — those run ALTER/CREATE statements that
+        # acquire table-level locks during the IF NOT EXISTS catalog check, and
+        # on a cold start that compounds with pool warm-up to time out the
+        # frontend's 15s axios window.
         if not _is_sqlite and os.getenv("DISABLE_RUNTIME_DDL", "").lower() in ("1", "true", "yes"):
             with self.engine.connect() as conn:
                 self._db_healthcheck(conn)
@@ -1094,6 +1083,18 @@ class Database:
             except Exception as e:
                 log.warning("employee_contacts backfill skipped: %s", e)
             return
+
+        if not _is_sqlite:
+            self._maybe_ensure_postgres_missing_schemas()
+            self._maybe_ensure_postgres_case_assignments_employee_link_mode()
+            self._maybe_ensure_policy_versions_normalization_draft_json()
+            self._maybe_ensure_policy_versions_normalization_state()
+            self._maybe_ensure_policy_benefit_rule_hr_overrides()
+            self._maybe_ensure_compensation_allowance_policy_config()
+
+        # archived_at is needed on both SQLite dev and Postgres prod. The helper
+        # handles both and only runs ALTER TABLE if the column is missing.
+        self._maybe_ensure_archived_at_columns()
 
         with self.engine.begin() as conn:
             if _is_sqlite:

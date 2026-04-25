@@ -39,7 +39,7 @@ companies
 
 ## Migrations / code
 
-- Postgres: `supabase/migrations/20260320120000_canonical_identity_employee_contacts.sql`, `20260321120000_employee_contacts_unique_email_per_company.sql`
+- Postgres: `supabase/migrations/20260320120000_canonical_identity_employee_contacts.sql`, `20260321110000_employee_contacts_unique_email_per_company.sql`
 - App layer: `backend/database.py` (CRUD, backfill, claim marking), `backend/main.py` (HR assign, admin create, employee claim/auto-attach), `backend/identity_normalize.py`.
 - **HR + Admin assignment creation** share `backend/services/unified_assignment_creation.py` — see [unified-assignment-creation.md](./unified-assignment-creation.md).
 
