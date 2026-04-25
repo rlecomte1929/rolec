@@ -10,7 +10,7 @@
 Apply migrations from the repo on your Supabase project (CLI or Dashboard), especially:
 
 - `supabase/migrations/20260320120000_canonical_identity_employee_contacts.sql`
-- `supabase/migrations/20260321120000_employee_contacts_unique_email_per_company.sql`
+- `supabase/migrations/20260321110000_employee_contacts_unique_email_per_company.sql`
 - `supabase/migrations/20260410120000_identity_link_guardrails.sql`
 - `supabase/migrations/20260325000000_case_milestones.sql` (and `20260317000000_case_milestones_tracker.sql`)
 
