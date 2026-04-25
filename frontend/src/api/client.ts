@@ -254,13 +254,19 @@ api.interceptors.response.use(
 );
 
 // Auth API
+// `/api/auth/login` and `/api/auth/register` may be the first request after
+// the Render backend has scaled to zero, so the cold-start spin-up can blow
+// past the 15s default. Bump these two specifically — every other call rides
+// behind a successful login and finds the worker already warm.
+const AUTH_ENTRYPOINT_TIMEOUT = 45_000;
+
 export const authAPI = {
   login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const response = await api.post('/api/auth/login', data);
+    const response = await api.post('/api/auth/login', data, { timeout: AUTH_ENTRYPOINT_TIMEOUT });
     return response.data;
   },
   register: async (data: RegisterRequest): Promise<LoginResponse> => {
-    const response = await api.post('/api/auth/register', data);
+    const response = await api.post('/api/auth/register', data, { timeout: AUTH_ENTRYPOINT_TIMEOUT });
     return response.data;
   },
   logout: async (): Promise<void> => {
