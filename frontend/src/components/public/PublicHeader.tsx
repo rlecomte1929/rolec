@@ -5,7 +5,7 @@ import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
 
-const logoUrl = '/relopass-logo.png?v=1';
+const logoUrl = '/relopass-logo.png?v=2';
 
 const PUBLIC_NAV = [
   { key: 'platform', label: 'Platform', path: ROUTE_DEFS.platform.path },
@@ -46,7 +46,7 @@ export const PublicHeader: React.FC = () => {
             <img
               src={logoUrl}
               alt="ReloPass"
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl object-contain"
+              className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl object-contain"
             />
             <span className="text-lg font-semibold text-marketing-primary tracking-tight hidden sm:inline">
               ReloPass

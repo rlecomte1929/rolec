@@ -12,9 +12,16 @@ import {
 import { CasePreviewMock } from '../../components/CasePreviewMock';
 import { buildRoute } from '../../navigation/routes';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
+import { usePageMeta } from '../../hooks/usePageMeta';
 import { platformContent } from './platformContent';
 
 export const PlatformPage: React.FC = () => {
+  usePageMeta({
+    title: 'The Platform — ReloPass',
+    description: 'Every relocation on one system of record. Cases, documents, providers, and progress in one place.',
+    ogUrl: 'https://www.relopass.com/platform',
+  });
+
   const { open: openDemoBooking } = useDemoBooking();
   const c = platformContent;
 

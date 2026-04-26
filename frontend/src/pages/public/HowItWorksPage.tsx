@@ -8,9 +8,16 @@ import {
   FadeIn,
 } from '../../components/marketing';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
+import { usePageMeta } from '../../hooks/usePageMeta';
 import { howItWorksContent } from './howItWorksContent';
 
 export const HowItWorksPage: React.FC = () => {
+  usePageMeta({
+    title: 'How It Works — ReloPass',
+    description: 'From case open to case closed. Four steps, one record. See how a relocation runs inside ReloPass.',
+    ogUrl: 'https://www.relopass.com/how-it-works',
+  });
+
   const { open: openDemoBooking } = useDemoBooking();
   const c = howItWorksContent;
 
@@ -26,7 +33,7 @@ export const HowItWorksPage: React.FC = () => {
       </Section>
 
       <Section spacing="lg" background="muted">
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 space-y-20 lg:space-y-28">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 space-y-20 lg:space-y-28">
           <div
             className="hidden md:block absolute left-1/2 top-8 bottom-8 w-px bg-marketing-accent/30 -translate-x-1/2"
             aria-hidden="true"
@@ -37,10 +44,10 @@ export const HowItWorksPage: React.FC = () => {
               <FadeIn key={step.number} delay={idx * 100}>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
                   <div className={imageRight ? '' : 'lg:order-2'}>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#0d9488]">
+                    <p className="text-5xl sm:text-6xl font-bold tracking-wider text-[#0d9488] leading-none">
                       {step.number}
                     </p>
-                    <h2 className="mt-3 text-[20px] font-bold text-marketing-primary leading-tight">
+                    <h2 className="mt-4 text-[22px] font-bold text-marketing-primary leading-tight">
                       {step.title}
                     </h2>
                     <p className="mt-3 text-[14px] text-marketing-text-muted leading-relaxed">

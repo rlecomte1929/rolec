@@ -2,18 +2,41 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 const SCROLL_THRESHOLD_RATIO = 0.3;
 
+const DEFAULT_BOTTOM = 32; // 8 in tailwind units (2rem)
+const FOOTER_GAP = 16; // px gap between button and footer top edge
+
 export const BackToTop: React.FC = () => {
   const [visible, setVisible] = useState(false);
+  const [bottomOffset, setBottomOffset] = useState<number>(DEFAULT_BOTTOM);
 
   const handleScroll = useCallback(() => {
     const threshold = window.innerHeight * SCROLL_THRESHOLD_RATIO;
     setVisible(window.scrollY > threshold);
+
+    // When the footer enters the viewport, slide the button up so it sits
+    // just above the footer's top edge instead of overlapping it.
+    const footer = document.querySelector('footer');
+    if (!footer) {
+      setBottomOffset(DEFAULT_BOTTOM);
+      return;
+    }
+    const fr = footer.getBoundingClientRect();
+    const overlap = window.innerHeight - fr.top;
+    if (overlap > 0) {
+      setBottomOffset(overlap + FOOTER_GAP);
+    } else {
+      setBottomOffset(DEFAULT_BOTTOM);
+    }
   }, []);
 
   useEffect(() => {
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('resize', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
   }, [handleScroll]);
 
   const scrollToTop = () => {
@@ -27,7 +50,8 @@ export const BackToTop: React.FC = () => {
       type="button"
       onClick={scrollToTop}
       aria-label="Back to top"
-      className="fixed bottom-20 right-4 sm:bottom-8 sm:right-8 z-40 flex items-center gap-2 rounded-full border border-marketing-border bg-marketing-surface px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-medium text-marketing-text-muted shadow-sm transition-all duration-200 hover:border-marketing-border hover:bg-marketing-surface-muted hover:text-marketing-primary focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2 animate-fade-in"
+      style={{ bottom: `${bottomOffset}px` }}
+      className="fixed right-4 sm:right-8 z-40 flex items-center gap-2 rounded-full border border-marketing-border bg-marketing-surface px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm font-medium text-marketing-text-muted shadow-sm transition-all duration-200 hover:border-marketing-border hover:bg-marketing-surface-muted hover:text-marketing-primary focus:outline-none focus:ring-2 focus:ring-marketing-accent focus:ring-offset-2 animate-fade-in"
     >
       <svg
         className="h-4 w-4 shrink-0"

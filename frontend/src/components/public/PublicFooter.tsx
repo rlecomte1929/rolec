@@ -11,6 +11,7 @@ const PRODUCT_LINKS = [
   { label: 'Why ReloPass', path: ROUTE_DEFS.why.path },
   { label: 'How it works', path: ROUTE_DEFS.howItWorks.path },
   { label: 'Security', path: ROUTE_DEFS.security.path },
+  { label: 'Privacy', path: ROUTE_DEFS.privacy.path },
   { label: 'Get started', path: ROUTE_DEFS.access.path },
 ] as const;
 
@@ -23,7 +24,7 @@ export const PublicFooter: React.FC = () => {
   const { open: openDemoBooking } = useDemoBooking();
   return (
     <footer className="border-t border-marketing-border bg-marketing-surface-muted">
-      <Container maxWidth="xl" className="py-12 sm:py-16">
+      <Container maxWidth="xl" className="py-8 sm:py-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12">
           <div className="lg:col-span-1">
             <h4 className="text-xs font-bold uppercase tracking-wider text-black mb-4">
@@ -96,13 +97,20 @@ export const PublicFooter: React.FC = () => {
           <div />
         </div>
 
-        <div className="mt-12 pt-8 border-t border-marketing-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="mt-8 pt-6 border-t border-marketing-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <p className="text-xs text-marketing-text-subtle">
             Informational guidance only. ReloPass does not provide legal advice.
           </p>
-          <p className="text-xs text-marketing-text-subtle">
-            © {new Date().getFullYear()} ReloPass. All rights reserved.
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-marketing-text-subtle">
+              © {new Date().getFullYear()} ReloPass. All rights reserved.
+            </p>
+            <img
+              src="/relopass-full-logo.png?v=1"
+              alt="ReloPass"
+              className="h-20 w-auto sm:h-24"
+            />
+          </div>
         </div>
       </Container>
     </footer>

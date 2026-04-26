@@ -2,9 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { initAnalytics } from './analytics';
+import { initErrorTracking } from './lib/errorTracking';
 import './index.css';
 
 initAnalytics();
+initErrorTracking();
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {
