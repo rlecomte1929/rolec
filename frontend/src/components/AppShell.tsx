@@ -12,8 +12,9 @@ import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentSco
 import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
 import { CompanyBrand } from './CompanyBrand';
+import { FeedbackWidget } from './FeedbackWidget';
 
-const logoUrl = '/relopass-logo.png?v=1';
+const logoUrl = '/relopass-logo.png?v=2';
 
 const LogoutButton: React.FC = () => {
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
@@ -141,8 +142,11 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             <img
               src={logoUrl}
               alt="ReloPass logo"
-              className="h-16 w-16 rounded-xl object-contain"
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl object-contain"
             />
+            <span className="text-lg font-semibold text-[#0b2b43] tracking-tight hidden sm:inline">
+              ReloPass
+            </span>
           </Link>
           <div className="flex items-center gap-2">
             {(isHrRole || isEmployeeRole) && !showAdminContextOnly && role !== 'ADMIN' && <CompanyBrand />}
@@ -429,6 +433,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
         </Container>
       </footer>
 
+      <FeedbackWidget userId={getAuthItem('relopass_user_id')} />
     </div>
   );
 };

@@ -94,7 +94,7 @@ export const InlineDemoForm: React.FC = () => {
   };
 
   return (
-    <div className="relative mx-auto mt-12 max-w-xl">
+    <div className="relative mx-auto mt-12 max-w-2xl">
       <div
         style={{
           opacity: submitted ? 0 : 1,

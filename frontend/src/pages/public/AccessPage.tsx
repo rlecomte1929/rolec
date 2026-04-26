@@ -10,9 +10,16 @@ import {
 } from '../../components/marketing';
 import { buildRoute } from '../../navigation/routes';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
+import { usePageMeta } from '../../hooks/usePageMeta';
 import { accessContent } from './accessContent';
 
 export const AccessPage: React.FC = () => {
+  usePageMeta({
+    title: 'Get Started — ReloPass',
+    description: 'Book a demo, sign in, or create an account. 30-minute walkthrough. No commitment.',
+    ogUrl: 'https://www.relopass.com/access',
+  });
+
   const { open: openDemoBooking } = useDemoBooking();
   const c = accessContent;
 
@@ -63,7 +70,7 @@ export const AccessPage: React.FC = () => {
 
         {/* 3. WHAT THE DEMO COVERS */}
         <FadeIn>
-          <div className="mt-16 sm:mt-20 max-w-xl mx-auto">
+          <div className="mt-16 sm:mt-20 max-w-2xl mx-auto">
             <h2 className="text-marketing-h3 font-semibold text-marketing-primary text-center">
               {c.demoCover.title}
             </h2>

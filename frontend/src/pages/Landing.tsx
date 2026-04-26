@@ -15,6 +15,7 @@ import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { getAuthItem } from '../utils/demo';
 import { useDemoBooking } from '../hooks/useDemoBooking';
+import { usePageMeta } from '../hooks/usePageMeta';
 import { landingContent } from './landing/landingContent';
 
 export const Landing: React.FC = () => {
@@ -22,6 +23,12 @@ export const Landing: React.FC = () => {
     { label: 'Book a demo', routeKey: 'access' },
     { label: 'See the platform', routeKey: 'platform' },
   ]);
+
+  usePageMeta({
+    title: 'ReloPass — The operating layer for cross-border relocation',
+    description: 'Cases, documents, providers, and status on one record. Built for HR and mobility teams.',
+    ogUrl: 'https://www.relopass.com',
+  });
 
   const { open: openDemoBooking } = useDemoBooking();
   const c = landingContent;

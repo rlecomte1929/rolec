@@ -33,6 +33,8 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
     { to: buildRoute('adminSuppliers'), label: 'Suppliers', path: ROUTE_DEFS.adminSuppliers.path },
     { to: buildRoute('adminProspects'), label: 'Prospects', path: ROUTE_DEFS.adminProspects.path },
     { to: buildRoute('adminMessages'), label: 'Messages', path: ROUTE_DEFS.adminMessages.path },
+    { to: buildRoute('adminErrors'), label: 'Errors', path: ROUTE_DEFS.adminErrors.path },
+    { to: buildRoute('adminFeedback'), label: 'Feedback', path: ROUTE_DEFS.adminFeedback.path },
   ];
   if (SHOW_RESOURCES_NAV) {
     navItems.push({ to: buildRoute('adminResources'), label: 'Resources', path: ROUTE_DEFS.adminResources.path });

@@ -11,9 +11,16 @@ import {
 } from '../../components/marketing';
 import { buildRoute } from '../../navigation/routes';
 import { useDemoBooking } from '../../hooks/useDemoBooking';
+import { usePageMeta } from '../../hooks/usePageMeta';
 import { whyReloPassContent } from './whyReloPassContent';
 
 export const WhyReloPassPage: React.FC = () => {
+  usePageMeta({
+    title: 'Why ReloPass',
+    description: 'Relocation fails in the handoffs. ReloPass puts every case, document, and provider update on one record.',
+    ogUrl: 'https://www.relopass.com/why',
+  });
+
   const { open: openDemoBooking } = useDemoBooking();
   const c = whyReloPassContent;
 

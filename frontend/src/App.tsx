@@ -1,6 +1,8 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
+import { NavigationLogger } from './components/NavigationLogger';
 import { ScrollToTop } from './components/ScrollToTop';
 import { SelectedCaseProvider } from './contexts/SelectedCaseContext';
 import { EmployeeAssignmentProvider } from './contexts/EmployeeAssignmentContext';
@@ -15,6 +17,7 @@ import { HowItWorksPage } from './pages/public/HowItWorksPage';
 import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
 import { AccessPage } from './pages/public/AccessPage';
 import { SecurityPage } from './pages/public/SecurityPage';
+import { PrivacyPage } from './pages/public/PrivacyPage';
 import { Auth } from './pages/Auth';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
 import { ROUTES as WIZARD_ROUTES } from './routes';
@@ -70,6 +73,8 @@ const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies').then((m
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((module) => ({ default: module.AdminUsers })));
 const AdminAssignments = lazy(() => import('./pages/admin/AdminAssignments').then((module) => ({ default: module.AdminAssignments })));
 const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((module) => ({ default: module.AdminMessages })));
+const AdminErrors = lazy(() => import('./pages/admin/AdminErrors').then((module) => ({ default: module.AdminErrors })));
+const AdminFeedback = lazy(() => import('./pages/admin/AdminFeedback'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
 const AdminProspects = lazy(() => import('./pages/admin/AdminProspects').then((module) => ({ default: module.AdminProspects })));
 const AdminSupplierNew = lazy(() => import('./pages/admin/AdminSupplierNew').then((module) => ({ default: module.AdminSupplierNew })));
@@ -147,6 +152,7 @@ function App() {
     <ErrorBoundary>
     <Router>
       <ScrollToTop />
+      <NavigationLogger />
       <DemoBookingProvider>
       <SelectedCaseProvider>
       <EmployeeAssignmentProvider>
@@ -154,12 +160,14 @@ function App() {
       <ServicesFlowProvider>
       <QueryRedirect />
       <Suspense fallback={<RouteFallback />}>
+      <AppErrorBoundary componentName="AppRouter">
       <Routes>
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
         <Route path={ROUTE_DEFS.platform.path} element={<PlatformPage />} />
         <Route path={ROUTE_DEFS.why.path} element={<WhyReloPassPage />} />
         <Route path={ROUTE_DEFS.howItWorks.path} element={<HowItWorksPage />} />
         <Route path={ROUTE_DEFS.security.path} element={<SecurityPage />} />
+        <Route path={ROUTE_DEFS.privacy.path} element={<PrivacyPage />} />
         <Route path={ROUTE_DEFS.access.path} element={<AccessPage />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         <Route path="/journey" element={<Journey />} />
@@ -223,6 +231,8 @@ function App() {
         <Route path={ROUTE_DEFS.adminUsers.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminPeople.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRelocations.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminAssignments.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminMessages.path} replace /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFeedback.path} element={<RequireAdminRoute><AdminFeedback /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminProspects.path} element={<RequireAdminRoute><AdminProspects /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliersNew.path} element={<RequireAdminRoute><AdminSupplierNew /></RequireAdminRoute>} />
@@ -303,6 +313,7 @@ function App() {
         )}
         <Route path="*" element={<Navigate to={ROUTE_DEFS.landing.path} replace />} />
       </Routes>
+      </AppErrorBoundary>
       </Suspense>
       </ServicesFlowProvider>
       </HrCompanyContextProvider>

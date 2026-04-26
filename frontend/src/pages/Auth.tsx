@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { Card, Input, Select, Alert, LoadingButton } from '../components/antigravity';
-import { AppShell } from '../components/AppShell';
+import { PublicLayout } from '../components/public';
 import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
@@ -145,21 +145,22 @@ export const Auth: React.FC = () => {
   }
 
   return (
-    <AppShell>
+    <PublicLayout>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
         <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <img src="/relopass-logo.png?v=1" alt="ReloPass logo" className="h-11 w-11 rounded-2xl object-contain" />
-            <div>
-              <h1 className="text-3xl font-semibold text-[#0b2b43]">ReloPass</h1>
-              <p className="text-[#4b5563]">Run relocation as one process. Cases, documents, and providers in one place.</p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-semibold text-[#0b2b43] leading-tight">
+              Run every relocation on one record.
+            </h1>
+            <p className="mt-3 text-[#4b5563] leading-relaxed">
+              ReloPass keeps cases, documents, and provider activity in one place — so HR stops chasing updates and employees always know what's next.
+            </p>
           </div>
-          <div className="space-y-2 text-sm text-[#4b5563]">
-            <div>• Case intake, readiness, and compliance in one workflow.</div>
-            <div>• Track housing, schooling, and provider work on the case.</div>
-            <div>• HR review with clear decisions on each step.</div>
-          </div>
+          <ul className="space-y-2 text-sm text-[#4b5563]">
+            <li>• Open cases, track readiness, and run compliance on one workflow.</li>
+            <li>• Coordinate housing, schools, and providers from the same record.</li>
+            <li>• HR sees every case. Employees see their own next steps.</li>
+          </ul>
         </div>
 
         <Card padding="lg">
@@ -288,6 +289,6 @@ export const Auth: React.FC = () => {
           </div>
         </Card>
       </div>
-    </AppShell>
+    </PublicLayout>
   );
 };
