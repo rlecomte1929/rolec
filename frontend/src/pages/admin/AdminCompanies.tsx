@@ -42,6 +42,10 @@ export const AdminCompanies: React.FC = () => {
   const [filterContact, setFilterContact] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkFeedback, setBulkFeedback] = useState<'idle' | 'archiving' | 'deleting' | 'done' | 'error'>('idle');
+  const [bulkErrorMsg, setBulkErrorMsg] = useState<string>('');
 
   const load = async () => {
     setLoading(true);
@@ -250,9 +254,86 @@ export const AdminCompanies: React.FC = () => {
           <Button onClick={() => load()} disabled={loading}>
             {loading ? 'Loading…' : 'Search'}
           </Button>
-          <Button variant="primary" onClick={() => setAddOpen(true)}>
-            Add company
-          </Button>
+          {!selectionMode ? (
+            <>
+              <Button variant="primary" onClick={() => setAddOpen(true)}>
+                Add company
+              </Button>
+              <Button variant="outline" onClick={() => { setSelectionMode(true); setBulkFeedback('idle'); setBulkErrorMsg(''); }}>
+                Edit
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectionMode(false);
+                  setSelectedIds(new Set());
+                  setBulkFeedback('idle');
+                  setBulkErrorMsg('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                disabled={selectedIds.size === 0 || bulkFeedback === 'archiving' || bulkFeedback === 'deleting'}
+                onClick={async () => {
+                  if (selectedIds.size === 0) return;
+                  if (!window.confirm(`Archive ${selectedIds.size} selected company(ies)? They will be hidden from active lists but data is preserved.`)) return;
+                  const ids = Array.from(selectedIds);
+                  setBulkFeedback('archiving');
+                  setBulkErrorMsg('');
+                  const results = await Promise.allSettled(ids.map((id) => adminAPI.archiveCompany(id)));
+                  const failed = results.filter((r) => r.status === 'rejected').length;
+                  await load();
+                  setSelectedIds(new Set());
+                  if (failed > 0) {
+                    setBulkFeedback('error');
+                    setBulkErrorMsg(`${failed} of ${ids.length} archive operation(s) failed.`);
+                    setTimeout(() => setBulkFeedback('idle'), 5000);
+                  } else {
+                    setBulkFeedback('done');
+                    setSelectionMode(false);
+                    setTimeout(() => setBulkFeedback('idle'), 3000);
+                  }
+                }}
+              >
+                {bulkFeedback === 'archiving' ? 'Archiving…' : 'Archive selected'}
+              </Button>
+              <Button
+                variant="outline"
+                disabled={selectedIds.size === 0 || bulkFeedback === 'archiving' || bulkFeedback === 'deleting'}
+                onClick={async () => {
+                  if (selectedIds.size === 0) return;
+                  if (!window.confirm(`PERMANENTLY DELETE ${selectedIds.size} selected company(ies)? This is irreversible. Existing assignments, employees, and policies will keep dangling references.`)) return;
+                  if (!window.confirm('Are you absolutely sure? This action cannot be undone.')) return;
+                  const ids = Array.from(selectedIds);
+                  setBulkFeedback('deleting');
+                  setBulkErrorMsg('');
+                  const results = await Promise.allSettled(ids.map((id) => adminAPI.deleteCompany(id)));
+                  const failed = results.filter((r) => r.status === 'rejected').length;
+                  await load();
+                  setSelectedIds(new Set());
+                  if (failed > 0) {
+                    setBulkFeedback('error');
+                    setBulkErrorMsg(`${failed} of ${ids.length} delete operation(s) failed.`);
+                    setTimeout(() => setBulkFeedback('idle'), 5000);
+                  } else {
+                    setBulkFeedback('done');
+                    setSelectionMode(false);
+                    setTimeout(() => setBulkFeedback('idle'), 3000);
+                  }
+                }}
+              >
+                {bulkFeedback === 'deleting' ? 'Deleting…' : 'Delete selected'}
+              </Button>
+              <span className="text-sm text-[#6b7280]">{selectedIds.size} selected</span>
+              {bulkFeedback === 'done' && <span className="text-sm text-green-600">Done.</span>}
+              {bulkFeedback === 'error' && <span className="text-sm text-red-600">{bulkErrorMsg}</span>}
+            </>
+          )}
           {hasColumnFilters && (
             <Button variant="outline" onClick={clearColumnFilters}>
               Clear table filters
@@ -284,6 +365,23 @@ export const AdminCompanies: React.FC = () => {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-[#e2e8f0] text-left text-[#6b7280] font-medium">
+                  {selectionMode && (
+                    <th className="py-2 pr-2 align-bottom w-8">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-[#cbd5e1]"
+                        aria-label="Select all"
+                        checked={filteredAndSorted.length > 0 && filteredAndSorted.every((c) => selectedIds.has(c.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(new Set(filteredAndSorted.map((c) => c.id)));
+                          } else {
+                            setSelectedIds(new Set());
+                          }
+                        }}
+                      />
+                    </th>
+                  )}
                   <th className="py-2 pr-4 align-bottom">
                     <button
                       type="button"
@@ -368,6 +466,7 @@ export const AdminCompanies: React.FC = () => {
                   <th className="py-2 pl-2 align-bottom text-left font-medium text-[#6b7280]">Actions</th>
                 </tr>
                 <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-left">
+                  {selectionMode && <th className="py-2 pr-2" />}
                   <th className="py-2 pr-4 font-normal align-top">
                     <input
                       value={filterNameCol}
@@ -485,6 +584,24 @@ export const AdminCompanies: React.FC = () => {
                 ) : null}
                 {filteredAndSorted.map((c) => (
                   <tr key={c.id} className="border-b border-[#e2e8f0]">
+                    {selectionMode && (
+                      <td className="py-3 pr-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-[#cbd5e1]"
+                          checked={selectedIds.has(c.id)}
+                          onChange={(e) => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(c.id);
+                              else next.delete(c.id);
+                              return next;
+                            });
+                          }}
+                          aria-label={`Select ${c.name}`}
+                        />
+                      </td>
+                    )}
                     <td className="py-3 pr-4">
                       <div className="flex items-center gap-2 flex-wrap">
                         {canEdit(c) && editingId === c.id ? (
