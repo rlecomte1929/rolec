@@ -65,8 +65,11 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
 
     setState('submitting');
 
+    // user_id is intentionally omitted — the DB default `auth.uid()` fills it
+    // from the JWT, which guarantees it matches the RLS WITH CHECK rule.
+    // The `userId` prop is kept for forward compatibility / future analytics.
+    void userId;
     const { error } = await supabase.from('feedback').insert({
-      user_id:  userId,
       page_url: window.location.pathname,
       category,
       message:  trimmed.slice(0, 2000),
