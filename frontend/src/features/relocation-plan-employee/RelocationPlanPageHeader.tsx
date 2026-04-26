@@ -23,7 +23,7 @@ export const RelocationPlanPageHeader: React.FC<RelocationPlanPageHeaderProps> =
           </p>
           <p className="text-xs text-[#64748b] mt-2">
             <span className="text-[#6b7280]">Informational guidance only.</span>{' '}
-            <Link to={ROUTE_DEFS.trust.path} className="text-[#0b2b43] underline underline-offset-2 hover:text-[#123651]">
+            <Link to={ROUTE_DEFS.security.path} className="text-[#0b2b43] underline underline-offset-2 hover:text-[#123651]">
               How we handle your information
             </Link>
           </p>

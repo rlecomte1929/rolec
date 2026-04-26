@@ -1,4 +1,5 @@
 import React from 'react';
+import { FadeIn } from './FadeIn';
 
 interface TrustDifferentiationProps {
   title: string;
@@ -31,15 +32,17 @@ export const TrustDifferentiation: React.FC<TrustDifferentiationProps> = ({
       <div className="rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8">
         <ul className="space-y-3" role="list">
           {checklist.map((item, i) => (
-            <li key={i} className="flex gap-3 items-center">
-              <span
-                className="h-2 w-2 shrink-0 rounded-full bg-marketing-accent"
-                aria-hidden
-              />
-              <span className="text-sm text-marketing-text leading-relaxed">
-                {item}
-              </span>
-            </li>
+            <FadeIn key={i} delay={i * 80}>
+              <li className="flex gap-3 items-center">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full bg-marketing-accent"
+                  aria-hidden
+                />
+                <span className="text-sm text-marketing-text leading-relaxed">
+                  {item}
+                </span>
+              </li>
+            </FadeIn>
           ))}
         </ul>
       </div>

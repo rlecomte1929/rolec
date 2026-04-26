@@ -20,7 +20,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
 }) => {
   return (
     <div
-      className={`rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8 transition-shadow hover:shadow-sm ${className}`}
+      className={`rounded-xl border border-marketing-border bg-marketing-surface p-6 sm:p-8 transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-md ${className}`}
     >
       {icon && <div className="mb-4">{icon}</div>}
       {eyebrow && (
