@@ -1,13 +1,15 @@
 /**
  * Why ReloPass: problem and differentiation. No full process diagram.
+ *
+ * Phase 3 copy + visual upgrade — April 2026
  */
 
 export const whyReloPassContent = {
   hero: {
     eyebrow: 'For HR and mobility teams',
-    headline: 'Relocation fails in the handoffs',
+    headline: 'Relocation fails in the handoffs.',
     subheadline:
-      'Inboxes, spreadsheets, and vendor updates rarely share one picture. ReloPass keeps coordination on the case.',
+      'Inboxes, spreadsheets, and vendor portals each hold a piece of the case. ReloPass puts them on one record.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
     trustMicrocopy: '30-minute walkthrough. No commitment.',
@@ -16,15 +18,16 @@ export const whyReloPassContent = {
   currentReality: {
     title: 'What teams still fight',
     items: [
-      'Updates in too many channels',
-      'Repeated questions to HR',
-      'Cases drift without a single owner view',
-      'Follow-up becomes its own job',
+      'Visa status lives in the provider\'s inbox, not the case.',
+      'HR fields the same questions because employees cannot see their own progress.',
+      'No single view shows which cases are on track and which are blocked.',
+      'Chasing updates becomes a job of its own.',
     ],
-    supportingLine: 'Work ships, but the overhead is high.',
+    supportingLine: 'Relocations complete. The coordination cost stays high.',
   },
 
-  thesis: 'Fragmented coordination breaks relocation. ReloPass centralizes it on the case.',
+  thesis:
+    'Fragmented coordination breaks relocation. ReloPass puts everything on one case.',
 
   differentiation: {
     title: 'What is different',
@@ -36,14 +39,16 @@ export const whyReloPassContent = {
         'Not an HR add-on.',
       ],
     },
+    productAnchor:
+      'When a document uploads, the case updates. HR does not need to chase the provider.',
     blocks: [
       {
         title: 'Case at the center',
-        body: 'Not a generic task list. Each case has structure, status, and next steps.',
+        body: 'Each case has structure, status, and next steps built in.',
       },
       {
         title: 'Less chasing',
-        body: 'The workflow carries more coordination so the team spends less time hunting updates.',
+        body: 'The workflow carries the coordination. The team stops hunting updates.',
       },
     ],
   },
@@ -51,11 +56,14 @@ export const whyReloPassContent = {
   outcomes: {
     title: 'Day-to-day impact',
     items: [
-      'Fewer places to track',
-      'Easier to move cases under pressure',
-      'Less duplicate follow-up',
+      'One case view instead of four tools open at once.',
+      'Move blocked cases without losing thread on the others.',
+      'Updates reach HR through the case, not another email chain.',
     ],
-    supportingLine: 'Less friction, not more software for its own sake.',
+    supportingLine: 'The case does the coordination. The team does the work.',
+    image: '/screenshot-hr-assignments.png',
+    imageAlt:
+      'HR assignments view showing active relocations with corridors, statuses, and deadlines on one record.',
   },
 
   peakCta: {

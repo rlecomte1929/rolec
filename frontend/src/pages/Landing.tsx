@@ -9,7 +9,7 @@ import {
   CTAPanel,
   CTAButton,
   TrustDifferentiation,
-  LandingProductStrip,
+  FadeIn,
 } from '../components/marketing';
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
@@ -53,91 +53,110 @@ export const Landing: React.FC = () => {
               </CTAButton>
             </>
           }
-          visual={<LandingProductStrip blocks={c.productStrip.blocks} />}
+          visual={
+            <img
+              src="/screenshot-hero-case-card.png"
+              alt="ReloPass case view showing Paul Doe's France to Singapore relocation — status, milestones, documents, and provider activity on one record."
+              width={600}
+              height={360}
+              loading="eager"
+              className="hidden md:block w-full max-w-[600px] h-auto rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.10)] transition-transform duration-300 ease-out hover:scale-[1.02]"
+            />
+          }
         />
       </Section>
 
       {/* 2. PROBLEM: 3 cards */}
       <Section spacing="lg" background="muted">
-        <SectionHeader
-          title={c.problem.title}
-          align="center"
-        />
+        <FadeIn>
+          <SectionHeader
+            title={c.problem.title}
+            align="center"
+          />
+        </FadeIn>
         <div className="mt-12 sm:mt-16 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-          {c.problem.cards.map((card) => (
-            <FeatureCard
-              key={card.title}
-              title={card.title}
-              description={card.body}
-            />
+          {c.problem.cards.map((card, i) => (
+            <FadeIn key={card.title} delay={i * 80}>
+              <FeatureCard
+                title={card.title}
+                description={card.body}
+              />
+            </FadeIn>
           ))}
         </div>
       </Section>
 
       {/* 3. SOLUTION: 4 blocks */}
       <Section spacing="lg" background="transparent">
-        <SectionHeader
-          eyebrow={c.solution.sectionHeader}
-          title={c.solution.title}
-          align="center"
-        />
+        <FadeIn>
+          <SectionHeader
+            eyebrow={c.solution.sectionHeader}
+            title={c.solution.title}
+            align="center"
+          />
+        </FadeIn>
         <div className="mt-12 sm:mt-16 max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-          {c.solution.blocks.map((block) => (
-            <FeatureCard
-              key={block.title}
-              title={block.title}
-              description={block.body}
-              className="bg-marketing-surface"
-            />
+          {c.solution.blocks.map((block, i) => (
+            <FadeIn key={block.title} delay={i * 80}>
+              <FeatureCard
+                title={block.title}
+                description={block.body}
+                className="bg-marketing-surface"
+              />
+            </FadeIn>
           ))}
         </div>
       </Section>
 
       {/* 4. DIFFERENTIATION / TRUST: Left text, right checklist */}
       <Section spacing="lg" background="muted">
-        <div className="max-w-5xl mx-auto">
-        {c.trust.categoryBoundary && (
-          <div className="mb-10 text-center">
-            <p className="text-marketing-body-lg font-bold text-marketing-primary">
-              {c.trust.categoryBoundary.positive}
-            </p>
-            {c.trust.categoryBoundary.negatives.map((line) => (
-              <p key={line} className="text-marketing-body text-marketing-text-muted font-medium">
-                {line}
+        <FadeIn>
+          <div className="max-w-5xl mx-auto">
+          {c.trust.categoryBoundary && (
+            <div className="mb-10 text-center">
+              <p className="text-marketing-body-lg font-bold text-marketing-primary">
+                {c.trust.categoryBoundary.positive}
               </p>
-            ))}
+              {c.trust.categoryBoundary.negatives.map((line) => (
+                <p key={line} className="text-marketing-body text-marketing-text-muted font-medium">
+                  {line}
+                </p>
+              ))}
+            </div>
+          )}
+          <TrustDifferentiation
+            title={c.trust.title}
+            body={c.trust.body}
+            checklist={c.trust.checklist}
+          />
           </div>
-        )}
-        <TrustDifferentiation
-          title={c.trust.title}
-          body={c.trust.body}
-          checklist={c.trust.checklist}
-        />
-        </div>
+        </FadeIn>
       </Section>
 
       {/* 5. FINAL CTA: Centered, compact, decisive */}
       <Section spacing="lg" background="transparent">
-        <CTAPanel
-          title={c.finalCta.headline}
-          subtitle={c.finalCta.microCopy}
-          variant="surface"
-          primaryAction={
-            <CTAButton onClick={() => openDemoBooking('landing-final')} variant="primary" size="lg">
-              {c.finalCta.options.demo}
-            </CTAButton>
-          }
-          secondaryAction={
-            <CTAButton to={buildRoute('platform')} variant="outline" size="lg">
-              {c.finalCta.options.platform}
-            </CTAButton>
-          }
-          tertiaryAction={
-            <CTAButton to={`${buildRoute('auth')}?mode=login`} variant="ghost" size="lg">
-              {c.finalCta.options.signIn}
-            </CTAButton>
-          }
-        />
+        <FadeIn>
+          <CTAPanel
+            title={c.finalCta.headline}
+            subtitle={c.finalCta.microCopy}
+            variant="surface"
+            primaryAction={
+              <CTAButton onClick={() => openDemoBooking('landing-final')} variant="primary" size="lg">
+                {c.finalCta.options.demo}
+              </CTAButton>
+            }
+            secondaryAction={
+              <CTAButton to={buildRoute('platform')} variant="outline" size="lg">
+                {c.finalCta.options.platform}
+              </CTAButton>
+            }
+            tertiaryAction={
+              <CTAButton to={`${buildRoute('auth')}?mode=login`} variant="ghost" size="lg">
+                {c.finalCta.options.signIn}
+              </CTAButton>
+            }
+          />
+        </FadeIn>
       </Section>
     </PublicLayout>
   );

@@ -11,9 +11,10 @@ import { BookDemoModal } from './components/marketing/BookDemoModal';
 import { ROUTE_DEFS } from './navigation/routes';
 import { Landing } from './pages/Landing';
 import { PlatformPage } from './pages/public/PlatformPage';
-import { TrustPage } from './pages/public/TrustPage';
+import { HowItWorksPage } from './pages/public/HowItWorksPage';
 import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
 import { AccessPage } from './pages/public/AccessPage';
+import { SecurityPage } from './pages/public/SecurityPage';
 import { Auth } from './pages/Auth';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
 import { ROUTES as WIZARD_ROUTES } from './routes';
@@ -157,7 +158,8 @@ function App() {
         <Route path={ROUTE_DEFS.landing.path} element={<Landing />} />
         <Route path={ROUTE_DEFS.platform.path} element={<PlatformPage />} />
         <Route path={ROUTE_DEFS.why.path} element={<WhyReloPassPage />} />
-        <Route path={ROUTE_DEFS.trust.path} element={<TrustPage />} />
+        <Route path={ROUTE_DEFS.howItWorks.path} element={<HowItWorksPage />} />
+        <Route path={ROUTE_DEFS.security.path} element={<SecurityPage />} />
         <Route path={ROUTE_DEFS.access.path} element={<AccessPage />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         <Route path="/journey" element={<Journey />} />

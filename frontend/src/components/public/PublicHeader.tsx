@@ -10,7 +10,7 @@ const logoUrl = '/relopass-logo.png?v=1';
 const PUBLIC_NAV = [
   { key: 'platform', label: 'Platform', path: ROUTE_DEFS.platform.path },
   { key: 'why', label: 'Why ReloPass', path: ROUTE_DEFS.why.path },
-  { key: 'trust', label: 'How it works', path: ROUTE_DEFS.trust.path },
+  { key: 'howItWorks', label: 'How it works', path: ROUTE_DEFS.howItWorks.path },
   { key: 'access', label: 'Get started', path: ROUTE_DEFS.access.path },
 ] as const;
 

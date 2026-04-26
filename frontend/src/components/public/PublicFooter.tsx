@@ -9,7 +9,8 @@ const CONTACT_EMAIL = 'mailto:contact@relopass.com?subject=ReloPass%20Inquiry';
 const PRODUCT_LINKS = [
   { label: 'Platform', path: ROUTE_DEFS.platform.path },
   { label: 'Why ReloPass', path: ROUTE_DEFS.why.path },
-  { label: 'How it works', path: ROUTE_DEFS.trust.path },
+  { label: 'How it works', path: ROUTE_DEFS.howItWorks.path },
+  { label: 'Security', path: ROUTE_DEFS.security.path },
   { label: 'Get started', path: ROUTE_DEFS.access.path },
 ] as const;
 

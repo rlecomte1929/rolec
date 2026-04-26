@@ -16,7 +16,7 @@ export const accessContent = {
   options: {
     bookDemo: {
       label: 'Book a demo',
-      description: 'See your corridor and case volume in a live 30-minute walkthrough.',
+      description: 'See your corridor and case volume on a live case view.',
       cta: 'Book a demo',
     },
     signIn: {
@@ -34,4 +34,33 @@ export const accessContent = {
   closingCta: 'Structure how you run relocation. Start with one case.',
 
   reassurance: 'You can start with one case.',
+
+  demoCover: {
+    title: 'What the demo covers',
+    bullets: [
+      'Your corridors and case volume on a live case view.',
+      'How policy rules, documents, and provider tasks stay on one record.',
+      'What switching from email and spreadsheets looks like in week one.',
+    ],
+  },
+
+  bookingForm: {
+    title: 'Book a demo',
+    fields: {
+      name: { label: 'Name', placeholder: 'Your name' },
+      email: { label: 'Work email', placeholder: 'name@company.com' },
+      company: { label: 'Company', placeholder: 'Company name' },
+      corridor: {
+        label: 'Primary corridor or annual volume',
+        placeholder: 'e.g. France to Singapore, ~15 moves/year',
+      },
+    },
+    submitLabel: 'Request a demo',
+    submitMicrocopy: 'Someone from our team will confirm a time within the next business days.',
+    success: {
+      title: 'Request received.',
+      body: 'We will be in touch within the next business days to confirm your walkthrough.',
+    },
+    errorFallback: 'Something went wrong. Email us at contact@relopass.com.',
+  },
 } as const;

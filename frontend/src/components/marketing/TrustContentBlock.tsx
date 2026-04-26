@@ -12,6 +12,8 @@ interface TrustContentBlockProps {
   optional?: string;
   /** Mandatory boundary line (e.g. decisions disclaimer) */
   boundary?: string;
+  /** Apply card-style hover lift + shadow. Off by default. */
+  hoverable?: boolean;
   className?: string;
 }
 
@@ -27,11 +29,15 @@ export const TrustContentBlock: React.FC<TrustContentBlockProps> = ({
   closing,
   optional,
   boundary,
+  hoverable = false,
   className = '',
 }) => {
   const hasIntro = intro ?? body;
+  const hoverClasses = hoverable
+    ? 'group cursor-default transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-md'
+    : '';
   return (
-    <div className={className}>
+    <div className={`${hoverClasses} ${className}`.trim()}>
       <h2 className="text-marketing-h1 font-semibold text-marketing-primary tracking-tight">
         {title}
       </h2>

@@ -24,3 +24,5 @@ export { CoreModelDiagram } from './CoreModelDiagram';
 export { DualViewSection } from './DualViewSection';
 export { PlatformSystemDiagram } from './PlatformSystemDiagram';
 export { SystemFlowDiagram, type ProcessStep } from './SystemFlowDiagram';
+export { InlineDemoForm } from './InlineDemoForm';
+export { FadeIn } from './FadeIn';

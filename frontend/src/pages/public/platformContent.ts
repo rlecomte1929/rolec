@@ -26,16 +26,37 @@ export const platformContent = {
       {
         title: 'Case overview',
         body: 'Status, dates, and open work in one place.',
+        image: '/screenshot-service-package.png',
+        imageAlt: 'Service package estimate showing three selected providers with costs',
       },
       {
-        title: 'Documents',
-        body: 'Requirements and files tied to the case.',
+        title: 'Corridor resources',
+        body: 'Visa steps, housing options, and school guides. Matched to the corridor.',
+        image: '/screenshot-destination-intelligence.png',
+        imageAlt: 'Destination intelligence for Singapore: visa, housing, and school resources',
       },
       {
         title: 'Service providers',
         body: 'Vendor steps stay linked to the same case.',
+        image: '/screenshot-provider-recommendations.png',
+        imageAlt: 'Provider recommendations ranked by match score and policy alignment',
       },
     ],
+  },
+
+  splitSection: {
+    title: 'One record. Two views.',
+    subtitle: 'HR sees every case. Employees see their own.',
+    hrView: {
+      label: 'HR view',
+      image: '/screenshot-hr-assignments.png',
+      caption: 'All cases, corridors, and status across the team.',
+    },
+    employeeView: {
+      label: 'Employee view',
+      image: '/screenshot-employee-plan.png',
+      caption: 'Each step, sequenced. The next action is always clear.',
+    },
   },
 
   cta: {
