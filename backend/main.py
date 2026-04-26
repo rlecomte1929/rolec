@@ -1546,6 +1546,39 @@ def deactivate_company(company_id: str, user: Dict[str, Any] = Depends(require_a
     return {"company": company, "message": "Deactivated"}
 
 
+@app.post("/api/admin/companies/{company_id}/archive")
+def archive_company(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    """Soft-delete: set status='archived' so the company is hidden from active
+    lists but its data is preserved. Reversible via PATCH with status='active'."""
+    existing = db.get_company(company_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Company not found")
+    if (existing.get("status") or "").lower() == "archived":
+        return {"company": existing, "message": "Already archived"}
+    db.archive_company(company_id)
+    company = db.get_company(company_id)
+    log.info("admin company archived id=%s by=%s", company_id, user.get("id"))
+    db.log_audit(user["id"], "ARCHIVE", "company", company_id, None, {})
+    return {"company": company, "message": "Archived"}
+
+
+@app.delete("/api/admin/companies/{company_id}")
+def delete_company(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    """Hard-delete: removes the company row entirely. Will orphan rows in
+    tables that hold a company_id without an FK constraint (employees,
+    hr_users, profiles, relocation_cases, support_cases) — the row goes,
+    those references remain. Use Archive for reversible removal."""
+    existing = db.get_company(company_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Company not found")
+    ok = db.delete_company_hard(company_id)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Delete failed")
+    log.info("admin company deleted id=%s by=%s", company_id, user.get("id"))
+    db.log_audit(user["id"], "DELETE", "company", company_id, None, {})
+    return {"deleted": company_id, "message": "Deleted"}
+
+
 @app.get("/api/admin/users")
 def list_users(
     q: Optional[str] = Query(None),

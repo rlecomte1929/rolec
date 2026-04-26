@@ -8684,6 +8684,23 @@ class Database:
             conn.execute(text("DELETE FROM companies WHERE id = :id"), {"id": company_id})
         return True
 
+    def archive_company(self, company_id: str) -> bool:
+        """Set companies.status to 'archived'. Soft-delete used by the admin
+        UI to hide a company from active lists without destroying its data."""
+        return self.update_company(company_id, status="archived")
+
+    def delete_company_hard(self, company_id: str) -> bool:
+        """Hard-delete a company row. Will orphan rows in tables that hold a
+        company_id column without an explicit FK constraint (employees,
+        hr_users, profiles, relocation_cases, support_cases). Use only when
+        you actually want the row gone."""
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text("DELETE FROM companies WHERE id = :id"),
+                {"id": company_id},
+            )
+            return (result.rowcount or 0) > 0
+
     def update_company_logo(self, company_id: str, logo_url: Optional[str]) -> None:
         with self.engine.begin() as conn:
             if _is_sqlite:

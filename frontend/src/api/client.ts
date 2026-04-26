@@ -798,6 +798,18 @@ export const adminAPI = {
     invalidateApiCachePrefix('admin:companies:');
     return response.data;
   },
+  /** Soft delete: sets status='archived' so the company is hidden from active lists. Reversible. */
+  archiveCompany: async (companyId: string): Promise<{ company: AdminCompany; message?: string }> => {
+    const response = await api.post(`/api/admin/companies/${companyId}/archive`);
+    invalidateApiCachePrefix('admin:companies:');
+    return response.data;
+  },
+  /** Hard delete: removes the company row. Irreversible — orphans references in employees/hr_users/profiles/etc. */
+  deleteCompany: async (companyId: string): Promise<{ deleted: string; message?: string }> => {
+    const response = await api.delete(`/api/admin/companies/${companyId}`);
+    invalidateApiCachePrefix('admin:companies:');
+    return response.data;
+  },
   runReconciliationBackfillTestCompany: async (): Promise<{ ok: boolean; summary?: { test_company_id: string; profiles_linked: number; hr_users_linked: number; relocation_cases_linked: number }; error?: string }> => {
     const response = await api.post('/api/admin/reconciliation/backfill-test-company');
     return response.data;
