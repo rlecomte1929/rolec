@@ -39,7 +39,7 @@ describe('Draft flow — review panel', () => {
       />
     );
 
-    expect(screen.getByText(/Policy draft review/i)).toBeInTheDocument();
+    expect(screen.getByText(/Document summary/i)).toBeInTheDocument();
     expect(screen.getByText(/relocation-policy-2025\.pdf/)).toBeInTheDocument();
     expect(screen.getByText(/What to fix before going live/i)).toBeInTheDocument();
     expect(screen.getByText(/Add a clear cap for household goods shipment/i)).toBeInTheDocument();

@@ -14,7 +14,6 @@ import {
 import { StarterPolicyDraftGuidance } from './StarterPolicyDraftGuidance';
 import { STARTER_TEMPLATE_OPTIONS, type StarterTemplateKey } from './starterPolicyCopy';
 import { HrPolicyDraftReviewPanel } from './HrPolicyDraftReviewPanel';
-import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
 import { POLICY_TOPIC_LABELS, POLICY_TOPIC_ORDER } from './policyTopicLabels';
 import { formatPolicySourceCitation, getSourceProvenance } from './policySourceProvenance';
 
@@ -644,13 +643,6 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
 
   return (
     <div className="space-y-6" data-hr-policy-workspace="v2">
-      <HrPolicyAssistantPanel
-        variant="sideSheet"
-        policyId={selectedPolicyId}
-        documentId={typeof sourceDocId === 'string' ? sourceDocId : null}
-        contextLoading={Boolean(selectedPolicyId && loading)}
-      />
-
       <HrPolicyWorkspaceLayout
         resolved={workspaceResolved}
         lifecycle={policyLifecycle}

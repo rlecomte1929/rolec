@@ -178,14 +178,6 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
 
   return (
     <div className="space-y-6" id="hr-policy-draft-review">
-      <div>
-        <h2 className="text-lg font-semibold text-[#0b2b43]">Policy draft review</h2>
-        <p className="text-sm text-[#6b7280] mt-1 max-w-3xl">
-          Read this summary first, then use the benefit table below to edit. What you see here matches the latest save
-          of this policy version.
-        </p>
-      </div>
-
       {reviewLoading && (
         <div className="rounded-lg border border-[#e5e7eb] p-4 animate-pulse space-y-3" role="status" aria-live="polite">
           <div className="h-4 bg-slate-200 rounded w-1/3" />
@@ -193,6 +185,36 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           <div className="h-20 bg-slate-100 rounded" />
         </div>
       )}
+
+      {/* What to fix before going live — promoted to top so the action list
+          ranks above descriptive blocks. */}
+      <Card padding="lg">
+        <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">What to fix before going live</h3>
+        <p className="text-xs text-[#6b7280] mb-3">
+          Plain-language items from readiness checks. Use them together with the workspace banner above.
+        </p>
+        {missingStructure.length > 0 && (
+          <ul className="list-disc list-inside text-sm text-[#374151] space-y-1 mb-4">
+            {missingStructure.map((m, i) => (
+              <li key={i}>{String(m.issue || m.field || 'Structure gap')}</li>
+            ))}
+          </ul>
+        )}
+        {issues.length > 0 ? (
+          <ul className="space-y-2">
+            {issues.slice(0, 40).map((it, i) => (
+              <li key={i} className="text-sm border-l-2 border-amber-300 pl-3 py-0.5">
+                <span className="text-xs text-[#6b7280]">{formatIssueTierLabel(it.tier)}: </span>
+                <span className="text-[#111827]">{formatReadinessIssueForDisplay(it)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          !missingStructure.length && (
+            <p className="text-sm text-[#6b7280]">No open checklist items for this version right now.</p>
+          )
+        )}
+      </Card>
 
       {/* 1 — Document summary */}
       <Card padding="lg">
@@ -478,36 +500,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
         )}
       </Card>
 
-      {/* 5 — Missing structure / blockers */}
-      <Card padding="lg">
-        <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">What to fix before going live</h3>
-        <p className="text-xs text-[#6b7280] mb-3">
-          Plain-language items from readiness checks. Use them together with the workspace banner above.
-        </p>
-        {missingStructure.length > 0 && (
-          <ul className="list-disc list-inside text-sm text-[#374151] space-y-1 mb-4">
-            {missingStructure.map((m, i) => (
-              <li key={i}>{String(m.issue || m.field || 'Structure gap')}</li>
-            ))}
-          </ul>
-        )}
-        {issues.length > 0 ? (
-          <ul className="space-y-2">
-            {issues.slice(0, 40).map((it, i) => (
-              <li key={i} className="text-sm border-l-2 border-amber-300 pl-3 py-0.5">
-                <span className="text-xs text-[#6b7280]">{formatIssueTierLabel(it.tier)}: </span>
-                <span className="text-[#111827]">{formatReadinessIssueForDisplay(it)}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          !missingStructure.length && (
-            <p className="text-sm text-[#6b7280]">No open checklist items for this version right now.</p>
-          )
-        )}
-      </Card>
-
-      {/* 6 — Employee visibility preview */}
+      {/* 5 — Employee visibility preview */}
       <Card padding="lg" className="bg-[#f8fafc] border-[#e2e8f0]" id="hr-policy-employee-visibility-preview">
         <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">Employee visibility preview</h3>
         <div
