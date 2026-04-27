@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 from datetime import datetime, timedelta
 import os
@@ -12,9 +13,46 @@ from ...database import db, Database
 from .. import crud, schemas, models
 from ..services.research import run_country_research
 from ..services.official_ingest_service import ingest_url_to_knowledge_doc
+from ...services.audit_log_service import (
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    insert_audit_log,
+)
 import json
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+logger = logging.getLogger(__name__)
+
+
+def _audit_postgres(
+    *,
+    entity_type: str,
+    entity_id: str,
+    action_type: str,
+    new_value: Optional[dict] = None,
+    old_value: Optional[dict] = None,
+    actor_id: Optional[str] = None,
+) -> None:
+    """Write one audit_logs row on the Postgres tier; never raise."""
+    try:
+        with db.engine.begin() as conn:
+            insert_audit_log(
+                conn,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                action_type=action_type,
+                old_value=old_value,
+                new_value=new_value,
+                actor_type=ACTOR_HUMAN,
+                actor_id=actor_id,
+            )
+    except Exception:
+        logger.exception(
+            "audit_log write failed entity_type=%s entity_id=%s",
+            entity_type,
+            entity_id,
+        )
 
 
 def _is_admin_user(user: dict) -> bool:
@@ -147,6 +185,7 @@ def approve_research_candidate(
 ):
     _require_ingest_enabled()
     domain_area = (payload or {}).get("domain_area") or "other"
+    actor_id = user.get("id")
     with SessionLocal() as session:
         candidate = crud.update_research_candidate_status(session, candidate_id, "approved")
         if not candidate:
@@ -184,6 +223,19 @@ def approve_research_candidate(
             })
         succeeded = len([r for r in results if r.get("status") == "fetched"])
         failed = len(results) - succeeded
+        _audit_postgres(
+            entity_type="research_candidates",
+            entity_id=candidate.id,
+            action_type=ACTION_UPDATE,
+            new_value={
+                "status": "approved",
+                "domain_area": domain_area,
+                "ingest_job_id": job.id,
+                "doc_id": (results[0] or {}).get("doc_id"),
+                "fetch_status": (results[0] or {}).get("status"),
+            },
+            actor_id=actor_id,
+        )
         return {"attempted": 1, "succeeded": succeeded, "failed": failed, "results": results}
 
 
@@ -195,6 +247,7 @@ def ingest_url(payload: dict, user: dict = Depends(require_admin)):
     domain_area = (payload or {}).get("domain_area") or "other"
     if not url or not destination_country:
         raise HTTPException(status_code=400, detail="Missing url or destination_country")
+    actor_id = user.get("id")
     with SessionLocal() as session:
         job = crud.create_ingest_job(
             session,
@@ -229,6 +282,20 @@ def ingest_url(payload: dict, user: dict = Depends(require_admin)):
             })
         succeeded = len([r for r in results if r.get("status") == "fetched"])
         failed = len(results) - succeeded
+        _audit_postgres(
+            entity_type="ingest_jobs",
+            entity_id=job.id,
+            action_type=ACTION_INSERT,
+            new_value={
+                "url": url,
+                "destination_country": destination_country,
+                "domain_area": domain_area,
+                "doc_id": (results[0] or {}).get("doc_id"),
+                "fetch_status": (results[0] or {}).get("status"),
+                "source": "ingest_url",
+            },
+            actor_id=actor_id,
+        )
         return {"attempted": 1, "succeeded": succeeded, "failed": failed, "results": results}
 
 
@@ -240,6 +307,7 @@ def ingest_batch(payload: dict, user: dict = Depends(require_admin)):
     default_area = (payload or {}).get("domain_area") or "other"
     if not urls or not destination_country:
         raise HTTPException(status_code=400, detail="Missing urls or destination_country")
+    actor_id = user.get("id")
     results = []
     for item in urls:
         if isinstance(item, dict):
@@ -262,19 +330,36 @@ def ingest_batch(payload: dict, user: dict = Depends(require_admin)):
                     "created_at": datetime.utcnow(),
                 },
             )
+            item_result: dict
             try:
                 result = ingest_url_to_knowledge_doc(url, destination_country, domain_area)
                 crud.update_ingest_job(session, job.id, "done", doc_id=result.get("doc_id"))
-                results.append({
+                item_result = {
                     "url": url,
                     "status": result.get("fetch_status"),
                     "doc_id": result.get("doc_id"),
                     "facts_created": result.get("facts_created"),
                     "error": result.get("error"),
-                })
+                }
+                results.append(item_result)
             except Exception as exc:
+                item_result = {"url": url, "status": "fetch_failed", "error": str(exc)}
                 crud.update_ingest_job(session, job.id, "failed", error=str(exc))
-                results.append({"url": url, "status": "fetch_failed", "error": str(exc)})
+                results.append(item_result)
+            _audit_postgres(
+                entity_type="ingest_jobs",
+                entity_id=job.id,
+                action_type=ACTION_INSERT,
+                new_value={
+                    "url": url,
+                    "destination_country": destination_country,
+                    "domain_area": domain_area,
+                    "doc_id": item_result.get("doc_id"),
+                    "fetch_status": item_result.get("status"),
+                    "source": "ingest_batch",
+                },
+                actor_id=actor_id,
+            )
     succeeded = len([r for r in results if r.get("status") == "fetched"])
     failed = len(results) - succeeded
     return {"attempted": len(results), "succeeded": succeeded, "failed": failed, "results": results}
@@ -400,7 +485,16 @@ def approve_requirement_facts(payload: dict, user: dict = Depends(require_admin)
     fact_ids = (payload or {}).get("fact_ids") or []
     if not fact_ids:
         raise HTTPException(status_code=400, detail="fact_ids required")
-    db.update_requirement_fact_status(fact_ids, "approved", user.get("id") or "admin")
+    actor_id = user.get("id") or "admin"
+    db.update_requirement_fact_status(fact_ids, "approved", actor_id)
+    for fid in fact_ids:
+        _audit_postgres(
+            entity_type="requirement_facts",
+            entity_id=fid,
+            action_type=ACTION_UPDATE,
+            new_value={"status": "approved"},
+            actor_id=actor_id if actor_id != "admin" else None,
+        )
     return {"ok": True, "count": len(fact_ids)}
 
 
@@ -410,7 +504,16 @@ def reject_requirement_facts(payload: dict, user: dict = Depends(require_admin))
     fact_ids = (payload or {}).get("fact_ids") or []
     if not fact_ids:
         raise HTTPException(status_code=400, detail="fact_ids required")
-    db.update_requirement_fact_status(fact_ids, "rejected", user.get("id") or "admin")
+    actor_id = user.get("id") or "admin"
+    db.update_requirement_fact_status(fact_ids, "rejected", actor_id)
+    for fid in fact_ids:
+        _audit_postgres(
+            entity_type="requirement_facts",
+            entity_id=fid,
+            action_type=ACTION_UPDATE,
+            new_value={"status": "rejected"},
+            actor_id=actor_id if actor_id != "admin" else None,
+        )
     return {"ok": True, "count": len(fact_ids)}
 
 
@@ -443,10 +546,31 @@ def reconcile_policy_ingest(
     max_age = int((payload or {}).get("max_age_seconds") or 900)
     if max_age < 60:
         raise HTTPException(status_code=400, detail="max_age_seconds must be >= 60")
+    actor_id = user.get("id")
     summary = reconcile_orphaned_policy_ingest_jobs(
         db,
         max_age_seconds=max_age,
-        actor_id=user.get("id"),
+        actor_id=actor_id,
         actor_label="admin_manual",
     )
+    for orphan in summary.get("orphans") or []:
+        doc_id = orphan.get("id")
+        if not doc_id:
+            continue
+        _audit_postgres(
+            entity_type="policy_documents",
+            entity_id=doc_id,
+            action_type=ACTION_UPDATE,
+            old_value={
+                "processing_status": orphan.get("previous_processing_status"),
+                "assistant_import_status": orphan.get("previous_assistant_import_status"),
+            },
+            new_value={
+                "processing_status": "failed",
+                "assistant_import_status": "failed",
+                "reason": "admin_manual_reconcile",
+                "max_age_seconds": max_age,
+            },
+            actor_id=actor_id,
+        )
     return summary
