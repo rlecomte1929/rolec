@@ -462,7 +462,11 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       {/* 2. What employees see today */}
       <TopicSummarySection
         matrixPayload={matrixPayload}
-        onRequestDetails={() => setDetailedReviewOpen(true)}
+        onRequestDetails={() => {
+          // Workspace is now flat (no collapsible) — scroll to it.
+          const el = document.getElementById('hr-policy-detailed-review');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }}
       />
 
       {/* 3. Build your next version (only shown when there is no live policy
