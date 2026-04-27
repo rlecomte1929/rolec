@@ -2100,6 +2100,32 @@ class Database:
                 ON catalog_employee_demand (company_id, last_seen_at DESC)
             """))
 
+            # Policy Assistant RAG chunks (Sprint A). Postgres has this via
+            # supabase migration 20260503100000_policy_assistant_chunks.sql
+            # with pgvector. SQLite has no pgvector so we store the
+            # embedding as a JSON-encoded TEXT array — services/
+            # policy_chunk_retriever.py falls back to in-Python cosine
+            # similarity when running on SQLite.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_assistant_chunks (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    policy_version_id TEXT,
+                    source_type TEXT NOT NULL,
+                    source_ref TEXT NOT NULL,
+                    chunk_text TEXT NOT NULL,
+                    chunk_metadata TEXT NOT NULL DEFAULT '{}',
+                    embedding TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (company_id, source_type, source_ref)
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_pac_company_sqlite
+                ON policy_assistant_chunks (company_id)
+            """))
+
             # Exception requests (T1.3) — Postgres has these via supabase migration
             # 20260427100000_exception_requests.sql; mirror on SQLite for local dev
             # so the FastAPI router works against the local file DB without Supabase.
