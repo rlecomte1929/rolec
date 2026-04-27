@@ -54,7 +54,10 @@ describe('HR policy lifecycle (product states)', () => {
   });
 
   describe('C. ready_to_publish', () => {
-    it('shows publish CTA, readiness badge, opens preflight when callback provided', () => {
+    it('shows publish CTA and opens preflight when callback provided', () => {
+      // The redundant "Ready to publish—not live yet" phase badge was
+      // dropped in slice 2 of the IA simplification — that signal is on
+      // the sticky status strip now. CTA + preflight wiring still tested.
       const onPreflight = vi.fn();
       const model = resolveLayoutModelFromState('ready_to_publish');
       expect(model.resolved.phase).toBe('ready_to_publish');
@@ -63,7 +66,6 @@ describe('HR policy lifecycle (product states)', () => {
           onRequestPublishPreflight: onPreflight,
         })
       );
-      expect(screen.getByText(/Ready to publish—not live yet/i)).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: /publish policy/i }));
       expect(onPreflight).toHaveBeenCalledTimes(1);
     });

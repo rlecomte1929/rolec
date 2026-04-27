@@ -294,11 +294,17 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
 
   return (
     <div className="space-y-6" data-hr-policy-workspace-layout>
-      {/* A — Policy status at a glance (live / under review / employee view + next step) */}
+      {/* A — What this means for employees + next step.
+          Slice 2 of the IA simplification drops the "Policy status"
+          headline + Live/Draft phase badges — those duplicate the
+          sticky status strip at the top of the page. The publish-
+          readiness + comparison-readiness badges stay because they
+          tell HR something the strip doesn't (specifically what's
+          missing before publish). */}
       <Card padding="lg" className="border-[#0b2b43]/12">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-[#0b2b43]">Policy status</h2>
+            <h2 className="text-lg font-semibold text-[#0b2b43]">What this means for employees</h2>
             <p className="text-sm text-[#4b5563] mt-1 max-w-3xl">{copy.headline}</p>
             <p className="text-sm text-[#6b7280] mt-1 max-w-3xl">{copy.subline}</p>
           </div>
@@ -309,18 +315,16 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-3">
-          {resolved.phase === 'published' && <Badge tone="success">Live for employees</Badge>}
-          {resolved.phase === 'ready_to_publish' && <Badge tone="warning">Ready to publish—not live yet</Badge>}
-          {resolved.phase === 'draft_not_publishable' && <Badge tone="warning">Draft—finish checklist</Badge>}
-          {resolved.phase === 'no_policy' && <Badge>No live policy</Badge>}
-          {resolved.publishReadiness?.status && (
-            <Badge tone="neutral">{formatPublishReadinessBadge(resolved.publishReadiness.status)}</Badge>
-          )}
-          {resolved.comparisonReadiness?.status && (
-            <Badge tone="neutral">{formatComparisonReadinessBadge(resolved.comparisonReadiness.status)}</Badge>
-          )}
-        </div>
+        {(resolved.publishReadiness?.status || resolved.comparisonReadiness?.status) && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {resolved.publishReadiness?.status && (
+              <Badge tone="neutral">{formatPublishReadinessBadge(resolved.publishReadiness.status)}</Badge>
+            )}
+            {resolved.comparisonReadiness?.status && (
+              <Badge tone="neutral">{formatComparisonReadinessBadge(resolved.comparisonReadiness.status)}</Badge>
+            )}
+          </div>
+        )}
 
         {resolved.phase === 'no_policy' && documentsCount > 0 && (
           <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mt-3">

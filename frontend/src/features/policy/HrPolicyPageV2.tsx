@@ -498,17 +498,23 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       {/* 4. Draft vs Live — two diffs, one per pipeline:
           - matrix (PR #4): compensation & allowance caps
           - canonical (this PR): document-normalized benefit rules
-          CanonicalPolicyDiffView renders null when the company has no
-          canonical policy at all, so matrix-only deployments don't see
-          a dangling empty section. */}
+
+          Slice 2 of the IA simplification gates CanonicalPolicyDiffView
+          at this layer: matrix-only deployments (no documents uploaded
+          → no canonical policy possible) skip the canonical diff card
+          entirely. Previously the component would mount, fetch, and
+          flash a loading card before deciding to render null, leaving
+          dead pixels for the common matrix-only case. */}
       <PolicyDiffView
         adminCompanyId={adminCompanyId ?? null}
         refreshTrigger={workspaceRefreshTrigger}
       />
-      <CanonicalPolicyDiffView
-        adminCompanyId={adminCompanyId ?? null}
-        refreshTrigger={workspaceRefreshTrigger}
-      />
+      {documents.length > 0 && (
+        <CanonicalPolicyDiffView
+          adminCompanyId={adminCompanyId ?? null}
+          refreshTrigger={workspaceRefreshTrigger}
+        />
+      )}
 
       {/* 5. Benefit table & publish (was: "Detailed review" collapsible).
           PR 0.5 simplification flattens this — the table is the primary
