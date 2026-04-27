@@ -638,8 +638,24 @@ export const HrVendorCuration: React.FC = () => {
           <div>
             <h2 className="text-lg font-semibold text-[#0b2b43]">Admin master vendors</h2>
             <p className="text-sm text-[#6b7280] mt-1">
-              {masters.length} item{masters.length === 1 ? '' : 's'} for {category} in {city || '—'}.
-              Untick to hide from your employees.
+              {(() => {
+                const selectedMasters = masters.filter((r) => effectiveSelected(r)).length;
+                const visibleToEmployees = selectedMasters + customs.length;
+                return (
+                  <>
+                    {selectedMasters} of {masters.length} admin item{masters.length === 1 ? '' : 's'}{' '}
+                    selected for {category} in {city || '—'}
+                    {customs.length > 0 && (
+                      <>
+                        {' '}· {customs.length} custom vendor{customs.length === 1 ? '' : 's'} added
+                      </>
+                    )}
+                    {' '}<strong className="text-[#0b2b43]">
+                      → {visibleToEmployees} visible to employees
+                    </strong>. Untick to hide.
+                  </>
+                );
+              })()}
             </p>
           </div>
           <Button onClick={() => void saveSelections()} disabled={!dirty || saving}>

@@ -41,7 +41,6 @@ export const ServicesRecommendations: React.FC = () => {
     setActiveCaseId(assignmentId || null);
     return () => setActiveCaseId(null);
   }, [assignmentId, setActiveCaseId]);
-  const debugMode = new URLSearchParams(location.search).get('debug') === '1';
   const go = (path: string) => navigate({ pathname: path, search: location.search });
 
   if (!recommendations || Object.keys(recommendations).length === 0) {
@@ -81,7 +80,6 @@ export const ServicesRecommendations: React.FC = () => {
         onSelectedPackageChange={setShortlist}
         onStartOver={() => go(buildRoute('services'))}
         onViewSummary={() => go(buildRoute('servicesEstimate'))}
-        debugMode={debugMode}
         displayCurrency={displayCurrency}
       />
     </AppShell>

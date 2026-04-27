@@ -101,6 +101,83 @@ class EmployeeDemandTests(unittest.TestCase):
             n = conn.execute(text("SELECT COUNT(*) FROM catalog_employee_demand")).scalar()
         self.assertEqual(n, 0)
 
+    def test_satisfied_rows_hidden_from_widget(self) -> None:
+        """
+        Once HR has curated at least one vendor for a (category, city)
+        scope (master selection or custom add), the demand row should
+        drop out of the widget — even though the row stays in the DB
+        for audit / debugging.
+        """
+        company = str(uuid.uuid4())
+        # Two demand signals: Insurance/Munich and Electricity/Munich.
+        employee_demand.record_demand(
+            company_id=company, category="insurance", destination_city="Munich",
+        )
+        employee_demand.record_demand(
+            company_id=company, category="electricity", destination_city="Munich",
+        )
+
+        # Mock the curation lookup: HR has selected an insurance master,
+        # but has done nothing for electricity.
+        def fake_list_curation(*, company_id, category, destination_city=None):
+            if category == "insurance" and destination_city == "Munich":
+                return [{"master_item_id": "m-1", "selected": True, "custom_item_json": None}]
+            return []
+
+        with mock.patch(
+            "backend.services.vendor_curation.list_curation",
+            side_effect=fake_list_curation,
+        ):
+            rows = employee_demand.list_demand_for_company(company)
+
+        # Insurance is now satisfied; only Electricity should appear.
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["category"], "electricity")
+
+        # And the underlying DB row is still there (audit preserved).
+        with self.engine.connect() as conn:
+            n = conn.execute(text("SELECT COUNT(*) FROM catalog_employee_demand")).scalar()
+        self.assertEqual(n, 2)
+
+    def test_satisfied_via_custom_vendor(self) -> None:
+        """
+        A custom vendor (no master_item_id, just custom_item_json) also
+        satisfies the demand — HR has provided an answer for that scope.
+        """
+        company = str(uuid.uuid4())
+        employee_demand.record_demand(
+            company_id=company, category="movers", destination_city="Berlin",
+        )
+
+        def fake_list_curation(*, company_id, category, destination_city=None):
+            return [{"master_item_id": None, "selected": False,
+                     "custom_item_json": {"name": "ABC Movers Berlin"}}]
+
+        with mock.patch(
+            "backend.services.vendor_curation.list_curation",
+            side_effect=fake_list_curation,
+        ):
+            rows = employee_demand.list_demand_for_company(company)
+        self.assertEqual(rows, [])
+
+    def test_curation_lookup_failure_keeps_row_visible(self) -> None:
+        """
+        If the curation lookup fails (table missing in dev, exception in
+        the service), the demand row should STAY visible — fail open so
+        HR doesn't silently lose the signal.
+        """
+        company = str(uuid.uuid4())
+        employee_demand.record_demand(
+            company_id=company, category="schools", destination_city="Tokyo",
+        )
+        with mock.patch(
+            "backend.services.vendor_curation.list_curation",
+            side_effect=RuntimeError("table not found"),
+        ):
+            rows = employee_demand.list_demand_for_company(company)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["category"], "schools")
+
     def test_country_back_filled_on_repeat(self) -> None:
         # First record without country, second with — country should land
         # on the existing row instead of being lost.

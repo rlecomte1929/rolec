@@ -25,6 +25,62 @@ const WARNING_LABELS: Record<string, string> = {
   waitlist: 'Waitlist may apply',
 };
 
+/**
+ * Friendly labels for the score-dimension keys returned by each scoring
+ * plugin. Plugins use snake_case (coverage / family_coverage / etc.);
+ * this mapping turns them into title-case for the UI. Unknown keys
+ * fall back to a generic prettifier (snake_case → Title Case).
+ */
+const SCORE_DIMENSION_LABELS: Record<string, string> = {
+  coverage: 'Coverage match',
+  deductible: 'Deductible',
+  family: 'Family coverage',
+  family_coverage: 'Family coverage',
+  rating: 'User rating',
+  availability: 'Availability',
+  green: 'Green energy',
+  flex: 'Flexibility',
+  flex_score: 'Flexibility',
+  trans: 'Transparent pricing',
+  curriculum: 'Curriculum match',
+  language: 'Language match',
+  distance: 'Distance to office',
+  experience: 'Experience',
+  budget: 'Budget fit',
+  speed: 'Service speed',
+  insurance: 'Insurance included',
+};
+
+function prettyDimensionLabel(key: string): string {
+  if (SCORE_DIMENSION_LABELS[key]) return SCORE_DIMENSION_LABELS[key];
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * One scoring-dimension chip. Color reflects strength so HR/employee
+ * can scan the row visually (green = strong contributor, amber = mid,
+ * red = weak). Score is on a 0–100 scale by plugin convention.
+ */
+function ScoreDimensionChip({ label, value }: { label: string; value: number }) {
+  const tone =
+    value >= 80
+      ? 'bg-green-100 text-green-800 border-green-200'
+      : value >= 50
+        ? 'bg-amber-100 text-amber-800 border-amber-200'
+        : 'bg-red-50 text-red-700 border-red-200';
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-medium ${tone}`}
+      title={`Dimension contributes ${value.toFixed(0)} of 100 to the overall score`}
+    >
+      <span>{prettyDimensionLabel(label)}</span>
+      <span className="font-semibold">{value.toFixed(0)}</span>
+    </span>
+  );
+}
+
 function RatingStars({ rating }: { rating?: number }) {
   if (rating == null || typeof rating !== 'number' || !Number.isFinite(rating)) return null;
   const clamped = Math.max(0, Math.min(5, rating));
@@ -72,7 +128,6 @@ function RecCard({
   category,
   criteriaEcho,
   defaultExpanded = false,
-  defaultShowDebug = false,
   isInPackage,
   onTogglePackage,
   displayCurrency,
@@ -81,13 +136,11 @@ function RecCard({
   category: string;
   criteriaEcho?: Record<string, unknown>;
   defaultExpanded?: boolean;
-  defaultShowDebug?: boolean;
   isInPackage: boolean;
   onTogglePackage: () => void;
   displayCurrency: string;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [showDebug, setShowDebug] = useState(defaultShowDebug);
   const tier = item.tier || 'ok';
   const avail = item.metadata?.availability_level || 'high';
   const expl = item.explanation;
@@ -202,28 +255,35 @@ function RecCard({
         </Button>
       </div>
       {expanded && (
-        <div className="mt-3 pt-3 border-t border-[#e2e8f0] space-y-2">
+        <div className="mt-3 pt-3 border-t border-[#e2e8f0] space-y-3">
           <p className="text-sm text-[#4b5563]">{item.rationale}</p>
-          {(Object.keys(expl?.score_dimensions ?? item.breakdown ?? {}).length > 0) && (
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => setShowDebug(!showDebug)}
-                className="text-xs font-medium text-[#6b7280] hover:text-[#0b2b43]"
-              >
-                {showDebug ? 'Hide scoring details' : 'Show scoring details ›'}
-              </button>
-              {showDebug && (
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {Object.entries(expl?.score_dimensions ?? item.breakdown ?? {}).map(([k, v]) => (
-                    <span key={k} className="text-xs bg-[#f1f5f9] px-2 py-0.5 rounded">
-                      {k}: {typeof v === 'number' ? v.toFixed(1) : String(v)}
-                    </span>
+          {(() => {
+            const dims = expl?.score_dimensions ?? item.breakdown ?? {};
+            const entries = Object.entries(dims).filter(
+              ([, v]) => typeof v === 'number'
+            ) as Array<[string, number]>;
+            if (entries.length === 0) return null;
+            // Sort highest contribution first so the strongest factors
+            // lead — that's what HR / employees actually want to scan.
+            entries.sort((a, b) => b[1] - a[1]);
+            return (
+              <div>
+                <div className="text-xs font-medium text-[#0b2b43] mb-1.5">
+                  How this score was built
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {entries.map(([k, v]) => (
+                    <ScoreDimensionChip key={k} label={k} value={v} />
                   ))}
                 </div>
-              )}
-            </div>
-          )}
+                <p className="mt-1.5 text-xs text-[#6b7280]">
+                  Each dimension is 0–100. The overall score weighs them
+                  per the {category} plugin's formula. HR-configurable
+                  weights ship in a follow-up sprint.
+                </p>
+              </div>
+            );
+          })()}
           {item.cons.length > 0 && (
             <div className="text-sm text-amber-700">Cons: {item.cons.join(', ')}</div>
           )}
@@ -245,7 +305,6 @@ interface Props {
   onSelectedPackageChange: (pkg: Map<string, string>) => void;
   onStartOver: () => void;
   onViewSummary: () => void;
-  debugMode?: boolean;
   displayCurrency: string;
 }
 
@@ -256,7 +315,6 @@ export const RecommendationResults: React.FC<Props> = ({
   onSelectedPackageChange,
   onStartOver,
   onViewSummary,
-  debugMode = false,
   displayCurrency,
 }) => {
   const entries = Object.entries(results);
@@ -337,7 +395,6 @@ export const RecommendationResults: React.FC<Props> = ({
                     category={category}
                     criteriaEcho={res.criteria_echo}
                     defaultExpanded={idx === 0}
-                    defaultShowDebug={debugMode && idx === 0}
                     isInPackage={selectedPackage.get(category) === item.item_id}
                     onTogglePackage={() => togglePackage(category, item.item_id)}
                     displayCurrency={displayCurrency}
