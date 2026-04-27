@@ -28,6 +28,10 @@ _CITY_ALIASES: dict[str, str] = {
     "no": "Oslo",
     "san francisco": "San Francisco",
     "sf": "San Francisco",
+    "munich": "Munich",
+    "münchen": "Munich",
+    "germany": "Munich",
+    "de": "Munich",
 }
 
 
@@ -45,6 +49,7 @@ _CITY_CURRENCY: dict[str, str] = {
     "Oslo": "NOK",
     "New York": "USD",
     "San Francisco": "USD",
+    "Munich": "EUR",
 }
 
 # Approx conversion to USD for metadata (for display/comparison)
@@ -52,6 +57,7 @@ _CURRENCY_TO_USD: dict[str, float] = {
     "SGD": 0.74,
     "NOK": 0.09,
     "USD": 1.0,
+    "EUR": 1.09,
 }
 
 
