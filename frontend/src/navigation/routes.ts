@@ -56,6 +56,7 @@ export const ROUTE_DEFS = {
   notificationSettings: { path: '/settings/notifications', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   adminConsole: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
   adminOverview: { path: '/admin', roles: ['ADMIN'] as RouteRole[] },
+  adminCatalogQueue: { path: '/admin/catalog-queue', roles: ['ADMIN'] as RouteRole[] },
   adminCompanies: { path: '/admin/companies', roles: ['ADMIN'] as RouteRole[] },
   adminPeople: { path: '/admin/people', roles: ['ADMIN'] as RouteRole[] },
   adminAssignments: { path: '/admin/assignments', roles: ['ADMIN'] as RouteRole[] },

@@ -16,7 +16,11 @@ import {
   bulkSelect,
   deleteCustomVendor,
   getCurationView,
+  getScrapeQuota,
+  populateVendorsWithAi,
   type CurationRow,
+  type DestinationRequest,
+  type ScrapeQuotaState,
 } from '../api/hrCatalog';
 
 const CATEGORY_OPTIONS: { value: string; label: string }[] = [
@@ -39,6 +43,7 @@ const CATEGORY_OPTIONS: { value: string; label: string }[] = [
 export const HrVendorCuration: React.FC = () => {
   const [category, setCategory] = useState<string>('schools');
   const [city, setCity] = useState<string>('Munich');
+  const [country, setCountry] = useState<string>('Germany');
   const [rows, setRows] = useState<CurationRow[]>([]);
   // Track unsaved master toggles: master_item_id -> next selected.
   const [pendingToggles, setPendingToggles] = useState<Map<string, boolean>>(new Map());
@@ -51,6 +56,12 @@ export const HrVendorCuration: React.FC = () => {
   const [customName, setCustomName] = useState('');
   const [customNotes, setCustomNotes] = useState('');
   const [addingCustom, setAddingCustom] = useState(false);
+
+  // Phase 2b-secured: scraper trigger state
+  const [populating, setPopulating] = useState(false);
+  const [populateMessage, setPopulateMessage] = useState<string | null>(null);
+  const [pendingTicket, setPendingTicket] = useState<DestinationRequest | null>(null);
+  const [quota, setQuota] = useState<ScrapeQuotaState | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,6 +81,45 @@ export const HrVendorCuration: React.FC = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Refresh quota state on category/city change so the badge stays current.
+  useEffect(() => {
+    void getScrapeQuota().then(setQuota).catch(() => setQuota(null));
+    setPopulateMessage(null);
+    setPendingTicket(null);
+  }, [category, city]);
+
+  const populate = async () => {
+    if (!city.trim() || !country.trim()) {
+      setError('Destination city and country are required to ask the AI.');
+      return;
+    }
+    setPopulating(true);
+    setError(null);
+    setPopulateMessage(null);
+    setPendingTicket(null);
+    try {
+      const result = await populateVendorsWithAi(category, city.trim(), country.trim());
+      if (result.status === 'pending_admin_approval') {
+        setPendingTicket(result.request || null);
+        setPopulateMessage(result.message || 'Awaiting admin approval.');
+      } else {
+        setPopulateMessage(
+          result.inserted && result.inserted > 0
+            ? `AI populated ${result.inserted} vendor${result.inserted === 1 ? '' : 's'} for ${city}. Review carefully and tick the ones to show your employees.`
+            : `${city} already has master vendors for ${category}. Nothing was added (no AI tokens used).`,
+        );
+        if (result.quota) setQuota(result.quota);
+        await load();
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not populate with AI.';
+      setError(msg);
+      void getScrapeQuota().then(setQuota).catch(() => {});
+    } finally {
+      setPopulating(false);
+    }
+  };
 
   const masters = useMemo(() => rows.filter((r) => r.kind === 'master'), [rows]);
   const customs = useMemo(() => rows.filter((r) => r.kind === 'custom'), [rows]);
@@ -167,7 +217,7 @@ export const HrVendorCuration: React.FC = () => {
       subtitle="Choose which providers your employees see, per service and destination."
     >
       <Card padding="lg" className="mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <label className="block">
             <span className="text-sm font-medium text-[#0b2b43]">Service category</span>
             <select
@@ -192,12 +242,28 @@ export const HrVendorCuration: React.FC = () => {
               placeholder="e.g. Munich"
             />
           </label>
+          <label className="block">
+            <span className="text-sm font-medium text-[#0b2b43]">Country</span>
+            <input
+              type="text"
+              className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="e.g. Germany"
+            />
+          </label>
           <div className="flex items-end">
             <Button onClick={() => void load()} disabled={loading} variant="outline">
               {loading ? 'Loading…' : 'Reload'}
             </Button>
           </div>
         </div>
+        {quota && (
+          <p className="mt-3 text-xs text-[#64748b]">
+            AI catalog quota today: <strong className="text-[#0b2b43]">{quota.used}/{quota.limit}</strong> used
+            ({quota.remaining} remaining; resets at midnight UTC).
+          </p>
+        )}
       </Card>
 
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
@@ -216,11 +282,43 @@ export const HrVendorCuration: React.FC = () => {
             {saving ? 'Saving…' : dirty ? `Save ${pendingToggles.size} change${pendingToggles.size === 1 ? '' : 's'}` : 'No changes to save'}
           </Button>
         </div>
+        {populateMessage && (
+          <Alert variant={pendingTicket ? 'info' : 'success'} className="mb-3">
+            {populateMessage}
+          </Alert>
+        )}
+        {pendingTicket && (
+          <div className="mb-3 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-sm text-[#1e3a5f]">
+            Ticket opened: {pendingTicket.city}, {pendingTicket.country} for{' '}
+            <strong>{pendingTicket.category}</strong>. Waiting on admin to allowlist
+            this destination. We'll auto-populate as soon as it's approved.
+          </div>
+        )}
         {masters.length === 0 ? (
-          <p className="text-sm text-[#6b7280] py-4">
-            No master vendors yet for this category × city. Phase 2c scrapers will populate this
-            when they ship; for now you can add custom vendors below.
-          </p>
+          <div className="py-2">
+            <p className="text-sm text-[#4b5563] mb-3">
+              No master vendors yet for {category} in {city || '—'}.
+            </p>
+            <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] p-4">
+              <p className="text-sm font-medium text-[#0b2b43] mb-1">
+                Populate with AI
+              </p>
+              <p className="text-xs text-[#92400e] mb-3">
+                We'll ask the AI to suggest up to 10 vendors for this category in {city || '—'}.
+                <strong> Review carefully before approving</strong> — the AI is a starting point,
+                not a vetted list. Each call counts against your daily AI quota.
+              </p>
+              <Button
+                onClick={() => void populate()}
+                disabled={populating || !city.trim() || !country.trim()}
+              >
+                {populating ? 'Asking the AI…' : 'Populate vendors with AI'}
+              </Button>
+            </div>
+            <p className="mt-4 text-sm text-[#6b7280]">
+              Or skip the AI and add your own preferred vendors below.
+            </p>
+          </div>
         ) : (
           <ul className="divide-y divide-[#e2e8f0] border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
             {masters.map((row) => {

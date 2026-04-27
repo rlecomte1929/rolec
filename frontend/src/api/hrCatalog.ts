@@ -64,3 +64,57 @@ export const addCustomVendor = (body: CustomVendorBody): Promise<unknown> =>
 
 export const deleteCustomVendor = (rowId: string): Promise<{ deleted: boolean; id: string }> =>
   apiDelete(`/api/hr/catalog/curation/custom/${encodeURIComponent(rowId)}`);
+
+// ---------------------------------------------------------------------------
+// Phase 2b-secured: scraper trigger + ticket queue (HR side)
+// ---------------------------------------------------------------------------
+
+export interface ScrapeQuotaState {
+  day: string;
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+export interface DestinationRequest {
+  id: string;
+  city: string;
+  country: string;
+  category: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requested_by: string;
+  company_id: string;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PopulateWithAiResult {
+  status: 'completed' | 'pending_admin_approval';
+  category?: string;
+  destination_city?: string;
+  country?: string;
+  inserted?: number;
+  quota?: ScrapeQuotaState;
+  request?: DestinationRequest;
+  message?: string;
+}
+
+export const populateVendorsWithAi = (
+  category: string,
+  destinationCity: string,
+  country: string,
+): Promise<PopulateWithAiResult> =>
+  apiPost('/api/hr/catalog/populate-with-ai', {
+    category,
+    destination_city: destinationCity,
+    country,
+  });
+
+export const getScrapeQuota = (): Promise<ScrapeQuotaState> =>
+  apiGet('/api/hr/catalog/scrape-quota');
+
+export const listMyDestinationRequests = (): Promise<DestinationRequest[]> =>
+  apiGet('/api/hr/catalog/destination-requests');
