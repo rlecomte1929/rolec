@@ -2003,6 +2003,51 @@ class Database:
                 ON company_vendor_selections (master_item_id)
             """))
 
+            # Catalog scraper safety net (Phase 2b-secured). Postgres mirrors:
+            # supabase migration 20260427140000_catalog_scrape_safety.sql.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS catalog_destination_allowlist (
+                    city TEXT NOT NULL,
+                    country TEXT NOT NULL,
+                    approved_by TEXT,
+                    approved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    notes TEXT,
+                    PRIMARY KEY (city, country)
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS catalog_scrape_quota (
+                    company_id TEXT NOT NULL,
+                    day TEXT NOT NULL,
+                    calls_made INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (company_id, day)
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS catalog_destination_requests (
+                    id TEXT PRIMARY KEY,
+                    city TEXT NOT NULL,
+                    country TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    requested_by TEXT NOT NULL,
+                    company_id TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    resolved_by TEXT,
+                    resolved_at TEXT,
+                    notes TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_cdr_status
+                ON catalog_destination_requests (status, created_at DESC)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_cdr_company
+                ON catalog_destination_requests (company_id, created_at DESC)
+            """))
+
             # Exception requests (T1.3) — Postgres has these via supabase migration
             # 20260427100000_exception_requests.sql; mirror on SQLite for local dev
             # so the FastAPI router works against the local file DB without Supabase.

@@ -235,3 +235,105 @@ def delete_custom(
     if not ok:
         raise HTTPException(status_code=404, detail="Custom vendor not found")
     return {"deleted": True, "id": row_id}
+
+
+# ---------------------------------------------------------------------------
+# Phase 2b-secured: HR-initiated scraper trigger with allowlist + quota gates
+# ---------------------------------------------------------------------------
+
+
+class PopulateWithAiBody(BaseModel):
+    category: str = Field(..., min_length=1)
+    destination_city: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=1)
+
+
+@router.post("/populate-with-ai")
+def populate_with_ai(
+    body: PopulateWithAiBody,
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """
+    HR-initiated catalog scrape. Layered safety:
+
+      L4 allowlist  → off-allowlist requests open a ticket instead of
+                      burning tokens (returns 202 + {"status": "pending_admin_approval"})
+      L3 quota      → 429 when the company has exceeded today's daily cap
+      L1 already-populated check happens inside catalog_scraper —
+                      callers won't re-burn tokens for a populated slot
+      L7 audit      → every dispatch + every ticket open writes an audit_logs row
+    """
+    from ...services import scrape_safety, catalog_scraper
+
+    company_id = _caller_company_id(user)
+    actor_id = user["id"]
+    city = body.destination_city.strip()
+    country = body.country.strip()
+
+    # L4 — allowlist gate
+    if not scrape_safety.is_destination_allowlisted(city, country):
+        ticket = scrape_safety.open_destination_request(
+            city=city,
+            country=country,
+            category=body.category,
+            requested_by_user_id=actor_id,
+            company_id=company_id,
+        )
+        return {
+            "status": "pending_admin_approval",
+            "request": ticket,
+            "message": (
+                f"{city}, {country} isn't on our supported destinations yet. "
+                "We've notified our admin team — you'll see it appear here once approved."
+            ),
+        }
+
+    # L3 — quota gate (atomic check + increment so concurrent calls don't race)
+    quota = scrape_safety.check_and_increment_quota(company_id)
+    if not quota["allowed"]:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": (
+                    f"Daily catalog-scrape quota of {quota['limit']} reached "
+                    f"for your company. Try again tomorrow (UTC) or contact admin."
+                ),
+                "quota": quota,
+            },
+        )
+
+    # L1 short-circuit lives inside populate_destination_catalog itself.
+    rows = catalog_scraper.populate_destination_catalog(
+        category=body.category,
+        destination_city=city,
+        country=country,
+    )
+    return {
+        "status": "completed",
+        "category": body.category,
+        "destination_city": city,
+        "country": country,
+        "inserted": len(rows),
+        "quota": quota,
+    }
+
+
+@router.get("/scrape-quota")
+def get_scrape_quota(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """Return today's quota state for the caller's company. Used by the UI."""
+    from ...services import scrape_safety
+    return scrape_safety.get_quota_state(_caller_company_id(user))
+
+
+@router.get("/destination-requests")
+def list_my_destination_requests(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> List[Dict[str, Any]]:
+    """HR sees the tickets they (or their company) have opened."""
+    from ...services import scrape_safety
+    return scrape_safety.list_destination_requests(
+        company_id=_caller_company_id(user),
+        limit=100,
+    )
