@@ -1969,6 +1969,40 @@ class Database:
                 ON service_catalog_items (source)
             """))
 
+            # HR per-company curation (Phase 2d). Postgres has this via
+            # supabase migration 20260427130000_company_vendor_selections.sql.
+            # SQLite mirror; FK to service_catalog_items is informational
+            # only here (SQLite doesn't enforce by default).
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS company_vendor_selections (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    destination_city TEXT,
+                    country TEXT,
+                    master_item_id TEXT,
+                    custom_item_json TEXT,
+                    selected INTEGER NOT NULL DEFAULT 1,
+                    display_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    created_by_user_id TEXT,
+                    UNIQUE (company_id, category, destination_city, master_item_id),
+                    CHECK (
+                        (master_item_id IS NOT NULL AND custom_item_json IS NULL)
+                        OR (master_item_id IS NULL AND custom_item_json IS NOT NULL)
+                    )
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_cvs_company_cat_city
+                ON company_vendor_selections (company_id, category, destination_city)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_cvs_master_item
+                ON company_vendor_selections (master_item_id)
+            """))
+
             # Exception requests (T1.3) — Postgres has these via supabase migration
             # 20260427100000_exception_requests.sql; mirror on SQLite for local dev
             # so the FastAPI router works against the local file DB without Supabase.
