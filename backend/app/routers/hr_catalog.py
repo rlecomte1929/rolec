@@ -101,12 +101,20 @@ def get_curation_view(
     - Every HR custom vendor row for the same scope.
     """
     company_id = _caller_company_id(user)
-    master_items = service_catalog.list_items(
+    # Match the master plugins' geo-bound vs geo-agnostic split: when the
+    # category has no rows tagged with a city, every row applies everywhere
+    # (e.g. movers / banks). Filtering strictly on city would hide them and
+    # leave HR with "0 items" for categories that in fact have a full list.
+    all_active = service_catalog.list_items(
         category=category,
-        city=destination_city,
         active_only=True,
         limit=200,
     )
+    has_geo_rows = any(m.get("city") for m in all_active)
+    if has_geo_rows and destination_city:
+        master_items = [m for m in all_active if m.get("city") == destination_city]
+    else:
+        master_items = all_active
     selections = vendor_curation.list_curation(
         company_id=company_id,
         category=category,
