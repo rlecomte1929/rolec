@@ -172,6 +172,19 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
 
   const versionLive = String(versionStatus || '').toLowerCase() === 'published';
 
+  // Slice 2 of the IA simplification gates the doc-only blocks. Matrix-only
+  // deployments (no PDF uploaded, baseline created from a template) used to
+  // see "No file linked", "No clause highlights or pre-rule items" — all dead
+  // pixels. These blocks now collapse entirely when the underlying signals
+  // are absent. Document-imported deployments still see them.
+  const hasSourceDocument = Boolean(
+    sourceDoc && (docFilename || docType || docScope || processing)
+  );
+  const hasExtractedSignals =
+    clauseCandidates.length > 0 ||
+    draftRuleCandidates.length > 0 ||
+    groupedPolicyItems.length > 0;
+
   if (workspaceResolved.phase === 'no_policy') {
     return null;
   }
@@ -216,7 +229,8 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
         )}
       </Card>
 
-      {/* 1 — Document summary */}
+      {/* 1 — Document summary (only when a source document is attached) */}
+      {hasSourceDocument && (
       <Card padding="lg">
         <h3 className="text-sm font-semibold text-[#0b2b43] mb-3">Document summary</h3>
         <dl className="grid gap-3 sm:grid-cols-2 text-sm">
@@ -245,6 +259,7 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           </div>
         )}
       </Card>
+      )}
 
       {/* 2 — Review status banner */}
       <div className={`rounded-lg border px-4 py-3 ${bannerToneClasses(banner.tone)}`}>
@@ -257,7 +272,8 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
         )}
       </div>
 
-      {/* 3 — Extracted policy signals */}
+      {/* 3 — Extracted policy signals (only when extraction produced something) */}
+      {hasExtractedSignals && (
       <Card padding="lg">
         <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">Extracted policy signals</h3>
         <p className="text-xs text-[#6b7280] mb-4">
@@ -400,12 +416,8 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           </div>
         )}
 
-        {clauseCandidates.length === 0 && draftRuleCandidates.length === 0 && groupedPolicyItems.length === 0 && (
-          <p className="text-sm text-[#6b7280]">
-            No clause highlights or pre-rule items for this version—common for a baseline created without a source file.
-          </p>
-        )}
       </Card>
+      )}
 
       {/* 4 — Publishable rules */}
       <Card padding="lg">
