@@ -221,12 +221,15 @@ export const PackageSummary: React.FC<Props> = ({
     capUsd: number;
   } | null>(null);
 
+  const [exceptionRows, setExceptionRows] = useState<ExceptionRequest[]>([]);
+  const [exceptionsRefreshNonce, setExceptionsRefreshNonce] = useState(0);
   useEffect(() => {
     if (!assignmentId) return;
     let cancelled = false;
     listExceptionRequestsForCase(assignmentId)
       .then((rows) => {
         if (cancelled) return;
+        setExceptionRows(rows);
         const next = new Map<string, ExceptionRequest>();
         // Most recent (server returns DESC) wins per category.
         for (const row of rows) {
@@ -240,7 +243,19 @@ export const PackageSummary: React.FC<Props> = ({
     return () => {
       cancelled = true;
     };
-  }, [assignmentId]);
+  }, [assignmentId, exceptionsRefreshNonce]);
+
+  // Re-fetch when the user comes back to this tab so HR's decisions show
+  // up without requiring a hard refresh.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        setExceptionsRefreshNonce((n) => n + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   const EXCEPTION_BADGE: Record<
     ExceptionRequest['status'],
@@ -305,6 +320,61 @@ export const PackageSummary: React.FC<Props> = ({
           </button>
         </div>
       </div>
+
+      {exceptionRows.length > 0 && (
+        <Card padding="lg">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-[#0b2b43]">Your exception requests</h3>
+            <button
+              type="button"
+              onClick={() => setExceptionsRefreshNonce((n) => n + 1)}
+              className="text-xs text-[#0b2b43] hover:underline"
+            >
+              Refresh
+            </button>
+          </div>
+          <p className="text-sm text-[#6b7280] mb-3">
+            Saved with your case. The decision shows here even if you re-build your shortlist.
+          </p>
+          <ul className="space-y-3">
+            {exceptionRows.map((row) => {
+              const badge = EXCEPTION_BADGE[row.status];
+              return (
+                <li
+                  key={row.id}
+                  className="rounded-lg border border-[#e2e8f0] bg-white p-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-[#0b2b43] capitalize">
+                          {categoryLabels[row.category] || row.category}
+                        </span>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${badge.className}`}
+                        >
+                          {badge.label}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-sm text-[#334155]">
+                        Requested {fmt(row.requested_amount)} vs cap {fmt(row.cap_amount)}
+                      </div>
+                      <p className="mt-2 whitespace-pre-line text-sm text-[#475569]">
+                        Your reason: {row.reason}
+                      </p>
+                      {row.hr_note && (
+                        <p className="mt-1 text-sm text-[#0b2b43]">
+                          <span className="font-medium">HR note:</span> {row.hr_note}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       {packageItems.length === 0 ? (
         <Card padding="lg">
