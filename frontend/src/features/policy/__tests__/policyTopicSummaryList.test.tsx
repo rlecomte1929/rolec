@@ -130,6 +130,26 @@ describe('PolicyTopicSummaryList', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it('hides "View details" when no onRequestDetails callback is provided (employee surface)', () => {
+    render(<PolicyTopicSummaryList matrixPayload={payload()} />);
+    expect(screen.queryByRole('button', { name: /View details/i })).not.toBeInTheDocument();
+    // Theme rows still render so the summary itself is usable.
+    expect(screen.getByText('Relocation assistance')).toBeInTheDocument();
+  });
+
+  it('respects custom heading + subtitle for the employee surface', () => {
+    render(
+      <PolicyTopicSummaryList
+        matrixPayload={payload()}
+        heading="Your benefits at a glance"
+        subtitle="Approved benefits for your assignment, grouped by theme."
+      />
+    );
+    expect(screen.getByText('Your benefits at a glance')).toBeInTheDocument();
+    expect(screen.getByText(/Approved benefits for your assignment/)).toBeInTheDocument();
+    expect(screen.queryByText(/What employees see today/)).not.toBeInTheDocument();
+  });
+
   it('shows applicability label when the row narrows targeting', () => {
     render(
       <PolicyTopicSummaryList

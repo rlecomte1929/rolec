@@ -69,8 +69,15 @@ function statusForRow(row: PolicyConfigBenefitRow): {
 
 type Props = {
   matrixPayload: PolicyConfigWorkingPayload | null;
-  /** "Dive deeper" button — opens the Detailed review drawer on the parent. */
-  onRequestDetails: () => void;
+  /** "Dive deeper" button — opens the Detailed review drawer on the parent.
+   *  Omit on read-only surfaces (e.g. the employee policy page) where there
+   *  is no editing drawer to open. */
+  onRequestDetails?: () => void;
+  /** Override the default heading. Employee surface uses
+   *  "Your benefits at a glance"; HR keeps "What employees see today". */
+  heading?: string;
+  /** Override the subtitle. Same rationale as `heading`. */
+  subtitle?: string;
 };
 
 // --- Component -------------------------------------------------------------
@@ -78,6 +85,8 @@ type Props = {
 export const PolicyTopicSummaryList: React.FC<Props> = ({
   matrixPayload,
   onRequestDetails,
+  heading = 'What employees see today',
+  subtitle = 'Summary of the currently live relocation policy by theme. Click a theme to see its individual benefit rows — read-only here. Edits happen in the Detailed review drawer.',
 }) => {
   const themes = useMemo(() => {
     const cats: PolicyConfigCategoryBlock[] = matrixPayload?.categories ?? [];
@@ -112,7 +121,7 @@ export const PolicyTopicSummaryList: React.FC<Props> = ({
   if (themes.length === 0) {
     return (
       <div>
-        <h2 className="text-lg font-semibold text-[#0b2b43]">What employees see today</h2>
+        <h2 className="text-lg font-semibold text-[#0b2b43]">{heading}</h2>
         <p className="text-sm text-slate-600 mt-2">
           No structured matrix has been published yet. Build your first version below.
         </p>
@@ -123,15 +132,14 @@ export const PolicyTopicSummaryList: React.FC<Props> = ({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[#0b2b43]">What employees see today</h2>
-        <Button size="sm" variant="outline" onClick={onRequestDetails}>
-          View details
-        </Button>
+        <h2 className="text-lg font-semibold text-[#0b2b43]">{heading}</h2>
+        {onRequestDetails && (
+          <Button size="sm" variant="outline" onClick={onRequestDetails}>
+            View details
+          </Button>
+        )}
       </div>
-      <p className="text-sm text-slate-600 mt-1.5">
-        Summary of the currently live relocation policy by theme. Click a theme to see its
-        individual benefit rows — read-only here. Edits happen in the Detailed review drawer.
-      </p>
+      <p className="text-sm text-slate-600 mt-1.5">{subtitle}</p>
       <ul className="mt-4 divide-y divide-slate-200" data-testid="policy-topic-summary-list">
         {themes.map((t) => {
           const isOpen = openKeys.has(t.key);
