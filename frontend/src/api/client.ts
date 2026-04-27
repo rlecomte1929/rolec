@@ -2988,3 +2988,59 @@ export async function apiPatch<T>(
   });
   return data;
 }
+
+export async function apiDelete<T>(
+  path: string,
+  opts?: { headers?: Record<string, string>; requestId?: string }
+): Promise<T> {
+  let response: Response;
+  const tStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const requestId =
+    opts?.requestId ||
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+  const pathOnly = path.split('?')[0] || '/';
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'DELETE',
+      headers: {
+        ...authHeaders(),
+        ...(opts?.headers || {}),
+        'X-Request-ID': requestId,
+      },
+    });
+  } catch {
+    throw new Error('Unable to reach the server. Please check your connection and try again.');
+  }
+  if (!response.ok) {
+    const text = await response.text();
+    const tBody = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    recordRequestPerf({
+      requestId,
+      method: 'DELETE',
+      path: pathOnly,
+      status: response.status,
+      ok: false,
+      durationHeadersMs: tBody - tStart,
+      durationBodyMs: tBody - tStart,
+      startedAt: tStart,
+    });
+    throw buildApiError(response, text);
+  }
+  const jsonStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const text = await response.text();
+  const data = (text ? JSON.parse(text) : null) as T;
+  const tEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  recordRequestPerf({
+    requestId,
+    method: 'DELETE',
+    path: pathOnly,
+    status: response.status,
+    ok: true,
+    durationHeadersMs: jsonStart - tStart,
+    durationBodyMs: tEnd - tStart,
+    startedAt: tStart,
+  });
+  return data;
+}
