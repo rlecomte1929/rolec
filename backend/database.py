@@ -1934,6 +1934,41 @@ class Database:
                 ON services_state (organization_id)
             """))
 
+            # Master catalog of service vendors per (category, city/country).
+            # Phase 2a of the recommendations catalog routine. Postgres has
+            # this via supabase migration 20260427120000_service_catalog_items.sql;
+            # mirror on SQLite for local dev so the admin endpoints + the
+            # JSON->DB backfill script work without Supabase.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS service_catalog_items (
+                    id TEXT PRIMARY KEY,
+                    category TEXT NOT NULL,
+                    city TEXT,
+                    country TEXT,
+                    name TEXT NOT NULL,
+                    attributes_json TEXT NOT NULL DEFAULT '{}',
+                    source TEXT NOT NULL DEFAULT 'manual',
+                    active INTEGER NOT NULL DEFAULT 1,
+                    external_id TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    created_by_user_id TEXT,
+                    UNIQUE (category, external_id)
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_service_catalog_items_cat_city
+                ON service_catalog_items (category, city)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_service_catalog_items_cat_country
+                ON service_catalog_items (category, country)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_service_catalog_items_source
+                ON service_catalog_items (source)
+            """))
+
             # Exception requests (T1.3) — Postgres has these via supabase migration
             # 20260427100000_exception_requests.sql; mirror on SQLite for local dev
             # so the FastAPI router works against the local file DB without Supabase.
