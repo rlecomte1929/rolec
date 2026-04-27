@@ -177,6 +177,19 @@ export const HrCaseSummary: React.FC = () => {
       title="Case Summary"
       subtitle="Same view as the employee: essentials, gaps, shared plan."
     >
+      <nav
+        className="mb-4 text-sm text-[#64748b] flex items-center gap-1"
+        aria-label="Breadcrumb"
+      >
+        <Link
+          to={buildRoute('hrCommandCenter')}
+          className="text-[#0b2b43] hover:underline"
+        >
+          ← Dashboard
+        </Link>
+        <span aria-hidden="true" className="text-[#94a3b8]"> / </span>
+        <span className="text-[#475569]" aria-current="page">{headerName}</span>
+      </nav>
       {error && (
         <Alert variant="error">
           {error}

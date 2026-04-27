@@ -90,7 +90,7 @@ export const HrCommandCenter: React.FC = () => {
   };
 
   return (
-    <AppShell title="Command Center" subtitle="Portfolio view and risk signals across cases.">
+    <AppShell title="Dashboard" subtitle="Portfolio view and risk signals across cases.">
       <div className="space-y-6">
         {/* KPI Row: shell visible immediately, values stream in */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
