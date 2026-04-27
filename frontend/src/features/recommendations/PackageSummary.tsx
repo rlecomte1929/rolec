@@ -4,6 +4,7 @@ import { Card, Button } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 import type { RecommendationResponse, RecommendationItem } from './types';
 import {
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
@@ -150,6 +151,7 @@ export const PackageSummary: React.FC<Props> = ({
     if (item) packageItems.push({ category, item });
   }
 
+  type CapStatus = 'within' | 'over' | 'not_capped';
   const comparison: {
     category: string;
     label: string;
@@ -159,6 +161,9 @@ export const PackageSummary: React.FC<Props> = ({
     extra: number;
     /** Published policy exists but no mapped numeric cap for this service category — treat as uncovered for estimates. */
     noPublishedCapForCategory: boolean;
+    /** No mapping exists in CATEGORY_TO_CAP at all (e.g. banks/insurance/electricity). */
+    noCapMapping: boolean;
+    status: CapStatus;
   }[] = [];
   if (policyCaps) {
     for (const { category, item } of packageItems) {
@@ -173,9 +178,12 @@ export const PackageSummary: React.FC<Props> = ({
             : capKey === 'schools_usd'
               ? policyCaps.schools_usd
               : 0;
+      const noCapMapping = !capKey;
       const noPublishedCapForCategory = Boolean(hasPublishedPolicy && capKey && cap <= 0);
       const covered = Math.min(total, cap);
       const extra = Math.max(0, total - cap);
+      const status: CapStatus =
+        noCapMapping || cap <= 0 ? 'not_capped' : extra > 0 ? 'over' : 'within';
       comparison.push({
         category,
         label: categoryLabels[category] || category,
@@ -184,9 +192,29 @@ export const PackageSummary: React.FC<Props> = ({
         covered,
         extra,
         noPublishedCapForCategory,
+        noCapMapping,
+        status,
       });
     }
   }
+
+  const viewerRole = useMemo(() => normalizeStoredRole(getAuthItem('relopass_role')), []);
+  const isHrViewer = viewerRole === 'HR' || viewerRole === 'ADMIN';
+
+  const STATUS_BADGE: Record<CapStatus, { label: string; className: string }> = {
+    within: {
+      label: 'Within cap',
+      className: 'bg-[#dcfce7] text-[#166534] border-[#bbf7d0]',
+    },
+    over: {
+      label: 'Over cap',
+      className: 'bg-[#ffedd5] text-[#9a3412] border-[#fed7aa]',
+    },
+    not_capped: {
+      label: 'Not capped',
+      className: 'bg-[#f1f5f9] text-[#475569] border-[#e2e8f0]',
+    },
+  };
 
   const totalPackage = comparison.reduce((s, c) => s + c.total, 0);
   const totalCovered = comparison.reduce((s, c) => s + c.covered, 0);
@@ -262,7 +290,14 @@ export const PackageSummary: React.FC<Props> = ({
 
           {policyCaps && comparison.length > 0 && comparisonAvailable !== false && (
             <Card padding="lg">
-              <h3 className="font-semibold text-[#0b2b43] mb-2">HR Policy Comparison</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <h3 className="font-semibold text-[#0b2b43]">HR Policy Comparison</h3>
+                {isHrViewer && (
+                  <span className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-xs font-medium text-[#1d4ed8]">
+                    HR view — same numbers the employee sees
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-[#6b7280] mb-2">
                 Caps below are from your company&apos;s published policy. See how much your company covers vs. what you may pay out of pocket.
               </p>
@@ -272,7 +307,7 @@ export const PackageSummary: React.FC<Props> = ({
                 this service type.
               </p>
 
-              {comparison.some((c) => c.noPublishedCapForCategory) && (
+              {comparison.some((c) => c.noPublishedCapForCategory || c.noCapMapping) && (
                 <p className="text-sm text-[#92400e] bg-[#fffbeb] border border-[#fde68a] rounded-lg px-3 py-2 mb-4">
                   Where your employer has not published a matching numeric limit for a selected service category, we treat
                   the employer-covered amount as zero for this estimate so you can see the full cost. See your policy
@@ -281,57 +316,89 @@ export const PackageSummary: React.FC<Props> = ({
               )}
 
               <div className="space-y-6 mb-8">
-                {comparison.map((c) => (
-                  <div key={c.category}>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="font-medium text-[#0b2b43]">{c.label}</span>
-                      <span>
-                        Total: {fmt(c.total)}
-                        {c.cap > 0 && (
-                          <span className="ml-2 text-[#6b7280]">
-                            (Cap: {fmt(c.cap)})
+                {comparison.map((c) => {
+                  const badge = STATUS_BADGE[c.status];
+                  return (
+                    <div key={c.category}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm mb-2">
+                        <span className="flex items-center gap-2">
+                          <span className="font-medium text-[#0b2b43]">{c.label}</span>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${badge.className}`}
+                          >
+                            {badge.label}
                           </span>
-                        )}
-                      </span>
-                    </div>
-                    {c.noPublishedCapForCategory && (
-                      <p className="text-xs text-[#b45309] mb-2">
-                        No employer cap is modeled in ReloPass for this category — estimate shown as out-of-pocket unless
-                        your formal policy says otherwise.
-                      </p>
-                    )}
-                    <div className="h-8 flex rounded-lg overflow-hidden bg-[#e2e8f0]">
-                      <div
-                        className="bg-[#22c55e] flex items-center justify-end pr-2 transition-all"
-                        style={{
-                          width: c.total > 0 ? `${(c.covered / c.total) * 100}%` : '0%',
-                          minWidth: c.covered > 0 ? 48 : 0,
-                        }}
-                      >
-                        {c.covered > 0 && (
-                          <span className="text-xs font-medium text-white">Covered</span>
-                        )}
+                        </span>
+                        <span>
+                          Total: {fmt(c.total)}
+                          {c.cap > 0 && (
+                            <span className="ml-2 text-[#6b7280]">
+                              (Cap: {fmt(c.cap)})
+                            </span>
+                          )}
+                        </span>
                       </div>
-                      <div
-                        className="bg-[#f97316] flex items-center pl-2 transition-all"
-                        style={{
-                          width: c.total > 0 ? `${(c.extra / c.total) * 100}%` : '0%',
-                          minWidth: c.extra > 0 ? 48 : 0,
-                        }}
-                      >
-                        {c.extra > 0 && (
-                          <span className="text-xs font-medium text-white">Extra</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-xs text-[#6b7280] mt-1">
-                      <span>Company covers: {fmt(c.covered)}</span>
-                      {c.extra > 0 && (
-                        <span className="text-[#f97316] font-medium">You pay: {fmt(c.extra)}</span>
+                      {c.noCapMapping && hasPublishedPolicy && (
+                        <p className="text-xs text-[#475569] mb-2">
+                          Not capped by your employer policy in ReloPass — this category is shown as fully out-of-pocket
+                          for the estimate.
+                        </p>
                       )}
+                      {c.noPublishedCapForCategory && (
+                        <p className="text-xs text-[#b45309] mb-2">
+                          No employer cap is modeled in ReloPass for this category — estimate shown as out-of-pocket unless
+                          your formal policy says otherwise.
+                        </p>
+                      )}
+                      {c.cap > 0 ? (
+                        <div className="h-8 flex rounded-lg overflow-hidden bg-[#e2e8f0]">
+                          <div
+                            className="bg-[#22c55e] flex items-center justify-end pr-2 transition-all"
+                            style={{
+                              width: c.total > 0 ? `${(c.covered / c.total) * 100}%` : '0%',
+                              minWidth: c.covered > 0 ? 48 : 0,
+                            }}
+                          >
+                            {c.covered > 0 && (
+                              <span className="text-xs font-medium text-white">Covered</span>
+                            )}
+                          </div>
+                          <div
+                            className="bg-[#f97316] flex items-center pl-2 transition-all"
+                            style={{
+                              width: c.total > 0 ? `${(c.extra / c.total) * 100}%` : '0%',
+                              minWidth: c.extra > 0 ? 48 : 0,
+                            }}
+                          >
+                            {c.extra > 0 && (
+                              <span className="text-xs font-medium text-white">Extra</span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-8 flex items-center justify-end rounded-lg bg-[#f1f5f9] px-2">
+                          <span className="text-xs font-medium text-[#475569]">No cap published</span>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-[#6b7280] mt-1">
+                        <span>Company covers: {fmt(c.covered)}</span>
+                        {c.extra > 0 && (
+                          <span className="text-[#f97316] font-medium">You pay: {fmt(c.extra)}</span>
+                        )}
+                        {isHrViewer && (
+                          <button
+                            type="button"
+                            disabled
+                            title="Cap override workflow ships with ExceptionRequest (T1.3) — UI stub for the demo."
+                            className="ml-auto inline-flex items-center rounded-md border border-[#cbd5e1] bg-white px-2 py-1 text-xs font-medium text-[#475569] opacity-60 cursor-not-allowed"
+                          >
+                            Override cap
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="pt-6 border-t border-[#e2e8f0] space-y-2">
