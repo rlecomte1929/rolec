@@ -340,6 +340,16 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                     Dashboard
                   </Link>
                   <Link
+                    to={buildRoute('hrVendorCuration')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrVendorCuration.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Vendors
+                  </Link>
+                  <Link
                     to={messagesRoute}
                     className={`px-3 py-1 rounded-full border ${
                       isActiveRoute(ROUTE_DEFS.hrMessages.path)
