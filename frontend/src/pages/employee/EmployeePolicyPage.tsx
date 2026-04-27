@@ -22,6 +22,8 @@ import {
 import { glossaryIdForBenefitKey } from '../../features/policy-config/compensationGlossary';
 import { PolicyGlossarySection } from '../../features/policy-config/PolicyGlossarySection';
 import { TermHelpIcon } from '../../features/policy-config/TermHelpIcon';
+import { PolicyTopicSummaryList } from '../../features/policy/PolicyTopicSummaryList';
+import type { PolicyConfigWorkingPayload } from '../../features/policy-config/types';
 
 type ServicesPolicyContext = Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>>;
 
@@ -312,6 +314,26 @@ export const EmployeePolicyPage: React.FC = () => {
             )}
 
             <PolicyGlossarySection variant="employee" />
+
+            {/* Theme-grouped read-only summary mirroring the HR-side
+                "What employees see today" card. The employee endpoint
+                already filters to covered + applicable rows, so every
+                row in `data.categories` is something HR has approved
+                for this assignment & level. */}
+            {sortedCategories.length > 0 && (
+              <Card padding="lg" className="border-[#e2e8f0]">
+                <PolicyTopicSummaryList
+                  matrixPayload={
+                    {
+                      ...(data ?? {}),
+                      categories: sortedCategories,
+                    } as PolicyConfigWorkingPayload
+                  }
+                  heading="Your benefits at a glance"
+                  subtitle="Approved benefits for your assignment, grouped by theme. Click a theme to see the individual benefit rows. Read-only — only your employer can change policy."
+                />
+              </Card>
+            )}
 
             <div className="space-y-6">
               {sortedCategories.map((cat) => (
