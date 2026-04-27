@@ -8,6 +8,9 @@ import { glossaryIdForBenefitKey } from './compensationGlossary';
 import { TermHelpIcon } from './TermHelpIcon';
 import { validateBenefitRow } from './benefitRowValidation';
 import { patchAdditionalTerms, readAdditionalTerms } from './benefitProgramDetails';
+import { JurisdictionOverridesEditor } from './JurisdictionOverridesEditor';
+import type { PolicyJurisdictionOverride } from './types';
+import { isSectionCOverridesEnabled } from '../../featureFlags';
 import {
   normalizeAssignmentType,
   normalizeAssignmentTypeList,
@@ -29,6 +32,21 @@ const VALUE_TYPE_OPTIONS = [
   { value: 'percentage', label: 'Percentage' },
   { value: 'text', label: 'Describe in words only' },
 ];
+
+/**
+ * Section C badge tooltip: a one-line summary of where the overrides apply.
+ * "SG, MY · DE · US" — countries grouped per override, semicolon-separated.
+ * Truncates after the first three so a busy benefit doesn't blow out the
+ * tooltip.
+ */
+const summarizeOverrides = (overrides: PolicyJurisdictionOverride[]): string => {
+  const parts = overrides.slice(0, 3).map((ov) => {
+    const cs = (ov.jurisdiction_countries || []).join(', ') || '?';
+    return cs;
+  });
+  const more = overrides.length > 3 ? ` +${overrides.length - 3} more` : '';
+  return `Overrides apply to: ${parts.join(' · ')}${more}`;
+};
 
 const UNIT_FREQUENCY_OPTIONS = [
   { value: 'one_time', label: 'One-time' },
@@ -133,6 +151,25 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
             <div className="flex flex-wrap items-center gap-1.5">
               <div className="font-medium text-[#0b2b43] text-base">{title}</div>
               {glossaryId ? <TermHelpIcon glossaryId={glossaryId} /> : null}
+              {/* Section C badge: when this benefit has any jurisdiction
+                  overrides authored, surface a count + summary so HR
+                  knows the row has region-specific behavior without
+                  having to scroll to the bottom of the editor. Hidden
+                  when the flag is off — even if rows somehow have
+                  overrides, the editor section won't render. */}
+              {isSectionCOverridesEnabled() &&
+                Array.isArray(row.jurisdiction_overrides) &&
+                row.jurisdiction_overrides.length > 0 && (
+                  <span
+                    className="inline-flex items-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-xs font-medium text-[#1d4ed8]"
+                    title={summarizeOverrides(
+                      row.jurisdiction_overrides as PolicyJurisdictionOverride[]
+                    )}
+                  >
+                    {row.jurisdiction_overrides.length} override
+                    {row.jurisdiction_overrides.length === 1 ? '' : 's'}
+                  </span>
+                )}
             </div>
             <div className="text-xs text-[#94a3b8] font-mono mt-0.5">{row.benefit_key}</div>
             {serverError && (
@@ -365,6 +402,17 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
                 placeholder="Approval rules, carve-outs, or legal context (optional)."
               />
             </div>
+
+            {/* Section C — per-jurisdiction overrides. Behind a feature
+                flag so the editor only renders when explicitly enabled.
+                Section is hidden entirely (not just disabled) when off. */}
+            {isSectionCOverridesEnabled() && (
+              <JurisdictionOverridesEditor
+                overrides={(row.jurisdiction_overrides || []) as PolicyJurisdictionOverride[]}
+                disabled={disabled}
+                onChange={(next) => onChange({ ...row, jurisdiction_overrides: next })}
+              />
+            )}
 
           </>
         )}

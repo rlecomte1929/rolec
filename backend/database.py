@@ -1399,6 +1399,37 @@ class Database:
                 ON policy_config_benefits(policy_config_version_id)
             """))
 
+            # Section C of HR Policy: per-jurisdiction × employee_level ×
+            # assignment_type override rows that stack on top of a base
+            # policy_config_benefits row. SQLite mirror of supabase/migrations/
+            # 20260502100000_policy_benefit_jurisdiction_overrides.sql.
+            # SQLite has no text[] — jurisdiction_countries is JSON-encoded
+            # TEXT, parsed by services/policy_section_c_resolver.py which
+            # handles both shapes (Postgres array, SQLite JSON string).
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_benefit_jurisdiction_overrides (
+                    id TEXT PRIMARY KEY,
+                    benefit_row_id TEXT NOT NULL
+                        REFERENCES policy_config_benefits(id) ON DELETE CASCADE,
+                    jurisdiction_countries TEXT NOT NULL DEFAULT '[]',
+                    employee_level TEXT,
+                    assignment_type TEXT,
+                    amount_value REAL,
+                    currency_code TEXT,
+                    cap_rule_json TEXT NOT NULL DEFAULT '{}',
+                    reimbursement_md TEXT,
+                    repayment_md TEXT,
+                    display_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (benefit_row_id, employee_level, assignment_type)
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_sqlite_pbjo_benefit
+                ON policy_benefit_jurisdiction_overrides(benefit_row_id)
+            """))
+
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS case_service_answers (
                     id TEXT PRIMARY KEY,
@@ -14564,6 +14595,136 @@ class Database:
                 params,
             )
         return bid
+
+    # ------------------------------------------------------------------
+    # Section C: jurisdiction overrides on policy_config_benefits rows.
+    # See supabase/migrations/20260502100000_policy_benefit_jurisdiction_overrides.sql
+    # and services/policy_section_c_resolver.py.
+    # ------------------------------------------------------------------
+
+    def list_jurisdiction_overrides_for_benefit_rows(
+        self, benefit_row_ids: List[str]
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Bulk fetch overrides for a list of benefit rows (one query, grouped
+        in Python). Returns dict keyed by benefit_row_id; missing entries
+        get an empty list. jurisdiction_countries comes back as either a
+        Postgres text[] (already a Python list) or a SQLite JSON-string;
+        the resolver handles both shapes.
+        """
+        if not benefit_row_ids:
+            return {}
+        ids = [str(b) for b in benefit_row_ids if b]
+        if not ids:
+            return {}
+        # SQLAlchemy parametrizes the IN list as expanding bindparam by
+        # building :id_0, :id_1 etc., but we keep this simple and use a
+        # tuple param to stay portable across Postgres and SQLite.
+        with self.engine.connect() as conn:
+            placeholders = ", ".join(f":id_{i}" for i in range(len(ids)))
+            params = {f"id_{i}": v for i, v in enumerate(ids)}
+            rows = conn.execute(
+                text(
+                    f"""
+                    SELECT id, benefit_row_id, jurisdiction_countries,
+                           employee_level, assignment_type,
+                           amount_value, currency_code, cap_rule_json,
+                           reimbursement_md, repayment_md, display_order,
+                           created_at, updated_at
+                    FROM policy_benefit_jurisdiction_overrides
+                    WHERE benefit_row_id IN ({placeholders})
+                    ORDER BY display_order ASC, created_at ASC
+                    """
+                ),
+                params,
+            ).fetchall()
+        out: Dict[str, List[Dict[str, Any]]] = {bid: [] for bid in ids}
+        for r in rows:
+            m = dict(r._mapping)
+            cap = m.get("cap_rule_json")
+            if isinstance(cap, str):
+                try:
+                    m["cap_rule_json"] = json.loads(cap)
+                except Exception:
+                    m["cap_rule_json"] = {}
+            elif cap is None:
+                m["cap_rule_json"] = {}
+            out.setdefault(str(m["benefit_row_id"]), []).append(m)
+        return out
+
+    def replace_jurisdiction_overrides_for_benefit(
+        self,
+        benefit_row_id: str,
+        overrides: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Delete-and-insert all override rows for one benefit. Called from
+        put_draft after the benefit row itself has been (re)inserted.
+        Cascade delete on policy_config_benefits.id covers the case where
+        the benefit row goes away; this method handles the case where the
+        benefit stays but its overrides change.
+
+        SQLite caveat: jurisdiction_countries is JSON-encoded TEXT.
+        Postgres: native text[]; we let the driver coerce a Python list.
+        """
+        bid = str(benefit_row_id)
+        rows: List[Dict[str, Any]] = []
+        now = datetime.utcnow().isoformat()
+        for ov in overrides or []:
+            countries = list(ov.get("jurisdiction_countries") or [])
+            cap = ov.get("cap_rule_json") or {}
+            if isinstance(cap, dict):
+                cap_serialized: Any = json.dumps(cap)
+            else:
+                cap_serialized = "{}"
+            row_id = str(ov.get("id") or uuid.uuid4())
+            rows.append(
+                {
+                    "id": row_id,
+                    "benefit_row_id": bid,
+                    "jurisdiction_countries": (
+                        json.dumps(countries) if _is_sqlite else countries
+                    ),
+                    "employee_level": ov.get("employee_level"),
+                    "assignment_type": ov.get("assignment_type"),
+                    "amount_value": ov.get("amount_value"),
+                    "currency_code": ov.get("currency_code"),
+                    "cap_rule_json": cap_serialized,
+                    "reimbursement_md": ov.get("reimbursement_md"),
+                    "repayment_md": ov.get("repayment_md"),
+                    "display_order": int(ov.get("display_order") or 0),
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            )
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "DELETE FROM policy_benefit_jurisdiction_overrides "
+                    "WHERE benefit_row_id = :bid"
+                ),
+                {"bid": bid},
+            )
+            for r in rows:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO policy_benefit_jurisdiction_overrides
+                        (id, benefit_row_id, jurisdiction_countries,
+                         employee_level, assignment_type,
+                         amount_value, currency_code, cap_rule_json,
+                         reimbursement_md, repayment_md, display_order,
+                         created_at, updated_at)
+                        VALUES
+                        (:id, :benefit_row_id, :jurisdiction_countries,
+                         :employee_level, :assignment_type,
+                         :amount_value, :currency_code, :cap_rule_json,
+                         :reimbursement_md, :repayment_md, :display_order,
+                         :created_at, :updated_at)
+                        """
+                    ),
+                    r,
+                )
 
     def publish_policy_config_version_atomic(self, version_id: str) -> None:
         vid = str(version_id)

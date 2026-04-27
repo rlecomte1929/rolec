@@ -69,6 +69,23 @@ class PolicyConfigEmployeeLevel(str, Enum):
     c_suite = "c_suite"
 
 
+class PolicyJurisdictionOverrideWrite(BaseModel):
+    """Section C: per-(country × employee_level × assignment_type) override
+    that hangs off a base PolicyConfigBenefitWrite. Empty axes are wildcards
+    (NULL employee_level / assignment_type matches any employee on that
+    dimension). Empty fields like amount_value mean "inherit from base"."""
+
+    jurisdiction_countries: List[str] = Field(..., min_length=1)
+    employee_level: Optional[PolicyConfigEmployeeLevel] = None
+    assignment_type: Optional[PolicyConfigAssignmentType] = None
+    amount_value: Optional[float] = None
+    currency_code: Optional[str] = None
+    cap_rule_json: Dict[str, Any] = Field(default_factory=dict)
+    reimbursement_md: Optional[str] = None
+    repayment_md: Optional[str] = None
+    display_order: int = 0
+
+
 class PolicyConfigBenefitWrite(BaseModel):
     """Payload for creating/updating one benefit row (batch save)."""
 
@@ -87,6 +104,11 @@ class PolicyConfigBenefitWrite(BaseModel):
     assignment_types: List[PolicyConfigAssignmentType] = Field(default_factory=list)
     family_statuses: List[PolicyConfigFamilyStatus] = Field(default_factory=list)
     employee_levels: List[PolicyConfigEmployeeLevel] = Field(default_factory=list)
+    # Section C — optional list of jurisdiction-aware overrides authored on
+    # this row. Empty list (default) means "no overrides; base row applies
+    # to everyone." See services/policy_section_c_resolver.py for how
+    # overrides resolve at employee-read time.
+    jurisdiction_overrides: List[PolicyJurisdictionOverrideWrite] = Field(default_factory=list)
     is_active: bool = True
     display_order: int = 0
 

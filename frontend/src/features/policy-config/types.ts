@@ -2,6 +2,28 @@
  * Frontend shapes for GET/PUT policy-config matrix API (snake_case, aligned with
  * backend PolicyConfigBenefitRead / working payload from PolicyConfigMatrixService).
  */
+
+/**
+ * Section C: per-(jurisdiction × employee_level × assignment_type) override
+ * row that hangs off a base PolicyConfigBenefitRow. Empty axes
+ * (employee_level / assignment_type === null) are wildcards. Empty
+ * fields (amount_value, currency_code, etc.) inherit from the base row
+ * — HR can override only the markdown clauses for a region without
+ * redefining the cap. Country list is ISO-3166 alpha-2.
+ */
+export type PolicyJurisdictionOverride = {
+  id?: string | null;
+  jurisdiction_countries: string[];
+  employee_level?: string | null;
+  assignment_type?: string | null;
+  amount_value?: number | null;
+  currency_code?: string | null;
+  cap_rule_json?: Record<string, unknown>;
+  reimbursement_md?: string | null;
+  repayment_md?: string | null;
+  display_order?: number;
+};
+
 export type PolicyConfigBenefitRow = {
   id?: string | null;
   category?: string;
@@ -24,6 +46,11 @@ export type PolicyConfigBenefitRow = {
   is_active?: boolean;
   targeting_signature?: string;
   maximum_budget_explanation?: string;
+  /** Section C overrides authored on this benefit row. Empty list when none. */
+  jurisdiction_overrides?: PolicyJurisdictionOverride[];
+  /** Employee read-side: which override (if any) was applied to resolve this row. */
+  override_applied?: boolean;
+  override_id?: string | null;
 };
 
 export type PolicyConfigCategoryBlock = {
