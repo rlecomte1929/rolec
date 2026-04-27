@@ -8,7 +8,7 @@
  * docs/RECOMMENDATIONS_CATALOG_ROUTINE.md.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '../components/AppShell';
 import { Alert, Button, Card } from '../components/antigravity';
 import {
@@ -114,6 +114,11 @@ export const HrVendorCuration: React.FC = () => {
   // Phase 2 notifications: employee demand backlog (what employees are waiting on).
   const [demand, setDemand] = useState<EmployeeDemandRow[]>([]);
   const [demandLoading, setDemandLoading] = useState(false);
+  // Curate-jump target: when HR clicks "Curate" on a demand row, we scroll the
+  // master-vendors card into view and flash a ring so the action is visible
+  // even when (category, destination) didn't change.
+  const masterCardRef = useRef<HTMLDivElement | null>(null);
+  const [flashMaster, setFlashMaster] = useState(false);
 
   // "Request a new destination" modal state
   const [requestModalOpen, setRequestModalOpen] = useState(false);
@@ -392,7 +397,18 @@ export const HrVendorCuration: React.FC = () => {
             'use "Request a new destination" to send it to admin.',
         );
       }
+    } else if (row.destination_city) {
+      // Country missing on the demand row — try matching by city only.
+      const match = destinations.find((d) => d.city === row.destination_city);
+      if (match) setSelectedDestinationKey(destinationKey(match));
     }
+    // Visible feedback even when the (category, destination) didn't change:
+    // scroll the master-vendors card into view and briefly flash it.
+    setFlashMaster(true);
+    window.setTimeout(() => {
+      masterCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+    window.setTimeout(() => setFlashMaster(false), 1800);
   };
 
   return (
@@ -612,8 +628,13 @@ export const HrVendorCuration: React.FC = () => {
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
       {info && <Alert variant="success" className="mb-4">{info}</Alert>}
 
-      <Card padding="lg" className="mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <Card
+        padding="lg"
+        className={`mb-6 transition-shadow ${
+          flashMaster ? 'ring-4 ring-[#fde68a] ring-offset-2' : ''
+        }`}
+      >
+        <div ref={masterCardRef} className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div>
             <h2 className="text-lg font-semibold text-[#0b2b43]">Admin master vendors</h2>
             <p className="text-sm text-[#6b7280] mt-1">

@@ -78,6 +78,7 @@ def apply_hr_curation(
     items: List[RecommendationItem],
     company_id: Optional[str],
     destination_city: Optional[str],
+    destination_country: Optional[str] = None,
 ) -> Tuple[List[RecommendationItem], Optional[str]]:
     """
     Filter the engine's ranked items down to those HR has approved for the
@@ -140,6 +141,7 @@ def apply_hr_curation(
                 company_id=company_id,
                 category=category,
                 destination_city=destination_city,
+                destination_country=destination_country,
             )
         except Exception:
             log.exception("record_demand dispatch failed")
