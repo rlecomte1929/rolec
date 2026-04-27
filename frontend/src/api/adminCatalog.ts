@@ -73,3 +73,11 @@ export const resolveDestinationRequest = (
     status,
     notes,
   });
+
+export interface AdminNotificationCounts {
+  pending_tickets: number;
+  allowlisted_destinations: number;
+}
+
+export const getAdminNotificationCounts = (): Promise<AdminNotificationCounts> =>
+  apiGet('/api/admin/catalog/notification-counts');

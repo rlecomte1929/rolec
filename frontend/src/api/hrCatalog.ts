@@ -156,3 +156,30 @@ export const populateDestinationWithAi = (
     destination_city: destinationCity,
     country,
   });
+
+// ---------------------------------------------------------------------------
+// Phase 2 notifications: employee demand + nav badges
+// ---------------------------------------------------------------------------
+
+export interface EmployeeDemandRow {
+  id: string;
+  company_id: string;
+  category: string;
+  destination_city: string | null;
+  destination_country: string | null;
+  last_seen_by_user_id: string | null;
+  last_seen_at: string;
+  demand_count: number;
+}
+
+export const listEmployeeDemand = (): Promise<EmployeeDemandRow[]> =>
+  apiGet('/api/hr/catalog/employee-demand');
+
+export interface HrNotificationCounts {
+  employees_waiting: number;
+  destinations_with_demand: number;
+  pending_admin_tickets: number;
+}
+
+export const getHrNotificationCounts = (): Promise<HrNotificationCounts> =>
+  apiGet('/api/hr/catalog/notification-counts');

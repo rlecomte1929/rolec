@@ -132,5 +132,16 @@ def apply_hr_curation(
         kept.append(_custom_to_recommendation(c))
 
     if not kept:
+        # Record the demand signal so HR can see who's waiting on what.
+        # Best-effort — never raise on the filter path.
+        try:
+            from . import employee_demand
+            employee_demand.record_demand(
+                company_id=company_id,
+                category=category,
+                destination_city=destination_city,
+            )
+        except Exception:
+            log.exception("record_demand dispatch failed")
         return [], "hr_pending"
     return kept, None

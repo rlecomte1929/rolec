@@ -18,13 +18,48 @@ import {
   getCurationView,
   getScrapeQuota,
   listAllowlistedDestinations,
+  listEmployeeDemand,
   populateDestinationWithAi,
   type AllowlistedDestination,
   type CurationRow,
   type DestinationRequest,
+  type EmployeeDemandRow,
   type PopulateDestinationResult,
   type ScrapeQuotaState,
 } from '../api/hrCatalog';
+
+const CATEGORY_LABELS: Record<string, string> = {
+  living_areas: 'Living areas / Housing',
+  schools: 'Schools',
+  movers: 'Movers',
+  banks: 'Banks',
+  insurance: 'Insurance',
+  electricity: 'Electricity',
+  medical: 'Medical',
+  telecom: 'Telecom',
+  childcare: 'Childcare',
+  storage: 'Storage',
+  transport: 'Transport',
+  language_integration: 'Language / Integration',
+  legal_admin: 'Legal & Admin',
+  tax_finance: 'Tax & Finance',
+};
+
+function formatRelative(iso: string): string {
+  try {
+    const then = new Date(iso).getTime();
+    const ms = Date.now() - then;
+    const mins = Math.floor(ms / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  } catch {
+    return '';
+  }
+}
 
 const CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: 'living_areas', label: 'Living areas / Housing' },
@@ -76,6 +111,10 @@ export const HrVendorCuration: React.FC = () => {
   const [pendingTicket, setPendingTicket] = useState<DestinationRequest | null>(null);
   const [quota, setQuota] = useState<ScrapeQuotaState | null>(null);
 
+  // Phase 2 notifications: employee demand backlog (what employees are waiting on).
+  const [demand, setDemand] = useState<EmployeeDemandRow[]>([]);
+  const [demandLoading, setDemandLoading] = useState(false);
+
   // "Request a new destination" modal state
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [newCity, setNewCity] = useState('');
@@ -122,6 +161,23 @@ export const HrVendorCuration: React.FC = () => {
     // Intentionally fire only on mount — selectedDestinationKey is internal.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const reloadDemand = useCallback(async () => {
+    setDemandLoading(true);
+    try {
+      const list = await listEmployeeDemand();
+      setDemand(list);
+    } catch {
+      // Non-fatal — widget is informational; absence shouldn't block the page.
+      setDemand([]);
+    } finally {
+      setDemandLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reloadDemand();
+  }, [reloadDemand]);
 
   const load = useCallback(async () => {
     if (!city) {
@@ -315,11 +371,89 @@ export const HrVendorCuration: React.FC = () => {
 
   const dirty = pendingToggles.size > 0;
 
+  const totalEmployeesWaiting = useMemo(
+    () => demand.reduce((acc, d) => acc + (d.demand_count || 0), 0),
+    [demand],
+  );
+  const distinctCombos = demand.length;
+
+  const jumpToDemand = (row: EmployeeDemandRow) => {
+    setCategory(row.category);
+    if (row.destination_city && row.destination_country) {
+      const key = `${row.destination_city}|${row.destination_country}`;
+      // Only switch if the destination is currently allowlisted; otherwise
+      // surface a hint so HR knows admin still needs to approve it.
+      if (destinations.find((d) => destinationKey(d) === key)) {
+        setSelectedDestinationKey(key);
+        setInfo(null);
+      } else {
+        setInfo(
+          `${row.destination_city}, ${row.destination_country} isn't on your allowlist yet — ` +
+            'use "Request a new destination" to send it to admin.',
+        );
+      }
+    }
+  };
+
   return (
     <AppShell
       title="Vendor curation"
       subtitle="Choose which providers your employees see, per service and destination."
     >
+      {(demandLoading || demand.length > 0) && (
+        <Card padding="lg" className="mb-6 border border-[#fde68a] bg-[#fffbeb]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-[#92400e]">
+                Employees waiting on you
+              </h2>
+              <p className="text-sm text-[#92400e]/90 mt-1">
+                {demandLoading ? (
+                  'Checking…'
+                ) : (
+                  <>
+                    <strong>{totalEmployeesWaiting}</strong> employee view
+                    {totalEmployeesWaiting === 1 ? '' : 's'} hit an empty state across{' '}
+                    <strong>{distinctCombos}</strong> service / destination combo
+                    {distinctCombos === 1 ? '' : 's'}. Pick a row to jump to it.
+                  </>
+                )}
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => void reloadDemand()} disabled={demandLoading}>
+              {demandLoading ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          </div>
+          {demand.length > 0 && (
+            <ul className="mt-4 divide-y divide-[#fde68a] border border-[#fde68a] rounded-lg overflow-hidden bg-white">
+              {demand.slice(0, 8).map((row) => {
+                const catLabel = CATEGORY_LABELS[row.category] || row.category;
+                const dest =
+                  row.destination_city && row.destination_country
+                    ? `${row.destination_city}, ${row.destination_country}`
+                    : row.destination_city || '—';
+                return (
+                  <li key={row.id} className="p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-[#0b2b43]">
+                        {catLabel} · {dest}
+                      </div>
+                      <div className="text-xs text-[#64748b] mt-0.5">
+                        {row.demand_count} hit{row.demand_count === 1 ? '' : 's'} ·
+                        {' '}last seen {formatRelative(row.last_seen_at)}
+                      </div>
+                    </div>
+                    <Button variant="outline" onClick={() => jumpToDemand(row)}>
+                      Curate
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      )}
+
       <Card padding="lg" className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <label className="block">
