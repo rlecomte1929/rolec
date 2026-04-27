@@ -4,12 +4,10 @@
  * Renders inside BenefitRowEditor below the base fields. Each override row
  * is a small sub-form: country picker (multi), employee level (single,
  * optional), assignment type (single, optional), amount + currency
- * (optional — empty = inherit from base). Tier ordering inside the
- * override's cap_rule_json is enforced by the backend; we surface
- * validation errors per row when they come back.
- *
- * Markdown editor for reimbursement_md / repayment_md and FX conversion
- * hint live in PR 4 — this PR ships the structural editor.
+ * (optional — empty = inherit from base), plus markdown clauses for
+ * reimbursement and repayment terms. Tier ordering inside the override's
+ * cap_rule_json is enforced by the backend; we surface validation errors
+ * per row when they come back.
  */
 import React from 'react';
 import { Input, Select } from '../../components/antigravity';
@@ -20,6 +18,7 @@ import {
 } from './policyTargeting';
 import { POLICY_CURRENCY_OPTIONS } from './currencyOptions';
 import { CountryMultiSelect } from './CountryMultiSelect';
+import { MarkdownTextarea } from './MarkdownTextarea';
 
 type Props = {
   overrides: PolicyJurisdictionOverride[];
@@ -207,6 +206,27 @@ export const JurisdictionOverridesEditor: React.FC<Props> = ({
                       fullWidth
                     />
                   </div>
+
+                  {/* Reimbursement / repayment markdown clauses (PR 4).
+                      Region-specific legal language often differs from the
+                      base policy — HR can override only the markdown
+                      without touching the cap above by leaving amount /
+                      currency blank. */}
+                  <MarkdownTextarea
+                    label="Reimbursement terms for this region (markdown)"
+                    value={ov.reimbursement_md}
+                    onChange={(v) => updateAt(i, { reimbursement_md: v })}
+                    disabled={disabled}
+                    placeholder="What HR will reimburse and how. Use **bold**, *italic*, or - bullets."
+                    hint="Region-specific terms shown to employees in this country."
+                  />
+                  <MarkdownTextarea
+                    label="Repayment / clawback terms for this region (markdown)"
+                    value={ov.repayment_md}
+                    onChange={(v) => updateAt(i, { repayment_md: v })}
+                    disabled={disabled}
+                    placeholder="When the employee may need to repay (early departure, etc.)."
+                  />
                 </div>
               </li>
             );
