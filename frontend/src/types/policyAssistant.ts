@@ -52,6 +52,23 @@ export interface PolicyAssistantRefusal {
   supported_examples: string[];
 }
 
+/**
+ * Source chunk cited inline in `answer_text` via `[chunk:<id>]`. Returned
+ * by the RAG engine (Sprint A/B/C). Optional on PolicyAssistantAnswer so
+ * legacy engine outputs (which don't produce chunk citations) still type-
+ * check; renderers that want clickable chips check for this and fall
+ * back to plain text when absent.
+ */
+export interface PolicyAssistantCitedChunk {
+  id: string;
+  /** e.g. "matrix_benefit", "matrix_override" */
+  source_type: string;
+  /** e.g. "policy_config_benefits.b1" — used to scroll to the matching DOM row. */
+  source_ref: string;
+  /** Full chunk text — shown in the chip's tooltip / expanded preview. */
+  chunk_text: string;
+}
+
 export interface PolicyAssistantAnswer {
   answer_type: PolicyAssistantAnswerType;
   canonical_topic?: string | null;
@@ -65,6 +82,10 @@ export interface PolicyAssistantAnswer {
   refusal?: PolicyAssistantRefusal | null;
   role_scope: string;
   detected_intent?: string | null;
+  /** RAG engine output — present when the answer was grounded in
+   *  retrieved chunks. Renderers turn `[chunk:<id>]` tokens in
+   *  `answer_text` into clickable chips that look these up. */
+  cited_chunks?: PolicyAssistantCitedChunk[];
 }
 
 export interface EmployeePolicyAssistantQueryResponse {

@@ -56,8 +56,15 @@ function BenefitReadOnlyCard({ b }: { b: PolicyConfigBenefitRow }) {
   const notesBlock = mergeNotesAndConditions(b);
   const glossaryId = glossaryIdForBenefitKey(b.benefit_key);
 
+  // The data-policy-source-ref attribute lets the Policy Assistant
+  // citation chips scroll to + flash this row when an answer cites it.
+  // Format mirrors what the RAG indexer emits: `policy_config_benefits.<id>`.
+  const sourceRef = b.id ? `policy_config_benefits.${b.id}` : undefined;
   return (
-    <li className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-sm">
+    <li
+      className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-sm"
+      data-policy-source-ref={sourceRef}
+    >
       <h3 className="text-base font-semibold text-[#0b2b43] leading-snug flex flex-wrap items-center gap-1.5">
         <span>{b.benefit_label || 'Benefit'}</span>
         {glossaryId ? <TermHelpIcon glossaryId={glossaryId} /> : null}
