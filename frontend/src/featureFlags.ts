@@ -16,3 +16,14 @@ const isOn = (raw: unknown): boolean =>
  * Set `VITE_ENABLE_RFQ=true` in `.env.local` to bring it back for dev.
  */
 export const isRfqEnabled = (): boolean => isOn(import.meta.env.VITE_ENABLE_RFQ);
+
+/**
+ * Section C of HR Policy: per-(jurisdiction × employee_level × assignment_type)
+ * overrides on benefit rows. The editor renders inside the benefit-edit drawer
+ * so HR can author region-specific caps. Backend stack (resolver, endpoints,
+ * persistence) ships in PRs #66 / #68; this flag gates the editor UI.
+ *
+ * Set `VITE_FEATURE_SECTION_C_OVERRIDES=true` in `.env.local` to enable for dev.
+ */
+export const isSectionCOverridesEnabled = (): boolean =>
+  isOn(import.meta.env.VITE_FEATURE_SECTION_C_OVERRIDES);

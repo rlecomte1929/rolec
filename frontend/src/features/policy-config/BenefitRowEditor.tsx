@@ -8,6 +8,9 @@ import { glossaryIdForBenefitKey } from './compensationGlossary';
 import { TermHelpIcon } from './TermHelpIcon';
 import { validateBenefitRow } from './benefitRowValidation';
 import { patchAdditionalTerms, readAdditionalTerms } from './benefitProgramDetails';
+import { JurisdictionOverridesEditor } from './JurisdictionOverridesEditor';
+import type { PolicyJurisdictionOverride } from './types';
+import { isSectionCOverridesEnabled } from '../../featureFlags';
 import {
   normalizeAssignmentType,
   normalizeAssignmentTypeList,
@@ -365,6 +368,17 @@ export const BenefitRowEditor: React.FC<Props> = ({ row, disabled, onChange, pre
                 placeholder="Approval rules, carve-outs, or legal context (optional)."
               />
             </div>
+
+            {/* Section C — per-jurisdiction overrides. Behind a feature
+                flag so the editor only renders when explicitly enabled.
+                Section is hidden entirely (not just disabled) when off. */}
+            {isSectionCOverridesEnabled() && (
+              <JurisdictionOverridesEditor
+                overrides={(row.jurisdiction_overrides || []) as PolicyJurisdictionOverride[]}
+                disabled={disabled}
+                onChange={(next) => onChange({ ...row, jurisdiction_overrides: next })}
+              />
+            )}
 
           </>
         )}
