@@ -13,6 +13,17 @@ import { logEmployeeEntry } from '../utils/employeeJourneyPerf';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
 import { getApiErrorCode } from '../utils/apiDetail';
 import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
+import { getLastVisited } from '../utils/employeeCaseProgress';
+
+/**
+ * Resolve where to send the user when they click "Open case" on the
+ * dashboard. Honor the last route they visited inside this assignment
+ * (so re-entering doesn't force them through the wizard again). Falls
+ * back to the case summary page when no last-visited is recorded.
+ */
+function openCaseHref(assignmentId: string): string {
+  return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
+}
 
 const FLOW_STEPS = [
   '1. Fill your case',
@@ -531,7 +542,7 @@ export const EmployeeJourney: React.FC = () => {
                     <div className="text-xs font-mono text-[#94a3b8] pt-1">{row.assignment_id}</div>
                   </div>
                   <div className="flex sm:flex-col sm:justify-center shrink-0">
-                    <Button onClick={() => navigate(`/employee/case/${row.assignment_id}/summary`)}>Open case</Button>
+                    <Button onClick={() => navigate(openCaseHref(row.assignment_id))}>Open case</Button>
                   </div>
                 </li>
               ))}

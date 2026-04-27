@@ -10,6 +10,8 @@ import { Alert, Card, LoadingButton } from '../../components/antigravity';
 import { getCaseDetailsByAssignmentId } from '../../api/caseDetails';
 import { getAuthItem } from '../../utils/demo';
 import { AssignmentDebugPanel } from '../AssignmentDebugPanel';
+import { EmployeeNextActionBar } from '../../components/employee/EmployeeNextActionBar';
+import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 import type { CaseDTO, CaseDraftDTO } from '../../types';
 import { buildRoute } from '../../navigation/routes';
 
@@ -110,6 +112,10 @@ export const EmployeeCaseSummary: React.FC = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Remember the user's last position so the dashboard's "Open case" can
+  // route them back here instead of forcing a fresh wizard start.
+  useTrackLastVisited(assignmentId || null);
 
   const b = draft?.relocationBasics || {};
   const ep = draft?.employeeProfile || {};
@@ -242,6 +248,29 @@ export const EmployeeCaseSummary: React.FC = () => {
 
       {(import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') && assignmentId && (
         <AssignmentDebugPanel assignmentIdFromRoute={assignmentId} />
+      )}
+
+      {/* Sticky next-action bar — eliminates the "what now?" dead-end on
+          this page. If the user has done some intake but not all of it,
+          the primary CTA goes back to the wizard. If they've finished
+          intake, route them to the relocation plan (the aggregator). */}
+      {assignmentId && !isLoading && (
+        <EmployeeNextActionBar
+          status={hasAnyData ? 'My case' : 'Nothing saved yet'}
+          hint={
+            hasAnyData
+              ? "Pick up where you left off — the wizard remembers your inputs."
+              : "Start your intake to unlock services and the relocation plan."
+          }
+          primaryLabel={hasAnyData ? 'View relocation plan →' : 'Start intake →'}
+          primaryHref={
+            hasAnyData
+              ? planHref
+              : `/employee/case/${assignmentId}/wizard/1`
+          }
+          secondaryLabel={hasAnyData ? 'Continue editing intake' : undefined}
+          secondaryHref={hasAnyData ? `/employee/case/${assignmentId}/wizard/1` : undefined}
+        />
       )}
     </AppShell>
   );
