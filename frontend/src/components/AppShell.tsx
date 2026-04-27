@@ -231,6 +231,22 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 >
                   {myCaseNavLabel}
                 </Link>
+                {/* Order matches the user flow: intake → services → plan.
+                    Relocation plan moved AFTER Services so the nav reads
+                    left-to-right as a journey. The plan is the aggregator
+                    employees revisit between steps; the dashboard already
+                    handles "where do I jump back in" via last-visited
+                    routing (PR #75). */}
+                <Link
+                  to={buildRoute('services')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.services.path) || isActiveRoute(ROUTE_DEFS.providers.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Services
+                </Link>
                 <Link
                   to={relocationPlanHref}
                   title={
@@ -247,16 +263,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   Relocation plan
                 </Link>
                 <Link
-                  to={buildRoute('services')}
-                  className={`px-3 py-1 rounded-full border ${
-                    isActiveRoute(ROUTE_DEFS.services.path) || isActiveRoute(ROUTE_DEFS.providers.path)
-                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-                      : 'border-transparent hover:text-[#0b2b43]'
-                  }`}
-                >
-                  Services
-                </Link>
-                <Link
                   to={buildRoute('hrPolicy')}
                   className={`px-3 py-1 rounded-full border ${
                     isActiveRoute(ROUTE_DEFS.hrPolicy.path)
@@ -266,16 +272,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 >
                   HR Policy
                 </Link>
-                <Link
-                  to={buildRoute('employeePolicy')}
-                  className={`px-3 py-1 rounded-full border ${
-                    isActiveRoute(ROUTE_DEFS.employeePolicy.path)
-                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-                      : 'border-transparent hover:text-[#0b2b43]'
-                  }`}
-                >
-                  Compensation &amp; Allowance
-                </Link>
+                {/* "Compensation & Allowance" hidden from the employee nav.
+                    The matrix-table view at /employee/policy is reachable
+                    via direct URL (route remains active) but no longer
+                    competes with HR Policy as a separate top-nav item.
+                    HR Policy now serves as the single "what does my
+                    employer cover" entry point — both narrative + numbers
+                    accessible from there. Re-expose later if customer
+                    feedback shows people miss the dedicated table view. */}
                 <Link
                   to={buildRoute('messages')}
                   className={`px-3 py-1 rounded-full border ${
