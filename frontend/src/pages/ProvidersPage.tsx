@@ -110,7 +110,11 @@ export const ProvidersPage: React.FC = () => {
   const [message, setMessage] = useState('');
   const [loadError, setLoadError] = useState('');
   const [loadErrorDetails, setLoadErrorDetails] = useState('');
-  const { setSelectedServices, displayCurrency, setDisplayCurrency } = useServicesFlow();
+  const { setSelectedServices, displayCurrency, setDisplayCurrency, setActiveCaseId } = useServicesFlow();
+  useEffect(() => {
+    setActiveCaseId(assignmentId || null);
+    return () => setActiveCaseId(null);
+  }, [assignmentId, setActiveCaseId]);
   const [pendingCurrency, setPendingCurrency] = useState<string>(displayCurrency);
   const navigate = useNavigate();
   // Keep the picker in sync if the committed currency changes from elsewhere
