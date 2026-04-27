@@ -27,6 +27,7 @@ from backend.app.routers.exception_requests import (  # noqa: E402
     ExceptionRequestPatch,
     create_exception_request,
     list_exception_requests_for_case,
+    list_exception_requests_for_company,
     resolve_exception_request,
 )
 from fastapi import HTTPException  # noqa: E402
@@ -101,12 +102,16 @@ class ExceptionRequestRouterTests(unittest.TestCase):
         self.addCleanup(self.profile_patcher.stop)
 
     def _audit_rows(self):
+        # rowid gives stable insertion order even when multiple rows share
+        # second-resolution created_at (datetime.utcnow().isoformat() at the
+        # service tier vs. CURRENT_TIMESTAMP defaulting in SQLite both lose
+        # sub-second precision on inserts done in the same tick).
         with self.engine.connect() as conn:
             return list(
                 conn.execute(
                     text(
                         "SELECT entity_type, entity_id, action_type, actor_id "
-                        "FROM audit_logs ORDER BY created_at, id"
+                        "FROM audit_logs ORDER BY rowid"
                     )
                 ).mappings()
             )
@@ -287,6 +292,54 @@ class ExceptionRequestRouterTests(unittest.TestCase):
                 user=hr_b,
             )
         self.assertEqual(ctx.exception.status_code, 404)
+
+
+    # ------------------------------------------------------------------
+    # GET /api/exception-requests (HR queue)
+    # ------------------------------------------------------------------
+    def test_company_list_hr_only(self) -> None:
+        company = _company_id()
+        emp = _make_user(str(uuid.uuid4()), "EMPLOYEE", company)
+        with self.assertRaises(HTTPException) as ctx:
+            list_exception_requests_for_company(status=None, user=emp)
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_company_list_filters_by_status(self) -> None:
+        company = _company_id()
+        emp = _make_user(str(uuid.uuid4()), "EMPLOYEE", company)
+        hr = _make_user(str(uuid.uuid4()), "HR", company)
+        # 2 created (pending), then resolve one
+        a = create_exception_request(case_id=str(uuid.uuid4()), body=ExceptionRequestCreate(
+            category="housing", requested_amount=100, cap_amount=50, currency="EUR", reason="r1",
+        ), user=emp)
+        create_exception_request(case_id=str(uuid.uuid4()), body=ExceptionRequestCreate(
+            category="schools", requested_amount=200, cap_amount=150, currency="EUR", reason="r2",
+        ), user=emp)
+        resolve_exception_request(request_id=a["id"],
+                                  body=ExceptionRequestPatch(status="approved"),
+                                  user=hr)
+
+        all_rows = list_exception_requests_for_company(status=None, user=hr)
+        pending = list_exception_requests_for_company(status="pending", user=hr)
+        approved = list_exception_requests_for_company(status="approved", user=hr)
+        self.assertEqual(len(all_rows), 2)
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(len(approved), 1)
+        self.assertEqual(approved[0]["id"], a["id"])
+
+    def test_company_list_scoped_to_caller_tenant(self) -> None:
+        company_a, company_b = _company_id(), _company_id()
+        emp_a = _make_user(str(uuid.uuid4()), "EMPLOYEE", company_a)
+        emp_b = _make_user(str(uuid.uuid4()), "EMPLOYEE", company_b)
+        hr_a = _make_user(str(uuid.uuid4()), "HR", company_a)
+        body = lambda: ExceptionRequestCreate(  # noqa: E731
+            category="housing", requested_amount=100, cap_amount=50, currency="EUR", reason="x",
+        )
+        create_exception_request(case_id=str(uuid.uuid4()), body=body(), user=emp_a)
+        create_exception_request(case_id=str(uuid.uuid4()), body=body(), user=emp_b)
+        rows = list_exception_requests_for_company(status=None, user=hr_a)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["organization_id"], company_a)
 
 
 if __name__ == "__main__":

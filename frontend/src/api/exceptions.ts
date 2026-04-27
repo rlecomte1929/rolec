@@ -51,6 +51,14 @@ export const createExceptionRequest = (
 export const listExceptionRequestsForCase = (caseId: string): Promise<ExceptionRequest[]> =>
   apiGet<ExceptionRequest[]>(`/api/cases/${encodeURIComponent(caseId)}/exception-requests`);
 
+/** HR / Admin: list every exception request across the caller's company. */
+export const listExceptionRequestsForCompany = (
+  status?: ExceptionStatus,
+): Promise<ExceptionRequest[]> => {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiGet<ExceptionRequest[]>(`/api/exception-requests${qs}`);
+};
+
 /** HR approves or rejects a pending exception request. */
 export const resolveExceptionRequest = (
   requestId: string,
