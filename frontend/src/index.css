@@ -114,3 +114,17 @@ html, body, #root {
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
 }
+
+/* Brief flash applied by Policy Assistant citation chips when the user
+ * clicks a [chunk:<id>] in the answer — confirms the scroll landed on
+ * the right row. Background-only (no layout shift) so the row doesn't
+ * jump while highlighted. */
+@keyframes policy-source-pulse {
+  0%   { background-color: rgba(59, 130, 246, 0.18); }
+  60%  { background-color: rgba(59, 130, 246, 0.10); }
+  100% { background-color: transparent; }
+}
+.policy-source-highlight {
+  animation: policy-source-pulse 1.6s ease-out;
+  border-radius: 0.5rem;
+}

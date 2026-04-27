@@ -187,11 +187,15 @@ export const PolicyTopicSummaryList: React.FC<Props> = ({
                     <ul className="space-y-2">
                       {t.rows.map((row) => {
                         const st = statusForRow(row);
+                        // Mirrors the RAG indexer's source_ref so Policy
+                        // Assistant citation chips can scroll to this row.
+                        const sourceRef = row.id ? `policy_config_benefits.${row.id}` : undefined;
                         return (
                           <li
                             key={`${row.benefit_key}-${row.targeting_signature ?? 'global'}`}
                             className="bg-slate-50/60 rounded-md px-3 py-2 border border-slate-200"
                             data-testid="policy-topic-row"
+                            data-policy-source-ref={sourceRef}
                           >
                             <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                               <div className="min-w-0 flex-1">

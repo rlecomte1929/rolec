@@ -7,6 +7,7 @@ import { Copy, Loader2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
+import { formatAnswerWithCitations } from './policyAssistantCitations';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 import { formatEvidenceAttribution } from './policyEvidenceFormatting';
 import {
@@ -204,7 +205,7 @@ function AnswerResultCard({
           <>
             {primaryText ? (
               <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfd] px-4 py-3.5 text-[15px] leading-[1.65] text-slate-800">
-                {formatRichMessage(primaryText)}
+                {formatAnswerWithCitations(primaryText, answer.cited_chunks)}
               </div>
             ) : null}
 

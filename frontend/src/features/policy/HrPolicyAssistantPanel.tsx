@@ -6,6 +6,7 @@ import { Alert, Button, Card } from '../../components/antigravity';
 import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 import { hrAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
+import { formatAnswerWithCitations } from './policyAssistantCitations';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 import {
   deriveSupportStatus,
@@ -131,7 +132,9 @@ function HrAnswerResultCard({
             </div>
 
             {primaryText ? (
-              <div className="text-sm text-slate-800 leading-relaxed">{formatRichMessage(primaryText)}</div>
+              <div className="text-sm text-slate-800 leading-relaxed">
+                {formatAnswerWithCitations(primaryText, answer.cited_chunks)}
+              </div>
             ) : null}
 
             {answer.evidence && answer.evidence.length > 0 ? (
