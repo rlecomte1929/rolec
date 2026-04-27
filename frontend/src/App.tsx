@@ -66,6 +66,7 @@ const CountryDetailPage = lazy(() => import('./pages/admin/CountryDetailPage').t
 const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage').then((module) => ({ default: module.AdminOverviewPage })));
 const AdminMobilityCaseInspectPage = lazy(() => import('./pages/admin/AdminMobilityCaseInspectPage').then((module) => ({ default: module.AdminMobilityCaseInspectPage })));
 const AdminPoliciesPage = lazy(() => import('./pages/admin/AdminPoliciesPage').then((module) => ({ default: module.AdminPoliciesPage })));
+const AdminCatalogQueuePage = lazy(() => import('./pages/admin/AdminCatalogQueuePage').then((module) => ({ default: module.AdminCatalogQueuePage })));
 // AdminPolicyConfigPage (/admin/policy-config) was retired: it duplicated the
 // row-by-row editor already living in the Policy Workspace ("Edit structured
 // baseline" bulk editor). Per product direction one editor is the source of
@@ -221,6 +222,7 @@ function App() {
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCompanies.path} element={<RequireAdminRoute><AdminCompanies /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPeople.path} element={<RequireAdminRoute><AdminUsers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAssignments.path} element={<RequireAdminRoute><AdminAssignments /></RequireAdminRoute>} />
