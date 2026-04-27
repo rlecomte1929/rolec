@@ -137,6 +137,7 @@ from .routes import relocation as relocation_router
 from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
 from .routes import resources as resources_router
+from .routes import hr_resources as hr_resources_router
 from .app.recommendations.router import router as recommendations_router
 from .app.recommendations.admin_debug import router as admin_recommendations_debug_router
 from .app.routers import suppliers as suppliers_router
@@ -516,6 +517,7 @@ app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")
 app.include_router(policy_canonical_router.read_router, prefix="/api")
 app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
+app.include_router(hr_resources_router.router)
 app.include_router(recommendations_router)
 app.include_router(relocation_router.router)
 app.include_router(relocation_router.api_router)

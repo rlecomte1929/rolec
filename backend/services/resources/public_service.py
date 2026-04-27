@@ -291,6 +291,142 @@ def _get_curated_resources_as_public(
     return resources, categories
 
 
+def build_preview_context(
+    country_code: str,
+    country_name: Optional[str] = None,
+    city_name: Optional[str] = None,
+    family_type: str = "single",
+    relocation_type: str = "permanent",
+    has_children: Optional[bool] = None,
+) -> Dict[str, Any]:
+    """
+    Build a synthetic ResourceContext for HR-side preview.
+
+    Mirrors build_resource_context_from_draft(...) so the same scoring,
+    recommended-tags, and filters apply, but inputs come from explicit
+    HR-chosen knobs instead of a case draft.
+    """
+    cc = (country_code or "").upper().strip()
+    family = (family_type or "single").lower()
+    if family not in ("single", "couple", "family"):
+        family = "single"
+    reloc = (relocation_type or "permanent").lower()
+    if reloc not in ("short_term", "long_term", "permanent"):
+        reloc = "permanent"
+    children = bool(has_children) if has_children is not None else (family == "family")
+
+    recommended_tags: List[str] = []
+    if children:
+        recommended_tags.extend(["schools", "childcare", "parks", "family_activity", "family_friendly"])
+    if family == "single":
+        recommended_tags.extend(["networking", "expat_groups", "coworking", "cinema", "concerts"])
+    if reloc == "short_term":
+        recommended_tags.extend(["temporary_housing", "public_transport", "quick_setup"])
+    if reloc in ("long_term", "permanent"):
+        recommended_tags.extend(["registration", "schooling", "healthcare", "bank_account", "neighborhood"])
+
+    return {
+        "caseId": None,
+        "countryCode": cc,
+        "countryName": country_name or None,
+        "cityName": (city_name or None) and city_name.strip() or None,
+        "familyType": family,
+        "hasChildren": children,
+        "childAges": [],
+        "spouseWorking": None,
+        "relocationType": reloc,
+        "preferredLanguage": None,
+        "recommendedTags": list(dict.fromkeys(recommended_tags)),
+        "previewMode": True,
+    }
+
+
+def get_resources_page_data_for_preview(
+    country_code: str,
+    country_name: Optional[str] = None,
+    city_name: Optional[str] = None,
+    family_type: str = "single",
+    relocation_type: str = "permanent",
+    has_children: Optional[bool] = None,
+    filters: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    HR-side preview composite. Same shape as get_resources_page_data, but
+    context comes from explicit HR-chosen knobs instead of a case draft.
+    """
+    context = build_preview_context(
+        country_code=country_code,
+        country_name=country_name,
+        city_name=city_name,
+        family_type=family_type,
+        relocation_type=relocation_type,
+        has_children=has_children,
+    )
+    cc = context.get("countryCode") or "NO"
+    city = context.get("cityName")
+
+    effective_filters = _merge_context_into_filters(context, filters or {})
+    user_filters = filters or {}
+
+    categories = [dto._to_public_category(c) for c in find_active_categories()]
+    resources = get_published_resources(cc, effective_filters, page=1, limit=50)
+
+    if not resources:
+        resources = _get_rkg_resources(cc, effective_filters, context, limit=50)
+    if not resources:
+        curated_resources, curated_categories = _get_curated_resources_as_public(cc, city or "")
+        resources = curated_resources
+        if curated_categories:
+            categories = curated_categories
+
+    events = get_published_events(cc, effective_filters, page=1, limit=20)
+    if not events:
+        try:
+            from ..rkg_resources import get_country_events
+            now = datetime.now(timezone.utc)
+            ev_rows = get_country_events(
+                country_code=cc,
+                city=city,
+                date_from=now,
+                date_to=now + timedelta(days=14),
+                published_only=True,
+                limit=20,
+            )
+            events = [dto._to_public_event(e) for e in ev_rows]
+        except Exception:
+            pass
+
+    recommended = get_recommended_resources(context, limit=5)
+    if not recommended.get("recommendedForYou") and resources:
+        recommended["recommendedForYou"] = resources[:5]
+        recommended["firstSteps"] = [r for r in resources if r.get("resourceType") in ("checklist_item", "official_link")][:5]
+        if context.get("hasChildren"):
+            recommended["familyEssentials"] = [r for r in resources if r.get("resourceType") in ("guide", "place")][:5]
+
+    from ..country_resources import get_personalization_hints
+    profile = {
+        "destination_city": city,
+        "country_code": cc,
+        "has_children": context.get("hasChildren"),
+        "family_status": context.get("familyType"),
+        "has_spouse": context.get("familyType") in ("couple", "family"),
+        "spouse_working": context.get("spouseWorking"),
+        "relocation_type": context.get("relocationType"),
+        "children_ages": context.get("childAges"),
+    }
+    hints = get_personalization_hints(profile)
+
+    return {
+        "context": context,
+        "categories": categories,
+        "resources": resources,
+        "events": events,
+        "recommended": recommended,
+        "hints": hints,
+        "filtersApplied": user_filters,
+    }
+
+
 def get_resources_page_data(
     case_id: str,
     draft: Dict[str, Any],

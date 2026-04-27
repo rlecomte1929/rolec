@@ -55,6 +55,7 @@ const QuoteRfqDetail = lazy(() => import('./pages/services/QuoteRfqDetail').then
 const VendorInbox = lazy(() => import('./pages/vendor/VendorInbox').then((module) => ({ default: module.VendorInbox })));
 const VendorRfq = lazy(() => import('./pages/vendor/VendorRfq').then((module) => ({ default: module.VendorRfq })));
 const HrCompanyProfile = lazy(() => import('./pages/HrCompanyProfile').then((module) => ({ default: module.HrCompanyProfile })));
+const HrResourcesPreview = lazy(() => import('./pages/HrResourcesPreview').then((module) => ({ default: module.HrResourcesPreview })));
 const HrEmployees = lazy(() => import('./pages/HrEmployees').then((module) => ({ default: module.HrEmployees })));
 const HrEmployeeDetail = lazy(() => import('./pages/HrEmployeeDetail').then((module) => ({ default: module.HrEmployeeDetail })));
 const HrCommandCenter = lazy(() => import('./pages/HrCommandCenter').then((module) => ({ default: module.HrCommandCenter })));
@@ -293,12 +294,10 @@ function App() {
           "coming soon" card during demos. Remove these entirely once the
           feature ships or the nav entry is retired.
         */}
-        {import.meta.env.DEV && (
-          <Route
-            path={ROUTE_DEFS.hrResources.path}
-            element={<PlaceholderPage title="Resources" description="Access HR relocation resources and guides." />}
-          />
-        )}
+        <Route
+          path={ROUTE_DEFS.hrResources.path}
+          element={<HrResourcesPreview />}
+        />
         <Route path={ROUTE_DEFS.hrCompanyProfile.path} element={<HrCompanyProfile />} />
         <Route path={ROUTE_DEFS.hrEmployees.path} element={<HrEmployees />} />
         <Route path={ROUTE_DEFS.hrEmployeeDetail.path} element={<HrEmployeeDetail />} />
