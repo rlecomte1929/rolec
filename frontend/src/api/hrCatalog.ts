@@ -118,3 +118,41 @@ export const getScrapeQuota = (): Promise<ScrapeQuotaState> =>
 
 export const listMyDestinationRequests = (): Promise<DestinationRequest[]> =>
   apiGet('/api/hr/catalog/destination-requests');
+
+// HR-readable allowlist (same shape as admin endpoint).
+export interface AllowlistedDestination {
+  city: string;
+  country: string;
+  approved_by: string | null;
+  approved_at: string;
+  notes: string | null;
+}
+
+export const listAllowlistedDestinations = (): Promise<AllowlistedDestination[]> =>
+  apiGet('/api/hr/catalog/destinations');
+
+// Destination-level scraper trigger — fires across ALL service categories
+// for the (city, country) in one HR click.
+export interface PopulateDestinationResult {
+  status: 'completed' | 'pending_admin_approval';
+  destination_city?: string;
+  country?: string;
+  categories_total?: number;
+  categories_populated?: number;
+  categories_skipped_existing?: number;
+  categories_quota_blocked?: number;
+  total_inserted?: number;
+  per_category?: Array<{ category: string; status: string; inserted: number }>;
+  quota?: ScrapeQuotaState;
+  request?: DestinationRequest;
+  message?: string;
+}
+
+export const populateDestinationWithAi = (
+  destinationCity: string,
+  country: string,
+): Promise<PopulateDestinationResult> =>
+  apiPost('/api/hr/catalog/populate-destination-with-ai', {
+    destination_city: destinationCity,
+    country,
+  });

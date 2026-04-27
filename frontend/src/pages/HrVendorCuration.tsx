@@ -17,9 +17,12 @@ import {
   deleteCustomVendor,
   getCurationView,
   getScrapeQuota,
-  populateVendorsWithAi,
+  listAllowlistedDestinations,
+  populateDestinationWithAi,
+  type AllowlistedDestination,
   type CurationRow,
   type DestinationRequest,
+  type PopulateDestinationResult,
   type ScrapeQuotaState,
 } from '../api/hrCatalog';
 
@@ -40,10 +43,20 @@ const CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: 'tax_finance', label: 'Tax & Finance' },
 ];
 
+/** Sentinel value for the dropdown's "Request a new destination" option. */
+const REQUEST_NEW_VALUE = '__request_new__';
+
+function destinationKey(d: { city: string; country: string }): string {
+  return `${d.city}|${d.country}`;
+}
+
 export const HrVendorCuration: React.FC = () => {
   const [category, setCategory] = useState<string>('schools');
-  const [city, setCity] = useState<string>('Munich');
-  const [country, setCountry] = useState<string>('Germany');
+  // Destinations come from the admin allowlist — HR can't type free-form.
+  const [destinations, setDestinations] = useState<AllowlistedDestination[]>([]);
+  const [destinationsLoading, setDestinationsLoading] = useState(false);
+  // Selected destination key ("city|country"). Empty until user picks one.
+  const [selectedDestinationKey, setSelectedDestinationKey] = useState<string>('');
   const [rows, setRows] = useState<CurationRow[]>([]);
   // Track unsaved master toggles: master_item_id -> next selected.
   const [pendingToggles, setPendingToggles] = useState<Map<string, boolean>>(new Map());
@@ -57,17 +70,68 @@ export const HrVendorCuration: React.FC = () => {
   const [customNotes, setCustomNotes] = useState('');
   const [addingCustom, setAddingCustom] = useState(false);
 
-  // Phase 2b-secured: scraper trigger state
+  // Phase 2b-secured: destination-scoped scraper trigger state
   const [populating, setPopulating] = useState(false);
-  const [populateMessage, setPopulateMessage] = useState<string | null>(null);
+  const [populateResult, setPopulateResult] = useState<PopulateDestinationResult | null>(null);
   const [pendingTicket, setPendingTicket] = useState<DestinationRequest | null>(null);
   const [quota, setQuota] = useState<ScrapeQuotaState | null>(null);
 
+  // "Request a new destination" modal state
+  const [requestModalOpen, setRequestModalOpen] = useState(false);
+  const [newCity, setNewCity] = useState('');
+  const [newCountry, setNewCountry] = useState('');
+  const [requesting, setRequesting] = useState(false);
+
+  // Resolve the active destination from the dropdown selection.
+  const activeDestination = useMemo<AllowlistedDestination | null>(() => {
+    if (!selectedDestinationKey) return null;
+    return destinations.find((d) => destinationKey(d) === selectedDestinationKey) || null;
+  }, [destinations, selectedDestinationKey]);
+
+  const city = activeDestination?.city || '';
+  const country = activeDestination?.country || '';
+
+  const reloadDestinations = useCallback(async (preferKey?: string) => {
+    setDestinationsLoading(true);
+    try {
+      const list = await listAllowlistedDestinations();
+      setDestinations(list);
+      // Prefer an explicitly-passed key (right after a fresh approval), else
+      // keep the current selection if still present, else first item.
+      const preferred = preferKey && list.find((d) => destinationKey(d) === preferKey);
+      if (preferred) {
+        setSelectedDestinationKey(destinationKey(preferred));
+      } else if (
+        selectedDestinationKey
+        && !list.find((d) => destinationKey(d) === selectedDestinationKey)
+      ) {
+        setSelectedDestinationKey(list.length > 0 ? destinationKey(list[0]) : '');
+      } else if (!selectedDestinationKey && list.length > 0) {
+        setSelectedDestinationKey(destinationKey(list[0]));
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to load destinations.';
+      setError(msg);
+    } finally {
+      setDestinationsLoading(false);
+    }
+  }, [selectedDestinationKey]);
+
+  useEffect(() => {
+    void reloadDestinations();
+    // Intentionally fire only on mount — selectedDestinationKey is internal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const load = useCallback(async () => {
+    if (!city) {
+      setRows([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const data = await getCurationView(category, city || null);
+      const data = await getCurationView(category, city);
       setRows(data.rows);
       setPendingToggles(new Map());
     } catch (err: unknown) {
@@ -85,39 +149,79 @@ export const HrVendorCuration: React.FC = () => {
   // Refresh quota state on category/city change so the badge stays current.
   useEffect(() => {
     void getScrapeQuota().then(setQuota).catch(() => setQuota(null));
-    setPopulateMessage(null);
+    setPopulateResult(null);
     setPendingTicket(null);
   }, [category, city]);
 
-  const populate = async () => {
-    if (!city.trim() || !country.trim()) {
-      setError('Destination city and country are required to ask the AI.');
+  const onPickDestination = (value: string) => {
+    if (value === REQUEST_NEW_VALUE) {
+      setRequestModalOpen(true);
+      return;
+    }
+    setSelectedDestinationKey(value);
+  };
+
+  const populateAllForDestination = async () => {
+    if (!city || !country) {
+      setError('Pick a destination first.');
       return;
     }
     setPopulating(true);
     setError(null);
-    setPopulateMessage(null);
+    setPopulateResult(null);
     setPendingTicket(null);
     try {
-      const result = await populateVendorsWithAi(category, city.trim(), country.trim());
+      const result = await populateDestinationWithAi(city, country);
       if (result.status === 'pending_admin_approval') {
+        // Should not happen — destination came from allowlist — but render it
+        // gracefully if backend disagrees.
         setPendingTicket(result.request || null);
-        setPopulateMessage(result.message || 'Awaiting admin approval.');
       } else {
-        setPopulateMessage(
-          result.inserted && result.inserted > 0
-            ? `AI populated ${result.inserted} vendor${result.inserted === 1 ? '' : 's'} for ${city}. Review carefully and tick the ones to show your employees.`
-            : `${city} already has master vendors for ${category}. Nothing was added (no AI tokens used).`,
-        );
+        setPopulateResult(result);
         if (result.quota) setQuota(result.quota);
-        await load();
       }
+      await load();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Could not populate with AI.';
       setError(msg);
       void getScrapeQuota().then(setQuota).catch(() => {});
     } finally {
       setPopulating(false);
+    }
+  };
+
+  const submitNewDestinationRequest = async () => {
+    const c = newCity.trim();
+    const co = newCountry.trim();
+    if (!c || !co) {
+      setError('City and country are required.');
+      return;
+    }
+    setRequesting(true);
+    setError(null);
+    try {
+      const result = await populateDestinationWithAi(c, co);
+      if (result.status === 'pending_admin_approval') {
+        setPendingTicket(result.request || null);
+        setRequestModalOpen(false);
+        setNewCity('');
+        setNewCountry('');
+        setInfo(
+          `Request sent for ${c}, ${co}. Once admin allowlists it, it'll appear in the destination dropdown.`,
+        );
+      } else {
+        // Backend says it's already allowlisted — refresh and select it.
+        await reloadDestinations(`${c}|${co}`);
+        setRequestModalOpen(false);
+        setNewCity('');
+        setNewCountry('');
+        setInfo(`${c}, ${co} is already supported. Selected.`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not open request.';
+      setError(msg);
+    } finally {
+      setRequesting(false);
     }
   };
 
@@ -217,7 +321,29 @@ export const HrVendorCuration: React.FC = () => {
       subtitle="Choose which providers your employees see, per service and destination."
     >
       <Card padding="lg" className="mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <label className="block">
+            <span className="text-sm font-medium text-[#0b2b43]">Destination</span>
+            <select
+              className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
+              value={selectedDestinationKey}
+              onChange={(e) => onPickDestination(e.target.value)}
+              disabled={destinationsLoading}
+            >
+              {destinations.length === 0 && !destinationsLoading && (
+                <option value="">No destinations supported yet</option>
+              )}
+              {destinations.map((d) => (
+                <option key={destinationKey(d)} value={destinationKey(d)}>
+                  {d.city}, {d.country}
+                </option>
+              ))}
+              <option value={REQUEST_NEW_VALUE}>+ Request a new destination…</option>
+            </select>
+            <p className="mt-1 text-xs text-[#94a3b8]">
+              HR can pick from supported destinations only. New destinations need admin approval.
+            </p>
+          </label>
           <label className="block">
             <span className="text-sm font-medium text-[#0b2b43]">Service category</span>
             <select
@@ -232,27 +358,18 @@ export const HrVendorCuration: React.FC = () => {
               ))}
             </select>
           </label>
-          <label className="block">
-            <span className="text-sm font-medium text-[#0b2b43]">Destination city</span>
-            <input
-              type="text"
-              className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="e.g. Munich"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium text-[#0b2b43]">Country</span>
-            <input
-              type="text"
-              className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              placeholder="e.g. Germany"
-            />
-          </label>
-          <div className="flex items-end">
+          <div className="flex items-end gap-2 flex-wrap">
+            <Button
+              onClick={() => void populateAllForDestination()}
+              disabled={populating || !city || !country}
+              title={
+                !city || !country
+                  ? 'Pick a destination first'
+                  : `Populate every service category for ${city}, ${country} with AI`
+              }
+            >
+              {populating ? 'Asking the AI…' : 'Populate all services with AI'}
+            </Button>
             <Button onClick={() => void load()} disabled={loading} variant="outline">
               {loading ? 'Loading…' : 'Reload'}
             </Button>
@@ -261,10 +378,102 @@ export const HrVendorCuration: React.FC = () => {
         {quota && (
           <p className="mt-3 text-xs text-[#64748b]">
             AI catalog quota today: <strong className="text-[#0b2b43]">{quota.used}/{quota.limit}</strong> used
-            ({quota.remaining} remaining; resets at midnight UTC).
+            ({quota.remaining} remaining; resets at midnight UTC). Each service category that
+            actually calls the AI counts as 1 — already-populated categories don't.
           </p>
         )}
+        {populateResult && populateResult.status === 'completed' && (
+          <Alert variant="success" className="mt-3">
+            {populateResult.total_inserted ? (
+              <>
+                AI populated <strong>{populateResult.total_inserted}</strong> vendors across{' '}
+                <strong>{populateResult.categories_populated}</strong> service categor
+                {populateResult.categories_populated === 1 ? 'y' : 'ies'} for {city}, {country}.{' '}
+                {(populateResult.categories_skipped_existing || 0) > 0 && (
+                  <>
+                    Skipped {populateResult.categories_skipped_existing} already-populated categor
+                    {populateResult.categories_skipped_existing === 1 ? 'y' : 'ies'} (no AI tokens used).{' '}
+                  </>
+                )}
+                {(populateResult.categories_quota_blocked || 0) > 0 && (
+                  <>
+                    {populateResult.categories_quota_blocked} categor
+                    {populateResult.categories_quota_blocked === 1 ? 'y' : 'ies'} hit your daily quota — try again tomorrow (UTC).{' '}
+                  </>
+                )}
+                Pick a category below to review and tick the ones to show your employees.
+              </>
+            ) : (
+              <>
+                {city} already has master vendors for every service category. Nothing was added — no AI tokens used.
+              </>
+            )}
+          </Alert>
+        )}
+        {pendingTicket && (
+          <Alert variant="info" className="mt-3">
+            Ticket opened for {pendingTicket.city}, {pendingTicket.country}. Waiting on admin to
+            allowlist this destination.
+          </Alert>
+        )}
       </Card>
+
+      {requestModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b2b43]/40 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !requesting) setRequestModalOpen(false);
+          }}
+        >
+          <Card padding="lg" className="w-full max-w-md bg-white">
+            <h3 className="text-lg font-semibold text-[#0b2b43]">Request a new destination</h3>
+            <p className="mt-2 text-sm text-[#4b5563]">
+              Tell us where your employee is moving. Admin reviews and approves
+              new destinations to keep AI usage controlled — once approved you can
+              populate every service category with one click.
+            </p>
+            <label className="mt-4 block text-sm font-medium text-[#0b2b43]">
+              City
+              <input
+                type="text"
+                className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
+                value={newCity}
+                onChange={(e) => setNewCity(e.target.value)}
+                placeholder="e.g. Tokyo"
+                disabled={requesting}
+              />
+            </label>
+            <label className="mt-3 block text-sm font-medium text-[#0b2b43]">
+              Country
+              <input
+                type="text"
+                className="mt-1 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-sm text-[#0b2b43]"
+                value={newCountry}
+                onChange={(e) => setNewCountry(e.target.value)}
+                placeholder="e.g. Japan"
+                disabled={requesting}
+              />
+            </label>
+            <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setRequestModalOpen(false)}
+                disabled={requesting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void submitNewDestinationRequest()}
+                disabled={requesting || !newCity.trim() || !newCountry.trim()}
+              >
+                {requesting ? 'Sending…' : 'Send request to admin'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
       {info && <Alert variant="success" className="mb-4">{info}</Alert>}
@@ -282,41 +491,18 @@ export const HrVendorCuration: React.FC = () => {
             {saving ? 'Saving…' : dirty ? `Save ${pendingToggles.size} change${pendingToggles.size === 1 ? '' : 's'}` : 'No changes to save'}
           </Button>
         </div>
-        {populateMessage && (
-          <Alert variant={pendingTicket ? 'info' : 'success'} className="mb-3">
-            {populateMessage}
-          </Alert>
-        )}
-        {pendingTicket && (
-          <div className="mb-3 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-sm text-[#1e3a5f]">
-            Ticket opened: {pendingTicket.city}, {pendingTicket.country} for{' '}
-            <strong>{pendingTicket.category}</strong>. Waiting on admin to allowlist
-            this destination. We'll auto-populate as soon as it's approved.
-          </div>
-        )}
         {masters.length === 0 ? (
           <div className="py-2">
-            <p className="text-sm text-[#4b5563] mb-3">
-              No master vendors yet for {category} in {city || '—'}.
-            </p>
-            <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] p-4">
-              <p className="text-sm font-medium text-[#0b2b43] mb-1">
-                Populate with AI
-              </p>
-              <p className="text-xs text-[#92400e] mb-3">
-                We'll ask the AI to suggest up to 10 vendors for this category in {city || '—'}.
-                <strong> Review carefully before approving</strong> — the AI is a starting point,
-                not a vetted list. Each call counts against your daily AI quota.
-              </p>
-              <Button
-                onClick={() => void populate()}
-                disabled={populating || !city.trim() || !country.trim()}
-              >
-                {populating ? 'Asking the AI…' : 'Populate vendors with AI'}
-              </Button>
-            </div>
-            <p className="mt-4 text-sm text-[#6b7280]">
-              Or skip the AI and add your own preferred vendors below.
+            <p className="text-sm text-[#4b5563]">
+              No master vendors yet for {category} in {city || 'this destination'}.{' '}
+              {city && country ? (
+                <>
+                  Use <strong>Populate all services with AI</strong> at the top of the page to
+                  populate every category in one click, or add your own preferred vendors below.
+                </>
+              ) : (
+                <>Pick a destination at the top to begin, or add your own preferred vendors below.</>
+              )}
             </p>
           </div>
         ) : (
