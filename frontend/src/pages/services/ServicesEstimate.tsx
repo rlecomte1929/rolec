@@ -10,6 +10,8 @@ import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext'
 import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { buildRoute } from '../../navigation/routes';
 import { isRfqEnabled } from '../../featureFlags';
+import { EmployeeNextActionBar } from '../../components/employee/EmployeeNextActionBar';
+import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 
 const CATEGORY_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -37,6 +39,10 @@ export const ServicesEstimate: React.FC = () => {
     setActiveCaseId(assignmentId || null);
     return () => setActiveCaseId(null);
   }, [assignmentId, setActiveCaseId]);
+  // Records this as the resume target so re-entering from dashboard
+  // returns the user to the estimate / shortlist instead of forcing a
+  // restart of the services flow.
+  useTrackLastVisited(assignmentId || null);
   const go = (path: string) => navigate({ pathname: path, search: location.search });
 
   if (!recommendations) {
@@ -93,6 +99,20 @@ export const ServicesEstimate: React.FC = () => {
             Request quotations
           </Button>
         </div>
+      )}
+
+      {/* End-of-services-flow: route to the relocation plan, which is
+          the aggregator across all phases. Without this CTA the user
+          hits a dead end here and bounces. */}
+      {assignmentId && (
+        <EmployeeNextActionBar
+          status="Estimate ready"
+          hint="Your service picks are saved. The relocation plan aggregates all phases — visa, housing, schooling, and more — into one timeline."
+          primaryLabel="View my relocation plan →"
+          primaryHref={buildRoute('employeeCasePlan', { caseId: assignmentId })}
+          secondaryLabel="Back to recommendations"
+          secondaryHref={`${buildRoute('servicesRecommendations')}${location.search}`}
+        />
       )}
     </AppShell>
   );

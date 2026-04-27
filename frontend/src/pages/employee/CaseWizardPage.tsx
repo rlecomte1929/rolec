@@ -17,6 +17,7 @@ import { Step2EmployeeProfile } from './wizard/Step2EmployeeProfile';
 import { Step3FamilyMembers } from './wizard/Step3FamilyMembers';
 import { Step4AssignmentContext } from './wizard/Step4AssignmentContext';
 import { Step5ReviewCreate } from './wizard/Step5ReviewCreate';
+import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 
 function buildDefaultDraft(): CaseDraftDTO {
   const name = getAuthItem('relopass_name');
@@ -224,6 +225,11 @@ export const CaseWizardPage: React.FC = () => {
   }, [draft]);
 
   const assignmentId = assignmentIdFromRoute;
+
+  // Persist current wizard step as the resume target — re-entering from
+  // the dashboard's "Open case" lands the user back on this step instead
+  // of forcing a restart from step 1.
+  useTrackLastVisited(assignmentId || null);
 
   // Enforce linear progression: cannot skip ahead.
   useEffect(() => {
