@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Card, Input } from '../../components/antigravity';
 import { companyPolicyAPI, hrPolicyReviewAPI, policyDocumentsAPI } from '../../api/client';
-import { deriveHrPolicyPipelineState } from './hrPolicyDegradedState';
-import { HrPolicyPipelineBanner } from './HrPolicyPipelineBanner';
 import { deriveHrPolicyLifecycleContext, isTemplatePolicy } from './hrPolicyLifecycle';
 import { buildEmployeePreviewCompare } from './hrPolicyEmployeePreviewCompare';
 import { HrPolicyWorkspaceLayout } from './HrPolicyWorkspaceLayout';
@@ -17,7 +15,6 @@ import { StarterPolicyDraftGuidance } from './StarterPolicyDraftGuidance';
 import { STARTER_TEMPLATE_OPTIONS, type StarterTemplateKey } from './starterPolicyCopy';
 import { HrPolicyDraftReviewPanel } from './HrPolicyDraftReviewPanel';
 import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
-import { HrBenefitOverrideSection } from './HrBenefitOverrideSection';
 import { POLICY_TOPIC_LABELS, POLICY_TOPIC_ORDER } from './policyTopicLabels';
 import { formatPolicySourceCitation, getSourceProvenance } from './policySourceProvenance';
 
@@ -476,11 +473,6 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
     return Math.round((sum / rules.length) * 100);
   }, [normalized?.benefit_rules]);
 
-  const pipelineDerived = useMemo(
-    () => deriveHrPolicyPipelineState(documents, normalized),
-    [documents, normalized]
-  );
-
   const workspaceResolved = useMemo(
     () =>
       resolveHrPolicyWorkspaceState({
@@ -706,12 +698,11 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
         />
       )}
 
-      <div id="hr-policy-detailed-review" className="scroll-mt-4 pt-2 border-t border-[#e5e7eb]">
-        <div className="text-xl font-semibold text-[#0b2b43]">Detailed review</div>
-        <p className="text-sm text-[#6b7280] mt-1 mb-4 max-w-3xl">
-          Document summary, readiness, and rule-level context. Use this before large edits in the benefit table.
-        </p>
-      </div>
+      {/* PR 0.5 simplification: dropped HrBenefitOverrideSection,
+          HrPolicyPipelineBanner, and the "Detailed review" / "Tip" banners.
+          Per-benefit edits now happen via the row-level Edit button on the
+          benefit table below — single editor, not two. The draft-review
+          panel is retained for canonical-pipeline document context. */}
 
       {selectedPolicyId && (
         <HrPolicyDraftReviewPanel
@@ -721,28 +712,6 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           reviewLoading={reviewLoading}
         />
       )}
-
-      {selectedPolicyId && normalized?.version?.id && Array.isArray(normalized?.benefit_rules) && (
-        <HrBenefitOverrideSection
-          policyId={selectedPolicyId}
-          versionId={String(normalized.version.id)}
-          benefitRules={normalized.benefit_rules}
-          hrOverrides={policyReview?.hr_overrides}
-          entitlementPreview={policyReview?.entitlement_effective_preview}
-          onDataRefresh={bumpPolicyDataRefresh}
-        />
-      )}
-
-      <div className="text-xl font-semibold text-[#0b2b43]">Benefit table &amp; publish</div>
-      <div className="text-sm text-[#6b7280] mb-2">
-        Edit rules below; use overrides above when you need HR-only adjustments without changing baseline rows.
-      </div>
-      <div className="rounded-lg bg-[#f0fdf4] border border-[#bbf7d0] px-4 py-2 text-xs text-[#166534]">
-        <strong>Tip:</strong> Upload or reprocess files in Documents &amp; processing, then build the policy. After you
-        edit rules, choose <strong>Publish version</strong> so employee assignments pick up the live version.
-      </div>
-
-      <HrPolicyPipelineBanner derived={pipelineDerived} loading={Boolean(selectedPolicyId && loading)} />
 
       {message && (
         <Alert variant={messageVariant}>{message}</Alert>
@@ -1070,12 +1039,12 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
             <Button variant="outline" size="sm" onClick={() => handleSaveStatus('draft')} disabled={statusBusy}>
               {statusBusy ? 'Saving…' : 'Save draft'}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleSaveStatus('review_required')} disabled={statusBusy}>
-              {statusBusy ? 'Saving…' : 'Mark for review'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleSaveStatus('reviewed')} disabled={statusBusy}>
-              {statusBusy ? 'Saving…' : 'Mark reviewed'}
-            </Button>
+            {/* PARKED: 'Mark for review' / 'Mark reviewed' lifecycle buttons hidden in PR 0.5
+                (HR Policy UX simplification, design doc 2026-04-27). The DB column
+                policy_versions.status still accepts 'review_required' / 'reviewed' values, the
+                companyPolicyAPI.patchLatestVersionStatus endpoint stays, and historical rows
+                with these statuses display correctly. Re-expose by uncommenting these two
+                buttons if a customer asks for a reviewer workflow. */}
             <Button
               size="sm"
               onClick={() => setPublishModalOpen(true)}
