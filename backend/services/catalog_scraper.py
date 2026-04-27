@@ -175,6 +175,19 @@ def populate_destination_catalog(
             destination_city,
         )
         return []
+    # L1 cost short-circuit (Phase 2b-secured): if the master already has any
+    # rows for this (category, city), skip the LLM call entirely. This is the
+    # biggest single cost saver — even repeated triggers from a malicious
+    # caller never re-burn tokens once the slot is populated. Re-scraping a
+    # populated destination requires deactivating the existing rows first
+    # (admin path, Phase 2h).
+    if service_catalog.count_by_category_city(category, destination_city) > 0:
+        log.info(
+            "catalog_scraper_skipped_already_populated category=%s destination_city=%s",
+            category,
+            destination_city,
+        )
+        return []
     if client is None:
         client = _build_client()
     if client is None:
