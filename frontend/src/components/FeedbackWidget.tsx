@@ -85,7 +85,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
   }
 
   return (
-    <div ref={containerRef} className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+    <div ref={containerRef} className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
       {(state === 'open' || state === 'submitting' || state === 'success' || state === 'error') && (
         <div className="w-80 rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">

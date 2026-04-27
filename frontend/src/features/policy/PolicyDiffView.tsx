@@ -10,9 +10,91 @@
  * change lists. Full-fidelity editing still happens in the Detailed
  * review drawer; this view is for "what did I change?" glances.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
 import { policyConfigMatrixAPI } from '../../api/client';
+import { POLICY_CONFIG_CATEGORIES } from '../policy-config/constants';
+
+/**
+ * Build a stable map from category_key -> friendly label so the diff
+ * view can render "Compensation & Allowances (5 new)" instead of
+ * "compensation_allowances 5 new". Falls back to the raw key for any
+ * unknown category so we never show a blank header.
+ */
+const CATEGORY_LABEL_BY_KEY: Record<string, string> = Object.fromEntries(
+  POLICY_CONFIG_CATEGORIES.map((c) => [c.key, c.label])
+);
+const CATEGORY_ORDER: string[] = POLICY_CONFIG_CATEGORIES.map((c) => c.key);
+
+function groupByCategory<T extends { category?: string }>(
+  rows: T[]
+): Array<[string, T[]]> {
+  const buckets = new Map<string, T[]>();
+  for (const r of rows) {
+    const k = r.category || 'uncategorized';
+    const arr = buckets.get(k) ?? [];
+    arr.push(r);
+    buckets.set(k, arr);
+  }
+  // Preserve canonical category order; uncategorized goes last.
+  const ordered: Array<[string, T[]]> = [];
+  for (const k of CATEGORY_ORDER) {
+    if (buckets.has(k)) ordered.push([k, buckets.get(k)!]);
+  }
+  for (const [k, v] of buckets) {
+    if (!CATEGORY_ORDER.includes(k)) ordered.push([k, v]);
+  }
+  return ordered;
+}
+
+/**
+ * Per-category collapsible group for the Draft vs Live diff list.
+ * Collapsed by default — when HR has 41 added rows, a flat list takes
+ * a screen and a half of scroll. Grouping cuts that to one screen of
+ * headers + on-demand expansion.
+ */
+function CategoryGroup<T extends { category?: string; benefit_key?: string; targeting_signature?: string | null }>({
+  categoryKey,
+  rows,
+  changeKindLabel,
+  renderRow,
+  defaultOpen = false,
+}: {
+  categoryKey: string;
+  rows: T[];
+  changeKindLabel: string;
+  renderRow: (row: T) => React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const label = CATEGORY_LABEL_BY_KEY[categoryKey] || categoryKey;
+  return (
+    <div className="border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-3 py-2 flex items-center justify-between hover:bg-[#f8fafc] text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[#6b7280] text-xs">{open ? '▼' : '▶'}</span>
+          <span className="font-medium text-[#0b2b43]">{label}</span>
+          <span className="text-xs text-[#6b7280]">
+            {rows.length} {changeKindLabel}{rows.length === 1 ? '' : ''}
+          </span>
+        </div>
+      </button>
+      {open && (
+        <ul className="divide-y divide-[#e2e8f0] border-t border-[#e2e8f0]">
+          {rows.map((r) => (
+            <li key={`${r.benefit_key ?? '?'}::${r.targeting_signature ?? 'global'}`} className="p-2">
+              {renderRow(r)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 // --- Types ------------------------------------------------------------------
 
@@ -329,19 +411,32 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
               <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">
                 Changed rows ({diff!.changed.length})
               </h3>
-              <ul className="space-y-2">
-                {diff!.changed.map((entry) => {
-                  const key = `${entry.after.benefit_key}::${entry.after.targeting_signature ?? 'global'}`;
-                  return (
-                    <ChangedRow
-                      key={key}
-                      entry={entry}
-                      reverting={revertingKey === key}
-                      onRevert={() => void revert(entry.after)}
+              {/* Changed rows are open by default — HR almost always wants
+                  to see WHAT changed (the whole point of "Draft vs Live").
+                  Added/Removed are collapsed; changes are the eye-catcher. */}
+              <div className="space-y-2">
+                {groupByCategory(diff!.changed.map((e) => ({ ...e.after, _entry: e })))
+                  .map(([categoryKey, rows]) => (
+                    <CategoryGroup
+                      key={`changed-${categoryKey}`}
+                      categoryKey={categoryKey}
+                      rows={rows}
+                      changeKindLabel="changed"
+                      defaultOpen
+                      renderRow={(row) => {
+                        const entry = (row as { _entry: ChangedEntry })._entry;
+                        const key = `${entry.after.benefit_key}::${entry.after.targeting_signature ?? 'global'}`;
+                        return (
+                          <ChangedRow
+                            entry={entry}
+                            reverting={revertingKey === key}
+                            onRevert={() => void revert(entry.after)}
+                          />
+                        );
+                      }}
                     />
-                  );
-                })}
-              </ul>
+                  ))}
+              </div>
             </section>
           )}
 
@@ -350,19 +445,31 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
               <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">
                 Added rows ({diff!.added.length})
               </h3>
-              <ul className="space-y-2">
-                {diff!.added.map((row) => {
-                  const key = `${row.benefit_key}::${row.targeting_signature ?? 'global'}`;
-                  return (
-                    <AddedRow
-                      key={key}
-                      row={row}
-                      reverting={revertingKey === key}
-                      onRevert={() => void revert(row)}
-                    />
-                  );
-                })}
-              </ul>
+              {/* Grouped by category, collapsed by default. With 41 added
+                  rows in a fresh template apply, a flat list ate a screen
+                  and a half of scroll; grouping fits the same data into
+                  one screen of headers and lets HR expand only what they
+                  care about. */}
+              <div className="space-y-2">
+                {groupByCategory(diff!.added).map(([categoryKey, rows]) => (
+                  <CategoryGroup
+                    key={`added-${categoryKey}`}
+                    categoryKey={categoryKey}
+                    rows={rows}
+                    changeKindLabel="new"
+                    renderRow={(row) => {
+                      const key = `${row.benefit_key}::${row.targeting_signature ?? 'global'}`;
+                      return (
+                        <AddedRow
+                          row={row}
+                          reverting={revertingKey === key}
+                          onRevert={() => void revert(row)}
+                        />
+                      );
+                    }}
+                  />
+                ))}
+              </div>
             </section>
           )}
 
@@ -371,19 +478,26 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
               <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">
                 Removed rows ({diff!.removed.length})
               </h3>
-              <ul className="space-y-2">
-                {diff!.removed.map((row) => {
-                  const key = `${row.benefit_key}::${row.targeting_signature ?? 'global'}`;
-                  return (
-                    <RemovedRow
-                      key={key}
-                      row={row}
-                      reverting={revertingKey === key}
-                      onRevert={() => void revert(row)}
-                    />
-                  );
-                })}
-              </ul>
+              <div className="space-y-2">
+                {groupByCategory(diff!.removed).map(([categoryKey, rows]) => (
+                  <CategoryGroup
+                    key={`removed-${categoryKey}`}
+                    categoryKey={categoryKey}
+                    rows={rows}
+                    changeKindLabel="removed"
+                    renderRow={(row) => {
+                      const key = `${row.benefit_key}::${row.targeting_signature ?? 'global'}`;
+                      return (
+                        <RemovedRow
+                          row={row}
+                          reverting={revertingKey === key}
+                          onRevert={() => void revert(row)}
+                        />
+                      );
+                    }}
+                  />
+                ))}
+              </div>
             </section>
           )}
 
