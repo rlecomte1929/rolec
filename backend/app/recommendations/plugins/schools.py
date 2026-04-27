@@ -19,6 +19,7 @@ _CITY_CURRENCY: dict[str, str] = {
     "Oslo": "NOK",
     "New York": "USD",
     "San Francisco": "USD",
+    "Munich": "EUR",
 }
 
 # Approx annual tuition in local currency by level and city (for display)
@@ -27,9 +28,10 @@ _TUITION_LOCAL: dict[str, dict[str, int]] = {
     "Oslo": {"high": 333000, "medium": 207000, "low": 111000},
     "New York": {"high": 45000, "medium": 28000, "low": 15000},
     "San Francisco": {"high": 45000, "medium": 28000, "low": 15000},
+    "Munich": {"high": 24000, "medium": 16000, "low": 0},
 }
 
-_CURRENCY_TO_USD: dict[str, float] = {"SGD": 0.74, "NOK": 0.09, "USD": 1.0}
+_CURRENCY_TO_USD: dict[str, float] = {"SGD": 0.74, "NOK": 0.09, "USD": 1.0, "EUR": 1.09}
 
 # City aliases: user input -> canonical city in dataset
 _CITY_ALIASES: dict[str, str] = {
@@ -47,6 +49,10 @@ _CITY_ALIASES: dict[str, str] = {
     "no": "Oslo",
     "san francisco": "San Francisco",
     "sf": "San Francisco",
+    "munich": "Munich",
+    "münchen": "Munich",
+    "germany": "Munich",
+    "de": "Munich",
 }
 
 
