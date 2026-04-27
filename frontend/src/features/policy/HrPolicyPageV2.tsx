@@ -29,7 +29,6 @@
  *                                  the benefit row itself)
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
 import {
   policyConfigMatrixAPI,
@@ -193,44 +192,30 @@ const BuildNextVersionSection: React.FC<{
   const [docsOpen, setDocsOpen] = useState(false);
   return (
     <Card padding="lg">
-      <h2 className="text-lg font-semibold text-[#0b2b43]">Build your next version</h2>
+      <h2 className="text-lg font-semibold text-[#0b2b43]">Start your policy</h2>
       <p className="text-sm text-slate-600 mt-1.5">
-        Two ways in. Either upload an approved company policy and let ReloPass extract
-        benefit rules from it, or start from a template and edit the values yourself.
+        Pick a template baseline. You'll edit the caps yourself in the benefit table
+        below — no document upload required.
       </p>
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* PR 0.5 simplification: template is the primary CTA (matrix-first
+          authoring). Document import demoted to a quieter secondary link
+          beneath the primary action. */}
+      <div className="mt-4">
+        <Button onClick={onTemplateClick} data-testid="start-from-template-card">
+          ✨ Start from a template
+        </Button>
         <button
           type="button"
           onClick={onImportClick}
-          className="text-left p-4 rounded-lg border border-slate-200 hover:border-[#0b2b43] hover:bg-slate-50 transition"
+          className="ml-3 text-sm text-slate-600 hover:text-[#0b2b43] underline"
         >
-          <div className="text-2xl" aria-hidden>📄</div>
-          <div className="font-semibold text-[#0b2b43] mt-2">Import a document</div>
-          <p className="text-sm text-slate-600 mt-1">
-            Upload a PDF or DOCX. ReloPass classifies it, extracts caps and rules, and
-            turns it into a draft you can review and publish.
-          </p>
-          <div className="mt-3 text-xs font-medium text-[#0b2b43]">
-            Best when you already have an approved company policy document. →
-          </div>
+          Or import a document instead →
         </button>
-        <button
-          type="button"
-          onClick={onTemplateClick}
-          className="text-left p-4 rounded-lg border border-slate-200 hover:border-[#0b2b43] hover:bg-slate-50 transition"
-          data-testid="start-from-template-card"
-        >
-          <div className="text-2xl" aria-hidden>✨</div>
-          <div className="font-semibold text-[#0b2b43] mt-2">Start from a template</div>
-          <p className="text-sm text-slate-600 mt-1">
-            Pick Conservative, Standard, or Premium. ReloPass pre-fills the compensation
-            matrix with level-tiered caps (Entry&nbsp;Level / Manager / Director / VP /
-            C-suite).
-          </p>
-          <div className="mt-3 text-xs font-medium text-[#0b2b43]">
-            Best when starting fresh or stress-testing limits. →
-          </div>
-        </button>
+        <p className="text-xs text-slate-500 mt-2">
+          Templates pre-fill the matrix with level-tiered caps
+          (Entry&nbsp;Level / Manager / Director / VP / C-suite). Importing a PDF
+          extracts rules from a company policy you already have.
+        </p>
       </div>
       {hasLivePolicy && (
         <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">
@@ -372,7 +357,6 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
   const [documents, setDocuments] = useState<PolicyDocumentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [detailedReviewOpen, setDetailedReviewOpen] = useState(false);
   const [postNormalizePolicyId, setPostNormalizePolicyId] = useState<string | null>(null);
   const [workspaceRefreshTrigger, setWorkspaceRefreshTrigger] = useState(0);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -419,17 +403,27 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
     String(normalized?.version?.status || '').toLowerCase() === 'published' ||
     matrixPayload?.status === 'published';
 
+  // Canonical lives in normalized.version.status; matrix editable + not
+  // sourced from a published clone means HR is mid-draft on the matrix.
+  // Used by Section 3 ("Build your next version") to hide the two onboarding
+  // doors once HR has any version in flight — no point offering a fresh
+  // template when they are already editing one.
+  const canonicalLive =
+    String(normalized?.version?.status || '').toLowerCase() === 'published';
+  const hasDraftInProgress = Boolean(
+    matrixPayload?.editable &&
+      matrixPayload?.source !== 'published' &&
+      matrixPayload?.source !== 'published_clone'
+  );
+
   const publishEnabled = Boolean(normalized?.version?.id) && !hasLivePolicy;
   const [publishBusy, _setPublishBusy] = useState(false);
 
   const handleImportClick = () => {
-    setDetailedReviewOpen(true);
-    // Scroll to detailed review; the Document intake card lives at the top
+    // Scroll to the workspace; the Document intake card lives at the top
     // of HrPolicyReviewWorkspace so the user lands on the upload controls.
-    setTimeout(() => {
-      const el = document.getElementById('hr-policy-detailed-review');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
+    const el = document.getElementById('hr-policy-detailed-review');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const policyId = normalized?.version?.policy_id ?? normalized?.policy?.id ?? null;
@@ -452,15 +446,14 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         matrixPayload={matrixPayload}
         hasDocument={documents.length > 0}
         onPreviewEmployeeView={() => {
-          // Employee preview lives in the detailed review today; later it
-          // becomes a dedicated modal. This keeps the CTA discoverable
-          // while we ship the new modal in a follow-up.
-          setDetailedReviewOpen(true);
+          // Workspace is now flat (no collapsible) — scroll to it so the
+          // user lands on the publish/preview controls inside.
+          const el = document.getElementById('hr-policy-detailed-review');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }}
         onPublish={() => {
-          // Publish UX also lives in the detailed review today (PublishControls
-          // card). Open the drawer and scroll to it.
-          setDetailedReviewOpen(true);
+          const el = document.getElementById('hr-policy-detailed-review');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }}
         publishEnabled={publishEnabled}
         publishBusy={publishBusy}
@@ -472,14 +465,20 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         onRequestDetails={() => setDetailedReviewOpen(true)}
       />
 
-      {/* 3. Build your next version */}
-      <BuildNextVersionSection
-        documents={documents}
-        hasLivePolicy={hasLivePolicy}
-        onImportClick={handleImportClick}
-        onTemplateClick={() => setTemplatePickerOpen(true)}
-        adminCompanyId={adminCompanyId}
-      />
+      {/* 3. Build your next version (only shown when there is no live policy
+          OR no draft in progress — once HR has a working version, the matrix
+          editor below is the primary authoring surface). PR 0.5 simplification:
+          template is the primary CTA; document import is a quieter secondary
+          link to keep the "matrix-primary" pipeline stance clear. */}
+      {!canonicalLive && !hasDraftInProgress && (
+        <BuildNextVersionSection
+          documents={documents}
+          hasLivePolicy={hasLivePolicy}
+          onImportClick={handleImportClick}
+          onTemplateClick={() => setTemplatePickerOpen(true)}
+          adminCompanyId={adminCompanyId}
+        />
+      )}
 
       <PolicyTemplatePicker
         open={templatePickerOpen}
@@ -507,50 +506,21 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         refreshTrigger={workspaceRefreshTrigger}
       />
 
-      {/* 5. Version history */}
-      <VersionHistorySection normalized={normalized} />
-
-      {/* Detailed review (collapsed progressive disclosure) */}
+      {/* 5. Benefit table & publish (was: "Detailed review" collapsible).
+          PR 0.5 simplification flattens this — the table is the primary
+          authoring surface, no point hiding it. The version history below
+          stays compact via VersionHistorySection's own collapse. */}
       <div id="hr-policy-detailed-review">
-        <Card padding="lg">
-          <button
-            type="button"
-            onClick={() => setDetailedReviewOpen((v) => !v)}
-            className="flex items-center justify-between w-full"
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-[#0b2b43]">Detailed review</h2>
-              <p className="text-sm text-slate-600 mt-1 text-left">
-                Document intake, per-rule adjustments, publish controls, unpublish.
-                Hidden by default — open only when you need to dive in.
-              </p>
-            </div>
-            <span className="text-slate-500 text-lg">{detailedReviewOpen ? '▾' : '▸'}</span>
-          </button>
-          {detailedReviewOpen && (
-            <div className="mt-4 border-t border-slate-200 pt-4">
-              <HrPolicyReviewWorkspace
-                refreshTrigger={workspaceRefreshTrigger}
-                postNormalizePolicyId={postNormalizePolicyId}
-                onBindComplete={() => setPostNormalizePolicyId(null)}
-                adminCompanyId={adminCompanyId ?? null}
-              />
-              <div className="mt-4 flex justify-end">
-                <Link
-                  to="#hr-policy-top"
-                  className="text-xs text-slate-500 hover:text-[#0b2b43] underline"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                >
-                  Back to top
-                </Link>
-              </div>
-            </div>
-          )}
-        </Card>
+        <HrPolicyReviewWorkspace
+          refreshTrigger={workspaceRefreshTrigger}
+          postNormalizePolicyId={postNormalizePolicyId}
+          onBindComplete={() => setPostNormalizePolicyId(null)}
+          adminCompanyId={adminCompanyId ?? null}
+        />
       </div>
+
+      {/* 6. Version history */}
+      <VersionHistorySection normalized={normalized} />
 
       {/* Keeps refresh bump wired so the Detailed review's internal actions
           (publish / unpublish / re-normalize) reload the top-level status. */}
