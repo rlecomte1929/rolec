@@ -7,6 +7,7 @@ import { KPICard } from '../components/command-center/KPICard';
 import { RiskBadge } from '../components/command-center/RiskBadge';
 import { hrAPI } from '../api/client';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { HrExceptionsQueueCard } from '../features/exceptions/HrExceptionsQueueCard';
 
 type CaseRow = {
   id: string;
@@ -102,6 +103,8 @@ export const HrCommandCenter: React.FC = () => {
           <KPICard title="Overdue Tasks" value={kpisLoading && kpis == null ? '…' : (kpis?.overdueTasksCount ?? '-')} />
           <KPICard title="Budget Overruns" value={kpisLoading && kpis == null ? '…' : (kpis?.budgetOverrunsCount ?? '-')} />
         </div>
+
+        <HrExceptionsQueueCard />
 
         {/* Cases Table: shell visible immediately */}
         <Card padding="lg">

@@ -233,6 +233,47 @@ def list_exception_requests_for_case(
     return [_row_to_dict(r) for r in rows]
 
 
+@router.get(
+    "/api/exception-requests",
+    response_model=List[ExceptionRequestRead],
+)
+def list_exception_requests_for_company(
+    status: Optional[str] = None,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
+    """
+    HR / Admin: list all exception requests across the caller's company.
+    Optional ?status=pending|approved|rejected filter for the queue view.
+    """
+    role = (user.get("role") or "").upper()
+    if role not in ("HR", "ADMIN") and not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="HR or Admin only")
+    if status is not None and status not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail=f"status must be one of {VALID_STATUSES}")
+
+    organization_id = _caller_company_id(user)
+    with db.engine.begin() as conn:
+        if status:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM exception_requests "
+                    "WHERE organization_id = :org AND status = :status "
+                    "ORDER BY created_at DESC"
+                ),
+                {"org": organization_id, "status": status},
+            ).mappings().all()
+        else:
+            rows = conn.execute(
+                text(
+                    "SELECT * FROM exception_requests "
+                    "WHERE organization_id = :org "
+                    "ORDER BY created_at DESC"
+                ),
+                {"org": organization_id},
+            ).mappings().all()
+    return [_row_to_dict(r) for r in rows]
+
+
 @router.patch(
     "/api/exception-requests/{request_id}",
     response_model=ExceptionRequestRead,
