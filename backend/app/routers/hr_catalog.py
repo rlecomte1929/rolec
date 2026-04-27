@@ -14,6 +14,7 @@ Audit trail goes via the relopass_audit_row trigger on the table.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -337,3 +338,152 @@ def list_my_destination_requests(
         company_id=_caller_company_id(user),
         limit=100,
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2b — destination-scoped flow (replaces single-category as the primary path)
+# ---------------------------------------------------------------------------
+
+# Sentinel category used on tickets that ask the admin to allowlist a brand-new
+# destination ("populate ALL services here"). Distinct from any real category
+# key so the admin queue UI can render it as "All services".
+ALL_CATEGORIES_SENTINEL = "_all_categories"
+
+
+@router.get("/destinations")
+def list_allowlisted_destinations(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> List[Dict[str, Any]]:
+    """
+    HR-readable list of (city, country) the system supports for AI scraping.
+    Frontend uses this to render a dropdown — HR can only pick supported
+    destinations, never type a free-form string. Anything else goes through
+    the "Request a new destination" ticket flow.
+    """
+    from ...services import scrape_safety
+    return scrape_safety.list_allowlist()
+
+
+class PopulateDestinationBody(BaseModel):
+    destination_city: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=1)
+
+
+@router.post("/populate-destination-with-ai")
+def populate_destination_with_ai(
+    body: PopulateDestinationBody,
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """
+    Destination-level scraper trigger — populates ALL service categories
+    for the (city, country) in one HR click, with the same safety layers
+    as the per-category endpoint:
+
+      L4 allowlist → off-list opens a SINGLE ticket (category sentinel
+                     "_all_categories") and returns 202-style pending,
+                     no LLM calls.
+      L3 quota     → each category that actually fires the LLM counts as
+                     1 against the daily cap. Categories already populated
+                     short-circuit (L1) and do NOT increment the quota.
+      L1 already-populated → skipped per-category.
+    """
+    from ...services import scrape_safety, catalog_scraper
+    from ..recommendations.registry import list_categories
+
+    company_id = _caller_company_id(user)
+    actor_id = user["id"]
+    city = body.destination_city.strip()
+    country = body.country.strip()
+
+    # L4 — allowlist
+    if not scrape_safety.is_destination_allowlisted(city, country):
+        ticket = scrape_safety.open_destination_request(
+            city=city,
+            country=country,
+            category=ALL_CATEGORIES_SENTINEL,
+            requested_by_user_id=actor_id,
+            company_id=company_id,
+        )
+        return {
+            "status": "pending_admin_approval",
+            "request": ticket,
+            "message": (
+                f"{city}, {country} isn't on our supported destinations yet. "
+                "We've notified our admin team — once approved, you can populate "
+                "every service category in one click."
+            ),
+        }
+
+    # Iterate all known categories. Each that actually calls the LLM counts
+    # against quota; each that hits the L1 short-circuit (already populated)
+    # is skipped silently and does NOT charge quota.
+    categories = [c["key"] for c in list_categories()]
+    results: List[Dict[str, Any]] = []
+    populated = 0
+    skipped_existing = 0
+    quota_blocked = 0
+    total_inserted = 0
+    last_quota: Optional[Dict[str, Any]] = None
+
+    # Cheap config gate: if the scraper is disabled OR no API key, no
+    # category will actually invoke the LLM. Don't charge quota or even
+    # call the scraper module — return everything as "scraper_disabled"
+    # so the UX message stays honest.
+    scraper_runnable = catalog_scraper._enabled() and bool(os.getenv("OPENAI_API_KEY"))
+
+    for cat in categories:
+        # L1 pre-check: if rows already exist, mark as skipped without
+        # touching quota or the scraper at all.
+        from ...services import service_catalog
+        if service_catalog.count_by_category_city(cat, city) > 0:
+            skipped_existing += 1
+            results.append({"category": cat, "status": "skipped_existing", "inserted": 0})
+            continue
+
+        if not scraper_runnable:
+            # Scraper is off (or unconfigured) — don't charge quota for a
+            # call that physically can't happen. The UI shows this state
+            # via the per-category breakdown.
+            results.append({"category": cat, "status": "scraper_disabled", "inserted": 0})
+            continue
+
+        # L3 — quota gate. We only get here if the scraper actually CAN
+        # call the LLM. If we've burned through the cap mid-loop, remaining
+        # categories return quota_blocked and we stop incrementing.
+        quota = scrape_safety.check_and_increment_quota(company_id)
+        last_quota = quota
+        if not quota["allowed"]:
+            quota_blocked += 1
+            results.append({"category": cat, "status": "quota_blocked", "inserted": 0})
+            continue
+
+        rows = catalog_scraper.populate_destination_catalog(
+            category=cat,
+            destination_city=city,
+            country=country,
+        )
+        if rows:
+            populated += 1
+            total_inserted += len(rows)
+            results.append({"category": cat, "status": "populated", "inserted": len(rows)})
+        else:
+            # Scraper returned 0 (LLM failed, disabled, no API key) — quota was
+            # incremented; treat as failed for clarity.
+            results.append({"category": cat, "status": "scraper_returned_empty", "inserted": 0})
+
+    if last_quota is None:
+        # Every category short-circuited (everything already populated).
+        last_quota = scrape_safety.get_quota_state(company_id)
+
+    return {
+        "status": "completed",
+        "destination_city": city,
+        "country": country,
+        "categories_total": len(categories),
+        "categories_populated": populated,
+        "categories_skipped_existing": skipped_existing,
+        "categories_quota_blocked": quota_blocked,
+        "total_inserted": total_inserted,
+        "per_category": results,
+        "quota": last_quota,
+    }
