@@ -50,11 +50,21 @@ export function validateDynamicAnswers(
   return errors;
 }
 
+/** Question keys whose label should be suffixed with the user's display currency. */
+const CURRENCY_LABEL_KEYS = new Set(['budget_min', 'budget_max']);
+
+function withCurrencySuffix(label: string, key: string, displayCurrency?: string): string {
+  if (!displayCurrency || !CURRENCY_LABEL_KEYS.has(key)) return label;
+  return `${label} (${displayCurrency})`;
+}
+
 export const DynamicServicesQuestionnaire: React.FC<{
   questions: DynamicQuestion[];
   answers: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
-}> = ({ questions, answers, onChange }) => {
+  /** Currency code (USD, EUR, …) appended to budget question labels for clarity. */
+  displayCurrency?: string;
+}> = ({ questions, answers, onChange, displayCurrency }) => {
   const visibleQuestions = useMemo(
     () => questions.filter((q) => evalAppliesIf(q.applies_if ?? null, answers)),
     [questions, answers]
@@ -87,7 +97,7 @@ export const DynamicServicesQuestionnaire: React.FC<{
               return (
                 <div key={id}>
                   <label className="block text-sm font-medium text-[#0b2b43] mb-1">
-                    {q.label}{q.required ? ' *' : ''}
+                    {withCurrencySuffix(q.label, id, displayCurrency)}{q.required ? ' *' : ''}
                   </label>
 
                   {q.type === 'text' && (
