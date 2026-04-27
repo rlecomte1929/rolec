@@ -1399,6 +1399,37 @@ class Database:
                 ON policy_config_benefits(policy_config_version_id)
             """))
 
+            # Section C of HR Policy: per-jurisdiction × employee_level ×
+            # assignment_type override rows that stack on top of a base
+            # policy_config_benefits row. SQLite mirror of supabase/migrations/
+            # 20260502100000_policy_benefit_jurisdiction_overrides.sql.
+            # SQLite has no text[] — jurisdiction_countries is JSON-encoded
+            # TEXT, parsed by services/policy_section_c_resolver.py which
+            # handles both shapes (Postgres array, SQLite JSON string).
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_benefit_jurisdiction_overrides (
+                    id TEXT PRIMARY KEY,
+                    benefit_row_id TEXT NOT NULL
+                        REFERENCES policy_config_benefits(id) ON DELETE CASCADE,
+                    jurisdiction_countries TEXT NOT NULL DEFAULT '[]',
+                    employee_level TEXT,
+                    assignment_type TEXT,
+                    amount_value REAL,
+                    currency_code TEXT,
+                    cap_rule_json TEXT NOT NULL DEFAULT '{}',
+                    reimbursement_md TEXT,
+                    repayment_md TEXT,
+                    display_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (benefit_row_id, employee_level, assignment_type)
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_sqlite_pbjo_benefit
+                ON policy_benefit_jurisdiction_overrides(benefit_row_id)
+            """))
+
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS case_service_answers (
                     id TEXT PRIMARY KEY,
