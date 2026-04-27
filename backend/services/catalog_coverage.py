@@ -114,11 +114,9 @@ def ensure_destination_catalog(
     have = int(cat.get("items", 0)) if cat and isinstance(cat.get("items"), int) else 0
     needed = max(0, MAX_ITEMS_PER_DESTINATION - have)
 
+    scraper_dispatched = False
+    inserted = 0
     if needed > 0:
-        # TODO(scraper): dispatch a per-category scraper that writes up to
-        # MAX_ITEMS_PER_DESTINATION items into a DB-backed catalog. For
-        # now we emit a structured log so we can rank which (category,
-        # city) pairs to build scrapers for first based on real demand.
         log.info(
             "catalog_gap_detected category=%s destination_city=%s country=%s have=%d needed=%d",
             category,
@@ -127,6 +125,25 @@ def ensure_destination_catalog(
             have,
             needed,
         )
+        # Phase 2b: try to fill the gap via the catalog scraper. The scraper
+        # is gated by CATALOG_SCRAPER_ENABLED + OPENAI_API_KEY; when not
+        # configured this is a no-op and we keep the gap log for Phase 1's
+        # metric-stream behavior.
+        try:
+            from . import catalog_scraper  # local import keeps test boundary clean
+            rows = catalog_scraper.populate_destination_catalog(
+                category=category,
+                destination_city=destination_city,
+                country=country,
+            )
+            inserted = len(rows)
+            scraper_dispatched = inserted > 0
+        except Exception:
+            log.exception(
+                "catalog_scraper_dispatch_failed category=%s destination_city=%s",
+                category,
+                destination_city,
+            )
 
     return {
         "category": category,
@@ -134,7 +151,8 @@ def ensure_destination_catalog(
         "country": country,
         "have": have,
         "needed": needed,
-        "scraper_dispatched": False,
+        "scraper_dispatched": scraper_dispatched,
+        "scraper_inserted": inserted,
     }
 
 
