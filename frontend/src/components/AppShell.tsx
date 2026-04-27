@@ -13,6 +13,7 @@ import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
 import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
+import { isRfqEnabled } from '../featureFlags';
 
 const logoUrl = '/relopass-logo.png?v=2';
 
@@ -257,16 +258,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 >
                   Messages
                 </Link>
-                <Link
-                  to={buildRoute('quotesInbox')}
-                  className={`px-3 py-1 rounded-full border ${
-                    isActiveRoute(ROUTE_DEFS.quotesInbox.path)
-                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-                      : 'border-transparent hover:text-[#0b2b43]'
-                  }`}
-                >
-                  Quotes
-                </Link>
+                {isRfqEnabled() && (
+                  <Link
+                    to={buildRoute('quotesInbox')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.quotesInbox.path)
+                        ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Quotes
+                  </Link>
+                )}
                 <Link
                   to={buildRoute('resources')}
                   className={`px-3 py-1 rounded-full border ${
