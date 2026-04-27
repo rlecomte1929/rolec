@@ -145,3 +145,21 @@ def resolve_destination_request(
         except ValueError:
             pass
     return ticket
+
+
+@router.get("/notification-counts")
+def admin_notification_counts(
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """
+    Lightweight summary admin uses for nav badges:
+      - pending_tickets: HR-opened destination requests waiting on admin
+      - allowlisted_destinations: total approved destinations
+    """
+    from ...services import scrape_safety
+    pending = scrape_safety.list_destination_requests(status="pending", limit=500)
+    allowlist = scrape_safety.list_allowlist()
+    return {
+        "pending_tickets": len(pending),
+        "allowlisted_destinations": len(allowlist),
+    }

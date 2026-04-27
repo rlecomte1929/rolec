@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
+import { getAdminNotificationCounts, type AdminNotificationCounts } from '../../api/adminCatalog';
 
 const SHOW_RESOURCES_NAV = true;
 
@@ -21,7 +22,29 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
   const isActive = (path: string, exact?: boolean) =>
     exact ? location.pathname === path : location.pathname === path || location.pathname.startsWith(`${path}/`);
 
-  const navItems: { to: string; label: string; path?: string }[] = [
+  // Phase 2 notifications: poll admin notification counts so the catalog queue
+  // tab gets a red badge when HRs have requested destinations the admin hasn't
+  // approved yet.
+  const [adminNotif, setAdminNotif] = useState<AdminNotificationCounts | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchOnce = () => {
+      void getAdminNotificationCounts()
+        .then((c) => {
+          if (!cancelled) setAdminNotif(c);
+        })
+        .catch(() => {});
+    };
+    fetchOnce();
+    const id = window.setInterval(fetchOnce, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
+  const pendingTickets = adminNotif?.pending_tickets ?? 0;
+
+  const navItems: { to: string; label: string; path?: string; badge?: number }[] = [
     { to: buildRoute('adminOverview'), label: 'Dashboard', path: ROUTE_DEFS.adminOverview.path },
     { to: buildRoute('adminCompanies'), label: 'Companies', path: ROUTE_DEFS.adminCompanies.path },
     { to: buildRoute('adminPeople'), label: 'People', path: ROUTE_DEFS.adminPeople.path },
@@ -32,6 +55,12 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
     // of truth). /admin/policy-config route removed entirely.
     { to: buildRoute('adminSuppliers'), label: 'Suppliers', path: ROUTE_DEFS.adminSuppliers.path },
     { to: buildRoute('adminProspects'), label: 'Prospects', path: ROUTE_DEFS.adminProspects.path },
+    {
+      to: buildRoute('adminCatalogQueue'),
+      label: 'Catalog Queue',
+      path: ROUTE_DEFS.adminCatalogQueue.path,
+      badge: pendingTickets,
+    },
     { to: buildRoute('adminMessages'), label: 'Messages', path: ROUTE_DEFS.adminMessages.path },
     { to: buildRoute('adminErrors'), label: 'Errors', path: ROUTE_DEFS.adminErrors.path },
     { to: buildRoute('adminFeedback'), label: 'Feedback', path: ROUTE_DEFS.adminFeedback.path },
@@ -49,15 +78,23 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children }) => {
         </p>
       </div>
       <div className="flex flex-wrap gap-2 border-b border-[#e2e8f0] pb-4 mb-4">
-        {navItems.map(({ to, label, path }) => {
+        {navItems.map(({ to, label, path, badge }) => {
           const pathToCheck = path ?? to;
           const active =
             (pathToCheck === '/admin' ? isActive('/admin', true) : isActive(pathToCheck)) ||
             (pathToCheck === '/admin/suppliers' && isActive('/admin/suppliers/')) ||
             (pathToCheck === '/admin/resources' && (isActive('/admin/resources/') || isActive('/admin/events')));
           return (
-            <Link key={label} to={to} className={navLinkClass(active)}>
+            <Link key={label} to={to} className={`${navLinkClass(active)} inline-flex items-center gap-2`}>
               {label}
+              {badge && badge > 0 ? (
+                <span
+                  className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[#dc2626] px-1.5 py-0 text-[11px] font-semibold leading-5 text-white"
+                  title={`${badge} pending`}
+                >
+                  {badge}
+                </span>
+              ) : null}
             </Link>
           );
         })}

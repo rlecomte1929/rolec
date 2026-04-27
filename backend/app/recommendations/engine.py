@@ -187,11 +187,13 @@ def recommend(
     if company_id:
         # Phase 2c — filter through HR's curation.
         from ...services.employee_recommendations_filter import apply_hr_curation
+        dest_country = (criteria.get("destination_country") or "").strip() or None
         items, hr_curation_status = apply_hr_curation(
             category=category,
             items=items,
             company_id=company_id,
             destination_city=dest_city or None,
+            destination_country=dest_country,
         )
         if hr_curation_status:
             criteria_echo["hr_curation_status"] = hr_curation_status

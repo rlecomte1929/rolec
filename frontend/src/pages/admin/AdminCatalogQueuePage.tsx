@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppShell } from '../../components/AppShell';
+import { AdminLayout } from './AdminLayout';
 import { Alert, Button, Card } from '../../components/antigravity';
 import {
   addAllowlistEntry,
@@ -117,7 +117,7 @@ export const AdminCatalogQueuePage: React.FC = () => {
   }, [allowlist]);
 
   return (
-    <AppShell
+    <AdminLayout
       title="Catalog destination queue"
       subtitle="HR-opened scrape requests + admin-managed allowlist."
     >
@@ -276,6 +276,6 @@ export const AdminCatalogQueuePage: React.FC = () => {
           <p className="mt-4 text-sm text-[#6b7280]">No allowlisted destinations yet.</p>
         )}
       </Card>
-    </AppShell>
+    </AdminLayout>
   );
 };

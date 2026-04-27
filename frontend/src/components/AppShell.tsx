@@ -14,6 +14,7 @@ import { adminAPI } from '../api/client';
 import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
 import { isRfqEnabled } from '../featureFlags';
+import { getHrNotificationCounts, type HrNotificationCounts } from '../api/hrCatalog';
 
 const logoUrl = '/relopass-logo.png?v=2';
 
@@ -89,6 +90,33 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
             : myAssignmentsHref;
   const isRelocationPlanRoute = /\/employee\/case\/[^/]+\/plan\/?$/.test(location.pathname);
   const { context: adminContext, refresh: refreshAdminContext } = useAdminContext();
+
+  // Phase 2 notifications: HR sees a badge on the Vendors nav when employees
+  // hit empty-state recommendations or admin tickets are pending. Polled
+  // lightly — this isn't a realtime queue, just "hey, something's piling up."
+  const [hrNotif, setHrNotif] = useState<HrNotificationCounts | null>(null);
+  useEffect(() => {
+    if (!showHrNav) return;
+    let cancelled = false;
+    const fetchOnce = () => {
+      void getHrNotificationCounts()
+        .then((c) => {
+          if (!cancelled) setHrNotif(c);
+        })
+        .catch(() => {
+          // Silent — badge just stays hidden if the call fails.
+        });
+    };
+    fetchOnce();
+    const id = window.setInterval(fetchOnce, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [showHrNav]);
+  const hrVendorBadgeCount = hrNotif
+    ? (hrNotif.destinations_with_demand || 0) + (hrNotif.pending_admin_tickets || 0)
+    : 0;
 
   const isActiveRoute = (path: string) => {
     if (path.includes('/:')) {
@@ -341,13 +369,23 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   </Link>
                   <Link
                     to={buildRoute('hrVendorCuration')}
-                    className={`px-3 py-1 rounded-full border ${
+                    className={`px-3 py-1 rounded-full border inline-flex items-center gap-2 ${
                       isActiveRoute(ROUTE_DEFS.hrVendorCuration.path)
                         ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
                         : 'border-transparent hover:text-[#0b2b43]'
                     }`}
+                    title={
+                      hrVendorBadgeCount > 0
+                        ? `${hrNotif?.destinations_with_demand ?? 0} destination(s) with employee demand · ${hrNotif?.pending_admin_tickets ?? 0} pending admin ticket(s)`
+                        : undefined
+                    }
                   >
                     Vendors
+                    {hrVendorBadgeCount > 0 && (
+                      <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[#dc2626] px-1.5 py-0 text-[11px] font-semibold leading-5 text-white">
+                        {hrVendorBadgeCount}
+                      </span>
+                    )}
                   </Link>
                   <Link
                     to={messagesRoute}

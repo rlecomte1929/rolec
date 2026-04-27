@@ -78,6 +78,7 @@ def apply_hr_curation(
     items: List[RecommendationItem],
     company_id: Optional[str],
     destination_city: Optional[str],
+    destination_country: Optional[str] = None,
 ) -> Tuple[List[RecommendationItem], Optional[str]]:
     """
     Filter the engine's ranked items down to those HR has approved for the
@@ -132,5 +133,17 @@ def apply_hr_curation(
         kept.append(_custom_to_recommendation(c))
 
     if not kept:
+        # Record the demand signal so HR can see who's waiting on what.
+        # Best-effort — never raise on the filter path.
+        try:
+            from . import employee_demand
+            employee_demand.record_demand(
+                company_id=company_id,
+                category=category,
+                destination_city=destination_city,
+                destination_country=destination_country,
+            )
+        except Exception:
+            log.exception("record_demand dispatch failed")
         return [], "hr_pending"
     return kept, None

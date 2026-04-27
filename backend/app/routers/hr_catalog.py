@@ -487,3 +487,41 @@ def populate_destination_with_ai(
         "per_category": results,
         "quota": last_quota,
     }
+
+
+@router.get("/employee-demand")
+def list_employee_demand(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> List[Dict[str, Any]]:
+    """
+    HR-side view of which (category, destination) combos employees are
+    currently waiting on. Each row records the most-recent employee who
+    hit the "HR is finalizing" empty state, plus how many times that
+    combo has been seen across the company.
+    """
+    from ...services import employee_demand
+    return employee_demand.list_demand_for_company(_caller_company_id(user))
+
+
+@router.get("/notification-counts")
+def hr_notification_counts(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """
+    Lightweight summary HR uses to render nav badges:
+      - employees_waiting: rows of pending demand the company has
+      - destinations_with_demand: distinct (category, city) combos
+      - pending_admin_tickets: tickets HR opened that are still pending admin
+    """
+    from ...services import employee_demand, scrape_safety
+    company_id = _caller_company_id(user)
+    demand_rows = employee_demand.list_demand_for_company(company_id, limit=500)
+    distinct = {(d.get("category"), d.get("destination_city")) for d in demand_rows}
+    pending_tickets = scrape_safety.list_destination_requests(
+        status="pending", company_id=company_id, limit=500,
+    )
+    return {
+        "employees_waiting": sum(int(d.get("demand_count") or 0) for d in demand_rows),
+        "destinations_with_demand": len(distinct),
+        "pending_admin_tickets": len(pending_tickets),
+    }

@@ -2079,6 +2079,27 @@ class Database:
                 ON catalog_destination_requests (company_id, created_at DESC)
             """))
 
+            # Employee demand signal (Phase 2 notifications). Postgres has this
+            # via supabase migration 20260427150000_catalog_employee_demand.sql.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS catalog_employee_demand (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    destination_city TEXT,
+                    destination_country TEXT,
+                    last_seen_by_user_id TEXT,
+                    last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    demand_count INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (company_id, category, destination_city)
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_ced_company
+                ON catalog_employee_demand (company_id, last_seen_at DESC)
+            """))
+
             # Exception requests (T1.3) — Postgres has these via supabase migration
             # 20260427100000_exception_requests.sql; mirror on SQLite for local dev
             # so the FastAPI router works against the local file DB without Supabase.
