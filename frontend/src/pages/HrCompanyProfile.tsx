@@ -210,6 +210,12 @@ export const HrCompanyProfile: React.FC = () => {
             </>
           ) : (
           <>
+          {/* 2-column layout cuts the form's vertical footprint roughly
+              in half so HR can see the full profile without scrolling on
+              a 13" laptop. Address (long string) spans both columns. The
+              logo dropzone below stays full-width so the drag target
+              isn't cramped. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <Input label="Company name" value={name} onChange={setName} fullWidth />
           <Input label="Legal name" value={legalName} onChange={setLegalName} fullWidth placeholder="Optional" />
           <Input label="Country" value={country} onChange={setCountry} fullWidth />
@@ -217,12 +223,15 @@ export const HrCompanyProfile: React.FC = () => {
           <Input label="Company size band" value={sizeBand} onChange={setSizeBand} placeholder="e.g. 50-200" fullWidth />
           <Input label="Industry" value={industry} onChange={setIndustry} fullWidth placeholder="Optional" />
           <Input label="Website" value={website} onChange={setWebsite} fullWidth placeholder="https://..." />
-          <Input label="Address" value={address} onChange={setAddress} fullWidth />
           <Input label="Phone" value={phone} onChange={setPhone} fullWidth />
+          <div className="md:col-span-2">
+            <Input label="Address" value={address} onChange={setAddress} fullWidth />
+          </div>
           <Input label="HR contact" value={hrContact} onChange={setHrContact} placeholder="e.g. hr@company.com" fullWidth />
           <Input label="Default destination country" value={defaultDestinationCountry} onChange={setDefaultDestinationCountry} fullWidth placeholder="Optional" />
           <Input label="Support / HR contact email" value={supportEmail} onChange={setSupportEmail} fullWidth placeholder="Optional" />
           <Input label="Default working location" value={defaultWorkingLocation} onChange={setDefaultWorkingLocation} fullWidth placeholder="Optional" />
+          </div>
 
           <div className="pt-2">
             <label className="block text-sm font-medium text-[#374151] mb-2">Company logo</label>
