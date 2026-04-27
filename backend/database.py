@@ -1916,6 +1916,37 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_canonical_policy_query_audit_logs_company
                 ON canonical_policy_query_audit_logs(company_id)
             """))
+
+            # Exception requests (T1.3) — Postgres has these via supabase migration
+            # 20260427100000_exception_requests.sql; mirror on SQLite for local dev
+            # so the FastAPI router works against the local file DB without Supabase.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS exception_requests (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    organization_id TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    requested_amount REAL NOT NULL,
+                    cap_amount REAL NOT NULL,
+                    currency TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    hr_note TEXT,
+                    requested_by_user_id TEXT NOT NULL,
+                    resolved_by_user_id TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    resolved_at TEXT,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_exception_requests_case
+                ON exception_requests (case_id, created_at DESC)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_exception_requests_org_status
+                ON exception_requests (organization_id, status, created_at DESC)
+            """))
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS company_policy_assistant_bindings (
                     company_id TEXT PRIMARY KEY,

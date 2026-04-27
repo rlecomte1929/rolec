@@ -140,6 +140,7 @@ from .routes import resources as resources_router
 from .app.recommendations.router import router as recommendations_router
 from .app.recommendations.admin_debug import router as admin_recommendations_debug_router
 from .app.routers import suppliers as suppliers_router
+from .app.routers import exception_requests as exception_requests_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -489,6 +490,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(compat_router.router)
 app.include_router(cases_router.router)
+app.include_router(exception_requests_router.router)
 app.include_router(mobility_context_router.router)
 app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
