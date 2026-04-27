@@ -1,7 +1,8 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { RecommendationResponse } from '../recommendations/types';
 import type { ServiceKey } from './serviceConfig';
 import { normalizeServicesCurrency, SERVICES_DISPLAY_CURRENCY_STORAGE_KEY } from './servicesCurrency';
+import { getServicesState, saveServicesState } from '../../api/servicesState';
 
 interface ServicesFlowState {
   selectedServices: Set<ServiceKey>;
@@ -15,9 +16,19 @@ interface ServicesFlowState {
   /** ISO 4217 code — used for all service-flow estimates (converted from USD baseline). */
   displayCurrency: string;
   setDisplayCurrency: (code: string) => void;
+  /**
+   * Per-case server persistence. Pages call setActiveCaseId(assignmentId) on
+   * mount so the context can pull saved state and debounce-save changes back.
+   * Pass null to fall back to localStorage-only mode.
+   */
+  setActiveCaseId: (caseId: string | null) => void;
+  /** True while the initial server fetch is in-flight; pages can render shells. */
+  remoteStateLoading: boolean;
 }
 
 const ServicesFlowContext = createContext<ServicesFlowState | null>(null);
+
+const SAVE_DEBOUNCE_MS = 700;
 
 export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceKey>>(() => {
@@ -71,6 +82,91 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Per-case server sync
+  //
+  // Pages set the active case id; we fetch saved state once and replace the
+  // in-memory state. Subsequent local changes are debounced-saved back. While
+  // the fetch is in-flight we suppress saves so we don't race the seed call.
+  // ---------------------------------------------------------------------------
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
+  const [remoteStateLoading, setRemoteStateLoading] = useState(false);
+  const suppressSaveRef = useRef(true);
+  const lastFetchedCaseRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!activeCaseId) {
+      // No case context — keep localStorage-only behavior.
+      suppressSaveRef.current = true;
+      return;
+    }
+    if (lastFetchedCaseRef.current === activeCaseId) return;
+    let cancelled = false;
+    suppressSaveRef.current = true;
+    setRemoteStateLoading(true);
+    getServicesState(activeCaseId)
+      .then((row) => {
+        if (cancelled) return;
+        if (row?.state) {
+          const s = row.state as Record<string, unknown>;
+          if (Array.isArray(s.selectedServices)) {
+            setSelectedServices(new Set(s.selectedServices as ServiceKey[]));
+          }
+          if (s.answers && typeof s.answers === 'object') {
+            setAnswers(s.answers as Record<string, unknown>);
+          }
+          if (s.recommendations !== undefined) {
+            setRecommendations(
+              s.recommendations as Record<string, RecommendationResponse> | null,
+            );
+          }
+          if (Array.isArray(s.shortlist)) {
+            setShortlist(new Map(s.shortlist as [string, string][]));
+          }
+          if (typeof s.displayCurrency === 'string') {
+            setDisplayCurrency(s.displayCurrency);
+          }
+        }
+      })
+      .catch(() => {
+        // Non-fatal: keep whatever is in localStorage.
+      })
+      .finally(() => {
+        if (cancelled) return;
+        lastFetchedCaseRef.current = activeCaseId;
+        setRemoteStateLoading(false);
+        // Allow saves on the next tick so the state setters above don't
+        // immediately echo a save back to the server.
+        setTimeout(() => {
+          suppressSaveRef.current = false;
+        }, 0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCaseId, setDisplayCurrency]);
+
+  // Debounced save whenever any persisted slice changes.
+  useEffect(() => {
+    if (!activeCaseId) return;
+    if (suppressSaveRef.current) return;
+    const handle = setTimeout(() => {
+      const blob = {
+        selectedServices: Array.from(selectedServices),
+        answers,
+        recommendations,
+        shortlist: Array.from(shortlist.entries()),
+        displayCurrency,
+      };
+      void saveServicesState(activeCaseId, blob).catch(() => {
+        // Non-fatal: localStorage still has the state.
+      });
+    }, SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [activeCaseId, selectedServices, answers, recommendations, shortlist, displayCurrency]);
+
+  // localStorage mirrors stay in place as a fallback for unauthenticated /
+  // no-case scenarios (and as a fast warm-cache before the server fetch).
   useEffect(() => {
     try {
       localStorage.setItem('services_selected', JSON.stringify(Array.from(selectedServices)));
@@ -115,8 +211,18 @@ export const ServicesFlowProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setShortlist,
       displayCurrency,
       setDisplayCurrency,
+      setActiveCaseId,
+      remoteStateLoading,
     }),
-    [selectedServices, answers, recommendations, shortlist, displayCurrency, setDisplayCurrency]
+    [
+      selectedServices,
+      answers,
+      recommendations,
+      shortlist,
+      displayCurrency,
+      setDisplayCurrency,
+      remoteStateLoading,
+    ],
   );
 
   return (

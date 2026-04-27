@@ -36,7 +36,7 @@ function caseToInitialAnswers(
 export const ServicesQuestions: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedServices, setSelectedServices, setRecommendations, setShortlist, answers, setAnswers, displayCurrency } = useServicesFlow();
+  const { selectedServices, setSelectedServices, setRecommendations, setShortlist, answers, setAnswers, displayCurrency, setActiveCaseId } = useServicesFlow();
   const {
     assignmentId: primaryAssignmentId,
     linkedSummaries,
@@ -67,6 +67,11 @@ export const ServicesQuestions: React.FC = () => {
   pathnameRef.current = location.pathname;
   const mountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    setActiveCaseId(assignmentId || null);
+    return () => setActiveCaseId(null);
+  }, [assignmentId, setActiveCaseId]);
 
   useEffect(() => {
     mountedRef.current = true;

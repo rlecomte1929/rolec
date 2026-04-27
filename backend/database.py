@@ -1917,6 +1917,23 @@ class Database:
                 ON canonical_policy_query_audit_logs(company_id)
             """))
 
+            # Per-case Services-flow state (selected services + answers + recommendations
+            # + shortlist + display currency). Postgres has this via supabase migration
+            # 20260427110000_services_state.sql; mirror on SQLite for local dev.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS services_state (
+                    case_id TEXT PRIMARY KEY,
+                    organization_id TEXT NOT NULL,
+                    state_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_by_user_id TEXT
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_services_state_org
+                ON services_state (organization_id)
+            """))
+
             # Exception requests (T1.3) — Postgres has these via supabase migration
             # 20260427100000_exception_requests.sql; mirror on SQLite for local dev
             # so the FastAPI router works against the local file DB without Supabase.
