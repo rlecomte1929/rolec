@@ -7300,11 +7300,19 @@ def get_employee_services_policy_context(
 def get_assignment_policy_budget(
     assignment_id: str,
     req: Request,
+    display_currency: Optional[str] = Query(None),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
-    """Employee: Get policy caps for this assignment. Same resolution as policy route. Never 500 for missing policy."""
+    """Employee: Get policy caps for this assignment. Same resolution as policy route. Never 500 for missing policy.
+
+    When `display_currency` is set, the response includes a `caps_display`
+    object with the same per-category caps converted from USD via the same
+    rate table the frontend uses. T1.4 — server-side canonical so HR and
+    employee see identical numbers.
+    """
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     from .services.policy_adapter import caps_from_resolved_benefits, DEFAULT_CURRENCY
+    from .services.fx_service import convert_usd_to_display, normalize_display_currency
 
     try:
         result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
@@ -7418,7 +7426,7 @@ def get_assignment_policy_budget(
         )
     except Exception:
         pass
-    return {
+    response: Dict[str, Any] = {
         "ok": True,
         "has_policy": True,
         "comparison_available": True,
@@ -7426,6 +7434,19 @@ def get_assignment_policy_budget(
         "budget": budget,
         **budget,
     }
+    if display_currency:
+        cur = normalize_display_currency(display_currency)
+        caps = budget.get("caps") or {}
+        response["display_currency"] = cur
+        response["caps_display"] = {
+            k: convert_usd_to_display(v, cur) if isinstance(v, (int, float)) else v
+            for k, v in caps.items()
+        }
+        if isinstance(budget.get("total_cap"), (int, float)):
+            response["total_cap_display"] = convert_usd_to_display(
+                budget["total_cap"], cur
+            )
+    return response
 
 
 @app.post("/api/employee/policy-assistant/query")
@@ -8457,16 +8478,45 @@ def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[st
 
 
 @app.get("/api/employee/policy/caps")
-def get_employee_policy_caps(user: Dict[str, Any] = Depends(get_current_user)):
-    """Return policy caps for package comparison (housing/month, movers, schools, in USD)."""
+def get_employee_policy_caps(
+    display_currency: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    Return policy caps for package comparison (housing/month, movers, schools, immigration).
+
+    When `display_currency` is set (e.g. EUR, GBP), the response also includes a
+    `display_currency` field naming the currency used and a `caps_display` map
+    with the same amounts converted from USD using indicative FX rates that
+    match the frontend's table — so HR and the employee see the same numbers
+    regardless of who's calling. Existing `*_usd` fields are preserved for
+    backward compatibility (T1.4 from Sprint 2 plan).
+    """
+    from .services.fx_service import convert_usd_to_display, normalize_display_currency
+
     policy = policy_engine.load_policy()
     caps = policy.get("caps", {})
-    return {
-        "housing_monthly_usd": caps.get("housing", {}).get("amount", 5000),
-        "movers_usd": caps.get("movers", {}).get("amount", 10000),
-        "schools_usd": caps.get("schools", {}).get("amount", 20000),
-        "immigration_usd": caps.get("immigration", {}).get("amount", 4000),
+    housing_usd = caps.get("housing", {}).get("amount", 5000)
+    movers_usd = caps.get("movers", {}).get("amount", 10000)
+    schools_usd = caps.get("schools", {}).get("amount", 20000)
+    immigration_usd = caps.get("immigration", {}).get("amount", 4000)
+
+    payload: Dict[str, Any] = {
+        "housing_monthly_usd": housing_usd,
+        "movers_usd": movers_usd,
+        "schools_usd": schools_usd,
+        "immigration_usd": immigration_usd,
     }
+    if display_currency:
+        cur = normalize_display_currency(display_currency)
+        payload["display_currency"] = cur
+        payload["caps_display"] = {
+            "housing_monthly": convert_usd_to_display(housing_usd, cur),
+            "movers": convert_usd_to_display(movers_usd, cur),
+            "schools": convert_usd_to_display(schools_usd, cur),
+            "immigration": convert_usd_to_display(immigration_usd, cur),
+        }
+    return payload
 
 
 # ---------------------------------------------------------------------------
