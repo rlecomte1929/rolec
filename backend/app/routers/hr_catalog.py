@@ -139,11 +139,13 @@ def get_curation_view(
                 selection_id=sel.get("id") if sel else None,
                 master_item_id=m["id"],
                 name=m["name"],
-                # Default to True (visible) until HR explicitly toggles off — HR
-                # opting in row by row would mean an empty employee view at
-                # T0 for every new destination, which is the opposite of what
-                # the lazy-backfill routine is trying to achieve.
-                selected=bool(sel["selected"]) if sel else True,
+                # Default to False (hidden) until HR explicitly approves —
+                # the strict authority model: "the employee can only pick
+                # from the list pre-selected and validated by HR." Until HR
+                # ticks an item, the employee does not see it. The empty
+                # employee state is rendered as "HR is finalizing providers"
+                # by Phase 2c's filter.
+                selected=bool(sel["selected"]) if sel else False,
                 attributes=m.get("attributes_json") or {},
                 source=m.get("source"),
                 city=m.get("city"),

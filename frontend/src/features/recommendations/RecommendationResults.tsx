@@ -321,21 +321,30 @@ export const RecommendationResults: React.FC<Props> = ({
               Choose one option per service to build your relocation package. Estimates use your selected currency
               (set on Select services). You can compare costs with your HR policy in the summary.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {res.recommendations.map((item, idx) => (
-                <RecCard
-                  key={item.item_id}
-                  item={item}
-                  category={category}
-                  criteriaEcho={res.criteria_echo}
-                  defaultExpanded={idx === 0}
-                  defaultShowDebug={debugMode && idx === 0}
-                  isInPackage={selectedPackage.get(category) === item.item_id}
-                  onTogglePackage={() => togglePackage(category, item.item_id)}
-                  displayCurrency={displayCurrency}
-                />
-              ))}
-            </div>
+            {res.recommendations.length === 0 &&
+            (res.criteria_echo as Record<string, unknown> | undefined)?.hr_curation_status === 'hr_pending' ? (
+              <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
+                <strong className="block text-[#0b2b43] mb-1">Your HR is finalizing providers for this category.</strong>
+                Once HR has approved the vendors for your destination, they'll show up here automatically.
+                Until then, hold off on this category — you can build the rest of your package and come back.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {res.recommendations.map((item, idx) => (
+                  <RecCard
+                    key={item.item_id}
+                    item={item}
+                    category={category}
+                    criteriaEcho={res.criteria_echo}
+                    defaultExpanded={idx === 0}
+                    defaultShowDebug={debugMode && idx === 0}
+                    isInPackage={selectedPackage.get(category) === item.item_id}
+                    onTogglePackage={() => togglePackage(category, item.item_id)}
+                    displayCurrency={displayCurrency}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         ) : null
       )}

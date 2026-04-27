@@ -10,7 +10,8 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
-from ..auth_deps import require_assignment_visibility, require_hr_or_employee
+from ..auth_deps import get_current_user, require_assignment_visibility, require_hr_or_employee
+from ...database import db as _db
 from .criteria_builder import _flatten_saved_answers, build_criteria_for_assignment
 from .engine import recommend
 
@@ -126,7 +127,10 @@ def post_recommendations_batch(
             )
             return (backend_key, None)
         try:
-            return (backend_key, recommend(backend_key, criteria, top_n=10))
+            return (
+                backend_key,
+                recommend(backend_key, criteria, top_n=10, company_id=company_id),
+            )
         except Exception as e:
             log.warning(
                 "request_id=%s category=%s recommendations_batch failed error=%s",
@@ -194,10 +198,20 @@ DESTINATION_REQUIRING = ("living_areas", "schools", "movers")
 
 
 @router.post("/{category}", response_model=RecommendationResponse)
-def post_recommend(category: str, body: Dict[str, Any], request: Request):
-    """Get recommendations for a category."""
+def post_recommend(
+    category: str,
+    body: Dict[str, Any],
+    request: Request,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Get recommendations for a category, filtered through HR's curation."""
     request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
     start = time.perf_counter()
+    # Phase 2c: resolve the caller's company_id so the engine can filter the
+    # ranked items through HR's company_vendor_selections. Falls back to the
+    # legacy un-curated behavior if the caller has no tenant.
+    profile = _db.get_profile_record(user.get("id"))
+    user_company_id = (profile or {}).get("company_id") or user.get("company")
     plugin = get_plugin(category)
     if not plugin:
         raise HTTPException(status_code=404, detail=f"Category not found: {category}")
@@ -216,7 +230,7 @@ def post_recommend(category: str, body: Dict[str, Any], request: Request):
             detail="destination_city is required for this category. Please complete your preferences with a destination city.",
         )
     try:
-        result = recommend(category, criteria, top_n=int(top_n))
+        result = recommend(category, criteria, top_n=int(top_n), company_id=user_company_id)
         dur_ms = (time.perf_counter() - start) * 1000
         dest = (criteria.get("destination_city") or "").strip()
         log.info(
