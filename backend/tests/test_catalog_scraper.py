@@ -188,6 +188,29 @@ class CatalogScraperTests(unittest.TestCase):
 
 
     # ------------------------------------------------------------------
+    # L1 cost short-circuit: skip LLM when slot already populated
+    # ------------------------------------------------------------------
+    def test_short_circuit_skips_llm_when_already_populated(self) -> None:
+        # Pre-populate the master with one row for (movers, Tokyo)
+        service_catalog.upsert_item(
+            category="movers", name="Pre-existing", attributes={}, source="seed",
+            city="Tokyo", external_id="pre-1",
+        )
+        client = _fake_client({
+            "vendors": [{"name": "Should Not Insert", "summary": "x", "website": None,
+                         "strengths": [], "notes": None}]
+        })
+        result = catalog_scraper.populate_destination_catalog(
+            category="movers", destination_city="Tokyo", client=client,
+        )
+        self.assertEqual(result, [])
+        # Critical: the LLM client must NOT have been called.
+        client.chat.completions.create.assert_not_called()
+        # And no scraper-source row was added.
+        rows = self._read_rows()
+        self.assertEqual([r["source"] for r in rows], ["seed"])
+
+    # ------------------------------------------------------------------
     # Dispatch path: ensure_destination_catalog calls into the scraper
     # ------------------------------------------------------------------
     def test_dispatch_from_ensure_destination_catalog(self) -> None:

@@ -55,3 +55,93 @@ def list_catalog_items(
         )
     except ValueError as ex:
         raise HTTPException(status_code=400, detail=str(ex))
+
+
+# ---------------------------------------------------------------------------
+# Phase 2b-secured: destination allowlist + ticket-queue admin
+# ---------------------------------------------------------------------------
+
+
+class AllowlistAddBody(BaseModel):
+    city: str
+    country: str
+    notes: Optional[str] = None
+
+
+class ResolveTicketBody(BaseModel):
+    status: str  # "approved" | "rejected"
+    notes: Optional[str] = None
+
+
+@router.get("/destinations/allowlist")
+def list_destination_allowlist(
+    user: Dict[str, Any] = Depends(require_admin),
+) -> List[Dict[str, Any]]:
+    from ...services import scrape_safety
+    return scrape_safety.list_allowlist()
+
+
+@router.post("/destinations/allowlist")
+def add_destination_to_allowlist(
+    body: AllowlistAddBody,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    from ...services import scrape_safety
+    try:
+        return scrape_safety.add_allowlist_entry(
+            city=body.city,
+            country=body.country,
+            approved_by_user_id=user["id"],
+            notes=body.notes,
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+
+
+@router.get("/destination-requests")
+def list_destination_requests(
+    status: Optional[str] = None,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> List[Dict[str, Any]]:
+    """Admin queue of HR-opened tickets. ?status=pending|approved|rejected."""
+    from ...services import scrape_safety
+    if status and status not in ("pending", "approved", "rejected"):
+        raise HTTPException(status_code=400, detail="status must be pending, approved, or rejected")
+    return scrape_safety.list_destination_requests(status=status, limit=200)
+
+
+@router.patch("/destination-requests/{request_id}")
+def resolve_destination_request(
+    request_id: str,
+    body: ResolveTicketBody,
+    user: Dict[str, Any] = Depends(require_admin),
+) -> Dict[str, Any]:
+    """
+    Admin approves or rejects a ticket. On 'approved', the (city, country)
+    is added to the allowlist; the original requester can then re-trigger
+    the populate-with-ai endpoint and the scrape will fire (subject to quota).
+    """
+    from ...services import scrape_safety
+    try:
+        ticket = scrape_safety.resolve_destination_request(
+            request_id=request_id,
+            new_status=body.status,
+            actor_user_id=user["id"],
+            notes=body.notes,
+        )
+    except LookupError as ex:
+        raise HTTPException(status_code=404, detail=str(ex))
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+
+    if ticket["status"] == "approved":
+        try:
+            scrape_safety.add_allowlist_entry(
+                city=ticket["city"],
+                country=ticket["country"],
+                approved_by_user_id=user["id"],
+                notes=f"Approved via ticket {request_id}",
+            )
+        except ValueError:
+            pass
+    return ticket
