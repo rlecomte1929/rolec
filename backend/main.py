@@ -7541,6 +7541,75 @@ def post_hr_policy_assistant_query(
         raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
 
 
+@app.post("/api/policy-assistant/rag-query")
+def post_policy_assistant_rag_query(
+    body: Dict[str, Any] = Body(...),
+    req: Request = None,  # type: ignore[assignment]
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Sprint B: RAG-grounded Policy Assistant entry point. Replaces the
+    deterministic engine for the new flow; the existing endpoints stay
+    for backwards compatibility until Sprint C wires the frontend over.
+
+    Body:
+      { "question": str (required, max 4000 chars),
+        "session_id": str | null,
+        "top_k": int | null  (default 8, capped at 16) }
+
+    Auth: HR or EMPLOYEE for the user's company. Cross-company access
+    is impossible at the data layer — the retriever filters by
+    company_id pulled from the user's profile, not from the body.
+    """
+    request_id = getattr(req.state, "request_id", None) if req else None
+    question = (body.get("question") or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question is required")
+    if len(question) > 4000:
+        raise HTTPException(status_code=400, detail="question too long")
+    session_id = (body.get("session_id") or "").strip() or None
+    top_k = int(body.get("top_k") or 8)
+    if top_k < 1 or top_k > 16:
+        top_k = 8
+
+    # Company scoping comes from the authenticated user, NEVER the
+    # request body. This is the load-bearing isolation guarantee:
+    # the user cannot ask about another company by passing a different
+    # company_id.
+    profile = db.get_profile_record(user.get("id")) or {}
+    company_id = profile.get("company_id")
+    if not company_id:
+        raise HTTPException(status_code=400, detail="user has no company")
+
+    # Optional employee context for Section C resolution hints in the
+    # prompt — pulled from profile, not user-supplied.
+    emp_ctx = {
+        "employee_level": profile.get("employee_level") or profile.get("band"),
+        # country/assignment_type would come from active assignment;
+        # leaving for Sprint C (frontend can pass them when known).
+    }
+
+    try:
+        from .services.policy_assistant_rag_engine import answer_policy_question
+        result = answer_policy_question(
+            company_id=str(company_id),
+            user_id=str(user.get("id") or ""),
+            question=question,
+            session_id=session_id,
+            employee_context={k: v for k, v in emp_ctx.items() if v},
+            top_k=top_k,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        log.exception(
+            "policy_assistant rag query failed company=%s request_id=%s",
+            company_id, request_id,
+        )
+        raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
+    return result
+
+
 @app.post("/api/policy-assistant/analytics/beacon")
 def post_policy_assistant_analytics_beacon(
     body: PolicyAssistantAnalyticsBeaconRequest,
