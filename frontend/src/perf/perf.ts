@@ -3,7 +3,14 @@
  * - Tracks per-request timings keyed by requestId (X-Request-ID).
  * - Tracks interactions (click -> UI update) keyed by interaction id.
  * - No external deps; dev-focused and enabled via VITE_PERF_DEBUG.
+ *
+ * Recording always runs (cheap, in-memory ring buffer used by getRequestLog
+ * for the in-app perf panel). Console output is gated by VITE_PERF_DEBUG so
+ * production builds don't spam DevTools per request / interaction.
  */
+
+const PERF_CONSOLE_ENABLED =
+  import.meta.env.VITE_PERF_DEBUG === '1' || import.meta.env.VITE_PERF_DEBUG === 'true';
 
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD' | string;
 
@@ -71,19 +78,20 @@ export function recordRequestPerf(entry: RequestPerfEntry) {
   if (requestLog.length > MAX_REQUEST_LOGS) {
     requestLog.splice(0, requestLog.length - MAX_REQUEST_LOGS);
   }
-  // Console log for quick inspection
-  // Example: [perf] req <id> GET /api/foo status=200 total_ms=32.4 server_ms=12.1 network_ms=20.3
-  // eslint-disable-next-line no-console
-  const totalMs = entry.durationBodyMs;
-  const serverStr = typeof entry.serverMs === 'number' ? ` server_ms=${entry.serverMs.toFixed(1)}` : '';
-  const networkStr =
-    typeof entry.serverMs === 'number'
-      ? ` network_ms=${Math.max(0, totalMs - entry.serverMs).toFixed(1)}`
-      : '';
-  console.log(
-    `[perf] req ${entry.requestId} ${entry.method} ${entry.path} ` +
-      `status=${entry.status} ok=${entry.ok} total_ms=${totalMs.toFixed(1)}${serverStr}${networkStr}`
-  );
+  if (PERF_CONSOLE_ENABLED) {
+    // Example: [perf] req <id> GET /api/foo status=200 total_ms=32.4 server_ms=12.1 network_ms=20.3
+    const totalMs = entry.durationBodyMs;
+    const serverStr = typeof entry.serverMs === 'number' ? ` server_ms=${entry.serverMs.toFixed(1)}` : '';
+    const networkStr =
+      typeof entry.serverMs === 'number'
+        ? ` network_ms=${Math.max(0, totalMs - entry.serverMs).toFixed(1)}`
+        : '';
+    // eslint-disable-next-line no-console
+    console.log(
+      `[perf] req ${entry.requestId} ${entry.method} ${entry.path} ` +
+        `status=${entry.status} ok=${entry.ok} total_ms=${totalMs.toFixed(1)}${serverStr}${networkStr}`
+    );
+  }
   notifyListeners();
 }
 
@@ -129,11 +137,13 @@ export async function endInteraction(handle: InteractionHandle): Promise<void> {
     interactions.splice(0, interactions.length - MAX_INTERACTIONS);
   }
 
-  // eslint-disable-next-line no-console
-  console.log(
-    `[perf] interaction ${handle.name} id=${handle.id} ` +
-      `click_to_render_ms=${clickToRenderMs.toFixed(1)} requests=${entry.requestCount}`
-  );
+  if (PERF_CONSOLE_ENABLED) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[perf] interaction ${handle.name} id=${handle.id} ` +
+        `click_to_render_ms=${clickToRenderMs.toFixed(1)} requests=${entry.requestCount}`
+    );
+  }
 
   // Clear current interaction if it matches
   if (currentInteractionId === handle.id) {
