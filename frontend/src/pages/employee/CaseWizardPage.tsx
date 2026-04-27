@@ -536,23 +536,6 @@ export const CaseWizardPage: React.FC = () => {
             Restoring your saved details…
           </div>
         )}
-        {enableTestFill && (
-          <Card padding="md">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-[#0b2b43]">Test controls</div>
-                <div className="text-xs text-[#6b7280]">Generate deterministic answers for demos.</div>
-              </div>
-              <button
-                onClick={handleFillForTest}
-                className="rounded-full border border-[#0b2b43] px-3 py-1 text-xs font-semibold text-[#0b2b43] hover:bg-[#0b2b43] hover:text-white"
-              >
-                Fill for test
-              </button>
-            </div>
-          </Card>
-        )}
-
         <CaseContextBar
           origin={caseData?.originCountry}
           destination={caseData?.destCountry}
@@ -611,6 +594,18 @@ export const CaseWizardPage: React.FC = () => {
               <div className="text-sm font-semibold text-[#0b2b43]">Need help?</div>
               <div className="text-xs text-[#6b7280] mt-1">Our team can guide you through the wizard.</div>
               <button className="mt-3 text-xs text-[#0b2b43] underline">Contact support</button>
+              {enableTestFill && (
+                <div className="mt-4 border-t border-[#e2e8f0] pt-3">
+                  <button
+                    type="button"
+                    onClick={handleFillForTest}
+                    title="Demo only — fills the wizard with deterministic answers."
+                    className="text-xs text-[#94a3b8] hover:text-[#0b2b43] hover:underline"
+                  >
+                    Fill for test (demo)
+                  </button>
+                </div>
+              )}
             </Card>
           </div>
           <div>
