@@ -236,6 +236,60 @@ def _normalize_cap_rule(cap: Any) -> Dict[str, Any]:
     return {}
 
 
+def _serialize_overrides(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Section C: shape an override DB row for the API. Drops bookkeeping
+    columns the UI doesn't need and normalizes jurisdiction_countries
+    from either Postgres text[] or the SQLite JSON-string mirror into a
+    plain Python list. Order is whatever the bulk-fetch returned (already
+    sorted by display_order, created_at).
+    """
+    out: List[Dict[str, Any]] = []
+    for r in rows or []:
+        raw_countries = r.get("jurisdiction_countries")
+        if isinstance(raw_countries, list):
+            countries = [str(c) for c in raw_countries]
+        elif isinstance(raw_countries, str):
+            s = raw_countries.strip()
+            if s.startswith("["):
+                try:
+                    parsed = json.loads(s)
+                    countries = [str(c) for c in parsed] if isinstance(parsed, list) else []
+                except Exception:
+                    countries = []
+            elif s.startswith("{") and s.endswith("}"):
+                countries = [c.strip() for c in s[1:-1].split(",") if c.strip()]
+            elif s:
+                countries = [s]
+            else:
+                countries = []
+        else:
+            countries = []
+        cap = r.get("cap_rule_json")
+        if isinstance(cap, str):
+            try:
+                cap = json.loads(cap)
+            except Exception:
+                cap = {}
+        elif cap is None:
+            cap = {}
+        out.append(
+            {
+                "id": str(r.get("id")) if r.get("id") is not None else None,
+                "jurisdiction_countries": countries,
+                "employee_level": r.get("employee_level"),
+                "assignment_type": r.get("assignment_type"),
+                "amount_value": r.get("amount_value"),
+                "currency_code": r.get("currency_code"),
+                "cap_rule_json": cap,
+                "reimbursement_md": r.get("reimbursement_md"),
+                "repayment_md": r.get("repayment_md"),
+                "display_order": int(r.get("display_order") or 0),
+            }
+        )
+    return out
+
+
 def allowance_cap_from_row(b: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Normalized cap object for UI / comparison engines."""
     cr = _normalize_cap_rule(b.get("cap_rule_json"))
@@ -377,7 +431,13 @@ class PolicyConfigMatrixService:
             "employee_levels_supported": el,
         }
 
-    def _benefits_to_api(self, rows: List[Dict[str, Any]], *, include_internal: bool) -> List[Dict[str, Any]]:
+    def _benefits_to_api(
+        self,
+        rows: List[Dict[str, Any]],
+        *,
+        include_internal: bool,
+        overrides_by_benefit_id: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    ) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
         for b in rows:
             cap = _normalize_cap_rule(b.get("cap_rule_json"))
@@ -399,6 +459,15 @@ class PolicyConfigMatrixService:
                 "display_order": int(b.get("display_order") or 0),
                 "allowance_cap": allowance_cap_from_row(b),
                 "cap_rule_json": cap,
+                # Section C overrides serialize alongside the base row. Empty
+                # list when this benefit has no jurisdiction-aware overrides
+                # (the common case). Frontend renders nothing for an empty
+                # array; the override-edit drawer reads/writes this field.
+                "jurisdiction_overrides": _serialize_overrides(
+                    overrides_by_benefit_id.get(str(b.get("id")), [])
+                    if overrides_by_benefit_id and b.get("id")
+                    else []
+                ),
             }
             if include_internal:
                 item["id"] = str(b.get("id")) if b.get("id") else None
@@ -458,7 +527,25 @@ class PolicyConfigMatrixService:
             strict_context=targeting_strict,
         )
         meta = self._version_to_metadata(version, benefits, editable=editable, source=source)
-        bapi = self._benefits_to_api(benefits_view, include_internal=True)
+        # Section C: bulk fetch overrides for these benefit rows. Single
+        # query, grouped server-side. Empty dict for rows without an id
+        # (e.g. virtual scaffold rows in the empty_scaffold path) so the
+        # serializer just emits empty jurisdiction_overrides arrays.
+        # `getattr` keeps the service tolerant of older test fakes that
+        # haven't grown the override-aware helpers yet — the override
+        # tests use their own fake which does implement them.
+        benefit_ids = [str(b.get("id")) for b in benefits_view if b.get("id")]
+        _list_ovs = getattr(
+            self._db,
+            "list_jurisdiction_overrides_for_benefit_rows",
+            lambda _ids: {},
+        )
+        overrides_by_id = _list_ovs(benefit_ids) if benefit_ids else {}
+        bapi = self._benefits_to_api(
+            benefits_view,
+            include_internal=True,
+            overrides_by_benefit_id=overrides_by_id,
+        )
         return {
             **meta,
             "categories": self._group_categories(bapi),
@@ -707,6 +794,43 @@ class PolicyConfigMatrixService:
                 if ck and "category" not in d:
                     d["category"] = ck
                 flat_writes.append(PolicyConfigBenefitWrite.model_validate(d))
+
+        # Section C: validate override payloads BEFORE we destroy the old
+        # rows. Cross-row collision check (UNIQUE on the DB enforces this
+        # too; doing it in Python first lets us 422 with a useful message
+        # instead of a 500 IntegrityError).
+        from .policy_section_c_validation import (
+            detect_override_collisions,
+            normalize_country_codes,
+            validate_jurisdiction_override,
+        )
+        for m in flat_writes:
+            ov_dicts = [
+                ov.model_dump() if hasattr(ov, "model_dump") else dict(ov)
+                for ov in (m.jurisdiction_overrides or [])
+            ]
+            for ov in ov_dicts:
+                # Normalize countries before validating so SG and "sg" are
+                # the same and we reject only genuinely unknown codes.
+                ov["jurisdiction_countries"] = normalize_country_codes(
+                    list(ov.get("jurisdiction_countries") or [])
+                )
+                # Pydantic enums on optional axes need to flatten to .value
+                # for downstream Python comparison (resolver uses strings).
+                ovl = ov.get("employee_level")
+                ov["employee_level"] = ovl.value if hasattr(ovl, "value") else ovl
+                ova = ov.get("assignment_type")
+                ov["assignment_type"] = ova.value if hasattr(ova, "value") else ova
+                validate_jurisdiction_override(ov)
+            collision = detect_override_collisions(ov_dicts)
+            if collision:
+                import json as _json
+                raise ValueError(
+                    _json.dumps(
+                        {"code": "validation_error", "errors": [collision]}
+                    )
+                )
+
         self._db.delete_policy_config_benefits_for_version(vid)
         for m in flat_writes:
             sig = compute_targeting_signature(
@@ -737,7 +861,31 @@ class PolicyConfigMatrixService:
                 "is_active": m.is_active,
                 "display_order": m.display_order,
             }
-            self._db.insert_policy_config_benefit_row(row)
+            inserted_id = self._db.insert_policy_config_benefit_row(row)
+            # Section C: persist overrides for this benefit row. Empty list
+            # means "no overrides" — the helper deletes prior rows and
+            # inserts nothing, which is the correct shape after the parent
+            # row was just freshly inserted.
+            ov_payloads = [
+                ov.model_dump() if hasattr(ov, "model_dump") else dict(ov)
+                for ov in (m.jurisdiction_overrides or [])
+            ]
+            for ov in ov_payloads:
+                ov["jurisdiction_countries"] = normalize_country_codes(
+                    list(ov.get("jurisdiction_countries") or [])
+                )
+                ovl = ov.get("employee_level")
+                ov["employee_level"] = ovl.value if hasattr(ovl, "value") else ovl
+                ova = ov.get("assignment_type")
+                ov["assignment_type"] = ova.value if hasattr(ova, "value") else ova
+            # Defensive against older test fakes; production DB always
+            # has this method.
+            _replace_ovs = getattr(
+                self._db,
+                "replace_jurisdiction_overrides_for_benefit",
+                lambda _bid, _ovs: None,
+            )
+            _replace_ovs(inserted_id, ov_payloads)
         ed = str(body.get("effective_date"))[:10]
         self._db.update_policy_config_version_effective_date(vid, ed, only_if_draft=True)
         vrow = self._db.get_policy_config_version_row(vid)
@@ -1147,7 +1295,20 @@ class PolicyConfigMatrixService:
         *,
         assignment_type: Optional[str],
         family_status: Optional[str],
+        country: Optional[str] = None,
+        employee_level: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """
+        Returns the employee-resolved policy. Section C: when a destination
+        country is supplied, jurisdiction overrides on each benefit row are
+        applied via policy_section_c_resolver; the row's amount_value /
+        currency_code / cap_rule_json / markdown clauses get folded with
+        the most-specific override that matches.
+
+        Without a country, overrides are returned alongside the base row
+        (employee can still see "this benefit has SG-specific rules") but
+        the resolver does not collapse them into a single effective row.
+        """
         at_norm = normalize_assignment_type(assignment_type)
         fs_norm = normalize_family_status(family_status)
         pub = self._db.get_latest_published_policy_config_version(str(company_id), CONFIG_KEY)
@@ -1157,7 +1318,12 @@ class PolicyConfigMatrixService:
                 "effective_date": None,
                 "policy_version": None,
                 "version_number": None,
-                "assignment_context": {"assignment_type": at_norm, "family_status": fs_norm},
+                "assignment_context": {
+                    "assignment_type": at_norm,
+                    "family_status": fs_norm,
+                    "country": country,
+                    "employee_level": employee_level,
+                },
                 "categories": [],
                 "message": "No published compensation & allowance configuration for your employer.",
             }
@@ -1171,15 +1337,68 @@ class PolicyConfigMatrixService:
             if not row_matches_targeting(b, at_norm, fs_norm, strict_context=True):
                 continue
             filtered.append(b)
-        bapi = self._benefits_to_api(filtered, include_internal=False)
-        for it, src in zip(bapi, filtered):
-            it["maximum_budget_explanation"] = maximum_budget_explanation(src)
+
+        # Section C: bulk-load overrides for every surviving base row.
+        # When the employee's country is known, fold the most-specific
+        # match onto each row before serializing. This is where the
+        # employee-side authority chain (Admin → HR → Employee) actually
+        # produces a single effective number per benefit.
+        benefit_ids = [str(b.get("id")) for b in filtered if b.get("id")]
+        _list_ovs = getattr(
+            self._db,
+            "list_jurisdiction_overrides_for_benefit_rows",
+            lambda _ids: {},
+        )
+        overrides_by_id = _list_ovs(benefit_ids) if benefit_ids else {}
+        emp_ctx = {
+            "country": country,
+            "employee_level": employee_level,
+            "assignment_type": at_norm,
+        }
+        if country:
+            from .policy_section_c_resolver import resolve_effective_benefit
+            resolved_rows: List[Dict[str, Any]] = []
+            applied_override_ids: Dict[str, str] = {}
+            for b in filtered:
+                bid = str(b.get("id") or "")
+                ovs = overrides_by_id.get(bid, [])
+                effective, applied_id = resolve_effective_benefit(b, ovs, emp_ctx)
+                resolved_rows.append(effective)
+                if applied_id:
+                    applied_override_ids[bid] = applied_id
+            bapi = self._benefits_to_api(
+                resolved_rows,
+                include_internal=False,
+                overrides_by_benefit_id=overrides_by_id,
+            )
+            # Surface which override (if any) was applied per row so the
+            # employee UI can show "Singapore-specific cap" without having
+            # to reapply the resolver client-side.
+            for it, src in zip(bapi, resolved_rows):
+                it["maximum_budget_explanation"] = maximum_budget_explanation(src)
+                it["override_applied"] = bool(src.get("override_applied"))
+                it["override_id"] = src.get("override_id")
+        else:
+            bapi = self._benefits_to_api(
+                filtered,
+                include_internal=False,
+                overrides_by_benefit_id=overrides_by_id,
+            )
+            for it, src in zip(bapi, filtered):
+                it["maximum_budget_explanation"] = maximum_budget_explanation(src)
+                it["override_applied"] = False
+                it["override_id"] = None
         return {
             "has_policy_config": True,
             "effective_date": _iso_date(pub.get("effective_date")),
             "policy_version": str(pub.get("id")),
             "version_number": int(pub.get("version_number") or 0),
-            "assignment_context": {"assignment_type": at_norm, "family_status": fs_norm},
+            "assignment_context": {
+                "assignment_type": at_norm,
+                "family_status": fs_norm,
+                "country": country,
+                "employee_level": employee_level,
+            },
             "categories": self._group_categories(bapi),
         }
 

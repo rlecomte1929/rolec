@@ -11899,6 +11899,12 @@ def employee_get_policy_config(
     case_id: Optional[str] = Query(None, alias="caseId"),
     assignment_type: Optional[str] = Query(None, alias="assignmentType"),
     family_status: Optional[str] = Query(None, alias="familyStatus"),
+    # Section C: explicit overrides for the destination country and the
+    # employee's level. Both default to None; when None, the resolver
+    # treats them as missing context and Section C overrides do not
+    # collapse onto the base row (overrides still surface alongside it).
+    country: Optional[str] = Query(None, alias="country"),
+    employee_level: Optional[str] = Query(None, alias="employeeLevel"),
     user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
 ):
     effective = _effective_user(user, UserRole.EMPLOYEE)
@@ -11941,7 +11947,12 @@ def employee_get_policy_config(
             if not coid or coid == cid:
                 assign_for_ctx = fa
 
-    if assign_for_ctx and (not atype or not fstat):
+    # Resolve country + employee_level from case context when not passed
+    # in. Country lives on the relocation case (host_country); employee
+    # level is on the employee profile.
+    resolved_country = country
+    resolved_level = employee_level
+    if assign_for_ctx and (not atype or not fstat or not resolved_country or not resolved_level):
         from .services.policy_resolution import extract_resolution_context
 
         aid = str(assign_for_ctx.get("id") or "").strip()
@@ -11965,9 +11976,27 @@ def employee_get_policy_config(
             atype = ctx.get("assignment_type")
         if not fstat:
             fstat = ctx.get("family_status")
+        # Section C: pull country from host_country on the case, level
+        # from the employee profile band when not passed explicitly.
+        # readiness_service already has the country-name → ISO2 mapper
+        # (Germany → DE, Singapore → SG, etc.) — reuse it instead of
+        # duplicating the alias table.
+        if not resolved_country and case_row:
+            from .readiness_service import normalize_destination_key
+            host = case_row.get("host_country") or case_row.get("destination_country")
+            if host:
+                resolved_country = normalize_destination_key(str(host))
+        if not resolved_level and emp_pf:
+            band = emp_pf.get("employee_level") or emp_pf.get("band")
+            if band:
+                resolved_level = str(band).strip().lower()
 
     return policy_config_matrix_svc.employee_grouped_payload(
-        cid, assignment_type=atype, family_status=fstat
+        cid,
+        assignment_type=atype,
+        family_status=fstat,
+        country=resolved_country,
+        employee_level=resolved_level,
     )
 
 
