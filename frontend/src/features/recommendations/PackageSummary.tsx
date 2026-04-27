@@ -2,6 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Card, Button } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
+import {
+  listExceptionRequestsForCase,
+  type ExceptionRequest,
+} from '../../api/exceptions';
+import { RequestExceptionModal } from '../exceptions/RequestExceptionModal';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
@@ -200,6 +205,60 @@ export const PackageSummary: React.FC<Props> = ({
 
   const viewerRole = useMemo(() => normalizeStoredRole(getAuthItem('relopass_role')), []);
   const isHrViewer = viewerRole === 'HR' || viewerRole === 'ADMIN';
+  const isEmployeeViewer = viewerRole === 'EMPLOYEE';
+
+  // Existing exception requests on this case, keyed by category. Refresh after
+  // any new request the employee submits. Demo simplification: we use the
+  // assignment id as the case_id surrogate — the backend stores it as TEXT and
+  // the prod migration FK to mobility_cases will be wired in T1.4 follow-up.
+  const [exceptionsByCategory, setExceptionsByCategory] = useState<
+    Map<string, ExceptionRequest>
+  >(new Map());
+  const [modalState, setModalState] = useState<{
+    category: string;
+    label: string;
+    requestedUsd: number;
+    capUsd: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!assignmentId) return;
+    let cancelled = false;
+    listExceptionRequestsForCase(assignmentId)
+      .then((rows) => {
+        if (cancelled) return;
+        const next = new Map<string, ExceptionRequest>();
+        // Most recent (server returns DESC) wins per category.
+        for (const row of rows) {
+          if (!next.has(row.category)) next.set(row.category, row);
+        }
+        setExceptionsByCategory(next);
+      })
+      .catch(() => {
+        // Non-fatal — the page still works without exception status.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId]);
+
+  const EXCEPTION_BADGE: Record<
+    ExceptionRequest['status'],
+    { label: string; className: string }
+  > = {
+    pending: {
+      label: 'Exception pending HR review',
+      className: 'bg-[#fef9c3] text-[#854d0e] border-[#fde68a]',
+    },
+    approved: {
+      label: 'Exception approved by HR',
+      className: 'bg-[#dcfce7] text-[#166534] border-[#bbf7d0]',
+    },
+    rejected: {
+      label: 'Exception rejected',
+      className: 'bg-[#fee2e2] text-[#991b1b] border-[#fecaca]',
+    },
+  };
 
   const STATUS_BADGE: Record<CapStatus, { label: string; className: string }> = {
     within: {
@@ -385,21 +444,76 @@ export const PackageSummary: React.FC<Props> = ({
                         {c.extra > 0 && (
                           <span className="text-[#f97316] font-medium">You pay: {fmt(c.extra)}</span>
                         )}
-                        {isHrViewer && (
-                          <button
-                            type="button"
-                            disabled
-                            title="Cap override workflow ships with ExceptionRequest (T1.3) — UI stub for the demo."
-                            className="ml-auto inline-flex items-center rounded-md border border-[#cbd5e1] bg-white px-2 py-1 text-xs font-medium text-[#475569] opacity-60 cursor-not-allowed"
-                          >
-                            Override cap
-                          </button>
-                        )}
+                        {(() => {
+                          const existing = exceptionsByCategory.get(c.category);
+                          if (existing) {
+                            const badge = EXCEPTION_BADGE[existing.status];
+                            return (
+                              <span
+                                className={`ml-auto inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${badge.className}`}
+                                title={existing.hr_note || undefined}
+                              >
+                                {badge.label}
+                              </span>
+                            );
+                          }
+                          if (isEmployeeViewer && c.status === 'over' && assignmentId) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setModalState({
+                                    category: c.category,
+                                    label: c.label,
+                                    requestedUsd: c.total,
+                                    capUsd: c.cap,
+                                  })
+                                }
+                                className="ml-auto inline-flex items-center rounded-md border border-[#0b2b43] bg-white px-2 py-1 text-xs font-medium text-[#0b2b43] hover:bg-[#eef4f8]"
+                              >
+                                Request exception
+                              </button>
+                            );
+                          }
+                          if (isHrViewer) {
+                            return (
+                              <span
+                                className="ml-auto text-xs text-[#94a3b8]"
+                                title="Resolve in HR Command Center → Exceptions queue."
+                              >
+                                Resolve in HR queue
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                   );
                 })}
               </div>
+
+              {modalState && assignmentId && (
+                <RequestExceptionModal
+                  open
+                  onClose={() => setModalState(null)}
+                  onSuccess={(req) => {
+                    setExceptionsByCategory((prev) => {
+                      const next = new Map(prev);
+                      next.set(req.category, req);
+                      return next;
+                    });
+                    setModalState(null);
+                  }}
+                  caseId={assignmentId}
+                  category={modalState.category}
+                  categoryLabel={modalState.label}
+                  requestedAmountUsd={modalState.requestedUsd}
+                  capAmountUsd={modalState.capUsd}
+                  displayRequested={fmt(modalState.requestedUsd)}
+                  displayCap={fmt(modalState.capUsd)}
+                />
+              )}
 
               <div className="pt-6 border-t border-[#e2e8f0] space-y-2">
                 <div className="flex justify-between font-semibold text-[#0b2b43]">
