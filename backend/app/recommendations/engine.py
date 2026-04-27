@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .explanation import build_explanation
 from .registry import get_plugin
@@ -61,8 +61,22 @@ def recommend(
     category: str,
     criteria: Dict[str, Any],
     top_n: int = 10,
+    company_id: Optional[str] = None,
 ) -> RecommendationResponse:
-    """Run recommendation for a category with given criteria."""
+    """
+    Run recommendation for a category with given criteria.
+
+    When `company_id` is supplied, the result is filtered through the
+    employee-recommendations-filter (Phase 2c): only master items HR has
+    explicitly approved for the company are kept, and HR custom vendors
+    are appended. When HR has zero approvals for the (company, category,
+    destination_city) scope, the response returns an empty list with
+    `criteria_echo.hr_curation_status = 'hr_pending'` so the UI can render
+    a "HR is finalizing providers" placeholder rather than the raw master.
+
+    When `company_id` is None (admin debug, internal jobs), the filter is
+    skipped — the legacy un-curated behavior is preserved.
+    """
     plugin = get_plugin(category)
     if not plugin:
         raise ValueError(f"Unknown category: {category}")
@@ -168,6 +182,19 @@ def recommend(
     office = (criteria.get("office_address") or "").strip()
     criteria_echo["office_address"] = office or _default_office_for_city(dest_city)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    hr_curation_status: Optional[str] = None
+    if company_id:
+        # Phase 2c — filter through HR's curation.
+        from ...services.employee_recommendations_filter import apply_hr_curation
+        items, hr_curation_status = apply_hr_curation(
+            category=category,
+            items=items,
+            company_id=company_id,
+            destination_city=dest_city or None,
+        )
+        if hr_curation_status:
+            criteria_echo["hr_curation_status"] = hr_curation_status
 
     return RecommendationResponse(
         category=category,

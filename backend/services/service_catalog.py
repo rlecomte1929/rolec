@@ -172,6 +172,26 @@ def upsert_item(
     return _row_to_item(row)
 
 
+def find_master_by_external_id(category: str, external_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Resolve a master row by its (category, external_id) tuple. Used by the
+    employee-recommendations filter to map plugin output (keyed by item_id,
+    which is the JSON's external_id) back to the master row's UUID, so HR's
+    selections-by-master_item_id can be applied.
+    """
+    if not external_id:
+        return None
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT * FROM service_catalog_items "
+                "WHERE category = :cat AND external_id = :eid AND active = 1"
+            ),
+            {"cat": category, "eid": external_id},
+        ).mappings().first()
+    return _row_to_item(row) if row else None
+
+
 def count_by_category_city(category: str, city: Optional[str] = None) -> int:
     """Coverage count helper used by Phase 1's catalog_coverage."""
     sql = "SELECT COUNT(*) FROM service_catalog_items WHERE category = :cat AND active = 1"
