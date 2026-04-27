@@ -7,6 +7,7 @@ import { PackageSummary } from '../../features/recommendations/PackageSummary';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
 import { buildRoute } from '../../navigation/routes';
+import { isRfqEnabled } from '../../featureFlags';
 
 const CATEGORY_LABELS: Record<string, string> = {
   living_areas: 'Living Areas',
@@ -61,11 +62,13 @@ export const ServicesEstimate: React.FC = () => {
         onBack={() => go(buildRoute('servicesRecommendations'))}
         onStartOver={() => go(buildRoute('services'))}
       />
-      <div className="mt-6 flex items-center justify-end">
-        <Button disabled={!hasShortlist} onClick={() => go(buildRoute('servicesRfqNew'))}>
-          Request quotations
-        </Button>
-      </div>
+      {isRfqEnabled() && (
+        <div className="mt-6 flex items-center justify-end">
+          <Button disabled={!hasShortlist} onClick={() => go(buildRoute('servicesRfqNew'))}>
+            Request quotations
+          </Button>
+        </div>
+      )}
     </AppShell>
   );
 };

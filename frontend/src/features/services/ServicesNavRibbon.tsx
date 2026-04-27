@@ -4,8 +4,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { buildRoute } from '../../navigation/routes';
+import { isRfqEnabled } from '../../featureFlags';
 
-const STEPS = [
+const ALL_STEPS = [
   { key: 'services', path: '/services', label: 'Select services' },
   { key: 'questions', path: '/services/questions', label: 'Preferences' },
   { key: 'recommendations', path: '/services/recommendations', label: 'Recommendations' },
@@ -17,6 +18,7 @@ export const ServicesNavRibbon: React.FC = () => {
   const location = useLocation();
   const currentPath = location.pathname;
   const qs = location.search || '';
+  const STEPS = isRfqEnabled() ? ALL_STEPS : ALL_STEPS.filter((s) => s.key !== 'rfq');
 
   return (
     <nav
