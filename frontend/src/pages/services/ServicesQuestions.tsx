@@ -36,7 +36,7 @@ function caseToInitialAnswers(
 export const ServicesQuestions: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedServices, setSelectedServices, setRecommendations, setShortlist, answers, setAnswers } = useServicesFlow();
+  const { selectedServices, setSelectedServices, setRecommendations, setShortlist, answers, setAnswers, displayCurrency } = useServicesFlow();
   const {
     assignmentId: primaryAssignmentId,
     linkedSummaries,
@@ -372,6 +372,7 @@ export const ServicesQuestions: React.FC = () => {
         questions={questionsForSelected}
         answers={answers}
         onChange={onAnswersChange}
+        displayCurrency={displayCurrency}
       />
 
       {!isValid && (

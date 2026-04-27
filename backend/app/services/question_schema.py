@@ -38,9 +38,12 @@ def _bank() -> List[ServiceQuestionDef]:
     """Canonical question bank. Only enabled services with backend support."""
     return [
         # Housing
+        # Currency suffix is appended client-side from the user's chosen
+        # display currency (set on the Select services page) so the wizard
+        # stays consistent across the flow.
         ServiceQuestionDef(
             question_key="budget_min",
-            label="Min monthly budget (SGD)",
+            label="Min monthly budget",
             type="number",
             service_category="housing",
             default=2000,
@@ -48,7 +51,7 @@ def _bank() -> List[ServiceQuestionDef]:
         ),
         ServiceQuestionDef(
             question_key="budget_max",
-            label="Max monthly budget (SGD)",
+            label="Max monthly budget",
             type="number",
             service_category="housing",
             default=5000,
@@ -83,7 +86,7 @@ def _bank() -> List[ServiceQuestionDef]:
             label="Office/work address (optional)",
             type="text",
             service_category="housing",
-            placeholder="e.g. Raffles Place MRT, Singapore",
+            placeholder="e.g. nearest landmark, postcode, or address",
             criteria_key="office_address",
         ),
         # Schools
