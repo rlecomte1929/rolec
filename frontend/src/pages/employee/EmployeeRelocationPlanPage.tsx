@@ -50,7 +50,7 @@ export const EmployeeRelocationPlanPage: React.FC = () => {
         )}
       </PolicyAssistantDockedShell>
       <PolicyAssistantFab
-        label={assistantOpen ? 'Close policy assistant' : 'Ask about your policy'}
+        label="Ask about your policy"
         isPanelOpen={assistantOpen}
         onClick={() => setAssistantOpen((v) => !v)}
       />
