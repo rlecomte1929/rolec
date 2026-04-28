@@ -63,7 +63,12 @@ describe('HrPolicyAssistantPanel', () => {
 
   it('shows no-policy guidance when policy id missing', () => {
     render(<HrPolicyAssistantPanel policyId={null} />);
-    expect(screen.getByText(/select or create a company policy/i)).toBeInTheDocument();
+    // Sprint 3.5: copy now explains the actual limitation (matrix-only
+    // policies aren't supported by the assistant backend) and tells the
+    // user the action that unlocks Q&A — uploading a policy document.
+    expect(
+      screen.getByText(/upload a policy document to enable Q&A/i)
+    ).toBeInTheDocument();
   });
 
   it('applies a suggestion chip to the textarea', () => {
