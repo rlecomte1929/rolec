@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
+import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import { CaseContextBar } from '../../components/case/CaseContextBar';
 import { WizardSidebar } from '../../components/case/WizardSidebar';
 import { Card } from '../../components/antigravity';
@@ -633,6 +635,18 @@ export const CaseWizardPage: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Policy Assistant on the wizard too — employees often hit a
+          benefit question mid-intake. Stacks above the global Feedback
+          widget at bottom-right. */}
+      <PolicyAssistantFab label="Open Policy Assistant — ask about your HR policy">
+        {() => (
+          <EmployeePolicyAssistantPanel
+            assignmentId={assignmentId}
+            assignmentLoading={false}
+            variant="card"
+          />
+        )}
+      </PolicyAssistantFab>
     </AppShell>
   );
 };
