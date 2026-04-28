@@ -2,8 +2,8 @@
  * Bounded policy Q&A for employees: single-turn answers from published policy data.
  * Mounted as `embedded` inside PolicyAssistantDockedShell — docked panel on lg+, bottom-sheet on mobile.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Copy, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronUp, Copy, Loader2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
@@ -118,9 +118,9 @@ function AnswerResultCard({
   answer: PolicyAssistantAnswer;
   assistantTurnRequestId?: string | null;
   /** Only the most recent turn renders the "Related policy questions"
-   *  chip block — older cards keep their badges, copy button, evidence,
-   *  conditions, and answer text. After 10 turns, suppressing chips
-   *  on history saves ~30 buttons of visual noise. */
+   *  chip block AND defaults to expanded — older cards default to
+   *  collapsed (header-only). After 10 turns, suppressing both chips
+   *  and full bodies saves ~30 buttons + 5 screens of visual noise. */
   isMostRecent: boolean;
   onFollowUpSelect: (
     text: string,
@@ -138,6 +138,22 @@ function AnswerResultCard({
     answer.answer_text?.trim() ||
     (isClarification && answer.refusal ? answer.refusal.refusal_text : '') ||
     (isRefusal && answer.refusal ? answer.refusal.refusal_text : '');
+
+  // Collapsibility: most recent stays expanded; older cards collapse
+  // to header-only by default. When the parent submits a new question,
+  // the previous-most-recent card's `isMostRecent` flips to false and
+  // this useEffect resyncs the local state — which means a manually-
+  // expanded older card collapses on the next submit. That's
+  // acceptable per the Sprint 3 spec: the user has fresh focus on the
+  // new answer, and avoiding the more complex lifted-state model
+  // keeps this small.
+  const [collapsed, setCollapsed] = useState(!isMostRecent);
+  useEffect(() => {
+    setCollapsed(!isMostRecent);
+  }, [isMostRecent]);
+
+  const reactId = useId();
+  const bodyId = `pa-card-body-${reactId}`;
 
   const handleCopy = async () => {
     const text = turnToPlainText(question, answer);
@@ -158,12 +174,27 @@ function AnswerResultCard({
       role="article"
       aria-label="Policy Q&A"
     >
-      {/* Header row: question on the left, status badge stack on the
-          right. Putting the status at eye-level with the question makes
-          the card scannable in the docked layout where vertical space
-          is precious. flex-wrap so the badge drops below on very narrow
-          panels (~380px) instead of overlapping the question text. */}
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-[#f4f7fb] px-4 py-3.5">
+      {/* Header row is the collapse toggle. Click anywhere on the
+          gradient bg flips collapsed state; the badge/topic/copy
+          children remain non-interactive (badge, chip) or stop
+          propagation (copy button). The chevron is the visual
+          affordance for keyboard + screen reader users. role=button
+          on the wrapping div + aria-expanded + Enter/Space handler
+          keeps a11y intact without needing nested <button>s. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
+        aria-controls={bodyId}
+        onClick={() => setCollapsed((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setCollapsed((v) => !v);
+          }
+        }}
+        className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-[#f4f7fb] px-4 py-3.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30"
+      >
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Your question</div>
           <p className="mt-1.5 text-[15px] font-medium leading-snug text-[#0b2b43]">{question}</p>
@@ -183,20 +214,30 @@ function AnswerResultCard({
               {topic}
             </span>
           ) : null}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleCopy();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-[#0b2b43]"
+            >
+              <Copy className="h-3.5 w-3.5 opacity-70" aria-hidden />
+              {copied ? EMPLOYEE_POLICY_ASSISTANT_COPIED : EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER}
+            </button>
+            <span
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500"
+              aria-hidden
+            >
+              {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4 px-4 py-4">
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => void handleCopy()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-[#0b2b43]"
-          >
-            <Copy className="h-3.5 w-3.5 opacity-70" aria-hidden />
-            {copied ? EMPLOYEE_POLICY_ASSISTANT_COPIED : EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER}
-          </button>
-        </div>
+      {collapsed ? null : (
+      <div id={bodyId} className="space-y-4 px-4 py-4">
 
         {isRefusal && answer.refusal ? (
           <>
@@ -293,6 +334,7 @@ function AnswerResultCard({
           </>
         )}
       </div>
+      )}
     </article>
   );
 }

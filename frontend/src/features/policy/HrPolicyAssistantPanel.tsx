@@ -1,8 +1,8 @@
 /**
  * Bounded policy Q&A for HR: working draft, published signals, employee view — not a generic copilot.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { hrAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
@@ -77,18 +77,43 @@ function HrAnswerResultCard({
   const readinessLine = comparisonReadinessExplanation(answer.comparison_readiness);
   const dvpHint = draftVsPublishedHint(answer);
 
+  // Collapsibility: default to collapsed when not the most recent
+  // turn. Submitting a new question flips the previous-most-recent's
+  // isMostRecent prop, the useEffect resyncs, and the previously-
+  // expanded card snaps closed. Acceptable per Sprint 3 spec — keeps
+  // state management trivial.
+  const [collapsed, setCollapsed] = useState(!isMostRecent);
+  useEffect(() => {
+    setCollapsed(!isMostRecent);
+  }, [isMostRecent]);
+  const reactId = useId();
+  const bodyId = `hr-pa-card-body-${reactId}`;
+
   return (
     <div
       className="rounded-lg border border-slate-200 bg-white shadow-sm"
       role="region"
       aria-label="HR policy answer"
     >
-      {/* Header row: question on the left, status badge (+ topic chip
-          on supported answers) on the right. Putting status at
-          eye-level with the question makes the card scannable in the
-          docked panel. flex-wrap drops the badge below on very narrow
-          widths so it doesn't overlap. */}
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-2.5 bg-slate-50/80">
+      {/* Header row doubles as the collapse toggle. Click anywhere on
+          the slate background flips collapsed state; badge/topic remain
+          visual children, the chevron is the keyboard/screen-reader
+          affordance. role=button + aria-expanded + Enter/Space handler
+          keeps a11y intact. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
+        aria-controls={bodyId}
+        onClick={() => setCollapsed((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setCollapsed((v) => !v);
+          }
+        }}
+        className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-2.5 bg-slate-50/80 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30"
+      >
         <div className="min-w-0 flex-1">
           <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Question</div>
           <p className="text-sm text-slate-800 mt-0.5">{question}</p>
@@ -108,9 +133,16 @@ function HrAnswerResultCard({
               {answer.canonical_topic.replace(/_/g, ' ')}
             </span>
           ) : null}
+          <span
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500"
+            aria-hidden
+          >
+            {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </span>
         </div>
       </div>
-      <div className="px-4 py-3 space-y-3">
+      {collapsed ? null : (
+      <div id={bodyId} className="px-4 py-3 space-y-3">
         {isRefusal && answer.refusal ? (
           <>
             <div className="text-sm text-slate-800 leading-relaxed">
@@ -218,6 +250,7 @@ function HrAnswerResultCard({
           </>
         )}
       </div>
+      )}
     </div>
   );
 }
