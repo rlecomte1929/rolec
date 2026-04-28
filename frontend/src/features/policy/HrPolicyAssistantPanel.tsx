@@ -2,6 +2,7 @@
  * Bounded policy Q&A for HR: working draft, published signals, employee view — not a generic copilot.
  */
 import React, { useCallback, useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 import { hrAPI } from '../../api/client';
@@ -22,11 +23,11 @@ import { trackPolicyAssistantFollowUpClicked } from './policyAssistantAnalytics'
 import {
   HR_POLICY_ASSISTANT_NO_POLICY,
   HR_POLICY_ASSISTANT_PLACEHOLDER,
-  HR_POLICY_ASSISTANT_SCOPE_NOTE,
   HR_POLICY_ASSISTANT_SUBMIT,
   HR_POLICY_ASSISTANT_SUBTITLE,
   HR_POLICY_ASSISTANT_SUGGESTIONS,
   HR_POLICY_ASSISTANT_TITLE,
+  HR_POLICY_ASSISTANT_TRUST_PILL,
 } from './hrPolicyAssistantCopy';
 
 const MAX_TURNS = 5;
@@ -318,11 +319,16 @@ export const HrPolicyAssistantPanel: React.FC<{
 
   const coreForm = (
     <>
-      <p
-        className={`text-xs text-slate-500 leading-relaxed ${inSheetLike ? 'mt-0' : 'mt-2'}`}
-      >
-        {HR_POLICY_ASSISTANT_SCOPE_NOTE}
-      </p>
+      {/* Trust-signal pill replacing the previous SCOPE_NOTE paragraph.
+          Same intent (tell HR what data backs the answers + that this
+          isn't legal advice) but reads as an affirmative chip rather
+          than a footer disclaimer. */}
+      <div className={inSheetLike ? 'mt-0' : 'mt-2'}>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900">
+          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+          {HR_POLICY_ASSISTANT_TRUST_PILL}
+        </span>
+      </div>
 
       <div className="mt-4 space-y-2">
         <label htmlFor={questionId} className="sr-only">

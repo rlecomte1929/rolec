@@ -3,13 +3,12 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import '@testing-library/jest-dom/vitest';
 import { EmployeePolicyAssistantPanel } from '../EmployeePolicyAssistantPanel';
 import {
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER,
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY,
   EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT,
   EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUBTITLE,
   EMPLOYEE_POLICY_ASSISTANT_TITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS,
+  EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL,
 } from '../employeePolicyAssistantCopy';
 import type { PolicyAssistantAnswer } from '../../../types/policyAssistant';
 
@@ -76,12 +75,13 @@ afterEach(() => {
 });
 
 describe('EmployeePolicyAssistantPanel', () => {
-  it('shows title, subtitle, and disclaimer when assignment is present', () => {
+  it('shows title, subtitle, and trust-signal pill when assignment is present', () => {
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
     expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_TITLE)).toBeInTheDocument();
     expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_SUBTITLE)).toBeInTheDocument();
-    expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER)).toBeInTheDocument();
-    expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY)).toBeInTheDocument();
+    // Slice 3 replaced the dual-paragraph footer disclaimer with a
+    // single trust-signal pill above the response section.
+    expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL)).toBeInTheDocument();
   });
 
   it('shows no-assignment copy when assignment id missing', () => {

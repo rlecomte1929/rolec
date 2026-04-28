@@ -6,6 +6,7 @@ import {
   HR_POLICY_ASSISTANT_SUBTITLE,
   HR_POLICY_ASSISTANT_TITLE,
   HR_POLICY_ASSISTANT_SUGGESTIONS,
+  HR_POLICY_ASSISTANT_TRUST_PILL,
 } from '../hrPolicyAssistantCopy';
 import type { PolicyAssistantAnswer } from '../../../types/policyAssistant';
 
@@ -53,7 +54,8 @@ describe('HrPolicyAssistantPanel', () => {
     render(<HrPolicyAssistantPanel policyId="pol-1" />);
     expect(screen.getByText(HR_POLICY_ASSISTANT_TITLE)).toBeInTheDocument();
     expect(screen.getByText(HR_POLICY_ASSISTANT_SUBTITLE)).toBeInTheDocument();
-    expect(screen.getByText(/normalized policy data/i)).toBeInTheDocument();
+    // Slice 3 replaced the SCOPE_NOTE paragraph with a trust-signal pill.
+    expect(screen.getByText(HR_POLICY_ASSISTANT_TRUST_PILL)).toBeInTheDocument();
   });
 
   it('shows no-policy guidance when policy id missing', () => {

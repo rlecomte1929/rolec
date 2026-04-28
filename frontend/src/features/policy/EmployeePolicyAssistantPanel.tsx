@@ -3,7 +3,7 @@
  * HR Policy page: `sideSheet` — right anchored panel (desktop) / sheet (mobile), not a floating chat bubble.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, Loader2 } from 'lucide-react';
+import { CheckCircle2, Copy, Loader2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
@@ -25,8 +25,6 @@ import {
   EMPLOYEE_POLICY_ASSISTANT_CLEAR_HISTORY,
   EMPLOYEE_POLICY_ASSISTANT_COPIED,
   EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER,
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER,
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY,
   EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT,
   EMPLOYEE_POLICY_ASSISTANT_ERROR_DETAIL,
   EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE,
@@ -38,6 +36,7 @@ import {
   EMPLOYEE_POLICY_ASSISTANT_SUBTITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS,
   EMPLOYEE_POLICY_ASSISTANT_TITLE,
+  EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL,
 } from './employeePolicyAssistantCopy';
 import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 
@@ -540,9 +539,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           </div>
         </section>
 
-        <div className="pt-1 border-t border-slate-200/80 space-y-1">
-          <p className="text-[11px] leading-relaxed text-slate-400">{EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER}</p>
-          <p className="text-[11px] leading-relaxed text-slate-400">{EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY}</p>
+        {/* Trust-signal pill — replaces the previous two paragraphs of
+            light-gray disclaimer text. Reads as a positive signal
+            ("we checked the source") rather than a defensive
+            afterthought, while keeping the legal hedge inline. */}
+        <div className="pt-1">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900">
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+            {EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL}
+          </span>
         </div>
 
         {/* POLICY RESPONSE AREA — grounded policy output (not chat UI) */}
