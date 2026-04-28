@@ -171,14 +171,32 @@ const StatusStrip: React.FC<StatusStripProps> = ({
 const TopicSummarySection: React.FC<{
   matrixPayload: PolicyConfigWorkingPayload | null;
   onRequestDetails: () => void;
-}> = ({ matrixPayload, onRequestDetails }) => (
-  <Card padding="lg">
-    <PolicyTopicSummaryList
-      matrixPayload={matrixPayload}
-      onRequestDetails={onRequestDetails}
-    />
-  </Card>
-);
+}> = ({ matrixPayload, onRequestDetails }) => {
+  // The HR endpoint hands back EITHER the published clone (read-only)
+  // OR the draft (editable, never been published). The accordion has
+  // historically said "What employees see today" for both — which is a
+  // lie when the payload is a draft, because employees see nothing
+  // until HR publishes. Switch the title + subtitle on that flag so
+  // HR isn't surprised when the employee surface is empty.
+  const isLive =
+    matrixPayload?.status === 'published' ||
+    matrixPayload?.source === 'published' ||
+    matrixPayload?.source === 'published_clone';
+  const heading = isLive ? 'What employees see today' : 'Your draft preview (not live yet)';
+  const subtitle = isLive
+    ? 'Summary of the currently live relocation policy by theme. Click a theme to see its individual benefit rows — read-only here. Edits happen in the Detailed review drawer.'
+    : 'This draft is HR-only — employees see nothing from this on /hr/policy until you Publish draft. Click a theme to preview the benefit rows that would go live.';
+  return (
+    <Card padding="lg">
+      <PolicyTopicSummaryList
+        matrixPayload={matrixPayload}
+        onRequestDetails={onRequestDetails}
+        heading={heading}
+        subtitle={subtitle}
+      />
+    </Card>
+  );
+};
 
 // --- Build next version -----------------------------------------------------
 
@@ -462,14 +480,28 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       {/* 2. What employees see today — collapsed disclosure (slice 3d).
           The benefit table further down is HR's primary work surface;
           this read-only summary is reference, not action. Stays in DOM
-          (data still pre-fetched) so opening is instant. */}
+          (data still pre-fetched) so opening is instant.
+          Disclosure label flips to "Preview your draft" when the
+          payload is a draft (matches the inner heading from
+          TopicSummarySection so HR isn't misled into thinking employees
+          can see the draft). */}
       <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
         <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
           <div className="flex items-center justify-between gap-3">
             <span className="text-base font-semibold text-[#0b2b43]">
-              ▸ See what employees see today
+              {(matrixPayload?.status === 'published' ||
+                matrixPayload?.source === 'published' ||
+                matrixPayload?.source === 'published_clone')
+                ? '▸ See what employees see today'
+                : '▸ Preview your draft (not live for employees yet)'}
             </span>
-            <span className="text-xs text-[#64748b]">read-only summary by theme</span>
+            <span className="text-xs text-[#64748b]">
+              {(matrixPayload?.status === 'published' ||
+                matrixPayload?.source === 'published' ||
+                matrixPayload?.source === 'published_clone')
+                ? 'read-only summary by theme'
+                : 'publish to make this visible to employees'}
+            </span>
           </div>
         </summary>
         <div className="px-5 pb-5">

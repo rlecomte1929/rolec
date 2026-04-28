@@ -221,7 +221,12 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
       ) : !data?.has_policy_config ? (
         <Card padding="lg" className="border-[#e2e8f0] bg-[#fafbfc]">
           <h2 className="text-lg font-semibold text-[#0b2b43] mb-2">No published policy yet</h2>
-          <p className="text-sm text-[#475569] leading-relaxed max-w-2xl">{EMPTY_UNPUBLISHED}</p>
+          <p className="text-sm text-[#475569] leading-relaxed max-w-2xl">
+            {EMPTY_UNPUBLISHED} Your HR team may have a draft in progress — it
+            becomes visible here as soon as they click <strong>Publish</strong>.
+            Reach out to HR via <Link to={buildRoute('messages')} className="text-[#0b2b43] underline">Messages</Link>{' '}
+            if you have benefit questions in the meantime.
+          </p>
           {(assignmentLabel !== '—' || familyLabel !== '—') && (
             <p className="text-xs text-[#94a3b8] mt-4">
               Context we used: {assignmentLabel} · {familyLabel}
