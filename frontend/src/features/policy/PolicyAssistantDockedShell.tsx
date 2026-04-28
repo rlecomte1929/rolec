@@ -123,9 +123,13 @@ export const PolicyAssistantDockedShell: React.FC<PolicyAssistantDockedShellProp
   return (
     <div className="flex flex-row min-h-0 w-full">
       {/* Main content column. flex-1 + min-w-0 so flexbox can shrink it
-          when the panel takes its 420px on lg+. */}
+          when the panel takes its 420px on lg+. overflow-x-clip keeps
+          page-level sticky bars (e.g. HrPolicyPageV2's StatusStrip
+          which uses negative horizontal margins to bleed across page
+          padding) inside the column boundary instead of spilling into
+          the docked panel area where they'd cover the panel header. */}
       <div
-        className="flex-1 min-w-0 transition-[margin] duration-[250ms] ease-out"
+        className="flex-1 min-w-0 overflow-x-clip transition-[margin] duration-[250ms] ease-out"
         data-policy-assistant-main
       >
         {children}
