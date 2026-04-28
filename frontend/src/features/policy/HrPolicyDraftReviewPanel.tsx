@@ -193,6 +193,27 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
         )}
       </Card>
 
+      {/* Slice 3d wraps the doc-only blocks (Document summary + Extracted
+          policy signals) in one shared <details>. Both are reference
+          surfaces — useful for the audit case but noise during the fast
+          "fix + publish" path. The disclosure only renders when at
+          least one of them has data (matrix-only deployments collapse
+          this section away entirely). */}
+      {(hasSourceDocument || hasExtractedSignals) && (
+      <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-base font-semibold text-[#0b2b43]">
+              ▸ See document-extraction signals
+            </span>
+            <span className="text-xs text-[#64748b]">
+              {hasSourceDocument && 'source document'}
+              {hasSourceDocument && hasExtractedSignals && ' · '}
+              {hasExtractedSignals && 'extracted clauses'}
+            </span>
+          </div>
+        </summary>
+        <div className="px-5 pb-5 space-y-6">
       {/* 1 — Document summary (only when a source document is attached) */}
       {hasSourceDocument && (
       <Card padding="lg">
@@ -376,6 +397,9 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
         )}
 
       </Card>
+      )}
+        </div>
+      </details>
       )}
 
       {/* Slice 3b removed the "Rules on this version" Card — it was a
