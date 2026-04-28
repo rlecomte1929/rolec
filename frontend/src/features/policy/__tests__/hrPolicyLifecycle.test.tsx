@@ -78,7 +78,11 @@ describe('HR policy lifecycle (product states)', () => {
       expect(model.resolved.hasUnpublishedDraftAhead).toBe(false);
       render(renderHrPolicyLayout(model));
       expect(screen.getByText(/Active policy \(live\)/i)).toBeInTheDocument();
-      expect(screen.getByText(/This published version is what relocating employees see today/i)).toBeInTheDocument();
+      // Slice 3c replaced the verbose "This published version is what relocating
+      // employees see today..." subline with a tight "If you publish right now: …"
+      // impact sentence. For the published-no-replacement case it reads "no
+      // immediate change". The longer copy is gone by design.
+      expect(screen.getByText(/no immediate change/i)).toBeInTheDocument();
       expect(screen.getByTestId('hr-policy-employee-compare')).toBeInTheDocument();
       expect(screen.getByTestId('hr-policy-panel-current-employee')).toBeInTheDocument();
       expect(screen.queryByTestId('hr-policy-panel-if-publish')).not.toBeInTheDocument();
