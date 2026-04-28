@@ -78,7 +78,7 @@ describe('HrPolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
       target: { value: 'What changes if I publish?' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() =>
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('pol-1', 'What changes if I publish?', undefined)
     );
@@ -100,7 +100,7 @@ describe('HrPolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
       target: { value: 'Test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(postPolicyAssistantQuery).toHaveBeenCalledWith('pol-1', 'Test', 'doc-9'));
   });
 
@@ -119,7 +119,7 @@ describe('HrPolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
       target: { value: 'Why informational?' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     const region = await screen.findByRole('region', { name: /HR policy answer/i });
     expect(within(region).getByText('Comparison readiness:')).toBeInTheDocument();
     expect(within(region).getByText('informational only', { exact: false })).toBeInTheDocument();
@@ -151,7 +151,7 @@ describe('HrPolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
       target: { value: 'How should we beat competitors on benefits?' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(screen.getByText(/no policy answer/i)).toBeInTheDocument());
     expect(screen.getByText(/within-policy examples/i)).toBeInTheDocument();
     expect(screen.getByText('What do employees see for temporary housing?')).toBeInTheDocument();

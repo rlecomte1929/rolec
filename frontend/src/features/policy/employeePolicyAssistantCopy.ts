@@ -17,7 +17,7 @@ export const EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY = 'Not legal or immi
 export const EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT =
   'Link an active assignment to use policy Q&A.';
 
-export const EMPLOYEE_POLICY_ASSISTANT_SUBMIT = 'Get answer →';
+export const EMPLOYEE_POLICY_ASSISTANT_SUBMIT = 'Ask';
 
 /** Inline hint when submit is clicked with an empty question (clears on input or chip). */
 export const EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT =

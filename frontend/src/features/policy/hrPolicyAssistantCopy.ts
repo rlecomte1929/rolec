@@ -11,7 +11,7 @@ export const HR_POLICY_ASSISTANT_SCOPE_NOTE =
 export const HR_POLICY_ASSISTANT_NO_POLICY =
   'Select or create a company policy in the workspace to use policy Q&A.';
 
-export const HR_POLICY_ASSISTANT_SUBMIT = 'Get answer →';
+export const HR_POLICY_ASSISTANT_SUBMIT = 'Ask';
 
 export const HR_POLICY_ASSISTANT_SUGGESTIONS: string[] = [
   'What do employees see for shipment?',

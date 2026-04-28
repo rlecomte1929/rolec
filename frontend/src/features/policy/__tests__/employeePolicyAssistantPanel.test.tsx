@@ -102,9 +102,9 @@ describe('EmployeePolicyAssistantPanel', () => {
     await waitFor(() => expect(ta).toHaveFocus());
   });
 
-  it('shows inline hint when Get answer is clicked with an empty question', () => {
+  it('shows inline hint when Ask is clicked with an empty question', () => {
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT)).toBeInTheDocument();
     expect(postPolicyAssistantQuery).not.toHaveBeenCalled();
   });
@@ -122,7 +122,7 @@ describe('EmployeePolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
       target: { value: 'Test question' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(await screen.findByText(/checking published policy/i)).toBeInTheDocument();
   });
 
@@ -137,7 +137,7 @@ describe('EmployeePolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
       target: { value: 'Is temporary housing included?' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(postPolicyAssistantQuery).toHaveBeenCalledWith('asg-1', 'Is temporary housing included?'));
     await waitFor(() => {
       expect(screen.getByText(/included \(published policy\)/i)).toBeInTheDocument();
@@ -184,7 +184,7 @@ describe('EmployeePolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
       target: { value: 'Negotiate my salary' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(screen.getByText(/no policy answer/i)).toBeInTheDocument());
     expect(screen.getByText(/policy questions you can ask/i)).toBeInTheDocument();
     expect(screen.getByText('What is my housing cap?')).toBeInTheDocument();
@@ -198,7 +198,7 @@ describe('EmployeePolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
       target: { value: 'Test question' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => {
       expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE)).toBeInTheDocument();
     });
