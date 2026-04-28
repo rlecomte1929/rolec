@@ -94,9 +94,16 @@ function uploadDocumentTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigat
     return { kind: 'internal', to: buildRoute('submissionCenter') };
   }
 
-  // Passport / document upload UI lives on wizard step 2 today.
-  // TODO(relopass): `/employee/case/:id/documents` or summary anchor when a unified upload area exists.
-  return { kind: 'internal', to: employeeCaseWizardStep(aid, 2) };
+  // Passport / document upload UI lives on wizard step 2. Routing
+  // straight to step 2 fails when intake step 1 isn't complete (the
+  // wizard blocks deep-links to later steps with "Complete the
+  // previous steps before continuing"). Route to step 1 instead — the
+  // wizard auto-normalizes to the FIRST INCOMPLETE step on landing,
+  // so a partway-through user lands somewhere they can act, and a
+  // ready-to-upload user lands on step 2 transparently.
+  // TODO(relopass): replace with `/employee/case/:id/documents` once
+  // a dedicated upload surface exists.
+  return { kind: 'internal', to: employeeCaseWizardStep(aid, 1) };
 }
 
 function completeWizardStepTarget(ctx: RelocationPlanCtaNavigateContext): CtaNavigateTarget {

@@ -100,7 +100,10 @@ export const PolicyAssistantFab: React.FC<Props> = ({
         aria-haspopup="dialog"
         aria-expanded={open}
         title={label}
-        className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full bg-[#0b2b43] text-white shadow-lg hover:bg-[#0f3a5a] focus:outline-none focus:ring-4 focus:ring-[#0b2b43]/30 flex items-center justify-center text-2xl"
+        // Stacks above FeedbackWidget (which owns bottom-6 right-6 globally).
+        // Same right-6 column for visual alignment; bottom-24 leaves
+        // ~16px of breathing room above the Feedback chip.
+        className="fixed bottom-24 right-6 z-40 h-14 w-14 rounded-full bg-[#0b2b43] text-white shadow-lg hover:bg-[#0f3a5a] focus:outline-none focus:ring-4 focus:ring-[#0b2b43]/30 flex items-center justify-center text-2xl"
         data-testid="policy-assistant-fab"
       >
         <span aria-hidden>💬</span>
