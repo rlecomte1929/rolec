@@ -158,35 +158,36 @@ function AnswerResultCard({
       role="article"
       aria-label="Policy Q&A"
     >
-      <div className="border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-[#f4f7fb] px-4 py-3.5">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Your question</div>
-        <p className="mt-1.5 text-[15px] font-medium leading-snug text-[#0b2b43]">{question}</p>
+      {/* Header row: question on the left, status badge stack on the
+          right. Putting the status at eye-level with the question makes
+          the card scannable in the docked layout where vertical space
+          is precious. flex-wrap so the badge drops below on very narrow
+          panels (~380px) instead of overlapping the question text. */}
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-[#f4f7fb] px-4 py-3.5">
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Your question</div>
+          <p className="mt-1.5 text-[15px] font-medium leading-snug text-[#0b2b43]">{question}</p>
+        </div>
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
+          <span
+            className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${
+              isRefusal && answer.refusal
+                ? supportStatusBadgeClass('refused')
+                : supportStatusBadgeClass(status)
+            }`}
+          >
+            {isRefusal && answer.refusal ? supportStatusLabel('refused') : supportStatusLabel(status)}
+          </span>
+          {!isRefusal && topic ? (
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium capitalize text-slate-700">
+              {topic}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="space-y-4 px-4 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {isRefusal && answer.refusal ? (
-              <span
-                className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${supportStatusBadgeClass('refused')}`}
-              >
-                {supportStatusLabel('refused')}
-              </span>
-            ) : (
-              <>
-                <span
-                  className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${supportStatusBadgeClass(status)}`}
-                >
-                  {supportStatusLabel(status)}
-                </span>
-                {topic ? (
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium capitalize text-slate-700">
-                    {topic}
-                  </span>
-                ) : null}
-              </>
-            )}
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             onClick={() => void handleCopy()}
