@@ -14022,7 +14022,21 @@ class Database:
 
     def resolve_readiness_destination_for_assignment(self, assignment_id: str) -> Tuple[Optional[str], Optional[str]]:
         """
-        Returns (destination_raw, destination_key) from employee profile, then relocation case.
+        Returns (destination_raw, destination_key) for the assignment.
+
+        Priority:
+          1. Employee profile (intake form) — most recent first-party answer
+          2. Canonical `relocation_cases.host_country` column — set by the
+             intake/admin flow and updated on reassignment
+          3. Case `profile_json.movePlan.destination` — historical blob,
+             may be stale (e.g. assignment was reassigned but the blob was
+             never re-saved)
+
+        The blob is the LAST fallback, not the first, because we have seen
+        cases where it disagrees with the canonical column (e.g. monica's
+        case had host_country="Japan" but profile_json said "Singapore",
+        causing the readiness summary to mislabel a Japan assignment with
+        a Singapore template).
         """
         prof = self.get_employee_profile(assignment_id)
         raw = extract_destination_from_profile(prof)
@@ -14032,10 +14046,11 @@ class Database:
                 cid = (asn.get("case_id") or "").strip()
                 case = self.get_case_by_id(cid) if cid else None
                 if case:
-                    pj = case.get("profile_json")
-                    raw = extract_destination_from_case_profile(pj)
-                    if not raw and case.get("host_country"):
-                        raw = str(case.get("host_country")).strip()
+                    if case.get("host_country"):
+                        raw = str(case.get("host_country")).strip() or None
+                    if not raw:
+                        # Last-resort fallback to the historical blob.
+                        raw = extract_destination_from_case_profile(case.get("profile_json"))
         key = normalize_destination_key(raw)
         return raw, key
 
