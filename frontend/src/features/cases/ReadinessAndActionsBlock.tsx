@@ -70,7 +70,19 @@ export const ReadinessAndActionsBlock: React.FC<Props> = ({
           )}
           <div className={`flex flex-wrap items-center gap-2 ${embedInOperationalFlow ? '' : 'mt-1'}`}>
             <span className="text-xl font-semibold text-[#0b2b43]">{ui.overall_label}</span>
-            <Badge variant={statusBadgeVariant(ui.overall_status)}>{ui.overall_status.replace(/_/g, ' ')}</Badge>
+            {/* Slice D1: was a duplicate text badge ("Missing information"
+                next to a heading that already said "Missing information").
+                Now shows the missing-item count when relevant — useful
+                signal — or just a colored dot for non-missing states. */}
+            {ui.overall_status === 'missing_information' && ui.intake_total > 0 ? (
+              <Badge variant={statusBadgeVariant(ui.overall_status)}>
+                {Math.max(0, ui.intake_total - ui.intake_satisfied)} missing
+              </Badge>
+            ) : ui.overall_status !== ui.overall_label.toLowerCase().replace(/\s+/g, '_') ? (
+              <Badge variant={statusBadgeVariant(ui.overall_status)}>
+                {ui.overall_status.replace(/_/g, ' ')}
+              </Badge>
+            ) : null}
           </div>
           <p className="text-sm text-[#475569] mt-2 max-w-3xl">{ui.completion_basis}</p>
           <p className="text-xs text-[#64748b] mt-2 max-w-3xl leading-relaxed">
