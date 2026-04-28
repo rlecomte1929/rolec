@@ -202,7 +202,7 @@ function AnswerResultCard({
             <div className="rounded-lg border border-slate-100 bg-slate-50/60 px-4 py-3.5 text-[15px] leading-[1.65] text-slate-800">
               {formatRichMessage(answer.refusal.refusal_text)}
             </div>
-            {answer.refusal.supported_examples.length > 0 ? (
+            {isMostRecent && answer.refusal.supported_examples.length > 0 ? (
               <div className="rounded-lg border border-slate-100 bg-white px-3 py-3">
                 <div className="text-xs font-semibold text-slate-600 mb-2">Policy questions you can ask</div>
                 <ul className="text-sm text-slate-700 list-disc pl-5 space-y-1.5 leading-relaxed">

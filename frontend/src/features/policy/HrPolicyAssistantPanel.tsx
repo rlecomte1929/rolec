@@ -98,7 +98,7 @@ function HrAnswerResultCard({
             <div className="text-sm text-slate-800 leading-relaxed">
               {formatRichMessage(answer.refusal.refusal_text)}
             </div>
-            {answer.refusal.supported_examples.length > 0 && (
+            {isMostRecent && answer.refusal.supported_examples.length > 0 && (
               <div>
                 <div className="text-xs font-semibold text-slate-600 mb-1.5">Within-policy examples</div>
                 <ul className="text-sm text-slate-700 list-disc pl-5 space-y-1">
