@@ -434,8 +434,54 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       matrixPayload?.source !== 'published_clone'
   );
 
-  const publishEnabled = Boolean(normalized?.version?.id) && !hasLivePolicy;
-  const [publishBusy, _setPublishBusy] = useState(false);
+  // Publish gate: matrix-only deployments (the common case) need to be
+  // able to publish too. Previously this required a `normalized.version.id`
+  // (a document-extracted/canonical policy), which meant matrix-only HR
+  // teams had a forever-disabled top "Publish draft" button — and the
+  // legacy "Publish version" button further down published a different
+  // system (`policy_versions`) that the employee endpoint doesn't read.
+  // Result: HR clicked Publish, employee saw "No published policy yet".
+  // Enable the top button whenever there's a matrix draft to publish or a
+  // canonical version ready to ship; the publish handler picks the right
+  // path based on what's available.
+  const matrixHasUnpublishedChanges =
+    Boolean(matrixPayload?.editable) &&
+    matrixPayload?.source !== 'published' &&
+    matrixPayload?.source !== 'published_clone';
+  const publishEnabled =
+    matrixHasUnpublishedChanges || (Boolean(normalized?.version?.id) && !hasLivePolicy);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+
+  const publishMatrix = useCallback(async () => {
+    if (!matrixHasUnpublishedChanges) {
+      // Nothing matrix-side to publish — fall through to scroll-to-detail
+      // so the canonical/document-extracted publish controls in the
+      // workspace below pick up the action.
+      const el = document.getElementById('hr-policy-detailed-review');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    setPublishBusy(true);
+    setPublishError(null);
+    try {
+      await policyConfigMatrixAPI.hrPublish({}, adminCompanyId ?? undefined);
+      // Bump refreshes both the matrix payload and the workspace state so
+      // the topic accordion flips from "Your draft preview" to "What
+      // employees see today" without a hard reload.
+      bump();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail;
+      setPublishError(
+        typeof detail === 'string' && detail
+          ? detail
+          : 'Could not publish your draft. Try the legacy publish controls in the Detailed review section, or contact support.'
+      );
+    } finally {
+      setPublishBusy(false);
+    }
+  }, [matrixHasUnpublishedChanges, adminCompanyId, bump]);
 
   const handleImportClick = () => {
     // Scroll to the workspace; the Document intake card lives at the top
@@ -457,6 +503,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
   return (
     <div className="space-y-6 pb-12">
       {loadError && <Alert variant="error">{loadError}</Alert>}
+      {publishError && <Alert variant="error">{publishError}</Alert>}
 
       {/* 1. Status strip */}
       <StatusStrip
@@ -469,10 +516,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
           const el = document.getElementById('hr-policy-detailed-review');
           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }}
-        onPublish={() => {
-          const el = document.getElementById('hr-policy-detailed-review');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
+        onPublish={() => void publishMatrix()}
         publishEnabled={publishEnabled}
         publishBusy={publishBusy}
       />
