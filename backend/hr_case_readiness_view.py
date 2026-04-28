@@ -186,7 +186,11 @@ def build_hr_case_readiness_ui(
 
     parts = [f"{intake_done} of {intake_total} intake & document checkpoints satisfied"]
     if chk_applicable and chk_total is not None and chk_done is not None:
-        parts.append(f"{chk_done} of {chk_total} route checklist items completed (template)")
+        # Slice D2: dropped the "(template)" suffix. HR users don't need
+        # to know the source taxonomy here — the surrounding readiness
+        # block already clarifies that route checklists come from
+        # destination templates.
+        parts.append(f"{chk_done} of {chk_total} route checklist items completed")
 
     completion_basis = "; ".join(parts)
 
