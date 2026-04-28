@@ -20,7 +20,15 @@ import {
   supportStatusBadgeClass,
   supportStatusLabel,
 } from './employeePolicyAssistantModel';
-import { trackPolicyAssistantFollowUpClicked } from './policyAssistantAnalytics';
+import {
+  trackPolicyAssistantAnswerReceived,
+  trackPolicyAssistantDismissed,
+  trackPolicyAssistantFollowUpClicked,
+  trackPolicyAssistantOpened,
+  trackPolicyAssistantQuestionSubmitted,
+  type PolicyAssistantQuestionSource,
+  type PolicyAssistantSurface,
+} from './policyAssistantAnalytics';
 import {
   EMPLOYEE_POLICY_ASSISTANT_CLEAR_HISTORY,
   EMPLOYEE_POLICY_ASSISTANT_COPIED,
@@ -312,6 +320,55 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   const [sheetOpen, setSheetOpen] = useState(false);
   const [emptySubmitHint, setEmptySubmitHint] = useState(false);
 
+  // Analytics: surface label per mount, plus refs for state we need at
+  // dismissal time (closure-stable across the unmount cleanup).
+  const surface: PolicyAssistantSurface =
+    layoutVariant === 'card' ? 'employee_card' : 'employee_fab';
+  const submitSourceRef = useRef<PolicyAssistantQuestionSource>('free_text');
+  const hadQuestionRef = useRef(false);
+  const hadAnswerRef = useRef(false);
+
+  // Embedded variant: the panel mounts only when the FAB sheet opens
+  // and unmounts when it closes — so mount = "Opened" and unmount =
+  // "Dismissed". Card variant fires Opened once on mount; it has no
+  // explicit dismissal (lives inline on a page).
+  useEffect(() => {
+    if (layoutVariant === 'embedded' || layoutVariant === 'card') {
+      trackPolicyAssistantOpened({ surface });
+    }
+    if (layoutVariant === 'embedded') {
+      return () => {
+        trackPolicyAssistantDismissed({
+          surface,
+          had_question: hadQuestionRef.current,
+          had_answer: hadAnswerRef.current,
+        });
+      };
+    }
+    return undefined;
+    // surface is stable for the lifetime of this component — depending on
+    // it would require a stable value anyway.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // sideSheet variant: open/close is driven by `sheetOpen`. Fire
+  // Opened on the open transition, Dismissed on the close transition.
+  const prevSheetOpenRef = useRef(false);
+  useEffect(() => {
+    if (layoutVariant !== 'sideSheet') return;
+    const prev = prevSheetOpenRef.current;
+    if (sheetOpen && !prev) {
+      trackPolicyAssistantOpened({ surface });
+    } else if (!sheetOpen && prev) {
+      trackPolicyAssistantDismissed({
+        surface,
+        had_question: hadQuestionRef.current,
+        had_answer: hadAnswerRef.current,
+      });
+    }
+    prevSheetOpenRef.current = sheetOpen;
+  }, [sheetOpen, layoutVariant, surface]);
+
   useEffect(() => {
     if (!assignmentId) {
       setTurns([]);
@@ -347,10 +404,25 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     setSubmitting(true);
     setEmptySubmitHint(false);
     setError('');
+    // Analytics: capture the source for THIS submission, then reset to
+    // 'free_text' so the next plain-textarea submission is correctly
+    // labeled. shortcut/follow_up handlers below set the ref before
+    // calling submit().
+    const source = submitSourceRef.current;
+    submitSourceRef.current = 'free_text';
+    hadQuestionRef.current = true;
+    trackPolicyAssistantQuestionSubmitted({ surface, source });
     try {
       const res = await employeeAPI.postPolicyAssistantQuery(assignmentId, trimmed);
       const answer = res.answer;
       scrollToResponseAfterAnswerRef.current = true;
+      hadAnswerRef.current = true;
+      trackPolicyAssistantAnswerReceived({
+        surface,
+        answer_type: answer?.answer_type ?? null,
+        status: deriveSupportStatus(answer),
+        request_id: res.request_id ?? null,
+      });
       setTurns((prev) => {
         const next = [
           ...prev,
@@ -373,12 +445,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     } finally {
       setSubmitting(false);
     }
-  }, [assignmentId, trimmed]);
+  }, [assignmentId, trimmed, surface]);
 
   const applySuggestion = (q: string) => {
     setMessage(q);
     setError('');
     setEmptySubmitHint(false);
+    // Mark the next submit as originating from a shortcut chip so
+    // analytics can distinguish it from raw textarea input.
+    submitSourceRef.current = 'shortcut';
     focusQuestionInput();
   };
 
@@ -415,6 +490,9 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     setMessage(text);
     setError('');
     setEmptySubmitHint(false);
+    // Mark the next submission as originating from a follow-up chip
+    // so QuestionSubmitted carries source='follow_up'.
+    submitSourceRef.current = 'follow_up';
     focusQuestionInput();
   };
 

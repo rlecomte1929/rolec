@@ -16,6 +16,9 @@ vi.mock('../../../api/client', () => ({
   hrAPI: {
     postPolicyAssistantQuery: (...args: unknown[]) => postPolicyAssistantQuery(...args),
   },
+  // Sprint 1 analytics beacons go through apiPost — stub here so the
+  // mocked module exposes the symbol; calls are fire-and-forget.
+  apiPost: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 function baseAnswer(overrides: Partial<PolicyAssistantAnswer> = {}): PolicyAssistantAnswer {

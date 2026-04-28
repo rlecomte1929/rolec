@@ -1,7 +1,7 @@
 /**
  * Bounded policy Q&A for HR: working draft, published signals, employee view — not a generic copilot.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
@@ -19,7 +19,15 @@ import {
   draftVsPublishedHint,
   policyScopeLine,
 } from './hrPolicyAssistantModel';
-import { trackPolicyAssistantFollowUpClicked } from './policyAssistantAnalytics';
+import {
+  trackPolicyAssistantAnswerReceived,
+  trackPolicyAssistantDismissed,
+  trackPolicyAssistantFollowUpClicked,
+  trackPolicyAssistantOpened,
+  trackPolicyAssistantQuestionSubmitted,
+  type PolicyAssistantQuestionSource,
+  type PolicyAssistantSurface,
+} from './policyAssistantAnalytics';
 import {
   HR_POLICY_ASSISTANT_NO_POLICY,
   HR_POLICY_ASSISTANT_PLACEHOLDER,
@@ -229,6 +237,46 @@ export const HrPolicyAssistantPanel: React.FC<{
   const layoutSheet = variant === 'sideSheet';
   const inSheetLike = variant !== 'card';
 
+  // Analytics: HR panel mounts only inside HR-side surfaces (sideSheet
+  // trigger on /hr/policy or embedded inside the FAB on the same page).
+  const surface: PolicyAssistantSurface = 'hr_sidesheet';
+  const submitSourceRef = useRef<PolicyAssistantQuestionSource>('free_text');
+  const hadQuestionRef = useRef(false);
+  const hadAnswerRef = useRef(false);
+
+  useEffect(() => {
+    if (variant === 'embedded' || variant === 'card') {
+      trackPolicyAssistantOpened({ surface });
+    }
+    if (variant === 'embedded') {
+      return () => {
+        trackPolicyAssistantDismissed({
+          surface,
+          had_question: hadQuestionRef.current,
+          had_answer: hadAnswerRef.current,
+        });
+      };
+    }
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const prevSheetOpenRef = useRef(false);
+  useEffect(() => {
+    if (variant !== 'sideSheet') return;
+    const prev = prevSheetOpenRef.current;
+    if (sheetOpen && !prev) {
+      trackPolicyAssistantOpened({ surface });
+    } else if (!sheetOpen && prev) {
+      trackPolicyAssistantDismissed({
+        surface,
+        had_question: hadQuestionRef.current,
+        had_answer: hadAnswerRef.current,
+      });
+    }
+    prevSheetOpenRef.current = sheetOpen;
+  }, [sheetOpen, variant, surface]);
+
   const pid = policyId?.trim() || null;
   const trimmed = message.trim();
   const canSubmit = Boolean(pid && trimmed && !submitting);
@@ -237,8 +285,19 @@ export const HrPolicyAssistantPanel: React.FC<{
     if (!pid || !trimmed) return;
     setSubmitting(true);
     setError('');
+    const source = submitSourceRef.current;
+    submitSourceRef.current = 'free_text';
+    hadQuestionRef.current = true;
+    trackPolicyAssistantQuestionSubmitted({ surface, source });
     try {
       const res = await hrAPI.postPolicyAssistantQuery(pid, trimmed, documentId?.trim() || undefined);
+      hadAnswerRef.current = true;
+      trackPolicyAssistantAnswerReceived({
+        surface,
+        answer_type: res.answer?.answer_type ?? null,
+        status: deriveSupportStatus(res.answer),
+        request_id: res.request_id ?? null,
+      });
       setTurns((prev) => {
         const next = [
           ...prev,
@@ -265,11 +324,13 @@ export const HrPolicyAssistantPanel: React.FC<{
     } finally {
       setSubmitting(false);
     }
-  }, [pid, trimmed, documentId]);
+  }, [pid, trimmed, documentId, surface]);
 
   const applySuggestion = (q: string) => {
     setMessage(q);
     setError('');
+    // Mark next submit as originating from a shortcut chip.
+    submitSourceRef.current = 'shortcut';
   };
 
   const handleFollowUpFromAnswer = (
@@ -287,6 +348,8 @@ export const HrPolicyAssistantPanel: React.FC<{
     });
     setMessage(text);
     setError('');
+    // Mark next submit as originating from a follow-up chip.
+    submitSourceRef.current = 'follow_up';
   };
 
   if (contextLoading && !pid) {

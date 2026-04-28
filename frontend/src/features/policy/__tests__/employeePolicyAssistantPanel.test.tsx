@@ -18,6 +18,10 @@ vi.mock('../../../api/client', () => ({
   employeeAPI: {
     postPolicyAssistantQuery: (...args: unknown[]) => postPolicyAssistantQuery(...args),
   },
+  // Sprint 1 added analytics beacons via apiPost. Stub it here so the
+  // mocked module exposes the symbol; analytics calls are fire-and-
+  // forget and don't affect the assertions.
+  apiPost: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 function entitlementAnswer(overrides: Partial<PolicyAssistantAnswer> = {}): PolicyAssistantAnswer {
