@@ -149,7 +149,7 @@ export const PolicyAssistantDockedShell: React.FC<PolicyAssistantDockedShellProp
         {/* Sticky header so title + close button stay visible while the
             assistant body scrolls underneath. */}
         <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 bg-white">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div id={titleId} className="text-base font-semibold tracking-tight text-[#0b2b43]">
               {title}
             </div>
@@ -191,7 +191,7 @@ export const PolicyAssistantDockedShell: React.FC<PolicyAssistantDockedShellProp
           />
           <div className="relative z-10 flex h-[100dvh] max-h-[100dvh] w-full flex-col bg-white shadow-[0_-8px_30px_rgba(15,23,42,0.12)] sm:h-auto sm:max-h-[92vh] sm:rounded-t-2xl">
             <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 bg-white">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div
                   id={`${titleId}-mobile`}
                   className="text-base font-semibold tracking-tight text-[#0b2b43]"

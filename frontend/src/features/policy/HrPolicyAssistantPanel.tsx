@@ -433,8 +433,16 @@ export const HrPolicyAssistantPanel: React.FC<{
 
   if (!pid) {
     if (variant === 'embedded') {
-      // Honest minimal fallback inside the docked shell — no chrome to repeat.
-      return <p className="text-sm text-slate-500">{HR_POLICY_ASSISTANT_NO_POLICY}</p>;
+      // Honest minimal fallback inside the docked shell — no chrome to
+      // repeat. break-words keeps the message inside the column even
+      // on browser zoom or narrower-than-default panel widths.
+      return (
+        <div className="space-y-2">
+          <p className="text-sm leading-relaxed text-slate-600 break-words">
+            {HR_POLICY_ASSISTANT_NO_POLICY}
+          </p>
+        </div>
+      );
     }
     return (
       <Card padding="md" className="border-slate-200 bg-slate-50/50" id="hr-policy-assistant">

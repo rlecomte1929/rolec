@@ -504,18 +504,22 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       {/* Sprint 2 trigger — replaces the old PolicyAssistantFab. Sits
           flush-right above the status strip so it's discoverable
           without competing with the page heading. The docked shell
-          handles the panel itself. */}
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setAssistantOpen((v) => !v)}
-          aria-expanded={assistantOpen}
-          aria-controls="hr-policy-assistant-shell-title"
-        >
-          {assistantOpen ? 'Close policy assistant' : 'Ask about this policy'}
-        </Button>
-      </div>
+          owns the close affordance via its header X — the trigger
+          hides when the panel is open so we don't render two ways to
+          close the same panel. */}
+      {assistantOpen ? null : (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setAssistantOpen(true)}
+            aria-expanded={false}
+            aria-controls="hr-policy-assistant-shell-title"
+          >
+            Ask about this policy
+          </Button>
+        </div>
+      )}
 
       {/* 1. Status strip */}
       <StatusStrip

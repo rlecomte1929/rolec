@@ -44,7 +44,7 @@ function EmployeePolicyContent() {
         </div>
       </div>
       <PolicyAssistantFab
-        label={assistantOpen ? 'Close policy assistant' : 'Ask about your policy'}
+        label="Ask about your policy"
         isPanelOpen={assistantOpen}
         onClick={() => setAssistantOpen((v) => !v)}
       />

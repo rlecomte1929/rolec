@@ -657,7 +657,7 @@ export const CaseWizardPage: React.FC = () => {
       {/* FAB trigger — toggles the docked shell. Hides on lg+ when
           open so it doesn't overlap the panel. */}
       <PolicyAssistantFab
-        label={assistantOpen ? 'Close policy assistant' : 'Ask about your policy'}
+        label="Ask about your policy"
         isPanelOpen={assistantOpen}
         onClick={() => setAssistantOpen((v) => !v)}
       />
