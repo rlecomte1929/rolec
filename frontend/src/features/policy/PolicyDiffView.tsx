@@ -13,6 +13,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
 import { policyConfigMatrixAPI } from '../../api/client';
+import {
+  CollapsibleCategory,
+  groupByCategory,
+  shouldDefaultOpen,
+} from './diffCategoryGrouping';
 
 // --- Types ------------------------------------------------------------------
 
@@ -329,19 +334,27 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
               <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">
                 Changed rows ({diff!.changed.length})
               </h3>
-              <ul className="space-y-2">
-                {diff!.changed.map((entry) => {
-                  const key = `${entry.after.benefit_key}::${entry.after.targeting_signature ?? 'global'}`;
-                  return (
-                    <ChangedRow
-                      key={key}
-                      entry={entry}
-                      reverting={revertingKey === key}
-                      onRevert={() => void revert(entry.after)}
-                    />
-                  );
-                })}
-              </ul>
+              <div className="space-y-2">
+                {groupByCategory(diff!.changed, (e) => e.after.category).map((group) => (
+                  <CollapsibleCategory
+                    key={group.key}
+                    group={group}
+                    accentClassName="border-l-4 border-l-amber-400"
+                    defaultOpen={shouldDefaultOpen(diff!.changed.length)}
+                    testId="policy-diff-changed-group"
+                    renderRow={(entry) => {
+                      const key = `${entry.after.benefit_key}::${entry.after.targeting_signature ?? 'global'}`;
+                      return (
+                        <ChangedRow
+                          entry={entry}
+                          reverting={revertingKey === key}
+                          onRevert={() => void revert(entry.after)}
+                        />
+                      );
+                    }}
+                  />
+                ))}
+              </div>
             </section>
           )}
 
@@ -350,19 +363,27 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
               <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">
                 Added rows ({diff!.added.length})
               </h3>
-              <ul className="space-y-2">
-                {diff!.added.map((row) => {
-                  const key = `${row.benefit_key}::${row.targeting_signature ?? 'global'}`;
-                  return (
-                    <AddedRow
-                      key={key}
-                      row={row}
-                      reverting={revertingKey === key}
-                      onRevert={() => void revert(row)}
-                    />
-                  );
-                })}
-              </ul>
+              <div className="space-y-2">
+                {groupByCategory(diff!.added, (r) => r.category).map((group) => (
+                  <CollapsibleCategory
+                    key={group.key}
+                    group={group}
+                    accentClassName="border-l-4 border-l-emerald-400"
+                    defaultOpen={shouldDefaultOpen(diff!.added.length)}
+                    testId="policy-diff-added-group"
+                    renderRow={(row) => {
+                      const key = `${row.benefit_key}::${row.targeting_signature ?? 'global'}`;
+                      return (
+                        <AddedRow
+                          row={row}
+                          reverting={revertingKey === key}
+                          onRevert={() => void revert(row)}
+                        />
+                      );
+                    }}
+                  />
+                ))}
+              </div>
             </section>
           )}
 
@@ -371,19 +392,27 @@ export const PolicyDiffView: React.FC<Props> = ({ adminCompanyId, refreshTrigger
               <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">
                 Removed rows ({diff!.removed.length})
               </h3>
-              <ul className="space-y-2">
-                {diff!.removed.map((row) => {
-                  const key = `${row.benefit_key}::${row.targeting_signature ?? 'global'}`;
-                  return (
-                    <RemovedRow
-                      key={key}
-                      row={row}
-                      reverting={revertingKey === key}
-                      onRevert={() => void revert(row)}
-                    />
-                  );
-                })}
-              </ul>
+              <div className="space-y-2">
+                {groupByCategory(diff!.removed, (r) => r.category).map((group) => (
+                  <CollapsibleCategory
+                    key={group.key}
+                    group={group}
+                    accentClassName="border-l-4 border-l-red-400"
+                    defaultOpen={shouldDefaultOpen(diff!.removed.length)}
+                    testId="policy-diff-removed-group"
+                    renderRow={(row) => {
+                      const key = `${row.benefit_key}::${row.targeting_signature ?? 'global'}`;
+                      return (
+                        <RemovedRow
+                          row={row}
+                          reverting={revertingKey === key}
+                          onRevert={() => void revert(row)}
+                        />
+                      );
+                    }}
+                  />
+                ))}
+              </div>
             </section>
           )}
 
