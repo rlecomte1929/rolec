@@ -38,6 +38,12 @@ EVENT_ASSISTANT_ANSWER_TOPIC = "assistant_answer_topic"
 EVENT_ASSISTANT_ANSWER_READINESS = "assistant_answer_readiness"
 EVENT_ASSISTANT_FOLLOW_UP_CLICKED = "assistant_follow_up_clicked"
 EVENT_ASSISTANT_REFUSAL_SHOWN = "assistant_refusal_shown"
+# Sprint 1.5: UI-driven beacons covering container lifecycle.
+# No question text — surface label + small enums + booleans only.
+EVENT_ASSISTANT_OPENED = "assistant_opened"
+EVENT_ASSISTANT_QUESTION_SUBMITTED = "assistant_question_submitted"
+EVENT_ASSISTANT_ANSWER_RECEIVED = "assistant_answer_received"
+EVENT_ASSISTANT_DISMISSED = "assistant_dismissed"
 
 
 def _role_str(role: PolicyAssistantRoleScope) -> str:
@@ -290,4 +296,97 @@ def emit_assistant_follow_up_clicked(
         request_id=request_id,
         user_role=_role_str(role),
         extra=extra,
+    )
+
+
+# --- Sprint 1.5 beacon emitters ---------------------------------------
+# Mirror the four UI-side analytics functions in
+# frontend/src/features/policy/policyAssistantAnalytics.ts. All four
+# share the same surface enum and write into analytics_events.extra so
+# dashboards can group by surface without a schema migration.
+
+
+def emit_assistant_opened(
+    *,
+    role: PolicyAssistantRoleScope,
+    request_id: Optional[str],
+    surface: str,
+) -> None:
+    """The assistant sheet/panel just became visible."""
+    _emit(
+        EVENT_ASSISTANT_OPENED,
+        request_id=request_id,
+        user_role=_role_str(role),
+        extra={"surface": (surface or "")[:32] or None},
+    )
+
+
+def emit_assistant_question_submitted(
+    *,
+    role: PolicyAssistantRoleScope,
+    request_id: Optional[str],
+    surface: str,
+    source: str,
+) -> None:
+    """User clicked Ask. ``source`` distinguishes typed input (`free_text`)
+    from sample-question chip (`shortcut`) from follow-up chip (`follow_up`).
+    """
+    _emit(
+        EVENT_ASSISTANT_QUESTION_SUBMITTED,
+        request_id=request_id,
+        user_role=_role_str(role),
+        extra={
+            "surface": (surface or "")[:32] or None,
+            "source": (source or "")[:32] or None,
+        },
+    )
+
+
+def emit_assistant_answer_received(
+    *,
+    role: PolicyAssistantRoleScope,
+    request_id: Optional[str],
+    surface: str,
+    answer_type: Optional[str],
+    status: str,
+    assistant_turn_request_id: Optional[str] = None,
+) -> None:
+    """API answered. ``status`` is the derived support status from the
+    UI (answered / clarification / refused …) so dashboards can track
+    refusal + clarification rates per surface."""
+    extra: Dict[str, Any] = {
+        "surface": (surface or "")[:32] or None,
+        "answer_type": (answer_type or "")[:64] or None,
+        "status": (status or "")[:64] or None,
+    }
+    if assistant_turn_request_id and str(assistant_turn_request_id).strip():
+        extra["assistant_turn_request_id"] = str(assistant_turn_request_id).strip()[:128]
+    _emit(
+        EVENT_ASSISTANT_ANSWER_RECEIVED,
+        request_id=request_id,
+        user_role=_role_str(role),
+        extra=extra,
+    )
+
+
+def emit_assistant_dismissed(
+    *,
+    role: PolicyAssistantRoleScope,
+    request_id: Optional[str],
+    surface: str,
+    had_question: bool,
+    had_answer: bool,
+) -> None:
+    """User closed the sheet. The booleans capture whether they typed
+    anything and whether they got at least one answer before closing —
+    useful for the abandoned-without-answer rate."""
+    _emit(
+        EVENT_ASSISTANT_DISMISSED,
+        request_id=request_id,
+        user_role=_role_str(role),
+        extra={
+            "surface": (surface or "")[:32] or None,
+            "had_question": bool(had_question),
+            "had_answer": bool(had_answer),
+        },
     )

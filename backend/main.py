@@ -21,12 +21,12 @@ log = logging.getLogger(__name__)
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Annotated, Literal, Optional, Dict, Any, List, Tuple, Union
 import uuid
 from datetime import datetime, date
 import re
 import json
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -1176,10 +1176,17 @@ class HrPolicyAssistantQueryRequest(BaseModel):
     session: Optional[Dict[str, Any]] = None
 
 
-class PolicyAssistantAnalyticsBeaconRequest(BaseModel):
-    """Non-PII client beacon (e.g. follow-up chip). No free-text beyond whitelisted fields."""
+class _BeaconBase(BaseModel):
+    """Common beacon model config. ``extra='forbid'`` keeps the surface
+    tight — a client can't sneak in PII fields by appending them."""
 
-    event: str
+    model_config = {"extra": "forbid"}
+
+
+class FollowUpClickedBeacon(_BeaconBase):
+    """Pre-Sprint-1 event. Locks down the original required fields."""
+
+    event: Literal["assistant_follow_up_clicked"]
     follow_up_intent: Optional[str] = Field(None, max_length=80)
     follow_up_index: int = Field(..., ge=0, le=20)
     canonical_topic: Optional[str] = Field(None, max_length=64)
@@ -1188,6 +1195,60 @@ class PolicyAssistantAnalyticsBeaconRequest(BaseModel):
         max_length=128,
         description="Correlates to request_id from the policy assistant query that showed the chip.",
     )
+
+
+# Sprint 1.5: surface label for the four new events. Enum (not free
+# string) so dashboards can group cleanly.
+_BeaconSurface = Literal["employee_fab", "hr_sidesheet", "employee_card"]
+
+
+class AssistantOpenedBeacon(_BeaconBase):
+    event: Literal["assistant_opened"]
+    surface: _BeaconSurface
+
+
+class AssistantQuestionSubmittedBeacon(_BeaconBase):
+    event: Literal["assistant_question_submitted"]
+    surface: _BeaconSurface
+    source: Literal["free_text", "shortcut", "follow_up"]
+
+
+class AssistantAnswerReceivedBeacon(_BeaconBase):
+    event: Literal["assistant_answer_received"]
+    surface: _BeaconSurface
+    answer_type: Optional[str] = Field(None, max_length=64)
+    status: str = Field(..., max_length=64)
+    request_id: Optional[str] = Field(None, max_length=128)
+
+
+class AssistantDismissedBeacon(_BeaconBase):
+    event: Literal["assistant_dismissed"]
+    surface: _BeaconSurface
+    had_question: bool
+    had_answer: bool
+
+
+# Discriminated union wrapped in RootModel so FastAPI accepts it as a
+# request body. Pydantic v2 picks the right model from the `event`
+# tag, so 422 errors point at the actual mismatch ("missing field
+# 'surface' for assistant_opened") instead of conflating all events
+# under one schema. RootModel preserves the JSON shape — the body is
+# just the event object, not wrapped in a parent key.
+class PolicyAssistantAnalyticsBeaconRequest(
+    RootModel[
+        Annotated[
+            Union[
+                FollowUpClickedBeacon,
+                AssistantOpenedBeacon,
+                AssistantQuestionSubmittedBeacon,
+                AssistantAnswerReceivedBeacon,
+                AssistantDismissedBeacon,
+            ],
+            Field(discriminator="event"),
+        ]
+    ]
+):
+    pass
 
 
 def _require_reason(reason: Optional[str]) -> None:
@@ -7618,24 +7679,75 @@ def post_policy_assistant_analytics_beacon(
 ):
     """
     Lightweight client-side policy assistant signals (no question text).
-    Currently supports: assistant_follow_up_clicked.
+
+    Sprint 1.5 widens this from a single-event endpoint to a discriminated
+    union covering the five UI-side beacons:
+      - assistant_follow_up_clicked  (pre-Sprint-1, unchanged behavior)
+      - assistant_opened
+      - assistant_question_submitted
+      - assistant_answer_received
+      - assistant_dismissed
+
+    The discriminator lives on the request model (`event` literal); each
+    event dispatches to its own emit function which writes to the same
+    analytics_events stream as record_policy_assistant_turn. No PII —
+    surface label, source enum, status enum, booleans, request_id only.
     """
-    if body.event != "assistant_follow_up_clicked":
-        raise HTTPException(status_code=400, detail="Unsupported analytics event")
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
-    from .services.policy_assistant_analytics import emit_assistant_follow_up_clicked
+    from .services.policy_assistant_analytics import (
+        emit_assistant_follow_up_clicked,
+        emit_assistant_opened,
+        emit_assistant_question_submitted,
+        emit_assistant_answer_received,
+        emit_assistant_dismissed,
+    )
     from .services.policy_assistant_contract import PolicyAssistantRoleScope
 
     role_upper = (user.get("role") or "").upper()
     rs = PolicyAssistantRoleScope.HR if role_upper == "HR" else PolicyAssistantRoleScope.EMPLOYEE
-    emit_assistant_follow_up_clicked(
-        role=rs,
-        request_id=request_id,
-        follow_up_intent=body.follow_up_intent,
-        follow_up_index=body.follow_up_index,
-        canonical_topic=body.canonical_topic,
-        assistant_turn_request_id=body.assistant_turn_request_id,
-    )
+
+    # `body` is a RootModel — the actual discriminated event lives at
+    # `body.root`. Pydantic has already routed the dict to the right
+    # subclass based on the `event` literal.
+    event_obj = body.root
+    if isinstance(event_obj, FollowUpClickedBeacon):
+        emit_assistant_follow_up_clicked(
+            role=rs,
+            request_id=request_id,
+            follow_up_intent=event_obj.follow_up_intent,
+            follow_up_index=event_obj.follow_up_index,
+            canonical_topic=event_obj.canonical_topic,
+            assistant_turn_request_id=event_obj.assistant_turn_request_id,
+        )
+    elif isinstance(event_obj, AssistantOpenedBeacon):
+        emit_assistant_opened(role=rs, request_id=request_id, surface=event_obj.surface)
+    elif isinstance(event_obj, AssistantQuestionSubmittedBeacon):
+        emit_assistant_question_submitted(
+            role=rs,
+            request_id=request_id,
+            surface=event_obj.surface,
+            source=event_obj.source,
+        )
+    elif isinstance(event_obj, AssistantAnswerReceivedBeacon):
+        emit_assistant_answer_received(
+            role=rs,
+            request_id=request_id,
+            surface=event_obj.surface,
+            answer_type=event_obj.answer_type,
+            status=event_obj.status,
+            assistant_turn_request_id=event_obj.request_id,
+        )
+    elif isinstance(event_obj, AssistantDismissedBeacon):
+        emit_assistant_dismissed(
+            role=rs,
+            request_id=request_id,
+            surface=event_obj.surface,
+            had_question=event_obj.had_question,
+            had_answer=event_obj.had_answer,
+        )
+    else:
+        # Defensive: the discriminated union should never produce another type.
+        raise HTTPException(status_code=400, detail="Unsupported analytics event")
     return {"ok": True}
 
 
