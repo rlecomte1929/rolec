@@ -10,7 +10,7 @@ import {
   HrPolicyWorkspaceResolved,
   deriveHrPolicyPrimaryAction,
 } from './hrPolicyWorkspaceState';
-import { formatComparisonReadinessBadge, formatPublishReadinessBadge } from './policyWorkflowCopy';
+import { formatComparisonReadinessBadge } from './policyWorkflowCopy';
 import { StarterPolicyOnboardingCard } from './StarterPolicyOnboardingCard';
 import type { StarterTemplateKey } from './starterPolicyCopy';
 import type { EmployeePreviewCompareModel } from './hrPolicyEmployeePreviewCompare';
@@ -182,22 +182,6 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
   const issueLimit = showAllIssues ? 50 : 3;
   const visibleIssues = resolved.highlightIssues.slice(0, issueLimit);
 
-  const liveSummary = (): { title: string; body: string } => {
-    if (resolved.phase === 'no_policy') {
-      return { title: 'Nothing live yet', body: 'Employees do not have a published policy to view.' };
-    }
-    if (resolved.phase === 'published' || resolved.publishedVersionNumber != null) {
-      return {
-        title: lifecycle.activeSource.title,
-        body: lifecycle.activeSource.subtitle,
-      };
-    }
-    return {
-      title: 'No live employee policy yet',
-      body: 'Publish a version to put benefits on employee assignments. This draft is HR-only until then.',
-    };
-  };
-
   const underReviewSummary = (): { title: string; body: string } => {
     if (resolved.phase === 'no_policy') {
       return { title: '—', body: 'Create or upload a policy to start a draft.' };
@@ -224,31 +208,7 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
     return { title: 'No draft in progress', body: 'Upload a newer file or edit values; new work stays as a draft until published.' };
   };
 
-  const employeeViewSummary = (): { title: string; body: string } => {
-    if (resolved.phase === 'no_policy') {
-      return { title: 'Employee view', body: 'Nothing to show until HR publishes a policy.' };
-    }
-    if (resolved.phase !== 'published') {
-      return {
-        title: 'Employee view',
-        body: 'Employees only see published versions. This draft is invisible to them until you publish.',
-      };
-    }
-    const tier =
-      resolved.comparisonSummary === 'full'
-        ? 'Full comparison'
-        : resolved.comparisonSummary === 'partial'
-          ? 'Partial comparison'
-          : 'Informational only';
-    return {
-      title: `Published policy — ${tier}`,
-      body: COMPARISON_SUMMARY_COPY[resolved.comparisonSummary],
-    };
-  };
-
-  const live = liveSummary();
   const review = underReviewSummary();
-  const emp = employeeViewSummary();
 
   const renderPrimaryCta = () => {
     switch (primaryAction) {
@@ -315,14 +275,14 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
           )}
         </div>
 
-        {(resolved.publishReadiness?.status || resolved.comparisonReadiness?.status) && (
+        {/* Slice 3b: drop the publish-readiness Badge — it duplicates the
+            "What to fix before going live" checklist, which is the actual
+            action list HR uses. Comparison-readiness stays because it
+            tells HR something distinct (whether the live and draft are
+            shown side-by-side to employees). */}
+        {resolved.comparisonReadiness?.status && (
           <div className="flex flex-wrap gap-2 mt-3">
-            {resolved.publishReadiness?.status && (
-              <Badge tone="neutral">{formatPublishReadinessBadge(resolved.publishReadiness.status)}</Badge>
-            )}
-            {resolved.comparisonReadiness?.status && (
-              <Badge tone="neutral">{formatComparisonReadinessBadge(resolved.comparisonReadiness.status)}</Badge>
-            )}
+            <Badge tone="neutral">{formatComparisonReadinessBadge(resolved.comparisonReadiness.status)}</Badge>
           </div>
         )}
 
@@ -347,33 +307,25 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
           </div>
         )}
 
+        {/* Slice 3b: collapse the 3-column at-a-glance grid to a single
+            "Under review (HR only)" panel.
+            - "Live for employees today" duplicated the sticky status
+              strip's Live pill at the top of the page.
+            - "Employee cost comparison" duplicated the dedicated
+              Employee visibility preview further down.
+            What's left is the only signal HR doesn't get elsewhere:
+            what's currently in the draft they're authoring. */}
         {loading ? (
           <div className="mt-4">
             <AtAGlanceSkeleton />
           </div>
         ) : (
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b] mb-1">
-                Live for employees today
-              </div>
-              <div className="text-sm font-medium text-[#0b2b43]">{live.title}</div>
-              <p className="text-xs text-[#4b5563] mt-1 leading-relaxed">{live.body}</p>
+          <div className="mt-4 rounded-lg border border-[#e5e7eb] bg-[#fafafa] p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b] mb-1">
+              Under review (HR only)
             </div>
-            <div className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b] mb-1">
-                Under review (HR only)
-              </div>
-              <div className="text-sm font-medium text-[#0b2b43]">{review.title}</div>
-              <p className="text-xs text-[#4b5563] mt-1 leading-relaxed">{review.body}</p>
-            </div>
-            <div className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b] mb-1">
-                Employee cost comparison
-              </div>
-              <div className="text-sm font-medium text-[#0b2b43]">{emp.title}</div>
-              <p className="text-xs text-[#4b5563] mt-1 leading-relaxed">{emp.body}</p>
-            </div>
+            <div className="text-sm font-medium text-[#0b2b43]">{review.title}</div>
+            <p className="text-xs text-[#4b5563] mt-1 leading-relaxed">{review.body}</p>
           </div>
         )}
 
