@@ -8,7 +8,14 @@ import type { AssignmentDetail, AssignmentStatus } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { CaseTimeline } from '../features/timeline/CaseTimeline';
-import { CaseReadinessCore } from '../features/readiness/CaseReadinessCore';
+// CaseReadinessCore was the old "Case readiness" section showing
+// destination-specific compliance template (e.g. "Singapore — Employment
+// Pass"). Dropped from the Case Summary page as redundant: it duplicated
+// the readiness checklist already in step 2 (ReadinessAndActionsBlock)
+// and the relocation plan in step 3 (CaseTimeline). Until per-destination
+// templates are wired up properly, the section also misled HR by
+// hardcoding Singapore for any unsupported destination. Component file
+// kept in features/readiness/ for now; unused.
 import { CaseEssentialsCard } from '../features/cases/CaseEssentialsCard';
 import { ReadinessAndActionsBlock } from '../features/cases/ReadinessAndActionsBlock';
 import { CaseOperationalSection } from '../features/cases/CaseOperationalSection';
@@ -175,7 +182,7 @@ export const HrCaseSummary: React.FC = () => {
   return (
     <AppShell
       title="Case Summary"
-      subtitle="Same view as the employee: essentials, gaps, shared plan."
+      subtitle="HR overview of this case — essentials, blockers, and the shared timeline. Edits here sync to the employee."
     >
       <nav
         className="mb-4 text-sm text-[#64748b] flex items-center gap-1"
@@ -269,16 +276,14 @@ export const HrCaseSummary: React.FC = () => {
             </CaseOperationalSection>
           )}
 
-          {assignment?.id && (
-            <>
-              <div className="rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-3 text-xs text-[#64748b] leading-relaxed">
-                <span className="font-semibold text-[#0b2b43]">Route and template reference</span>. Checklist rows,
-                template milestones, and source tiers for this destination. Use after the steps above. Does not replace
-                the shared plan for day-to-day work.
-              </div>
-              <CaseReadinessCore assignmentId={assignment.id} />
-            </>
-          )}
+          {/* Slice C1: dropped the "Route and template reference" /
+              CaseReadinessCore section that used to live here. It
+              duplicated the readiness checklist (step 2) and the
+              relocation plan (step 3), and the destination-template
+              lookup misfired for unsupported countries (always
+              fell back to Singapore). The destination-template feature
+              comes back as part of step 2 once per-country templates
+              exist for more than one destination. */}
 
           {canReopen && isReopenOpen && (
             <Card padding="lg">
