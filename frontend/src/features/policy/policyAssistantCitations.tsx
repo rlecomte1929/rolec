@@ -52,6 +52,64 @@ export function scrollToSourceRef(sourceRef: string): boolean {
   return true;
 }
 
+/**
+ * Map a backend `evidence.reference` (typically a `benefit_key` like
+ * "shipment_allowance" or a canonical topic value like "shipment") to a
+ * stable HTML element id we mark up on policy-clause rows. Slugifies
+ * to keep the id readable in DevTools and avoid collisions with other
+ * id schemes already in use on the page.
+ */
+export function referenceToElementId(ref: string): string {
+  const slug = String(ref || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `policy-clause-${slug || 'unknown'}`;
+}
+
+/**
+ * Resolve a Policy Assistant `evidence.reference` to a DOM element on
+ * the policy page and scroll-into-view + flash it. Tries (in order):
+ *   1. The id produced by `referenceToElementId` — direct anchor
+ *   2. `[data-policy-reference="<ref>"]` — explicit attribute match
+ *
+ * The two-step lookup is intentional: it lets the policy page mark up
+ * clauses with EITHER a stable id OR an attribute, without forcing one
+ * convention onto callers. Returns false when no element is found so
+ * callers can log + degrade gracefully.
+ */
+export function scrollToPolicyReference(reference: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const ref = String(reference || '').trim();
+  if (!ref) return false;
+  let el = document.getElementById(referenceToElementId(ref));
+  if (!el) {
+    el = document.querySelector<HTMLElement>(
+      `[data-policy-reference="${CSS.escape(ref)}"]`
+    );
+  }
+  if (!el) return false;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add(HIGHLIGHT_CLASS);
+  window.setTimeout(() => el.classList.remove(HIGHLIGHT_CLASS), HIGHLIGHT_DURATION_MS);
+  return true;
+}
+
+/**
+ * True when the viewport is wide enough that the docked Policy
+ * Assistant panel sits side-by-side with the policy page (lg+, ≥1024px).
+ * Citation deep-linking is disabled below this breakpoint because the
+ * mobile bottom-sheet covers the policy underneath — scrolling the
+ * page behind a modal yields nothing the user can see.
+ */
+export function isCitationDeepLinkAvailable(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return window.matchMedia('(min-width: 1024px)').matches;
+}
+
 type CitationChipProps = {
   index: number;
   chunk?: PolicyAssistantCitedChunk;
