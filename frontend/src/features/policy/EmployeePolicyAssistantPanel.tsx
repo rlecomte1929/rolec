@@ -3,7 +3,7 @@
  * Mounted as `embedded` inside PolicyAssistantDockedShell — docked panel on lg+, bottom-sheet on mobile.
  */
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Copy, Loader2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Copy, Loader2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
@@ -535,6 +535,11 @@ export const EmployeePolicyAssistantPanel: React.FC<{
 
   const errorParts = error ? policyAssistantUserFacingError(error) : null;
 
+  // Empty state: no typed message AND no saved Q&A. Drives the
+  // "sample questions as hero cards" layout below; once the user
+  // types or submits anything we revert to the textarea-hero layout.
+  const isEmptyState = !message.trim() && turns.length === 0;
+
   const mainForm = (
     <>
       {/* Inner header is the panel's own title/subtitle pair. Card mode
@@ -553,6 +558,37 @@ export const EmployeePolicyAssistantPanel: React.FC<{
       ) : null}
 
       <div className="flex flex-col gap-8">
+        {/* Empty state hero: when there are no saved turns AND the
+            user hasn't started typing, lead with sample questions as
+            full-width clickable cards. First-time users find "what to
+            ask" harder than "how to ask"; the cards put a starter set
+            front-and-center. Once the user types or has saved Q&A,
+            switch back to the textarea-hero layout below. */}
+        {isEmptyState ? (
+          <section
+            id={shortcutsSectionId}
+            className="flex flex-col gap-3"
+            aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
+          >
+            <h3 className="text-sm font-semibold text-[#0b2b43] mb-1">Try one of these:</h3>
+            <ul className="flex flex-col gap-2">
+              {shortcuts.map((s) => (
+                <li key={s}>
+                  <button
+                    type="button"
+                    onClick={() => applySuggestion(s)}
+                    disabled={submitting}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left text-sm font-medium text-slate-700 transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <span className="min-w-0 leading-snug">{s}</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         {/* Input + primary action */}
         <div className="flex flex-col gap-2" aria-busy={submitting}>
           <label htmlFor={questionId} className="sr-only">
@@ -561,10 +597,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           <textarea
             ref={textareaRef}
             id={questionId}
-            rows={6}
+            rows={isEmptyState ? 3 : 6}
             maxLength={8000}
             placeholder={EMPLOYEE_POLICY_ASSISTANT_PLACEHOLDER}
-            className="w-full resize-y min-h-[10rem] rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 focus:shadow-[0_1px_2px_rgba(15,23,42,0.06)] disabled:opacity-60"
+            className={`w-full resize-y rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 focus:shadow-[0_1px_2px_rgba(15,23,42,0.06)] disabled:opacity-60 ${
+              isEmptyState ? 'min-h-[5rem]' : 'min-h-[10rem]'
+            }`}
             value={message}
             onChange={(e) => {
               setMessage(e.target.value);
@@ -599,6 +637,11 @@ export const EmployeePolicyAssistantPanel: React.FC<{
               EMPLOYEE_POLICY_ASSISTANT_SUBMIT
             )}
           </Button>
+          {isEmptyState ? (
+            <p className="text-xs text-slate-500 mt-0.5">
+              Or type your own question above.
+            </p>
+          ) : null}
           {emptySubmitHint ? (
             <p
               id="policy-assistant-empty-hint"
@@ -617,26 +660,31 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           ) : null}
         </div>
 
-        <section
-          id={shortcutsSectionId}
-          className="flex flex-col gap-2.5"
-          aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
-        >
-          <h3 className="text-xs font-medium text-slate-600">{EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}</h3>
-          <div className="flex flex-wrap gap-2">
-            {shortcuts.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => applySuggestion(s)}
-                disabled={submitting}
-                className="inline-flex h-9 min-h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 py-0 text-left text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:max-w-[280px]"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </section>
+        {/* Compact shortcut chips below the textarea, shown only when
+            the user is past the empty state (typing or has Q&A
+            history). The hero block above is the empty-state version. */}
+        {isEmptyState ? null : (
+          <section
+            id={shortcutsSectionId}
+            className="flex flex-col gap-2.5"
+            aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
+          >
+            <h3 className="text-xs font-medium text-slate-600">{EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}</h3>
+            <div className="flex flex-wrap gap-2">
+              {shortcuts.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => applySuggestion(s)}
+                  disabled={submitting}
+                  className="inline-flex h-9 min-h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 py-0 text-left text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:max-w-[280px]"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Trust-signal pill — replaces the previous two paragraphs of
             light-gray disclaimer text. Reads as a positive signal

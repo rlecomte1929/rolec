@@ -2,7 +2,7 @@
  * Bounded policy Q&A for HR: working draft, published signals, employee view — not a generic copilot.
  */
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { hrAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
@@ -398,6 +398,11 @@ export const HrPolicyAssistantPanel: React.FC<{
 
   const questionId = inSheetLike ? 'hr-policy-assistant-question-sheet' : 'hr-policy-assistant-question';
 
+  // Empty state: no typed message AND no answers yet. Drives the
+  // "sample questions as hero cards" layout — first-time HR users find
+  // "what to ask" harder than "how to ask".
+  const isEmptyState = !message.trim() && turns.length === 0;
+
   const coreForm = (
     <>
       {/* Trust-signal pill replacing the previous SCOPE_NOTE paragraph.
@@ -411,13 +416,37 @@ export const HrPolicyAssistantPanel: React.FC<{
         </span>
       </div>
 
+      {/* Empty-state hero: sample questions as full-width cards. Once
+          the user types or submits, swap back to the textarea-hero
+          layout below. */}
+      {isEmptyState ? (
+        <section className="mt-4 flex flex-col gap-3" aria-label="Sample policy questions">
+          <h3 className="text-sm font-semibold text-[#0b2b43] mb-1">Try one of these:</h3>
+          <ul className="flex flex-col gap-2">
+            {HR_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
+              <li key={s}>
+                <button
+                  type="button"
+                  onClick={() => applySuggestion(s)}
+                  disabled={submitting || contextLoading}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left text-sm font-medium text-slate-700 transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <span className="min-w-0 leading-snug">{s}</span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <div className="mt-4 space-y-2">
         <label htmlFor={questionId} className="sr-only">
           Policy question
         </label>
         <textarea
           id={questionId}
-          rows={inSheetLike ? 5 : 3}
+          rows={inSheetLike ? (isEmptyState ? 3 : 5) : 3}
           maxLength={8000}
           placeholder={HR_POLICY_ASSISTANT_PLACEHOLDER}
           className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 disabled:opacity-60${inSheetLike ? ' min-h-[5rem]' : ''}`}
@@ -427,21 +456,25 @@ export const HrPolicyAssistantPanel: React.FC<{
           aria-describedby="hr-policy-assistant-suggestions-hint"
         />
         <div id="hr-policy-assistant-suggestions-hint" className="text-xs text-slate-500">
-          Use a sample below or type a policy question, then submit.
+          {isEmptyState
+            ? 'Or type your own policy question above.'
+            : 'Use a sample below or type a policy question, then submit.'}
         </div>
-        <div className="flex flex-wrap gap-2">
-          {HR_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => applySuggestion(s)}
-              disabled={submitting || contextLoading}
-              className="text-left text-xs rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-700 hover:bg-slate-100 disabled:opacity-50 max-w-full"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+        {isEmptyState ? null : (
+          <div className="flex flex-wrap gap-2">
+            {HR_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => applySuggestion(s)}
+                disabled={submitting || contextLoading}
+                className="text-left text-xs rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-700 hover:bg-slate-100 disabled:opacity-50 max-w-full"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-2 pt-1">
           <Button type="button" onClick={() => void submit()} disabled={!canSubmit || contextLoading}>
             {submitting ? 'Checking policy…' : HR_POLICY_ASSISTANT_SUBMIT}
