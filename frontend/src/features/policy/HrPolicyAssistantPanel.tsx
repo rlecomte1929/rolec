@@ -2,11 +2,15 @@
  * Bounded policy Q&A for HR: working draft, published signals, employee view — not a generic copilot.
  */
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { hrAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
-import { formatAnswerWithCitations } from './policyAssistantCitations';
+import {
+  formatAnswerWithCitations,
+  isCitationDeepLinkAvailable,
+  scrollToPolicyReference,
+} from './policyAssistantCitations';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 import {
   deriveSupportStatus,
@@ -190,19 +194,64 @@ function HrAnswerResultCard({
               <div>
                 <div className="text-xs font-semibold text-slate-600 mb-1">Source reference</div>
                 <ul className="text-sm text-slate-700 space-y-2">
-                  {answer.evidence.map((ev, i) => (
-                    <li key={i} className="border-l-2 border-slate-200 pl-3">
-                      <div className="font-medium text-slate-800">{ev.label || ev.kind}</div>
-                      {ev.excerpt ? (
-                        <div className="text-slate-600 mt-0.5 whitespace-pre-wrap text-xs leading-relaxed">
-                          {ev.excerpt}
-                        </div>
-                      ) : null}
-                      <div className="text-xs text-slate-500 mt-1">
-                        {[ev.source, ev.section_ref, ev.policy_source_type].filter(Boolean).join(' · ')}
-                      </div>
-                    </li>
-                  ))}
+                  {answer.evidence.map((ev, i) => {
+                    const ref = (ev.reference || '').trim();
+                    const headline = ev.label || ev.kind;
+                    const meta = [ev.source, ev.section_ref, ev.policy_source_type]
+                      .filter(Boolean)
+                      .join(' · ');
+                    const handleScroll = () => {
+                      if (!ref) return;
+                      if (!isCitationDeepLinkAvailable()) return;
+                      const ok = scrollToPolicyReference(ref);
+                      if (!ok && typeof console !== 'undefined') {
+                        // eslint-disable-next-line no-console
+                        console.warn(
+                          `[hr-policy-assistant] no policy clause matched evidence reference "${ref}"`
+                        );
+                      }
+                    };
+                    if (!ref) {
+                      return (
+                        <li key={i} className="border-l-2 border-slate-200 pl-3">
+                          <div className="font-medium text-slate-800">{headline}</div>
+                          {ev.excerpt ? (
+                            <div className="text-slate-600 mt-0.5 whitespace-pre-wrap text-xs leading-relaxed">
+                              {ev.excerpt}
+                            </div>
+                          ) : null}
+                          <div className="text-xs text-slate-500 mt-1">{meta}</div>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={handleScroll}
+                          aria-label={`Show ${headline} on the policy page`}
+                          data-testid="policy-evidence-citation"
+                          className="group block w-full rounded-md border-l-2 border-slate-200 bg-transparent pl-3 pr-2 py-1.5 text-left transition-colors hover:bg-slate-50 hover:border-[#0b2b43]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/35"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-medium text-slate-800 group-hover:text-[#08213a]">
+                              {headline}
+                            </div>
+                            <Link2
+                              className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400 group-hover:text-[#0b2b43]"
+                              aria-hidden
+                            />
+                          </div>
+                          {ev.excerpt ? (
+                            <div className="text-slate-600 mt-0.5 whitespace-pre-wrap text-xs leading-relaxed">
+                              {ev.excerpt}
+                            </div>
+                          ) : null}
+                          <div className="text-xs text-slate-500 mt-1">{meta}</div>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ) : null}

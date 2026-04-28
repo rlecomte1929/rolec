@@ -3,11 +3,23 @@
  * Mounted as `embedded` inside PolicyAssistantDockedShell — docked panel on lg+, bottom-sheet on mobile.
  */
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Copy, Loader2 } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Link2,
+  Loader2,
+} from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
-import { formatAnswerWithCitations } from './policyAssistantCitations';
+import {
+  formatAnswerWithCitations,
+  isCitationDeepLinkAvailable,
+  scrollToPolicyReference,
+} from './policyAssistantCitations';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 import { formatEvidenceAttribution } from './policyEvidenceFormatting';
 import {
@@ -273,15 +285,60 @@ function AnswerResultCard({
                     const headline = (ev.label || humanizeEvidenceKind(ev.kind)).trim();
                     const attribution = formatEvidenceAttribution(ev).trim();
                     const showExtraAttribution = attribution.length > 0 && attribution !== headline;
+                    const ref = (ev.reference || '').trim();
+                    const handleScroll = () => {
+                      if (!ref) return;
+                      // Mobile: docked panel falls back to a bottom-sheet
+                      // that covers the page. Scrolling the policy
+                      // underneath would do nothing visible — skip.
+                      if (!isCitationDeepLinkAvailable()) return;
+                      const ok = scrollToPolicyReference(ref);
+                      if (!ok && typeof console !== 'undefined') {
+                        // eslint-disable-next-line no-console
+                        console.warn(
+                          `[policy-assistant] no policy clause matched evidence reference "${ref}"`
+                        );
+                      }
+                    };
+                    const clickable = Boolean(ref);
+                    if (!clickable) {
+                      return (
+                        <li key={i} className="border-l-[3px] border-[#0b2b43]/25 pl-3">
+                          <div className="text-sm font-semibold text-[#0b2b43]">{headline}</div>
+                          {ev.excerpt ? (
+                            <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{ev.excerpt}</div>
+                          ) : null}
+                          {showExtraAttribution ? (
+                            <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
+                          ) : null}
+                        </li>
+                      );
+                    }
                     return (
-                      <li key={i} className="border-l-[3px] border-[#0b2b43]/25 pl-3">
-                        <div className="text-sm font-semibold text-[#0b2b43]">{headline}</div>
-                        {ev.excerpt ? (
-                          <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{ev.excerpt}</div>
-                        ) : null}
-                        {showExtraAttribution ? (
-                          <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
-                        ) : null}
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={handleScroll}
+                          aria-label={`Show ${headline} on the policy page`}
+                          data-testid="policy-evidence-citation"
+                          className="group block w-full rounded-md border-l-[3px] border-[#0b2b43]/25 bg-transparent pl-3 pr-2 py-1.5 text-left transition-colors hover:bg-slate-50 hover:border-[#0b2b43]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/35"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-sm font-semibold text-[#0b2b43] group-hover:text-[#08213a]">
+                              {headline}
+                            </div>
+                            <Link2
+                              className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400 group-hover:text-[#0b2b43]"
+                              aria-hidden
+                            />
+                          </div>
+                          {ev.excerpt ? (
+                            <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{ev.excerpt}</div>
+                          ) : null}
+                          {showExtraAttribution ? (
+                            <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
+                          ) : null}
+                        </button>
                       </li>
                     );
                   })}
