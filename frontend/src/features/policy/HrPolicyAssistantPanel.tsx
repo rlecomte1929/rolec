@@ -4,7 +4,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
-import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 import { hrAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
 import { formatAnswerWithCitations } from './policyAssistantCitations';
@@ -226,32 +225,26 @@ export const HrPolicyAssistantPanel: React.FC<{
   /**
    * `card` — full-width inline block (legacy / tests). Owns its own
    *   header.
-   * `sideSheet` — panel mounts its own PolicyAssistantSideSheet
-   *   trigger and chrome. Inner header suppressed.
-   * `embedded` — caller provides the chrome (e.g. PolicyAssistantFab).
+   * `embedded` — caller provides the chrome (e.g. PolicyAssistantDockedShell).
    *   Render the form body only.
    */
-  variant?: 'card' | 'sideSheet' | 'embedded';
+  variant?: 'card' | 'embedded';
 }> = ({ policyId, documentId, contextLoading = false, variant = 'card' }) => {
   const [message, setMessage] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const layoutSheet = variant === 'sideSheet';
-  const inSheetLike = variant !== 'card';
+  const inSheetLike = variant === 'embedded';
 
-  // Analytics: HR panel mounts only inside HR-side surfaces (sideSheet
-  // trigger on /hr/policy or embedded inside the FAB on the same page).
+  // Analytics: HR panel mounts only inside HR-side surfaces (docked shell
+  // on /hr/policy).
   const surface: PolicyAssistantSurface = 'hr_sidesheet';
   const submitSourceRef = useRef<PolicyAssistantQuestionSource>('free_text');
   const hadQuestionRef = useRef(false);
   const hadAnswerRef = useRef(false);
 
   useEffect(() => {
-    if (variant === 'embedded' || variant === 'card') {
-      trackPolicyAssistantOpened({ surface });
-    }
+    trackPolicyAssistantOpened({ surface });
     if (variant === 'embedded') {
       return () => {
         trackPolicyAssistantDismissed({
@@ -264,22 +257,6 @@ export const HrPolicyAssistantPanel: React.FC<{
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const prevSheetOpenRef = useRef(false);
-  useEffect(() => {
-    if (variant !== 'sideSheet') return;
-    const prev = prevSheetOpenRef.current;
-    if (sheetOpen && !prev) {
-      trackPolicyAssistantOpened({ surface });
-    } else if (!sheetOpen && prev) {
-      trackPolicyAssistantDismissed({
-        surface,
-        had_question: hadQuestionRef.current,
-        had_answer: hadAnswerRef.current,
-      });
-    }
-    prevSheetOpenRef.current = sheetOpen;
-  }, [sheetOpen, variant, surface]);
 
   const pid = policyId?.trim() || null;
   const trimmed = message.trim();
@@ -357,8 +334,8 @@ export const HrPolicyAssistantPanel: React.FC<{
   };
 
   if (contextLoading && !pid) {
-    // sheet variants own their trigger / chrome from the parent.
-    if (layoutSheet || variant === 'embedded') return null;
+    // embedded variant gets chrome from the docked shell.
+    if (variant === 'embedded') return null;
     return (
       <Card padding="md" className="border-slate-200 bg-slate-50/40" id="hr-policy-assistant">
         <div className="text-base font-semibold text-[#0b2b43]">{HR_POLICY_ASSISTANT_TITLE}</div>
@@ -368,9 +345,8 @@ export const HrPolicyAssistantPanel: React.FC<{
   }
 
   if (!pid) {
-    if (layoutSheet) return null;
     if (variant === 'embedded') {
-      // Honest minimal fallback inside the FAB sheet — no chrome to repeat.
+      // Honest minimal fallback inside the docked shell — no chrome to repeat.
       return <p className="text-sm text-slate-500">{HR_POLICY_ASSISTANT_NO_POLICY}</p>;
     }
     return (
@@ -461,40 +437,10 @@ export const HrPolicyAssistantPanel: React.FC<{
     </>
   );
 
-  // Embedded: parent (typically PolicyAssistantFab) provides the
-  // sheet-like chrome; render the form body bare so the title + close
-  // button aren't duplicated.
+  // Embedded: parent (PolicyAssistantDockedShell) provides chrome; render
+  // the form body bare so the title + close button aren't duplicated.
   if (variant === 'embedded') {
     return <>{coreForm}</>;
-  }
-
-  if (layoutSheet) {
-    return (
-      <PolicyAssistantSideSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        title={HR_POLICY_ASSISTANT_TITLE}
-        subtitle={HR_POLICY_ASSISTANT_SUBTITLE}
-        titleId="hr-policy-assistant-sheet-title"
-        trigger={
-          <div className="sticky top-0 z-10 -mx-1 mb-4 flex flex-col items-end gap-1 bg-gradient-to-b from-white from-80% to-transparent pb-1 pt-1 px-1 sm:-mx-0">
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0 border-slate-300 text-[#0b2b43] font-medium shadow-sm"
-              onClick={() => setSheetOpen(true)}
-            >
-              {HR_POLICY_ASSISTANT_TITLE}
-            </Button>
-            <p className="hidden max-w-[15rem] text-right text-xs leading-snug text-slate-500 md:block">
-              Opens as a side panel. Workspace stays open.
-            </p>
-          </div>
-        }
-      >
-        {coreForm}
-      </PolicyAssistantSideSheet>
-    );
   }
 
   return (
