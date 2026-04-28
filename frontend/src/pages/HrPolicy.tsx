@@ -3,64 +3,35 @@ import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { trackRouteEntry, trackShellRender, trackPolicyStage } from '../perf/pagePerf';
 import { Alert, Button, Card } from '../components/antigravity';
-import { employeeAPI, policyDocumentsAPI } from '../api/client';
-import { EmployeePolicyPanel } from '../features/policy/EmployeePolicyPanel';
+import { policyDocumentsAPI } from '../api/client';
+import { EmployeePolicyView } from '../features/policy/EmployeePolicyView';
 import { EmployeePolicyAssistantPanel } from '../features/policy/EmployeePolicyAssistantPanel';
+import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
 
 function EmployeePolicyContent() {
-  const [pack, setPack] = useState<Awaited<ReturnType<typeof employeeAPI.getMyAssignmentPackagePolicy>> | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    employeeAPI
-      .getMyAssignmentPackagePolicy()
-      .then((res) => {
-        if (!cancelled) setPack(res);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPack({
-            status: 'error',
-            ok: false,
-            assignment_id: null,
-            has_policy: false,
-            policy: null,
-            benefits: [],
-            exclusions: [],
-            message: "We couldn't load your policy right now. Please try again shortly.",
-            message_secondary: null,
-          });
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // The assistant is a floating FAB — same pattern as the new HR page.
-  // Employees get a single consistent "ask the assistant" affordance in
-  // the bottom-right, never a rectangle competing with policy content.
+  // The /hr/policy route is reused for employees so the nav tab they
+  // see ("HR Policy") leads somewhere meaningful. The body is the same
+  // EmployeePolicyView used by /employee/policy: theme accordion driven
+  // by /api/employee/policy-config (covered + applicable rows only,
+  // auto-updates when HR republishes).
+  const { assignmentId } = useEmployeeAssignment();
+  const [assignmentLoading] = useState(false);
   return (
     <div className="pb-6">
       <div className="min-w-0">
-        <EmployeePolicyPanel pack={pack} loading={loading} />
+        <EmployeePolicyView />
       </div>
       <PolicyAssistantFab
         label="Open Policy Assistant — ask about your HR policy"
       >
         {() => (
           <EmployeePolicyAssistantPanel
-            assignmentId={pack?.assignment_id}
-            assignmentLoading={loading}
+            assignmentId={assignmentId ?? undefined}
+            assignmentLoading={assignmentLoading}
             variant="card"
           />
         )}
