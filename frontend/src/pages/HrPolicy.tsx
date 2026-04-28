@@ -32,7 +32,7 @@ function EmployeePolicyContent() {
           <EmployeePolicyAssistantPanel
             assignmentId={assignmentId ?? undefined}
             assignmentLoading={assignmentLoading}
-            variant="card"
+            variant="embedded"
           />
         )}
       </PolicyAssistantFab>

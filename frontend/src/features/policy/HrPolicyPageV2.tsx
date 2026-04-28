@@ -360,7 +360,7 @@ const FloatingPolicyAssistantButton: React.FC<{
   policyId: string | null;
 }> = ({ policyId }) => (
   <PolicyAssistantFab label="Open Policy Assistant — ask about this HR policy">
-    {() => <HrPolicyAssistantPanel policyId={policyId} variant="card" />}
+    {() => <HrPolicyAssistantPanel policyId={policyId} variant="embedded" />}
   </PolicyAssistantFab>
 );
 

@@ -643,7 +643,7 @@ export const CaseWizardPage: React.FC = () => {
           <EmployeePolicyAssistantPanel
             assignmentId={assignmentId}
             assignmentLoading={false}
-            variant="card"
+            variant="embedded"
           />
         )}
       </PolicyAssistantFab>

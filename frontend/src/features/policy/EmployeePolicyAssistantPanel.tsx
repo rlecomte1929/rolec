@@ -289,13 +289,20 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   /** When true, hide “no assignment” until parent finished loading. */
   assignmentLoading?: boolean;
   /**
-   * `card` — full-width panel (legacy in-page placement).
-   * `sideSheet` — HR Policy: triggers beside/near content; panel from the right (desktop) or sheet (mobile).
-   * @deprecated Use `sideSheet`. `fab` is treated as `sideSheet`.
+   * `card` — full-width panel rendered inline on a page (legacy /
+   *   tests). Includes its own header + Card wrapper.
+   * `sideSheet` — panel mounts itself with its own
+   *   PolicyAssistantSideSheet trigger + chrome. Inner header is
+   *   suppressed (the side-sheet provides one).
+   * `embedded` — caller already provides the chrome (e.g. inside
+   *   PolicyAssistantFab). Renders the form body only — no inner
+   *   header, no Card wrapper, no SideSheet wrapper.
+   * @deprecated Use `embedded` from inside the FAB. `fab` now maps to
+   *   `embedded`, not `sideSheet`, to fix duplicate-title rendering.
    */
-  variant?: 'card' | 'fab' | 'sideSheet';
+  variant?: 'card' | 'fab' | 'sideSheet' | 'embedded';
 }> = ({ assignmentId, assignmentLoading = false, variant = 'card' }) => {
-  const layoutVariant = variant === 'fab' ? 'sideSheet' : variant;
+  const layoutVariant = variant === 'fab' ? 'embedded' : variant;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const responseSectionRef = useRef<HTMLElement | null>(null);
   const scrollToResponseAfterAnswerRef = useRef(false);
@@ -412,10 +419,14 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     focusQuestionInput();
   };
 
-  const questionId =
-    layoutVariant === 'sideSheet' ? 'policy-assistant-question-sheet' : 'policy-assistant-question';
-  const shortcutsSectionId =
-    layoutVariant === 'sideSheet' ? 'policy-assistant-shortcuts-sheet' : 'policy-assistant-shortcuts';
+  // Card mode keeps the legacy ids; sheet-like containers (sideSheet,
+  // embedded inside the FAB) get the -sheet suffix so the same DOM tree
+  // doesn't collide if multiple instances render.
+  const inSheetLike = layoutVariant !== 'card';
+  const questionId = inSheetLike ? 'policy-assistant-question-sheet' : 'policy-assistant-question';
+  const shortcutsSectionId = inSheetLike
+    ? 'policy-assistant-shortcuts-sheet'
+    : 'policy-assistant-shortcuts';
 
   const shortcuts = EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS.slice(0, 4);
 
@@ -427,7 +438,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
 
   const mainForm = (
     <>
-      {layoutVariant !== 'sideSheet' ? (
+      {/* Inner header is the panel's own title/subtitle pair. Card mode
+          owns the only chrome around the panel and renders it. The
+          sideSheet variant has its own PolicyAssistantSideSheet header
+          and the embedded variant relies on PolicyAssistantFab's header
+          — both would duplicate the title if this rendered. */}
+      {layoutVariant === 'card' ? (
         <header className="mb-8 space-y-1.5">
           <h2 className="text-lg font-semibold tracking-tight text-[#0b2b43]">
             {EMPLOYEE_POLICY_ASSISTANT_TITLE}
@@ -585,7 +601,10 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   );
 
   if (assignmentLoading && !assignmentId) {
-    if (layoutVariant === 'sideSheet') {
+    // sideSheet returns null because it owns its own trigger button —
+    // hiding the panel hides the trigger too.
+    // embedded returns null because the parent (FAB) controls visibility.
+    if (layoutVariant === 'sideSheet' || layoutVariant === 'embedded') {
       return null;
     }
     return (
@@ -600,6 +619,13 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     if (layoutVariant === 'sideSheet') {
       return null;
     }
+    if (layoutVariant === 'embedded') {
+      // FAB sheet is open but no assignment in scope — show a minimal
+      // honest message inside the sheet rather than a blank dialog.
+      return (
+        <p className="text-sm text-slate-500">{EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT}</p>
+      );
+    }
     return (
       <Card padding="md" className="mb-6 border-slate-200 bg-slate-50/50">
         <div className="text-base font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</div>
@@ -607,6 +633,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
         <p className="text-sm text-slate-500 mt-3">{EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT}</p>
       </Card>
     );
+  }
+
+  // Embedded: parent controls chrome (PolicyAssistantFab provides the
+  // sheet header + close affordance). Render the body bare.
+  if (layoutVariant === 'embedded') {
+    return <>{mainForm}</>;
   }
 
   if (layoutVariant === 'sideSheet') {

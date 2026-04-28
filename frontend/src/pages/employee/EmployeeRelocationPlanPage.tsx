@@ -31,7 +31,7 @@ export const EmployeeRelocationPlanPage: React.FC = () => {
           <EmployeePolicyAssistantPanel
             assignmentId={routeCaseId}
             assignmentLoading={false}
-            variant="card"
+            variant="embedded"
           />
         )}
       </PolicyAssistantFab>

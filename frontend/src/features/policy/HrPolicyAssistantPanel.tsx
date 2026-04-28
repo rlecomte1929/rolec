@@ -211,10 +211,14 @@ export const HrPolicyAssistantPanel: React.FC<{
   /** True while normalized policy payload for the selected policy is loading. */
   contextLoading?: boolean;
   /**
-   * `card` — full-width block in page flow (tests, legacy).
-   * `sideSheet` — top-right trigger; right panel on large screens, full-width sheet on small screens.
+   * `card` — full-width inline block (legacy / tests). Owns its own
+   *   header.
+   * `sideSheet` — panel mounts its own PolicyAssistantSideSheet
+   *   trigger and chrome. Inner header suppressed.
+   * `embedded` — caller provides the chrome (e.g. PolicyAssistantFab).
+   *   Render the form body only.
    */
-  variant?: 'card' | 'sideSheet';
+  variant?: 'card' | 'sideSheet' | 'embedded';
 }> = ({ policyId, documentId, contextLoading = false, variant = 'card' }) => {
   const [message, setMessage] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -222,6 +226,7 @@ export const HrPolicyAssistantPanel: React.FC<{
   const [submitting, setSubmitting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const layoutSheet = variant === 'sideSheet';
+  const inSheetLike = variant !== 'card';
 
   const pid = policyId?.trim() || null;
   const trimmed = message.trim();
@@ -284,7 +289,8 @@ export const HrPolicyAssistantPanel: React.FC<{
   };
 
   if (contextLoading && !pid) {
-    if (layoutSheet) return null;
+    // sheet variants own their trigger / chrome from the parent.
+    if (layoutSheet || variant === 'embedded') return null;
     return (
       <Card padding="md" className="border-slate-200 bg-slate-50/40" id="hr-policy-assistant">
         <div className="text-base font-semibold text-[#0b2b43]">{HR_POLICY_ASSISTANT_TITLE}</div>
@@ -295,6 +301,10 @@ export const HrPolicyAssistantPanel: React.FC<{
 
   if (!pid) {
     if (layoutSheet) return null;
+    if (variant === 'embedded') {
+      // Honest minimal fallback inside the FAB sheet — no chrome to repeat.
+      return <p className="text-sm text-slate-500">{HR_POLICY_ASSISTANT_NO_POLICY}</p>;
+    }
     return (
       <Card padding="md" className="border-slate-200 bg-slate-50/50" id="hr-policy-assistant">
         <div className="text-base font-semibold text-[#0b2b43]">{HR_POLICY_ASSISTANT_TITLE}</div>
@@ -304,12 +314,12 @@ export const HrPolicyAssistantPanel: React.FC<{
     );
   }
 
-  const questionId = layoutSheet ? 'hr-policy-assistant-question-sheet' : 'hr-policy-assistant-question';
+  const questionId = inSheetLike ? 'hr-policy-assistant-question-sheet' : 'hr-policy-assistant-question';
 
   const coreForm = (
     <>
       <p
-        className={`text-xs text-slate-500 leading-relaxed ${layoutSheet ? 'mt-0' : 'mt-2'}`}
+        className={`text-xs text-slate-500 leading-relaxed ${inSheetLike ? 'mt-0' : 'mt-2'}`}
       >
         {HR_POLICY_ASSISTANT_SCOPE_NOTE}
       </p>
@@ -320,10 +330,10 @@ export const HrPolicyAssistantPanel: React.FC<{
         </label>
         <textarea
           id={questionId}
-          rows={layoutSheet ? 5 : 3}
+          rows={inSheetLike ? 5 : 3}
           maxLength={8000}
           placeholder={HR_POLICY_ASSISTANT_PLACEHOLDER}
-          className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 disabled:opacity-60${layoutSheet ? ' min-h-[5rem]' : ''}`}
+          className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 disabled:opacity-60${inSheetLike ? ' min-h-[5rem]' : ''}`}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           disabled={submitting || contextLoading}
@@ -375,6 +385,13 @@ export const HrPolicyAssistantPanel: React.FC<{
       ) : null}
     </>
   );
+
+  // Embedded: parent (typically PolicyAssistantFab) provides the
+  // sheet-like chrome; render the form body bare so the title + close
+  // button aren't duplicated.
+  if (variant === 'embedded') {
+    return <>{coreForm}</>;
+  }
 
   if (layoutSheet) {
     return (
