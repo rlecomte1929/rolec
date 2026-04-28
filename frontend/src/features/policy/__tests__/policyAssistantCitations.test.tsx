@@ -15,6 +15,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import {
   extractChunkIdsInOrder,
   formatAnswerWithCitations,
+  isCitationDeepLinkAvailable,
+  referenceToElementId,
+  scrollToPolicyReference,
   scrollToSourceRef,
 } from '../policyAssistantCitations';
 import type { PolicyAssistantCitedChunk } from '../../../types/policyAssistant';
@@ -160,5 +163,124 @@ describe('scrollToSourceRef', () => {
     );
     fireEvent.click(screen.getByTestId('policy-citation-chip'));
     expect(scrollSpy).toHaveBeenCalled();
+  });
+});
+
+describe('referenceToElementId', () => {
+  it('slugifies snake_case benefit keys', () => {
+    expect(referenceToElementId('shipment_allowance')).toBe('policy-clause-shipment-allowance');
+  });
+
+  it('slugifies dotted reference paths', () => {
+    expect(referenceToElementId('policy_matrix.long_term.housing')).toBe(
+      'policy-clause-policy-matrix-long-term-housing'
+    );
+  });
+
+  it('falls back to "unknown" for empty/whitespace input', () => {
+    expect(referenceToElementId('')).toBe('policy-clause-unknown');
+    expect(referenceToElementId('   ')).toBe('policy-clause-unknown');
+  });
+
+  it('strips leading/trailing punctuation runs', () => {
+    expect(referenceToElementId('--shipment--')).toBe('policy-clause-shipment');
+  });
+});
+
+describe('scrollToPolicyReference', () => {
+  let row: HTMLElement;
+  let attrRow: HTMLElement;
+  let scrollSpyId: ReturnType<typeof vi.fn>;
+  let scrollSpyAttr: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    // First lookup path: id matches referenceToElementId(ref)
+    row = document.createElement('div');
+    row.id = referenceToElementId('shipment_allowance');
+    document.body.appendChild(row);
+    scrollSpyId = vi.fn();
+    row.scrollIntoView = scrollSpyId as unknown as typeof row.scrollIntoView;
+
+    // Second lookup path: data-policy-reference attribute matches the
+    // raw ref. Used when callers can't put a clean id on the element.
+    attrRow = document.createElement('div');
+    attrRow.setAttribute('data-policy-reference', 'temporary_housing');
+    document.body.appendChild(attrRow);
+    scrollSpyAttr = vi.fn();
+    attrRow.scrollIntoView = scrollSpyAttr as unknown as typeof attrRow.scrollIntoView;
+  });
+
+  afterEach(() => {
+    document.body.removeChild(row);
+    document.body.removeChild(attrRow);
+  });
+
+  it('scrolls to the id-anchor first', () => {
+    expect(scrollToPolicyReference('shipment_allowance')).toBe(true);
+    expect(scrollSpyId).toHaveBeenCalledTimes(1);
+    expect(row.classList.contains('policy-source-highlight')).toBe(true);
+  });
+
+  it('falls back to data-policy-reference attribute when id misses', () => {
+    expect(scrollToPolicyReference('temporary_housing')).toBe(true);
+    expect(scrollSpyAttr).toHaveBeenCalledTimes(1);
+    expect(attrRow.classList.contains('policy-source-highlight')).toBe(true);
+  });
+
+  it('returns false for empty reference', () => {
+    expect(scrollToPolicyReference('')).toBe(false);
+    expect(scrollToPolicyReference('   ')).toBe(false);
+  });
+
+  it('returns false when no element matches', () => {
+    expect(scrollToPolicyReference('does_not_exist')).toBe(false);
+  });
+});
+
+describe('isCitationDeepLinkAvailable', () => {
+  let originalMatchMedia: typeof window.matchMedia | undefined;
+
+  beforeEach(() => {
+    originalMatchMedia = window.matchMedia;
+  });
+
+  afterEach(() => {
+    if (originalMatchMedia) {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+
+  it('returns true on lg+ viewports', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (q: string) => ({
+        matches: q.includes('1024px'),
+        media: q,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+    expect(isCitationDeepLinkAvailable()).toBe(true);
+  });
+
+  it('returns false below lg (mobile bottom-sheet covers the page)', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (q: string) => ({
+        matches: false,
+        media: q,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+    expect(isCitationDeepLinkAvailable()).toBe(false);
   });
 });

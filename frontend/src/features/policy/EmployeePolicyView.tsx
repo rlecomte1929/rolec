@@ -45,6 +45,7 @@ import { glossaryIdForBenefitKey } from '../policy-config/compensationGlossary';
 import { PolicyGlossarySection } from '../policy-config/PolicyGlossarySection';
 import { TermHelpIcon } from '../policy-config/TermHelpIcon';
 import { PolicyTopicSummaryList } from './PolicyTopicSummaryList';
+import { referenceToElementId } from './policyAssistantCitations';
 
 type ServicesPolicyContext = Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>>;
 
@@ -71,11 +72,18 @@ function BenefitReadOnlyCard({ b }: { b: PolicyConfigBenefitRow }) {
   const notesBlock = mergeNotesAndConditions(b);
   const glossaryId = glossaryIdForBenefitKey(b.benefit_key);
   const sourceRef = b.id ? `policy_config_benefits.${b.id}` : undefined;
+  // Anchor for Policy Assistant citation deep-linking. The backend
+  // returns evidence.reference == benefit_key for matrix-derived rows;
+  // mirroring that as both an id and a data attribute lets either
+  // lookup path resolve.
+  const policyAnchorId = b.benefit_key ? referenceToElementId(b.benefit_key) : undefined;
 
   return (
     <li
+      id={policyAnchorId}
       className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-sm"
       data-policy-source-ref={sourceRef}
+      data-policy-reference={b.benefit_key || undefined}
     >
       <h3 className="text-base font-semibold text-[#0b2b43] leading-snug flex flex-wrap items-center gap-1.5">
         <span>{b.benefit_label || 'Benefit'}</span>

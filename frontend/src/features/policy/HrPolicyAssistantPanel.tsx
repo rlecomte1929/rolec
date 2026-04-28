@@ -1,12 +1,16 @@
 /**
  * Bounded policy Q&A for HR: working draft, published signals, employee view — not a generic copilot.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { hrAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
-import { formatAnswerWithCitations } from './policyAssistantCitations';
+import {
+  formatAnswerWithCitations,
+  isCitationDeepLinkAvailable,
+  scrollToPolicyReference,
+} from './policyAssistantCitations';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 import {
   deriveSupportStatus,
@@ -77,28 +81,78 @@ function HrAnswerResultCard({
   const readinessLine = comparisonReadinessExplanation(answer.comparison_readiness);
   const dvpHint = draftVsPublishedHint(answer);
 
+  // Collapsibility: default to collapsed when not the most recent
+  // turn. Submitting a new question flips the previous-most-recent's
+  // isMostRecent prop, the useEffect resyncs, and the previously-
+  // expanded card snaps closed. Acceptable per Sprint 3 spec — keeps
+  // state management trivial.
+  const [collapsed, setCollapsed] = useState(!isMostRecent);
+  useEffect(() => {
+    setCollapsed(!isMostRecent);
+  }, [isMostRecent]);
+  const reactId = useId();
+  const bodyId = `hr-pa-card-body-${reactId}`;
+
   return (
     <div
       className="rounded-lg border border-slate-200 bg-white shadow-sm"
       role="region"
       aria-label="HR policy answer"
     >
-      <div className="border-b border-slate-100 px-4 py-2.5 bg-slate-50/80">
-        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Question</div>
-        <p className="text-sm text-slate-800 mt-0.5">{question}</p>
+      {/* Header row doubles as the collapse toggle. Click anywhere on
+          the slate background flips collapsed state; badge/topic remain
+          visual children, the chevron is the keyboard/screen-reader
+          affordance. role=button + aria-expanded + Enter/Space handler
+          keeps a11y intact. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
+        aria-controls={bodyId}
+        onClick={() => setCollapsed((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setCollapsed((v) => !v);
+          }
+        }}
+        className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-2.5 bg-slate-50/80 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">Question</div>
+          <p className="text-sm text-slate-800 mt-0.5">{question}</p>
+        </div>
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
+          <span
+            className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold ${
+              isRefusal && answer.refusal
+                ? supportStatusBadgeClass('refused')
+                : supportStatusBadgeClass(status)
+            }`}
+          >
+            {isRefusal && answer.refusal ? supportStatusLabel('refused') : supportStatusLabel(status)}
+          </span>
+          {!isRefusal && answer.canonical_topic ? (
+            <span className="text-xs text-slate-500">
+              {answer.canonical_topic.replace(/_/g, ' ')}
+            </span>
+          ) : null}
+          <span
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500"
+            aria-hidden
+          >
+            {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </span>
+        </div>
       </div>
-      <div className="px-4 py-3 space-y-3">
+      {collapsed ? null : (
+      <div id={bodyId} className="px-4 py-3 space-y-3">
         {isRefusal && answer.refusal ? (
           <>
-            <div
-              className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold ${supportStatusBadgeClass('refused')}`}
-            >
-              {supportStatusLabel('refused')}
-            </div>
             <div className="text-sm text-slate-800 leading-relaxed">
               {formatRichMessage(answer.refusal.refusal_text)}
             </div>
-            {answer.refusal.supported_examples.length > 0 && (
+            {isMostRecent && answer.refusal.supported_examples.length > 0 && (
               <div>
                 <div className="text-xs font-semibold text-slate-600 mb-1.5">Within-policy examples</div>
                 <ul className="text-sm text-slate-700 list-disc pl-5 space-y-1">
@@ -130,19 +184,6 @@ function HrAnswerResultCard({
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold ${supportStatusBadgeClass(status)}`}
-              >
-                {supportStatusLabel(status)}
-              </span>
-              {answer.canonical_topic ? (
-                <span className="text-xs text-slate-500">
-                  Topic: {answer.canonical_topic.replace(/_/g, ' ')}
-                </span>
-              ) : null}
-            </div>
-
             {primaryText ? (
               <div className="text-sm text-slate-800 leading-relaxed">
                 {formatAnswerWithCitations(primaryText, answer.cited_chunks)}
@@ -153,19 +194,64 @@ function HrAnswerResultCard({
               <div>
                 <div className="text-xs font-semibold text-slate-600 mb-1">Source reference</div>
                 <ul className="text-sm text-slate-700 space-y-2">
-                  {answer.evidence.map((ev, i) => (
-                    <li key={i} className="border-l-2 border-slate-200 pl-3">
-                      <div className="font-medium text-slate-800">{ev.label || ev.kind}</div>
-                      {ev.excerpt ? (
-                        <div className="text-slate-600 mt-0.5 whitespace-pre-wrap text-xs leading-relaxed">
-                          {ev.excerpt}
-                        </div>
-                      ) : null}
-                      <div className="text-xs text-slate-500 mt-1">
-                        {[ev.source, ev.section_ref, ev.policy_source_type].filter(Boolean).join(' · ')}
-                      </div>
-                    </li>
-                  ))}
+                  {answer.evidence.map((ev, i) => {
+                    const ref = (ev.reference || '').trim();
+                    const headline = ev.label || ev.kind;
+                    const meta = [ev.source, ev.section_ref, ev.policy_source_type]
+                      .filter(Boolean)
+                      .join(' · ');
+                    const handleScroll = () => {
+                      if (!ref) return;
+                      if (!isCitationDeepLinkAvailable()) return;
+                      const ok = scrollToPolicyReference(ref);
+                      if (!ok && typeof console !== 'undefined') {
+                        // eslint-disable-next-line no-console
+                        console.warn(
+                          `[hr-policy-assistant] no policy clause matched evidence reference "${ref}"`
+                        );
+                      }
+                    };
+                    if (!ref) {
+                      return (
+                        <li key={i} className="border-l-2 border-slate-200 pl-3">
+                          <div className="font-medium text-slate-800">{headline}</div>
+                          {ev.excerpt ? (
+                            <div className="text-slate-600 mt-0.5 whitespace-pre-wrap text-xs leading-relaxed">
+                              {ev.excerpt}
+                            </div>
+                          ) : null}
+                          <div className="text-xs text-slate-500 mt-1">{meta}</div>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={handleScroll}
+                          aria-label={`Show ${headline} on the policy page`}
+                          data-testid="policy-evidence-citation"
+                          className="group block w-full rounded-md border-l-2 border-slate-200 bg-transparent pl-3 pr-2 py-1.5 text-left transition-colors hover:bg-slate-50 hover:border-[#0b2b43]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/35"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-medium text-slate-800 group-hover:text-[#08213a]">
+                              {headline}
+                            </div>
+                            <Link2
+                              className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400 group-hover:text-[#0b2b43]"
+                              aria-hidden
+                            />
+                          </div>
+                          {ev.excerpt ? (
+                            <div className="text-slate-600 mt-0.5 whitespace-pre-wrap text-xs leading-relaxed">
+                              {ev.excerpt}
+                            </div>
+                          ) : null}
+                          <div className="text-xs text-slate-500 mt-1">{meta}</div>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ) : null}
@@ -213,6 +299,7 @@ function HrAnswerResultCard({
           </>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -360,6 +447,11 @@ export const HrPolicyAssistantPanel: React.FC<{
 
   const questionId = inSheetLike ? 'hr-policy-assistant-question-sheet' : 'hr-policy-assistant-question';
 
+  // Empty state: no typed message AND no answers yet. Drives the
+  // "sample questions as hero cards" layout — first-time HR users find
+  // "what to ask" harder than "how to ask".
+  const isEmptyState = !message.trim() && turns.length === 0;
+
   const coreForm = (
     <>
       {/* Trust-signal pill replacing the previous SCOPE_NOTE paragraph.
@@ -373,13 +465,37 @@ export const HrPolicyAssistantPanel: React.FC<{
         </span>
       </div>
 
+      {/* Empty-state hero: sample questions as full-width cards. Once
+          the user types or submits, swap back to the textarea-hero
+          layout below. */}
+      {isEmptyState ? (
+        <section className="mt-4 flex flex-col gap-3" aria-label="Sample policy questions">
+          <h3 className="text-sm font-semibold text-[#0b2b43] mb-1">Try one of these:</h3>
+          <ul className="flex flex-col gap-2">
+            {HR_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
+              <li key={s}>
+                <button
+                  type="button"
+                  onClick={() => applySuggestion(s)}
+                  disabled={submitting || contextLoading}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left text-sm font-medium text-slate-700 transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <span className="min-w-0 leading-snug">{s}</span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <div className="mt-4 space-y-2">
         <label htmlFor={questionId} className="sr-only">
           Policy question
         </label>
         <textarea
           id={questionId}
-          rows={inSheetLike ? 5 : 3}
+          rows={inSheetLike ? (isEmptyState ? 3 : 5) : 3}
           maxLength={8000}
           placeholder={HR_POLICY_ASSISTANT_PLACEHOLDER}
           className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 disabled:opacity-60${inSheetLike ? ' min-h-[5rem]' : ''}`}
@@ -389,21 +505,25 @@ export const HrPolicyAssistantPanel: React.FC<{
           aria-describedby="hr-policy-assistant-suggestions-hint"
         />
         <div id="hr-policy-assistant-suggestions-hint" className="text-xs text-slate-500">
-          Use a sample below or type a policy question, then submit.
+          {isEmptyState
+            ? 'Or type your own policy question above.'
+            : 'Use a sample below or type a policy question, then submit.'}
         </div>
-        <div className="flex flex-wrap gap-2">
-          {HR_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => applySuggestion(s)}
-              disabled={submitting || contextLoading}
-              className="text-left text-xs rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-700 hover:bg-slate-100 disabled:opacity-50 max-w-full"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+        {isEmptyState ? null : (
+          <div className="flex flex-wrap gap-2">
+            {HR_POLICY_ASSISTANT_SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => applySuggestion(s)}
+                disabled={submitting || contextLoading}
+                className="text-left text-xs rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-slate-700 hover:bg-slate-100 disabled:opacity-50 max-w-full"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-2 pt-1">
           <Button type="button" onClick={() => void submit()} disabled={!canSubmit || contextLoading}>
             {submitting ? 'Checking policy…' : HR_POLICY_ASSISTANT_SUBMIT}

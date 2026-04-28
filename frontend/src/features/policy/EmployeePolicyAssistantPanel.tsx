@@ -2,12 +2,24 @@
  * Bounded policy Q&A for employees: single-turn answers from published policy data.
  * Mounted as `embedded` inside PolicyAssistantDockedShell — docked panel on lg+, bottom-sheet on mobile.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Copy, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Link2,
+  Loader2,
+} from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
-import { formatAnswerWithCitations } from './policyAssistantCitations';
+import {
+  formatAnswerWithCitations,
+  isCitationDeepLinkAvailable,
+  scrollToPolicyReference,
+} from './policyAssistantCitations';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 import { formatEvidenceAttribution } from './policyEvidenceFormatting';
 import {
@@ -118,9 +130,9 @@ function AnswerResultCard({
   answer: PolicyAssistantAnswer;
   assistantTurnRequestId?: string | null;
   /** Only the most recent turn renders the "Related policy questions"
-   *  chip block — older cards keep their badges, copy button, evidence,
-   *  conditions, and answer text. After 10 turns, suppressing chips
-   *  on history saves ~30 buttons of visual noise. */
+   *  chip block AND defaults to expanded — older cards default to
+   *  collapsed (header-only). After 10 turns, suppressing both chips
+   *  and full bodies saves ~30 buttons + 5 screens of visual noise. */
   isMostRecent: boolean;
   onFollowUpSelect: (
     text: string,
@@ -138,6 +150,22 @@ function AnswerResultCard({
     answer.answer_text?.trim() ||
     (isClarification && answer.refusal ? answer.refusal.refusal_text : '') ||
     (isRefusal && answer.refusal ? answer.refusal.refusal_text : '');
+
+  // Collapsibility: most recent stays expanded; older cards collapse
+  // to header-only by default. When the parent submits a new question,
+  // the previous-most-recent card's `isMostRecent` flips to false and
+  // this useEffect resyncs the local state — which means a manually-
+  // expanded older card collapses on the next submit. That's
+  // acceptable per the Sprint 3 spec: the user has fresh focus on the
+  // new answer, and avoiding the more complex lifted-state model
+  // keeps this small.
+  const [collapsed, setCollapsed] = useState(!isMostRecent);
+  useEffect(() => {
+    setCollapsed(!isMostRecent);
+  }, [isMostRecent]);
+
+  const reactId = useId();
+  const bodyId = `pa-card-body-${reactId}`;
 
   const handleCopy = async () => {
     const text = turnToPlainText(question, answer);
@@ -158,51 +186,77 @@ function AnswerResultCard({
       role="article"
       aria-label="Policy Q&A"
     >
-      <div className="border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-[#f4f7fb] px-4 py-3.5">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Your question</div>
-        <p className="mt-1.5 text-[15px] font-medium leading-snug text-[#0b2b43]">{question}</p>
+      {/* Header row is the collapse toggle. Click anywhere on the
+          gradient bg flips collapsed state; the badge/topic/copy
+          children remain non-interactive (badge, chip) or stop
+          propagation (copy button). The chevron is the visual
+          affordance for keyboard + screen reader users. role=button
+          on the wrapping div + aria-expanded + Enter/Space handler
+          keeps a11y intact without needing nested <button>s. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
+        aria-controls={bodyId}
+        onClick={() => setCollapsed((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setCollapsed((v) => !v);
+          }
+        }}
+        className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-[#f4f7fb] px-4 py-3.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Your question</div>
+          <p className="mt-1.5 text-[15px] font-medium leading-snug text-[#0b2b43]">{question}</p>
+        </div>
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
+          <span
+            className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${
+              isRefusal && answer.refusal
+                ? supportStatusBadgeClass('refused')
+                : supportStatusBadgeClass(status)
+            }`}
+          >
+            {isRefusal && answer.refusal ? supportStatusLabel('refused') : supportStatusLabel(status)}
+          </span>
+          {!isRefusal && topic ? (
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium capitalize text-slate-700">
+              {topic}
+            </span>
+          ) : null}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleCopy();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-[#0b2b43]"
+            >
+              <Copy className="h-3.5 w-3.5 opacity-70" aria-hidden />
+              {copied ? EMPLOYEE_POLICY_ASSISTANT_COPIED : EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER}
+            </button>
+            <span
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500"
+              aria-hidden
+            >
+              {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </span>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-4 px-4 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {isRefusal && answer.refusal ? (
-              <span
-                className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${supportStatusBadgeClass('refused')}`}
-              >
-                {supportStatusLabel('refused')}
-              </span>
-            ) : (
-              <>
-                <span
-                  className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${supportStatusBadgeClass(status)}`}
-                >
-                  {supportStatusLabel(status)}
-                </span>
-                {topic ? (
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium capitalize text-slate-700">
-                    {topic}
-                  </span>
-                ) : null}
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleCopy()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-[#0b2b43]"
-          >
-            <Copy className="h-3.5 w-3.5 opacity-70" aria-hidden />
-            {copied ? EMPLOYEE_POLICY_ASSISTANT_COPIED : EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER}
-          </button>
-        </div>
+      {collapsed ? null : (
+      <div id={bodyId} className="space-y-4 px-4 py-4">
 
         {isRefusal && answer.refusal ? (
           <>
             <div className="rounded-lg border border-slate-100 bg-slate-50/60 px-4 py-3.5 text-[15px] leading-[1.65] text-slate-800">
               {formatRichMessage(answer.refusal.refusal_text)}
             </div>
-            {answer.refusal.supported_examples.length > 0 ? (
+            {isMostRecent && answer.refusal.supported_examples.length > 0 ? (
               <div className="rounded-lg border border-slate-100 bg-white px-3 py-3">
                 <div className="text-xs font-semibold text-slate-600 mb-2">Policy questions you can ask</div>
                 <ul className="text-sm text-slate-700 list-disc pl-5 space-y-1.5 leading-relaxed">
@@ -231,15 +285,60 @@ function AnswerResultCard({
                     const headline = (ev.label || humanizeEvidenceKind(ev.kind)).trim();
                     const attribution = formatEvidenceAttribution(ev).trim();
                     const showExtraAttribution = attribution.length > 0 && attribution !== headline;
+                    const ref = (ev.reference || '').trim();
+                    const handleScroll = () => {
+                      if (!ref) return;
+                      // Mobile: docked panel falls back to a bottom-sheet
+                      // that covers the page. Scrolling the policy
+                      // underneath would do nothing visible — skip.
+                      if (!isCitationDeepLinkAvailable()) return;
+                      const ok = scrollToPolicyReference(ref);
+                      if (!ok && typeof console !== 'undefined') {
+                        // eslint-disable-next-line no-console
+                        console.warn(
+                          `[policy-assistant] no policy clause matched evidence reference "${ref}"`
+                        );
+                      }
+                    };
+                    const clickable = Boolean(ref);
+                    if (!clickable) {
+                      return (
+                        <li key={i} className="border-l-[3px] border-[#0b2b43]/25 pl-3">
+                          <div className="text-sm font-semibold text-[#0b2b43]">{headline}</div>
+                          {ev.excerpt ? (
+                            <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{ev.excerpt}</div>
+                          ) : null}
+                          {showExtraAttribution ? (
+                            <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
+                          ) : null}
+                        </li>
+                      );
+                    }
                     return (
-                      <li key={i} className="border-l-[3px] border-[#0b2b43]/25 pl-3">
-                        <div className="text-sm font-semibold text-[#0b2b43]">{headline}</div>
-                        {ev.excerpt ? (
-                          <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{ev.excerpt}</div>
-                        ) : null}
-                        {showExtraAttribution ? (
-                          <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
-                        ) : null}
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={handleScroll}
+                          aria-label={`Show ${headline} on the policy page`}
+                          data-testid="policy-evidence-citation"
+                          className="group block w-full rounded-md border-l-[3px] border-[#0b2b43]/25 bg-transparent pl-3 pr-2 py-1.5 text-left transition-colors hover:bg-slate-50 hover:border-[#0b2b43]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/35"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-sm font-semibold text-[#0b2b43] group-hover:text-[#08213a]">
+                              {headline}
+                            </div>
+                            <Link2
+                              className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400 group-hover:text-[#0b2b43]"
+                              aria-hidden
+                            />
+                          </div>
+                          {ev.excerpt ? (
+                            <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{ev.excerpt}</div>
+                          ) : null}
+                          {showExtraAttribution ? (
+                            <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
+                          ) : null}
+                        </button>
                       </li>
                     );
                   })}
@@ -292,6 +391,7 @@ function AnswerResultCard({
           </>
         )}
       </div>
+      )}
     </article>
   );
 }
@@ -492,6 +592,11 @@ export const EmployeePolicyAssistantPanel: React.FC<{
 
   const errorParts = error ? policyAssistantUserFacingError(error) : null;
 
+  // Empty state: no typed message AND no saved Q&A. Drives the
+  // "sample questions as hero cards" layout below; once the user
+  // types or submits anything we revert to the textarea-hero layout.
+  const isEmptyState = !message.trim() && turns.length === 0;
+
   const mainForm = (
     <>
       {/* Inner header is the panel's own title/subtitle pair. Card mode
@@ -510,6 +615,37 @@ export const EmployeePolicyAssistantPanel: React.FC<{
       ) : null}
 
       <div className="flex flex-col gap-8">
+        {/* Empty state hero: when there are no saved turns AND the
+            user hasn't started typing, lead with sample questions as
+            full-width clickable cards. First-time users find "what to
+            ask" harder than "how to ask"; the cards put a starter set
+            front-and-center. Once the user types or has saved Q&A,
+            switch back to the textarea-hero layout below. */}
+        {isEmptyState ? (
+          <section
+            id={shortcutsSectionId}
+            className="flex flex-col gap-3"
+            aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
+          >
+            <h3 className="text-sm font-semibold text-[#0b2b43] mb-1">Try one of these:</h3>
+            <ul className="flex flex-col gap-2">
+              {shortcuts.map((s) => (
+                <li key={s}>
+                  <button
+                    type="button"
+                    onClick={() => applySuggestion(s)}
+                    disabled={submitting}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left text-sm font-medium text-slate-700 transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <span className="min-w-0 leading-snug">{s}</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         {/* Input + primary action */}
         <div className="flex flex-col gap-2" aria-busy={submitting}>
           <label htmlFor={questionId} className="sr-only">
@@ -518,10 +654,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           <textarea
             ref={textareaRef}
             id={questionId}
-            rows={6}
+            rows={isEmptyState ? 3 : 6}
             maxLength={8000}
             placeholder={EMPLOYEE_POLICY_ASSISTANT_PLACEHOLDER}
-            className="w-full resize-y min-h-[10rem] rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 focus:shadow-[0_1px_2px_rgba(15,23,42,0.06)] disabled:opacity-60"
+            className={`w-full resize-y rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 focus:shadow-[0_1px_2px_rgba(15,23,42,0.06)] disabled:opacity-60 ${
+              isEmptyState ? 'min-h-[5rem]' : 'min-h-[10rem]'
+            }`}
             value={message}
             onChange={(e) => {
               setMessage(e.target.value);
@@ -556,6 +694,11 @@ export const EmployeePolicyAssistantPanel: React.FC<{
               EMPLOYEE_POLICY_ASSISTANT_SUBMIT
             )}
           </Button>
+          {isEmptyState ? (
+            <p className="text-xs text-slate-500 mt-0.5">
+              Or type your own question above.
+            </p>
+          ) : null}
           {emptySubmitHint ? (
             <p
               id="policy-assistant-empty-hint"
@@ -574,26 +717,31 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           ) : null}
         </div>
 
-        <section
-          id={shortcutsSectionId}
-          className="flex flex-col gap-2.5"
-          aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
-        >
-          <h3 className="text-xs font-medium text-slate-600">{EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}</h3>
-          <div className="flex flex-wrap gap-2">
-            {shortcuts.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => applySuggestion(s)}
-                disabled={submitting}
-                className="inline-flex h-9 min-h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 py-0 text-left text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:max-w-[280px]"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </section>
+        {/* Compact shortcut chips below the textarea, shown only when
+            the user is past the empty state (typing or has Q&A
+            history). The hero block above is the empty-state version. */}
+        {isEmptyState ? null : (
+          <section
+            id={shortcutsSectionId}
+            className="flex flex-col gap-2.5"
+            aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
+          >
+            <h3 className="text-xs font-medium text-slate-600">{EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}</h3>
+            <div className="flex flex-wrap gap-2">
+              {shortcuts.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => applySuggestion(s)}
+                  disabled={submitting}
+                  className="inline-flex h-9 min-h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 py-0 text-left text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:max-w-[280px]"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Trust-signal pill — replaces the previous two paragraphs of
             light-gray disclaimer text. Reads as a positive signal
