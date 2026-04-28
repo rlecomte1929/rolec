@@ -638,7 +638,10 @@ export const CaseWizardPage: React.FC = () => {
       {/* Policy Assistant on the wizard too — employees often hit a
           benefit question mid-intake. Stacks above the global Feedback
           widget at bottom-right. */}
-      <PolicyAssistantFab label="Open Policy Assistant — ask about your HR policy">
+      <PolicyAssistantFab
+        label="Open policy assistant — ask about your policy"
+        sheetTitle="Ask about your policy"
+      >
         {() => (
           <EmployeePolicyAssistantPanel
             assignmentId={assignmentId}

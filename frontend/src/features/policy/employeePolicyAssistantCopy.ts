@@ -1,4 +1,4 @@
-export const EMPLOYEE_POLICY_ASSISTANT_TITLE = 'Policy Assistant';
+export const EMPLOYEE_POLICY_ASSISTANT_TITLE = 'Ask about your policy';
 
 export const EMPLOYEE_POLICY_ASSISTANT_SUBTITLE =
   'Questions use your company’s published relocation policy for this assignment.';

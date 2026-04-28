@@ -1,4 +1,4 @@
-export const HR_POLICY_ASSISTANT_TITLE = 'Policy Assistant';
+export const HR_POLICY_ASSISTANT_TITLE = 'Ask about this policy';
 
 export const HR_POLICY_ASSISTANT_SUBTITLE =
   'Ask about this policy version, employee-visible rules, and publish impact.';

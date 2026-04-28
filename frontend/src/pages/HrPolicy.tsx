@@ -26,7 +26,8 @@ function EmployeePolicyContent() {
         <EmployeePolicyView />
       </div>
       <PolicyAssistantFab
-        label="Open Policy Assistant — ask about your HR policy"
+        label="Open policy assistant — ask about your policy"
+        sheetTitle="Ask about your policy"
       >
         {() => (
           <EmployeePolicyAssistantPanel
