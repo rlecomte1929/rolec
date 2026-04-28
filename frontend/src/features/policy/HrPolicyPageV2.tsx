@@ -37,7 +37,7 @@ import {
 import type { PolicyConfigWorkingPayload } from '../policy-config/types';
 import { HrPolicyReviewWorkspace } from './HrPolicyReviewWorkspace';
 import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
-import { PolicyAssistantFab } from './PolicyAssistantFab';
+import { PolicyAssistantDockedShell } from './PolicyAssistantDockedShell';
 import { CanonicalPolicyDiffView } from './CanonicalPolicyDiffView';
 import { PolicyDiffView } from './PolicyDiffView';
 import { PolicyTemplatePicker } from './PolicyTemplatePicker';
@@ -347,26 +347,6 @@ const VersionHistorySection: React.FC<{
   );
 };
 
-// --- Floating Policy Assistant FAB -----------------------------------------
-
-/**
- * HR-flavored floating assistant. The shared PolicyAssistantFab owns the
- * button + sheet chrome; this wrapper only provides the HR assistant
- * panel as the sheet body. Kept inline here so page-scoped props
- * (policyId) stay local — a future employee equivalent will use the
- * same PolicyAssistantFab with EmployeePolicyAssistantPanel as body.
- */
-const FloatingPolicyAssistantButton: React.FC<{
-  policyId: string | null;
-}> = ({ policyId }) => (
-  <PolicyAssistantFab
-    label="Open policy assistant — ask about this policy"
-    sheetTitle="Ask about this policy"
-  >
-    {() => <HrPolicyAssistantPanel policyId={policyId} variant="embedded" />}
-  </PolicyAssistantFab>
-);
-
 // --- Main page --------------------------------------------------------------
 
 export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }) => {
@@ -495,6 +475,11 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
 
   const policyId = normalized?.version?.policy_id ?? normalized?.policy?.id ?? null;
 
+  // Sprint 2: docked-shell open state lifted to the page so the trigger
+  // button and the shell share it. Replaces the modal-overlay flow that
+  // PolicyAssistantFab + PolicyAssistantSideSheet owned previously.
+  const [assistantOpen, setAssistantOpen] = useState(false);
+
   if (loading) {
     return (
       <Card padding="lg">
@@ -504,9 +489,33 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
   }
 
   return (
+    <PolicyAssistantDockedShell
+      open={assistantOpen}
+      onOpenChange={setAssistantOpen}
+      title="Ask about this policy"
+      subtitle="Bounded Q&A on this workspace's policy data."
+      titleId="hr-policy-assistant-shell-title"
+      assistant={() => <HrPolicyAssistantPanel policyId={policyId} variant="embedded" />}
+    >
     <div className="space-y-6 pb-12">
       {loadError && <Alert variant="error">{loadError}</Alert>}
       {publishError && <Alert variant="error">{publishError}</Alert>}
+
+      {/* Sprint 2 trigger — replaces the old PolicyAssistantFab. Sits
+          flush-right above the status strip so it's discoverable
+          without competing with the page heading. The docked shell
+          handles the panel itself. */}
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setAssistantOpen((v) => !v)}
+          aria-expanded={assistantOpen}
+          aria-controls="hr-policy-assistant-shell-title"
+        >
+          {assistantOpen ? 'Close policy assistant' : 'Ask about this policy'}
+        </Button>
+      </div>
 
       {/* 1. Status strip */}
       <StatusStrip
@@ -650,9 +659,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       <div aria-hidden className="hidden">
         <button type="button" onClick={bump} />
       </div>
-
-      {/* Floating Policy Assistant */}
-      <FloatingPolicyAssistantButton policyId={policyId} />
     </div>
+    </PolicyAssistantDockedShell>
   );
 };

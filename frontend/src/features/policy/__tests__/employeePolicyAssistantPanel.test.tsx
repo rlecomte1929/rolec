@@ -152,14 +152,11 @@ describe('EmployeePolicyAssistantPanel', () => {
     expect(screen.getByText(/home leave cap/i)).toBeInTheDocument();
   });
 
-  it('sideSheet variant opens anchored panel with intro copy', async () => {
-    render(<EmployeePolicyAssistantPanel assignmentId="asg-1" variant="sideSheet" />);
-    fireEvent.click(screen.getByRole('button', { name: EMPLOYEE_POLICY_ASSISTANT_TITLE }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getAllByText(EMPLOYEE_POLICY_ASSISTANT_SUBTITLE).length).toBeGreaterThan(0);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  });
+  // Note: the sideSheet variant test was removed in Sprint 2. The panel
+  // no longer ships its own sheet wrapper — PolicyAssistantDockedShell
+  // owns the dock/bottom-sheet chrome and is covered by
+  // policyAssistantDockedShell.test.tsx. The embedded variant render
+  // path is exercised by the analytics + answer-card tests above.
 
   it('renders refusal card with supported examples', async () => {
     postPolicyAssistantQuery.mockResolvedValue({

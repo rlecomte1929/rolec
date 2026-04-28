@@ -6,6 +6,7 @@ import { Alert, Button, Card } from '../components/antigravity';
 import { policyDocumentsAPI } from '../api/client';
 import { EmployeePolicyView } from '../features/policy/EmployeePolicyView';
 import { EmployeePolicyAssistantPanel } from '../features/policy/EmployeePolicyAssistantPanel';
+import { PolicyAssistantDockedShell } from '../features/policy/PolicyAssistantDockedShell';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
@@ -15,29 +16,39 @@ import { buildRoute } from '../navigation/routes';
 function EmployeePolicyContent() {
   // The /hr/policy route is reused for employees so the nav tab they
   // see ("HR Policy") leads somewhere meaningful. The body is the same
-  // EmployeePolicyView used by /employee/policy: theme accordion driven
-  // by /api/employee/policy-config (covered + applicable rows only,
-  // auto-updates when HR republishes).
+  // EmployeePolicyView used by /employee/policy.
   const { assignmentId } = useEmployeeAssignment();
   const [assignmentLoading] = useState(false);
+  // Sprint 2: docked shell replaces the modal-overlay FAB. Open state
+  // is owned here so the FAB trigger and the shell share it; the FAB
+  // hides on lg+ when open to avoid overlapping the panel.
+  const [assistantOpen, setAssistantOpen] = useState(false);
   return (
-    <div className="pb-6">
-      <div className="min-w-0">
-        <EmployeePolicyView />
+    <PolicyAssistantDockedShell
+      open={assistantOpen}
+      onOpenChange={setAssistantOpen}
+      title="Ask about your policy"
+      subtitle="Bounded Q&A on your published policy."
+      titleId="employee-hrpolicy-assistant-shell-title"
+      assistant={() => (
+        <EmployeePolicyAssistantPanel
+          assignmentId={assignmentId ?? undefined}
+          assignmentLoading={assignmentLoading}
+          variant="embedded"
+        />
+      )}
+    >
+      <div className="pb-6">
+        <div className="min-w-0">
+          <EmployeePolicyView />
+        </div>
       </div>
       <PolicyAssistantFab
-        label="Open policy assistant — ask about your policy"
-        sheetTitle="Ask about your policy"
-      >
-        {() => (
-          <EmployeePolicyAssistantPanel
-            assignmentId={assignmentId ?? undefined}
-            assignmentLoading={assignmentLoading}
-            variant="embedded"
-          />
-        )}
-      </PolicyAssistantFab>
-    </div>
+        label={assistantOpen ? 'Close policy assistant' : 'Ask about your policy'}
+        isPanelOpen={assistantOpen}
+        onClick={() => setAssistantOpen((v) => !v)}
+      />
+    </PolicyAssistantDockedShell>
   );
 }
 

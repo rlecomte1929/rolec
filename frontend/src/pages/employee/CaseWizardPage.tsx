@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
+import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import { CaseContextBar } from '../../components/case/CaseContextBar';
 import { WizardSidebar } from '../../components/case/WizardSidebar';
@@ -480,8 +481,25 @@ export const CaseWizardPage: React.FC = () => {
 
   const completedSteps = stepCompletion.completed;
 
+  // Sprint 2: docked shell + trigger-only FAB.
+  const [assistantOpen, setAssistantOpen] = useState(false);
+
   return (
     <AppShell title="My case" subtitle="Relocation intake wizard.">
+      <PolicyAssistantDockedShell
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        title="Ask about your policy"
+        subtitle="Bounded Q&A on your published policy."
+        titleId="employee-wizard-assistant-shell-title"
+        assistant={() => (
+          <EmployeePolicyAssistantPanel
+            assignmentId={assignmentId}
+            assignmentLoading={false}
+            variant="embedded"
+          />
+        )}
+      >
       <div className="max-w-6xl mx-auto space-y-6">
         {assignmentStatus === 'awaiting_intake' && hrFeedback && (
           <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
@@ -635,21 +653,14 @@ export const CaseWizardPage: React.FC = () => {
           </div>
         </div>
       </div>
-      {/* Policy Assistant on the wizard too — employees often hit a
-          benefit question mid-intake. Stacks above the global Feedback
-          widget at bottom-right. */}
+      </PolicyAssistantDockedShell>
+      {/* FAB trigger — toggles the docked shell. Hides on lg+ when
+          open so it doesn't overlap the panel. */}
       <PolicyAssistantFab
-        label="Open policy assistant — ask about your policy"
-        sheetTitle="Ask about your policy"
-      >
-        {() => (
-          <EmployeePolicyAssistantPanel
-            assignmentId={assignmentId}
-            assignmentLoading={false}
-            variant="embedded"
-          />
-        )}
-      </PolicyAssistantFab>
+        label={assistantOpen ? 'Close policy assistant' : 'Ask about your policy'}
+        isPanelOpen={assistantOpen}
+        onClick={() => setAssistantOpen((v) => !v)}
+      />
     </AppShell>
   );
 };

@@ -1,6 +1,6 @@
 /**
  * Bounded policy Q&A for employees: single-turn answers from published policy data.
- * HR Policy page: `sideSheet` — right anchored panel (desktop) / sheet (mobile), not a floating chat bubble.
+ * Mounted as `embedded` inside PolicyAssistantDockedShell — docked panel on lg+, bottom-sheet on mobile.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Copy, Loader2 } from 'lucide-react';
@@ -46,7 +46,6 @@ import {
   EMPLOYEE_POLICY_ASSISTANT_TITLE,
   EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL,
 } from './employeePolicyAssistantCopy';
-import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 
 const MAX_TURNS = 15;
 
@@ -304,18 +303,13 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   /**
    * `card` — full-width panel rendered inline on a page (legacy /
    *   tests). Includes its own header + Card wrapper.
-   * `sideSheet` — panel mounts itself with its own
-   *   PolicyAssistantSideSheet trigger + chrome. Inner header is
-   *   suppressed (the side-sheet provides one).
    * `embedded` — caller already provides the chrome (e.g. inside
-   *   PolicyAssistantFab). Renders the form body only — no inner
-   *   header, no Card wrapper, no SideSheet wrapper.
-   * @deprecated Use `embedded` from inside the FAB. `fab` now maps to
-   *   `embedded`, not `sideSheet`, to fix duplicate-title rendering.
+   *   PolicyAssistantDockedShell). Renders the form body only — no
+   *   inner header, no Card wrapper.
    */
-  variant?: 'card' | 'fab' | 'sideSheet' | 'embedded';
+  variant?: 'card' | 'embedded';
 }> = ({ assignmentId, assignmentLoading = false, variant = 'card' }) => {
-  const layoutVariant = variant === 'fab' ? 'embedded' : variant;
+  const layoutVariant = variant;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const responseSectionRef = useRef<HTMLElement | null>(null);
   const scrollToResponseAfterAnswerRef = useRef(false);
@@ -323,7 +317,6 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   const [turns, setTurns] = useState<PolicyAssistantTurn[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [emptySubmitHint, setEmptySubmitHint] = useState(false);
 
   // Analytics: surface label per mount, plus refs for state we need at
@@ -334,14 +327,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   const hadQuestionRef = useRef(false);
   const hadAnswerRef = useRef(false);
 
-  // Embedded variant: the panel mounts only when the FAB sheet opens
+  // Embedded variant: the panel mounts only when the docked shell opens
   // and unmounts when it closes — so mount = "Opened" and unmount =
   // "Dismissed". Card variant fires Opened once on mount; it has no
   // explicit dismissal (lives inline on a page).
   useEffect(() => {
-    if (layoutVariant === 'embedded' || layoutVariant === 'card') {
-      trackPolicyAssistantOpened({ surface });
-    }
+    trackPolicyAssistantOpened({ surface });
     if (layoutVariant === 'embedded') {
       return () => {
         trackPolicyAssistantDismissed({
@@ -356,24 +347,6 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     // it would require a stable value anyway.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // sideSheet variant: open/close is driven by `sheetOpen`. Fire
-  // Opened on the open transition, Dismissed on the close transition.
-  const prevSheetOpenRef = useRef(false);
-  useEffect(() => {
-    if (layoutVariant !== 'sideSheet') return;
-    const prev = prevSheetOpenRef.current;
-    if (sheetOpen && !prev) {
-      trackPolicyAssistantOpened({ surface });
-    } else if (!sheetOpen && prev) {
-      trackPolicyAssistantDismissed({
-        surface,
-        had_question: hadQuestionRef.current,
-        had_answer: hadAnswerRef.current,
-      });
-    }
-    prevSheetOpenRef.current = sheetOpen;
-  }, [sheetOpen, layoutVariant, surface]);
 
   useEffect(() => {
     if (!assignmentId) {
@@ -502,9 +475,9 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     focusQuestionInput();
   };
 
-  // Card mode keeps the legacy ids; sheet-like containers (sideSheet,
-  // embedded inside the FAB) get the -sheet suffix so the same DOM tree
-  // doesn't collide if multiple instances render.
+  // Card mode keeps the legacy ids; embedded (docked shell) uses
+  // -sheet suffix so the same DOM tree doesn't collide if multiple
+  // instances render.
   const inSheetLike = layoutVariant !== 'card';
   const questionId = inSheetLike ? 'policy-assistant-question-sheet' : 'policy-assistant-question';
   const shortcutsSectionId = inSheetLike
@@ -523,9 +496,8 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     <>
       {/* Inner header is the panel's own title/subtitle pair. Card mode
           owns the only chrome around the panel and renders it. The
-          sideSheet variant has its own PolicyAssistantSideSheet header
-          and the embedded variant relies on PolicyAssistantFab's header
-          — both would duplicate the title if this rendered. */}
+          embedded variant relies on PolicyAssistantDockedShell's header
+          — duplicating it here would render the title twice. */}
       {layoutVariant === 'card' ? (
         <header className="mb-8 space-y-1.5">
           <h2 className="text-lg font-semibold tracking-tight text-[#0b2b43]">
@@ -693,10 +665,8 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   );
 
   if (assignmentLoading && !assignmentId) {
-    // sideSheet returns null because it owns its own trigger button —
-    // hiding the panel hides the trigger too.
-    // embedded returns null because the parent (FAB) controls visibility.
-    if (layoutVariant === 'sideSheet' || layoutVariant === 'embedded') {
+    // embedded returns null because the docked shell controls visibility.
+    if (layoutVariant === 'embedded') {
       return null;
     }
     return (
@@ -708,12 +678,9 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   }
 
   if (!assignmentId) {
-    if (layoutVariant === 'sideSheet') {
-      return null;
-    }
     if (layoutVariant === 'embedded') {
-      // FAB sheet is open but no assignment in scope — show a minimal
-      // honest message inside the sheet rather than a blank dialog.
+      // Docked shell is open but no assignment in scope — show a minimal
+      // honest message inside the panel rather than a blank dialog.
       return (
         <p className="text-sm text-slate-500">{EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT}</p>
       );
@@ -727,39 +694,10 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     );
   }
 
-  // Embedded: parent controls chrome (PolicyAssistantFab provides the
-  // sheet header + close affordance). Render the body bare.
+  // Embedded: parent (PolicyAssistantDockedShell) provides the header +
+  // close affordance. Render the body bare.
   if (layoutVariant === 'embedded') {
     return <>{mainForm}</>;
-  }
-
-  if (layoutVariant === 'sideSheet') {
-    return (
-      <PolicyAssistantSideSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        title={EMPLOYEE_POLICY_ASSISTANT_TITLE}
-        subtitle={EMPLOYEE_POLICY_ASSISTANT_SUBTITLE}
-        titleId="policy-assistant-sheet-title"
-        trigger={
-          <div className="sticky top-0 z-10 -mx-1 mb-4 flex flex-col items-end gap-1 bg-gradient-to-b from-white from-80% to-transparent pb-1 pt-1 px-1 sm:-mx-0">
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0 border-slate-300 text-[#0b2b43] font-medium shadow-sm"
-              onClick={() => setSheetOpen(true)}
-            >
-              {EMPLOYEE_POLICY_ASSISTANT_TITLE}
-            </Button>
-            <p className="hidden max-w-[15rem] text-right text-xs leading-snug text-slate-500 md:block">
-              Opens as a side panel. This page stays open.
-            </p>
-          </div>
-        }
-      >
-        {mainForm}
-      </PolicyAssistantSideSheet>
-    );
   }
 
   return <Card padding="md" className="mb-6 border-slate-200">{mainForm}</Card>;
