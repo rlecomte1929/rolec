@@ -1,7 +1,8 @@
 /**
  * Bounded policy Q&A for HR: working draft, published signals, employee view — not a generic copilot.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 import { hrAPI } from '../../api/client';
@@ -18,15 +19,23 @@ import {
   draftVsPublishedHint,
   policyScopeLine,
 } from './hrPolicyAssistantModel';
-import { trackPolicyAssistantFollowUpClicked } from './policyAssistantAnalytics';
+import {
+  trackPolicyAssistantAnswerReceived,
+  trackPolicyAssistantDismissed,
+  trackPolicyAssistantFollowUpClicked,
+  trackPolicyAssistantOpened,
+  trackPolicyAssistantQuestionSubmitted,
+  type PolicyAssistantQuestionSource,
+  type PolicyAssistantSurface,
+} from './policyAssistantAnalytics';
 import {
   HR_POLICY_ASSISTANT_NO_POLICY,
   HR_POLICY_ASSISTANT_PLACEHOLDER,
-  HR_POLICY_ASSISTANT_SCOPE_NOTE,
   HR_POLICY_ASSISTANT_SUBMIT,
   HR_POLICY_ASSISTANT_SUBTITLE,
   HR_POLICY_ASSISTANT_SUGGESTIONS,
   HR_POLICY_ASSISTANT_TITLE,
+  HR_POLICY_ASSISTANT_TRUST_PILL,
 } from './hrPolicyAssistantCopy';
 
 const MAX_TURNS = 5;
@@ -41,11 +50,15 @@ function HrAnswerResultCard({
   question,
   answer,
   assistantTurnRequestId,
+  isMostRecent,
   onFollowUpSelect,
 }: {
   question: string;
   answer: PolicyAssistantAnswer;
   assistantTurnRequestId?: string | null;
+  /** Only the most recent answer renders the chip block — historical
+   *  cards keep their content but drop the follow-up suggestions. */
+  isMostRecent: boolean;
   onFollowUpSelect: (
     text: string,
     index: number,
@@ -172,7 +185,7 @@ function HrAnswerResultCard({
               </div>
             )}
 
-            {answer.follow_up_options && answer.follow_up_options.length > 0 ? (
+            {isMostRecent && answer.follow_up_options && answer.follow_up_options.length > 0 ? (
               <div>
                 <div className="text-xs font-semibold text-slate-600 mb-1.5">Related policy questions</div>
                 <ul className="flex flex-wrap gap-2">
@@ -211,10 +224,14 @@ export const HrPolicyAssistantPanel: React.FC<{
   /** True while normalized policy payload for the selected policy is loading. */
   contextLoading?: boolean;
   /**
-   * `card` — full-width block in page flow (tests, legacy).
-   * `sideSheet` — top-right trigger; right panel on large screens, full-width sheet on small screens.
+   * `card` — full-width inline block (legacy / tests). Owns its own
+   *   header.
+   * `sideSheet` — panel mounts its own PolicyAssistantSideSheet
+   *   trigger and chrome. Inner header suppressed.
+   * `embedded` — caller provides the chrome (e.g. PolicyAssistantFab).
+   *   Render the form body only.
    */
-  variant?: 'card' | 'sideSheet';
+  variant?: 'card' | 'sideSheet' | 'embedded';
 }> = ({ policyId, documentId, contextLoading = false, variant = 'card' }) => {
   const [message, setMessage] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -222,6 +239,47 @@ export const HrPolicyAssistantPanel: React.FC<{
   const [submitting, setSubmitting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const layoutSheet = variant === 'sideSheet';
+  const inSheetLike = variant !== 'card';
+
+  // Analytics: HR panel mounts only inside HR-side surfaces (sideSheet
+  // trigger on /hr/policy or embedded inside the FAB on the same page).
+  const surface: PolicyAssistantSurface = 'hr_sidesheet';
+  const submitSourceRef = useRef<PolicyAssistantQuestionSource>('free_text');
+  const hadQuestionRef = useRef(false);
+  const hadAnswerRef = useRef(false);
+
+  useEffect(() => {
+    if (variant === 'embedded' || variant === 'card') {
+      trackPolicyAssistantOpened({ surface });
+    }
+    if (variant === 'embedded') {
+      return () => {
+        trackPolicyAssistantDismissed({
+          surface,
+          had_question: hadQuestionRef.current,
+          had_answer: hadAnswerRef.current,
+        });
+      };
+    }
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const prevSheetOpenRef = useRef(false);
+  useEffect(() => {
+    if (variant !== 'sideSheet') return;
+    const prev = prevSheetOpenRef.current;
+    if (sheetOpen && !prev) {
+      trackPolicyAssistantOpened({ surface });
+    } else if (!sheetOpen && prev) {
+      trackPolicyAssistantDismissed({
+        surface,
+        had_question: hadQuestionRef.current,
+        had_answer: hadAnswerRef.current,
+      });
+    }
+    prevSheetOpenRef.current = sheetOpen;
+  }, [sheetOpen, variant, surface]);
 
   const pid = policyId?.trim() || null;
   const trimmed = message.trim();
@@ -231,8 +289,19 @@ export const HrPolicyAssistantPanel: React.FC<{
     if (!pid || !trimmed) return;
     setSubmitting(true);
     setError('');
+    const source = submitSourceRef.current;
+    submitSourceRef.current = 'free_text';
+    hadQuestionRef.current = true;
+    trackPolicyAssistantQuestionSubmitted({ surface, source });
     try {
       const res = await hrAPI.postPolicyAssistantQuery(pid, trimmed, documentId?.trim() || undefined);
+      hadAnswerRef.current = true;
+      trackPolicyAssistantAnswerReceived({
+        surface,
+        answer_type: res.answer?.answer_type ?? null,
+        status: deriveSupportStatus(res.answer),
+        request_id: res.request_id ?? null,
+      });
       setTurns((prev) => {
         const next = [
           ...prev,
@@ -259,11 +328,13 @@ export const HrPolicyAssistantPanel: React.FC<{
     } finally {
       setSubmitting(false);
     }
-  }, [pid, trimmed, documentId]);
+  }, [pid, trimmed, documentId, surface]);
 
   const applySuggestion = (q: string) => {
     setMessage(q);
     setError('');
+    // Mark next submit as originating from a shortcut chip.
+    submitSourceRef.current = 'shortcut';
   };
 
   const handleFollowUpFromAnswer = (
@@ -281,10 +352,13 @@ export const HrPolicyAssistantPanel: React.FC<{
     });
     setMessage(text);
     setError('');
+    // Mark next submit as originating from a follow-up chip.
+    submitSourceRef.current = 'follow_up';
   };
 
   if (contextLoading && !pid) {
-    if (layoutSheet) return null;
+    // sheet variants own their trigger / chrome from the parent.
+    if (layoutSheet || variant === 'embedded') return null;
     return (
       <Card padding="md" className="border-slate-200 bg-slate-50/40" id="hr-policy-assistant">
         <div className="text-base font-semibold text-[#0b2b43]">{HR_POLICY_ASSISTANT_TITLE}</div>
@@ -295,6 +369,10 @@ export const HrPolicyAssistantPanel: React.FC<{
 
   if (!pid) {
     if (layoutSheet) return null;
+    if (variant === 'embedded') {
+      // Honest minimal fallback inside the FAB sheet — no chrome to repeat.
+      return <p className="text-sm text-slate-500">{HR_POLICY_ASSISTANT_NO_POLICY}</p>;
+    }
     return (
       <Card padding="md" className="border-slate-200 bg-slate-50/50" id="hr-policy-assistant">
         <div className="text-base font-semibold text-[#0b2b43]">{HR_POLICY_ASSISTANT_TITLE}</div>
@@ -304,15 +382,20 @@ export const HrPolicyAssistantPanel: React.FC<{
     );
   }
 
-  const questionId = layoutSheet ? 'hr-policy-assistant-question-sheet' : 'hr-policy-assistant-question';
+  const questionId = inSheetLike ? 'hr-policy-assistant-question-sheet' : 'hr-policy-assistant-question';
 
   const coreForm = (
     <>
-      <p
-        className={`text-xs text-slate-500 leading-relaxed ${layoutSheet ? 'mt-0' : 'mt-2'}`}
-      >
-        {HR_POLICY_ASSISTANT_SCOPE_NOTE}
-      </p>
+      {/* Trust-signal pill replacing the previous SCOPE_NOTE paragraph.
+          Same intent (tell HR what data backs the answers + that this
+          isn't legal advice) but reads as an affirmative chip rather
+          than a footer disclaimer. */}
+      <div className={inSheetLike ? 'mt-0' : 'mt-2'}>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900">
+          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+          {HR_POLICY_ASSISTANT_TRUST_PILL}
+        </span>
+      </div>
 
       <div className="mt-4 space-y-2">
         <label htmlFor={questionId} className="sr-only">
@@ -320,10 +403,10 @@ export const HrPolicyAssistantPanel: React.FC<{
         </label>
         <textarea
           id={questionId}
-          rows={layoutSheet ? 5 : 3}
+          rows={inSheetLike ? 5 : 3}
           maxLength={8000}
           placeholder={HR_POLICY_ASSISTANT_PLACEHOLDER}
-          className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 disabled:opacity-60${layoutSheet ? ' min-h-[5rem]' : ''}`}
+          className={`w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-300 disabled:opacity-60${inSheetLike ? ' min-h-[5rem]' : ''}`}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           disabled={submitting || contextLoading}
@@ -362,12 +445,14 @@ export const HrPolicyAssistantPanel: React.FC<{
       {turns.length > 0 ? (
         <div className="mt-5 space-y-4">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Policy answers</div>
-          {[...turns].reverse().map((t) => (
+          {[...turns].reverse().map((t, index) => (
+            // Reversed list — index 0 is the most recent answer.
             <HrAnswerResultCard
               key={t.id}
               question={t.question}
               answer={t.answer}
               assistantTurnRequestId={t.assistantRequestId}
+              isMostRecent={index === 0}
               onFollowUpSelect={handleFollowUpFromAnswer}
             />
           ))}
@@ -375,6 +460,13 @@ export const HrPolicyAssistantPanel: React.FC<{
       ) : null}
     </>
   );
+
+  // Embedded: parent (typically PolicyAssistantFab) provides the
+  // sheet-like chrome; render the form body bare so the title + close
+  // button aren't duplicated.
+  if (variant === 'embedded') {
+    return <>{coreForm}</>;
+  }
 
   if (layoutSheet) {
     return (

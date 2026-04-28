@@ -26,13 +26,17 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 type Props = {
   /**
    * Accessible label announced by screen readers when the FAB is focused.
-   * Defaults to "Open Policy Assistant"; overridable if the surrounding
-   * page prefers more specific wording ("Ask about your HR policy").
+   * Defaults to "Open policy assistant"; mount sites should pass a more
+   * specific label ("Ask about your policy" / "Ask about this policy")
+   * so the trigger reads as role-aware.
    */
   label?: string;
   /**
    * Sheet title rendered in the header when open. Defaults to "Policy
-   * Assistant". Kept short so mobile sheet headers don't wrap.
+   * assistant". Mount sites SHOULD pass an explicit sheetTitle matching
+   * the role: "Ask about your policy" (employee) / "Ask about this
+   * policy" (HR). With the embedded panel variant the FAB header is the
+   * only place the title shows.
    */
   sheetTitle?: string;
   /**
@@ -50,8 +54,8 @@ type Props = {
 };
 
 export const PolicyAssistantFab: React.FC<Props> = ({
-  label = 'Open Policy Assistant',
-  sheetTitle = 'Policy Assistant',
+  label = 'Open policy assistant',
+  sheetTitle = 'Policy assistant',
   children,
   onOpen,
 }) => {
@@ -129,7 +133,7 @@ export const PolicyAssistantFab: React.FC<Props> = ({
                 type="button"
                 onClick={close}
                 className="text-slate-500 hover:text-[#0b2b43] px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/30"
-                aria-label="Close Policy Assistant"
+                aria-label={`Close ${sheetTitle.toLowerCase()}`}
               >
                 Close
               </button>

@@ -359,8 +359,11 @@ const VersionHistorySection: React.FC<{
 const FloatingPolicyAssistantButton: React.FC<{
   policyId: string | null;
 }> = ({ policyId }) => (
-  <PolicyAssistantFab label="Open Policy Assistant — ask about this HR policy">
-    {() => <HrPolicyAssistantPanel policyId={policyId} variant="card" />}
+  <PolicyAssistantFab
+    label="Open policy assistant — ask about this policy"
+    sheetTitle="Ask about this policy"
+  >
+    {() => <HrPolicyAssistantPanel policyId={policyId} variant="embedded" />}
   </PolicyAssistantFab>
 );
 

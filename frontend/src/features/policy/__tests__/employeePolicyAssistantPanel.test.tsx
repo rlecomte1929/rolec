@@ -3,13 +3,12 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import '@testing-library/jest-dom/vitest';
 import { EmployeePolicyAssistantPanel } from '../EmployeePolicyAssistantPanel';
 import {
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER,
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY,
   EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT,
   EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUBTITLE,
   EMPLOYEE_POLICY_ASSISTANT_TITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS,
+  EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL,
 } from '../employeePolicyAssistantCopy';
 import type { PolicyAssistantAnswer } from '../../../types/policyAssistant';
 
@@ -19,6 +18,10 @@ vi.mock('../../../api/client', () => ({
   employeeAPI: {
     postPolicyAssistantQuery: (...args: unknown[]) => postPolicyAssistantQuery(...args),
   },
+  // Sprint 1 added analytics beacons via apiPost. Stub it here so the
+  // mocked module exposes the symbol; analytics calls are fire-and-
+  // forget and don't affect the assertions.
+  apiPost: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 function entitlementAnswer(overrides: Partial<PolicyAssistantAnswer> = {}): PolicyAssistantAnswer {
@@ -76,12 +79,13 @@ afterEach(() => {
 });
 
 describe('EmployeePolicyAssistantPanel', () => {
-  it('shows title, subtitle, and disclaimer when assignment is present', () => {
+  it('shows title, subtitle, and trust-signal pill when assignment is present', () => {
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
     expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_TITLE)).toBeInTheDocument();
     expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_SUBTITLE)).toBeInTheDocument();
-    expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER)).toBeInTheDocument();
-    expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY)).toBeInTheDocument();
+    // Slice 3 replaced the dual-paragraph footer disclaimer with a
+    // single trust-signal pill above the response section.
+    expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL)).toBeInTheDocument();
   });
 
   it('shows no-assignment copy when assignment id missing', () => {
@@ -102,9 +106,9 @@ describe('EmployeePolicyAssistantPanel', () => {
     await waitFor(() => expect(ta).toHaveFocus());
   });
 
-  it('shows inline hint when Get answer is clicked with an empty question', () => {
+  it('shows inline hint when Ask is clicked with an empty question', () => {
     render(<EmployeePolicyAssistantPanel assignmentId="asg-1" />);
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT)).toBeInTheDocument();
     expect(postPolicyAssistantQuery).not.toHaveBeenCalled();
   });
@@ -122,7 +126,7 @@ describe('EmployeePolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
       target: { value: 'Test question' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     expect(await screen.findByText(/checking published policy/i)).toBeInTheDocument();
   });
 
@@ -137,7 +141,7 @@ describe('EmployeePolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
       target: { value: 'Is temporary housing included?' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(postPolicyAssistantQuery).toHaveBeenCalledWith('asg-1', 'Is temporary housing included?'));
     await waitFor(() => {
       expect(screen.getByText(/included \(published policy\)/i)).toBeInTheDocument();
@@ -184,7 +188,7 @@ describe('EmployeePolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
       target: { value: 'Negotiate my salary' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(screen.getByText(/no policy answer/i)).toBeInTheDocument());
     expect(screen.getByText(/policy questions you can ask/i)).toBeInTheDocument();
     expect(screen.getByText('What is my housing cap?')).toBeInTheDocument();
@@ -198,7 +202,7 @@ describe('EmployeePolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/shipment allowance/i), {
       target: { value: 'Test question' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => {
       expect(screen.getByText(EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE)).toBeInTheDocument();
     });

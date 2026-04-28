@@ -3,7 +3,7 @@
  * HR Policy page: `sideSheet` — right anchored panel (desktop) / sheet (mobile), not a floating chat bubble.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, Loader2 } from 'lucide-react';
+import { CheckCircle2, Copy, Loader2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
@@ -20,13 +20,19 @@ import {
   supportStatusBadgeClass,
   supportStatusLabel,
 } from './employeePolicyAssistantModel';
-import { trackPolicyAssistantFollowUpClicked } from './policyAssistantAnalytics';
+import {
+  trackPolicyAssistantAnswerReceived,
+  trackPolicyAssistantDismissed,
+  trackPolicyAssistantFollowUpClicked,
+  trackPolicyAssistantOpened,
+  trackPolicyAssistantQuestionSubmitted,
+  type PolicyAssistantQuestionSource,
+  type PolicyAssistantSurface,
+} from './policyAssistantAnalytics';
 import {
   EMPLOYEE_POLICY_ASSISTANT_CLEAR_HISTORY,
   EMPLOYEE_POLICY_ASSISTANT_COPIED,
   EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER,
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER,
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY,
   EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT,
   EMPLOYEE_POLICY_ASSISTANT_ERROR_DETAIL,
   EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE,
@@ -38,6 +44,7 @@ import {
   EMPLOYEE_POLICY_ASSISTANT_SUBTITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS,
   EMPLOYEE_POLICY_ASSISTANT_TITLE,
+  EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL,
 } from './employeePolicyAssistantCopy';
 import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 
@@ -105,11 +112,17 @@ function AnswerResultCard({
   question,
   answer,
   assistantTurnRequestId,
+  isMostRecent,
   onFollowUpSelect,
 }: {
   question: string;
   answer: PolicyAssistantAnswer;
   assistantTurnRequestId?: string | null;
+  /** Only the most recent turn renders the "Related policy questions"
+   *  chip block — older cards keep their badges, copy button, evidence,
+   *  conditions, and answer text. After 10 turns, suppressing chips
+   *  on history saves ~30 buttons of visual noise. */
+  isMostRecent: boolean;
   onFollowUpSelect: (
     text: string,
     index: number,
@@ -251,7 +264,7 @@ function AnswerResultCard({
               </div>
             )}
 
-            {answer.follow_up_options && answer.follow_up_options.length > 0 ? (
+            {isMostRecent && answer.follow_up_options && answer.follow_up_options.length > 0 ? (
               <div>
                 <div className="text-xs font-semibold text-slate-600 mb-2">Related policy questions</div>
                 <ul className="flex flex-wrap gap-2">
@@ -289,13 +302,20 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   /** When true, hide “no assignment” until parent finished loading. */
   assignmentLoading?: boolean;
   /**
-   * `card` — full-width panel (legacy in-page placement).
-   * `sideSheet` — HR Policy: triggers beside/near content; panel from the right (desktop) or sheet (mobile).
-   * @deprecated Use `sideSheet`. `fab` is treated as `sideSheet`.
+   * `card` — full-width panel rendered inline on a page (legacy /
+   *   tests). Includes its own header + Card wrapper.
+   * `sideSheet` — panel mounts itself with its own
+   *   PolicyAssistantSideSheet trigger + chrome. Inner header is
+   *   suppressed (the side-sheet provides one).
+   * `embedded` — caller already provides the chrome (e.g. inside
+   *   PolicyAssistantFab). Renders the form body only — no inner
+   *   header, no Card wrapper, no SideSheet wrapper.
+   * @deprecated Use `embedded` from inside the FAB. `fab` now maps to
+   *   `embedded`, not `sideSheet`, to fix duplicate-title rendering.
    */
-  variant?: 'card' | 'fab' | 'sideSheet';
+  variant?: 'card' | 'fab' | 'sideSheet' | 'embedded';
 }> = ({ assignmentId, assignmentLoading = false, variant = 'card' }) => {
-  const layoutVariant = variant === 'fab' ? 'sideSheet' : variant;
+  const layoutVariant = variant === 'fab' ? 'embedded' : variant;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const responseSectionRef = useRef<HTMLElement | null>(null);
   const scrollToResponseAfterAnswerRef = useRef(false);
@@ -305,6 +325,55 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   const [submitting, setSubmitting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [emptySubmitHint, setEmptySubmitHint] = useState(false);
+
+  // Analytics: surface label per mount, plus refs for state we need at
+  // dismissal time (closure-stable across the unmount cleanup).
+  const surface: PolicyAssistantSurface =
+    layoutVariant === 'card' ? 'employee_card' : 'employee_fab';
+  const submitSourceRef = useRef<PolicyAssistantQuestionSource>('free_text');
+  const hadQuestionRef = useRef(false);
+  const hadAnswerRef = useRef(false);
+
+  // Embedded variant: the panel mounts only when the FAB sheet opens
+  // and unmounts when it closes — so mount = "Opened" and unmount =
+  // "Dismissed". Card variant fires Opened once on mount; it has no
+  // explicit dismissal (lives inline on a page).
+  useEffect(() => {
+    if (layoutVariant === 'embedded' || layoutVariant === 'card') {
+      trackPolicyAssistantOpened({ surface });
+    }
+    if (layoutVariant === 'embedded') {
+      return () => {
+        trackPolicyAssistantDismissed({
+          surface,
+          had_question: hadQuestionRef.current,
+          had_answer: hadAnswerRef.current,
+        });
+      };
+    }
+    return undefined;
+    // surface is stable for the lifetime of this component — depending on
+    // it would require a stable value anyway.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // sideSheet variant: open/close is driven by `sheetOpen`. Fire
+  // Opened on the open transition, Dismissed on the close transition.
+  const prevSheetOpenRef = useRef(false);
+  useEffect(() => {
+    if (layoutVariant !== 'sideSheet') return;
+    const prev = prevSheetOpenRef.current;
+    if (sheetOpen && !prev) {
+      trackPolicyAssistantOpened({ surface });
+    } else if (!sheetOpen && prev) {
+      trackPolicyAssistantDismissed({
+        surface,
+        had_question: hadQuestionRef.current,
+        had_answer: hadAnswerRef.current,
+      });
+    }
+    prevSheetOpenRef.current = sheetOpen;
+  }, [sheetOpen, layoutVariant, surface]);
 
   useEffect(() => {
     if (!assignmentId) {
@@ -341,10 +410,25 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     setSubmitting(true);
     setEmptySubmitHint(false);
     setError('');
+    // Analytics: capture the source for THIS submission, then reset to
+    // 'free_text' so the next plain-textarea submission is correctly
+    // labeled. shortcut/follow_up handlers below set the ref before
+    // calling submit().
+    const source = submitSourceRef.current;
+    submitSourceRef.current = 'free_text';
+    hadQuestionRef.current = true;
+    trackPolicyAssistantQuestionSubmitted({ surface, source });
     try {
       const res = await employeeAPI.postPolicyAssistantQuery(assignmentId, trimmed);
       const answer = res.answer;
       scrollToResponseAfterAnswerRef.current = true;
+      hadAnswerRef.current = true;
+      trackPolicyAssistantAnswerReceived({
+        surface,
+        answer_type: answer?.answer_type ?? null,
+        status: deriveSupportStatus(answer),
+        request_id: res.request_id ?? null,
+      });
       setTurns((prev) => {
         const next = [
           ...prev,
@@ -367,12 +451,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     } finally {
       setSubmitting(false);
     }
-  }, [assignmentId, trimmed]);
+  }, [assignmentId, trimmed, surface]);
 
   const applySuggestion = (q: string) => {
     setMessage(q);
     setError('');
     setEmptySubmitHint(false);
+    // Mark the next submit as originating from a shortcut chip so
+    // analytics can distinguish it from raw textarea input.
+    submitSourceRef.current = 'shortcut';
     focusQuestionInput();
   };
 
@@ -409,13 +496,20 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     setMessage(text);
     setError('');
     setEmptySubmitHint(false);
+    // Mark the next submission as originating from a follow-up chip
+    // so QuestionSubmitted carries source='follow_up'.
+    submitSourceRef.current = 'follow_up';
     focusQuestionInput();
   };
 
-  const questionId =
-    layoutVariant === 'sideSheet' ? 'policy-assistant-question-sheet' : 'policy-assistant-question';
-  const shortcutsSectionId =
-    layoutVariant === 'sideSheet' ? 'policy-assistant-shortcuts-sheet' : 'policy-assistant-shortcuts';
+  // Card mode keeps the legacy ids; sheet-like containers (sideSheet,
+  // embedded inside the FAB) get the -sheet suffix so the same DOM tree
+  // doesn't collide if multiple instances render.
+  const inSheetLike = layoutVariant !== 'card';
+  const questionId = inSheetLike ? 'policy-assistant-question-sheet' : 'policy-assistant-question';
+  const shortcutsSectionId = inSheetLike
+    ? 'policy-assistant-shortcuts-sheet'
+    : 'policy-assistant-shortcuts';
 
   const shortcuts = EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS.slice(0, 4);
 
@@ -427,7 +521,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
 
   const mainForm = (
     <>
-      {layoutVariant !== 'sideSheet' ? (
+      {/* Inner header is the panel's own title/subtitle pair. Card mode
+          owns the only chrome around the panel and renders it. The
+          sideSheet variant has its own PolicyAssistantSideSheet header
+          and the embedded variant relies on PolicyAssistantFab's header
+          — both would duplicate the title if this rendered. */}
+      {layoutVariant === 'card' ? (
         <header className="mb-8 space-y-1.5">
           <h2 className="text-lg font-semibold tracking-tight text-[#0b2b43]">
             {EMPLOYEE_POLICY_ASSISTANT_TITLE}
@@ -524,9 +623,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           </div>
         </section>
 
-        <div className="pt-1 border-t border-slate-200/80 space-y-1">
-          <p className="text-[11px] leading-relaxed text-slate-400">{EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER}</p>
-          <p className="text-[11px] leading-relaxed text-slate-400">{EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY}</p>
+        {/* Trust-signal pill — replaces the previous two paragraphs of
+            light-gray disclaimer text. Reads as a positive signal
+            ("we checked the source") rather than a defensive
+            afterthought, while keeping the legal hedge inline. */}
+        <div className="pt-1">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900">
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+            {EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL}
+          </span>
         </div>
 
         {/* POLICY RESPONSE AREA — grounded policy output (not chat UI) */}
@@ -558,12 +663,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           </div>
           {turns.length > 0 ? (
             <div className="space-y-4">
-              {[...turns].reverse().map((t) => (
+              {[...turns].reverse().map((t, index) => (
+                // The list is reversed so index 0 is the most recent
+                // turn — only that card renders the follow-up chip block.
                 <AnswerResultCard
                   key={t.id}
                   question={t.question}
                   answer={t.answer}
                   assistantTurnRequestId={t.assistantRequestId}
+                  isMostRecent={index === 0}
                   onFollowUpSelect={handleFollowUpFromAnswer}
                 />
               ))}
@@ -585,7 +693,10 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   );
 
   if (assignmentLoading && !assignmentId) {
-    if (layoutVariant === 'sideSheet') {
+    // sideSheet returns null because it owns its own trigger button —
+    // hiding the panel hides the trigger too.
+    // embedded returns null because the parent (FAB) controls visibility.
+    if (layoutVariant === 'sideSheet' || layoutVariant === 'embedded') {
       return null;
     }
     return (
@@ -600,6 +711,13 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     if (layoutVariant === 'sideSheet') {
       return null;
     }
+    if (layoutVariant === 'embedded') {
+      // FAB sheet is open but no assignment in scope — show a minimal
+      // honest message inside the sheet rather than a blank dialog.
+      return (
+        <p className="text-sm text-slate-500">{EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT}</p>
+      );
+    }
     return (
       <Card padding="md" className="mb-6 border-slate-200 bg-slate-50/50">
         <div className="text-base font-semibold text-[#0b2b43]">{EMPLOYEE_POLICY_ASSISTANT_TITLE}</div>
@@ -607,6 +725,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
         <p className="text-sm text-slate-500 mt-3">{EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT}</p>
       </Card>
     );
+  }
+
+  // Embedded: parent controls chrome (PolicyAssistantFab provides the
+  // sheet header + close affordance). Render the body bare.
+  if (layoutVariant === 'embedded') {
+    return <>{mainForm}</>;
   }
 
   if (layoutVariant === 'sideSheet') {

@@ -26,12 +26,15 @@ export const EmployeeRelocationPlanPage: React.FC = () => {
       )}
       {/* Policy Assistant available from the relocation plan too — stacks
           above the global Feedback widget at bottom-right. */}
-      <PolicyAssistantFab label="Open Policy Assistant — ask about your HR policy">
+      <PolicyAssistantFab
+        label="Open policy assistant — ask about your policy"
+        sheetTitle="Ask about your policy"
+      >
         {() => (
           <EmployeePolicyAssistantPanel
             assignmentId={routeCaseId}
             assignmentLoading={false}
-            variant="card"
+            variant="embedded"
           />
         )}
       </PolicyAssistantFab>
