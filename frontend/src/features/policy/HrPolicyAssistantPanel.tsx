@@ -50,11 +50,15 @@ function HrAnswerResultCard({
   question,
   answer,
   assistantTurnRequestId,
+  isMostRecent,
   onFollowUpSelect,
 }: {
   question: string;
   answer: PolicyAssistantAnswer;
   assistantTurnRequestId?: string | null;
+  /** Only the most recent answer renders the chip block — historical
+   *  cards keep their content but drop the follow-up suggestions. */
+  isMostRecent: boolean;
   onFollowUpSelect: (
     text: string,
     index: number,
@@ -181,7 +185,7 @@ function HrAnswerResultCard({
               </div>
             )}
 
-            {answer.follow_up_options && answer.follow_up_options.length > 0 ? (
+            {isMostRecent && answer.follow_up_options && answer.follow_up_options.length > 0 ? (
               <div>
                 <div className="text-xs font-semibold text-slate-600 mb-1.5">Related policy questions</div>
                 <ul className="flex flex-wrap gap-2">
@@ -441,12 +445,14 @@ export const HrPolicyAssistantPanel: React.FC<{
       {turns.length > 0 ? (
         <div className="mt-5 space-y-4">
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Policy answers</div>
-          {[...turns].reverse().map((t) => (
+          {[...turns].reverse().map((t, index) => (
+            // Reversed list — index 0 is the most recent answer.
             <HrAnswerResultCard
               key={t.id}
               question={t.question}
               answer={t.answer}
               assistantTurnRequestId={t.assistantRequestId}
+              isMostRecent={index === 0}
               onFollowUpSelect={handleFollowUpFromAnswer}
             />
           ))}

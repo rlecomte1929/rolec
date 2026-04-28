@@ -112,11 +112,17 @@ function AnswerResultCard({
   question,
   answer,
   assistantTurnRequestId,
+  isMostRecent,
   onFollowUpSelect,
 }: {
   question: string;
   answer: PolicyAssistantAnswer;
   assistantTurnRequestId?: string | null;
+  /** Only the most recent turn renders the "Related policy questions"
+   *  chip block — older cards keep their badges, copy button, evidence,
+   *  conditions, and answer text. After 10 turns, suppressing chips
+   *  on history saves ~30 buttons of visual noise. */
+  isMostRecent: boolean;
   onFollowUpSelect: (
     text: string,
     index: number,
@@ -258,7 +264,7 @@ function AnswerResultCard({
               </div>
             )}
 
-            {answer.follow_up_options && answer.follow_up_options.length > 0 ? (
+            {isMostRecent && answer.follow_up_options && answer.follow_up_options.length > 0 ? (
               <div>
                 <div className="text-xs font-semibold text-slate-600 mb-2">Related policy questions</div>
                 <ul className="flex flex-wrap gap-2">
@@ -657,12 +663,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           </div>
           {turns.length > 0 ? (
             <div className="space-y-4">
-              {[...turns].reverse().map((t) => (
+              {[...turns].reverse().map((t, index) => (
+                // The list is reversed so index 0 is the most recent
+                // turn — only that card renders the follow-up chip block.
                 <AnswerResultCard
                   key={t.id}
                   question={t.question}
                   answer={t.answer}
                   assistantTurnRequestId={t.assistantRequestId}
+                  isMostRecent={index === 0}
                   onFollowUpSelect={handleFollowUpFromAnswer}
                 />
               ))}
