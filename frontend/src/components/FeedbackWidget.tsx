@@ -85,7 +85,12 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
   }
 
   return (
-    <div ref={containerRef} className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+    // Position note: PolicyAssistantFab (the chat-bubble button on policy
+    // pages) also sits at bottom-6 right-6 with z-40. Anchoring this
+    // widget at right-24 leaves the 56px FAB + a small gap clear so the
+    // two never overlap. The popover above the trigger keeps `items-end`
+    // so it still stays inside the viewport on small screens.
+    <div ref={containerRef} className="fixed bottom-6 right-24 z-50 flex flex-col items-end gap-2">
       {(state === 'open' || state === 'submitting' || state === 'success' || state === 'error') && (
         <div className="w-80 rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
