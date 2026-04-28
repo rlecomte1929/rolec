@@ -459,15 +459,29 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         publishBusy={publishBusy}
       />
 
-      {/* 2. What employees see today */}
-      <TopicSummarySection
-        matrixPayload={matrixPayload}
-        onRequestDetails={() => {
-          // Workspace is now flat (no collapsible) — scroll to it.
-          const el = document.getElementById('hr-policy-detailed-review');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
-      />
+      {/* 2. What employees see today — collapsed disclosure (slice 3d).
+          The benefit table further down is HR's primary work surface;
+          this read-only summary is reference, not action. Stays in DOM
+          (data still pre-fetched) so opening is instant. */}
+      <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-base font-semibold text-[#0b2b43]">
+              ▸ See what employees see today
+            </span>
+            <span className="text-xs text-[#64748b]">read-only summary by theme</span>
+          </div>
+        </summary>
+        <div className="px-5 pb-5">
+          <TopicSummarySection
+            matrixPayload={matrixPayload}
+            onRequestDetails={() => {
+              const el = document.getElementById('hr-policy-detailed-review');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          />
+        </div>
+      </details>
 
       {/* 3. Build your next version (only shown when there is no live policy
           OR no draft in progress — once HR has a working version, the matrix
@@ -495,25 +509,45 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         adminCompanyId={adminCompanyId}
       />
 
-      {/* 4. Draft vs Live — two diffs, one per pipeline:
-          - matrix (PR #4): compensation & allowance caps
-          - canonical (this PR): document-normalized benefit rules
-
-          Slice 2 of the IA simplification gates CanonicalPolicyDiffView
-          at this layer: matrix-only deployments (no documents uploaded
-          → no canonical policy possible) skip the canonical diff card
-          entirely. Previously the component would mount, fetch, and
-          flash a loading card before deciding to render null, leaving
-          dead pixels for the common matrix-only case. */}
-      <PolicyDiffView
-        adminCompanyId={adminCompanyId ?? null}
-        refreshTrigger={workspaceRefreshTrigger}
-      />
+      {/* 4. Draft vs Live diffs — collapsed disclosures (slice 3d).
+          Big diffs need to stay one click away, not push the editable
+          benefit table further down the page. The category-grouped
+          accordions inside (slice 3a) keep the open state scannable.
+          Slice 2 still gates the canonical diff to deployments with
+          uploaded documents. */}
+      <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-base font-semibold text-[#0b2b43]">
+              ▸ See draft vs live changes
+            </span>
+            <span className="text-xs text-[#64748b]">matrix diff with revert per row</span>
+          </div>
+        </summary>
+        <div className="px-5 pb-5">
+          <PolicyDiffView
+            adminCompanyId={adminCompanyId ?? null}
+            refreshTrigger={workspaceRefreshTrigger}
+          />
+        </div>
+      </details>
       {documents.length > 0 && (
-        <CanonicalPolicyDiffView
-          adminCompanyId={adminCompanyId ?? null}
-          refreshTrigger={workspaceRefreshTrigger}
-        />
+        <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+          <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-base font-semibold text-[#0b2b43]">
+                ▸ See document-extraction diff
+              </span>
+              <span className="text-xs text-[#64748b]">canonical rules from your uploaded files</span>
+            </div>
+          </summary>
+          <div className="px-5 pb-5">
+            <CanonicalPolicyDiffView
+              adminCompanyId={adminCompanyId ?? null}
+              refreshTrigger={workspaceRefreshTrigger}
+            />
+          </div>
+        </details>
       )}
 
       {/* 5. Benefit table & publish (was: "Detailed review" collapsible).
