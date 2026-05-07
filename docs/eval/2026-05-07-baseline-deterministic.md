@@ -1,102 +1,141 @@
-# Standard baseline deterministic eval — BLOCKED (2026-05-07)
+# Eval verdict — 2026-05-07 — deterministic policy assistant
 
-**Status: did not run.** No verdict table; three findings prevented
-the eval from starting against the intended policy. Companion file:
-[2026-05-07-engine-routing.md](docs/eval/2026-05-07-engine-routing.md).
+## Summary
 
-## Intended target (recap)
+The 12-question eval did not run. A single probe to
+`POST /api/hr/policy-assistant/query` against `demo-hr-policy-001`
+returned **HTTP 500 in 1.456s** before any refusal-quality
+measurement was possible. Diagnosis (code-read, no further API
+calls) confirms this is deterministic for the `policy_id` shape,
+not a transient issue.
 
-- Engine: `POST /api/hr/policy-assistant/query` (deterministic).
-- Policy: Standard baseline created today in synthetic tenant
-  `eval_synth_2026_05` (company_id `461a487b-8937-493c-8684-904862fcde7b`),
-  initialised via `/api/hr/policy-documents/initialize-from-template`.
-- Plan: 10 questions — 4 covered, 4 POLICY_GAP, 2 EXTERNAL_TABLE — with
-  PASS / SOFT_FAIL / HARD_FAIL verdicts as defined in the spec.
+**This is the eval's verdict: HARD_FAIL by definition, generalised
+across all questions that would have been asked.**
 
-## Findings that prevented the eval
+## What was tested
 
-### Finding 1 — HReval JWT resolves to the wrong tenant
+- **Endpoint:** `POST /api/hr/policy-assistant/query`
+- **Auth:** HReval session token via `/api/auth/login` (PBKDF2 path,
+  `public.users`)
+- **Target policy:** `demo-hr-policy-001` (the only policy returned
+  by `/api/hr/policies` for this account)
+- **Probe question:** "What is the temporary housing allowance cap
+  under the published policy?"
+- **Result:** HTTP 500, body `"Internal server error"`, request_id
+  `b583f63c-bfd4-497a-8e3c-ba45368b753e`
 
-`GET https://api.relopass.com/api/hr/policies` with the supplied
-HReval bearer token returned a single policy:
+## Root cause
 
-```
-policyId:      demo-hr-policy-001
-policyName:    Global Relocation Policy (Demo)
-companyEntity: NOR-INV-001
-status:        published, version 1
-created_at:    2026-02-21T07:47:25
-```
+1. Code expects `policy_id: str` (no UUID cast in Python),
+   parameterized as `:id` against `WHERE id = :id` at
+   [`backend/database.py:11066`](backend/database.py#L11066) — but
+   Postgres receives that param as text and the column is `uuid`,
+   so the driver/server enforces UUID syntax at execution.
+2. Schema stores `id uuid primary key default gen_random_uuid()`
+   ([`supabase/migrations/20260301021000_company_policies_and_benefits.sql:4`](supabase/migrations/20260301021000_company_policies_and_benefits.sql#L4));
+   every FK in subsequent migrations confirms `uuid`.
+3. Yes — `'demo-hr-policy-001'` (19 chars, contains `-` but isn't
+   UUID-shaped) **deterministically** raises `DataError: invalid
+   input syntax for type uuid` and yields HTTP 500 with FastAPI's
+   default body (matches the `"Internal server error"` observed,
+   not the route's custom `"Policy assistant failed"`).
+4. **Crash site:** [`backend/database.py:11068`](backend/database.py#L11068) —
+   the `.fetchone()` of `SELECT * FROM company_policies WHERE id = :id`
+   inside `Database.get_company_policy`, called from
+   [`backend/main.py:7575`](backend/main.py#L7575) **before** the
+   try/except at
+   [`backend/main.py:7589-7602`](backend/main.py#L7589); that's
+   why the catch-all message did not fire.
+5. **No path.** Listing at `/api/hr/policies` returns the demo slug
+   (likely from a JSON seed / demo registry, not from
+   `company_policies`), but every deterministic-engine consumer
+   (`get_company_policy`, `_require_policy_access`, audit writes)
+   keys off the same uuid column — the 500 is universal for this
+   `policy_id`.
 
-That is the seeded demo policy, not the Standard baseline initialised
-today. The HReval account on prod is bound to the demo company, not
-to `eval_synth_2026_05`. The UI presumably scopes by an additional
-mechanism the bare bearer token does not carry — most likely a
-company-switcher header (`X-Company-Id` or similar) or a session
-selection on the server side keyed off something other than the token.
+## Why this matters more than a 12-question verdict
 
-Without that mechanism documented, the bearer token alone cannot reach
-`policy_id` rows under `461a487b-8937-493c-8684-904862fcde7b`. Querying
-the demo policy would have produced an eval against the wrong content.
+The `/api/hr/policies` endpoint advertises `demo-hr-policy-001` as
+a valid policy to the HR UI. Every consumer endpoint of the
+`policy_id` in the policy assistant flow will deterministically
+500 against it. This is a contract violation between the listing
+endpoint and the rest of the platform: the system advertises
+something it cannot operate on. Any HR user who currently sees
+this policy in their UI and asks the assistant a question about
+it gets a 500.
 
-### Finding 2 — `/api/hr/policy-documents` hangs
+The unknown — and now the most important open question for
+ReloPass production readiness — is how many such mismatches exist
+in the production index, and whether any real customer (not
+synthetic, not demo) is currently exposed to them.
 
-`GET https://api.relopass.com/api/hr/policy-documents` returned **0
-bytes after 20.0s**, matching the 15s cancellation the UI exhibited
-earlier today. Under the spec's HARD_FAIL rule for production
-timeouts, this would by itself score every question that depends on
-document content as a HARD_FAIL — so even with the right tenant, this
-endpoint is not safe to read from until it is fixed.
+## Other findings surfaced today (not retested)
 
-Other policy reads in this session were healthy: `GET /api/hr/policies`
-returned 200 in ~1.1s on the same token.
+- `/api/hr/policy-documents` hangs >20s with zero bytes returned.
+  Independent of `policy_id` shape. Likely Supabase RLS resolution
+  failure due to dual-auth path mismatch — this account
+  authenticates via `public.users` (PBKDF2) but RLS-protected
+  reads expect `auth.users` session.
+- Auth tokens are opaque session UUIDs, not JWTs. All identity
+  context is server-resolved. Implications for audit and
+  cross-context binding need mapping.
+- The company-context shown in the React UI (`eval_synth_2026_05`)
+  diverges from what the same token resolves to at the API layer
+  (`NOR-INV-001` / demo policy). The UI's company switcher uses a
+  mechanism we have not yet identified.
+- `profiles.company_id` is NULL for at least 3 production user
+  rows (Yves, Christopher, Mark Thompson). Several rows duplicate
+  emails.
 
-### Finding 3 — eval spec endpoint paths do not match real routes
+## Eval gating recommendation
 
-The original spec named:
+No further engine evaluation should be attempted until:
 
-- `GET /api/hr/policy-config` — does not exist (404).
-- `GET /api/hr/company-policies` — does not exist (404).
+1. The `policy_id` schema discrepancy is resolved, OR a UUID-shaped
+   policy with content is confirmed queryable end-to-end via this
+   token.
+2. `/api/hr/policy-documents` responds within SLA, or its hang is
+   diagnosed and the cause is understood.
+3. The dual-context identity mismatch (UI vs token) is mapped —
+   at minimum, we need to know which `company_id` any given API
+   call actually scopes to, given a session token.
 
-Real surface (verified):
+## Recommended priorities for the next dev session
 
-- `GET /api/hr/policies` (list) — exists and worked.
-- `GET /api/hr/policies/{policy_id}` — exists, not exercised.
-- `GET /api/hr/policy-documents` — exists but hangs (Finding 2).
+**P0** — Audit the production `company_policies` table. List every
+`policy_id`, group by id-shape (UUID vs string), identify which
+the listing endpoint exposes vs which the consumer endpoints can
+actually serve.
 
-Corrections logged in
-[2026-05-07-engine-routing.md](docs/eval/2026-05-07-engine-routing.md);
-flagged here because designing the 10 questions required reading
-baseline rule content, and the two specified read paths were not
-real.
+**P0** — Add a regression test that calls
+`/api/hr/policy-assistant/query` against every policy returned by
+`/api/hr/policies` for a given user and asserts no 500s. Today's
+probe would have failed this test.
 
-## Worst observation (verbatim)
+**P1** — Fix the listing endpoint to filter out non-queryable
+policies, OR fix the consumer endpoints to handle string
+`policy_id`s gracefully (validate-and-refuse rather than crash).
 
-This file would normally close with the assistant's exact response on
-the worst failure. The eval did not run, so there is no assistant
-response to quote. The worst **observed** behaviour from a dependent
-production endpoint was:
+**P1** — Diagnose `/api/hr/policy-documents` 20s hang.
 
-> `GET /api/hr/policy-documents` — `curl: (28) Operation timed out
-> after 20006 milliseconds with 0 bytes received` (HTTP 000, 20.006s).
+**P2** — Map the company-context resolution path between UI and
+API.
 
-## Recommendation for the next session
+**P2** — Audit the `auth.users` / `public.users` dual-auth
+boundary.
 
-Fix the tenant-binding pipeline before retrying the eval. Concretely:
+## Methodology note
 
-1. Document the company-switcher mechanism (header? session? URL
-   prefix?) the UI uses when an HR user has access to multiple
-   companies, and decide whether HReval should be granted explicit
-   access to `eval_synth_2026_05` instead of relying on a switcher.
-2. Verify that `GET /api/hr/policies` under that mechanism returns
-   the Standard baseline `policy_id` for company
-   `461a487b-8937-493c-8684-904862fcde7b`, then capture that
-   `policy_id` for the eval.
-3. Separately, restore `/api/hr/policy-documents`. Until then, plan
-   to read baseline rule content via `GET /api/hr/policies/{policy_id}`
-   only and avoid any question whose verification requires the
-   documents listing.
-4. Once both are resolved, re-run the 10-question eval against the
-   real Standard baseline using
-   [2026-05-07-engine-routing.md](docs/eval/2026-05-07-engine-routing.md)
-   as the contract.
+This session followed evaluation-driven-development discipline:
+single probe before full eval; honest record of failure as data;
+diagnosis via code-read rather than further production probes.
+The result is a finding worth more than a clean verdict table on
+a synthetic test would have been.
+
+## Out of scope
+
+Did **not** measure: refusal-quality, citation faithfulness,
+retrieval recall, latency under load, behaviour against real
+customer data, behaviour of the LLM-orchestrated
+`/api/policy-assistant/rag-query` path. All deferred to a future
+session, after engine reachability is restored.
