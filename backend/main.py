@@ -1281,6 +1281,8 @@ def _normalize_destination_country(value: Optional[str]) -> Optional[str]:
         return "SG"
     if normalized in ("US", "USA", "UNITED STATES"):
         return "US"
+    if normalized in ("GB", "UK", "UNITED KINGDOM"):
+        return "GB"
     return None
 
 
@@ -8376,6 +8378,40 @@ def get_dossier_questions(
     )
 
 
+# Maps dossier question_key → wizard draft assignmentContext field for exception bridging
+_DOSSIER_KEY_TO_DRAFT_FIELD: Dict[str, str] = {
+    "gb.sponsor_licence": "ukSponsorLicenceConfirmed",
+    "gb.points_eligibility": "ukPointsThresholdConfirmed",
+}
+
+
+def _bridge_dossier_to_draft(case_id: str, library_payload: List[Dict[str, Any]], question_lookup: Dict[str, Any]) -> None:
+    """After saving dossier answers, patch wizard draft fields consumed by the exception engine."""
+    patches: Dict[str, Any] = {}
+    for item in library_payload:
+        q = question_lookup.get(item.get("question_id", ""))
+        if not q:
+            continue
+        draft_field = _DOSSIER_KEY_TO_DRAFT_FIELD.get(q.get("question_key") or "")
+        if draft_field is not None:
+            patches[draft_field] = item["answer"]
+    if not patches:
+        return
+    try:
+        with SessionLocal() as session:
+            case = app_crud.get_case(session, case_id)
+            if not case:
+                return
+            draft = json.loads(case.draft_json or "{}")
+            ac = draft.setdefault("assignmentContext", {})
+            ac.update(patches)
+            case.draft_json = json.dumps(draft)
+            session.commit()
+            log.info("dossier_bridge case_id=%s patched=%s", case_id, list(patches.keys()))
+    except Exception as exc:
+        log.warning("_bridge_dossier_to_draft failed case_id=%s: %s", case_id, exc)
+
+
 @app.post("/api/dossier/answers")
 def save_dossier_answers(
     request: DossierAnswersRequest,
@@ -8383,7 +8419,12 @@ def save_dossier_answers(
 ):
     access = _require_case_access(request.case_id, user)
     effective = access["effective_user"]
-    raw_questions = db.list_dossier_questions("SG") + db.list_dossier_questions("US")
+    # Include all supported destinations so answers are never rejected as "Unknown"
+    raw_questions = (
+        db.list_dossier_questions("SG") +
+        db.list_dossier_questions("US") +
+        db.list_dossier_questions("GB")
+    )
     question_lookup = {q["id"]: q for q in raw_questions}
     case_questions = db.list_dossier_case_questions(request.case_id)
     case_lookup = {q["id"]: q for q in case_questions}
@@ -8414,6 +8455,11 @@ def save_dossier_answers(
         db.upsert_dossier_answers(request.case_id, effective["id"], library_payload)
     if case_payload:
         db.upsert_dossier_case_answers(request.case_id, effective["id"], case_payload)
+
+    # Bridge exception-relevant answers back into the wizard draft
+    if library_payload:
+        _bridge_dossier_to_draft(request.case_id, library_payload, question_lookup)
+
     return {"ok": True}
 
 

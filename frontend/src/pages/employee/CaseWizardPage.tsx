@@ -67,6 +67,8 @@ function caseToWizardDraft(caseData: CaseDTO | null, assignment?: { employee_ful
     employeeProfile: {
       ...seededEmployeeProfile,
       ...draftEmployeeProfile,
+      // Always fall back to the auth email if the draft has none
+      email: draftEmployeeProfile.email || seededEmployeeProfile.email || '',
     },
     familyMembers: {
       ...base.familyMembers,
