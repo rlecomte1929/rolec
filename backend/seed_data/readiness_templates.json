@@ -62,6 +62,41 @@
         { "sort_order": 4, "phase": "move", "title": "Arrival in France", "body_employee": "Start visa validation / OFII steps as instructed.", "body_hr": "Coordinate start date.", "owner_role": "employee", "relative_timing": "T-2 weeks" },
         { "sort_order": 5, "phase": "post", "title": "Titre de séjour issued", "body_employee": "Secure physical card and copies.", "body_hr": "HR file for compliance.", "owner_role": "employee", "relative_timing": "T+0 to 8 weeks" }
       ]
+    },
+    {
+      "destination_key": "GB",
+      "route_key": "employment",
+      "route_title": "United Kingdom — Skilled Worker visa (sponsored route)",
+      "employee_summary": "Your employer holds a sponsor licence and will assign you a Certificate of Sponsorship (CoS). You then apply for a Skilled Worker visa before travelling to the UK. ReloPass tracks each step so nothing slips.",
+      "hr_summary": "Confirm sponsor licence is active, assign an undefined or defined CoS as appropriate, and support the employee's visa application. Right-to-work check on Day 1 is mandatory.",
+      "internal_notes_hr": "Check CoS assignment lead time (defined CoS needs Home Office approval, ~5 business days). Ensure salary meets minimum threshold for role SOC code. BRP collection from Post Office within 10 days of arrival.",
+      "watchouts": [
+        "CoS must be assigned before the employee submits their visa application — allow at least 1 week buffer.",
+        "Salary must meet both the general threshold and the specific SOC code going rate; verify before issuing CoS.",
+        "BRP card is sent to a UK address — employee must collect within 10 days of arrival.",
+        "Right-to-work check must be completed on or before Day 1; share code expires in 90 days."
+      ],
+      "checklist": [
+        { "sort_order": 1, "stable_key": "gb_sw_offer_letter", "title": "Formal offer letter confirming role, salary & SOC code", "owner_role": "employer", "required": true, "notes_employee": "Required for CoS assignment and visa application.", "notes_hr": "Salary must satisfy both general threshold and going rate for the SOC code." },
+        { "sort_order": 2, "stable_key": "gb_sw_cos_assigned", "title": "Certificate of Sponsorship (CoS) assigned", "owner_role": "hr", "required": true, "notes_employee": "You will need the CoS reference number to apply for your visa.", "notes_hr": "Use undefined CoS for most new hires; defined CoS if employee is already in UK on another route." },
+        { "sort_order": 3, "stable_key": "gb_sw_passport", "title": "Valid passport (all travellers)", "owner_role": "employee", "required": true, "notes_employee": "Must be valid for the duration of your intended stay.", "notes_hr": null },
+        { "sort_order": 4, "stable_key": "gb_sw_english_evidence", "title": "English language evidence", "owner_role": "employee", "required": true, "notes_employee": "Degree taught in English, or approved test (IELTS/LanguageCert). Check UKVI approved providers.", "notes_hr": "Exempt if national of majority English-speaking country." },
+        { "sort_order": 5, "stable_key": "gb_sw_finance_evidence", "title": "Maintenance funds evidence (if not covered by employer)", "owner_role": "employee", "required": false, "notes_employee": "£1,270 in bank for 28 consecutive days unless employer certifies maintenance.", "notes_hr": "Certify maintenance on CoS to remove this requirement for the employee." },
+        { "sort_order": 6, "stable_key": "gb_sw_visa_application", "title": "Online visa application submitted & biometrics booked", "owner_role": "employee", "required": true, "depends_on_sort_order": 2, "notes_employee": "Apply at least 3 months before start date. Biometrics at UKVCAS service point.", "notes_hr": "Provide IHS surcharge payment confirmation number if employer covers it." },
+        { "sort_order": 7, "stable_key": "gb_sw_visa_granted", "title": "Skilled Worker visa granted", "owner_role": "employee", "required": true, "depends_on_sort_order": 6, "notes_employee": "Check vignette dates — first entry must be on or before the valid from date.", "notes_hr": "Retain copy for sponsor compliance file." },
+        { "sort_order": 8, "stable_key": "gb_sw_rtw_check", "title": "Right-to-work check completed (Day 1)", "owner_role": "hr", "required": true, "depends_on_sort_order": 7, "notes_employee": "Use the UKVI online share code to allow HR to verify.", "notes_hr": "Statutory excuse requires online check for visa nationals — record date and outcome." },
+        { "sort_order": 9, "stable_key": "gb_sw_brp_collection", "title": "BRP card collected from Post Office", "owner_role": "employee", "required": true, "depends_on_sort_order": 7, "notes_employee": "Collect within 10 days of arrival. Address on visa letter shows which Post Office branch.", "notes_hr": "Retain copy for compliance file; chase if not confirmed collected." },
+        { "sort_order": 10, "stable_key": "gb_sw_housing_school", "title": "Housing & schooling shortlist (if family)", "owner_role": "employee", "required": false, "notes_employee": "Dependant visas can be applied at the same time.", "notes_hr": "Confirm whether employer covers relocation costs." }
+      ],
+      "milestones": [
+        { "sort_order": 1, "phase": "pre", "title": "Kickoff & sponsorship check", "body_employee": "HR confirms your employer is a licensed sponsor and outlines the Skilled Worker timeline.", "body_hr": "Verify sponsor licence is active, check CoS allocation, confirm salary vs SOC code thresholds.", "owner_role": "hr", "relative_timing": "T-12 weeks" },
+        { "sort_order": 2, "phase": "pre", "title": "CoS assigned", "body_employee": "You receive your CoS reference number — keep it safe for the visa application.", "body_hr": "Assign CoS via sponsor management system; note expiry (3 months from assignment).", "owner_role": "hr", "relative_timing": "T-10 weeks" },
+        { "sort_order": 3, "phase": "pre", "title": "Document pack ready", "body_employee": "Gather passport, English evidence, finances (if needed), and any dependant documents.", "body_hr": "Review pack for completeness before employee submits application.", "owner_role": "employee", "relative_timing": "T-9 weeks" },
+        { "sort_order": 4, "phase": "immigration", "title": "Visa application submitted & biometrics", "body_employee": "Submit online, pay IHS surcharge, attend biometrics appointment.", "body_hr": "Confirm IHS paid (or reimbursed per policy); track application reference.", "owner_role": "employee", "relative_timing": "T-8 weeks" },
+        { "sort_order": 5, "phase": "immigration", "title": "Visa decision received", "body_employee": "Check vignette validity. First entry before 'valid from' date.", "body_hr": "File decision copy; update compliance record.", "owner_role": "hr", "relative_timing": "T-4 weeks" },
+        { "sort_order": 6, "phase": "move", "title": "Arrival in UK & right-to-work check", "body_employee": "Generate share code; HR will complete the online check on Day 1.", "body_hr": "Complete UKVI online right-to-work check on or before start date.", "owner_role": "hr", "relative_timing": "T-0" },
+        { "sort_order": 7, "phase": "post", "title": "BRP collected & settle-in", "body_employee": "Collect BRP within 10 days. Start bank account, NI number, GP registration.", "body_hr": "Confirm BRP collected; file copy; schedule 6-month compliance check.", "owner_role": "employee", "relative_timing": "T+1 to 2 weeks" }
+      ]
     }
   ]
 }

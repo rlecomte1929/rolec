@@ -1079,6 +1079,10 @@ class Database:
             except Exception as e:
                 log.warning("readiness template seed skipped: %s", e)
             try:
+                self.ensure_missing_readiness_templates()
+            except Exception as e:
+                log.warning("readiness template top-up skipped: %s", e)
+            try:
                 self._backfill_employee_contacts()
             except Exception as e:
                 log.warning("employee_contacts backfill skipped: %s", e)
@@ -3396,6 +3400,11 @@ class Database:
             self.seed_readiness_templates_if_empty()
         except Exception as e:
             log.warning("readiness template seed skipped: %s", e)
+
+        try:
+            self.ensure_missing_readiness_templates()
+        except Exception as e:
+            log.warning("readiness template top-up skipped: %s", e)
 
         try:
             self._backfill_employee_contacts()
@@ -14247,6 +14256,101 @@ class Database:
                             "rt": m.get("relative_timing"),
                         },
                     )
+
+    def ensure_missing_readiness_templates(self) -> None:
+        """
+        Idempotent top-up: insert any destination templates present in the JSON
+        seed file that are not yet in the database.  Safe to call every startup —
+        rows that already exist (matched on destination_key + route_key) are
+        skipped via INSERT OR IGNORE / ON CONFLICT DO NOTHING.
+        """
+        if not self._readiness_store_available():
+            return
+        seed_path = os.path.join(os.path.dirname(__file__), "seed_data", "readiness_templates.json")
+        if not os.path.isfile(seed_path):
+            return
+        with open(seed_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        templates = payload.get("templates") or []
+        _is_sqlite = str(self.engine.url).startswith("sqlite")
+        now = datetime.utcnow().isoformat()
+        for t in templates:
+            dest = (t.get("destination_key") or "").strip().upper()
+            route = (t.get("route_key") or DEFAULT_ROUTE_KEY).strip() or DEFAULT_ROUTE_KEY
+            if not dest:
+                continue
+            # Check if this destination+route already exists
+            with self.engine.connect() as conn:
+                existing = conn.execute(
+                    text("SELECT id FROM readiness_templates WHERE destination_key = :dk AND route_key = :rk"),
+                    {"dk": dest, "rk": route},
+                ).fetchone()
+            if existing:
+                continue  # already seeded
+            # Insert template + children
+            tid = str(uuid.uuid4())
+            watchouts = json.dumps(t.get("watchouts") or [])
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "INSERT INTO readiness_templates "
+                        "(id, destination_key, route_key, route_title, employee_summary, hr_summary, "
+                        "internal_notes_hr, watchouts_json, updated_at) "
+                        "VALUES (:id, :dk, :rk, :rt, :es, :hs, :inh, :wj, :ua)"
+                    ),
+                    {
+                        "id": tid,
+                        "dk": dest,
+                        "rk": route,
+                        "rt": t.get("route_title") or f"{dest} — {route}",
+                        "es": t.get("employee_summary") or "",
+                        "hs": t.get("hr_summary") or "",
+                        "inh": t.get("internal_notes_hr"),
+                        "wj": watchouts,
+                        "ua": now,
+                    },
+                )
+                for c in t.get("checklist") or []:
+                    conn.execute(
+                        text(
+                            "INSERT INTO readiness_template_checklist_items "
+                            "(id, template_id, sort_order, title, owner_role, required, depends_on_sort_order, "
+                            "notes_employee, notes_hr, stable_key) "
+                            "VALUES (:id, :tid, :so, :title, :own, :req, :dep, :ne, :nh, :sk)"
+                        ),
+                        {
+                            "id": str(uuid.uuid4()),
+                            "tid": tid,
+                            "so": int(c.get("sort_order") or 0),
+                            "title": c.get("title") or "Item",
+                            "own": (c.get("owner_role") or "employee").strip(),
+                            "req": 1 if c.get("required", True) else 0,
+                            "dep": c.get("depends_on_sort_order"),
+                            "ne": c.get("notes_employee"),
+                            "nh": c.get("notes_hr"),
+                            "sk": c.get("stable_key"),
+                        },
+                    )
+                for m in t.get("milestones") or []:
+                    conn.execute(
+                        text(
+                            "INSERT INTO readiness_template_milestones "
+                            "(id, template_id, sort_order, phase, title, body_employee, body_hr, owner_role, relative_timing) "
+                            "VALUES (:id, :tid, :so, :ph, :title, :be, :bh, :own, :rt)"
+                        ),
+                        {
+                            "id": str(uuid.uuid4()),
+                            "tid": tid,
+                            "so": int(m.get("sort_order") or 0),
+                            "ph": (m.get("phase") or "general").strip(),
+                            "title": m.get("title") or "Milestone",
+                            "be": m.get("body_employee"),
+                            "bh": m.get("body_hr"),
+                            "own": (m.get("owner_role") or "hr").strip(),
+                            "rt": m.get("relative_timing"),
+                        },
+                    )
+            log.info("readiness template seeded: %s / %s", dest, route)
 
     def get_readiness_template(self, destination_key: str, route_key: str) -> Optional[Dict[str, Any]]:
         if not self._readiness_store_available():
