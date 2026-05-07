@@ -19,7 +19,8 @@ from backend.relocation_plan_task_library import (
 
 class RelocationPlanLibraryTests(unittest.TestCase):
     def test_all_mvp_codes_mapped_from_milestone_types(self) -> None:
-        expected = {
+        # Core MVP codes (original set)
+        expected_core = {
             "task_profile_core",
             "task_family_dependents",
             "task_passport_upload",
@@ -38,7 +39,40 @@ class RelocationPlanLibraryTests(unittest.TestCase):
             "task_tax_local_registration",
             "task_settling_in",
         }
-        self.assertEqual(set(TASK_BY_MILESTONE_TYPE.keys()), expected)
+        # Extended codes: family, EU, L1B, Japan, UK Skilled Worker (added in S4/P2/P5)
+        expected_extended = {
+            "task_dependent_visa",
+            "task_partner_family_visa",
+            "task_partner_mvv",
+            "task_spouse_work_permit",
+            "task_school_research",
+            "task_school_application",
+            "task_eu_registration",
+            "task_l1b_support_letter",
+            "task_l1b_petition_prep",
+            "task_l1b_petition_filing",
+            "task_l1b_visa_interview",
+            "task_l1b_port_of_entry",
+            "task_l1b_ssn",
+            "task_japan_coe_prep",
+            "task_japan_coe_visa",
+            "task_japan_municipal_reg",
+            "task_japan_residence_card",
+            "task_uk_cos_request",
+            "task_uk_visa_application",
+            "task_uk_biometric_appointment",
+            "task_uk_brp_collection",
+            "task_uk_right_to_work_check",
+        }
+        expected = expected_core | expected_extended
+        actual = set(TASK_BY_MILESTONE_TYPE.keys())
+        # All expected codes must be present
+        self.assertTrue(
+            expected.issubset(actual),
+            f"Missing from library: {expected - actual}",
+        )
+        # No unknown codes should exist either
+        self.assertEqual(actual, expected, f"Unexpected codes: {actual - expected}")
 
     def test_phase_order_covers_all_library_phases(self) -> None:
         phases = {t.phase_key for t in iter_task_library()}

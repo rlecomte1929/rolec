@@ -2134,28 +2134,44 @@ class Database:
                 ON policy_assistant_chunks (company_id)
             """))
 
-            # Exception requests (T1.3) — Postgres has these via supabase migration
-            # 20260427100000_exception_requests.sql; mirror on SQLite for local dev
-            # so the FastAPI router works against the local file DB without Supabase.
+            # Exception requests — P2/P3 immigration-flag schema (supersedes old
+            # budget-exception schema; Postgres uses migration 20260427100000_*.sql).
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS exception_requests (
                     id TEXT PRIMARY KEY,
                     case_id TEXT NOT NULL,
-                    organization_id TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    requested_amount REAL NOT NULL,
-                    cap_amount REAL NOT NULL,
-                    currency TEXT NOT NULL,
-                    reason TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    hr_note TEXT,
-                    requested_by_user_id TEXT NOT NULL,
-                    resolved_by_user_id TEXT,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    assignment_id TEXT,
+                    exception_type TEXT NOT NULL,
+                    reason TEXT,
+                    severity TEXT NOT NULL DEFAULT 'warning'
+                      CHECK (severity IN ('warning','blocker')),
+                    status TEXT NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending','approved','denied','escalated','withdrawn')),
+                    recommended_action TEXT,
                     resolved_at TEXT,
-                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    resolved_by TEXT,
+                    resolution_notes TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
             """))
+            # Migrate any old budget-exception tables that are missing the new columns
+            for _col, _dflt in [
+                ("severity", "'warning'"),
+                ("exception_type", "''"),
+                ("assignment_id", "NULL"),
+                ("recommended_action", "NULL"),
+                ("resolved_by", "NULL"),
+                ("resolution_notes", "NULL"),
+            ]:
+                try:
+                    conn.execute(text(
+                        f"ALTER TABLE exception_requests ADD COLUMN {_col} TEXT NOT NULL DEFAULT {_dflt}"
+                        if _dflt not in ("NULL",) else
+                        f"ALTER TABLE exception_requests ADD COLUMN {_col} TEXT"
+                    ))
+                except Exception:
+                    pass
             try:
                 conn.execute(text("""
                     CREATE INDEX IF NOT EXISTS idx_exception_requests_case
