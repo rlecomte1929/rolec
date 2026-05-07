@@ -1279,14 +1279,22 @@ def _normalize_destination_country(value: Optional[str]) -> Optional[str]:
     normalized = value.strip().upper()
     if normalized in ("SG", "SINGAPORE"):
         return "SG"
-    if normalized in ("US", "USA", "UNITED STATES"):
+    if normalized in ("US", "USA", "UNITED STATES", "NEW YORK", "NEW YORK CITY", "NYC"):
         return "US"
-    if normalized in ("GB", "UK", "UNITED KINGDOM"):
+    if normalized in ("GB", "UK", "UNITED KINGDOM", "LONDON", "ENGLAND"):
         return "GB"
-    if normalized in ("FR", "FRANCE"):
+    if normalized in ("FR", "FRANCE", "PARIS"):
         return "FR"
-    if normalized in ("DE", "GERMANY", "DEUTSCHLAND"):
+    if normalized in ("DE", "GERMANY", "DEUTSCHLAND", "BERLIN", "MUNICH", "MÜNCHEN"):
         return "DE"
+    if normalized in ("NO", "NORWAY", "NORGE", "OSLO"):
+        return "NO"
+    if normalized in ("BR", "BRAZIL", "BRASIL", "RIO DE JANEIRO", "RIO", "SÃO PAULO", "SAO PAULO"):
+        return "BR"
+    if normalized in ("IT", "ITALY", "ITALIA", "ROME", "ROMA", "MILAN", "MILANO"):
+        return "IT"
+    if normalized in ("ES", "SPAIN", "ESPAÑA", "ESPANA", "MADRID", "BARCELONA"):
+        return "ES"
     return None
 
 
@@ -8429,7 +8437,11 @@ def save_dossier_answers(
         db.list_dossier_questions("US") +
         db.list_dossier_questions("GB") +
         db.list_dossier_questions("FR") +
-        db.list_dossier_questions("DE")
+        db.list_dossier_questions("DE") +
+        db.list_dossier_questions("NO") +
+        db.list_dossier_questions("BR") +
+        db.list_dossier_questions("IT") +
+        db.list_dossier_questions("ES")
     )
     question_lookup = {q["id"]: q for q in raw_questions}
     case_questions = db.list_dossier_case_questions(request.case_id)

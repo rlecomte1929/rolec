@@ -89,6 +89,14 @@ def _allowed_domains_for_destination(dest: str) -> List[str]:
         return ["service-public.fr", "interieur.gouv.fr", "ofii.fr", "diplomatie.gouv.fr", "gouv.fr"]
     if dest_upper in ("DE", "GERMANY"):
         return ["bamf.de", "make-it-in-germany.com", "auswaertiges-amt.de", "bundesregierung.de", "arbeitsagentur.de"]
+    if dest_upper in ("NO", "NORWAY"):
+        return ["udi.no", "nav.no", "skatteetaten.no", "norge.no", "politiet.no"]
+    if dest_upper in ("BR", "BRAZIL"):
+        return ["gov.br", "mre.gov.br", "pf.gov.br", "receita.fazenda.gov.br"]
+    if dest_upper in ("IT", "ITALY"):
+        return ["esteri.it", "interno.gov.it", "lavoro.gov.it", "stranieriinitalia.it", "governo.it"]
+    if dest_upper in ("ES", "SPAIN"):
+        return ["exteriores.gob.es", "interior.gob.es", "empleo.gob.es", "seg-social.es", "administracion.gob.es"]
     return []
 
 
@@ -191,6 +199,38 @@ def build_suggested_questions(dest: str, results: List[Dict[str, Any]]) -> List[
             ("Aufenthaltstitel", "Has your residence permit (Aufenthaltstitel) application been submitted to the Ausländerbehörde?"),
             ("Anerkennung", "Have your foreign qualifications been formally recognised by the relevant German authority?"),
             ("health insurance", "Do you have statutory or private health insurance in place for the residence permit?"),
+        ]
+    if dest_upper in ("NO", "NORWAY"):
+        templates = [
+            ("skilled worker", "Has the work permit type been confirmed? (Skilled Worker Permit or EU/EEA registration)"),
+            ("UDI", "Has the work permit application been submitted to UDI (for non-EU/EEA nationals)?"),
+            ("Skattekort", "Have you obtained your tax card (Skattekort) from Skatteetaten?"),
+            ("D-number", "Have you obtained a Norwegian D-number or national identity number (fødselsnummer)?"),
+            ("Folkeregisteret", "Have you registered your address with the Norwegian Population Register (Folkeregisteret)?"),
+        ]
+    if dest_upper in ("BR", "BRAZIL"):
+        templates = [
+            ("VITEM V", "Has the VITEM V work visa application been submitted at the consulate?"),
+            ("CRNM", "Has the CRNM (Federal Police residence registration) been completed within 90 days of arrival?"),
+            ("CPF", "Has your CPF (Cadastro de Pessoas Físicas) tax ID number been registered?"),
+            ("CTPS", "Has your CTPS (employment card) been registered with your employer?"),
+            ("MTE", "Has the employer obtained work authorization approval from the Ministry of Labour?"),
+        ]
+    if dest_upper in ("IT", "ITALY"):
+        templates = [
+            ("Nulla Osta", "Has the Nulla Osta (work authorization) been obtained from the Sportello Unico?"),
+            ("Permesso di Soggiorno", "Has the Permesso di Soggiorno (residence permit) application been submitted to the Questura?"),
+            ("Codice Fiscale", "Have you obtained your Italian tax code (Codice Fiscale)?"),
+            ("Type D", "Has the National (Type D) visa application been submitted at the Italian consulate?"),
+            ("ASL", "Have you enrolled in the Italian national healthcare system (SSN/ASL)?"),
+        ]
+    if dest_upper in ("ES", "SPAIN"):
+        templates = [
+            ("NIE", "Have you obtained your NIE (Número de Identidad de Extranjero)?"),
+            ("autorización", "Has the combined work and residence authorization been applied for?"),
+            ("Empadronamiento", "Have you completed the Empadronamiento (municipal address registration)?"),
+            ("TIE", "Has the TIE (Tarjeta de Identidad de Extranjero) residence card application been submitted?"),
+            ("Social Security", "Have you obtained your Spanish Social Security number?"),
         ]
 
     for t_key, t_question in templates:
