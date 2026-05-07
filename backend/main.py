@@ -5333,11 +5333,39 @@ def get_assignment_timeline(
                     except (json.JSONDecodeError, TypeError, ValueError):
                         draft = {}
                     target_move_date = getattr(case, "target_move_date", None)
+            # ── S5 wiring: extract plan-scope context from draft ─────────────
+            _s5_ac = draft.get("assignmentContext") or {}
+            _s5_as = draft.get("assignment") or {}
+            _s5_rb = draft.get("relocationBasics") or {}
+            _s5_contract_type = (
+                _s5_as.get("contractType")
+                or _s5_ac.get("contractType")
+                or _s5_rb.get("contractType")
+                or None
+            )
+            _s5_family = draft.get("family") or None
+            _s5_dest = _s5_rb.get("destCountry") or _s5_rb.get("destination_country") or None
+            _s5_origin = _s5_rb.get("originCountry") or _s5_rb.get("origin_country") or None
+            # ── P2 wiring: nationality for immigration regime detection ────────
+            _s5_ep = draft.get("employeeProfile") or {}
+            _s5_pa = draft.get("primaryApplicant") or {}
+            _s5_nationality = (
+                _s5_pa.get("nationality")
+                or _s5_ep.get("nationality")
+                or _s5_ep.get("nationalityCountry")
+                or _s5_rb.get("nationality")
+                or None
+            )
             defaults = compute_default_milestones(
                 case_id=case_id,
                 case_draft=draft,
                 selected_services=services,
                 target_move_date=str(target_move_date) if target_move_date else None,
+                contract_type=_s5_contract_type,
+                family_profile=_s5_family,
+                destination_country=_s5_dest,
+                origin_country=_s5_origin,
+                nationality=_s5_nationality,
             )
             for m in defaults:
                 try:
@@ -5362,6 +5390,43 @@ def get_assignment_timeline(
                         upsert_exc,
                         exc_info=True,
                     )
+            # ── P3 wiring: detect and persist exception flags ─────────────────
+            try:
+                from backend.services.immigration_regime import ImmigrationRegimeRouter as _RegimeRouter
+                from backend.services.exception_request_service import ExceptionRequestService as _ExcSvc
+                from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
+                _exc_profile = _extract_profile(draft)
+                _exc_profile.setdefault("destination_country", _s5_dest)
+                _exc_profile.setdefault("origin_country", _s5_origin)
+                _exc_profile.setdefault("nationality", _s5_nationality)
+                _exc_profile.setdefault("contract_type", _s5_contract_type)
+                _regime = _RegimeRouter().detect_regime(
+                    nationality=_exc_profile.get("nationality"),
+                    destination_country=_exc_profile.get("destination_country"),
+                    origin_country=_exc_profile.get("origin_country"),
+                    contract_type=_exc_profile.get("contract_type"),
+                )
+                for _flag in _ExcSvc().evaluate_case(profile=_exc_profile, regime=_regime):
+                    try:
+                        db.upsert_exception_request(
+                            case_id=case_id,
+                            exception_type=_flag.exception_type,
+                            reason=_flag.reason,
+                            severity=_flag.severity,
+                            assignment_id=assignment_id,
+                            recommended_action=_flag.recommended_action or None,
+                            request_id=request_id,
+                        )
+                    except Exception as _fe:
+                        log.warning(
+                            "upsert_exception_request failed case_id=%s type=%s: %s",
+                            case_id, _flag.exception_type, _fe,
+                        )
+            except Exception as _exc_err:
+                log.warning(
+                    "get_assignment_timeline exception detection failed case_id=%s: %s",
+                    case_id, _exc_err,
+                )
             milestones = db.list_case_milestones(case_id, request_id=request_id)
         except Exception as exc:
             log.warning(
@@ -7820,7 +7885,7 @@ def get_case_timeline(
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     milestones = db.list_case_milestones(case_id, request_id=request_id)
 
-    if ensure_defaults and len(milestones) == 0:
+    if ensure_defaults:
         try:
             assignment = access.get("assignment", {})
             assignment_id = assignment.get("id")
@@ -7842,35 +7907,115 @@ def get_case_timeline(
                     except (json.JSONDecodeError, TypeError, ValueError):
                         draft = {}
                     target_move_date = getattr(case, "target_move_date", None)
-            defaults = compute_default_milestones(
-                case_id=case_id,
-                case_draft=draft,
-                selected_services=services,
-                target_move_date=str(target_move_date) if target_move_date else None,
+            # ── S5 wiring: extract plan-scope context from draft ─────────────
+            _s5_ac = draft.get("assignmentContext") or {}
+            _s5_as = draft.get("assignment") or {}
+            _s5_rb = draft.get("relocationBasics") or {}
+            _raw_ct = (
+                _s5_as.get("contractType")
+                or _s5_ac.get("contractType")
+                or _s5_rb.get("contractType")
+                or None
             )
-            for m in defaults:
-                try:
-                    db.upsert_case_milestone(
-                        case_id=case_id,
-                        milestone_type=m["milestone_type"],
-                        title=m["title"],
-                        description=m.get("description"),
-                        target_date=m.get("target_date"),
-                        status=m.get("status", "pending"),
-                        sort_order=m.get("sort_order", 0),
-                        owner=m.get("owner", "joint"),
-                        criticality=m.get("criticality", "normal"),
-                        notes=m.get("notes"),
-                        request_id=request_id,
-                    )
-                except Exception as upsert_exc:
-                    log.warning(
-                        "get_case_timeline ensure_defaults upsert failed case_id=%s type=%s: %s",
-                        case_id,
-                        m.get("milestone_type"),
-                        upsert_exc,
-                        exc_info=True,
-                    )
+            # Normalise wizard contract type labels → internal case_type tokens.
+            # The wizard presents "assignment" / "permanent" / "contract" while
+            # plan_scope and immigration_regime expect "lta" / "permanent_transfer".
+            _CT_MAP = {
+                "assignment": "lta",
+                "permanent":  "permanent_transfer",
+                "contract":   "short_term_project",
+            }
+            _s5_contract_type = _CT_MAP.get((_raw_ct or "").lower(), _raw_ct)
+            _s5_family = draft.get("family") or None
+            _s5_dest = _s5_rb.get("destCountry") or _s5_rb.get("destination_country") or None
+            _s5_origin = _s5_rb.get("originCountry") or _s5_rb.get("origin_country") or None
+            # ── P2 wiring: nationality for immigration regime detection ────────
+            _s5_ep = draft.get("employeeProfile") or {}
+            _s5_pa = draft.get("primaryApplicant") or {}
+            _s5_nationality = (
+                _s5_pa.get("nationality")
+                or _s5_ep.get("nationality")
+                or _s5_ep.get("nationalityCountry")
+                or _s5_rb.get("nationality")
+                or None
+            )
+
+            # ── Create default milestones only when none exist yet ────────────
+            if len(milestones) == 0:
+                defaults = compute_default_milestones(
+                    case_id=case_id,
+                    case_draft=draft,
+                    selected_services=services,
+                    target_move_date=str(target_move_date) if target_move_date else None,
+                    contract_type=_s5_contract_type,
+                    family_profile=_s5_family,
+                    destination_country=_s5_dest,
+                    origin_country=_s5_origin,
+                    nationality=_s5_nationality,
+                )
+                for m in defaults:
+                    try:
+                        db.upsert_case_milestone(
+                            case_id=case_id,
+                            milestone_type=m["milestone_type"],
+                            title=m["title"],
+                            description=m.get("description"),
+                            target_date=m.get("target_date"),
+                            status=m.get("status", "pending"),
+                            sort_order=m.get("sort_order", 0),
+                            owner=m.get("owner", "joint"),
+                            criticality=m.get("criticality", "normal"),
+                            notes=m.get("notes"),
+                            request_id=request_id,
+                        )
+                    except Exception as upsert_exc:
+                        log.warning(
+                            "get_case_timeline ensure_defaults upsert failed case_id=%s type=%s: %s",
+                            case_id,
+                            m.get("milestone_type"),
+                            upsert_exc,
+                            exc_info=True,
+                        )
+
+            # ── P3 wiring: detect and persist exception flags ─────────────────
+            # Runs on every ensure_defaults=True call (idempotent via upsert),
+            # so flags are always current even when milestones already exist.
+            try:
+                from backend.services.immigration_regime import ImmigrationRegimeRouter as _RegimeRouter
+                from backend.services.exception_request_service import ExceptionRequestService as _ExcSvc
+                from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
+                _exc_profile = _extract_profile(draft)
+                _exc_profile.setdefault("destination_country", _s5_dest)
+                _exc_profile.setdefault("origin_country", _s5_origin)
+                _exc_profile.setdefault("nationality", _s5_nationality)
+                _exc_profile.setdefault("contract_type", _s5_contract_type)
+                _regime = _RegimeRouter().detect_regime(
+                    nationality=_exc_profile.get("nationality"),
+                    destination_country=_exc_profile.get("destination_country"),
+                    origin_country=_exc_profile.get("origin_country"),
+                    contract_type=_exc_profile.get("contract_type"),
+                )
+                for _flag in _ExcSvc().evaluate_case(profile=_exc_profile, regime=_regime):
+                    try:
+                        db.upsert_exception_request(
+                            case_id=case_id,
+                            exception_type=_flag.exception_type,
+                            reason=_flag.reason,
+                            severity=_flag.severity,
+                            assignment_id=None,
+                            recommended_action=_flag.recommended_action or None,
+                            request_id=request_id,
+                        )
+                    except Exception as _fe:
+                        log.warning(
+                            "upsert_exception_request failed case_id=%s type=%s: %s",
+                            case_id, _flag.exception_type, _fe,
+                        )
+            except Exception as _exc_err:
+                log.warning(
+                    "get_case_timeline exception detection failed case_id=%s: %s",
+                    case_id, _exc_err,
+                )
             milestones = db.list_case_milestones(case_id, request_id=request_id)
         except Exception as exc:
             log.warning(
@@ -7889,6 +8034,124 @@ def get_case_timeline(
             m["links"] = []
     summary = compute_timeline_summary(milestones)
     return {"case_id": case_id, "milestones": milestones, "summary": summary}
+
+
+@app.get(
+    "/api/cases/{case_id}/exceptions",
+    summary="List exception flags for a case",
+    tags=["timeline"],
+)
+def list_case_exceptions(
+    case_id: str,
+    request: Request,
+    status: Optional[str] = Query(
+        None,
+        description="Filter by status: pending | approved | denied | escalated | withdrawn. "
+                    "Omit to return all.",
+    ),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Return all exception_request flags for a case, ordered blockers-first.
+
+    HR sees all flags. Employees see only non-sensitive warning summaries
+    (blocker flags are returned in full for all roles here — HR can decide
+    what to surface in the UI layer).
+
+    Response shape:
+      {
+        "case_id": str,
+        "blockers": [...],      # severity == "blocker"
+        "warnings": [...],      # severity == "warning"
+        "total": int
+      }
+    """
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    _require_case_id_assignment_visible(case_id, user)
+    flags = db.list_exception_requests(case_id, request_id=request_id)
+    if status:
+        flags = [f for f in flags if f.get("status") == status]
+    blockers = [f for f in flags if f.get("severity") == "blocker"]
+    warnings = [f for f in flags if f.get("severity") == "warning"]
+    return {
+        "case_id": case_id,
+        "blockers": blockers,
+        "warnings": warnings,
+        "total": len(flags),
+    }
+
+
+class ExceptionUpdateBody(BaseModel):
+    status: str  # approved | denied | escalated | withdrawn
+    resolution_notes: Optional[str] = None
+
+
+@app.patch(
+    "/api/cases/{case_id}/exceptions/{exception_id}",
+    summary="Approve, deny, or escalate an exception flag",
+    tags=["timeline"],
+)
+def update_case_exception(
+    case_id: str,
+    exception_id: str,
+    body: ExceptionUpdateBody,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Update the resolution status of a single exception_request flag.
+
+    HR-only endpoint (employees cannot resolve their own exception flags).
+
+    Allowed target statuses:
+      • approved   — HR reviewed and signed off; case may proceed
+      • denied     — HR reviewed and refused; case is blocked
+      • escalated  — HR escalating to leadership / legal / finance
+      • withdrawn  — flag is no longer relevant (e.g. circumstances changed)
+
+    Body:
+      { "status": "approved", "resolution_notes": "Optional HR note" }
+
+    Returns the updated exception_request row.
+    """
+    _VALID_RESOLUTION_STATUSES = {"approved", "denied", "escalated", "withdrawn"}
+    if body.status not in _VALID_RESOLUTION_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Invalid status {body.status!r}. "
+                f"Must be one of: {', '.join(sorted(_VALID_RESOLUTION_STATUSES))}."
+            ),
+        )
+
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    _require_case_id_assignment_visible(case_id, user)
+
+    resolved_by = user.get("id") or user.get("user_id") or None
+
+    updated = db.update_exception_request(
+        case_id=case_id,
+        exception_id=exception_id,
+        status=body.status,
+        resolved_by=resolved_by,
+        resolution_notes=body.resolution_notes or None,
+        request_id=request_id,
+    )
+
+    if updated is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Exception flag {exception_id!r} not found for case {case_id!r}, "
+                "or you do not have visibility of this case."
+            ),
+        )
+
+    log.info(
+        "exception_flag_resolved case_id=%s exception_id=%s status=%s resolved_by=%s",
+        case_id, exception_id, body.status, resolved_by,
+    )
+    return updated
 
 
 @app.get(

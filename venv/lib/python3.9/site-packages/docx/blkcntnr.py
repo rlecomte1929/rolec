@@ -18,8 +18,7 @@ from docx.shared import StoryChild
 from docx.text.paragraph import Paragraph
 
 if TYPE_CHECKING:
-    import docx.types as t
-    from docx.oxml.comments import CT_Comment
+    from docx import types as t
     from docx.oxml.document import CT_Body
     from docx.oxml.section import CT_HdrFtr
     from docx.oxml.table import CT_Tc
@@ -27,7 +26,7 @@ if TYPE_CHECKING:
     from docx.styles.style import ParagraphStyle
     from docx.table import Table
 
-BlockItemElement: TypeAlias = "CT_Body | CT_Comment | CT_HdrFtr | CT_Tc"
+BlockItemElement: TypeAlias = "CT_Body | CT_HdrFtr | CT_Tc"
 
 
 class BlockItemContainer(StoryChild):
@@ -42,7 +41,9 @@ class BlockItemContainer(StoryChild):
         super(BlockItemContainer, self).__init__(parent)
         self._element = element
 
-    def add_paragraph(self, text: str = "", style: str | ParagraphStyle | None = None) -> Paragraph:
+    def add_paragraph(
+        self, text: str = "", style: str | ParagraphStyle | None = None
+    ) -> Paragraph:
         """Return paragraph newly added to the end of the content in this container.
 
         The paragraph has `text` in a single run if present, and is given paragraph
@@ -68,7 +69,7 @@ class BlockItemContainer(StoryChild):
         from docx.table import Table
 
         tbl = CT_Tbl.new_tbl(rows, cols, width)
-        self._element._insert_tbl(tbl)  # pyright: ignore[reportPrivateUsage]
+        self._element._insert_tbl(tbl)  #  # pyright: ignore[reportPrivateUsage]
         return Table(tbl, self)
 
     def iter_inner_content(self) -> Iterator[Paragraph | Table]:
@@ -76,7 +77,11 @@ class BlockItemContainer(StoryChild):
         from docx.table import Table
 
         for element in self._element.inner_content_elements:
-            yield (Paragraph(element, self) if isinstance(element, CT_P) else Table(element, self))
+            yield (
+                Paragraph(element, self)
+                if isinstance(element, CT_P)
+                else Table(element, self)
+            )
 
     @property
     def paragraphs(self):

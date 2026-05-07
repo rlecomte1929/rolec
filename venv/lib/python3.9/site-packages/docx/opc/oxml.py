@@ -1,15 +1,9 @@
-# pyright: reportPrivateUsage=false
-
 """Temporary stand-in for main oxml module.
 
 This module came across with the PackageReader transplant. Probably much will get
 replaced with objects from the pptx.oxml.core and then this module will either get
 deleted or only hold the package related custom element classes.
 """
-
-from __future__ import annotations
-
-from typing import cast
 
 from lxml import etree
 
@@ -33,12 +27,12 @@ nsmap = {
 # ===========================================================================
 
 
-def parse_xml(text: str) -> etree._Element:
+def parse_xml(text: str) -> etree._Element:  # pyright: ignore[reportPrivateUsage]
     """`etree.fromstring()` replacement that uses oxml parser."""
     return etree.fromstring(text, oxml_parser)
 
 
-def qn(tag: str) -> str:
+def qn(tag):
     """Stands for "qualified name", a utility function to turn a namespace prefixed tag
     name into a Clark-notation qualified tag name for lxml.
 
@@ -50,7 +44,7 @@ def qn(tag: str) -> str:
     return "{%s}%s" % (uri, tagroot)
 
 
-def serialize_part_xml(part_elm: etree._Element) -> bytes:
+def serialize_part_xml(part_elm):
     """Serialize `part_elm` etree element to XML suitable for storage as an XML part.
 
     That is to say, no insignificant whitespace added for readability, and an
@@ -59,7 +53,7 @@ def serialize_part_xml(part_elm: etree._Element) -> bytes:
     return etree.tostring(part_elm, encoding="UTF-8", standalone=True)
 
 
-def serialize_for_reading(element: etree._Element) -> str:
+def serialize_for_reading(element):
     """Serialize `element` to human-readable XML suitable for tests.
 
     No XML declaration.
@@ -77,7 +71,7 @@ class BaseOxmlElement(etree.ElementBase):
     classes in one place."""
 
     @property
-    def xml(self) -> str:
+    def xml(self):
         """Return XML string for this element, suitable for testing purposes.
 
         Pretty printed for readability and without an XML declaration at the top.
@@ -86,10 +80,8 @@ class BaseOxmlElement(etree.ElementBase):
 
 
 class CT_Default(BaseOxmlElement):
-    """`<Default>` element that appears in `[Content_Types].xml` part.
-
-    Used to specify a default content type to be applied to any part with the specified extension.
-    """
+    """``<Default>`` element, specifying the default content type to be applied to a
+    part with the specified extension."""
 
     @property
     def content_type(self):
@@ -103,8 +95,9 @@ class CT_Default(BaseOxmlElement):
         return self.get("Extension")
 
     @staticmethod
-    def new(ext: str, content_type: str):
-        """Return a new ``<Default>`` element with attributes set to parameter values."""
+    def new(ext, content_type):
+        """Return a new ``<Default>`` element with attributes set to parameter
+        values."""
         xml = '<Default xmlns="%s"/>' % nsmap["ct"]
         default = parse_xml(xml)
         default.set("Extension", ext)
@@ -124,7 +117,8 @@ class CT_Override(BaseOxmlElement):
 
     @staticmethod
     def new(partname, content_type):
-        """Return a new ``<Override>`` element with attributes set to parameter values."""
+        """Return a new ``<Override>`` element with attributes set to parameter
+        values."""
         xml = '<Override xmlns="%s"/>' % nsmap["ct"]
         override = parse_xml(xml)
         override.set("PartName", partname)
@@ -138,10 +132,11 @@ class CT_Override(BaseOxmlElement):
 
 
 class CT_Relationship(BaseOxmlElement):
-    """`<Relationship>` element, representing a single relationship from source to target part."""
+    """``<Relationship>`` element, representing a single relationship from a source to a
+    target part."""
 
     @staticmethod
-    def new(rId: str, reltype: str, target: str, target_mode: str = RTM.INTERNAL):
+    def new(rId, reltype, target, target_mode=RTM.INTERNAL):
         """Return a new ``<Relationship>`` element."""
         xml = '<Relationship xmlns="%s"/>' % nsmap["pr"]
         relationship = parse_xml(xml)
@@ -181,7 +176,7 @@ class CT_Relationship(BaseOxmlElement):
 class CT_Relationships(BaseOxmlElement):
     """``<Relationships>`` element, the root element in a .rels file."""
 
-    def add_rel(self, rId: str, reltype: str, target: str, is_external: bool = False):
+    def add_rel(self, rId, reltype, target, is_external=False):
         """Add a child ``<Relationship>`` element with attributes set according to
         parameter values."""
         target_mode = RTM.EXTERNAL if is_external else RTM.INTERNAL
@@ -189,10 +184,11 @@ class CT_Relationships(BaseOxmlElement):
         self.append(relationship)
 
     @staticmethod
-    def new() -> CT_Relationships:
+    def new():
         """Return a new ``<Relationships>`` element."""
         xml = '<Relationships xmlns="%s"/>' % nsmap["pr"]
-        return cast(CT_Relationships, parse_xml(xml))
+        relationships = parse_xml(xml)
+        return relationships
 
     @property
     def Relationship_lst(self):

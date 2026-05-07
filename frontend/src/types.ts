@@ -1217,3 +1217,33 @@ export interface PolicyServiceComparisonResponse {
   effective_service_comparison?: EffectiveServiceComparisonRow[];
 }
 
+// ── P3/B6: Exception flags ───────────────────────────────────────────────────
+
+/**
+ * A single immigration/policy exception flag detected by ExceptionRequestService.
+ * Mirrors the exception_requests DB row returned by GET /api/cases/{id}/exceptions.
+ */
+export interface ExceptionFlag {
+  id: string;
+  case_id: string;
+  assignment_id?: string | null;
+  exception_type: string;
+  reason: string;
+  severity: 'blocker' | 'warning';
+  status: 'pending' | 'approved' | 'denied' | 'escalated' | 'withdrawn';
+  recommended_action?: string | null;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  resolution_notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Response shape from GET /api/cases/{case_id}/exceptions */
+export interface CaseExceptionsResponse {
+  case_id: string;
+  blockers: ExceptionFlag[];
+  warnings: ExceptionFlag[];
+  total: number;
+}
+

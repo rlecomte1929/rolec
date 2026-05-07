@@ -398,7 +398,11 @@ class Font(ElementProxy):
         # -- False == 0, which happen to match the mapping for WD_UNDERLINE.SINGLE
         # -- and .NONE respectively.
         val = (
-            WD_UNDERLINE.SINGLE if value is True else WD_UNDERLINE.NONE if value is False else value
+            WD_UNDERLINE.SINGLE
+            if value is True
+            else WD_UNDERLINE.NONE
+            if value is False
+            else value
         )
         rPr.u_val = val
 

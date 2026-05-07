@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Iterator, List, cast
+from typing import TYPE_CHECKING, Callable, Iterator, List
 
 from docx.oxml.drawing import CT_Drawing
 from docx.oxml.ns import qn
-from docx.oxml.parser import OxmlElement
 from docx.oxml.simpletypes import ST_BrClear, ST_BrType
 from docx.oxml.text.font import CT_RPr
 from docx.oxml.xmlchemy import BaseOxmlElement, OptionalAttribute, ZeroOrMore, ZeroOrOne
@@ -30,7 +29,7 @@ class CT_R(BaseOxmlElement):
     _add_drawing: Callable[[], CT_Drawing]
     _add_t: Callable[..., CT_Text]
 
-    rPr: CT_RPr | None = ZeroOrOne("w:rPr")  # pyright: ignore[reportAssignmentType]
+    rPr: CT_RPr | None = ZeroOrOne("w:rPr")  # pyright: ignore[reportGeneralTypeIssues]
     br = ZeroOrMore("w:br")
     cr = ZeroOrMore("w:cr")
     drawing = ZeroOrMore("w:drawing")
@@ -88,19 +87,6 @@ class CT_R(BaseOxmlElement):
 
         return list(iter_items())
 
-    def insert_comment_range_end_and_reference_below(self, comment_id: int) -> None:
-        """Insert a `w:commentRangeEnd` and `w:commentReference` element after this run.
-
-        The `w:commentRangeEnd` element is the immediate sibling of this `w:r` and is followed by
-        a `w:r` containing the `w:commentReference` element.
-        """
-        self.addnext(self._new_comment_reference_run(comment_id))
-        self.addnext(OxmlElement("w:commentRangeEnd", attrs={qn("w:id"): str(comment_id)}))
-
-    def insert_comment_range_start_above(self, comment_id: int) -> None:
-        """Insert a `w:commentRangeStart` element with `comment_id` before this run."""
-        self.addprevious(OxmlElement("w:commentRangeStart", attrs={qn("w:id"): str(comment_id)}))
-
     @property
     def lastRenderedPageBreaks(self) -> List[CT_LastRenderedPageBreak]:
         """All `w:lastRenderedPageBreaks` descendants of this run."""
@@ -134,34 +120,18 @@ class CT_R(BaseOxmlElement):
         equivalent.
         """
         return "".join(
-            str(e) for e in self.xpath("w:br | w:cr | w:noBreakHyphen | w:ptab | w:t | w:tab")
+            str(e)
+            for e in self.xpath("w:br | w:cr | w:noBreakHyphen | w:ptab | w:t | w:tab")
         )
 
-    @text.setter
-    def text(self, text: str):  # pyright: ignore[reportIncompatibleMethodOverride]
+    @text.setter  # pyright: ignore[reportIncompatibleVariableOverride]
+    def text(self, text: str):
         self.clear_content()
         _RunContentAppender.append_to_run_from_text(self, text)
 
     def _insert_rPr(self, rPr: CT_RPr) -> CT_RPr:
         self.insert(0, rPr)
         return rPr
-
-    def _new_comment_reference_run(self, comment_id: int) -> CT_R:
-        """Return a new `w:r` element with `w:commentReference` referencing `comment_id`.
-
-        Should look like this:
-
-            <w:r>
-              <w:rPr><w:rStyle w:val="CommentReference"/></w:rPr>
-              <w:commentReference w:id="0"/>
-            </w:r>
-
-        """
-        r = cast(CT_R, OxmlElement("w:r"))
-        rPr = r.get_or_add_rPr()
-        rPr.style = "CommentReference"
-        r.append(OxmlElement("w:commentReference", attrs={qn("w:id"): str(comment_id)}))
-        return r
 
 
 # ------------------------------------------------------------------------------------
@@ -171,10 +141,12 @@ class CT_R(BaseOxmlElement):
 class CT_Br(BaseOxmlElement):
     """`<w:br>` element, indicating a line, page, or column break in a run."""
 
-    type: str | None = OptionalAttribute(  # pyright: ignore[reportAssignmentType]
+    type: str | None = OptionalAttribute(  # pyright: ignore[reportGeneralTypeIssues]
         "w:type", ST_BrType, default="textWrapping"
     )
-    clear: str | None = OptionalAttribute("w:clear", ST_BrClear)  # pyright: ignore
+    clear: str | None = OptionalAttribute(  # pyright: ignore[reportGeneralTypeIssues]
+        "w:clear", ST_BrClear
+    )
 
     def __str__(self) -> str:
         """Text equivalent of this element. Actual value depends on break type.

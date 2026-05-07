@@ -3,35 +3,35 @@
 Also some useful known pack URI strings such as PACKAGE_URI.
 """
 
-from __future__ import annotations
-
 import posixpath
 import re
 
 
 class PackURI(str):
-    """Provides access to pack URI components such as the baseURI and the filename slice.
+    """Provides access to pack URI components such as the baseURI and the filename
+    slice.
 
     Behaves as |str| otherwise.
     """
 
     _filename_re = re.compile("([a-zA-Z]+)([1-9][0-9]*)?")
 
-    def __new__(cls, pack_uri_str: str):
+    def __new__(cls, pack_uri_str):
         if pack_uri_str[0] != "/":
             tmpl = "PackURI must begin with slash, got '%s'"
             raise ValueError(tmpl % pack_uri_str)
         return str.__new__(cls, pack_uri_str)
 
     @staticmethod
-    def from_rel_ref(baseURI: str, relative_ref: str) -> PackURI:
-        """The absolute PackURI formed by translating `relative_ref` onto `baseURI`."""
+    def from_rel_ref(baseURI, relative_ref):
+        """Return a |PackURI| instance containing the absolute pack URI formed by
+        translating `relative_ref` onto `baseURI`."""
         joined_uri = posixpath.join(baseURI, relative_ref)
         abs_uri = posixpath.abspath(joined_uri)
         return PackURI(abs_uri)
 
     @property
-    def baseURI(self) -> str:
+    def baseURI(self):
         """The base URI of this pack URI, the directory portion, roughly speaking.
 
         E.g. ``'/ppt/slides'`` for ``'/ppt/slides/slide1.xml'``. For the package pseudo-
@@ -40,8 +40,9 @@ class PackURI(str):
         return posixpath.split(self)[0]
 
     @property
-    def ext(self) -> str:
-        """The extension portion of this pack URI, e.g. ``'xml'`` for ``'/word/document.xml'``.
+    def ext(self):
+        """The extension portion of this pack URI, e.g. ``'xml'`` for
+        ``'/word/document.xml'``.
 
         Note the period is not included.
         """
@@ -83,7 +84,7 @@ class PackURI(str):
         """
         return self[1:]
 
-    def relative_ref(self, baseURI: str):
+    def relative_ref(self, baseURI):
         """Return string containing relative reference to package item from `baseURI`.
 
         E.g. PackURI('/ppt/slideLayouts/slideLayout1.xml') would return

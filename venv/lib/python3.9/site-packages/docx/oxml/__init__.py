@@ -1,5 +1,3 @@
-# ruff: noqa: E402, I001
-
 """Initializes oxml sub-package.
 
 This including registering custom element classes corresponding to Open XML elements.
@@ -86,21 +84,16 @@ register_element_cls("w:titlePg", CT_OnOff)
 # ---------------------------------------------------------------------------
 # other custom element class mappings
 
-from .comments import CT_Comments, CT_Comment
-
-register_element_cls("w:comments", CT_Comments)
-register_element_cls("w:comment", CT_Comment)
-
-from .coreprops import CT_CoreProperties
+from .coreprops import CT_CoreProperties  # noqa
 
 register_element_cls("cp:coreProperties", CT_CoreProperties)
 
-from .document import CT_Body, CT_Document
+from .document import CT_Body, CT_Document  # noqa
 
 register_element_cls("w:body", CT_Body)
 register_element_cls("w:document", CT_Document)
 
-from .numbering import CT_Num, CT_Numbering, CT_NumLvl, CT_NumPr
+from .numbering import CT_Num, CT_Numbering, CT_NumLvl, CT_NumPr  # noqa
 
 register_element_cls("w:abstractNumId", CT_DecimalNumber)
 register_element_cls("w:ilvl", CT_DecimalNumber)
@@ -111,7 +104,7 @@ register_element_cls("w:numPr", CT_NumPr)
 register_element_cls("w:numbering", CT_Numbering)
 register_element_cls("w:startOverride", CT_DecimalNumber)
 
-from .section import (
+from .section import (  # noqa
     CT_HdrFtr,
     CT_HdrFtrRef,
     CT_PageMar,
@@ -129,11 +122,11 @@ register_element_cls("w:pgSz", CT_PageSz)
 register_element_cls("w:sectPr", CT_SectPr)
 register_element_cls("w:type", CT_SectType)
 
-from .settings import CT_Settings
+from .settings import CT_Settings  # noqa
 
 register_element_cls("w:settings", CT_Settings)
 
-from .styles import CT_LatentStyles, CT_LsdException, CT_Style, CT_Styles
+from .styles import CT_LatentStyles, CT_LsdException, CT_Style, CT_Styles  # noqa
 
 register_element_cls("w:basedOn", CT_String)
 register_element_cls("w:latentStyles", CT_LatentStyles)
@@ -148,7 +141,7 @@ register_element_cls("w:styles", CT_Styles)
 register_element_cls("w:uiPriority", CT_DecimalNumber)
 register_element_cls("w:unhideWhenUsed", CT_OnOff)
 
-from .table import (
+from .table import (  # noqa
     CT_Height,
     CT_Row,
     CT_Tbl,
@@ -156,7 +149,6 @@ from .table import (
     CT_TblGridCol,
     CT_TblLayoutType,
     CT_TblPr,
-    CT_TblPrEx,
     CT_TblWidth,
     CT_Tc,
     CT_TcPr,
@@ -166,15 +158,12 @@ from .table import (
 )
 
 register_element_cls("w:bidiVisual", CT_OnOff)
-register_element_cls("w:gridAfter", CT_DecimalNumber)
-register_element_cls("w:gridBefore", CT_DecimalNumber)
 register_element_cls("w:gridCol", CT_TblGridCol)
 register_element_cls("w:gridSpan", CT_DecimalNumber)
 register_element_cls("w:tbl", CT_Tbl)
 register_element_cls("w:tblGrid", CT_TblGrid)
 register_element_cls("w:tblLayout", CT_TblLayoutType)
 register_element_cls("w:tblPr", CT_TblPr)
-register_element_cls("w:tblPrEx", CT_TblPrEx)
 register_element_cls("w:tblStyle", CT_String)
 register_element_cls("w:tc", CT_Tc)
 register_element_cls("w:tcPr", CT_TcPr)
@@ -185,7 +174,7 @@ register_element_cls("w:trPr", CT_TrPr)
 register_element_cls("w:vAlign", CT_VerticalJc)
 register_element_cls("w:vMerge", CT_VMerge)
 
-from .text.font import (
+from .text.font import (  # noqa
     CT_Color,
     CT_Fonts,
     CT_Highlight,
@@ -224,11 +213,11 @@ register_element_cls("w:vanish", CT_OnOff)
 register_element_cls("w:vertAlign", CT_VerticalAlignRun)
 register_element_cls("w:webHidden", CT_OnOff)
 
-from .text.paragraph import CT_P
+from .text.paragraph import CT_P  # noqa
 
 register_element_cls("w:p", CT_P)
 
-from .text.parfmt import (
+from .text.parfmt import (  # noqa
     CT_Ind,
     CT_Jc,
     CT_PPr,
@@ -241,7 +230,6 @@ register_element_cls("w:ind", CT_Ind)
 register_element_cls("w:jc", CT_Jc)
 register_element_cls("w:keepLines", CT_OnOff)
 register_element_cls("w:keepNext", CT_OnOff)
-register_element_cls("w:outlineLvl", CT_DecimalNumber)
 register_element_cls("w:pageBreakBefore", CT_OnOff)
 register_element_cls("w:pPr", CT_PPr)
 register_element_cls("w:pStyle", CT_String)

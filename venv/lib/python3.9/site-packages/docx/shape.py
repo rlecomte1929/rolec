@@ -3,36 +3,26 @@
 A shape is a visual object that appears on the drawing layer of a document.
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
 from docx.enum.shape import WD_INLINE_SHAPE
 from docx.oxml.ns import nsmap
 from docx.shared import Parented
 
-if TYPE_CHECKING:
-    from docx.oxml.document import CT_Body
-    from docx.oxml.shape import CT_Inline
-    from docx.parts.story import StoryPart
-    from docx.shared import Length
-
 
 class InlineShapes(Parented):
-    """Sequence of |InlineShape| instances, supporting len(), iteration, and indexed access."""
+    """Sequence of |InlineShape| instances, supporting len(), iteration, and indexed
+    access."""
 
-    def __init__(self, body_elm: CT_Body, parent: StoryPart):
+    def __init__(self, body_elm, parent):
         super(InlineShapes, self).__init__(parent)
         self._body = body_elm
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx):
         """Provide indexed access, e.g. 'inline_shapes[idx]'."""
         try:
             inline = self._inline_lst[idx]
         except IndexError:
             msg = "inline shape index [%d] out of range" % idx
             raise IndexError(msg)
-
         return InlineShape(inline)
 
     def __iter__(self):
@@ -52,12 +42,12 @@ class InlineShape:
     """Proxy for an ``<wp:inline>`` element, representing the container for an inline
     graphical object."""
 
-    def __init__(self, inline: CT_Inline):
+    def __init__(self, inline):
         super(InlineShape, self).__init__()
         self._inline = inline
 
     @property
-    def height(self) -> Length:
+    def height(self):
         """Read/write.
 
         The display height of this inline shape as an |Emu| instance.
@@ -65,7 +55,7 @@ class InlineShape:
         return self._inline.extent.cy
 
     @height.setter
-    def height(self, cy: Length):
+    def height(self, cy):
         self._inline.extent.cy = cy
         self._inline.graphic.graphicData.pic.spPr.cy = cy
 
@@ -98,6 +88,6 @@ class InlineShape:
         return self._inline.extent.cx
 
     @width.setter
-    def width(self, cx: Length):
+    def width(self, cx):
         self._inline.extent.cx = cx
         self._inline.graphic.graphicData.pic.spPr.cx = cx

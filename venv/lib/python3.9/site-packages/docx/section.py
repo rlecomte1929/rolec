@@ -160,7 +160,11 @@ class Section:
         Items appear in document order.
         """
         for element in self._sectPr.iter_inner_content():
-            yield (Paragraph(element, self) if isinstance(element, CT_P) else Table(element, self))
+            yield (
+                Paragraph(element, self)  # pyright: ignore[reportGeneralTypeIssues]
+                if isinstance(element, CT_P)
+                else Table(element, self)
+            )
 
     @property
     def left_margin(self) -> Length | None:
@@ -265,10 +269,12 @@ class Sections(Sequence[Section]):
         self._document_part = document_part
 
     @overload
-    def __getitem__(self, key: int) -> Section: ...
+    def __getitem__(self, key: int) -> Section:
+        ...
 
     @overload
-    def __getitem__(self, key: slice) -> List[Section]: ...
+    def __getitem__(self, key: slice) -> List[Section]:
+        ...
 
     def __getitem__(self, key: int | slice) -> Section | List[Section]:
         if isinstance(key, slice):

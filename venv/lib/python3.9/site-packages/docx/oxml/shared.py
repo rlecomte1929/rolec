@@ -15,10 +15,10 @@ class CT_DecimalNumber(BaseOxmlElement):
     containing a text representation of a decimal number (e.g. 42) in its ``val``
     attribute."""
 
-    val: int = RequiredAttribute("w:val", ST_DecimalNumber)  # pyright: ignore[reportAssignmentType]
+    val = RequiredAttribute("w:val", ST_DecimalNumber)
 
     @classmethod
-    def new(cls, nsptagname: str, val: int):
+    def new(cls, nsptagname, val):
         """Return a new ``CT_DecimalNumber`` element having tagname `nsptagname` and
         ``val`` attribute set to `val`."""
         return OxmlElement(nsptagname, attrs={qn("w:val"): str(val)})
@@ -31,7 +31,7 @@ class CT_OnOff(BaseOxmlElement):
     "off". Defaults to `True`, so `<w:b>` for example means "bold is turned on".
     """
 
-    val: bool = OptionalAttribute(  # pyright: ignore[reportAssignmentType]
+    val: bool = OptionalAttribute(  # pyright: ignore[reportGeneralTypeIssues]
         "w:val", ST_OnOff, default=True
     )
 
@@ -42,11 +42,14 @@ class CT_String(BaseOxmlElement):
     In those cases, it containing a style name in its `val` attribute.
     """
 
-    val: str = RequiredAttribute("w:val", ST_String)  # pyright: ignore[reportAssignmentType]
+    val: str = RequiredAttribute(  # pyright: ignore[reportGeneralTypeIssues]
+        "w:val", ST_String
+    )
 
     @classmethod
     def new(cls, nsptagname: str, val: str):
-        """A new `CT_String`` element with tagname `nsptagname` and `val` attribute set to `val`."""
+        """Return a new ``CT_String`` element with tagname `nsptagname` and ``val``
+        attribute set to `val`."""
         elm = cast(CT_String, OxmlElement(nsptagname))
         elm.val = val
         return elm

@@ -26,7 +26,7 @@ class CT_P(BaseOxmlElement):
     hyperlink_lst: List[CT_Hyperlink]
     r_lst: List[CT_R]
 
-    pPr: CT_PPr | None = ZeroOrOne("w:pPr")  # pyright: ignore[reportAssignmentType]
+    pPr: CT_PPr | None = ZeroOrOne("w:pPr")  # pyright: ignore[reportGeneralTypeIssues]
     hyperlink = ZeroOrMore("w:hyperlink")
     r = ZeroOrMore("w:r")
 
@@ -92,8 +92,8 @@ class CT_P(BaseOxmlElement):
         pPr = self.get_or_add_pPr()
         pPr.style = style
 
-    @property
-    def text(self):  # pyright: ignore[reportIncompatibleMethodOverride]
+    @property  # pyright: ignore[reportIncompatibleVariableOverride]
+    def text(self):
         """The textual content of this paragraph.
 
         Inner-content child elements like `w:r` and `w:hyperlink` are translated to

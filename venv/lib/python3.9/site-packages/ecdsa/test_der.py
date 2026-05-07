@@ -600,3 +600,23 @@ def test_oids(ids):
     decoded_oid, rest = remove_object(encoded_oid)
     assert rest == b""
     assert decoded_oid == ids
+
+def test_remove_octet_string_rejects_truncated_length():
+    # OCTET STRING: declared length 4096, but only 3 bytes present
+    bad = b"\x04\x82\x10\x00" + b"ABC"
+    with pytest.raises(UnexpectedDER, match="Length longer than the provided buffer"):
+        remove_octet_string(bad)
+
+def test_remove_constructed_rejects_truncated_length():
+    # Constructed tag: 0xA0 (context-specific constructed, tag=0)
+    # declared length 4096, but only 3 bytes present
+    bad = b"\xA0\x82\x10\x00" + b"ABC"
+    with pytest.raises(UnexpectedDER, match="Length longer than the provided buffer"):
+        remove_constructed(bad)
+
+def test_remove_implicit_rejects_truncated_length():
+    # IMPLICIT primitive context-specific tag 0: 0x80
+    # declared length 4096, but only 3 bytes present
+    bad = b"\x80\x82\x10\x00" + b"ABC"
+    with pytest.raises(UnexpectedDER, match="Length longer than the provided buffer"):
+        remove_implicit(bad)

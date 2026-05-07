@@ -3274,6 +3274,32 @@ class Database:
                     self._ensure_case_milestones_tracker_sqlite(conn)
                 except Exception:
                     pass
+            # P2/P3: exception_requests (HR sign-off flags)
+            if _is_sqlite:
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS exception_requests (
+                            id TEXT PRIMARY KEY,
+                            case_id TEXT NOT NULL,
+                            assignment_id TEXT,
+                            exception_type TEXT NOT NULL,
+                            reason TEXT,
+                            severity TEXT NOT NULL DEFAULT 'warning'
+                              CHECK (severity IN ('warning','blocker')),
+                            status TEXT NOT NULL DEFAULT 'pending'
+                              CHECK (status IN ('pending','approved','denied','escalated','withdrawn')),
+                            recommended_action TEXT,
+                            resolved_at TEXT,
+                            resolved_by TEXT,
+                            resolution_notes TEXT,
+                            created_at TEXT NOT NULL,
+                            updated_at TEXT NOT NULL
+                        )
+                    """))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_exception_requests_case ON exception_requests(case_id)"))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_exception_requests_status ON exception_requests(status) WHERE status IN ('pending','escalated')"))
+                except Exception:
+                    pass
             # Analytics: workflow events for observability
             try:
                 conn.execute(text("""
@@ -4681,6 +4707,220 @@ class Database:
                 request_id=request_id,
             ).fetchall()
         return self._rows_to_list(rows)
+
+    # ------------------------------------------------------------------
+    # Exception requests (P2/P3 — HR sign-off flags)
+    # ------------------------------------------------------------------
+
+    def list_exception_requests(
+        self,
+        case_id: str,
+        assignment_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Return all exception_request rows for a case, ordered blockers first
+        then by created_at DESC.
+
+        If assignment_id is also supplied, returns only rows matching that
+        assignment (useful for assignment-scoped timeline endpoints).
+        """
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.connect() as conn:
+            if assignment_id:
+                rows = self._exec(
+                    conn,
+                    """SELECT id, case_id, assignment_id, exception_type, reason, severity,
+                       status, recommended_action, resolved_at, resolved_by,
+                       resolution_notes, created_at, updated_at
+                       FROM exception_requests
+                       WHERE case_id = :cid AND assignment_id = :aid
+                       ORDER BY
+                         CASE severity WHEN 'blocker' THEN 0 ELSE 1 END ASC,
+                         created_at DESC""",
+                    {"cid": cid, "aid": assignment_id},
+                    op_name="list_exception_requests",
+                    request_id=request_id,
+                ).fetchall()
+            else:
+                rows = self._exec(
+                    conn,
+                    """SELECT id, case_id, assignment_id, exception_type, reason, severity,
+                       status, recommended_action, resolved_at, resolved_by,
+                       resolution_notes, created_at, updated_at
+                       FROM exception_requests
+                       WHERE case_id = :cid
+                       ORDER BY
+                         CASE severity WHEN 'blocker' THEN 0 ELSE 1 END ASC,
+                         created_at DESC""",
+                    {"cid": cid},
+                    op_name="list_exception_requests",
+                    request_id=request_id,
+                ).fetchall()
+        return self._rows_to_list(rows)
+
+    def upsert_exception_request(
+        self,
+        case_id: str,
+        exception_type: str,
+        reason: str,
+        severity: str,
+        *,
+        assignment_id: Optional[str] = None,
+        recommended_action: Optional[str] = None,
+        status: str = "pending",
+        request_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Insert a new exception_request row, or update the reason/severity/
+        recommended_action on an existing one if (case_id, exception_type)
+        already exists with status='pending'.
+
+        Rows that have been resolved (approved/denied/withdrawn) are left
+        untouched — a new pending row is inserted alongside them instead.
+        """
+        cid = self.coalesce_case_lookup_id(case_id)
+        now = datetime.utcnow().isoformat()
+
+        # Try to UPDATE an existing pending row first (idempotent re-run).
+        with self.engine.begin() as conn:
+            result = self._exec(
+                conn,
+                """UPDATE exception_requests
+                   SET reason = :reason, severity = :sev,
+                       recommended_action = :ra, updated_at = :now
+                   WHERE case_id = :cid
+                     AND exception_type = :et
+                     AND status = 'pending'""",
+                {
+                    "cid": cid,
+                    "et": exception_type,
+                    "reason": reason,
+                    "sev": severity,
+                    "ra": recommended_action,
+                    "now": now,
+                },
+                op_name="update_exception_request",
+                request_id=request_id,
+            )
+            updated = getattr(result, "rowcount", 0)
+
+        if updated and updated > 0:
+            # Fetch the row we just updated.
+            with self.engine.connect() as conn:
+                row = self._exec(
+                    conn,
+                    """SELECT * FROM exception_requests
+                       WHERE case_id = :cid AND exception_type = :et
+                         AND status = 'pending'
+                       ORDER BY updated_at DESC LIMIT 1""",
+                    {"cid": cid, "et": exception_type},
+                    op_name="get_exception_request",
+                    request_id=request_id,
+                ).fetchone()
+            return self._row_to_dict(row) or {}
+
+        # No existing pending row — insert a new one.
+        eid = str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                """INSERT INTO exception_requests
+                   (id, case_id, assignment_id, exception_type, reason, severity,
+                    status, recommended_action, created_at, updated_at)
+                   VALUES (:id, :cid, :aid, :et, :reason, :sev,
+                           :status, :ra, :now, :now)""",
+                {
+                    "id": eid,
+                    "cid": cid,
+                    "aid": assignment_id,
+                    "et": exception_type,
+                    "reason": reason,
+                    "sev": severity,
+                    "status": status,
+                    "ra": recommended_action,
+                    "now": now,
+                },
+                op_name="insert_exception_request",
+                request_id=request_id,
+            )
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM exception_requests WHERE id = :id",
+                {"id": eid},
+                op_name="get_exception_request",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row) or {}
+
+    def update_exception_request(
+        self,
+        case_id: str,
+        exception_id: str,
+        status: str,
+        *,
+        resolved_by: Optional[str] = None,
+        resolution_notes: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Update the status (and optional resolution fields) of an existing
+        exception_request row.
+
+        Rules:
+          • Verifies the row belongs to case_id before updating (prevents
+            cross-case tampering via the API).
+          • Sets resolved_at = UTC now when moving to approved / denied /
+            escalated / withdrawn.
+          • Returns the updated row as a dict, or None if the row was not
+            found or does not belong to the given case.
+
+        Valid target statuses: approved | denied | escalated | withdrawn.
+        (The 'pending' status is managed by upsert_exception_request only.)
+        """
+        cid = self.coalesce_case_lookup_id(case_id)
+        now = datetime.utcnow().isoformat()
+        resolved_statuses = {"approved", "denied", "escalated", "withdrawn"}
+        resolved_at = now if status in resolved_statuses else None
+
+        with self.engine.begin() as conn:
+            result = self._exec(
+                conn,
+                """UPDATE exception_requests
+                   SET status           = :status,
+                       resolved_by      = :resolved_by,
+                       resolution_notes = :resolution_notes,
+                       resolved_at      = :resolved_at,
+                       updated_at       = :now
+                   WHERE id = :eid
+                     AND case_id = :cid""",
+                {
+                    "status": status,
+                    "resolved_by": resolved_by,
+                    "resolution_notes": resolution_notes,
+                    "resolved_at": resolved_at,
+                    "now": now,
+                    "eid": exception_id,
+                    "cid": cid,
+                },
+                op_name="update_exception_request_status",
+                request_id=request_id,
+            )
+            updated = getattr(result, "rowcount", 0)
+
+        if not updated:
+            return None  # row not found or wrong case_id
+
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM exception_requests WHERE id = :eid",
+                {"eid": exception_id},
+                op_name="get_exception_request",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row) or None
 
     # ------------------------------------------------------------------
     # Analytics events (observability)

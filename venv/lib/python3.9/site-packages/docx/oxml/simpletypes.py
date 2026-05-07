@@ -9,7 +9,6 @@ schema.
 
 from __future__ import annotations
 
-import datetime as dt
 from typing import TYPE_CHECKING, Any, Tuple
 
 from docx.exceptions import InvalidXmlError
@@ -37,10 +36,12 @@ class BaseSimpleType:
         return int(str_value)
 
     @classmethod
-    def convert_to_xml(cls, value: Any) -> str: ...
+    def convert_to_xml(cls, value: Any) -> str:
+        ...
 
     @classmethod
-    def validate(cls, value: Any) -> None: ...
+    def validate(cls, value: Any) -> None:
+        ...
 
     @classmethod
     def validate_int(cls, value: object):
@@ -48,7 +49,9 @@ class BaseSimpleType:
             raise TypeError("value must be <type 'int'>, got %s" % type(value))
 
     @classmethod
-    def validate_int_in_range(cls, value: int, min_inclusive: int, max_inclusive: int) -> None:
+    def validate_int_in_range(
+        cls, value: int, min_inclusive: int, max_inclusive: int
+    ) -> None:
         cls.validate_int(value)
         if value < min_inclusive or value > max_inclusive:
             raise ValueError(
@@ -126,7 +129,8 @@ class XsdBoolean(BaseSimpleType):
     def validate(cls, value: Any) -> None:
         if value not in (True, False):
             raise TypeError(
-                "only True or False (and possibly None) may be assigned, got '%s'" % value
+                "only True or False (and possibly None) may be assigned, got"
+                " '%s'" % value
             )
 
 
@@ -214,58 +218,6 @@ class ST_CoordinateUnqualified(XsdLong):
         cls.validate_int_in_range(value, -27273042329600, 27273042316900)
 
 
-class ST_DateTime(BaseSimpleType):
-    @classmethod
-    def convert_from_xml(cls, str_value: str) -> dt.datetime:
-        """Convert an xsd:dateTime string to a datetime object."""
-
-        def parse_xsd_datetime(dt_str: str) -> dt.datetime:
-            # -- handle trailing 'Z' (Zulu/UTC), common in Word files --
-            if dt_str.endswith("Z"):
-                try:
-                    # -- optional fractional seconds case --
-                    return dt.datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(
-                        tzinfo=dt.timezone.utc
-                    )
-                except ValueError:
-                    return dt.datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%SZ").replace(
-                        tzinfo=dt.timezone.utc
-                    )
-
-            # -- handles explicit offsets like +00:00, -05:00, or naive datetimes --
-            try:
-                return dt.datetime.fromisoformat(dt_str)
-            except ValueError:
-                # -- fall-back to parsing as naive datetime (with or without fractional seconds) --
-                try:
-                    return dt.datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S.%f")
-                except ValueError:
-                    return dt.datetime.strptime(dt_str, "%Y-%m-%dT%H:%M:%S")
-
-        try:
-            # -- parse anything reasonable, but never raise, just use default epoch time --
-            return parse_xsd_datetime(str_value)
-        except Exception:
-            return dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc)
-
-    @classmethod
-    def convert_to_xml(cls, value: dt.datetime) -> str:
-        # -- convert naive datetime to timezon-aware assuming local timezone --
-        if value.tzinfo is None:
-            value = value.astimezone()
-
-        # -- convert to UTC if not already --
-        value = value.astimezone(dt.timezone.utc)
-
-        # -- format with 'Z' suffix for UTC --
-        return value.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    @classmethod
-    def validate(cls, value: Any) -> None:
-        if not isinstance(value, dt.datetime):
-            raise TypeError("only a datetime.datetime object may be assigned, got '%s'" % value)
-
-
 class ST_DecimalNumber(XsdInt):
     pass
 
@@ -296,7 +248,8 @@ class ST_HexColor(BaseStringType):
         # must be an RGBColor object ---
         if not isinstance(value, RGBColor):
             raise ValueError(
-                "rgb color value must be RGBColor object, got %s %s" % (type(value), value)
+                "rgb color value must be RGBColor object, got %s %s"
+                % (type(value), value)
             )
 
 
@@ -363,7 +316,7 @@ class ST_SignedTwipsMeasure(XsdInt):
     def convert_from_xml(cls, str_value: str) -> Length:
         if "i" in str_value or "m" in str_value or "p" in str_value:
             return ST_UniversalMeasure.convert_from_xml(str_value)
-        return Twips(int(round(float(str_value))))
+        return Twips(int(str_value))
 
     @classmethod
     def convert_to_xml(cls, value: int | Length) -> str:

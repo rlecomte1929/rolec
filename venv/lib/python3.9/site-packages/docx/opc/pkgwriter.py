@@ -4,19 +4,12 @@ OPC stands for Open Packaging Convention. This is e, essentially an implementati
 OpcPackage.save().
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Iterable
-
 from docx.opc.constants import CONTENT_TYPE as CT
 from docx.opc.oxml import CT_Types, serialize_part_xml
 from docx.opc.packuri import CONTENT_TYPES_URI, PACKAGE_URI
 from docx.opc.phys_pkg import PhysPkgWriter
 from docx.opc.shared import CaseInsensitiveDict
 from docx.opc.spec import default_content_types
-
-if TYPE_CHECKING:
-    from docx.opc.part import Part
 
 
 class PackageWriter:
@@ -45,13 +38,13 @@ class PackageWriter:
         phys_writer.write(CONTENT_TYPES_URI, cti.blob)
 
     @staticmethod
-    def _write_parts(phys_writer: PhysPkgWriter, parts: Iterable[Part]):
+    def _write_parts(phys_writer, parts):
         """Write the blob of each part in `parts` to the package, along with a rels item
         for its relationships if and only if it has any."""
         for part in parts:
             phys_writer.write(part.partname, part.blob)
-            if len(part.rels):
-                phys_writer.write(part.partname.rels_uri, part.rels.xml)
+            if len(part._rels):
+                phys_writer.write(part.partname.rels_uri, part._rels.xml)
 
     @staticmethod
     def _write_pkg_rels(phys_writer, pkg_rels):

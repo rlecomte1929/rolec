@@ -7,14 +7,12 @@ of in-between, less than a paragraph and more than a run. So it gets its own mod
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import List
 
+from docx import types as t
+from docx.oxml.text.hyperlink import CT_Hyperlink
 from docx.shared import Parented
 from docx.text.run import Run
-
-if TYPE_CHECKING:
-    import docx.types as t
-    from docx.oxml.text.hyperlink import CT_Hyperlink
 
 
 class Hyperlink(Parented):
@@ -80,7 +78,7 @@ class Hyperlink(Parented):
         return self._hyperlink.anchor or ""
 
     @property
-    def runs(self) -> list[Run]:
+    def runs(self) -> List[Run]:
         """List of |Run| instances in this hyperlink.
 
         Together these define the visible text of the hyperlink. The text of a hyperlink

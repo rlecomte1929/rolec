@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import IO, TYPE_CHECKING, Iterator, cast
 
+from docx import types as t
 from docx.drawing import Drawing
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_BREAK
@@ -16,7 +17,6 @@ from docx.text.font import Font
 from docx.text.pagebreak import RenderedPageBreak
 
 if TYPE_CHECKING:
-    import docx.types as t
     from docx.enum.text import WD_UNDERLINE
     from docx.oxml.text.run import CT_R, CT_Text
     from docx.shared import Length
@@ -59,8 +59,8 @@ class Run(StoryChild):
     def add_picture(
         self,
         image_path_or_stream: str | IO[bytes],
-        width: int | Length | None = None,
-        height: int | Length | None = None,
+        width: Length | None = None,
+        height: Length | None = None,
     ) -> InlineShape:
         """Return |InlineShape| containing image identified by `image_path_or_stream`.
 
@@ -170,20 +170,10 @@ class Run(StoryChild):
                 yield item
             elif isinstance(item, CT_LastRenderedPageBreak):
                 yield RenderedPageBreak(item, self)
-            elif isinstance(item, CT_Drawing):  # pyright: ignore[reportUnnecessaryIsInstance]
+            elif isinstance(  # pyright: ignore[reportUnnecessaryIsInstance]
+                item, CT_Drawing
+            ):
                 yield Drawing(item, self)
-
-    def mark_comment_range(self, last_run: Run, comment_id: int) -> None:
-        """Mark the range of runs from this run to `last_run` (inclusive) as belonging to a comment.
-
-        `comment_id` identfies the comment that references this range.
-        """
-        # -- insert `w:commentRangeStart` with `comment_id` before this (first) run --
-        self._r.insert_comment_range_start_above(comment_id)
-
-        # -- insert `w:commentRangeEnd` and `w:commentReference` run with `comment_id` after
-        # -- `last_run`
-        last_run._r.insert_comment_range_end_and_reference_below(comment_id)
 
     @property
     def style(self) -> CharacterStyle:
@@ -195,7 +185,9 @@ class Run(StoryChild):
         property to |None| removes any directly-applied character style.
         """
         style_id = self._r.style
-        return cast(CharacterStyle, self.part.get_style(style_id, WD_STYLE_TYPE.CHARACTER))
+        return cast(
+            CharacterStyle, self.part.get_style(style_id, WD_STYLE_TYPE.CHARACTER)
+        )
 
     @style.setter
     def style(self, style_or_name: str | CharacterStyle | None):
@@ -245,7 +237,7 @@ class Run(StoryChild):
         return self.font.underline
 
     @underline.setter
-    def underline(self, value: bool | WD_UNDERLINE | None):
+    def underline(self, value: bool):
         self.font.underline = value
 
 

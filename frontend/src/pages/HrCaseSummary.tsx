@@ -20,6 +20,7 @@ import { CaseEssentialsCard } from '../features/cases/CaseEssentialsCard';
 import { ReadinessAndActionsBlock } from '../features/cases/ReadinessAndActionsBlock';
 import { CaseOperationalSection } from '../features/cases/CaseOperationalSection';
 import { deriveCaseEssentials } from '../features/cases/caseEssentials';
+import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
 
 const statusBadge = (status?: AssignmentStatus) => {
   if (!status) return <Badge variant="neutral">Unknown</Badge>;
@@ -240,6 +241,11 @@ export const HrCaseSummary: React.FC = () => {
               </div>
             </div>
           </Card>
+
+          {/* ── Exception flags (P3/B6): blockers + warnings from immigration check ── */}
+          {assignment.caseId && (
+            <ExceptionFlagsPanel caseId={assignment.caseId} />
+          )}
 
           <CaseOperationalSection
             step={1}

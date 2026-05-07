@@ -7,6 +7,7 @@ import { RiskBadge } from '../components/command-center/RiskBadge';
 import { hrAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
 
 export const HrCommandCenterCaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -90,6 +91,9 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             Open in Employee Dashboard
           </Button>
         </div>
+
+        {/* ── Exception flags (P3/B6): blockers + warnings from immigration check ── */}
+        <ExceptionFlagsPanel caseId={detail.id} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Timeline / Phases */}

@@ -12,7 +12,7 @@ from docx.image.tiff import Tiff
 
 SIGNATURES = (
     # class, offset, signature_bytes
-    (Png, 0, b"\x89PNG\x0d\x0a\x1a\x0a"),
+    (Png, 0, b"\x89PNG\x0D\x0A\x1A\x0A"),
     (Jfif, 6, b"JFIF"),
     (Exif, 6, b"Exif"),
     (Gif, 0, b"GIF87a"),

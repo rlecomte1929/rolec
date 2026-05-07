@@ -1,9 +1,5 @@
 """Objects that implement reading and writing OPC packages."""
 
-from __future__ import annotations
-
-from typing import IO, TYPE_CHECKING, Iterator, cast
-
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.opc.packuri import PACKAGE_URI, PackURI
 from docx.opc.part import PartFactory
@@ -11,14 +7,7 @@ from docx.opc.parts.coreprops import CorePropertiesPart
 from docx.opc.pkgreader import PackageReader
 from docx.opc.pkgwriter import PackageWriter
 from docx.opc.rel import Relationships
-from docx.shared import lazyproperty
-
-if TYPE_CHECKING:
-    from typing_extensions import Self
-
-    from docx.opc.coreprops import CoreProperties
-    from docx.opc.part import Part
-    from docx.opc.rel import _Relationship  # pyright: ignore[reportPrivateUsage]
+from docx.opc.shared import lazyproperty
 
 
 class OpcPackage:
@@ -27,6 +16,9 @@ class OpcPackage:
     A new instance is constructed by calling the :meth:`open` class method with a path
     to a package file or file-like object containing one.
     """
+
+    def __init__(self):
+        super(OpcPackage, self).__init__()
 
     def after_unmarshal(self):
         """Entry point for any post-unmarshaling processing.
@@ -38,18 +30,16 @@ class OpcPackage:
         pass
 
     @property
-    def core_properties(self) -> CoreProperties:
+    def core_properties(self):
         """|CoreProperties| object providing read/write access to the Dublin Core
         properties for this document."""
         return self._core_properties_part.core_properties
 
-    def iter_rels(self) -> Iterator[_Relationship]:
+    def iter_rels(self):
         """Generate exactly one reference to each relationship in the package by
         performing a depth-first traversal of the rels graph."""
 
-        def walk_rels(
-            source: OpcPackage | Part, visited: list[Part] | None = None
-        ) -> Iterator[_Relationship]:
+        def walk_rels(source, visited=None):
             visited = [] if visited is None else visited
             for rel in source.rels.values():
                 yield rel
@@ -66,7 +56,7 @@ class OpcPackage:
         for rel in walk_rels(self):
             yield rel
 
-    def iter_parts(self) -> Iterator[Part]:
+    def iter_parts(self):
         """Generate exactly one reference to each of the parts in the package by
         performing a depth-first traversal of the rels graph."""
 
@@ -86,7 +76,7 @@ class OpcPackage:
         for part in walk_parts(self):
             yield part
 
-    def load_rel(self, reltype: str, target: Part | str, rId: str, is_external: bool = False):
+    def load_rel(self, reltype, target, rId, is_external=False):
         """Return newly added |_Relationship| instance of `reltype` between this part
         and `target` with key `rId`.
 
@@ -106,7 +96,7 @@ class OpcPackage:
         """
         return self.part_related_by(RT.OFFICE_DOCUMENT)
 
-    def next_partname(self, template: str) -> PackURI:
+    def next_partname(self, template):
         """Return a |PackURI| instance representing partname matching `template`.
 
         The returned part-name has the next available numeric suffix to distinguish it
@@ -121,14 +111,14 @@ class OpcPackage:
                 return PackURI(candidate_partname)
 
     @classmethod
-    def open(cls, pkg_file: str | IO[bytes]) -> Self:
+    def open(cls, pkg_file):
         """Return an |OpcPackage| instance loaded with the contents of `pkg_file`."""
         pkg_reader = PackageReader.from_file(pkg_file)
         package = cls()
         Unmarshaller.unmarshal(pkg_reader, package, PartFactory)
         return package
 
-    def part_related_by(self, reltype: str) -> Part:
+    def part_related_by(self, reltype):
         """Return part to which this package has a relationship of `reltype`.
 
         Raises |KeyError| if no such relationship is found and |ValueError| if more than
@@ -137,16 +127,13 @@ class OpcPackage:
         return self.rels.part_with_reltype(reltype)
 
     @property
-    def parts(self) -> list[Part]:
+    def parts(self):
         """Return a list containing a reference to each of the parts in this package."""
         return list(self.iter_parts())
 
-    def relate_to(self, part: Part, reltype: str):
-        """Return rId key of new or existing relationship to `part`.
-
-        If a relationship of `reltype` to `part` already exists, its rId is returned. Otherwise a
-        new relationship is created and that rId is returned.
-        """
+    def relate_to(self, part, reltype):
+        """Return rId key of relationship to `part`, from the existing relationship if
+        there is one, otherwise a newly created one."""
         rel = self.rels.get_or_add(reltype, part)
         return rel.rId
 
@@ -156,23 +143,21 @@ class OpcPackage:
         relationships for this package."""
         return Relationships(PACKAGE_URI.baseURI)
 
-    def save(self, pkg_file: str | IO[bytes]):
-        """Save this package to `pkg_file`.
-
-        `pkg_file` can be either a file-path or a file-like object.
-        """
+    def save(self, pkg_file):
+        """Save this package to `pkg_file`, where `file` can be either a path to a file
+        (a string) or a file-like object."""
         for part in self.parts:
             part.before_marshal()
         PackageWriter.write(pkg_file, self.rels, self.parts)
 
     @property
-    def _core_properties_part(self) -> CorePropertiesPart:
+    def _core_properties_part(self):
         """|CorePropertiesPart| object related to this package.
 
         Creates a default core properties part if one is not present (not common).
         """
         try:
-            return cast(CorePropertiesPart, self.part_related_by(RT.CORE_PROPERTIES))
+            return self.part_related_by(RT.CORE_PROPERTIES)
         except KeyError:
             core_properties_part = CorePropertiesPart.default(self)
             self.relate_to(core_properties_part, RT.CORE_PROPERTIES)
@@ -205,7 +190,9 @@ class Unmarshaller:
         """
         parts = {}
         for partname, content_type, reltype, blob in pkg_reader.iter_sparts():
-            parts[partname] = part_factory(partname, content_type, reltype, blob, package)
+            parts[partname] = part_factory(
+                partname, content_type, reltype, blob, package
+            )
         return parts
 
     @staticmethod
@@ -215,5 +202,7 @@ class Unmarshaller:
         in `parts`."""
         for source_uri, srel in pkg_reader.iter_srels():
             source = package if source_uri == "/" else parts[source_uri]
-            target = srel.target_ref if srel.is_external else parts[srel.target_partname]
+            target = (
+                srel.target_ref if srel.is_external else parts[srel.target_partname]
+            )
             source.load_rel(srel.reltype, target, srel.rId, srel.is_external)

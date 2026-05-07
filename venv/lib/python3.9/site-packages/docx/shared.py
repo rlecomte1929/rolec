@@ -16,7 +16,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    import docx.types as t
+    from docx import types as t
     from docx.opc.part import XmlPart
     from docx.oxml.xmlchemy import BaseOxmlElement
     from docx.parts.story import StoryPart
@@ -127,9 +127,11 @@ class RGBColor(Tuple[int, int, int]):
     def __new__(cls, r: int, g: int, b: int):
         msg = "RGBColor() takes three integer values 0-255"
         for val in (r, g, b):
-            if not isinstance(val, int):  # pyright: ignore[reportUnnecessaryIsInstance]
-                raise TypeError(msg)
-            if val < 0 or val > 255:
+            if (
+                not isinstance(val, int)  # pyright: ignore[reportUnnecessaryIsInstance]
+                or val < 0
+                or val > 255
+            ):
                 raise ValueError(msg)
         return super(RGBColor, cls).__new__(cls, (r, g, b))
 
@@ -282,7 +284,9 @@ class ElementProxy:
     common type of class in python-docx other than custom element (oxml) classes.
     """
 
-    def __init__(self, element: BaseOxmlElement, parent: t.ProvidesXmlPart | None = None):
+    def __init__(
+        self, element: BaseOxmlElement, parent: t.ProvidesXmlPart | None = None
+    ):
         self._element = element
         self._parent = parent
 
@@ -328,7 +332,7 @@ class Parented:
         self._parent = parent
 
     @property
-    def part(self) -> XmlPart:
+    def part(self):
         """The package part containing this object."""
         return self._parent.part
 
