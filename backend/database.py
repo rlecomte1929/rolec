@@ -2152,14 +2152,22 @@ class Database:
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """))
-            conn.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_exception_requests_case
-                ON exception_requests (case_id, created_at DESC)
-            """))
-            conn.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_exception_requests_org_status
-                ON exception_requests (organization_id, status, created_at DESC)
-            """))
+            try:
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_exception_requests_case
+                    ON exception_requests (case_id, created_at DESC)
+                """))
+            except Exception:
+                pass
+            try:
+                # organization_id only exists in the older budget-exceptions schema;
+                # the P2/P3 immigration-flags schema does not have it — skip safely.
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_exception_requests_org_status
+                    ON exception_requests (organization_id, status, created_at DESC)
+                """))
+            except Exception:
+                pass
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS company_policy_assistant_bindings (
                     company_id TEXT PRIMARY KEY,
