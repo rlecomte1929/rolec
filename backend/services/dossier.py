@@ -164,6 +164,14 @@ def build_suggested_questions(dest: str, results: List[Dict[str, Any]]) -> List[
             ("SSN", "Will you need to apply for a Social Security Number (SSN)?"),
             ("I-9", "Will you need to complete I-9 employment verification?"),
         ]
+    if dest_upper in ("GB", "UK", "UNITED KINGDOM"):
+        templates = [
+            ("Sponsor Licence", "Does your employer hold an active UK Sponsor Licence?"),
+            ("Certificate of Sponsorship", "Has a Certificate of Sponsorship (CoS) been assigned to you?"),
+            ("Skilled Worker", "Have the mandatory 70 points under the UK points-based system been confirmed?"),
+            ("biometric", "Have you booked a biometric appointment at a UKVCAS service point?"),
+            ("BRP", "Are you aware that your BRP card must be collected from a Post Office within 10 days of arrival?"),
+        ]
 
     for t_key, t_question in templates:
         for r in results:

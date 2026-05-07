@@ -1083,6 +1083,10 @@ class Database:
             except Exception as e:
                 log.warning("readiness template top-up skipped: %s", e)
             try:
+                self.seed_dossier_questions_if_missing()
+            except Exception as e:
+                log.warning("dossier questions seed skipped: %s", e)
+            try:
                 self._backfill_employee_contacts()
             except Exception as e:
                 log.warning("employee_contacts backfill skipped: %s", e)
@@ -3413,6 +3417,11 @@ class Database:
             self.ensure_missing_readiness_templates()
         except Exception as e:
             log.warning("readiness template top-up skipped: %s", e)
+
+        try:
+            self.seed_dossier_questions_if_missing()
+        except Exception as e:
+            log.warning("dossier questions seed skipped: %s", e)
 
         try:
             self._backfill_employee_contacts()
@@ -6650,6 +6659,78 @@ class Database:
             return json.loads(value)
         except Exception:
             return None
+
+    def seed_dossier_questions_if_missing(self) -> None:
+        """
+        Idempotent: insert destination dossier_questions that are not yet in the
+        local DB.  Mirrors the Supabase migration seed so local dev works without
+        running migrations manually.  Safe to call every startup.
+        """
+        _SEED: list = [
+            # ── GB — UK Skilled Worker ────────────────────────────────────────
+            ("GB", "immigration", "gb.sponsor_licence",
+             "Does your employer hold an active UK Sponsor Licence issued by the Home Office?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 10),
+            ("GB", "immigration", "gb.cos_confirmed",
+             "Has a Certificate of Sponsorship (CoS) been assigned to you by your employer?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 20),
+            ("GB", "immigration", "gb.salary_threshold",
+             "Does your salary meet the Skilled Worker visa general threshold (£38,700 or SOC going rate, whichever is higher)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 30),
+            ("GB", "immigration", "gb.points_eligibility",
+             "Have the mandatory 70 points under the UK points-based system been confirmed? (Job offer 20 pts + sponsor 20 pts + salary 20 pts + English 10 pts)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 40),
+            ("GB", "immigration", "gb.english_evidence",
+             "Is English language evidence available? (degree taught in English, or approved test such as IELTS/LanguageCert)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 50),
+            ("GB", "registration", "gb.move_date_confirm",
+             "Do you have a confirmed arrival date in the UK?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.targetMoveDate","op":"exists","value":false}', 60),
+            ("GB", "immigration", "gb.dependents",
+             "Will any dependents (spouse, children) accompany you and require a UK Dependant visa?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 70),
+            ("GB", "immigration", "gb.dependent_details",
+             "If yes, how many dependents will apply for UK Dependant visas?",
+             "text", None, False,
+             '{"field":"relocationBasics.hasDependents","op":"==","value":true}', 80),
+        ]
+        now = datetime.utcnow().isoformat()
+        for row in _SEED:
+            dest, domain, qkey, qtext, atype, opts, mandatory, applies, sort = row
+            try:
+                with self.engine.connect() as conn:
+                    existing = conn.execute(
+                        text("SELECT id FROM dossier_questions WHERE destination_country=:d AND question_key=:k"),
+                        {"d": dest, "k": qkey},
+                    ).fetchone()
+                if existing:
+                    continue
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "INSERT INTO dossier_questions "
+                            "(id, destination_country, domain, question_key, question_text, answer_type, "
+                            "options, is_mandatory, applies_if, sort_order, version, created_at) "
+                            "VALUES (:id,:dest,:domain,:key,:text,:atype,:opts,:mand,:app,:sort,1,:now)"
+                        ),
+                        {
+                            "id": str(uuid.uuid4()), "dest": dest, "domain": domain,
+                            "key": qkey, "text": qtext, "atype": atype,
+                            "opts": json.dumps(opts) if opts is not None else None,
+                            "mand": 1 if mandatory else 0,
+                            "app": applies, "sort": sort, "now": now,
+                        },
+                    )
+                log.info("dossier_question seeded: %s / %s", dest, qkey)
+            except Exception as e:
+                log.warning("dossier_question seed skipped (%s/%s): %s", dest, qkey, e)
 
     def list_dossier_questions(self, destination_country: str) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
