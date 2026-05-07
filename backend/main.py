@@ -1283,6 +1283,8 @@ def _normalize_destination_country(value: Optional[str]) -> Optional[str]:
         return "US"
     if normalized in ("GB", "UK", "UNITED KINGDOM"):
         return "GB"
+    if normalized in ("FR", "FRANCE"):
+        return "FR"
     return None
 
 
@@ -8423,7 +8425,8 @@ def save_dossier_answers(
     raw_questions = (
         db.list_dossier_questions("SG") +
         db.list_dossier_questions("US") +
-        db.list_dossier_questions("GB")
+        db.list_dossier_questions("GB") +
+        db.list_dossier_questions("FR")
     )
     question_lookup = {q["id"]: q for q in raw_questions}
     case_questions = db.list_dossier_case_questions(request.case_id)

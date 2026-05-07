@@ -85,6 +85,8 @@ def _allowed_domains_for_destination(dest: str) -> List[str]:
         return ["mom.gov.sg", "ica.gov.sg", "iras.gov.sg", "cpf.gov.sg", "gov.sg"]
     if dest_upper in ("US", "USA", "UNITED STATES"):
         return ["uscis.gov", "travel.state.gov", "cbp.gov", "irs.gov", "ssa.gov"]
+    if dest_upper in ("FR", "FRANCE"):
+        return ["service-public.fr", "interieur.gouv.fr", "ofii.fr", "diplomatie.gouv.fr", "gouv.fr"]
     return []
 
 
@@ -171,6 +173,14 @@ def build_suggested_questions(dest: str, results: List[Dict[str, Any]]) -> List[
             ("Skilled Worker", "Have the mandatory 70 points under the UK points-based system been confirmed?"),
             ("biometric", "Have you booked a biometric appointment at a UKVCAS service point?"),
             ("BRP", "Are you aware that your BRP card must be collected from a Post Office within 10 days of arrival?"),
+        ]
+    if dest_upper in ("FR", "FRANCE"):
+        templates = [
+            ("VLS-TS", "Has your long-stay visa (VLS-TS) application been submitted to the consulate?"),
+            ("OFII", "Have you completed the OFII arrival declaration and medical visit?"),
+            ("titre de séjour", "Has your titre de séjour prefecture appointment been scheduled?"),
+            ("Passeport Talent", "Has your employer confirmed the work permit route (Salarié or Passeport Talent)?"),
+            ("consulate", "Has your consulate appointment been booked for the visa application?"),
         ]
 
     for t_key, t_question in templates:
