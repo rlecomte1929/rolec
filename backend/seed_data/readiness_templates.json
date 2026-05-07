@@ -97,6 +97,41 @@
         { "sort_order": 6, "phase": "move", "title": "Arrival in UK & right-to-work check", "body_employee": "Generate share code; HR will complete the online check on Day 1.", "body_hr": "Complete UKVI online right-to-work check on or before start date.", "owner_role": "hr", "relative_timing": "T-0" },
         { "sort_order": 7, "phase": "post", "title": "BRP collected & settle-in", "body_employee": "Collect BRP within 10 days. Start bank account, NI number, GP registration.", "body_hr": "Confirm BRP collected; file copy; schedule 6-month compliance check.", "owner_role": "employee", "relative_timing": "T+1 to 2 weeks" }
       ]
+    },
+    {
+      "destination_key": "DE",
+      "route_key": "employment",
+      "route_title": "Germany — EU Blue Card / Skilled Worker Visa",
+      "employee_summary": "Your employer will sponsor either an EU Blue Card (for high earners) or a Skilled Worker Visa under Germany's Fachkräftezuwanderungsgesetz. You apply at the German consulate before travelling, then complete Anmeldung and the residence permit after arrival.",
+      "hr_summary": "Confirm visa route based on salary and qualification recognition status. Support the employee's consulate application and ensure Anmeldung and Ausländerbehörde steps are completed promptly after arrival.",
+      "internal_notes_hr": "EU Blue Card requires salary ≥ €45,300 (2024 threshold) or €56,400 for shortage occupations. Qualification recognition may take 4–12 weeks — start early. Anmeldung must be done within 14 days of arrival.",
+      "watchouts": [
+        "Qualification recognition (Anerkennung) can be the critical-path item — initiate before the consulate appointment.",
+        "Anmeldung must be completed within 14 days of arrival; the confirmation letter (Anmeldebestätigung) is needed for the Aufenthaltstitel and bank accounts.",
+        "Statutory health insurance (gesetzliche Krankenversicherung) must be in place before the Ausländerbehörde appointment.",
+        "EU Blue Card holders can bring family without a separate income threshold — a useful selling point."
+      ],
+      "checklist": [
+        { "sort_order": 1, "stable_key": "de_offer_letter", "title": "Signed employment contract confirming salary and role", "owner_role": "employer", "required": true, "notes_employee": "Required for visa application and qualification recognition.", "notes_hr": "Confirm salary meets Blue Card or Skilled Worker threshold." },
+        { "sort_order": 2, "stable_key": "de_qualification_recognition", "title": "Professional qualification recognition (Anerkennung)", "owner_role": "employee", "required": true, "notes_employee": "Submit via anabin database or relevant chamber. Allow 4–12 weeks.", "notes_hr": "Required for regulated professions and Blue Card applications." },
+        { "sort_order": 3, "stable_key": "de_passport", "title": "Valid passport (all travellers)", "owner_role": "employee", "required": true, "notes_employee": "Must be valid for at least 6 months beyond intended stay.", "notes_hr": null },
+        { "sort_order": 4, "stable_key": "de_consulate_appointment", "title": "Consulate appointment booked", "owner_role": "employee", "required": true, "notes_employee": "Book at the German consulate in your current country of residence.", "notes_hr": "Lead time varies by consulate — book at T-12 weeks." },
+        { "sort_order": 5, "stable_key": "de_visa_application", "title": "Visa application submitted", "owner_role": "employee", "required": true, "depends_on_sort_order": 4, "notes_employee": "Bring full document pack: passport, contract, qualifications, biometric photos, health insurance proof.", "notes_hr": "Track application reference number." },
+        { "sort_order": 6, "stable_key": "de_visa_granted", "title": "Visa granted", "owner_role": "employee", "required": true, "depends_on_sort_order": 5, "notes_employee": "Check visa validity dates and permitted activities.", "notes_hr": "Retain copy for HR file." },
+        { "sort_order": 7, "stable_key": "de_anmeldung", "title": "Anmeldung (address registration) completed", "owner_role": "employee", "required": true, "depends_on_sort_order": 6, "notes_employee": "Register at the local Einwohnermeldeamt within 14 days of arrival. Bring passport and rental contract.", "notes_hr": "Anmeldebestätigung is needed for bank account and Ausländerbehörde." },
+        { "sort_order": 8, "stable_key": "de_health_insurance", "title": "Statutory or private health insurance enrolled", "owner_role": "employee", "required": true, "notes_employee": "Must be in place before the Ausländerbehörde appointment.", "notes_hr": "Check employer's health insurance contribution obligations." },
+        { "sort_order": 9, "stable_key": "de_aufenthaltstitel", "title": "Residence permit (Aufenthaltstitel) application submitted", "owner_role": "employee", "required": true, "depends_on_sort_order": 7, "notes_employee": "Apply at the Ausländerbehörde. Bring: passport, Anmeldebestätigung, contract, health insurance proof.", "notes_hr": "Process can take 4–8 weeks; employee may work in the meantime if visa permits." },
+        { "sort_order": 10, "stable_key": "de_housing_school", "title": "Housing & schooling shortlist (if family)", "owner_role": "employee", "required": false, "notes_employee": "Family members need separate Aufenthaltstitel — apply at the same time.", "notes_hr": "Confirm relocation budget covers family costs." }
+      ],
+      "milestones": [
+        { "sort_order": 1, "phase": "pre", "title": "Kickoff & visa route confirmation", "body_employee": "HR confirms whether you qualify for the EU Blue Card or Skilled Worker Visa and outlines the timeline.", "body_hr": "Verify salary vs Blue Card threshold; initiate qualification recognition if needed.", "owner_role": "hr", "relative_timing": "T-14 weeks" },
+        { "sort_order": 2, "phase": "pre", "title": "Qualification recognition submitted", "body_employee": "Submit your qualifications to the relevant German authority (anabin, IHK, or professional chamber).", "body_hr": "Track recognition status — this is often the critical path.", "owner_role": "employee", "relative_timing": "T-12 weeks" },
+        { "sort_order": 3, "phase": "pre", "title": "Document pack ready & consulate booked", "body_employee": "Gather passport, contract, qualification recognition, biometric photos, and health insurance evidence.", "body_hr": "Review pack for completeness before consulate appointment.", "owner_role": "employee", "relative_timing": "T-10 weeks" },
+        { "sort_order": 4, "phase": "immigration", "title": "Consulate appointment & visa application", "body_employee": "Attend consulate with full document pack and submit visa application.", "body_hr": "Track application reference; prepare for any additional document requests.", "owner_role": "employee", "relative_timing": "T-8 weeks" },
+        { "sort_order": 5, "phase": "immigration", "title": "Visa granted", "body_employee": "Check visa validity dates. First entry must be within the validity window.", "body_hr": "File copy; update compliance record; coordinate start date.", "owner_role": "hr", "relative_timing": "T-4 weeks" },
+        { "sort_order": 6, "phase": "move", "title": "Arrival & Anmeldung", "body_employee": "Arrive in Germany and register your address (Anmeldung) within 14 days at the Einwohnermeldeamt.", "body_hr": "Confirm arrival and Anmeldung completion; support with rental contract if needed.", "owner_role": "employee", "relative_timing": "T-0" },
+        { "sort_order": 7, "phase": "post", "title": "Aufenthaltstitel & settle-in", "body_employee": "Apply for residence permit at Ausländerbehörde. Open bank account, enroll in health insurance, register with tax office.", "body_hr": "Confirm Aufenthaltstitel submitted; schedule 3-month check-in.", "owner_role": "employee", "relative_timing": "T+2 to 4 weeks" }
+      ]
     }
   ]
 }

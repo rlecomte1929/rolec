@@ -87,6 +87,8 @@ def _allowed_domains_for_destination(dest: str) -> List[str]:
         return ["uscis.gov", "travel.state.gov", "cbp.gov", "irs.gov", "ssa.gov"]
     if dest_upper in ("FR", "FRANCE"):
         return ["service-public.fr", "interieur.gouv.fr", "ofii.fr", "diplomatie.gouv.fr", "gouv.fr"]
+    if dest_upper in ("DE", "GERMANY"):
+        return ["bamf.de", "make-it-in-germany.com", "auswaertiges-amt.de", "bundesregierung.de", "arbeitsagentur.de"]
     return []
 
 
@@ -181,6 +183,14 @@ def build_suggested_questions(dest: str, results: List[Dict[str, Any]]) -> List[
             ("titre de séjour", "Has your titre de séjour prefecture appointment been scheduled?"),
             ("Passeport Talent", "Has your employer confirmed the work permit route (Salarié or Passeport Talent)?"),
             ("consulate", "Has your consulate appointment been booked for the visa application?"),
+        ]
+    if dest_upper in ("DE", "GERMANY"):
+        templates = [
+            ("Blue Card", "Has the work visa type been confirmed? (EU Blue Card or Skilled Worker Visa)"),
+            ("Anmeldung", "Have you registered your address (Anmeldung) at the local Einwohnermeldeamt?"),
+            ("Aufenthaltstitel", "Has your residence permit (Aufenthaltstitel) application been submitted to the Ausländerbehörde?"),
+            ("Anerkennung", "Have your foreign qualifications been formally recognised by the relevant German authority?"),
+            ("health insurance", "Do you have statutory or private health insurance in place for the residence permit?"),
         ]
 
     for t_key, t_question in templates:
