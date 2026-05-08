@@ -9,6 +9,11 @@ relopass.db
 frontend/node_modules/
 frontend/dist/
 
+# Local Claude worktrees — registered via .git/worktrees/, never tracked.
+# (A previous commit accidentally committed these as orphan submodule
+# gitlinks, which broke Cloudflare Pages clones.)
+.claude/worktrees/
+
 # OS / editor
 .DS_Store
 Thumbs.db
