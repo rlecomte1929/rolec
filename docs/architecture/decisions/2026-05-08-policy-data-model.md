@@ -319,3 +319,11 @@ to *query* "how many nights?" we'll need to decompose. Flagged for v1.x.
 - **Single-dimensional tiering** (just employee grade). Rejected
   after Clauses 1, 3, and 4 — three of the five real clauses tier
   on dimensions other than employee grade.
+
+---
+
+## Reconciliation log
+
+**2026-05-08 (later same day):** The schema test in this ADR surfaced that diagram 03's single-dimension tier table (Director / Manager / Senior / Standard) was one slice of a larger structure. Real Technip clauses require multi-dimensional tier composition — for example, "two home leave trips per year for countries where the location allowance ≥ 40%" is keyed by host-country band, not employee grade. Diagram 03 has been redrawn to reflect this in PR #103, with `tier_composition = (employee_grade, family_status, assignment_type, host_country_allowance_band)`.
+
+Three implicit decisions visible in earlier drafts of the redrawn diagram (resolution rule, case-binding rule, blank-cell handling beyond "not configured + escalation") were intentionally removed before commit and remain unspecified. They are the scope of a follow-up ADR before Sprint A begins.
