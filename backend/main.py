@@ -1295,6 +1295,31 @@ def _normalize_destination_country(value: Optional[str]) -> Optional[str]:
         return "IT"
     if normalized in ("ES", "SPAIN", "ESPAÑA", "ESPANA", "MADRID", "BARCELONA"):
         return "ES"
+    if normalized in ("AU", "AUSTRALIA", "SYDNEY", "MELBOURNE", "BRISBANE", "PERTH",
+                      "ADELAIDE", "CANBERRA", "GOLD COAST", "NEWCASTLE", "SUNSHINE COAST", "WOLLONGONG"):
+        return "AU"
+    if normalized in ("CA", "CANADA", "TORONTO", "VANCOUVER", "MONTREAL", "CALGARY",
+                      "EDMONTON", "OTTAWA", "WINNIPEG", "HAMILTON", "KITCHENER", "QUEBEC CITY"):
+        return "CA"
+    if normalized in ("CH", "SWITZERLAND", "SCHWEIZ", "SUISSE", "ZURICH", "ZÜRICH",
+                      "GENEVA", "GENÈVE", "GENEVE", "BERN", "BERNE", "BASEL", "BIEL",
+                      "LAUSANNE", "LUCERNE", "LUGANO", "ST. GALLEN", "ST GALLEN", "WINTERTHUR"):
+        return "CH"
+    if normalized in ("HK", "HONG KONG", "KOWLOON", "NEW TERRITORIES"):
+        return "HK"
+    if normalized in ("JP", "JAPAN", "TOKYO", "OSAKA", "FUKUOKA", "NAGOYA", "SAPPORO",
+                      "KAWASAKI", "KOBE", "KYOTO", "SAITAMA", "YOKOHAMA"):
+        return "JP"
+    if normalized in ("NL", "NETHERLANDS", "NEDERLAND", "AMSTERDAM", "ROTTERDAM",
+                      "THE HAGUE", "DEN HAAG", "UTRECHT", "EINDHOVEN", "GRONINGEN",
+                      "ALMERE", "BREDA", "NIJMEGEN", "TILBURG"):
+        return "NL"
+    if normalized in ("AE", "UAE", "UNITED ARAB EMIRATES", "DUBAI", "ABU DHABI",
+                      "SHARJAH", "AJMAN", "FUJAIRAH", "RAS AL KHAIMAH", "UMM AL QUWAIN"):
+        return "AE"
+    if normalized in ("ZA", "SOUTH AFRICA", "JOHANNESBURG", "CAPE TOWN", "DURBAN",
+                      "PRETORIA", "BLOEMFONTEIN", "PORT ELIZABETH", "EAST LONDON", "PIETERMARITZBURG"):
+        return "ZA"
     return None
 
 
@@ -8441,7 +8466,15 @@ def save_dossier_answers(
         db.list_dossier_questions("NO") +
         db.list_dossier_questions("BR") +
         db.list_dossier_questions("IT") +
-        db.list_dossier_questions("ES")
+        db.list_dossier_questions("ES") +
+        db.list_dossier_questions("AU") +
+        db.list_dossier_questions("CA") +
+        db.list_dossier_questions("CH") +
+        db.list_dossier_questions("HK") +
+        db.list_dossier_questions("JP") +
+        db.list_dossier_questions("NL") +
+        db.list_dossier_questions("AE") +
+        db.list_dossier_questions("ZA")
     )
     question_lookup = {q["id"]: q for q in raw_questions}
     case_questions = db.list_dossier_case_questions(request.case_id)

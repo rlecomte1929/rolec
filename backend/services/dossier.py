@@ -97,6 +97,22 @@ def _allowed_domains_for_destination(dest: str) -> List[str]:
         return ["esteri.it", "interno.gov.it", "lavoro.gov.it", "stranieriinitalia.it", "governo.it"]
     if dest_upper in ("ES", "SPAIN"):
         return ["exteriores.gob.es", "interior.gob.es", "empleo.gob.es", "seg-social.es", "administracion.gob.es"]
+    if dest_upper in ("AU", "AUSTRALIA"):
+        return ["homeaffairs.gov.au", "immi.homeaffairs.gov.au", "ato.gov.au", "servicesaustralia.gov.au", "abf.gov.au"]
+    if dest_upper in ("CA", "CANADA"):
+        return ["canada.ca", "ircc.canada.ca", "cic.gc.ca", "servicecanada.gc.ca", "esdc.gc.ca"]
+    if dest_upper in ("CH", "SWITZERLAND"):
+        return ["sem.admin.ch", "ch.ch", "estv.admin.ch", "ahv-iv.ch", "bag.admin.ch"]
+    if dest_upper in ("HK", "HONG KONG"):
+        return ["immd.gov.hk", "gov.hk", "ird.gov.hk", "mpfa.org.hk", "labour.gov.hk"]
+    if dest_upper in ("JP", "JAPAN"):
+        return ["moj.go.jp", "mofa.go.jp", "mhlw.go.jp", "nta.go.jp", "nenkin.go.jp"]
+    if dest_upper in ("NL", "NETHERLANDS"):
+        return ["ind.nl", "government.nl", "belastingdienst.nl", "svb.nl", "uwv.nl"]
+    if dest_upper in ("AE", "UAE"):
+        return ["mohre.gov.ae", "icp.gov.ae", "mofaic.gov.ae", "uaepass.ae", "smartservices.ica.gov.ae"]
+    if dest_upper in ("ZA", "SOUTH AFRICA"):
+        return ["dha.gov.za", "sars.gov.za", "labour.gov.za", "saqa.org.za", "gov.za"]
     return []
 
 
@@ -231,6 +247,70 @@ def build_suggested_questions(dest: str, results: List[Dict[str, Any]]) -> List[
             ("Empadronamiento", "Have you completed the Empadronamiento (municipal address registration)?"),
             ("TIE", "Has the TIE (Tarjeta de Identidad de Extranjero) residence card application been submitted?"),
             ("Social Security", "Have you obtained your Spanish Social Security number?"),
+        ]
+    if dest_upper in ("AU", "AUSTRALIA"):
+        templates = [
+            ("482", "Has the Temporary Skill Shortage (subclass 482) or Employer Nomination (subclass 186) visa type been confirmed?"),
+            ("Labour Market Testing", "Has Labour Market Testing (LMT) been completed by the employer?"),
+            ("Skills Assessment", "Has the skills assessment been submitted to the relevant Australian assessing body?"),
+            ("TFN", "Have you applied for a Tax File Number (TFN) with the Australian Tax Office?"),
+            ("Medicare", "Have you enrolled in Medicare (if eligible) or arranged private health insurance?"),
+            ("Superannuation", "Has your employer set up or confirmed a superannuation fund for contributions?"),
+        ]
+    if dest_upper in ("CA", "CANADA"):
+        templates = [
+            ("LMIA", "Has the employer obtained a Labour Market Impact Assessment (LMIA) or confirmed LMIA-exempt route?"),
+            ("work permit", "Has the Canadian work permit application been submitted online or at a port of entry?"),
+            ("SIN", "Have you obtained a Social Insurance Number (SIN) from Service Canada?"),
+            ("provincial health", "Have you enrolled in the provincial health insurance plan (note: 3-month waiting period in some provinces)?"),
+            ("Express Entry", "Is the intended route Express Entry, CUSMA/USMCA, or Intracompany Transfer (ICT)?"),
+        ]
+    if dest_upper in ("CH", "SWITZERLAND"):
+        templates = [
+            ("permit B", "Has the Swiss residence and work permit (L or B) application been submitted to the cantonal migration office?"),
+            ("cantonal", "Has the employer confirmed the quota availability for a non-EU/EEA permit with the cantonal authority?"),
+            ("Einwohnerkontrolle", "Have you registered your address at the commune (Einwohnerkontrolle/contrôle des habitants)?"),
+            ("AHV", "Have you received your AHV/AVS social security number?"),
+            ("health insurance", "Is mandatory Swiss health insurance (Krankenkasse) in place? (Compulsory within 3 months of arrival)"),
+        ]
+    if dest_upper in ("HK", "HONG KONG"):
+        templates = [
+            ("employment visa", "Has the employment visa application been submitted to the Hong Kong Immigration Department?"),
+            ("HKID", "Have you obtained your Hong Kong Identity Card (HKID) at an Immigration Services Centre?"),
+            ("MPF", "Has your employer enrolled you in the Mandatory Provident Fund (MPF) scheme?"),
+            ("arrival registration", "Have you confirmed your entry conditions and any arrival registration requirements?"),
+        ]
+    if dest_upper in ("JP", "JAPAN"):
+        templates = [
+            ("Certificate of Eligibility", "Has the Certificate of Eligibility (COE) been obtained from the Regional Immigration Services Bureau?"),
+            ("work visa", "Has the Japanese work visa (Engineer/Specialist in Humanities) application been submitted at the consulate?"),
+            ("Juminhyo", "Have you completed resident registration (Juminhyo) at the municipal office within 14 days of arrival?"),
+            ("My Number", "Have you received your My Number (Individual Number) card?"),
+            ("health insurance", "Are you enrolled in Japanese health insurance (Shakai Hoken via employer, or National Health Insurance)?"),
+        ]
+    if dest_upper in ("NL", "NETHERLANDS"):
+        templates = [
+            ("Highly Skilled Migrant", "Has the Highly Skilled Migrant (Kennismigrant) permit application been submitted by the employer to the IND?"),
+            ("MVV", "Has the MVV (machtiging tot voorlopig verblijf) provisional residence visa been issued?"),
+            ("BSN", "Have you obtained a BSN (Burgerservicenummer) at the municipality?"),
+            ("DigiD", "Have you applied for a DigiD (Dutch digital identity) for online government services?"),
+            ("health insurance", "Is mandatory Dutch health insurance (zorgverzekering) in place? (Required within 4 months of arrival)"),
+        ]
+    if dest_upper in ("AE", "UAE"):
+        templates = [
+            ("entry permit", "Has the Employment Entry Permit been obtained from MOHRE (Ministry of Human Resources and Emiratisation)?"),
+            ("medical fitness", "Has the mandatory medical fitness test been completed?"),
+            ("residence visa", "Has the residence visa been stamped in the passport?"),
+            ("Emirates ID", "Has the Emirates ID application been submitted to the ICP (Federal Authority for Identity and Citizenship)?"),
+            ("work permit", "Has the MOHRE work permit / labour card been issued?"),
+        ]
+    if dest_upper in ("ZA", "SOUTH AFRICA"):
+        templates = [
+            ("Critical Skills", "Has the visa type been confirmed? (Critical Skills Work Visa, General Work Visa, or Intra-Company Transfer)"),
+            ("SAQA", "Has the SAQA (South African Qualifications Authority) foreign qualification evaluation been submitted?"),
+            ("work visa", "Has the South African work visa application been submitted at the nearest VFS/SA mission?"),
+            ("SARS", "Have you registered with SARS (South African Revenue Service) for a tax number?"),
+            ("dependents", "Will any dependents require South African relative's visas?"),
         ]
 
     for t_key, t_question in templates:
