@@ -4326,7 +4326,7 @@ def list_hr_assignments(
             placeholders = ", ".join(f":id{i}" for i in range(len(unique_ids)))
             sql = (
                 "SELECT id, status, stage, home_country, host_country, "
-                "employee_id, company_id "
+                "employee_id, company_id, profile_json "
                 "FROM relocation_cases WHERE id IN (" + placeholders + ")"
             )
             params = {f"id{i}": cid for i, cid in enumerate(unique_ids)}
@@ -4342,7 +4342,36 @@ def list_hr_assignments(
                     "host_country": m.get("host_country"),
                     "employee_id": m.get("employee_id"),
                     "company_id": m.get("company_id"),
+                    "profile_json": m.get("profile_json"),
                 }
+
+        # Batch-fetch employee profiles so list rows can resolve corridor with the
+        # same precedence as the case detail view (movePlan -> relocationBasics ->
+        # stored home/host_country). Without this the dashboard shows stale
+        # denormalized columns even when the profile has been updated.
+        profiles_by_aid: Dict[str, Dict[str, Any]] = {}
+        aids_for_profiles = [a.get("id") for a in assignments if a.get("id")]
+        if aids_for_profiles:
+            ep_placeholders = ", ".join(f":aid{i}" for i in range(len(aids_for_profiles)))
+            ep_params = {f"aid{i}": v for i, v in enumerate(aids_for_profiles)}
+            ep_sql = (
+                "SELECT assignment_id, profile_json FROM employee_profiles "
+                "WHERE assignment_id IN (" + ep_placeholders + ")"
+            )
+            try:
+                with db.engine.connect() as conn, timed("db.load_employee_profiles_bulk", request_id):
+                    ep_rows = conn.execute(text(ep_sql), ep_params).fetchall()
+                for r in ep_rows:
+                    m = r._mapping
+                    raw = m.get("profile_json")
+                    try:
+                        parsed = json.loads(raw) if isinstance(raw, str) else (raw or None)
+                    except Exception:
+                        parsed = None
+                    if isinstance(parsed, dict):
+                        profiles_by_aid[m["assignment_id"]] = parsed
+            except Exception:
+                log.warning("load_employee_profiles_bulk failed", exc_info=True)
 
         deadline_by_case: Dict[str, str] = {}
         if unique_ids:
@@ -4354,7 +4383,18 @@ def list_hr_assignments(
         summaries: List[AssignmentSummary] = []
         for assignment in assignments:
             eff_case = _effective_relocation_case_id(assignment)
-            case_meta = cases_by_id.get(eff_case) if eff_case else None
+            base_case_meta = cases_by_id.get(eff_case) if eff_case else None
+            case_meta: Optional[Dict[str, Any]] = None
+            if base_case_meta is not None:
+                case_meta = {k: v for k, v in base_case_meta.items() if k != "profile_json"}
+                resolved_origin, resolved_dest = _resolve_assignment_route_for_list(
+                    case_row=base_case_meta,
+                    employee_profile_json=profiles_by_aid.get(assignment.get("id")),
+                )
+                if resolved_origin:
+                    case_meta["home_country"] = resolved_origin
+                if resolved_dest:
+                    case_meta["host_country"] = resolved_dest
             case_id = eff_case or assignment.get("case_id") or assignment.get("id") or ""
             submitted_at = assignment.get("submitted_at")
             if isinstance(submitted_at, datetime):
@@ -4764,6 +4804,52 @@ def erase_case_data(
         "assignments_soft_deleted": len(assignment_ids),
         "pii_redacted": True,
     }
+
+
+def _resolve_assignment_route_for_list(
+    *,
+    case_row: Dict[str, Any],
+    employee_profile_json: Optional[Dict[str, Any]],
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Mirror the precedence used by GET /api/hr/assignments/{id} (caseOriginHint /
+    caseDestinationHint + frontend deriveCaseEssentials) so the dashboard list
+    and the case detail show the same corridor.
+
+    Precedence:
+      1. employee_profiles.profile_json -> movePlan.origin / movePlan.destination
+      2. relocation_cases.profile_json  -> relocationBasics.originCountry / destCountry
+      3. relocation_cases.home_country  / host_country (stored denormalized cols)
+    """
+    origin = (case_row.get("home_country") or "").strip() or None
+    dest = (case_row.get("host_country") or "").strip() or None
+
+    raw = case_row.get("profile_json")
+    if raw:
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(data, dict):
+                rb = data.get("relocationBasics") or {}
+                oc = (rb.get("originCountry") or "").strip() if isinstance(rb.get("originCountry"), str) else ""
+                dc = (rb.get("destCountry") or "").strip() if isinstance(rb.get("destCountry"), str) else ""
+                if oc:
+                    origin = oc
+                if dc:
+                    dest = dc
+        except Exception:
+            pass
+
+    if isinstance(employee_profile_json, dict):
+        mp = employee_profile_json.get("movePlan") or {}
+        if isinstance(mp, dict):
+            mp_origin = mp.get("origin")
+            mp_dest = mp.get("destination")
+            if isinstance(mp_origin, str) and mp_origin.strip():
+                origin = mp_origin.strip()
+            if isinstance(mp_dest, str) and mp_dest.strip():
+                dest = mp_dest.strip()
+
+    return origin, dest
 
 
 def _hr_assignment_case_route_hints(case_row: Optional[Dict[str, Any]]) -> tuple:
