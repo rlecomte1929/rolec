@@ -25,7 +25,7 @@ function renderBody(text: string): React.ReactNode {
 
 export const SecurityPage: React.FC = () => {
   usePageMeta({
-    title: 'Security — ReloPass',
+    title: 'Security · ReloPass',
     description: 'Data hosted in the EU, encrypted in transit and at rest. Role-based access throughout.',
     ogUrl: 'https://www.relopass.com/security',
   });

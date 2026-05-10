@@ -17,7 +17,7 @@ import { platformContent } from './platformContent';
 
 export const PlatformPage: React.FC = () => {
   usePageMeta({
-    title: 'The Platform — ReloPass',
+    title: 'The Platform · ReloPass',
     description: 'Every relocation on one system of record. Cases, documents, providers, and progress in one place.',
     ogUrl: 'https://www.relopass.com/platform',
   });

@@ -349,7 +349,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                         : 'border-transparent hover:text-[#0b2b43]'
                     }`}
                   >
-                    Assignments
+                    Cases
                   </Link>
                   <Link
                     to={buildRoute('hrEmployees')}
