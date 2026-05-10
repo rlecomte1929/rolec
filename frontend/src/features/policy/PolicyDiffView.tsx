@@ -10,7 +10,7 @@
  * change lists. Full-fidelity editing still happens in the Detailed
  * review drawer; this view is for "what did I change?" glances.
  */
-import React, { useCallback, useEffet, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
 import { policyConfigMatrixAPI } from '../../api/client';
 import { POLICY_CONFIG_CATEGORIES } from '../policy-config/constants';
