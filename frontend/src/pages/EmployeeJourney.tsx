@@ -1,301 +1,755 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
-import { Alert, Button, Card, Input } from '../components/antigravity';
+import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/antigravity';
 import { employeeAPI } from '../api/client';
+import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { useServicesFlow } from '../features/services/ServicesFlowContext';
+import { buildRoute } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
-import type { AssignmentStatus, EmployeeJourneyResponse } from '../types';
-import { safeNavigate } from '../navigation/safeNavigate';
+import type { PostSignupReconciliation } from '../types';
+import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
+import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
+import { formatRichMessage } from '../utils/richMessage';
+import { logEmployeeEntry } from '../utils/employeeJourneyPerf';
+import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
+import { getApiErrorCode } from '../utils/apiDetail';
+import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
+import { getLastVisited } from '../utils/employeeCaseProgress';
 
-const INTAKE_STATUSES: AssignmentStatus[] = ['DRAFT', 'IN_PROGRESS', 'CHANGES_REQUESTED'];
-const SUBMITTED_STATUSES: AssignmentStatus[] = ['EMPLOYEE_SUBMITTED', 'HR_REVIEW', 'HR_APPROVED'];
+/**
+ * Resolve where to send the user when they click "Open case" on the
+ * dashboard. Honor the last route they visited inside this assignment
+ * (so re-entering doesn't force them through the wizard again). Falls
+ * back to the case summary page when no last-visited is recorded.
+ *
+ * Both `assigned` (fresh assignment from HR, employee hasn't started
+ * intake yet) and `awaiting_intake` (employee started intake but hasn't
+ * submitted) are pre-intake states whose entry point is the wizard.
+ * Send both straight to step 1 rather than the summary (empty for a
+ * fresh case) or any stale last-visited URL.
+ */
+function openCaseHref(assignmentId: string, status?: string | null): string {
+  if (status === 'awaiting_intake' || status === 'assigned') {
+    return `/employee/case/${assignmentId}/wizard/1`;
+  }
+  return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
+}
 
-function statusLabel(status?: AssignmentStatus) {
-  if (status === 'HR_APPROVED') return 'Approved';
-  if (status === 'HR_REVIEW') return 'Under HR review';
-  if (status === 'EMPLOYEE_SUBMITTED') return 'Submitted to HR';
-  if (status === 'CHANGES_REQUESTED') return 'Changes requested';
-  return 'In intake';
+type FlowStep = {
+  label: string;
+  /** When set, the step renders as a Link to this path. */
+  href?: string;
+  /** When false, the step renders as a non-clickable muted pill with `mutedHint` as title. */
+  enabled?: boolean;
+  mutedHint?: string;
+};
+
+/** Basic UUID shape: used to catch swapped claim fields. */
+const ASSIGNMENT_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Dismissed pending-ID set per user (localStorage): when signature matches current pending rows, banner stays hidden. */
+function pendingBannerStorageKey(): string {
+  const uid = getAuthItem('relopass_user_id') || 'anon';
+  return `relopass_employee_new_pending_banner_dismissed_${uid}`;
+}
+
+function formatOverviewDate(iso: string | null | undefined): string {
+  if (!iso?.trim()) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function linkedStatusLabel(row: EmployeeLinkedOverviewRow): string {
+  const parts = [row.status, row.current_stage].filter(Boolean);
+  return parts.length ? parts.join(' · ') : '-';
+}
+
+function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: string | null }) {
+  return (
+    <div
+      className="mt-4 rounded-lg border border-[#93c5fd] bg-[#eff6ff] px-4 py-3 text-sm text-[#1e3a5f]"
+      role="region"
+      aria-label="How to fill the claim form"
+    >
+      <div className="font-semibold text-[#0b2b43] mb-2">How to fill this in</div>
+      <ol className="list-decimal pl-5 space-y-2 text-[#334155]">
+        <li>
+          <strong className="text-[#0b2b43]">First field:</strong> Your ReloPass email or username (what HR should have
+          on file). Not the assignment ID.
+        </li>
+        <li>
+          <strong className="text-[#0b2b43]">Second field:</strong> Assignment ID from HR (UUID). Example:{' '}
+          <span className="font-mono text-xs text-[#0b2b43]">a631bfd2-aac5-4f54-96bd-e60082157246</span>
+        </li>
+      </ol>
+      {signedInPrincipal ? (
+        <p className="mt-3 text-xs text-[#64748b] border-t border-[#bfdbfe] pt-3">
+          Signed in as <span className="font-medium text-[#0b2b43]">{signedInPrincipal}</span>. The first field should
+          match.
+        </p>
+      ) : null}
+      <p className="mt-2 text-xs text-[#64748b]">
+        <strong className="text-[#92400e]">Common mistake:</strong> assignment ID in the first field, or email in the
+        second. Swap them and try again.
+      </p>
+    </div>
+  );
+}
+
+function EmployeeAssignmentBootstrapCard({ title, detail }: { title: string; detail?: string }) {
+  return (
+    <div className="mb-6" role="status" aria-live="polite" aria-busy="true">
+      <Card
+        padding="lg"
+        className="border border-[#e2e8f0] flex flex-col items-center text-center py-12"
+      >
+        <div
+          className="h-10 w-10 rounded-full border-2 border-[#0b2b43] border-t-transparent animate-spin mb-4"
+          aria-hidden
+        />
+        <p className="text-base font-semibold text-[#0b2b43]">{title}</p>
+        {detail ? <p className="text-sm text-[#64748b] mt-2 max-w-md">{detail}</p> : null}
+      </Card>
+    </div>
+  );
 }
 
 export const EmployeeJourney: React.FC = () => {
-  const [assignmentId, setAssignmentId] = useState<string | null>(null);
-  const [journey, setJourney] = useState<EmployeeJourneyResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const {
+    assignmentId,
+    isLoading: assignmentLoading,
+    refetch: refetchAssignment,
+    linkedCount,
+    pendingCount,
+    linkedSummaries,
+    pendingSummaries,
+    overviewError,
+  } = useEmployeeAssignment();
   const [error, setError] = useState('');
   const [claimId, setClaimId] = useState('');
-  const [claimEmail, setClaimEmail] = useState(getAuthItem('relopass_email') || '');
+  const [claimEmail, setClaimEmail] = useState(
+    getAuthItem('relopass_email') || getAuthItem('relopass_username') || ''
+  );
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [claimingPendingId, setClaimingPendingId] = useState<string | null>(null);
+  const [linkRec, setLinkRec] = useState<PostSignupReconciliation | null>(null);
+  /** Hub: collapsed manual UUID form unless user opens it (always expanded for primary fallback). */
+  const [manualClaimExpanded, setManualClaimExpanded] = useState(false);
+  const [bannerDismissNonce, setBannerDismissNonce] = useState(0);
 
-  const navigate = useNavigate();
+  const hasLinked = linkedCount > 0;
+  const hasPendingOnly = !hasLinked && pendingCount > 0;
+  /** No linked and no auto-detected pending → full assignment-ID / manual claim experience. */
+  const showPrimaryManualClaimPage = !hasLinked && !hasPendingOnly;
+  const showPendingSection = pendingCount > 0;
+  /** Secondary manual path: linked and/or pending hub: recovery & HR UUID without a parallel API. */
+  const showSecondaryManualClaimCard = hasLinked || hasPendingOnly;
 
-  const loadAssignment = async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const response = await employeeAPI.getCurrentAssignment();
-      if (!response.assignment) {
-        setAssignmentId(null);
-        setJourney(null);
-        return;
-      }
-      setAssignmentId(response.assignment.id);
-      const data = await employeeAPI.getNextQuestion(response.assignment.id);
-      setJourney(data);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        safeNavigate(navigate, 'landing');
-      } else {
-        setError('Unable to load your case.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const pendingIdsSignature = useMemo(
+    () =>
+      [...pendingSummaries.map((r) => r.assignment_id)]
+        .filter(Boolean)
+        .sort()
+        .join('\n'),
+    [pendingSummaries]
+  );
 
   useEffect(() => {
-    loadAssignment();
+    if (hasPendingOnly) setManualClaimExpanded(true);
+  }, [hasPendingOnly]);
+
+  const showNewAssignmentBanner = useMemo(() => {
+    if (assignmentLoading || !hasLinked || pendingCount === 0 || !pendingIdsSignature) return false;
+    try {
+      const dismissed = localStorage.getItem(pendingBannerStorageKey()) ?? '';
+      return dismissed !== pendingIdsSignature;
+    } catch {
+      return true;
+    }
+  }, [assignmentLoading, hasLinked, pendingCount, pendingIdsSignature, bannerDismissNonce]);
+
+  const dismissNewAssignmentBanner = () => {
+    try {
+      localStorage.setItem(pendingBannerStorageKey(), pendingIdsSignature);
+    } catch {
+      /* ignore */
+    }
+    setBannerDismissNonce((n) => n + 1);
+  };
+
+  const scrollToPendingSection = () => {
+    document.getElementById('employee-hub-pending-assignments')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const entryStartedAt = useRef<number | null>(null);
+  const loggedAssignmentResolution = useRef(false);
+  const routePerfStartedAt = useRef<number | null>(null);
+
+  const signedInPrincipal =
+    (getAuthItem('relopass_email') || getAuthItem('relopass_username') || '').trim() || null;
+
+  useEffect(() => {
+    routePerfStartedAt.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackRouteEntry('/employee/journey');
+    trackShellRender('/employee/journey');
   }, []);
 
-  const status = journey?.assignmentStatus as AssignmentStatus | undefined;
-  const isIntake = status ? INTAKE_STATUSES.includes(status) : false;
-  const isSubmitted = status ? SUBMITTED_STATUSES.includes(status) : false;
-
-  // Wizard-first, dashboard-later:
-  // - before submission: force the wizard
-  // - after submission: force the dashboard (read-only)
   useEffect(() => {
-    if (!assignmentId || !journey || !status) return;
-    if (status === 'CHANGES_REQUESTED' && journey.hrNotes) {
-      sessionStorage.setItem('relopass_hr_notes', journey.hrNotes);
+    if (assignmentLoading) return;
+    const startedAt = routePerfStartedAt.current;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackFirstMeaningfulContent('/employee/journey', startedAt != null ? now - startedAt : undefined);
+  }, [assignmentLoading]);
+
+  useEffect(() => {
+    try {
+      const raw =
+        sessionStorage.getItem('post_auth_claim_reconciliation') ||
+        sessionStorage.getItem('post_signup_reconciliation');
+      if (!raw) return;
+      sessionStorage.removeItem('post_auth_claim_reconciliation');
+      sessionStorage.removeItem('post_signup_reconciliation');
+      const data = JSON.parse(raw) as PostSignupReconciliation;
+      setLinkRec(data);
+      void refetchAssignment();
+    } catch {
+      /* ignore */
     }
-    if (isIntake) {
-      navigate(`/employee/case/${assignmentId}/wizard/1`, { replace: true });
+  }, [refetchAssignment]);
+
+  useEffect(() => {
+    entryStartedAt.current = performance.now();
+    loggedAssignmentResolution.current = false;
+    logEmployeeEntry('employee_dashboard_entry', {});
+  }, []);
+
+  useEffect(() => {
+    if (assignmentLoading) {
+      loggedAssignmentResolution.current = false;
       return;
     }
-    if (isSubmitted) {
-      // If they came via /employee/journey, keep them here (this page is also /employee/dashboard).
-      return;
-    }
-  }, [assignmentId, journey, status, isIntake, isSubmitted, navigate]);
+    if (loggedAssignmentResolution.current) return;
+    loggedAssignmentResolution.current = true;
+    const t0 = entryStartedAt.current;
+    const scenario = overviewError
+      ? 'overview_error'
+      : hasLinked
+        ? 'linked'
+        : hasPendingOnly
+          ? 'pending_only'
+          : 'manual_fallback';
+    logEmployeeEntry('assignment_resolution_complete', {
+      msSinceEntry: t0 != null ? Math.round(performance.now() - t0) : undefined,
+      hasLinkedAssignment: hasLinked,
+      linkedCount,
+      pendingCount,
+      skippedManualAssignmentIdPage: hasLinked || hasPendingOnly,
+      scenario,
+    });
+    trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.hubResolution, {
+      scenario,
+      linkedCount,
+      pendingCount,
+      skippedManualAssignmentIdPage: hasLinked || hasPendingOnly,
+      showPrimaryManualClaimPage,
+      showPendingSection,
+      msSinceEntry: t0 != null ? Math.round(performance.now() - t0) : undefined,
+    });
+  }, [
+    assignmentLoading,
+    assignmentId,
+    hasLinked,
+    hasPendingOnly,
+    linkedCount,
+    pendingCount,
+    overviewError,
+    showPrimaryManualClaimPage,
+    showPendingSection,
+  ]);
 
-  const answeredCount = journey?.progress?.answeredCount || 0;
-  const totalQuestions = journey?.progress?.totalQuestions || 0;
-  const requiredDone = Math.min(answeredCount, totalQuestions);
-  const progressPercent = totalQuestions > 0 ? Math.round((requiredDone / totalQuestions) * 100) : 0;
-  const progressPercentCapped = Math.max(0, Math.min(100, progressPercent));
-
-  const profile = journey?.profile;
-
-  const family = useMemo(() => {
-    const spouseName = profile?.spouse?.fullName || '';
-    const children = profile?.dependents?.filter((child) => child.firstName) || [];
-    return { spouseName, children };
-  }, [profile?.spouse?.fullName, profile?.dependents]);
-
-  const handleClaimAssignment = async () => {
-    if (!claimId.trim() || !claimEmail.trim()) {
-      setError('Enter your email and the assignment ID provided by HR.');
+  const handleClaimPendingRow = async (pendingAssignmentId: string) => {
+    const loginTrim = (getAuthItem('relopass_email') || getAuthItem('relopass_username') || '').trim();
+    if (!loginTrim) {
+      setError('Sign-in email or username is missing. Sign out and sign in again, then retry.');
       return;
     }
     setError('');
+    setClaimingPendingId(pendingAssignmentId);
+    trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.linkPendingAttempt, {
+      assignmentId: pendingAssignmentId,
+    });
     try {
-      await employeeAPI.claimAssignment(claimId.trim(), claimEmail.trim());
-      await loadAssignment();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Unable to claim assignment.');
+      const res = await employeeAPI.linkPendingAssignment(pendingAssignmentId, loginTrim);
+      const nextAssignment = res.assignmentId || pendingAssignmentId;
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.linkPendingComplete, {
+        ok: true,
+        assignmentId: nextAssignment,
+        alreadyLinked: Boolean(res.alreadyLinked),
+      });
+      await refetchAssignment();
+      navigate(`/employee/case/${nextAssignment}/summary`);
+    } catch (err: unknown) {
+      const transport = getClientTransportErrorMessage(err);
+      setError(transport ?? getApiErrorMessage(err, 'Unable to link this assignment.'));
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.linkPendingComplete, {
+        ok: false,
+        assignmentId: pendingAssignmentId,
+        errorCode: getApiErrorCode(err),
+        transportError: Boolean(transport),
+      });
+    } finally {
+      setClaimingPendingId(null);
     }
   };
 
-  return (
-    <AppShell title="Employee Journey" subtitle="Complete your relocation profile for HR review.">
-      {isLoading && <div className="text-sm text-[#6b7280]">Loading...</div>}
+  const handleManualClaimSubmit = async () => {
+    if (!claimId.trim() || !claimEmail.trim()) {
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.manualClaimClientValidationFailed, {
+        reason: 'missing_fields',
+      });
+      setError('Fill both fields: your login (left) and the assignment ID from HR (right).');
+      return;
+    }
+    const idTrim = claimId.trim();
+    const loginTrim = claimEmail.trim();
+    if (ASSIGNMENT_ID_PATTERN.test(loginTrim) && !ASSIGNMENT_ID_PATTERN.test(idTrim)) {
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.manualClaimClientValidationFailed, {
+        reason: 'assignment_id_in_login_field',
+      });
+      setError(
+        'You pasted the assignment ID into the first field. Put the long ID (with dashes) in “Assignment ID” on the right, and your ReloPass email or username on the left.'
+      );
+      return;
+    }
+    if (idTrim.includes('@')) {
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.manualClaimClientValidationFailed, {
+        reason: 'email_in_assignment_field',
+      });
+      setError(
+        'The assignment ID is not an email address: use the UUID from HR in the right field only.'
+      );
+      return;
+    }
+    setError('');
+    setIsClaiming(true);
+    trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.manualClaimAttempt, {
+      assignmentId: idTrim,
+    });
+    try {
+      const res = await employeeAPI.claimAssignment(idTrim, loginTrim);
+      const nextAssignment = res.assignmentId || idTrim;
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.manualClaimComplete, {
+        ok: true,
+        assignmentId: nextAssignment,
+      });
+      await refetchAssignment();
+      navigate(`/employee/case/${nextAssignment}/summary`);
+    } catch (err: unknown) {
+      const transport = getClientTransportErrorMessage(err);
+      setError(transport ?? getApiErrorMessage(err, 'Unable to claim assignment.'));
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.manualClaimComplete, {
+        ok: false,
+        assignmentId: idTrim,
+        errorCode: getApiErrorCode(err),
+        transportError: Boolean(transport),
+      });
+    } finally {
+      setIsClaiming(false);
+    }
+  };
 
-      {!isLoading && error && (
-        <Alert variant="error">{error}</Alert>
-      )}
+  const { recommendations: servicesRecommendations } = useServicesFlow();
+  const hasRecommendations = Boolean(
+    servicesRecommendations && Object.keys(servicesRecommendations).length > 0,
+  );
+  const flowSteps: FlowStep[] = useMemo(
+    () => [
+      // Step 1: handled by the per-row "Open case" button on the cases below.
+      { label: '1. Fill your case' },
+      { label: '2. Choose services', href: buildRoute('services') },
+      {
+        label: '3. Review budget vs policy',
+        href: hasRecommendations ? buildRoute('servicesEstimate') : undefined,
+        enabled: hasRecommendations,
+        mutedHint: hasRecommendations ? undefined : 'Complete step 2 first',
+      },
+      { label: '4. (Soon) Request quotes' },
+      { label: '5. Exchange with HR' },
+    ],
+    [hasRecommendations],
+  );
 
-      {!isLoading && !assignmentId && (
-        <Card padding="lg">
-          <div className="space-y-3">
-            <div className="text-lg font-semibold text-[#0b2b43]">No relocation case assigned yet</div>
-            <div className="text-sm text-[#4b5563]">
-              When HR assigns your relocation case, you’ll complete a short 5-step wizard. If you already received an assignment ID, enter it below.
-            </div>
-            <div className="pt-2 space-y-3">
-              <Input
-                type="email"
-                value={claimEmail}
-                onChange={setClaimEmail}
-                label="Email"
-                placeholder="you@example.com"
-                fullWidth
-              />
-              <Input
-                value={claimId}
-                onChange={setClaimId}
-                label="Assignment ID"
-                placeholder="Paste the assignment ID from HR"
-                fullWidth
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={handleClaimAssignment}>Start</Button>
-                <Button variant="outline" onClick={loadAssignment}>Refresh</Button>
+  // Pill base style is shared so clickable + decorative steps line up visually.
+  // Clickable variants add the same hover/cursor/focus-visible affordance used
+  // on the HR cases-list rows for consistency with other interactive elements.
+  const PILL_BASE = 'rounded-full border border-[#cbd5f5] bg-[#eef4f8] px-3 py-1 font-medium';
+  const PILL_INTERACTIVE =
+    'cursor-pointer hover:bg-[#dbeafe] focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:outline-none transition-colors';
+  const PILL_MUTED = 'opacity-60 text-[#64748b]';
+
+  const flowchart = useMemo(() => {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-sm text-[#0b2b43]">
+        {flowSteps.map((step, idx) => (
+          <div key={step.label} className="flex items-center gap-2">
+            {step.href ? (
+              <Link to={step.href} className={`${PILL_BASE} ${PILL_INTERACTIVE}`}>
+                {step.label}
+              </Link>
+            ) : (
+              <div
+                className={`${PILL_BASE} ${step.enabled === false ? PILL_MUTED : ''}`}
+                title={step.mutedHint}
+                aria-disabled={step.enabled === false ? true : undefined}
+              >
+                {step.label}
               </div>
-              <Button variant="outline" onClick={() => safeNavigate(navigate, 'messages')}>Contact HR / Support</Button>
-            </div>
+            )}
+            {idx < flowSteps.length - 1 && <span className="text-[#94a3b8]">→</span>}
           </div>
-        </Card>
-      )}
+        ))}
+      </div>
+    );
+  }, [flowSteps]);
 
-      {!isLoading && assignmentId && journey && isIntake && (
-        <Card padding="lg">
-          <Alert variant="info">
-            <div className="space-y-2">
-              <div className="font-semibold text-[#0b2b43]">Continue your case intake</div>
-              <div className="text-sm text-[#4b5563]">
-                Complete your relocation details in the Case Wizard. Redirecting now.
-              </div>
-              <div className="flex flex-wrap gap-2 pt-2">
-                <Button onClick={() => navigate(`/employee/case/${assignmentId}/wizard/1`)}>Open case wizard</Button>
-                <Button variant="outline" onClick={loadAssignment}>Refresh</Button>
-              </div>
-            </div>
-          </Alert>
-        </Card>
-      )}
 
-      {!isLoading && assignmentId && journey && isSubmitted && (
-        <div className="space-y-6">
-          <Card padding="lg">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div>
-                <div className="text-2xl font-semibold text-[#0b2b43]">
-                  {profile?.primaryApplicant?.fullName || 'Employee'}
-                </div>
-                <div className="text-sm text-[#6b7280] mt-2">
-                  {profile?.movePlan?.origin || '—'} → {profile?.movePlan?.destination || '—'}
-                </div>
-                <div className="text-xs text-[#6b7280] mt-1">
-                  Target move: {profile?.movePlan?.targetArrivalDate || '—'}
-                </div>
-                <div className="mt-3 inline-flex items-center rounded-full bg-[#eef4f8] text-[#0b2b43] px-3 py-1 text-xs font-semibold">
-                  {statusLabel(status)}
-                </div>
-              </div>
+  const linkAlerts = useMemo(() => {
+    if (!linkRec) return null;
+    const blocks: React.ReactNode[] = [];
+    if (linkRec.headline?.trim() || linkRec.message?.trim()) {
+      blocks.push(
+        <Alert key="primary" variant="success" className="mb-4" title={linkRec.headline?.trim() || undefined}>
+          {linkRec.message?.trim() ? formatRichMessage(linkRec.message) : null}
+        </Alert>
+      );
+    } else if (linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length > 0) {
+      blocks.push(
+        <Alert key="attached" variant="success" className="mb-4" title="Case linked">
+          {linkRec.attachedAssignmentIds.length} assignment
+          {linkRec.attachedAssignmentIds.length > 1 ? 's' : ''} linked to this account. Open it below or refresh.
+        </Alert>
+      );
+    } else if (
+      linkRec.linkedContactIds &&
+      linkRec.linkedContactIds.length > 0 &&
+      !(linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length)
+    ) {
+      blocks.push(
+        <Alert key="profile" variant="info" className="mb-4" title="Contact matched">
+          Your login matches a company contact. New assignments from HR should show here after refresh or the next sign-in.
+        </Alert>
+      );
+    }
+    if ((linkRec.skippedRevokedInvites ?? 0) > 0) {
+      blocks.push(
+        <Alert key="revoked" variant="warning" className="mb-4" title="Invitation no longer active">
+          At least one pending invitation was cancelled by HR. If you still need access, contact your HR contact.
+        </Alert>
+      );
+    }
+    if (
+      (linkRec.skippedContactsLinkedToOtherUser ?? 0) > 0 ||
+      (linkRec.skippedAssignmentsLinkedToOtherUser ?? 0) > 0
+    ) {
+      blocks.push(
+        <Alert key="ambiguous" variant="warning" className="mb-4" title="Could not link automatically">
+          Another account may already own this contact or assignment. Send HR your work email and assignment ID to confirm
+          the correct login.
+        </Alert>
+      );
+    }
+    return blocks.length ? <div className="mb-6">{blocks}</div> : null;
+  }, [linkRec]);
 
-              <div className="w-full max-w-xs space-y-3">
-                <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
-                  <div className="text-xs text-[#6b7280] mb-2">Progress</div>
-                  <div className="flex items-center justify-between text-xs text-[#6b7280]">
-                    <span>{requiredDone} of {totalQuestions} required items completed</span>
-                    <span className="font-semibold text-[#0b2b43]">{progressPercentCapped}%</span>
-                  </div>
-                  <div className="mt-2 h-1.5 w-full rounded-full bg-[#e2e8f0]">
-                    <div className="h-1.5 rounded-full bg-[#0b2b43]" style={{ width: `${progressPercentCapped}%` }} />
-                  </div>
-                </div>
-                <div className="rounded-lg border border-[#e2e8f0] bg-white p-3">
-                  <div className="text-xs text-[#6b7280] mb-1">Edits</div>
-                  <div className="text-xs text-[#4b5563]">
-                    This case is read-only during HR review. If HR requests changes, you’ll be guided back into the wizard.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
+  const linkStatusBadge = useMemo(() => {
+    if (hasLinked) {
+      return (
+        <Badge variant="success" size="sm">
+          {linkedCount === 1 ? 'Linked: case on this account' : `Linked: ${linkedCount} assignments on this account`}
+        </Badge>
+      );
+    }
+    if (hasPendingOnly) {
+      return (
+        <Badge variant="info" size="sm">
+          {pendingCount === 1 ? 'Pending assignment to link' : `${pendingCount} pending assignments to link`}
+        </Badge>
+      );
+    }
+    if (linkRec?.linkedContactIds?.length && !(linkRec.attachedAssignmentIds && linkRec.attachedAssignmentIds.length)) {
+      return (
+        <Badge variant="info" size="sm">
+          Connected: waiting for an assignment from HR
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="neutral" size="sm">
+        No case linked yet: use email HR entered or claim below
+      </Badge>
+    );
+  }, [linkRec, hasLinked, hasPendingOnly, linkedCount, pendingCount]);
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43]">Relocation Basics</div>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Origin</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.movePlan?.origin || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Destination</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.movePlan?.destination || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Target move date</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.movePlan?.targetArrivalDate || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Purpose</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">Employment</div>
-                </div>
-              </div>
-            </Card>
+  const shellTitle = assignmentLoading
+    ? 'Welcome'
+    : hasLinked
+      ? 'My assignments'
+      : hasPendingOnly
+        ? 'Pending assignments'
+        : 'Welcome';
+  const shellSubtitle = assignmentLoading
+    ? 'Loading your assignment list.'
+    : hasLinked
+      ? 'Open a case or pick up where you left off.'
+      : hasPendingOnly
+        ? 'Link each row in Section B, then open the case from Section A.'
+        : 'Link a case with the assignment ID from HR, or wait for HR to match your email.';
 
-            <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43]">Employee Profile</div>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Nationality</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.nationality || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Role title</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.employer?.roleTitle || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Passport expiry</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.passport?.expiryDate || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Job level</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.employer?.jobLevel || '—'}</div>
-                </div>
-              </div>
-            </Card>
+  return (
+    <AppShell title={shellTitle} subtitle={shellSubtitle}>
+      {linkAlerts}
+      {assignmentLoading ? (
+        <EmployeeAssignmentBootstrapCard title="Checking assignments…" detail="One moment." />
+      ) : null}
 
-            <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43] mb-3">Family Members</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Spouse</div>
-                  <div className="text-sm font-medium text-[#0b2b43] mt-1">{family.spouseName || 'Not included'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Children</div>
-                  <div className="text-sm font-medium text-[#0b2b43] mt-1">{family.children.length}</div>
-                </div>
-              </div>
-              {family.children.length > 0 ? (
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {family.children.map((child, idx) => (
-                    <div key={`${child.firstName}-${idx}`} className="border border-[#e2e8f0] rounded-lg p-3">
-                      <div className="text-xs uppercase tracking-wide text-[#6b7280]">Child</div>
-                      <div className="text-sm font-medium text-[#0b2b43] mt-1">{child.firstName}</div>
-                      <div className="text-xs text-[#6b7280]">{child.dateOfBirth || 'DOB not set'}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </Card>
+      {!assignmentLoading && overviewError ? (
+        <Alert variant="warning" className="mb-6" title="Could not load assignments">
+          {overviewError}{' '}
+          <Button variant="outline" className="ml-2 mt-2 sm:mt-0" onClick={() => void refetchAssignment()}>
+            Try again
+          </Button>
+        </Alert>
+      ) : null}
 
-            <Card padding="lg">
-              <div className="text-sm font-semibold text-[#0b2b43]">Assignment / Context</div>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Employer</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.employer?.name || '—'}</div>
-                </div>
-                <div className="border border-[#e2e8f0] rounded-lg p-3">
-                  <div className="text-xs uppercase tracking-wide text-[#6b7280]">Contract start</div>
-                  <div className="text-[#0b2b43] font-medium mt-1">{profile?.primaryApplicant?.assignment?.startDate || '—'}</div>
-                </div>
-              </div>
-              <div className="mt-4">
-                <Button variant="outline" onClick={() => safeNavigate(navigate, 'messages')}>
-                  Contact HR / Support
-                </Button>
-              </div>
-            </Card>
+      {!assignmentLoading && error ? <Alert variant="error" className="mb-6">{error}</Alert> : null}
+
+      {!assignmentLoading && showNewAssignmentBanner ? (
+        <div className="mb-6 border border-[#93c5fd] bg-[#eff6ff] rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-semibold text-[#0b2b43]">New assignment for your email</div>
+            <p className="text-sm text-[#334155] mt-1">
+              Link it in Section B when you want. Section A is unchanged. Nothing opens until you act.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <Button onClick={scrollToPendingSection}>Review and link</Button>
+            <Button variant="outline" onClick={dismissNewAssignmentBanner}>
+              Dismiss
+            </Button>
           </div>
         </div>
-      )}
+      ) : null}
+
+      {!assignmentLoading ? (
+        <Card padding="lg" className="mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div className="text-lg font-semibold text-[#0b2b43]">Assignment status</div>
+            {linkStatusBadge}
+          </div>
+          <p className="text-sm text-[#4b5563] mb-4">
+            {hasLinked
+              ? 'Linked work is in Section A; pending work in Section B. If HR only gave you a UUID, use manual entry at the bottom.'
+              : hasPendingOnly
+                ? 'These rows match your sign-in but are not linked yet. Use Section B before you can open the case.'
+                : 'Sign in with the email or username HR used, or paste the assignment ID HR sent you.'}
+          </p>
+          <div className="text-lg font-semibold text-[#0b2b43] mb-2">Typical flow</div>
+          {flowchart}
+        </Card>
+      ) : null}
+
+      {!assignmentLoading ? (
+        <Card
+          id="employee-hub-linked-assignments"
+          padding="lg"
+          className="mb-6 border border-[#e2e8f0] scroll-mt-6"
+        >
+          <div className="text-lg font-semibold text-[#0b2b43] mb-1">Section A: Linked assignments</div>
+          <p className="text-sm text-[#64748b] mb-4">On your account. Open a row for full case details.</p>
+          {linkedSummaries.length === 0 ? (
+            <p className="text-sm text-[#4b5563] py-2">No linked assignments yet.</p>
+          ) : (
+            <ul className="divide-y divide-[#e2e8f0] border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
+              {linkedSummaries.map((row) => (
+                <li
+                  key={row.assignment_id}
+                  className="p-4 flex flex-col sm:flex-row sm:items-stretch sm:justify-between gap-4"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="font-semibold text-[#0b2b43]">{row.company?.name || 'Company'}</div>
+                    <div className="text-sm text-[#64748b]">{row.destination?.label || 'Destination TBD'}</div>
+                    <div className="text-sm text-[#334155]">
+                      <span className="text-[#64748b]">Status</span>{' '}
+                      <span className="font-medium text-[#0b2b43]">{linkedStatusLabel(row)}</span>
+                    </div>
+                    <div className="text-sm text-[#334155]">
+                      <span className="text-[#64748b]">Last updated</span>{' '}
+                      <span className="font-medium text-[#0b2b43]">
+                        {formatOverviewDate(row.updated_at || row.created_at)}
+                      </span>
+                    </div>
+                    <div className="text-xs font-mono text-[#94a3b8] pt-1">{row.assignment_id}</div>
+                  </div>
+                  <div className="flex sm:flex-col sm:justify-center shrink-0">
+                    <Button onClick={() => navigate(openCaseHref(row.assignment_id, row.status))}>Open case</Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      ) : null}
+
+      {!assignmentLoading && showPendingSection ? (
+        <Card
+          id="employee-hub-pending-assignments"
+          padding="lg"
+          className="mb-6 border border-[#93c5fd] bg-[#f8fafc] scroll-mt-6"
+        >
+          <div className="text-lg font-semibold text-[#0b2b43] mb-1">Section B: Pending assignments to link</div>
+          <p className="text-sm text-[#4b5563] mb-4">
+            HR set these up for your contact. Link one to add it to your account. We do not auto-open a case.
+          </p>
+          <ul className="space-y-4">
+            {pendingSummaries.map((row) => {
+              const st = row.claim?.state || '';
+              const blocked = st === 'invite_revoked' || row.claim?.extra_verification_required;
+              return (
+                <li
+                  key={row.assignment_id}
+                  className="rounded-lg border border-[#e2e8f0] bg-white p-4 flex flex-col sm:flex-row sm:items-stretch sm:justify-between gap-4"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="w-fit">
+                      <Badge variant="info" size="sm">
+                        Pending
+                      </Badge>
+                    </div>
+                    <div className="font-semibold text-[#0b2b43] pt-1">{row.company?.name || 'Company'}</div>
+                    <div className="text-sm text-[#64748b]">{row.destination?.label || 'Destination TBD'}</div>
+                    <div className="text-sm text-[#334155]">
+                      <span className="text-[#64748b]">Created</span>{' '}
+                      <span className="font-medium text-[#0b2b43]">{formatOverviewDate(row.created_at)}</span>
+                    </div>
+                    {st ? (
+                      <div className="text-xs text-[#94a3b8]">Claim state: {st}</div>
+                    ) : null}
+                    <div className="text-xs font-mono text-[#cbd5e1]">{row.assignment_id}</div>
+                  </div>
+                  <div className="flex sm:flex-col sm:justify-center shrink-0">
+                    {blocked ? (
+                      <p className="text-sm text-[#b45309] max-w-xs">
+                        Needs HR follow-up or manual claim. Use the form below if you have the assignment ID.
+                      </p>
+                    ) : (
+                      <LoadingButton
+                        onClick={() => void handleClaimPendingRow(row.assignment_id)}
+                        loading={claimingPendingId === row.assignment_id}
+                        loadingLabel="Linking…"
+                      >
+                        Link assignment
+                      </LoadingButton>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      ) : null}
+
+      {!assignmentLoading && showPrimaryManualClaimPage ? (
+        <Card padding="lg" className="mb-6 border border-[#cbd5e1]">
+          <div className="text-lg font-semibold text-[#0b2b43]">Manual link (assignment ID)</div>
+          <p className="text-sm text-[#4b5563] mt-2">
+            No auto-match for your login. Paste the assignment ID from HR. We run the same claim check as every other link
+            path.
+          </p>
+          <ManualClaimInstructions signedInPrincipal={signedInPrincipal} />
+          <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              type="text"
+              value={claimEmail}
+              onChange={setClaimEmail}
+              label="Step 1: Your ReloPass email or username"
+              placeholder="Same as your login (e.g. you@company.com)"
+              fullWidth
+            />
+            <Input
+              value={claimId}
+              onChange={setClaimId}
+              label="Step 2: Assignment ID from HR (UUID)"
+              placeholder="Paste only the ID from HR, not your email"
+              fullWidth
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <LoadingButton onClick={() => void handleManualClaimSubmit()} loading={isClaiming} loadingLabel="Linking…">
+              Link case
+            </LoadingButton>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Refresh page
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
+      {!assignmentLoading && showSecondaryManualClaimCard ? (
+        <Card padding="lg" className="mb-6 border border-dashed border-[#cbd5e1] bg-[#fafbfc]">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <div className="text-lg font-semibold text-[#0b2b43]">Enter assignment ID manually</div>
+              <p className="text-sm text-[#4b5563] mt-1 max-w-2xl">
+                Use if email match failed or HR only sent a UUID. Same manual claim as the card above, not the Section B
+                pending link.
+              </p>
+            </div>
+            {!manualClaimExpanded ? (
+              <Button variant="outline" className="shrink-0" onClick={() => setManualClaimExpanded(true)}>
+                Show form
+              </Button>
+            ) : (
+              <Button variant="outline" className="shrink-0" onClick={() => setManualClaimExpanded(false)}>
+                Hide form
+              </Button>
+            )}
+          </div>
+          {manualClaimExpanded ? (
+            <div className="mt-6 border-t border-[#e2e8f0] pt-6">
+              <ManualClaimInstructions signedInPrincipal={signedInPrincipal} />
+              <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  type="text"
+                  value={claimEmail}
+                  onChange={setClaimEmail}
+                  label="Step 1: Your ReloPass email or username"
+                  placeholder="Same as your login (e.g. you@company.com)"
+                  fullWidth
+                />
+                <Input
+                  value={claimId}
+                  onChange={setClaimId}
+                  label="Step 2: Assignment ID from HR (UUID)"
+                  placeholder="Paste only the ID from HR, not your email"
+                  fullWidth
+                />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <LoadingButton onClick={() => void handleManualClaimSubmit()} loading={isClaiming} loadingLabel="Linking…">
+                  Link case
+                </LoadingButton>
+                <Button variant="outline" onClick={() => void refetchAssignment()}>
+                  Refresh assignments
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
     </AppShell>
   );
 };
-

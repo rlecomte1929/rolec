@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { Button, Card } from '../../../components/antigravity';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
+import { ROUTES } from '../../../routes';
+import { COUNTRY_OPTIONS } from '../../../utils/countries';
 
 interface StepProps {
   draft: CaseDraftDTO;
@@ -8,14 +11,21 @@ interface StepProps {
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
   onBack: () => void;
+  isSaving?: boolean;
 }
 
-export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, onSave, onNext, onBack }) => {
+export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, onSave, onNext, onBack, isSaving }) => {
+  const navigate = useNavigate();
   const [local, setLocal] = useState(draft.employeeProfile);
   const [passportFileName, setPassportFileName] = useState('');
   const [pendingPassport, setPendingPassport] = useState(false);
   const [ocrMessage, setOcrMessage] = useState('');
   const [error, setError] = useState('');
+  const [draftExitSaving, setDraftExitSaving] = useState(false);
+
+  useEffect(() => {
+    setLocal(draft.employeeProfile || {});
+  }, [draft.employeeProfile]);
 
   const update = (key: keyof typeof local, value: any) => {
     setLocal({ ...local, [key]: value });
@@ -97,20 +107,34 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
         <label className="text-sm text-[#0b2b43]">
           Nationality
           {requiredMissing.nationality && <span className="text-red-600"> *</span>}
-          <input
+          <select
             value={local.nationality || ''}
             onChange={(event) => update('nationality', event.target.value)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-          />
+          >
+            <option value="">Select country</option>
+            {COUNTRY_OPTIONS.map((country) => (
+              <option key={country.code} value={country.name}>
+                {country.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="text-sm text-[#0b2b43]">
           Passport country
           {requiredMissing.passportCountry && <span className="text-red-600"> *</span>}
-          <input
+          <select
             value={local.passportCountry || ''}
             onChange={(event) => update('passportCountry', event.target.value)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-          />
+          >
+            <option value="">Select country</option>
+            {COUNTRY_OPTIONS.map((country) => (
+              <option key={country.code} value={country.name}>
+                {country.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="text-sm text-[#0b2b43]">
           Passport expiry
@@ -125,11 +149,18 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
         <label className="text-sm text-[#0b2b43]">
           Residence country
           {requiredMissing.residenceCountry && <span className="text-red-600"> *</span>}
-          <input
+          <select
             value={local.residenceCountry || ''}
             onChange={(event) => update('residenceCountry', event.target.value)}
             className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-          />
+          >
+            <option value="">Select country</option>
+            {COUNTRY_OPTIONS.map((country) => (
+              <option key={country.code} value={country.name}>
+                {country.name}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="text-sm text-[#0b2b43]">
           Email
@@ -146,26 +177,41 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
       <div className="mt-6 flex items-center justify-between">
         <Button variant="outline" onClick={onBack}>Back</Button>
         <div className="flex gap-2">
-          <Button
+          <LoadingButton
             variant="outline"
+            loading={draftExitSaving}
+            loadingLabel="Saving…"
+            disabled={isSaving}
             onClick={async () => {
-              await onSave(nextDraft);
-              window.location.href = '/employee/journey';
+              setDraftExitSaving(true);
+              setError('');
+              try {
+                await onSave(nextDraft);
+                if (import.meta.env.DEV) {
+                  console.debug('Save & Exit -> /employee/dashboard');
+                }
+                navigate(ROUTES.EMP_DASH);
+              } catch (err: any) {
+                setError(err?.message || "Couldn't save draft. Try again.");
+              } finally {
+                setDraftExitSaving(false);
+              }
             }}
           >
             Save as draft & exit
-          </Button>
+          </LoadingButton>
           <Button
+            disabled={isSaving || draftExitSaving}
             onClick={() => {
               if (hasMissing) {
-                setError('Please complete all required fields (marked with *).');
+                setError('Complete required fields (marked with *).');
                 return;
               }
               setError('');
               onNext(nextDraft);
             }}
           >
-            Next
+            {isSaving ? 'Saving…' : 'Next'}
           </Button>
         </div>
       </div>

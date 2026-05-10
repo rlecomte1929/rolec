@@ -1,0 +1,8 @@
+country_code,country_name,city_name,title,event_type,start_datetime,end_datetime,venue_name,address,price_text,currency,is_free,is_family_friendly,description,external_url
+NO,Norway,Oslo,Weekend cinema Family matinee,cinema,2025-04-05T11:00:00,2025-04-05T13:00:00,Colosseum Kino,Storgata 2 Oslo,120 NOK,NOK,false,true,Family-friendly film screening,https://www.oslokino.no/
+NO,Norway,Oslo,Oslo Philharmonic concert,concert,2025-04-06T19:00:00,2025-04-06T21:30:00,Oslo Concert Hall,Munkedamsveien 14,From 250 NOK,NOK,false,false,Evening classical concert,https://oslofilharmonien.no/
+NO,Norway,Oslo,Nordmarka guided hike,family_activity,2025-04-08T10:00:00,2025-04-08T14:00:00,Nordmarka,Meeting at Frognerseteren,Free,NOK,true,true,Free guided hike all levels,
+NO,Norway,Oslo,Munch Museum exhibition,museum,2025-04-04T10:00:00,2025-04-04T18:00:00,Munch Museum,Edvard Munchs plass 1,160 NOK,NOK,false,true,Temporary exhibition,https://www.munchmuseet.no/
+NO,Norway,Oslo,Internations Oslo meetup,networking,2025-04-10T18:30:00,2025-04-10T21:00:00,TBD bar,Oslo city center,Free,NOK,true,false,Monthly expat networking,https://www.internations.org/oslo-expats
+NO,Norway,Oslo,Vigeland Park Sunday tour,family_activity,2025-04-09T12:00:00,2025-04-09T13:30:00,Vigeland Park,Nobels gate 32,Free,NOK,true,true,Free sculpture park guided tour,
+NO,Norway,Oslo,National Theatre contemporary play,theater,2025-04-07T19:00:00,2025-04-07T21:30:00,National Theatre,Stortingsgata 15,From 200 NOK,NOK,false,false,Norwegian drama with subtitles,https://www.nationaltheatret.no/

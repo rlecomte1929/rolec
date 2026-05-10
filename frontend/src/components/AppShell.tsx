@@ -1,12 +1,44 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Container } from './antigravity';
-import { clearAuthItems, getAuthItem } from '../utils/demo';
+import { getAuthItem, normalizeStoredRole } from '../utils/demo';
+import { authAPI } from '../api/client';
 import { getNavigationError } from '../navigation/safeNavigate';
-import { buildRoute, ROUTE_DEFS } from '../navigation/routes';
+import { buildRoute, homeRouteKeyForRole, ROUTE_DEFS } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
+import { useSelectedCase } from '../contexts/SelectedCaseContext';
+import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { setPreferredEmployeeAssignmentId } from '../utils/employeeAssignmentScope';
+import { useAdminContext } from '../features/admin/useAdminContext';
+import { adminAPI } from '../api/client';
+import { CompanyBrand } from './CompanyBrand';
+import { FeedbackWidget } from './FeedbackWidget';
+import { isRfqEnabled } from '../featureFlags';
+import { getHrNotificationCounts, type HrNotificationCounts } from '../api/hrCatalog';
 
-const logoUrl = '/relopass-logo.png?v=1';
+const logoUrl = '/relopass-logo.png?v=2';
+
+const LogoutButton: React.FC = () => {
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+  return (
+    <button
+      onClick={async () => {
+        if (isLoggingOut) return;
+        setIsLoggingOut(true);
+        try {
+          await authAPI.logout();
+          window.location.replace(buildRoute('landing'));
+        } catch {
+          setIsLoggingOut(false);
+        }
+      }}
+      disabled={isLoggingOut}
+      className="text-xs text-[#94a3b8] hover:text-[#0b2b43] disabled:opacity-60"
+    >
+      {isLoggingOut ? 'Logging out…' : 'Logout'}
+    </button>
+  );
+};
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -16,12 +48,75 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle }) => {
   const name = getAuthItem('relopass_name');
-  const role = getAuthItem('relopass_role');
+  const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
   const location = useLocation();
   const [navError, setNavError] = useState<string | null>(getNavigationError());
-  const isHrRole = role === 'HR';
-  const lastAssignmentId = localStorage.getItem('relopass_last_assignment_id');
+  const isHrRole = role === 'HR' || role === 'ADMIN';
+  const isEmployeeRole = role === 'EMPLOYEE' || role === 'ADMIN';
+  const [searchParams] = useSearchParams();
+  const isOnEmployeeRoute = location.pathname.startsWith('/employee/');
+  const isOnAdminRoute = location.pathname.startsWith('/admin');
+  const isAdminPolicyWorkspace = location.pathname.startsWith('/hr/policy') && searchParams.get('adminCompanyId') != null;
+  const showAdminContextOnly = isOnAdminRoute || isAdminPolicyWorkspace;
+  const showEmployeeNav = (isEmployeeRole && !isHrRole) || (role === 'ADMIN' && isOnEmployeeRoute);
+  const showHrNav = isHrRole && !(role === 'ADMIN' && isOnEmployeeRoute) && !showAdminContextOnly;
+  const { selectedCaseId } = useSelectedCase();
+  const { assignmentId: assignmentIdFromContext, linkedCount, isLoading: employeeAssignmentLoading } =
+    useEmployeeAssignment();
+  const assignmentIdFromPath = location.pathname.match(/^\/employee\/case\/([^/]+)/)?.[1] ?? null;
+
+  const myAssignmentsHref = buildRoute('employeeDashboard');
+  const myCaseHref =
+    employeeAssignmentLoading && !assignmentIdFromPath
+      ? myAssignmentsHref
+      : linkedCount > 1
+        ? myAssignmentsHref
+        : linkedCount === 1 && assignmentIdFromContext
+          ? `/employee/case/${assignmentIdFromContext}/summary`
+          : assignmentIdFromPath
+            ? `/employee/case/${assignmentIdFromPath}/summary`
+            : myAssignmentsHref;
+  const myCaseNavLabel = linkedCount > 1 ? 'My assignments' : 'My case';
+  const relocationPlanHref =
+    employeeAssignmentLoading && !assignmentIdFromPath
+      ? myAssignmentsHref
+      : linkedCount > 1
+        ? myAssignmentsHref
+        : linkedCount === 1 && assignmentIdFromContext
+          ? buildRoute('employeeCasePlan', { caseId: assignmentIdFromContext })
+          : assignmentIdFromPath
+            ? buildRoute('employeeCasePlan', { caseId: assignmentIdFromPath })
+            : myAssignmentsHref;
+  const isRelocationPlanRoute = /\/employee\/case\/[^/]+\/plan\/?$/.test(location.pathname);
+  const { context: adminContext, refresh: refreshAdminContext } = useAdminContext();
+
+  // Phase 2 notifications: HR sees a badge on the Vendors nav when employees
+  // hit empty-state recommendations or admin tickets are pending. Polled
+  // lightly — this isn't a realtime queue, just "hey, something's piling up."
+  const [hrNotif, setHrNotif] = useState<HrNotificationCounts | null>(null);
+  useEffect(() => {
+    if (!showHrNav) return;
+    let cancelled = false;
+    const fetchOnce = () => {
+      void getHrNotificationCounts()
+        .then((c) => {
+          if (!cancelled) setHrNotif(c);
+        })
+        .catch(() => {
+          // Silent — badge just stays hidden if the call fails.
+        });
+    };
+    fetchOnce();
+    const id = window.setInterval(fetchOnce, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [showHrNav]);
+  const hrVendorBadgeCount = hrNotif
+    ? (hrNotif.destinations_with_demand || 0) + (hrNotif.pending_admin_tickets || 0)
+    : 0;
 
   const isActiveRoute = (path: string) => {
     if (path.includes('/:')) {
@@ -31,15 +126,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
-  const complianceRoute = lastAssignmentId
-    ? `${buildRoute('hrComplianceIndex')}?caseId=${lastAssignmentId}`
-    : buildRoute('hrComplianceIndex');
-  const policyRoute = lastAssignmentId
-    ? `${buildRoute('hrPolicy')}?caseId=${lastAssignmentId}`
+  const policyRoute = selectedCaseId
+    ? `${buildRoute('hrPolicy')}?caseId=${selectedCaseId}`
     : buildRoute('hrPolicy');
+  const messagesRoute = selectedCaseId
+    ? `${buildRoute('hrMessages')}?caseId=${selectedCaseId}`
+    : buildRoute('hrMessages');
 
   useRegisterNav('AppShell', [
-    { label: 'Employee view', routeKey: 'employeeJourney' },
+    { label: 'Employee view', routeKey: 'employeeDashboard' },
     { label: 'HR view', routeKey: 'hrDashboard' },
   ]);
 
@@ -52,75 +147,189 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
     return () => window.removeEventListener('nav-error', handler as EventListener);
   }, []);
 
+  useEffect(() => {
+    if (!showEmployeeNav) return;
+    const id = location.pathname.match(/^\/employee\/case\/([^/]+)/)?.[1]?.trim();
+    if (!id) return;
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+    ) {
+      return;
+    }
+    setPreferredEmployeeAssignmentId(id);
+  }, [location.pathname, showEmployeeNav]);
+
+  const logoHref = buildRoute(
+    getAuthItem('relopass_token') ? homeRouteKeyForRole(getAuthItem('relopass_role')) : 'landing'
+  );
+
   return (
     <div className="min-h-screen bg-[#f5f7fa] text-[#1f2937] flex flex-col">
       <header className="border-b border-[#e2e8f0] bg-white">
         <Container maxWidth="xl" className="py-4 flex items-center justify-between">
-          <Link to={buildRoute('landing')} className="flex items-center gap-3">
+          <Link to={logoHref} className="flex items-center gap-3">
             <img
               src={logoUrl}
               alt="ReloPass logo"
-              className="h-16 w-16 rounded-xl object-contain"
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl object-contain"
             />
-            <div>
-              <div className="text-lg font-semibold text-[#0b2b43]">ReloPass</div>
-            </div>
+            <span className="text-lg font-semibold text-[#0b2b43] tracking-tight hidden sm:inline">
+              ReloPass
+            </span>
           </Link>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => {
-                clearAuthItems();
-                window.location.href = buildRoute('landing');
-              }}
-              className="text-xs text-[#4b5563] hover:text-[#0b2b43] border border-[#e2e8f0] px-3 py-1 rounded-full"
-            >
-              Switch user
-            </button>
+          <div className="flex items-center gap-2">
+            {(isHrRole || isEmployeeRole) && !showAdminContextOnly && role !== 'ADMIN' && <CompanyBrand />}
+            <LogoutButton />
             <div className="text-right text-sm text-slate-600">
-              {identity && <div className="font-medium text-[#0f172a]">{identity}</div>}
-              {role && <div className="uppercase tracking-wide text-xs text-[#6b7280]">{role}</div>}
+              {identity && (
+                <Link
+                  to={
+                    role === 'EMPLOYEE'
+                      ? buildRoute('employeeDashboard')
+                      : role === 'ADMIN'
+                        ? buildRoute('adminOverview')
+                        : role === 'HR'
+                          ? buildRoute('hrDashboard')
+                          : buildRoute('landing')
+                  }
+                  className="inline-flex flex-col items-end rounded-lg px-3 py-2 font-medium text-[#0f172a] hover:bg-[#eef4f8] hover:text-[#0b2b43] transition-colors"
+                >
+                  {identity}
+                  {role && <span className="uppercase tracking-wide text-xs text-[#6b7280] font-normal mt-0.5">{role}</span>}
+                </Link>
+              )}
             </div>
           </div>
         </Container>
-        {isHrRole && (
+        {showEmployeeNav && (
+          <div className="border-t border-[#e2e8f0]">
+            <Container maxWidth="xl" className="py-3">
+              <nav className="flex flex-wrap items-center gap-2 text-sm text-[#6b7280]">
+                <Link
+                  to={buildRoute('employeeDashboard')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.employeeDashboard.path) && !location.pathname.includes('/wizard')
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to={myCaseHref}
+                  title={
+                    linkedCount > 1
+                      ? 'Choose a case from your dashboard when you have multiple assignments'
+                      : undefined
+                  }
+                  className={`px-3 py-1 rounded-full border ${
+                    (location.pathname.includes('/wizard') || location.pathname.includes('/summary')) &&
+                    location.pathname.startsWith('/employee/case/')
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  {myCaseNavLabel}
+                </Link>
+                {/* Order matches the user flow: intake → services → plan.
+                    Relocation plan moved AFTER Services so the nav reads
+                    left-to-right as a journey. The plan is the aggregator
+                    employees revisit between steps; the dashboard already
+                    handles "where do I jump back in" via last-visited
+                    routing (PR #75). */}
+                <Link
+                  to={buildRoute('services')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.services.path) || isActiveRoute(ROUTE_DEFS.providers.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Services
+                </Link>
+                <Link
+                  to={relocationPlanHref}
+                  title={
+                    linkedCount > 1
+                      ? 'Choose an assignment on your dashboard to open your relocation plan'
+                      : undefined
+                  }
+                  className={`px-3 py-1 rounded-full border ${
+                    isRelocationPlanRoute
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Relocation plan
+                </Link>
+                <Link
+                  to={buildRoute('hrPolicy')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.hrPolicy.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  HR Policy
+                </Link>
+                {/* "Compensation & Allowance" hidden from the employee nav.
+                    The matrix-table view at /employee/policy is reachable
+                    via direct URL (route remains active) but no longer
+                    competes with HR Policy as a separate top-nav item.
+                    HR Policy now serves as the single "what does my
+                    employer cover" entry point — both narrative + numbers
+                    accessible from there. Re-expose later if customer
+                    feedback shows people miss the dedicated table view. */}
+                <Link
+                  to={buildRoute('messages')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.messages.path)
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Messages
+                </Link>
+                {isRfqEnabled() && (
+                  <Link
+                    to={buildRoute('quotesInbox')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.quotesInbox.path)
+                        ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Quotes
+                  </Link>
+                )}
+                <Link
+                  to={buildRoute('resources')}
+                  className={`px-3 py-1 rounded-full border ${
+                    isActiveRoute(ROUTE_DEFS.resources.path) || location.pathname.includes('/resources')
+                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                      : 'border-transparent hover:text-[#0b2b43]'
+                  }`}
+                >
+                  Resources
+                </Link>
+              </nav>
+            </Container>
+          </div>
+        )}
+        {showHrNav && (
           <div className="border-t border-[#e2e8f0]">
             <Container maxWidth="xl" className="py-3 flex items-center justify-between gap-6">
               <div className="flex flex-wrap items-center gap-4">
-                <input
-                  placeholder="Search cases..."
-                  className="w-56 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
-                />
                 <nav className="flex flex-wrap items-center gap-2 text-sm text-[#6b7280]">
                   <Link
-                    to={buildRoute('hrDashboard')}
+                    to={buildRoute('hrCompanyProfile')}
                     className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrDashboard.path)
+                      isActiveRoute(ROUTE_DEFS.hrCompanyProfile.path)
                         ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
                         : 'border-transparent hover:text-[#0b2b43]'
                     }`}
                   >
-                    HR Dashboard
-                  </Link>
-                  <Link
-                    to={buildRoute('hrEmployeeDashboard')}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrEmployeeDashboard.path) ||
-                      isActiveRoute(ROUTE_DEFS.hrAssignmentReview.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    Employee Dashboard
-                  </Link>
-                  <Link
-                    to={complianceRoute}
-                    className={`px-3 py-1 rounded-full border ${
-                      isActiveRoute(ROUTE_DEFS.hrComplianceIndex.path) || isActiveRoute(ROUTE_DEFS.hrCompliance.path)
-                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
-                        : 'border-transparent hover:text-[#0b2b43]'
-                    }`}
-                  >
-                    Compliance Check
+                    Company Profile
                   </Link>
                   <Link
                     to={policyRoute}
@@ -130,10 +339,60 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                         : 'border-transparent hover:text-[#0b2b43]'
                     }`}
                   >
-                    HR Policy
+                    Policy
                   </Link>
                   <Link
-                    to={buildRoute('hrMessages')}
+                    to={buildRoute('hrDashboard')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrDashboard.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Cases
+                  </Link>
+                  <Link
+                    to={buildRoute('hrEmployees')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrEmployees.path) || isActiveRoute(ROUTE_DEFS.hrEmployeeDetail.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Employees
+                  </Link>
+                  <Link
+                    to={buildRoute('hrCommandCenter')}
+                    className={`px-3 py-1 rounded-full border ${
+                      isActiveRoute(ROUTE_DEFS.hrCommandCenter.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to={buildRoute('hrVendorCuration')}
+                    className={`px-3 py-1 rounded-full border inline-flex items-center gap-2 ${
+                      isActiveRoute(ROUTE_DEFS.hrVendorCuration.path)
+                        ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                    title={
+                      hrVendorBadgeCount > 0
+                        ? `${hrNotif?.destinations_with_demand ?? 0} destination(s) with employee demand · ${hrNotif?.pending_admin_tickets ?? 0} pending admin ticket(s)`
+                        : undefined
+                    }
+                  >
+                    Vendors
+                    {hrVendorBadgeCount > 0 && (
+                      <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[#dc2626] px-1.5 py-0 text-[11px] font-semibold leading-5 text-white">
+                        {hrVendorBadgeCount}
+                      </span>
+                    )}
+                  </Link>
+                  <Link
+                    to={messagesRoute}
                     className={`px-3 py-1 rounded-full border ${
                       isActiveRoute(ROUTE_DEFS.hrMessages.path)
                         ? 'border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]'
@@ -142,6 +401,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   >
                     Messages
                   </Link>
+                  {role === 'ADMIN' && (
+                    <Link
+                      to={buildRoute('adminConsole')}
+                      className={`px-3 py-1 rounded-full border ${
+                        isActiveRoute(ROUTE_DEFS.adminConsole.path)
+                          ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                          : 'border-transparent hover:text-[#0b2b43]'
+                      }`}
+                    >
+                      Admin Console
+                    </Link>
+                  )}
                   <Link
                     to={buildRoute('hrResources')}
                     className={`px-3 py-1 rounded-full border ${
@@ -152,23 +423,42 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                   >
                     Resources
                   </Link>
+                  {role === 'ADMIN' && (
+                    <Link
+                      to={buildRoute('employeeDashboard')}
+                      className={`px-3 py-1 rounded-full border ${
+                        isActiveRoute(ROUTE_DEFS.employeeDashboard.path)
+                          ? 'border-[#059669] text-[#059669] bg-[#ecfdf5]'
+                          : 'border-[#d1d5db] text-[#6b7280] hover:text-[#059669]'
+                      }`}
+                    >
+                      Employee View
+                    </Link>
+                  )}
                 </nav>
-              </div>
-              <div className="flex items-center gap-3">
-                <button className="h-9 w-9 rounded-full border border-[#e2e8f0] flex items-center justify-center text-[#64748b] hover:text-[#0b2b43]">
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7Z" />
-                    <path d="M13.73 21a2 2 0 01-3.46 0" />
-                  </svg>
-                </button>
-                <button className="h-9 w-9 rounded-full bg-[#0b2b43] text-white text-xs font-semibold">
-                  {identity ? identity.slice(0, 2).toUpperCase() : 'HR'}
-                </button>
               </div>
             </Container>
           </div>
         )}
       </header>
+      {adminContext?.impersonation && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <Container maxWidth="xl" className="py-2 flex items-center justify-between text-sm text-amber-900">
+            <span>
+              View-as mode: {adminContext.impersonation.mode.toUpperCase()} · {adminContext.impersonation.target_user_id}
+            </span>
+            <button
+              onClick={async () => {
+                await adminAPI.stopImpersonation();
+                refreshAdminContext();
+              }}
+              className="text-xs px-3 py-1 rounded-full bg-amber-100 hover:bg-amber-200"
+            >
+              Stop view-as
+            </button>
+          </Container>
+        </div>
+      )}
 
       {navError && (
         <div className="bg-[#fff5f5] border-b border-[#fbd5d5] text-[#7a2a2a] text-sm">
@@ -197,6 +487,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
           </div>
         </Container>
       </footer>
+
+      <FeedbackWidget userId={getAuthItem('relopass_user_id')} />
     </div>
   );
 };

@@ -1,5 +1,9 @@
 export const getAuthItem = (key: string) => localStorage.getItem(key);
 
+/** Normalize role from API/storage so ADMIN/HR/EMPLOYEE comparisons stay reliable. */
+export const normalizeStoredRole = (raw: string | null | undefined): string =>
+  (raw ?? '').trim().toUpperCase();
+
 export const setAuthItem = (key: string, value: string) => {
   localStorage.setItem(key, value);
 };

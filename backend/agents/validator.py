@@ -4,7 +4,7 @@ Normalizes formats and validates constraints.
 """
 from typing import Dict, Any, List, Tuple
 from datetime import datetime, date
-from schemas import RelocationProfile, ValidationError
+from ..schemas import RelocationProfile, ValidationError
 import re
 
 

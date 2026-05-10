@@ -1,9 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card } from '../../../components/antigravity';
-import type { CaseDraftDTO, CaseRequirementsDTO, RequirementItemDTO } from '../../../types';
-import { createCase, getRequirements } from '../../../api/cases';
+import { useNavigate } from 'react-router-dom';
+import { Button, Card, Alert, Input, Select } from '../../../components/antigravity';
+import { buildRoute } from '../../../navigation/routes';
+import type {
+  CaseDraftDTO,
+  CaseRequirementsDTO,
+  RequirementItemDTO,
+  DossierQuestion,
+  DossierSuggestion,
+} from '../../../types';
+import { buildRequirementsFromMissingFields, getRelocationCase } from '../../../api/relocation';
 import { RequirementList } from '../../../components/requirements/RequirementList';
-import { employeeAPI } from '../../../api/client';
+import { dossierAPI, requirementsAPI } from '../../../api/client';
+import { GuidancePackPanel } from '../../../components/guidance/GuidancePackPanel';
 
 interface StepProps {
   caseId: string;
@@ -12,18 +21,203 @@ interface StepProps {
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
   onBack: () => void;
+  onGoToStep?: (stepNumber: number) => void;
 }
 
-export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
+const DYNAMIC_DOSSIER_ENABLED =
+  import.meta.env.VITE_FEATURE_DYNAMIC_DOSSIER === 'true' ||
+  import.meta.env.NEXT_PUBLIC_FEATURE_DYNAMIC_DOSSIER === 'true';
+
+function SummarySection({
+  title,
+  stepNumber,
+  onEdit,
+  children,
+}: {
+  title: string;
+  stepNumber: number;
+  onEdit?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-sm font-semibold text-[#0b2b43]">{title}</div>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-xs text-[#0b2b43] underline hover:no-underline"
+          >
+            Edit (Step {stepNumber})
+          </button>
+        )}
+      </div>
+      <div className="text-sm text-[#4b5563] space-y-1">{children}</div>
+    </div>
+  );
+}
+
+// Bumped whenever the privacy notice changes materially. Stored with the
+// consent timestamp so we can distinguish users who consented under earlier
+// versions of the privacy copy.
+const PRIVACY_CONSENT_VERSION = 'v1-2026-04';
+
+function consentStorageKey(caseId: string): string {
+  return `relopass:privacyConsent:${caseId}`;
+}
+
+function readPersistedConsent(caseId: string): { consentedAt: string; version: string } | null {
+  try {
+    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(consentStorageKey(caseId)) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.consentedAt === 'string' && typeof parsed.version === 'string') {
+      return parsed;
+    }
+  } catch {
+    // Corrupt entry — treat as missing.
+  }
+  return null;
+}
+
+function persistConsent(caseId: string): { consentedAt: string; version: string } {
+  const record = { consentedAt: new Date().toISOString(), version: PRIVACY_CONSENT_VERSION };
+  try {
+    window.localStorage.setItem(consentStorageKey(caseId), JSON.stringify(record));
+  } catch {
+    // localStorage may be disabled (Safari private mode, etc.) — consent is
+    // still captured for this session; user will re-consent next load.
+  }
+  return record;
+}
+
+export const Step5ReviewCreate: React.FC<StepProps> = ({
+  caseId,
+  draft,
+  onSave,
+  onBack,
+  onGoToStep,
+}) => {
+  const navigate = useNavigate();
   const [requirements, setRequirements] = useState<CaseRequirementsDTO | null>(null);
-  const [created, setCreated] = useState(false);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  // Consent gates Save — required for GDPR/PII compliance since Step 2
+  // collects passport + nationality. Persisted per-case in localStorage;
+  // re-prompt required if the privacy notice version changes.
+  const [consented, setConsented] = useState<boolean>(() => {
+    const existing = readPersistedConsent(caseId);
+    return !!existing && existing.version === PRIVACY_CONSENT_VERSION;
+  });
+  const [dossierQuestions, setDossierQuestions] = useState<DossierQuestion[]>([]);
+  const [dossierAnswers, setDossierAnswers] = useState<Record<string, any>>({});
+  const [dossierComplete, setDossierComplete] = useState(true);
+  const [dossierSources, setDossierSources] = useState<Array<{ title?: string; url: string; snippet?: string }>>([]);
+  const [dossierLoading, setDossierLoading] = useState(false);
+  const [dossierSaving, setDossierSaving] = useState(false);
+  const [dossierError, setDossierError] = useState('');
+  const [dossierSuggestions, setDossierSuggestions] = useState<DossierSuggestion[]>([]);
+  const [suggestionSources, setSuggestionSources] = useState<Array<{ title?: string; url: string; snippet?: string }>>([]);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [approvedMissingFields, setApprovedMissingFields] = useState<string[]>([]);
+  const [sufficiencyLoading, setSufficiencyLoading] = useState(false);
+  const [sufficiencyMessage, setSufficiencyMessage] = useState<string | null>(null);
+  const errorRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [error]);
 
   useEffect(() => {
     if (!caseId) return;
-    getRequirements(caseId).then(setRequirements);
+    getRelocationCase(caseId)
+      .then((relocation) => {
+        const missing = Array.isArray(relocation.missing_fields) ? relocation.missing_fields : [];
+        setRequirements(buildRequirementsFromMissingFields(caseId, missing));
+        setMissingFields(missing);
+      })
+      .catch(() => {
+        setRequirements(null);
+        setMissingFields([]);
+      });
   }, [caseId]);
+
+  useEffect(() => {
+    if (!caseId) return;
+    setSufficiencyLoading(true);
+    setSufficiencyMessage(null);
+    requirementsAPI
+      .getSufficiency(caseId)
+      .then((res) => {
+        const missing = Array.isArray(res.missing_fields) ? res.missing_fields : [];
+        setApprovedMissingFields(missing);
+        const status = res?.compute_status;
+        if (status && status !== 'ok') {
+          setSufficiencyMessage(
+            typeof res?.message === 'string' && res.message.trim()
+              ? res.message
+              : 'Recommendations will be calculated after your relocation preferences are saved.'
+          );
+        }
+      })
+      .catch(() => {
+        setApprovedMissingFields([]);
+        setSufficiencyMessage(
+          'Could not calculate recommendations. Add missing fields or try again later.'
+        );
+      })
+      .finally(() => setSufficiencyLoading(false));
+  }, [caseId]);
+
+  useEffect(() => {
+    if (!DYNAMIC_DOSSIER_ENABLED || !caseId) return;
+    if (missingFields.length === 0 && approvedMissingFields.length === 0) {
+      setDossierQuestions([]);
+      setDossierAnswers({});
+      setDossierComplete(true);
+      setDossierSources([]);
+      return;
+    }
+    setDossierLoading(true);
+    setDossierError('');
+    dossierAPI.getQuestions(caseId)
+      .then((res) => {
+        setDossierQuestions(res.questions || []);
+        setDossierAnswers(res.answers || {});
+        setDossierComplete(Boolean(res.is_step5_complete));
+        setDossierSources(res.sources_used || []);
+      })
+      .catch(() => setDossierError('Unable to load dynamic dossier questions.'))
+      .finally(() => setDossierLoading(false));
+  }, [caseId, missingFields, approvedMissingFields]);
+
+  useEffect(() => {
+    if (!DYNAMIC_DOSSIER_ENABLED || !caseId || approvedMissingFields.length === 0) return;
+    const questionMap: Record<string, string> = {
+      visa_type: 'What is your visa / pass type (if known)?',
+      passport_expiry_date: 'What is your passport expiry date?',
+      nationality: 'What is your nationality?',
+      employer_country: 'Which country is your employer based in?',
+      employment_type: 'What is your employment type (e.g. employee, contractor)?',
+      dependents: 'Will any dependents relocate with you?',
+    };
+    const existingTexts = new Set(dossierQuestions.map((q) => q.question_text));
+    approvedMissingFields.forEach((field) => {
+      const text = questionMap[field] || `${field.replace(/_/g, ' ')}`;
+      if (existingTexts.has(text)) return;
+      dossierAPI.addCaseQuestion({
+        case_id: caseId,
+        question_text: text,
+        answer_type: 'text',
+        is_mandatory: true,
+      }).catch(() => undefined);
+    });
+  }, [approvedMissingFields, caseId, dossierQuestions]);
 
   const grouped = requirements?.requirements.reduce<Record<string, RequirementItemDTO[]>>((acc, item) => {
     acc[item.pillar] = acc[item.pillar] || [];
@@ -31,69 +225,195 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
     return acc;
   }, {}) || {};
 
-  const handleCreate = async () => {
+  const isAnswered = (value: any) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return true;
+  };
+
+  const mandatoryRemaining = DYNAMIC_DOSSIER_ENABLED
+    ? dossierQuestions.filter((q) => q.is_mandatory).filter((q) => !isAnswered(dossierAnswers[q.id])).length
+    : 0;
+
+  const handleSave = async (nextRoute?: string) => {
     setError('');
-    setIsCreating(true);
+    setDossierError('');
+    if (!consented) {
+      setError(
+        'Please confirm you have read the privacy notice and consent to the processing of your information before continuing.',
+      );
+      return;
+    }
+    // Record (or refresh) consent timestamp at the point of submission.
+    persistConsent(caseId);
+    setIsSaving(true);
     try {
-      // 1) Snapshot requirements / create case artifact (wizard backend)
-      await createCase(caseId);
-      // 2) Submit to HR (existing assignment state machine)
-      await employeeAPI.submitAssignment(caseId);
-      setCreated(true);
+      if (DYNAMIC_DOSSIER_ENABLED && caseId && missingFields.length > 0) {
+        if (mandatoryRemaining > 0) {
+          setError('Answer all mandatory dossier questions before continuing.');
+          return;
+        }
+        setDossierSaving(true);
+        const answersPayload = dossierQuestions
+          .filter((q) => Object.prototype.hasOwnProperty.call(dossierAnswers, q.id))
+          .map((q) => ({
+            question_id: q.source === 'library' ? q.id : null,
+            case_question_id: q.source === 'case' ? q.id : null,
+            answer: dossierAnswers[q.id],
+          }));
+        await dossierAPI.saveAnswers({ case_id: caseId, answers: answersPayload });
+        const refreshed = await dossierAPI.getQuestions(caseId);
+        setDossierQuestions(refreshed.questions || []);
+        setDossierAnswers(refreshed.answers || {});
+        setDossierComplete(Boolean(refreshed.is_step5_complete));
+        setDossierSources(refreshed.sources_used || []);
+      }
+      await onSave(draft);
+      setSaved(true);
+      if (nextRoute) {
+        navigate(nextRoute);
+      }
     } catch (err: any) {
-      // Prefer structured API error detail when present.
-      const detail = err?.detail;
+      const resData = err?.response?.data;
+      const detail = err?.detail ?? resData?.detail;
       if (detail && typeof detail === 'object' && detail.message) {
         const missing = Array.isArray(detail.missingFields) ? detail.missingFields : [];
-        if (missing.length) {
-          setError(`${detail.message}. Please complete Step 1 (Relocation Basics) required fields.`);
-        } else {
-          setError(detail.message);
-        }
+        setError(missing.length
+          ? `${detail.message}. Complete Step 1 (Relocation Basics) required fields.`
+          : detail.message);
+      } else if (detail && typeof detail === 'string') {
+        setError(detail);
+      } else if (resData && typeof resData === 'object' && resData.message) {
+        setError(resData.message);
       } else {
-        setError(err?.message || 'Unable to submit to HR.');
+        setError("Couldn't save. Try again.");
       }
     } finally {
-      setIsCreating(false);
+      setDossierSaving(false);
+      setIsSaving(false);
     }
   };
 
-  const blockingMissing =
-    requirements?.requirements.filter(
-      (item) => item.severity === 'BLOCKER' && item.statusForCase !== 'PROVIDED'
-    ) || [];
-  const canCreate = blockingMissing.length === 0;
+  const handleSuggestionSearch = async () => {
+    if (!caseId) return;
+    setSuggestionLoading(true);
+    try {
+      const res = await dossierAPI.searchSuggestions(caseId);
+      setDossierSuggestions(res.suggestions || []);
+      setSuggestionSources(res.sources || []);
+    } catch {
+      setDossierError('Unable to fetch suggested questions at this time.');
+    } finally {
+      setSuggestionLoading(false);
+    }
+  };
+
+  const handleAddSuggestion = async (suggestion: DossierSuggestion) => {
+    if (!caseId) return;
+    try {
+      await dossierAPI.addCaseQuestion({
+        case_id: caseId,
+        question_text: suggestion.question_text,
+        answer_type: suggestion.answer_type,
+        sources: suggestion.sources,
+      });
+      const refreshed = await dossierAPI.getQuestions(caseId);
+      setDossierQuestions(refreshed.questions || []);
+      setDossierAnswers(refreshed.answers || {});
+      setDossierComplete(Boolean(refreshed.is_step5_complete));
+      setDossierSources(refreshed.sources_used || []);
+      setDossierSuggestions((prev) => prev.filter((s) => s.question_text !== suggestion.question_text));
+    } catch {
+      setDossierError('Unable to add suggested question.');
+    }
+  };
 
   return (
     <Card padding="lg">
-      <div className="text-lg font-semibold text-[#0b2b43]">Review & Submit</div>
+      <div className="text-lg font-semibold text-[#0b2b43]">Review & Save</div>
       {error && (
-        <div className="mt-4 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
-          {error}
+        <div ref={errorRef}>
+          <Alert variant="error" className="mt-4">
+            {error}
+          </Alert>
+        </div>
+      )}
+      {saved && (
+        <div className="mt-4">
+          <Alert variant="success" title="Saved">
+            You can continue editing or go to the dashboard.
+          </Alert>
         </div>
       )}
 
-      {!created && blockingMissing.length > 0 && (
-        <div className="mt-4 rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3">
-          <div className="text-sm font-semibold text-[#7a2a2a]">
-            Cannot create case yet
-          </div>
-          <div className="text-xs text-[#6b7280] mt-1">
-            Resolve the blocker requirements below (marked as missing).
-          </div>
-        </div>
-      )}
       <div className="text-sm text-[#6b7280] mt-1">
-        Review the requirements generated from destination research. When you submit, your case becomes read-only for HR review.
+        Review the requirements generated from destination research. Save to persist your data.
+      </div>
+
+      <div className="mt-6">
+        <div className="text-sm font-semibold text-[#0b2b43] mb-3">Case overview</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SummarySection
+            title="Relocation Basics"
+            stepNumber={1}
+            onEdit={onGoToStep ? () => onGoToStep(1) : undefined}
+          >
+            <div>Origin: {[draft.relocationBasics?.originCity, draft.relocationBasics?.originCountry].filter(Boolean).join(', ') || '-'}</div>
+            <div>Destination: {[draft.relocationBasics?.destCity, draft.relocationBasics?.destCountry].filter(Boolean).join(', ') || '-'}</div>
+            <div>Purpose: {draft.relocationBasics?.purpose || '-'}</div>
+            <div>Target move date: {draft.relocationBasics?.targetMoveDate || '-'}</div>
+            <div>Duration: {draft.relocationBasics?.durationMonths != null ? `${draft.relocationBasics.durationMonths} months` : '-'}</div>
+          </SummarySection>
+          <SummarySection
+            title="Employee Profile"
+            stepNumber={2}
+            onEdit={onGoToStep ? () => onGoToStep(2) : undefined}
+          >
+            <div>Name: {draft.employeeProfile?.fullName || '-'}</div>
+            <div>Email: {draft.employeeProfile?.email || '-'}</div>
+            <div>Nationality: {draft.employeeProfile?.nationality || '-'}</div>
+            <div>Passport: {draft.employeeProfile?.passportCountry || '-'}</div>
+            <div>Residence: {draft.employeeProfile?.residenceCountry || '-'}</div>
+          </SummarySection>
+          <SummarySection
+            title="Family Members"
+            stepNumber={3}
+            onEdit={onGoToStep ? () => onGoToStep(3) : undefined}
+          >
+            <div>Spouse: {draft.familyMembers?.spouse?.fullName || '-'}</div>
+            <div>Children: {draft.familyMembers?.children?.length ? `${draft.familyMembers.children.length} child(ren)` : '-'}</div>
+          </SummarySection>
+          <SummarySection
+            title="Assignment / Context"
+            stepNumber={4}
+            onEdit={onGoToStep ? () => onGoToStep(4) : undefined}
+          >
+            <div>Employer: {draft.assignmentContext?.employerName || '-'}</div>
+            <div>Job title: {draft.assignmentContext?.jobTitle || '-'}</div>
+            <div>Contract start: {draft.assignmentContext?.contractStartDate || '-'}</div>
+            <div>Contract type: {draft.assignmentContext?.contractType || '-'}</div>
+          </SummarySection>
+        </div>
       </div>
 
       {localStorage.getItem('demo_role') === 'admin' && (
         <button
           className="mt-3 text-xs text-[#0b2b43] underline"
-          onClick={() => (window.location.href = '/admin/countries')}
+          onClick={() => navigate('/admin/countries')}
         >
           View Country Requirements DB
         </button>
+      )}
+
+      {(sufficiencyLoading || sufficiencyMessage) && (
+        <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">
+          {sufficiencyLoading ? (
+            <span>Calculating recommendations against destination requirements…</span>
+          ) : (
+            <span>{sufficiencyMessage}</span>
+          )}
+        </div>
       )}
 
       <div className="mt-6 space-y-6">
@@ -105,15 +425,206 @@ export const Step5ReviewCreate: React.FC<StepProps> = ({ caseId, onBack }) => {
         ))}
       </div>
 
-      <div className="mt-6 flex items-center justify-between">
+      {DYNAMIC_DOSSIER_ENABLED && (
+        <div className="mt-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-lg font-semibold text-[#0b2b43]">Additional questions to complete your dossier</div>
+              <div className="text-sm text-[#6b7280]">
+                Suggested prompts from destination requirements. Confirm your answers.
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleSuggestionSearch}
+              disabled={suggestionLoading || dossierLoading || missingFields.length === 0}
+            >
+              {suggestionLoading ? 'Searching...' : 'Find suggested questions'}
+            </Button>
+          </div>
+
+          {dossierError && (
+            <div className="rounded-lg border border-[#fecaca] bg-[#fff5f5] px-4 py-3 text-sm text-[#7a2a2a]">
+              {dossierError}
+            </div>
+          )}
+
+          {missingFields.length === 0 ? (
+            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm text-[#4b5563]">
+              All destination requirements are currently met based on official sources and the information you provided.
+              If you think something is missing, use “Find suggested questions” to review optional prompts.
+            </div>
+          ) : dossierLoading ? (
+            <div className="text-sm text-[#6b7280]">Loading dossier questions...</div>
+          ) : (
+            <div className="space-y-4">
+              {dossierQuestions.length === 0 && (
+                <div className="text-sm text-[#6b7280]">No additional questions for this destination.</div>
+              )}
+              {dossierQuestions.map((q) => (
+                <div key={q.id} className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="text-sm font-medium text-[#0b2b43]">{q.question_text}</div>
+                    {q.is_mandatory && (
+                      <span className="text-[10px] uppercase tracking-wide text-[#7a2a2a]">Required</span>
+                    )}
+                  </div>
+                  {q.answer_type === 'text' && (
+                    <Input
+                      value={dossierAnswers[q.id] ?? ''}
+                      onChange={(value) => setDossierAnswers((prev) => ({ ...prev, [q.id]: value }))}
+                      placeholder="Type your answer"
+                      fullWidth
+                    />
+                  )}
+                  {q.answer_type === 'date' && (
+                    <Input
+                      type="date"
+                      value={dossierAnswers[q.id] ?? ''}
+                      onChange={(value) => setDossierAnswers((prev) => ({ ...prev, [q.id]: value }))}
+                      fullWidth
+                    />
+                  )}
+                  {q.answer_type === 'boolean' && (
+                    <Select
+                      value={dossierAnswers[q.id] === true ? 'yes' : dossierAnswers[q.id] === false ? 'no' : ''}
+                      onChange={(value) =>
+                        setDossierAnswers((prev) => ({ ...prev, [q.id]: value === 'yes' }))
+                      }
+                      options={[
+                        { value: 'yes', label: 'Yes' },
+                        { value: 'no', label: 'No' },
+                      ]}
+                      placeholder="Select"
+                      fullWidth
+                    />
+                  )}
+                  {q.answer_type === 'select' && (
+                    <Select
+                      value={dossierAnswers[q.id] ?? ''}
+                      onChange={(value) => setDossierAnswers((prev) => ({ ...prev, [q.id]: value }))}
+                      options={(q.options || []).map((opt) => ({ value: opt, label: opt }))}
+                      placeholder="Select"
+                      fullWidth
+                    />
+                  )}
+                  {q.answer_type === 'multiselect' && (
+                    <div className="space-y-2">
+                      {(q.options || []).map((opt) => {
+                        const current = Array.isArray(dossierAnswers[q.id]) ? dossierAnswers[q.id] : [];
+                        const checked = current.includes(opt);
+                        return (
+                          <label key={opt} className="flex items-center gap-2 text-sm text-[#4b5563]">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => {
+                                const next = event.target.checked
+                                  ? [...current, opt]
+                                  : current.filter((v: string) => v !== opt);
+                                setDossierAnswers((prev) => ({ ...prev, [q.id]: next }));
+                              }}
+                            />
+                            {opt}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {dossierSuggestions.length > 0 && (
+            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
+              <div className="text-sm font-semibold text-[#0b2b43] mb-2">Suggested extra questions</div>
+              <div className="space-y-3">
+                {dossierSuggestions.map((s, idx) => (
+                  <div key={`${s.question_text}-${idx}`} className="flex items-center justify-between gap-4">
+                    <div className="text-sm text-[#4b5563]">{s.question_text}</div>
+                    <Button variant="outline" onClick={() => handleAddSuggestion(s)}>
+                      Add this question
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(suggestionSources.length > 0 || dossierSources.length > 0) && (
+            <details className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+              <summary className="text-sm font-semibold text-[#0b2b43] cursor-pointer">
+                Sources used
+              </summary>
+              <ul className="mt-3 space-y-2 text-sm text-[#4b5563]">
+                {(suggestionSources.length > 0 ? suggestionSources : dossierSources).map((src, idx) => (
+                  <li key={`${src.url}-${idx}`}>
+                    <a href={src.url} target="_blank" rel="noreferrer" className="text-[#1d4ed8] underline">
+                      {src.title || src.url}
+                    </a>
+                    {src.snippet && <div className="text-xs text-[#6b7280] mt-1">{src.snippet}</div>}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {dossierQuestions.length > 0 && (
+            <div className="text-xs text-[#6b7280]">
+              Mandatory remaining: {mandatoryRemaining} {mandatoryRemaining === 1 ? 'item' : 'items'}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-8">
+        <GuidancePackPanel caseId={caseId} isStep5Complete={dossierComplete} />
+      </div>
+
+      <div className="mt-6 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
+        <label className="flex items-start gap-3 text-sm text-[#0b2b43]">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-[#cbd5e1]"
+            checked={consented}
+            onChange={(e) => setConsented(e.target.checked)}
+            aria-describedby="privacy-consent-desc"
+          />
+          <span id="privacy-consent-desc">
+            I have read the{' '}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#1d4ed8] underline"
+            >
+              privacy notice
+            </a>{' '}
+            and consent to ReloPass processing my personal information — including passport,
+            nationality, and family details — for the purpose of managing my relocation. I
+            understand I can request deletion of my data at any time via HR.
+          </span>
+        </label>
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" onClick={onBack}>Back</Button>
-        {!created ? (
-          <Button onClick={handleCreate} disabled={!canCreate || isCreating}>
-            {isCreating ? 'Submitting...' : 'Submit to HR for review'}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => handleSave(buildRoute('employeeDashboard'))}
+            disabled={isSaving || dossierSaving || !consented}
+          >
+            {isSaving || dossierSaving ? 'Saving...' : 'Save & Exit'}
           </Button>
-        ) : (
-          <Button onClick={() => (window.location.href = '/employee/dashboard')}>Go to dashboard</Button>
-        )}
+          <Button
+            onClick={() => handleSave(buildRoute('services'))}
+            disabled={isSaving || dossierSaving || !consented}
+          >
+            {isSaving || dossierSaving ? 'Saving...' : 'Save & go to Services'}
+          </Button>
+        </div>
       </div>
     </Card>
   );

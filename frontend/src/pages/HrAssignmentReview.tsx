@@ -1,13 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, ProgressBar } from '../components/antigravity';
 import { hrAPI } from '../api/client';
-import type { AssignmentDetail, AssignmentSummary, ComplianceReport } from '../types';
+import { getCaseDetailsByAssignmentId } from '../api/caseDetails';
+import type { AssignmentDetail, AssignmentSummary, CaseDraftDTO, ComplianceReport } from '../types';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { AssignmentDebugPanel } from './AssignmentDebugPanel';
+import { HrAssignmentServicesCapPanel } from '../features/policy-config/HrAssignmentServicesCapPanel';
 
-type TabKey = 'timeline' | 'documents' | 'providers' | 'messages';
+type TabKey = 'timeline' | 'intake' | 'documents' | 'providers' | 'messages';
+
+function IntakeSummarySection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card padding="md" className="mb-4">
+      <div className="text-sm font-semibold text-[#0b2b43] mb-2">{title}</div>
+      <div className="text-sm text-[#4b5563] space-y-1">{children}</div>
+    </Card>
+  );
+}
 
 type CaseMessage = {
   id: string;
@@ -34,16 +46,34 @@ export const HrAssignmentReview: React.FC = () => {
   const [messages, setMessages] = useState<CaseMessage[]>([]);
   const [assistantInput, setAssistantInput] = useState('');
   const [messageInput, setMessageInput] = useState('');
+  const [intakeDraft, setIntakeDraft] = useState<CaseDraftDTO | null>(null);
+  const [intakeError, setIntakeError] = useState('');
+  const [intakeLoading, setIntakeLoading] = useState(false);
+  const [hrFeedback, setHrFeedback] = useState<Array<{ id: string; message: string; created_at: string }>>([]);
+  const [hrFeedbackInput, setHrFeedbackInput] = useState('');
+  const [hrFeedbackSending, setHrFeedbackSending] = useState(false);
+  const [hrFeedbackError, setHrFeedbackError] = useState('');
 
   const loadAssignments = async () => {
     try {
-      const data = await hrAPI.listAssignments();
+      const res = await hrAPI.listAssignments();
+      const data = res.assignments ?? [];
       setAssignments(data);
+      const paramCaseId = searchParams.get('caseId') || id || localStorage.getItem('relopass_last_assignment_id');
       if (data.length > 0) {
-        const initial = id || searchParams.get('caseId') || localStorage.getItem('relopass_last_assignment_id');
-        const nextId = initial && data.some((item) => item.id === initial) ? initial : data[0].id;
+        const match = paramCaseId
+          ? data.find((item) => item.id === paramCaseId || item.caseId === paramCaseId)
+          : null;
+        const initial = match ? match.id : paramCaseId;
+        const nextId = match
+          ? match.id
+          : initial && data.some((item) => item.id === initial)
+          ? initial
+          : data[0].id;
         setSelectedCaseId(nextId);
         localStorage.setItem('relopass_last_assignment_id', nextId);
+      } else if (paramCaseId) {
+        setSelectedCaseId(paramCaseId);
       }
     } catch (err: any) {
       if (err.response?.status === 401) {
@@ -57,6 +87,7 @@ export const HrAssignmentReview: React.FC = () => {
   const loadAssignment = async (caseId: string) => {
     if (!caseId) return;
     setIsLoading(true);
+    setError('');
     try {
       const data = await hrAPI.getAssignment(caseId);
       setAssignment(data);
@@ -66,7 +97,7 @@ export const HrAssignmentReview: React.FC = () => {
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
-        setError('Unable to load case details.');
+        setError('Assignment not found or not visible under RLS.');
       }
     } finally {
       setIsLoading(false);
@@ -88,6 +119,75 @@ export const HrAssignmentReview: React.FC = () => {
     }
   }, [selectedCaseId]);
 
+  const loadIntakeDraft = useCallback(async (assignmentId: string) => {
+    setIntakeError('');
+    setIntakeLoading(true);
+    try {
+      const { data, error } = await getCaseDetailsByAssignmentId(assignmentId);
+      if (error) {
+        setIntakeDraft(null);
+        setIntakeError(
+          error.includes('Case row missing')
+            ? error
+            : 'Assignment not found or not visible under RLS. The employee may not have started the wizard yet.'
+        );
+      } else if (data) {
+        setIntakeDraft(data.case?.draft ?? null);
+      } else {
+        setIntakeDraft(null);
+        setIntakeError('Unable to load intake responses. The employee may not have started the wizard yet.');
+      }
+    } catch {
+      setIntakeDraft(null);
+      setIntakeError('Assignment not found or not visible under RLS.');
+    } finally {
+      setIntakeLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (assignment?.id) {
+      loadIntakeDraft(assignment.id);
+    } else {
+      setIntakeDraft(null);
+      setIntakeError('');
+      setIntakeLoading(false);
+    }
+  }, [assignment?.id, loadIntakeDraft]);
+
+  const loadHrFeedback = useCallback(async (assignmentId: string) => {
+    setHrFeedbackError('');
+    try {
+      const data = await hrAPI.getFeedback(assignmentId);
+      setHrFeedback(data?.map((f) => ({ id: f.id, message: f.message, created_at: f.created_at })) ?? []);
+    } catch (err: unknown) {
+      setHrFeedbackError(err instanceof Error ? err.message : 'Failed to load feedback');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (assignment?.id) {
+      loadHrFeedback(assignment.id);
+    } else {
+      setHrFeedback([]);
+    }
+  }, [assignment?.id, loadHrFeedback]);
+
+  const handleSendHrFeedback = async () => {
+    if (!assignment?.id || !hrFeedbackInput.trim()) return;
+    setHrFeedbackSending(true);
+    setHrFeedbackError('');
+    try {
+      await hrAPI.postFeedback(assignment.id, hrFeedbackInput.trim());
+      setHrFeedbackInput('');
+      await loadHrFeedback(assignment.id);
+    } catch (err: unknown) {
+      setHrFeedbackError(err instanceof Error ? err.message : 'Failed to send feedback');
+    } finally {
+      setHrFeedbackSending(false);
+    }
+  };
+
   useEffect(() => {
     if (!assignment) return;
     const seedMessages: CaseMessage[] = [
@@ -102,7 +202,7 @@ export const HrAssignmentReview: React.FC = () => {
         id: 'msg-2',
         author: 'HR Manager',
         role: 'HR',
-        message: 'Thanks! Please prioritize passport scans and employment letter.',
+        message: 'Prioritize passport scans and employment letter when you can.',
         timestamp: 'Today, 10:05 AM',
       },
     ];
@@ -127,14 +227,15 @@ export const HrAssignmentReview: React.FC = () => {
         day: 'numeric',
         year: 'numeric',
       })
-    : '—';
-  const stageLabel = assignment?.status === 'EMPLOYEE_SUBMITTED'
-    ? 'Stage: Intake - Profile Review'
-    : assignment?.status === 'CHANGES_REQUESTED'
-    ? 'Stage: Changes Requested'
-    : assignment?.status === 'HR_APPROVED'
-    ? 'Stage: Approved'
-    : 'Stage: Intake - In progress';
+    : '-';
+  const stageLabel =
+    assignment?.status === 'submitted'
+      ? 'Stage: Intake - Profile Review'
+      : assignment?.status === 'approved'
+      ? 'Stage: Approved'
+      : assignment?.status === 'rejected'
+      ? 'Stage: Rejected'
+      : 'Stage: Intake - In progress';
   const readiness = Math.max(0, Math.min(100, Math.round(assignment?.completeness ?? 0)));
   const blockingItems = compliance?.checks?.filter((check) => check.status !== 'COMPLIANT') || [];
 
@@ -160,8 +261,8 @@ export const HrAssignmentReview: React.FC = () => {
   const docsComplete = docsList.filter((doc) => doc.complete).length;
   const docsTotal = docsList.length || 1;
 
-  const attentionItems = compliance?.actions?.length
-    ? compliance.actions
+  const attentionItems: string[] = compliance?.actions?.length
+    ? compliance.actions.map((a) => (typeof a === 'string' ? a : a.title))
     : ['Complete employee profile', 'Collect passport scans'];
   const inProgressItems = compliance?.checks?.length
     ? compliance.checks.filter((check) => check.status === 'NEEDS_REVIEW').map((check) => check.name)
@@ -176,7 +277,7 @@ export const HrAssignmentReview: React.FC = () => {
   };
 
   const handleOpenNudge = () => {
-    setNudgeMessage(`Hi ${fullName.split(' ')[0]}, please complete your profile details and upload missing documents.`);
+    setNudgeMessage(`Hi ${fullName.split(' ')[0]}, complete your profile details and upload missing documents.`);
     setIsNudgeOpen(true);
   };
 
@@ -197,8 +298,17 @@ export const HrAssignmentReview: React.FC = () => {
   };
 
   return (
-    <AppShell title="Employee Dashboard" subtitle="Review case progress, compliance, and next actions.">
-      {error && <Alert variant="error">{error}</Alert>}
+    <AppShell title="Assignment" subtitle="Progress, compliance, and next actions.">
+      {error && (
+        <Alert variant="error">
+          {error}
+          {import.meta.env.DEV && selectedCaseId && (
+            <div className="mt-2 text-xs font-mono text-[#6b7280]">
+              assignmentId: {selectedCaseId}
+            </div>
+          )}
+        </Alert>
+      )}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading case...</div>}
 
       {!isLoading && assignment && (
@@ -328,7 +438,7 @@ export const HrAssignmentReview: React.FC = () => {
 
                 <div className="border-b border-[#e2e8f0] mt-6" />
                 <div className="flex flex-wrap gap-6 text-sm text-[#6b7280] mt-3">
-                  {(['timeline', 'documents', 'providers', 'messages'] as TabKey[]).map((tab) => (
+                  {(['timeline', 'intake', 'documents', 'providers', 'messages'] as TabKey[]).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -336,7 +446,7 @@ export const HrAssignmentReview: React.FC = () => {
                         activeTab === tab ? 'text-[#0b2b43] font-semibold' : 'hover:text-[#0b2b43]'
                       }`}
                     >
-                      {tab}
+                      {tab === 'providers' ? 'Services' : tab}
                     </button>
                   ))}
                 </div>
@@ -402,6 +512,47 @@ export const HrAssignmentReview: React.FC = () => {
                 </div>
               )}
 
+              {activeTab === 'intake' && (
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold text-[#0b2b43]">Employee intake responses</div>
+                  {intakeError && <Alert variant="error">{intakeError}</Alert>}
+                  {!intakeError && intakeDraft && (
+                    <>
+                      <IntakeSummarySection title="Relocation Basics">
+                        <div>Origin: {[intakeDraft.relocationBasics?.originCity, intakeDraft.relocationBasics?.originCountry].filter(Boolean).join(', ') || '-'}</div>
+                        <div>Destination: {[intakeDraft.relocationBasics?.destCity, intakeDraft.relocationBasics?.destCountry].filter(Boolean).join(', ') || '-'}</div>
+                        <div>Purpose: {intakeDraft.relocationBasics?.purpose || '-'}</div>
+                        <div>Target move date: {intakeDraft.relocationBasics?.targetMoveDate || '-'}</div>
+                        <div>Duration: {intakeDraft.relocationBasics?.durationMonths != null ? `${intakeDraft.relocationBasics.durationMonths} months` : '-'}</div>
+                      </IntakeSummarySection>
+                      <IntakeSummarySection title="Employee Profile">
+                        <div>Name: {intakeDraft.employeeProfile?.fullName || '-'}</div>
+                        <div>Email: {intakeDraft.employeeProfile?.email || '-'}</div>
+                        <div>Nationality: {intakeDraft.employeeProfile?.nationality || '-'}</div>
+                        <div>Passport country: {intakeDraft.employeeProfile?.passportCountry || '-'}</div>
+                        <div>Residence country: {intakeDraft.employeeProfile?.residenceCountry || '-'}</div>
+                      </IntakeSummarySection>
+                      <IntakeSummarySection title="Family Members">
+                        <div>Spouse: {intakeDraft.familyMembers?.spouse?.fullName ? intakeDraft.familyMembers.spouse.fullName : '-'}</div>
+                        <div>Children: {intakeDraft.familyMembers?.children?.length ? `${intakeDraft.familyMembers.children.length} child(ren)` : '-'}</div>
+                      </IntakeSummarySection>
+                      <IntakeSummarySection title="Assignment / Context">
+                        <div>Employer: {intakeDraft.assignmentContext?.employerName || '-'}</div>
+                        <div>Job title: {intakeDraft.assignmentContext?.jobTitle || '-'}</div>
+                        <div>Contract start: {intakeDraft.assignmentContext?.contractStartDate || '-'}</div>
+                        <div>Contract type: {intakeDraft.assignmentContext?.contractType || '-'}</div>
+                      </IntakeSummarySection>
+                    </>
+                  )}
+                  {!intakeError && intakeLoading && (
+                    <div className="text-sm text-[#6b7280]">Loading intake data...</div>
+                  )}
+                  {!intakeError && !intakeLoading && !intakeDraft && (
+                    <div className="text-sm text-[#6b7280]">No intake data available.</div>
+                  )}
+                </div>
+              )}
+
               {activeTab === 'documents' && (
                 <Card padding="lg">
                   <div className="text-sm font-semibold text-[#0b2b43] mb-4">Documents</div>
@@ -420,21 +571,11 @@ export const HrAssignmentReview: React.FC = () => {
 
               {activeTab === 'providers' && (
                 <Card padding="lg">
-                  <div className="text-sm font-semibold text-[#0b2b43] mb-4">Providers</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { title: 'Housing partner', status: 'Shortlist', owner: 'HR' },
-                      { title: 'Immigration counsel', status: 'Specialist Required', owner: 'HR' },
-                      { title: 'Movers & logistics', status: 'Quotes pending', owner: 'Employee' },
-                      { title: 'Schooling advisor', status: 'On hold', owner: 'HR' },
-                    ].map((item) => (
-                      <div key={item.title} className="border border-[#e2e8f0] rounded-lg p-4 bg-white">
-                        <div className="text-sm font-semibold text-[#0b2b43]">{item.title}</div>
-                        <div className="text-xs text-[#6b7280] mt-1">Owner: {item.owner}</div>
-                        <div className="text-xs text-[#6b7280] mt-3">Status: {item.status}</div>
-                      </div>
-                    ))}
+                  <div className="text-sm font-semibold text-[#0b2b43] mb-2">Services & provider estimates</div>
+                  <div className="text-xs text-[#6b7280] mb-4">
+                    Relocation services and employee-entered estimates, with policy cap comparison for HR.
                   </div>
+                  {assignment?.id ? <HrAssignmentServicesCapPanel assignmentId={assignment.id} /> : null}
                 </Card>
               )}
 
@@ -483,6 +624,41 @@ export const HrAssignmentReview: React.FC = () => {
 
             <div className="space-y-4">
               <Card padding="lg">
+                <div className="text-sm font-semibold text-[#0b2b43] mb-3">Provide feedback</div>
+                <textarea
+                  value={hrFeedbackInput}
+                  onChange={(e) => setHrFeedbackInput(e.target.value)}
+                  placeholder="Add feedback for the employee..."
+                  rows={3}
+                  className="w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
+                />
+                {hrFeedbackError && (
+                  <div className="text-xs text-red-600 mt-2">{hrFeedbackError}</div>
+                )}
+                <Button
+                  onClick={handleSendHrFeedback}
+                  disabled={!hrFeedbackInput.trim() || hrFeedbackSending}
+                  className="mt-2"
+                >
+                  {hrFeedbackSending ? 'Sending...' : 'Send feedback'}
+                </Button>
+                <div className="mt-4 pt-4 border-t border-[#e2e8f0]">
+                  <div className="text-xs font-medium text-[#6b7280] mb-2">Feedback history</div>
+                  {hrFeedback.length === 0 && (
+                    <div className="text-xs text-[#9ca3af]">No feedback yet.</div>
+                  )}
+                  {hrFeedback.map((f) => (
+                    <div key={f.id} className="mb-3 text-sm">
+                      <div className="text-[#6b7280] text-xs">
+                        {new Date(f.created_at).toLocaleString()}
+                      </div>
+                      <div className="text-[#0b2b43] mt-0.5">{f.message}</div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card padding="lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-semibold text-[#0b2b43]">ReloPass Assistant</div>
@@ -522,6 +698,9 @@ export const HrAssignmentReview: React.FC = () => {
         </div>
       )}
 
+      {(import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') && selectedCaseId && (
+        <AssignmentDebugPanel assignmentIdFromRoute={selectedCaseId} />
+      )}
       {isNudgeOpen && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
           <Card padding="lg" className="w-full max-w-lg">

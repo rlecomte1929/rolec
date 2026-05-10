@@ -65,14 +65,14 @@ export const HrAssignmentPackageReview: React.FC = () => {
   const exceptionPending = coverage.some((item) => item.status === 'over_limit');
 
   useRegisterNav('HrAssignmentPackageReview', [
-    { label: 'Back to Providers', routeKey: 'providers' },
+    { label: 'Back to Services', routeKey: 'services' },
     { label: 'Continue to Submission Center', routeKey: 'submissionCenter' },
     { label: 'View rules', routeKey: 'hrPolicy' },
     { label: 'Request exception', routeKey: 'hrPolicy' },
   ]);
 
   return (
-    <AppShell title="Assignment Package & Limits" subtitle="Review coverage, caps, and HR approvals required.">
+    <AppShell title="Package and limits" subtitle="Coverage, caps, approvals.">
       {error && <Alert variant="error">{error}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading package review...</div>}
 
@@ -94,7 +94,7 @@ export const HrAssignmentPackageReview: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => safeNavigate(navigate, 'providers')}>Back to Providers</Button>
+              <Button variant="outline" onClick={() => safeNavigate(navigate, 'services')}>Back to Services</Button>
               <Button variant="outline" onClick={() => safeNavigate(navigate, 'submissionCenter')}>
                 Continue to Submission Center
               </Button>
@@ -199,7 +199,7 @@ export const HrAssignmentPackageReview: React.FC = () => {
                         Request exception
                       </Button>
                       <Button variant="outline" onClick={() => safeNavigate(navigate, 'providers')}>
-                        Adjust providers
+                        Adjust services
                       </Button>
                     </div>
                   </div>
@@ -214,7 +214,9 @@ export const HrAssignmentPackageReview: React.FC = () => {
                   <div className="text-sm font-semibold text-[#0b2b43]">Compliance observations</div>
                   <ul className="text-xs text-[#4b5563] mt-2 space-y-2">
                     {compliance.actions.map((action, idx) => (
-                      <li key={idx}>• {action}</li>
+                      <li key={idx}>
+                        • {typeof action === 'string' ? action : action.title}
+                      </li>
                     ))}
                   </ul>
                 </div>

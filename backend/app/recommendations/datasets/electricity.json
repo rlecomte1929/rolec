@@ -1,0 +1,12 @@
+[
+  {"item_id": "e-1", "name": "SP Group", "green_options": true, "contract_flexibility": "high", "pricing_transparency": 9, "rating": 4.3, "rating_count": 1200, "availability_level": "high", "next_available_days": 1, "confidence": 95},
+  {"item_id": "e-2", "name": "Tuas Power", "green_options": true, "contract_flexibility": "medium", "pricing_transparency": 8, "rating": 4.2, "rating_count": 890, "availability_level": "high", "next_available_days": 3, "confidence": 92},
+  {"item_id": "e-3", "name": "Geneco", "green_options": true, "contract_flexibility": "high", "pricing_transparency": 9, "rating": 4.4, "rating_count": 756, "availability_level": "high", "next_available_days": 2, "confidence": 91},
+  {"item_id": "e-4", "name": "Senoko Energy", "green_options": true, "contract_flexibility": "medium", "pricing_transparency": 8, "rating": 4.3, "rating_count": 645, "availability_level": "high", "next_available_days": 3, "confidence": 90},
+  {"item_id": "e-5", "name": "Keppel Electric", "green_options": true, "contract_flexibility": "medium", "pricing_transparency": 7, "rating": 4.2, "rating_count": 534, "availability_level": "high", "next_available_days": 5, "confidence": 88},
+  {"item_id": "e-6", "name": "Sembcorp Power", "green_options": true, "contract_flexibility": "low", "pricing_transparency": 7, "rating": 4.1, "rating_count": 423, "availability_level": "high", "next_available_days": 5, "confidence": 86},
+  {"item_id": "e-7", "name": "PacificLight", "green_options": false, "contract_flexibility": "medium", "pricing_transparency": 8, "rating": 4.2, "rating_count": 389, "availability_level": "high", "next_available_days": 3, "confidence": 87},
+  {"item_id": "e-8", "name": "iSwitch", "green_options": true, "contract_flexibility": "high", "pricing_transparency": 9, "rating": 4.5, "rating_count": 567, "availability_level": "high", "next_available_days": 2, "confidence": 93},
+  {"item_id": "e-9", "name": "Ohm Energy", "green_options": true, "contract_flexibility": "high", "pricing_transparency": 9, "rating": 4.4, "rating_count": 445, "availability_level": "high", "next_available_days": 2, "confidence": 90},
+  {"item_id": "e-10", "name": "Union Power", "green_options": true, "contract_flexibility": "medium", "pricing_transparency": 8, "rating": 4.2, "rating_count": 312, "availability_level": "high", "next_available_days": 4, "confidence": 88}
+]

@@ -37,7 +37,7 @@ export const Select: React.FC<SelectProps> = ({
         className={`px-4 py-2 border border-[#d1d5db] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0b2b43] transition-all bg-white ${widthClass}`}
       >
         {placeholder && <option value="">{placeholder}</option>}
-        {options.map((option) => (
+        {[...options].sort((a, b) => a.label.localeCompare(b.label)).map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>

@@ -1,0 +1,87 @@
+import React, { useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { AppShell } from '../../components/AppShell';
+import { Alert, Button, Card } from '../../components/antigravity';
+import { Link } from 'react-router-dom';
+import { RecommendationResults } from '../../features/recommendations/RecommendationResults';
+import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
+import { useServicesFlow } from '../../features/services/ServicesFlowContext';
+import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
+import { buildRoute } from '../../navigation/routes';
+
+const CATEGORY_LABELS: Record<string, string> = {
+  living_areas: 'Living Areas',
+  schools: 'Schools',
+  movers: 'Movers',
+  banks: 'Banks',
+  insurance: 'Insurance',
+  electricity: 'Electricity',
+  medical: 'Medical',
+  telecom: 'Telecom',
+  childcare: 'Childcare',
+  storage: 'Storage',
+  transport: 'Transport',
+  language_integration: 'Language',
+  legal_admin: 'Legal & Admin',
+  tax_finance: 'Tax & Finance',
+};
+
+export const ServicesRecommendations: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { recommendations, shortlist, setShortlist, displayCurrency, setActiveCaseId } = useServicesFlow();
+  const { assignmentId: primaryAssignmentId, linkedSummaries } = useEmployeeAssignment();
+  const queryAssignmentId = useMemo(() => parseAssignmentSearchParam(location.search), [location.search]);
+  const { effectiveId: assignmentId } = useMemo(
+    () => resolveScopedAssignmentId({ linkedSummaries, primaryAssignmentId, queryAssignmentId }),
+    [linkedSummaries, primaryAssignmentId, queryAssignmentId],
+  );
+  useEffect(() => {
+    setActiveCaseId(assignmentId || null);
+    return () => setActiveCaseId(null);
+  }, [assignmentId, setActiveCaseId]);
+  const go = (path: string) => navigate({ pathname: path, search: location.search });
+
+  if (!recommendations || Object.keys(recommendations).length === 0) {
+    return (
+      <AppShell title="Recommendations" subtitle="Complete service questions first.">
+        <Card padding="lg">
+          <p className="text-sm text-[#6b7280] mb-4">
+            Complete the service questions to unlock recommendations.
+          </p>
+          <Button onClick={() => go(buildRoute('servicesQuestions'))}>Answer questions</Button>
+        </Card>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell title="Recommendations" subtitle="Shortlist by service.">
+      <ServicesNavRibbon />
+      <Card padding="lg" className="mb-6">
+        <div className="text-sm text-[#4b5563]">
+          Next steps: 1) Select vendors  2) Request quotations  3) Receive offers  4) Decide
+        </div>
+      </Card>
+      <Alert variant="info" className="mb-4">
+        <p className="text-sm">
+          Estimates on this page are shown in <strong>{displayCurrency}</strong>. To change currency, go back to{' '}
+          <Link to={{ pathname: buildRoute('services'), search: location.search }} className="font-medium underline">
+            Select services
+          </Link>
+          .
+        </p>
+      </Alert>
+      <RecommendationResults
+        results={recommendations}
+        categoryLabels={CATEGORY_LABELS}
+        selectedPackage={shortlist}
+        onSelectedPackageChange={setShortlist}
+        onStartOver={() => go(buildRoute('services'))}
+        onViewSummary={() => go(buildRoute('servicesEstimate'))}
+        displayCurrency={displayCurrency}
+      />
+    </AppShell>
+  );
+};

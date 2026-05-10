@@ -1,9 +1,29 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.{ts,tsx}'],
+    passWithNoTests: true,
+  },
+  resolve: {
+    dedupe: ['react', 'react-dom', 'react-router-dom'],
+  },
+  build: {
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'supabase-vendor': ['@supabase/supabase-js'],
+          'axios-vendor': ['axios'],
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     allowedHosts: ['relopass.relopass.com'],

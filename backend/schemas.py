@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 from typing import Optional, List, Dict, Any
 from datetime import date
 from enum import Enum
@@ -45,6 +45,7 @@ class OverallStatus(str, Enum):
 class UserRole(str, Enum):
     HR = "HR"
     EMPLOYEE = "EMPLOYEE"
+    ADMIN = "ADMIN"
 
 
 # Child model
@@ -201,9 +202,23 @@ class UserResponse(BaseModel):
     company: Optional[str] = None
 
 
+class PostSignupReconciliation(BaseModel):
+    """Returned after EMPLOYEE register/login when pending contacts/assignments were linked."""
+
+    linkedContactIds: List[str] = Field(default_factory=list)
+    attachedAssignmentIds: List[str] = Field(default_factory=list)
+    skippedContactsLinkedToOtherUser: int = 0
+    skippedAssignmentsLinkedToOtherUser: int = 0
+    skippedRevokedInvites: int = 0
+    skippedAlreadyLinkedSameUser: int = 0
+    headline: Optional[str] = None
+    message: Optional[str] = None
+
+
 class LoginResponse(BaseModel):
     token: str
     user: UserResponse
+    reconciliation: Optional[PostSignupReconciliation] = None
 
 
 
@@ -292,12 +307,63 @@ class DashboardResponse(BaseModel):
 
 
 class AssignmentStatus(str, Enum):
-    DRAFT = "DRAFT"
-    IN_PROGRESS = "IN_PROGRESS"
-    EMPLOYEE_SUBMITTED = "EMPLOYEE_SUBMITTED"
-    HR_REVIEW = "HR_REVIEW"
-    HR_APPROVED = "HR_APPROVED"
-    CHANGES_REQUESTED = "CHANGES_REQUESTED"
+    """
+    Canonical assignment statuses (aligned with Postgres constraint).
+
+    All API responses and internal logic should use these values only.
+    Legacy/uppercase variants are normalized via normalize_status() in main.py.
+    """
+
+    CREATED = "created"
+    ASSIGNED = "assigned"
+    AWAITING_INTAKE = "awaiting_intake"
+    SUBMITTED = "submitted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CLOSED = "closed"
+
+
+class IntakeChecklistItem(BaseModel):
+    """Explicit HR-visible intake/document checkpoints (same GET as assignment detail)."""
+
+    key: str
+    label: str
+    satisfied: bool
+    category: str = "intake"
+    linked_tracker_task_type: Optional[str] = None
+
+
+class ReadinessBlockingItemView(BaseModel):
+    source: str
+    title: str
+    detail: Optional[str] = None
+    human_review_required: bool = False
+    provenance_note: Optional[str] = None
+    linked_tracker_task_type: Optional[str] = None
+
+
+class ReadinessNextActionView(BaseModel):
+    title: str
+    category: str = "general"
+    linked_tracker_task_type: Optional[str] = None
+
+
+class CaseReadinessUi(BaseModel):
+    """Merged readiness + compliance + checklist summary for HR case page (no extra requests)."""
+
+    overall_status: str
+    overall_label: str
+    completion_basis: str
+    intake_satisfied: int
+    intake_total: int
+    checklist_satisfied: Optional[int] = None
+    checklist_total: Optional[int] = None
+    checklist_applicable: bool = False
+    checklist_pending: Optional[int] = Field(default=None)
+    blocking_items: List[ReadinessBlockingItemView] = Field(default_factory=list)
+    next_actions: List[ReadinessNextActionView] = Field(default_factory=list)
+    trust_banner: Optional[str] = None
+    next_deadline_display: Optional[str] = None
 
 
 class AssignmentSummary(BaseModel):
@@ -307,6 +373,21 @@ class AssignmentSummary(BaseModel):
     status: AssignmentStatus
     submittedAt: Optional[str] = None
     complianceStatus: Optional[str] = None
+    employeeFirstName: Optional[str] = None
+    employeeLastName: Optional[str] = None
+    # 6B/6C: Optional relocation case summary attached to assignment
+    # Contains a safe subset of fields from relocation_cases.
+    case: Optional[Dict[str, Any]] = None
+    nextDeadline: Optional[str] = Field(
+        default=None,
+        description="Earliest open milestone due date for HR list (human-readable).",
+    )
+
+
+class AssignmentsListResponse(BaseModel):
+    """Paginated assignments list. Summary-only, no per-row compliance N+1."""
+    assignments: List[AssignmentSummary]
+    total: int
 
 
 class AssignmentDetail(BaseModel):
@@ -319,6 +400,16 @@ class AssignmentDetail(BaseModel):
     profile: Optional[RelocationProfile] = None
     completeness: Optional[int] = None
     complianceReport: Optional[Dict[str, Any]] = None
+    employeeFirstName: Optional[str] = None
+    employeeLastName: Optional[str] = None
+    # HR Case Essentials (same GET — profiles + relocation_cases; no extra HTTP round-trips)
+    employeeEmail: Optional[str] = Field(default=None)
+    linkedEmployeeFullName: Optional[str] = Field(default=None)
+    caseOriginHint: Optional[str] = Field(default=None)
+    caseDestinationHint: Optional[str] = Field(default=None)
+    intakeChecklist: List[IntakeChecklistItem] = Field(default_factory=list)
+    readinessSnapshot: Optional[Dict[str, Any]] = None
+    caseReadinessUi: Optional[CaseReadinessUi] = None
 
 
 class HRAssignmentDecision(BaseModel):
@@ -333,6 +424,8 @@ class CreateCaseResponse(BaseModel):
 
 class AssignCaseRequest(BaseModel):
     employeeIdentifier: str
+    employeeFirstName: Optional[str] = None
+    employeeLastName: Optional[str] = None
 
 
 class AssignCaseResponse(BaseModel):
@@ -379,3 +472,15 @@ class ComplianceActionRequest(BaseModel):
     checkId: str
     notes: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
+
+
+class AddEvidenceRequest(BaseModel):
+    evidence_type: str = Field(validation_alias=AliasChoices("evidenceType", "evidence_type"))
+    participant_id: Optional[str] = Field(None, validation_alias=AliasChoices("participantId", "participant_id"))
+    requirement_id: Optional[str] = Field(None, validation_alias=AliasChoices("requirementId", "requirement_id"))
+    file_url: Optional[str] = Field(None, validation_alias=AliasChoices("fileUrl", "file_url"))
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class AddEvidenceResponse(BaseModel):
+    evidenceId: str

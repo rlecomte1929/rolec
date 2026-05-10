@@ -1,0 +1,31 @@
+{
+  "eval_id": 2,
+  "eval_name": "pitch-deck-problem-slide",
+  "prompt": "Audit of Series A pitch deck problem slide",
+  "assertions": [
+    {
+      "text": "Content type is correctly identified as 'pitch deck' or 'investor deck'",
+      "type": "content_type"
+    },
+    {
+      "text": "Output uses the structured format: CONTENT TYPE, OVERALL SCORE, SCORECARD, FINDINGS, NARRATIVE ARC, GAP MATRIX, TOP 3 PRIORITIES",
+      "type": "format"
+    },
+    {
+      "text": "The phrase 'exciting new chapter' is flagged as lifestyle-relocation language",
+      "type": "brand_check"
+    },
+    {
+      "text": "The slide is critiqued for missing market-level / investor-grade problem framing (not just buyer pain)",
+      "type": "investor_framing"
+    },
+    {
+      "text": "Absence of quantified data (market size, cost of failure) is identified as a gap",
+      "type": "proof_check"
+    },
+    {
+      "text": "A rewrite of the problem slide is provided",
+      "type": "completeness"
+    }
+  ]
+}

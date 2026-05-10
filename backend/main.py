@@ -1,58 +1,585 @@
 """
 FastAPI main application for ReloPass backend.
 """
-from fastapi import FastAPI, HTTPException, Header, Depends, Query
-from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional, Dict, Any, List
+import asyncio
+import logging
+import threading
+import time
 import os
+import json as _json
+
+logging.basicConfig(level=logging.INFO)
+
+# Configure observability (Sentry + structured logging) before anything else
+# logs, so early startup lines land in the right format. All of it is no-op
+# unless the relevant env vars are set.
+from .observability import configure_observability  # noqa: E402
+configure_observability()
+
+log = logging.getLogger(__name__)
+
+from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from typing import Annotated, Literal, Optional, Dict, Any, List, Tuple, Union
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 import re
 import json
+from pydantic import BaseModel, Field, RootModel
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from schemas import (
+from .schemas import (
     RegisterRequest, LoginRequest, LoginResponse, AnswerRequest, NextQuestionResponse,
     RelocationProfile, DashboardResponse, HousingRecommendation,
     SchoolRecommendation, MoverRecommendation, TimelinePhase, TimelineTask,
     OverallStatus, UserResponse, UserRole, AssignmentStatus, AssignCaseRequest,
-    AssignCaseResponse, CreateCaseResponse, AssignmentSummary, AssignmentDetail,
+    AssignCaseResponse, CreateCaseResponse, AssignmentSummary, AssignmentDetail, AssignmentsListResponse,
+    PostSignupReconciliation,
+    IntakeChecklistItem, CaseReadinessUi,
     EmployeeJourneyRequest, EmployeeJourneyNextQuestion, HRAssignmentDecision,
     UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
-    UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest
+    UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest,
+    AddEvidenceRequest, AddEvidenceResponse,
 )
-from database import db
-from agents.orchestrator import IntakeOrchestrator
-from agents.compliance_engine import ComplianceEngine
-from policy_engine import PolicyEngine
-from app.db import init_db
-from app.seed import seed_demo_cases
-from app.routers import cases as cases_router
-from app.routers import admin as admin_router
+from .services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
+from .services.guidance_pack_service import generate_guidance_pack
+from .services.policy_adapter import normalize_policy_caps
+from .services.policy_extractor import extract_policy_from_bytes
+from .app.services.timeline_service import compute_default_milestones, compute_timeline_summary
+from .hr_case_readiness_view import build_intake_checklist_items, build_hr_case_readiness_ui
+from .services.country_resources import (
+    build_profile_context,
+    get_personalization_hints,
+    get_default_section_content,
+    RESOURCE_SECTIONS,
+    SECTION_LABELS,
+)
+from .services.rkg_resources import (
+    get_resource_context,
+    get_country_resources as rkg_get_country_resources,
+    get_country_events as rkg_get_country_events,
+    get_recommended_resources,
+    resources_to_sections,
+)
+from .app.services.requirements_sufficiency import compute_requirements_sufficiency
+# Import db_config first and log before any DB connection attempt
+# TODO: Remove masked DB log after confirming production connectivity
+from .db_config import DATABASE_URL as _db_url, get_masked_db_log_line
+log.info("Startup DB config (user/host only, no password): %s", get_masked_db_log_line())
+from .database import db, Database
+from .services.policy_config_matrix_service import PolicyConfigMatrixService
+from .schemas_policy_caps import CapsCompareRequest
+from .services.policy_config_targeting import (
+    normalize_assignment_type,
+    normalize_family_status,
+    validate_optional_query_assignment_type,
+    validate_optional_query_employee_level,
+    validate_optional_query_family_status,
+)
 
-app = FastAPI(title="ReloPass API", version="1.0.0")
-init_db()
-seed_demo_cases()
+policy_config_matrix_svc = PolicyConfigMatrixService(db)
+from .services.unified_assignment_creation import create_assignment_with_contact_and_invites
+from .services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
+from .services.employee_case_person_service import ensure_employee_case_person_for_assignment
+from .services.passport_case_document_sync_service import ensure_passport_case_document_for_assignment
+from .identity_errors import IdentityErrorCode, err_detail
+from .identity_observability import (
+    identity_event,
+    principal_fingerprint,
+    principal_fingerprint_from_login_identifier,
+)
+from .services.assignment_claim_link_service import reconcile_pending_assignment_claims
+from .services.employee_assignment_overview import build_employee_assignment_overview
+from .services.employee_policy_assistant_service import employee_policy_assistant_query_response_dict
+from .services.hr_policy_assistant_service import hr_policy_assistant_query_response_dict
+from .services.explicit_pending_link_service import (
+    execute_pending_explicit_link,
+    finalize_assignment_claim_attach,
+    PENDING_LINK_COMPANY_MISMATCH,
+    PENDING_LINK_CONTACT_NOT_LINKED,
+    PENDING_LINK_EXTRA_VERIFICATION,
+    PENDING_LINK_IDENTITY_MISMATCH,
+    PENDING_LINK_INVITE_REVOKED,
+    PENDING_LINK_NO_CONTACT,
+    PENDING_LINK_NOT_FOUND,
+    PENDING_LINK_NOT_PENDING,
+    PENDING_LINK_OTHER_OWNER,
+)
+from .dev_seed_auth import ensure_dev_seed_auth_user
+from .agents.orchestrator import IntakeOrchestrator
+from .agents.compliance_engine import ComplianceEngine
+from .policy_engine import PolicyEngine
+from .app.db import init_db, SessionLocal
+from .app import crud as app_crud
+from .relocation_plan_view_schemas import RelocationPlanViewResponse
+from .services.relocation_plan_view_service import (
+    get_relocation_plan_view_for_case_assignment,
+    invalidate_relocation_plan_cache,
+)
+from .app.routers import auth as auth_router
+from .app.routers import cases as cases_router
+from .app.routers import admin as admin_router
+from .app.routers import admin_resources as admin_resources_router
+from .app.routers import admin_staging as admin_staging_router
+from .app.routers import admin_freshness as admin_freshness_router
+from .app.routers import admin_review_queue as admin_review_queue_router
+from .app.routers import admin_notifications as admin_notifications_router
+from .app.routers import admin_ops_analytics as admin_ops_analytics_router
+from .app.routers import admin_workflow_analytics as admin_workflow_analytics_router
+from .app.routers import admin_collaboration as admin_collaboration_router
+from .app.routers import admin_prospects as admin_prospects_router
+from .app.routers import mobility_context as mobility_context_router
+from .app.routers import admin_mobility as admin_mobility_router
+from .app.routers import policy_canonical as policy_canonical_router
+from .routes import relocation as relocation_router
+from .routes import compat as compat_router
+from .routes import relocation_classify as relocation_classify_router
+from .routes import resources as resources_router
+from .routes import hr_resources as hr_resources_router
+from .app.recommendations.router import router as recommendations_router
+from .app.recommendations.admin_debug import router as admin_recommendations_debug_router
+from .app.routers import suppliers as suppliers_router
+from .app.routers import exception_requests as exception_requests_router
+from .app.routers import services_state as services_state_router
+from .app.routers import admin_catalog as admin_catalog_router
+from .app.routers import hr_catalog as hr_catalog_router
+from .app.services.question_engine import generate_questions
+from pydantic import BaseModel as _BaseModel
+from contextlib import asynccontextmanager, contextmanager
 
-# CORS middleware
+# ---------------------------------------------------------------------------
+# Startup: validate DATABASE_URL and log DB type
+# ---------------------------------------------------------------------------
+_db_info = Database.get_db_info()
+_db_scheme = _db_info["db_url_scheme"]
+_db_host = _db_info["db_host"] or "(local file)"
+
+# Legacy demo seed flags (used in startup logs and runtime diagnostics)
+ALLOW_LEGACY_DEMO_SEED = os.getenv("ALLOW_LEGACY_DEMO_SEED", "").lower() in ("1", "true", "yes")
+DISABLE_DEMO_RESEED = os.getenv("DISABLE_DEMO_RESEED", "").lower() in ("1", "true", "yes")
+# When true, skip wizard demo cases + supplier dataset seed (see lifespan below).
+DISABLE_STARTUP_SEED = os.getenv("DISABLE_STARTUP_SEED", "").lower() in ("1", "true", "yes")
+
+
+def _get_supabase_admin_client():
+    from .services.supabase_client import get_supabase_admin_client
+
+    return get_supabase_admin_client()
+
+
+def _run_background_startup_seed() -> None:
+    """Demo wizard cases + supplier rows; must not block ASGI bind (Render port check)."""
+    from .app.seed import seed_demo_cases
+    from .app.seed_suppliers import seed_suppliers_from_recommendation_datasets
+
+    log.info("Background: seeding demo cases…")
+    try:
+        seed_demo_cases()
+    except Exception as e:
+        log.warning("Demo case seed skipped or failed: %s", e)
+    try:
+        n = seed_suppliers_from_recommendation_datasets()
+        if n:
+            log.info(
+                "Background: seeded %d suppliers from recommendation datasets (living_areas, schools, movers).",
+                n,
+            )
+    except Exception as e:
+        log.warning("Supplier seed skipped or failed: %s", e)
+    log.info("Background startup seed finished.")
+
+
+async def _background_seed_task() -> None:
+    try:
+        await asyncio.to_thread(_run_background_startup_seed)
+    except Exception:
+        log.exception("Background startup seed task failed")
+
+
+def _run_startup_step_with_timeout(step_name: str, fn, timeout_s: int) -> bool:
+    """Run one startup step with a hard wall-clock timeout.
+
+    Each step emits structured `startup_step=...` logs on entry, exit, timeout,
+    and error, so if a deploy hangs you can see exactly which step stopped
+    responding instead of staring at a silent gap. A hung step is *abandoned*
+    (the daemon thread keeps running but the boot proceeds) — this is
+    deliberate: we'd rather serve requests with one degraded probe than fail
+    to bind the port within Render's ~5-min scan deadline. Returns True if
+    the step completed cleanly, False on timeout or exception.
+    """
+    log.info("startup_step=%s status=starting timeout_s=%d", step_name, timeout_s)
+    done = threading.Event()
+    capture: Dict[str, Any] = {"error": None}
+
+    def _runner() -> None:
+        try:
+            fn()
+        except Exception as exc:  # noqa: BLE001 — captured and logged below
+            capture["error"] = exc
+        finally:
+            done.set()
+
+    t = threading.Thread(
+        target=_runner,
+        daemon=True,
+        name=f"startup-{step_name}",
+    )
+    started = time.perf_counter()
+    t.start()
+    completed = done.wait(timeout=timeout_s)
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    if not completed:
+        log.warning(
+            "startup_step=%s status=TIMED_OUT after %ds — continuing boot without it",
+            step_name,
+            timeout_s,
+        )
+        return False
+    if capture["error"] is not None:
+        exc = capture["error"]
+        log.warning(
+            "startup_step=%s status=error elapsed_ms=%d %s: %s",
+            step_name,
+            elapsed_ms,
+            type(exc).__name__,
+            exc,
+        )
+        return False
+    log.info("startup_step=%s status=done elapsed_ms=%d", step_name, elapsed_ms)
+    return True
+
+
+def _run_runtime_startup_initialization() -> None:
+    log.info("Initializing database schemas...")
+    _run_startup_step_with_timeout("init_db", init_db, timeout_s=60)
+    _run_startup_step_with_timeout("ensure_initialized", db.ensure_initialized, timeout_s=60)
+    _run_startup_step_with_timeout(
+        "log_expected_tables_status", db.log_expected_tables_status, timeout_s=30
+    )
+
+    def _storage_diag() -> None:
+        from .services.policy_storage_health import log_startup_storage_diagnostic
+        log_startup_storage_diagnostic(db)
+
+    _run_startup_step_with_timeout("policy_storage_diag", _storage_diag, timeout_s=30)
+
+    # Mark as failed any policy_documents rows that were mid-extraction when
+    # the previous process exited. Without this they stay stuck in-flight
+    # forever and the upload idempotency guard (see #7) blocks retries.
+    def _reconcile() -> None:
+        from .services.policy_ingest_reconciler import reconcile_orphaned_policy_ingest_jobs
+        summary = reconcile_orphaned_policy_ingest_jobs(db, actor_label="startup")
+        if summary.get("failed"):
+            log.warning(
+                "Startup policy-ingest reconciler: failed %d orphaned documents",
+                summary["failed"],
+            )
+
+    _run_startup_step_with_timeout("policy_ingest_reconciler", _reconcile, timeout_s=60)
+
+    if _db_scheme == "sqlite" and ALLOW_LEGACY_DEMO_SEED and not DISABLE_DEMO_RESEED:
+        try:
+            _seed_demo_cases()
+        except Exception as e:
+            log.warning("Legacy demo seed skipped or failed: %s", e)
+
+    if DISABLE_STARTUP_SEED:
+        log.info("Startup seed disabled (DISABLE_STARTUP_SEED).")
+    else:
+        log.info("Demo/supplier seed scheduled in background after listen (Render-safe).")
+    log.info("Startup complete.")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await asyncio.to_thread(_run_runtime_startup_initialization)
+    if not DISABLE_STARTUP_SEED:
+        asyncio.create_task(_background_seed_task())
+    yield
+
+log.info("DB engine: %s | host: %s", _db_scheme, _db_host)
+
+if any(p in _db_url for p in ["YOUR_PASSWORD", "YOUR_HOST", "<password>", "placeholder"]):
+    log.error("DATABASE_URL contains placeholder text! Fix it in Render env vars.")
+    raise RuntimeError("DATABASE_URL contains placeholder text — refusing to start.")
+
+if _db_scheme == "sqlite":
+    log.warning("Running with SQLite — data will NOT persist across Render redeploys!")
+else:
+    log.info("Running with PostgreSQL — data persists across redeploys.")
+
+app = FastAPI(title="ReloPass API", version="1.0.0", lifespan=lifespan)
+
+# ---------------------------------------------------------------------------
+# Rate limiting (abuse protection on auth + claim endpoints).
+# Limiter instance lives in backend/rate_limit.py so routers can decorate
+# their endpoints without pulling main into a circular import. Main owns the
+# RateLimitExceeded exception handler and attaches the limiter to app state.
+# Disabled when RELOPASS_DISABLE_RATE_LIMITS=1 (tests set this in conftest).
+# ---------------------------------------------------------------------------
+from slowapi.errors import RateLimitExceeded
+from .rate_limit import limiter, _real_remote_address
+
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    """429 response that preserves X-Request-ID and CORS headers (matches global 500 handler)."""
+    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    hdrs: Dict[str, str] = {
+        "X-Request-ID": req_id,
+        "Retry-After": "60",
+    }
+    hdrs.update(cors_headers_for_request_origin(request))
+    log.warning(
+        "rate_limit_exceeded request_id=%s path=%s ip=%s limit=%s",
+        req_id,
+        request.url.path,
+        _real_remote_address(request),
+        str(getattr(exc, "detail", "")),
+    )
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": "Too many requests. Wait a moment before trying again.",
+            "request_id": req_id,
+        },
+        headers=hdrs,
+    )
+
+
+admin_graph_build_marker = os.getenv("ADMIN_GRAPH_BUILD_MARKER", "local-dev")
+log.info(
+    "ADMIN_GRAPH_BUILD_MARKER=%s db_scheme=%s seed_guard_active=%s DISABLE_DEMO_RESEED=%s ALLOW_LEGACY_DEMO_SEED=%s",
+    admin_graph_build_marker,
+    _db_scheme,
+    (_db_scheme == "sqlite" and DISABLE_DEMO_RESEED),
+    DISABLE_DEMO_RESEED,
+    ALLOW_LEGACY_DEMO_SEED,
+)
+
+# CORS middleware (include Vite fallback ports 3002–3005 for local dev)
 default_origins = [
     "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:3003",
+    "http://localhost:3004",
+    "http://localhost:3005",
     "http://localhost:5173",
-    "https://relopass.relopass.com",
+    "https://relopass.com",
+    "https://www.relopass.com",
 ]
 env_origins = os.getenv("CORS_ORIGINS")
 if env_origins:
-    default_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+    extra = [o.strip() for o in env_origins.split(",") if o.strip()]
+    default_origins = list(dict.fromkeys(default_origins + extra))
+# Match apex + subdomains (fullmatch). A plain `https://.*\.relopass\.com` misses https://relopass.com.
+origin_regex = os.getenv("CORS_ORIGIN_REGEX") or r"^https://([\w-]+\.)*relopass\.com$"
+
+_cors_origin_pattern = re.compile(origin_regex) if origin_regex else None
+
+
+def cors_headers_for_request_origin(request: Request) -> Dict[str, str]:
+    """
+    Duplicate CORSMiddleware origin checks for JSONResponse paths (e.g. unhandled 500).
+    Without this, some browsers report a CORS failure when the real issue is a server error.
+    """
+    origin = request.headers.get("origin")
+    if not origin:
+        return {}
+    allowed = origin in default_origins or bool(_cors_origin_pattern and _cors_origin_pattern.fullmatch(origin))
+    if not allowed:
+        return {}
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Expose-Headers": "X-Request-ID",
+        "Vary": "Origin",
+    }
+
+
+# NOTE: Register HTTP middleware before CORSMiddleware. Starlette prepends each
+# add_middleware / @app.middleware at index 0, so registering CORS *after* the
+# request-id middleware yields stack ServerError → CORS → RequestID → routes.
+# If CORS is inner (RequestID outer), some cross-origin responses can miss ACAO
+# headers and Chrome reports a generic "CORS error" (often on XHR with Auth).
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Ensure 500 responses include JSON body and go through normal response path (CORS)."""
+    import traceback as _traceback
+
+    from fastapi import HTTPException as _HTTPEx
+    if isinstance(exc, _HTTPEx):
+        raise exc
+    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    log.error(
+        "request_id=%s method=%s path=%s unhandled_exception=%s\n%s",
+        req_id,
+        request.method,
+        request.url.path,
+        repr(exc),
+        _traceback.format_exc(),
+    )
+    hdrs: Dict[str, str] = {"X-Request-ID": req_id}
+    hdrs.update(cors_headers_for_request_origin(request))
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "request_id": req_id,
+        },
+        headers=hdrs,
+    )
+
+
+@app.middleware("http")
+async def request_id_and_timing_middleware(request: Request, call_next):
+    """
+    Attach a request_id to each request/response and log overall handler duration.
+    Correlates with frontend X-Request-ID and DB/query spans.
+    """
+    req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = req_id
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.error(
+            "request_id=%s method=%s path=%s error=%s dur_ms=%.2f",
+            req_id,
+            request.method,
+            request.url.path,
+            repr(exc),
+            dur_ms,
+            exc_info=True,
+        )
+        raise
+    dur_ms = (time.perf_counter() - start) * 1000
+    response.headers["X-Request-ID"] = req_id
+    # Server-Timing lets the browser (and our perf.ts) split server handler time
+    # from network time without needing a separate API call.
+    response.headers["Server-Timing"] = f"app;dur={dur_ms:.1f}"
+    user_id = getattr(request.state, "user_id", None)
+    log.info(
+        "request_id=%s method=%s path=%s status=%s dur_ms=%.2f user_id=%s",
+        req_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        dur_ms,
+        user_id,
+    )
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=default_origins,  # React dev servers + Cloudflare Pages
+    allow_origins=default_origins,
+    allow_origin_regex=origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID", "Server-Timing"],
+    # Fewer preflight round-trips on repeat requests (helps perceived lag on slow networks).
+    max_age=86400,
 )
 
+app.include_router(auth_router.router)
+app.include_router(compat_router.router)
 app.include_router(cases_router.router)
+app.include_router(exception_requests_router.router)
+app.include_router(services_state_router.router)
+app.include_router(admin_catalog_router.router)
+app.include_router(hr_catalog_router.router)
+app.include_router(mobility_context_router.router)
+app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
+app.include_router(admin_resources_router.router, prefix="/api/admin")
+app.include_router(admin_staging_router.router, prefix="/api/admin")
+app.include_router(admin_freshness_router.router, prefix="/api/admin")
+app.include_router(admin_freshness_router.crawl_router, prefix="/api/admin")
+app.include_router(admin_freshness_router.changes_router, prefix="/api/admin")
+app.include_router(admin_review_queue_router.router, prefix="/api/admin")
+app.include_router(admin_notifications_router.router, prefix="/api/admin")
+app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
+app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
+app.include_router(admin_collaboration_router.router, prefix="/api/admin")
+app.include_router(admin_prospects_router.router, prefix="/api/admin")
+app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
+app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")
+app.include_router(policy_canonical_router.read_router, prefix="/api")
+app.include_router(suppliers_router.router)
+app.include_router(resources_router.router)
+app.include_router(hr_resources_router.router)
+app.include_router(recommendations_router)
+app.include_router(relocation_router.router)
+app.include_router(relocation_router.api_router)
+app.include_router(relocation_classify_router.router)
+
+@contextmanager
+def timed(span: str, request_id: Optional[str] = None):
+  """
+  Lightweight span timing helper for endpoint internals.
+
+  Usage:
+      with timed("db.get_assignment_by_id", request.state.request_id):
+          ...
+  """
+  start = time.perf_counter()
+  try:
+      yield
+  finally:
+      dur_ms = (time.perf_counter() - start) * 1000
+      if request_id:
+          log.info("request_id=%s span=%s dur_ms=%.2f", request_id, span, dur_ms)
+      else:
+          log.info("span=%s dur_ms=%.2f", span, dur_ms)
+
+
+@app.api_route("/health", methods=["GET", "HEAD"])
+def health_check():
+    return {
+        "status": "ok",
+        "service": "ReloPass API",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Debug / diagnostics endpoints
+# ---------------------------------------------------------------------------
+@app.get("/debug/db")
+def debug_db():
+    """Return non-secret database connectivity info."""
+    return Database.get_db_info()
+
+
+class _DebugKVBody(_BaseModel):
+    key: str
+    value: str
+
+
+@app.post("/debug/kv")
+def debug_kv_set(body: _DebugKVBody):
+    db.debug_kv_set(body.key, body.value)
+    return {"ok": True, "key": body.key}
+
+
+@app.get("/debug/kv/{key}")
+def debug_kv_get(key: str):
+    result = db.debug_kv_get(key)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Key '{key}' not found")
+    return result
+
 
 # Global orchestrator
 orchestrator = IntakeOrchestrator()
@@ -68,18 +595,14 @@ def _seed_demo_cases() -> None:
     demo_password = pwd_context.hash("Passw0rd!")
 
     def ensure_user(user_id: str, email: str, role: str, name: str) -> str:
-        existing = db.get_user_by_email(email)
-        if existing:
-            return existing["id"]
-        created = db.create_user(
+        return ensure_dev_seed_auth_user(
+            db,
             user_id=user_id,
-            username=None,
             email=email,
             password_hash=demo_password,
             role=role,
             name=name,
         )
-        return user_id if created else db.get_user_by_email(email)["id"]
 
     hr_user_id = ensure_user(
         user_id="demo-hr-001",
@@ -87,20 +610,89 @@ def _seed_demo_cases() -> None:
         role="HR",
         name="HR Demo",
     )
+    hr_user_id_2 = ensure_user(
+        user_id="demo-hr-002",
+        email="hr@relopass.com",
+        role="HR",
+        name="HR Manager",
+    )
 
     employees = [
         ("demo-emp-001", "sarah.jenkins@relopass.local", "Sarah Jenkins"),
         ("demo-emp-002", "mark.thompson@relopass.local", "Mark Thompson"),
+        ("demo-emp-003", "demo@relopass.com", "Demo Employee"),
+        ("test-emp-test", "testEMPtest@relopass.com", "Test Employee"),
     ]
     for emp_id, emp_email, emp_name in employees:
         ensure_user(emp_id, emp_email, "EMPLOYEE", emp_name)
+
+    # Admin seed + allowlist
+    admin_user_id = ensure_user(
+        user_id="demo-admin-001",
+        email="admin@relopass.com",
+        role="ADMIN",
+        name="ReloPass Admin",
+    )
+    db.add_admin_allowlist("admin@relopass.com", admin_user_id)
+
+    # Seed admin console entities
+    company_id = "demo-company-001"
+    db.create_company(company_id, "Acme Corp", "Singapore", "200-500", "1 Raffles Place, Singapore", "+65 6123 4567", "hr@acme.com")
+    test_company_id = "test-company-001"
+    db.create_company(test_company_id, "test", "Singapore", "1-50", "", "", "")
+    db.ensure_profile_record(hr_user_id, "hr.demo@relopass.local", "HR", "HR Demo", company_id)
+    db.ensure_profile_record(hr_user_id_2, "hr@relopass.com", "HR", "HR Manager", company_id)
+    db.ensure_profile_record(admin_user_id, "admin@relopass.com", "ADMIN", "ReloPass Admin", None)
+    for emp_id, emp_email, emp_name in employees:
+        # testEMPtest belongs to company "test" for policy visibility testing
+        profile_company = test_company_id if emp_id == "test-emp-test" else company_id
+        db.ensure_profile_record(emp_id, emp_email, "EMPLOYEE", emp_name, profile_company)
+
+    db.create_hr_user("hr-001", company_id, hr_user_id, {"can_manage_policy": True})
+    db.create_hr_user("hr-002", company_id, hr_user_id_2, {"can_manage_policy": True})
+    db.create_hr_user("hr-003", test_company_id, hr_user_id_2, {"can_manage_policy": True})
+    db.create_employee("emp-001", company_id, "demo-emp-001", "Band2", "Long-Term", "demo-case-oslo-sg-family", "active")
+    db.create_employee("emp-002", company_id, "demo-emp-003", "Band1", "Long-Term", "demo-case-demo-emp", "active")
+
+    db.upsert_relocation_case(
+        case_id="demo-case-oslo-sg-family",
+        company_id=company_id,
+        employee_id="emp-001",
+        status="in_progress",
+        stage="docs",
+        host_country="Singapore",
+        home_country="Norway",
+    )
+    db.upsert_relocation_case(
+        case_id="demo-case-demo-emp",
+        company_id=company_id,
+        employee_id="emp-002",
+        status="blocked",
+        stage="policy",
+        host_country="Singapore",
+        home_country="United States",
+    )
+
+    db.create_support_case(
+        support_case_id="support-001",
+        company_id=company_id,
+        created_by_profile_id=hr_user_id,
+        category="policy",
+        severity="high",
+        status="open",
+        summary="Policy caps not matching assignment band",
+        employee_id="emp-002",
+        hr_profile_id=hr_user_id,
+        last_error_code="POLICY_CAP_MISMATCH",
+        last_error_context={"band": "Band1", "assignmentType": "Long-Term"},
+    )
 
     scenarios = [
         {
             "case_id": "demo-case-oslo-sg-family",
             "assignment_id": "demo-assignment-oslo-sg-family",
             "employee_identifier": "sarah.jenkins@relopass.local",
-            "status": AssignmentStatus.EMPLOYEE_SUBMITTED.value,
+            "status": AssignmentStatus.SUBMITTED.value,
             "profile": RelocationProfile(
                 userId="demo-assignment-oslo-sg-family",
                 familySize=4,
@@ -137,10 +729,37 @@ def _seed_demo_cases() -> None:
             ).model_dump(mode="json"),
         },
         {
+            "case_id": "demo-case-demo-emp",
+            "assignment_id": "demo-assignment-demo-emp",
+            "employee_identifier": "demo@relopass.com",
+            "status": AssignmentStatus.ASSIGNED.value,
+            "profile": RelocationProfile(
+                userId="demo-assignment-demo-emp",
+                familySize=2,
+                spouse={"fullName": "Alex Demo", "wantsToWork": True},
+                dependents=[],
+                primaryApplicant={
+                    "fullName": "Demo Employee",
+                    "nationality": "American",
+                    "employer": {"name": "Acme Corp", "roleTitle": "Engineer", "jobLevel": "L1", "salaryBand": "80k - 100k"},
+                    "assignment": {"startDate": "2024-12-01"},
+                },
+                movePlan={
+                    "origin": "San Francisco, USA",
+                    "destination": "Singapore",
+                    "targetArrivalDate": "2024-12-15",
+                    "housing": {"budgetMonthlySGD": "5000-7000"},
+                    "schooling": {"budgetAnnualSGD": "0"},
+                    "movers": {"inventoryRough": "medium"},
+                },
+                complianceDocs={"hasPassportScans": True, "hasEmploymentLetter": False, "hasMarriageCertificate": False, "hasBirthCertificates": False},
+            ).model_dump(mode="json"),
+        },
+        {
             "case_id": "demo-case-sg-ny-single",
             "assignment_id": "demo-assignment-sg-ny-single",
             "employee_identifier": "mark.thompson@relopass.local",
-            "status": AssignmentStatus.IN_PROGRESS.value,
+            "status": AssignmentStatus.ASSIGNED.value,
             "profile": RelocationProfile(
                 userId="demo-assignment-sg-ny-single",
                 familySize=1,
@@ -175,6 +794,10 @@ def _seed_demo_cases() -> None:
         },
     ]
 
+    hr_profile = db.get_profile_record(hr_user_id)
+    hr_company_id = hr_profile.get("company_id") if hr_profile else None
+    # Legacy SQLite demo rows only: direct create_assignment without unified contact/invites.
+    # Production HR/Admin APIs use create_assignment_with_contact_and_invites (see identity_canonical).
     for scenario in scenarios:
         if not db.get_assignment_by_id(scenario["assignment_id"]):
             case_profile = {
@@ -182,7 +805,7 @@ def _seed_demo_cases() -> None:
                 "destination": scenario["profile"]["movePlan"]["destination"],
             }
             if not db.get_case_by_id(scenario["case_id"]):
-                db.create_case(scenario["case_id"], hr_user_id, case_profile)
+                db.create_case(scenario["case_id"], hr_user_id, case_profile, company_id=hr_company_id)
             db.create_assignment(
                 assignment_id=scenario["assignment_id"],
                 case_id=scenario["case_id"],
@@ -191,25 +814,140 @@ def _seed_demo_cases() -> None:
                 employee_identifier=scenario["employee_identifier"],
                 status=scenario["status"],
             )
+            try:
+                ensure_mobility_case_link_for_assignment(db, scenario["assignment_id"])
+            except Exception:
+                pass
             db.save_employee_profile(scenario["assignment_id"], scenario["profile"])
+            try:
+                ensure_employee_case_person_for_assignment(db, scenario["assignment_id"])
+            except Exception:
+                pass
+            try:
+                ensure_passport_case_document_for_assignment(db, scenario["assignment_id"])
+            except Exception:
+                pass
+
+    # Seed default published HR policy for wizard auto-fill
+    _seed_default_hr_policy()
 
 
-_seed_demo_cases()
+def _seed_default_hr_policy() -> None:
+    """Seed a default published HR policy so employees get wizard criteria auto-fill."""
+    policy_id = "demo-hr-policy-001"
+    if db.get_hr_policy(policy_id):
+        return
+    policy = {
+        "policyId": policy_id,
+        "policyName": "Global Relocation Policy (Demo)",
+        "companyEntity": "NOR-INV-001",
+        "effectiveDate": "2024-01-01",
+        "expiryDate": None,
+        "status": "published",
+        "version": 1,
+        "employeeBands": ["Band1", "Band2", "Band3", "Band4"],
+        "assignmentTypes": ["Permanent", "Long-Term", "Short-Term"],
+        "benefitCategories": {
+            "temporaryHousing": {
+                "allowed": True,
+                "maxAllowed": {"min": 2000, "medium": 4000, "extensive": 6000, "premium": 9000},
+                "unit": "currency",
+                "currency": "USD",
+                "documentationRequired": ["Lease agreement", "Receipts"],
+                "preApprovalRequired": True,
+            },
+            "educationSupport": {
+                "allowed": True,
+                "maxAllowed": {"min": 10000, "medium": 20000, "extensive": 35000, "premium": 45000},
+                "unit": "currency",
+                "currency": "USD",
+                "documentationRequired": ["School invoice", "Enrollment confirmation"],
+                "preApprovalRequired": False,
+            },
+            "shipment": {
+                "allowed": True,
+                "maxAllowed": {"min": 5000, "medium": 10000, "extensive": 15000, "premium": 25000},
+                "unit": "currency",
+                "currency": "USD",
+                "documentationRequired": ["Vendor quote", "Inventory list"],
+                "preApprovalRequired": True,
+            },
+        },
+    }
+    db.create_hr_policy(policy_id, policy, created_by=None)
 
-LEGACY_STATUS_MAP = {
-    "PENDING_EMPLOYEE": AssignmentStatus.DRAFT.value,
-    "SUBMITTED_TO_HR": AssignmentStatus.EMPLOYEE_SUBMITTED.value,
-    "APPROVED": AssignmentStatus.HR_APPROVED.value,
-}
+
+_CANONICAL_STATUS_VALUES = {s.value for s in AssignmentStatus}
 
 
-def normalize_status(status: str) -> str:
-    # Map legacy DB values to the new state machine.
-    return LEGACY_STATUS_MAP.get(status, status)
+def normalize_status(status: Optional[str]) -> str:
+    """
+    Normalize legacy / mixed-case status values to canonical Postgres values.
+
+    Canonical statuses (and ONLY these) are:
+      created | assigned | awaiting_intake | submitted | approved | rejected | closed
+
+    - Accepts Optional[str] and returns one of the canonical strings.
+    - Case-insensitive, trims whitespace.
+    - Maps legacy values like DRAFT / IN_PROGRESS / EMPLOYEE_SUBMITTED / HR_APPROVED, etc.
+    - Unknown or empty values fall back to 'created' (and are logged once).
+    """
+    if not status:
+        return AssignmentStatus.CREATED.value
+
+    raw = str(status).strip()
+    if not raw:
+        return AssignmentStatus.CREATED.value
+
+    lower = raw.lower()
+    upper = raw.upper()
+
+    # Already canonical
+    if lower in _CANONICAL_STATUS_VALUES:
+        return lower
+
+    legacy_map = {
+        # Old uppercase workflow statuses
+        "DRAFT": AssignmentStatus.AWAITING_INTAKE.value,
+        "IN_PROGRESS": AssignmentStatus.ASSIGNED.value,
+        "EMPLOYEE_SUBMITTED": AssignmentStatus.SUBMITTED.value,
+        "PENDING_EMPLOYEE": AssignmentStatus.AWAITING_INTAKE.value,
+        "SUBMITTED_TO_HR": AssignmentStatus.SUBMITTED.value,
+        "HR_APPROVED": AssignmentStatus.APPROVED.value,
+        "APPROVED": AssignmentStatus.APPROVED.value,
+        "HR_REJECTED": AssignmentStatus.REJECTED.value,
+        "REJECTED": AssignmentStatus.REJECTED.value,
+        "DONE": AssignmentStatus.CLOSED.value,
+        "CLOSED": AssignmentStatus.CLOSED.value,
+        # Transitional / review states get folded into submitted
+        "HR_REVIEW": AssignmentStatus.SUBMITTED.value,
+        "CHANGES_REQUESTED": AssignmentStatus.AWAITING_INTAKE.value,
+    }
+
+    mapped = legacy_map.get(upper)
+    if mapped:
+        return mapped
+
+    # Fallback: log once per distinct unknown value and return 'created'
+    log.warning("Unknown assignment status '%s', normalizing to 'created'", raw)
+    return AssignmentStatus.CREATED.value
+
+
+def assert_canonical_status(status: str) -> None:
+    """
+    Guard to ensure we only ever write canonical assignment statuses to the DB.
+    Raises a 400 if a non-canonical value is about to be persisted.
+    """
+    if status not in _CANONICAL_STATUS_VALUES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid assignment status '{status}'. Must be one of: {sorted(_CANONICAL_STATUS_VALUES)}",
+        )
 
 
 # Auth dependency
 async def get_current_user(
+    request: Request,
     authorization: Optional[str] = Header(None),
 ) -> Dict[str, Any]:
     """Extract user from authorization header."""
@@ -223,122 +961,1832 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    # Ensure admin profile record exists
+    db.ensure_profile_record(
+        user_id=user["id"],
+        email=user.get("email"),
+        role=user.get("role", UserRole.EMPLOYEE.value),
+        full_name=user.get("name"),
+        company_id=user.get("company"),
+    )
+
+    # Admin detection (role in profiles OR allowlisted @relopass.com)
+    if _is_admin_user(user):
+        user["role"] = UserRole.ADMIN.value
+        user["is_admin"] = True
+    else:
+        user["is_admin"] = False
+
+    # Attach user id for middleware logging (if Request is available).
+    if request is not None:
+        try:
+            request.state.user_id = user.get("id")
+        except Exception:
+            # request may be a test stub; ignore
+            pass
+
+    # Admin impersonation context (server-side)
+    session = db.get_admin_session(token)
+    if session and session.get("target_user_id"):
+        user["impersonation"] = {
+            "target_user_id": session.get("target_user_id"),
+            "mode": session.get("mode"),
+        }
+
     return user
 
 
+def _is_admin_user(user: Dict[str, Any]) -> bool:
+    role = (user.get("role") or "").upper()
+    if role == UserRole.ADMIN.value:
+        return True
+    profile = db.get_profile_record(user.get("id"))
+    if profile and (profile.get("role") or "").upper() == UserRole.ADMIN.value:
+        return True
+    email = (user.get("email") or "").strip().lower()
+    if email.endswith("@relopass.com") and db.is_admin_allowlisted(email):
+        return True
+    return False
+
+
 def require_role(role: UserRole):
+    """Require a specific role. ADMIN users pass all role checks."""
     def dependency(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-        if user.get("role") != role.value:
+        user_role = user.get("role")
+        if user_role == UserRole.ADMIN.value:
+            return user
+        if user_role != role.value:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return user
     return dependency
 
 
-@app.get("/")
+def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+    return user
+
+
+def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Allow HR or Employee. Admin passes as HR."""
+    r = user.get("role")
+    if r == UserRole.ADMIN.value:
+        return user
+    if r in (UserRole.HR.value, UserRole.EMPLOYEE.value):
+        return user
+    raise HTTPException(status_code=403, detail="HR or Employee only")
+
+
+def require_vendor(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Require user to be a vendor. Returns user dict with vendor_id added. 403 if not a vendor."""
+    vendor_id = db.get_vendor_for_user(user.get("id"))
+    if not vendor_id:
+        raise HTTPException(status_code=403, detail="Vendor access only")
+    user = dict(user)
+    user["vendor_id"] = vendor_id
+    return user
+
+
+class AdminImpersonateRequest(BaseModel):
+    targetUserId: str
+    mode: str
+    reason: Optional[str] = None
+
+
+class AdminReasonRequest(BaseModel):
+    reason: str
+    breakGlass: Optional[bool] = False
+    payload: Optional[Dict[str, Any]] = None
+
+
+class AdminSupportNoteRequest(BaseModel):
+    note: str
+    reason: str
+
+
+class AdminSupportCasePatchRequest(BaseModel):
+    priority: Optional[str] = None  # low | medium | high | urgent
+    status: Optional[str] = None   # open | investigating | blocked | resolved
+    assignee_id: Optional[str] = None
+    category: Optional[str] = None  # bug | feature request | onboarding | policy question | supplier issue | other
+
+
+class CompanyProfileRequest(BaseModel):
+    name: str
+    country: Optional[str] = None
+    size_band: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    hr_contact: Optional[str] = None
+    legal_name: Optional[str] = None
+    website: Optional[str] = None
+    hq_city: Optional[str] = None
+    industry: Optional[str] = None
+    default_destination_country: Optional[str] = None
+    support_email: Optional[str] = None
+    default_working_location: Optional[str] = None
+
+
+class DossierQuestionDTO(BaseModel):
+    id: str
+    question_text: str
+    answer_type: str
+    options: Optional[List[str]] = None
+    is_mandatory: bool
+    domain: str
+    question_key: Optional[str] = None
+    source: str = "library"
+
+
+class DossierQuestionsResponse(BaseModel):
+    destination_country: Optional[str]
+    questions: List[DossierQuestionDTO]
+    answers: Dict[str, Any]
+    mandatory_unanswered_count: int
+    is_step5_complete: bool
+    sources_used: List[Dict[str, Any]] = []
+
+
+class DossierAnswerItem(BaseModel):
+    question_id: Optional[str] = None
+    case_question_id: Optional[str] = None
+    answer: Any
+
+
+class DossierAnswersRequest(BaseModel):
+    case_id: str
+    answers: List[DossierAnswerItem]
+
+
+class DossierSearchSuggestionsRequest(BaseModel):
+    case_id: str
+
+
+class DossierSuggestionDTO(BaseModel):
+    question_text: str
+    answer_type: str
+    sources: List[Dict[str, Any]]
+
+
+class DossierSearchSuggestionsResponse(BaseModel):
+    destination_country: Optional[str]
+    sources: List[Dict[str, Any]]
+    suggestions: List[DossierSuggestionDTO]
+
+
+class DossierCaseQuestionRequest(BaseModel):
+    case_id: str
+    question_text: str
+    answer_type: str
+    options: Optional[List[str]] = None
+    is_mandatory: bool = False
+    sources: Optional[List[Dict[str, Any]]] = None
+
+
+class GuidanceGenerateRequest(BaseModel):
+    case_id: str
+    mode: Optional[str] = None
+
+
+
+class HrFeedbackRequest(BaseModel):
+    message: str
+
+
+class ReadinessChecklistPatchRequest(BaseModel):
+    status: str
+    notes: Optional[str] = None
+
+
+class ReadinessMilestonePatchRequest(BaseModel):
+    completed: bool
+    notes: Optional[str] = None
+
+
+class EmployeePolicyAssistantQueryRequest(BaseModel):
+    assignment_id: str
+    message: str
+    session: Optional[Dict[str, Any]] = None
+
+
+class HrPolicyAssistantQueryRequest(BaseModel):
+    policy_id: str
+    message: str
+    document_id: Optional[str] = None
+    session: Optional[Dict[str, Any]] = None
+
+
+class _BeaconBase(BaseModel):
+    """Common beacon model config. ``extra='forbid'`` keeps the surface
+    tight — a client can't sneak in PII fields by appending them."""
+
+    model_config = {"extra": "forbid"}
+
+
+class FollowUpClickedBeacon(_BeaconBase):
+    """Pre-Sprint-1 event. Locks down the original required fields."""
+
+    event: Literal["assistant_follow_up_clicked"]
+    follow_up_intent: Optional[str] = Field(None, max_length=80)
+    follow_up_index: int = Field(..., ge=0, le=20)
+    canonical_topic: Optional[str] = Field(None, max_length=64)
+    assistant_turn_request_id: Optional[str] = Field(
+        None,
+        max_length=128,
+        description="Correlates to request_id from the policy assistant query that showed the chip.",
+    )
+
+
+# Sprint 1.5: surface label for the four new events. Enum (not free
+# string) so dashboards can group cleanly.
+_BeaconSurface = Literal["employee_fab", "hr_sidesheet", "employee_card"]
+
+
+class AssistantOpenedBeacon(_BeaconBase):
+    event: Literal["assistant_opened"]
+    surface: _BeaconSurface
+
+
+class AssistantQuestionSubmittedBeacon(_BeaconBase):
+    event: Literal["assistant_question_submitted"]
+    surface: _BeaconSurface
+    source: Literal["free_text", "shortcut", "follow_up"]
+
+
+class AssistantAnswerReceivedBeacon(_BeaconBase):
+    event: Literal["assistant_answer_received"]
+    surface: _BeaconSurface
+    answer_type: Optional[str] = Field(None, max_length=64)
+    status: str = Field(..., max_length=64)
+    request_id: Optional[str] = Field(None, max_length=128)
+
+
+class AssistantDismissedBeacon(_BeaconBase):
+    event: Literal["assistant_dismissed"]
+    surface: _BeaconSurface
+    had_question: bool
+    had_answer: bool
+
+
+# Discriminated union wrapped in RootModel so FastAPI accepts it as a
+# request body. Pydantic v2 picks the right model from the `event`
+# tag, so 422 errors point at the actual mismatch ("missing field
+# 'surface' for assistant_opened") instead of conflating all events
+# under one schema. RootModel preserves the JSON shape — the body is
+# just the event object, not wrapped in a parent key.
+class PolicyAssistantAnalyticsBeaconRequest(
+    RootModel[
+        Annotated[
+            Union[
+                FollowUpClickedBeacon,
+                AssistantOpenedBeacon,
+                AssistantQuestionSubmittedBeacon,
+                AssistantAnswerReceivedBeacon,
+                AssistantDismissedBeacon,
+            ],
+            Field(discriminator="event"),
+        ]
+    ]
+):
+    pass
+
+
+def _require_reason(reason: Optional[str]) -> None:
+    if not reason or not reason.strip():
+        raise HTTPException(status_code=400, detail="Reason is required for admin actions")
+
+
+def _deny_if_impersonating(user: Dict[str, Any]) -> None:
+    if user.get("impersonation"):
+        raise HTTPException(status_code=403, detail="View-as mode is read-only. Use admin actions instead.")
+
+
+def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = None) -> Dict[str, Any]:
+    imp = user.get("impersonation")
+    if not imp:
+        return user
+    target = db.get_user_by_id(imp.get("target_user_id"))
+    if not target:
+        return user
+    if expected_role and target.get("role") != expected_role.value:
+        return user
+    return target
+
+
+def _normalize_destination_country(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    normalized = value.strip().upper()
+    if normalized in ("SG", "SINGAPORE"):
+        return "SG"
+    if normalized in ("US", "USA", "UNITED STATES", "NEW YORK", "NEW YORK CITY", "NYC"):
+        return "US"
+    if normalized in ("GB", "UK", "UNITED KINGDOM", "LONDON", "ENGLAND"):
+        return "GB"
+    if normalized in ("FR", "FRANCE", "PARIS"):
+        return "FR"
+    if normalized in ("DE", "GERMANY", "DEUTSCHLAND", "BERLIN", "MUNICH", "MÜNCHEN"):
+        return "DE"
+    if normalized in ("NO", "NORWAY", "NORGE", "OSLO"):
+        return "NO"
+    if normalized in ("BR", "BRAZIL", "BRASIL", "RIO DE JANEIRO", "RIO", "SÃO PAULO", "SAO PAULO"):
+        return "BR"
+    if normalized in ("IT", "ITALY", "ITALIA", "ROME", "ROMA", "MILAN", "MILANO"):
+        return "IT"
+    if normalized in ("ES", "SPAIN", "ESPAÑA", "ESPANA", "MADRID", "BARCELONA"):
+        return "ES"
+    if normalized in ("AU", "AUSTRALIA", "SYDNEY", "MELBOURNE", "BRISBANE", "PERTH",
+                      "ADELAIDE", "CANBERRA", "GOLD COAST", "NEWCASTLE", "SUNSHINE COAST", "WOLLONGONG"):
+        return "AU"
+    if normalized in ("CA", "CANADA", "TORONTO", "VANCOUVER", "MONTREAL", "CALGARY",
+                      "EDMONTON", "OTTAWA", "WINNIPEG", "HAMILTON", "KITCHENER", "QUEBEC CITY"):
+        return "CA"
+    if normalized in ("CH", "SWITZERLAND", "SCHWEIZ", "SUISSE", "ZURICH", "ZÜRICH",
+                      "GENEVA", "GENÈVE", "GENEVE", "BERN", "BERNE", "BASEL", "BIEL",
+                      "LAUSANNE", "LUCERNE", "LUGANO", "ST. GALLEN", "ST GALLEN", "WINTERTHUR"):
+        return "CH"
+    if normalized in ("HK", "HONG KONG", "KOWLOON", "NEW TERRITORIES"):
+        return "HK"
+    if normalized in ("JP", "JAPAN", "TOKYO", "OSAKA", "FUKUOKA", "NAGOYA", "SAPPORO",
+                      "KAWASAKI", "KOBE", "KYOTO", "SAITAMA", "YOKOHAMA"):
+        return "JP"
+    if normalized in ("NL", "NETHERLANDS", "NEDERLAND", "AMSTERDAM", "ROTTERDAM",
+                      "THE HAGUE", "DEN HAAG", "UTRECHT", "EINDHOVEN", "GRONINGEN",
+                      "ALMERE", "BREDA", "NIJMEGEN", "TILBURG"):
+        return "NL"
+    if normalized in ("AE", "UAE", "UNITED ARAB EMIRATES", "DUBAI", "ABU DHABI",
+                      "SHARJAH", "AJMAN", "FUJAIRAH", "RAS AL KHAIMAH", "UMM AL QUWAIN"):
+        return "AE"
+    if normalized in ("ZA", "SOUTH AFRICA", "JOHANNESBURG", "CAPE TOWN", "DURBAN",
+                      "PRETORIA", "BLOEMFONTEIN", "PORT ELIZABETH", "EAST LONDON", "PIETERMARITZBURG"):
+        return "ZA"
+    return None
+
+
+def _build_profile_snapshot(draft: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "relocationBasics": draft.get("relocationBasics") or {},
+        "employeeProfile": draft.get("employeeProfile") or {},
+        "familyMembers": draft.get("familyMembers") or {},
+        "assignmentContext": draft.get("assignmentContext") or {},
+    }
+
+
+def _require_case_access(case_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
+    assignment = db.get_assignment_by_case_id(case_id) or db.get_assignment_by_id(case_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found or not visible under RLS")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    eid = effective.get("id")
+    visible = False
+    if is_employee and eid is not None and emp_id == eid:
+        visible = True
+    if is_hr and (effective.get("is_admin") or (eid is not None and hr_id == eid)):
+        visible = True
+    if not visible:
+        raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
+    return {"assignment": assignment, "effective_user": effective}
+
+
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "ReloPass API"}
 
 
-@app.post("/api/auth/register", response_model=LoginResponse)
-def register(request: RegisterRequest):
-    """Register a new user with username or email and role."""
-    username = request.username.strip() if request.username else None
-    email = request.email.strip() if request.email else None
-
-    if not username and not email:
-        raise HTTPException(status_code=400, detail="Provide a username or email")
-
-    if username:
-        if not re.match(r"^[A-Za-z0-9_]{3,30}$", username):
-            raise HTTPException(status_code=400, detail="Username must be 3-30 chars, alphanumeric or underscore")
-        if db.get_user_by_username(username):
-            raise HTTPException(status_code=400, detail="Username already in use")
-
-    if email:
-        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
-            raise HTTPException(status_code=400, detail="Invalid email format")
-        if db.get_user_by_email(email):
-            raise HTTPException(status_code=400, detail="Email already in use")
-
-    if not request.password:
-        raise HTTPException(status_code=400, detail="Password required")
-
-    # Password hashing (placeholder for stronger policy/verification)
-    from passlib.context import CryptContext
-    # Use PBKDF2 to avoid bcrypt backend issues on Windows.
-    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-    password_hash = pwd_context.hash(request.password)
-
-    user_id = str(uuid.uuid4())
-    created = db.create_user(
-        user_id=user_id,
-        username=username,
-        email=email,
-        password_hash=password_hash,
-        role=request.role.value,
-        name=request.name,
-    )
-    if not created:
-        raise HTTPException(status_code=400, detail="Unable to create user")
-
-    token = str(uuid.uuid4())
-    db.create_session(token, user_id)
-
-    return LoginResponse(
-        token=token,
-        user=UserResponse(
-            id=user_id,
-            username=username,
+def _best_effort_reconcile_employee_assignments(
+    *,
+    context: str,
+    user_id: str,
+    email: Optional[str],
+    username: Optional[str],
+    role: str,
+    request_id: Optional[str],
+) -> None:
+    """Run canonical claim/link reconcile; must not break dashboard or employee routes."""
+    try:
+        reconcile_pending_assignment_claims(
+            db,
+            user_id=user_id,
             email=email,
-            role=request.role,
-            name=request.name,
-            company=None,
+            username=username,
+            role=role,
+            request_id=request_id,
+            emit_side_effects=True,
         )
+    except Exception as exc:
+        log.warning("%s claim_reconcile skipped error=%s", context, exc)
+
+
+# ---------------------------------------------------------------------------
+# Auth endpoints (register, login, logout) moved to backend/app/routers/auth.py
+# in the main.py decomposition effort. See that file for the implementation.
+# ---------------------------------------------------------------------------
+
+PERF_DEBUG = os.getenv("PERF_DEBUG", "").lower() in ("1", "true", "yes")
+
+
+
+
+def _log_endpoint_perf(endpoint: str, request_id: Optional[str], user_id: Optional[str], total_duration_ms: float, status_code: int, db_duration_ms: Optional[float] = None):
+    """Structured JSON log for endpoint perf (when PERF_DEBUG=1)."""
+    if not PERF_DEBUG:
+        return
+    payload = {
+        "endpoint": endpoint,
+        "request_id": request_id or "",
+        "user_id": (user_id or "")[:8] if user_id else "",
+        "total_duration_ms": round(total_duration_ms, 2),
+        "status_code": status_code,
+    }
+    if db_duration_ms is not None:
+        payload["db_duration_ms"] = round(db_duration_ms, 2)
+    log.info("[endpoint-perf] %s", _json.dumps(payload))
+
+
+# ---------------------------------------------------------------------------
+# Admin console endpoints
+# ---------------------------------------------------------------------------
+@app.get("/api/admin/context")
+def get_admin_context(user: Dict[str, Any] = Depends(require_admin)):
+    return {
+        "isAdmin": True,
+        "impersonation": user.get("impersonation"),
+    }
+
+
+@app.post("/api/admin/impersonate/start")
+def start_impersonation(
+    request: AdminImpersonateRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+    authorization: Optional[str] = Header(None),
+):
+    token = (authorization or "").replace("Bearer ", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing auth token")
+    mode = request.mode.lower()
+    if mode not in ("hr", "employee"):
+        raise HTTPException(status_code=400, detail="Invalid impersonation mode")
+    db.set_admin_session(token, user["id"], request.targetUserId, mode)
+    db.log_audit(
+        actor_user_id=user["id"],
+        action_type="VIEW_AS",
+        target_type="profile",
+        target_id=request.targetUserId,
+        reason=request.reason,
+        metadata={"mode": mode},
+    )
+    return {"ok": True, "impersonation": {"targetUserId": request.targetUserId, "mode": mode}}
+
+
+@app.post("/api/admin/impersonate/stop")
+def stop_impersonation(
+    user: Dict[str, Any] = Depends(require_admin),
+    authorization: Optional[str] = Header(None),
+):
+    token = (authorization or "").replace("Bearer ", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing auth token")
+    db.clear_admin_session(token)
+    db.log_audit(
+        actor_user_id=user["id"],
+        action_type="VIEW_AS",
+        target_type="profile",
+        target_id=None,
+        reason="Stop impersonation",
+        metadata={},
+    )
+    return {"ok": True}
+
+
+@app.get("/api/admin/companies")
+def list_companies(q: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
+    items = db.get_admin_company_index(q)
+    log.info("admin_companies list query=%s count=%s", q, len(items))
+    db.log_audit(user["id"], "READ", "company", None, None, {"query": q})
+    return {"companies": items}
+
+
+@app.get("/api/admin/companies/{company_id}")
+def get_company_detail(
+    company_id: str,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
+    log.info(
+        "admin_company_detail company_id=%s user_id=%s request_id=%s",
+        company_id, user.get("id"), request_id,
+    )
+    company = db.get_company(company_id)
+    if not company:
+        log.info("admin_company_detail company_id=%s found=0 checking orphan request_id=%s", company_id, request_id)
+        # Orphan: company_id not in companies table but may appear in hr_users/relocation_cases
+        with db.engine.connect() as conn:
+            has_hr = conn.execute(
+                text("SELECT 1 FROM hr_users WHERE company_id = :cid LIMIT 1"), {"cid": company_id}
+            ).fetchone()
+            has_case = conn.execute(
+                text("SELECT 1 FROM relocation_cases WHERE company_id = :cid LIMIT 1"), {"cid": company_id}
+            ).fetchone()
+        if has_hr or has_case:
+            company = {
+                "id": company_id,
+                "name": company_id,
+                "country": None,
+                "size_band": None,
+                "address": None,
+                "phone": None,
+                "hr_contact": None,
+                "created_at": None,
+                "updated_at": None,
+                "status": None,
+                "plan_tier": None,
+                "missing_from_registry": True,
+            }
+        else:
+            log.warning("admin_company_detail company_id=%s not_found request_id=%s", company_id, request_id)
+            raise HTTPException(status_code=404, detail="Company not found")
+    try:
+        hr_users = db.list_hr_users_with_profiles(company_id)
+        employees_raw = db.list_employees_with_profiles(company_id)
+        employees = [
+            {
+                "id": e["id"],
+                "company_id": e["company_id"],
+                "profile_id": e["profile_id"],
+                "name": e.get("full_name") or e.get("email") or e.get("profile_id"),
+                "email": e.get("email"),
+                "status": e.get("status") or "active",
+                "created_at": e.get("created_at"),
+            }
+            for e in employees_raw
+        ]
+        assignments = db.list_assignments_for_company_with_details(company_id)
+        policies_data = db.get_admin_policies_by_company(company_id)
+        if policies_data and policies_data.get("policies"):
+            policies = [
+                {
+                    "policy_id": p["policy_id"],
+                    "title": p.get("title"),
+                    "latest_version": p.get("latest_version_number"),
+                    "status": p.get("latest_version_status") or p.get("extraction_status") or "draft",
+                    "published": bool(p.get("published_version_id")),
+                }
+                for p in policies_data["policies"]
+            ]
+        else:
+            policies = []
+        summary = {
+            "hr_users_count": len(hr_users),
+            "employee_count": len(employees),
+            "assignments_count": len(assignments),
+            "policies_count": len(policies),
+        }
+        orphan_diagnostics = db.get_company_detail_orphan_diagnostics(company_id)
+        log.info(
+            "admin_company_detail company_id=%s found=1 hr=%s employees=%s assignments=%s policies=%s request_id=%s",
+            company_id, len(hr_users), len(employees), len(assignments), len(policies), request_id,
+        )
+        db.log_audit(user["id"], "READ", "company", company_id, None, {"detail": True})
+        return {
+            "company": company,
+            "summary": summary,
+            "hr_users": hr_users,
+            "employees": employees,
+            "assignments": assignments,
+            "policies": policies,
+            "counts_summary": summary,
+            "orphan_diagnostics": orphan_diagnostics,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception(
+            "admin_company_detail company_id=%s error=%s request_id=%s",
+            company_id, type(e).__name__, request_id,
+        )
+        raise
+
+
+class AdminCreateCompanyRequest(BaseModel):
+    name: str
+    country: Optional[str] = None
+    size_band: Optional[str] = None
+    status: Optional[str] = None
+    plan_tier: Optional[str] = None
+    hr_seat_limit: Optional[int] = None
+    employee_seat_limit: Optional[int] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    hr_contact: Optional[str] = None
+    support_email: Optional[str] = None
+
+
+class AdminUpdateCompanyRequest(BaseModel):
+    name: Optional[str] = None
+    country: Optional[str] = None
+    size_band: Optional[str] = None
+    status: Optional[str] = None
+    plan_tier: Optional[str] = None
+    hr_seat_limit: Optional[int] = None
+    employee_seat_limit: Optional[int] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    hr_contact: Optional[str] = None
+    support_email: Optional[str] = None
+
+
+@app.post("/api/admin/companies", status_code=201)
+def create_company(body: AdminCreateCompanyRequest, user: Dict[str, Any] = Depends(require_admin)):
+    company_id = str(uuid.uuid4())
+    db.create_company(
+        company_id=company_id,
+        name=body.name,
+        country=body.country,
+        size_band=body.size_band,
+        address=body.address,
+        phone=body.phone,
+        hr_contact=body.hr_contact,
+        support_email=body.support_email,
+        status=body.status,
+        plan_tier=body.plan_tier,
+        hr_seat_limit=body.hr_seat_limit,
+        employee_seat_limit=body.employee_seat_limit,
+    )
+    company = db.get_company(company_id)
+    log.info("admin company created id=%s name=%s by=%s", company_id, body.name, user.get("id"))
+    db.log_audit(user["id"], "CREATE", "company", company_id, None, {"name": body.name})
+    return {"company": company}
+
+
+@app.patch("/api/admin/companies/{company_id}")
+def update_company(company_id: str, body: AdminUpdateCompanyRequest, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_company(company_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Company not found")
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        return {"company": existing}
+    updated = db.update_company(company_id, **payload)
+    if not updated:
+        return {"company": existing}
+    company = db.get_company(company_id)
+    log.info("admin company updated id=%s by=%s keys=%s", company_id, user.get("id"), list(payload.keys()))
+    db.log_audit(user["id"], "UPDATE", "company", company_id, None, payload)
+    return {"company": company}
+
+
+@app.post("/api/admin/companies/{company_id}/deactivate")
+def deactivate_company(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_company(company_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Company not found")
+    if (existing.get("status") or "").lower() == "inactive":
+        return {"company": existing, "message": "Already inactive"}
+    db.deactivate_company(company_id)
+    company = db.get_company(company_id)
+    log.info("admin company deactivated id=%s by=%s", company_id, user.get("id"))
+    db.log_audit(user["id"], "DEACTIVATE", "company", company_id, None, {})
+    return {"company": company, "message": "Deactivated"}
+
+
+@app.post("/api/admin/companies/{company_id}/archive")
+def archive_company(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    """Soft-delete: set status='archived' so the company is hidden from active
+    lists but its data is preserved. Reversible via PATCH with status='active'."""
+    existing = db.get_company(company_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Company not found")
+    if (existing.get("status") or "").lower() == "archived":
+        return {"company": existing, "message": "Already archived"}
+    db.archive_company(company_id)
+    company = db.get_company(company_id)
+    log.info("admin company archived id=%s by=%s", company_id, user.get("id"))
+    db.log_audit(user["id"], "ARCHIVE", "company", company_id, None, {})
+    return {"company": company, "message": "Archived"}
+
+
+@app.delete("/api/admin/companies/{company_id}")
+def delete_company(company_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    """Hard-delete: removes the company row entirely. Will orphan rows in
+    tables that hold a company_id without an FK constraint (employees,
+    hr_users, profiles, relocation_cases, support_cases) — the row goes,
+    those references remain. Use Archive for reversible removal."""
+    existing = db.get_company(company_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Company not found")
+    ok = db.delete_company_hard(company_id)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Delete failed")
+    log.info("admin company deleted id=%s by=%s", company_id, user.get("id"))
+    db.log_audit(user["id"], "DELETE", "company", company_id, None, {})
+    return {"deleted": company_id, "message": "Deleted"}
+
+
+@app.get("/api/admin/users")
+def list_users(
+    q: Optional[str] = Query(None),
+    company_id: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    people, summary = db.get_admin_people_index(company_id=company_id, query=q, role=role)
+    log.info("admin_users list company_id=%s role=%s query=%s count=%s", company_id, role, q, summary.get("count"))
+    db.log_audit(user["id"], "READ", "profile", None, None, {"query": q, "company_id": company_id, "role": role})
+    return {"profiles": people, "summary": summary}
+
+
+@app.get("/api/admin/people")
+def list_people(
+    company_id: Optional[str] = Query(None),
+    role: Optional[str] = Query(None),
+    query: Optional[str] = Query(None, alias="q"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin people list with company, role, and text filters. Returns admin-safe fields including company_name, status."""
+    people, summary = db.get_admin_people_index(company_id=company_id, query=query, role=role)
+    db.log_audit(user["id"], "READ", "people", None, None, {"company_id": company_id, "role": role, "query": query})
+    return {"people": people, "summary": summary}
+
+
+class AdminCreatePersonRequest(BaseModel):
+    email: str
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    company_id: Optional[str] = None
+
+
+class AdminUpdatePersonRequest(BaseModel):
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    company_id: Optional[str] = None
+    status: Optional[str] = None
+
+
+class AdminAssignCompanyRequest(BaseModel):
+    company_id: str
+
+
+class AdminSetRoleRequest(BaseModel):
+    role: str
+
+
+@app.post("/api/admin/people", status_code=201)
+def create_person(
+    body: AdminCreatePersonRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    email = (body.email or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="email required")
+    request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
+    person_id = str(uuid.uuid4())
+    try:
+        role = (body.role or "EMPLOYEE").strip().upper()
+        db.create_profile(
+            person_id=person_id,
+            email=email,
+            full_name=body.full_name,
+            role=role,
+            company_id=body.company_id,
+        )
+        if role == "HR" and body.company_id:
+            db.ensure_hr_user_for_profile(person_id, body.company_id)
+        if role in ("EMPLOYEE", "EMPLOYEE_USER") and body.company_id:
+            db.ensure_employee_for_profile(person_id, body.company_id)
+    except IntegrityError as e:
+        log.warning(
+            "admin_create_person conflict request_id=%s email=%s company_id=%s error=%r",
+            request_id,
+            email,
+            body.company_id,
+            e,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "A person with this email already exists.", "request_id": request_id},
+        )
+    except Exception as e:
+        log.error(
+            "admin_create_person failed request_id=%s email=%s full_name=%s role=%s company_id=%s error=%r",
+            request_id,
+            email,
+            body.full_name,
+            body.role,
+            body.company_id,
+            e,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"message": "Failed to create person", "request_id": request_id},
+        )
+    profile = db.get_profile_record(person_id)
+    log.info(
+        "admin_create_person success request_id=%s id=%s email=%s company_id=%s by=%s",
+        request_id,
+        person_id,
+        email,
+        body.company_id,
+        user.get("id"),
+    )
+    db.log_audit(user["id"], "CREATE", "profile", person_id, None, {"email": email})
+    return {"person": profile}
+
+
+@app.patch("/api/admin/people/{person_id}")
+def update_person(person_id: str, body: AdminUpdatePersonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_profile_record(person_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Person not found")
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        return {"person": existing}
+    updated = db.update_profile(person_id, **payload)
+    if not updated:
+        return {"person": existing}
+    profile = db.get_profile_record(person_id)
+    db.log_audit(user["id"], "UPDATE", "profile", person_id, None, payload)
+    return {"person": profile}
+
+
+@app.post("/api/admin/people/{person_id}/assign-company")
+def assign_person_company(person_id: str, body: AdminAssignCompanyRequest, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_profile_record(person_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Person not found")
+    db.set_profile_company(person_id, body.company_id)
+    if (existing.get("role") or "").upper() == "HR":
+        db.ensure_hr_user_for_profile(person_id, body.company_id)
+    if (existing.get("role") or "").upper() in ("EMPLOYEE", "EMPLOYEE_USER"):
+        db.ensure_employee_for_profile(person_id, body.company_id)
+    profile = db.get_profile_record(person_id)
+    db.log_audit(user["id"], "ASSIGN_COMPANY", "profile", person_id, None, {"company_id": body.company_id})
+    return {"person": profile}
+
+
+@app.post("/api/admin/people/{person_id}/set-role")
+def set_person_role(person_id: str, body: AdminSetRoleRequest, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_profile_record(person_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Person not found")
+    db.set_profile_role(person_id, body.role)
+    if (body.role or "").strip().upper() == "HR" and existing.get("company_id"):
+        db.ensure_hr_user_for_profile(person_id, existing["company_id"])
+    if (body.role or "").strip().upper() in ("EMPLOYEE", "EMPLOYEE_USER") and existing.get("company_id"):
+        db.ensure_employee_for_profile(person_id, existing["company_id"])
+    profile = db.get_profile_record(person_id)
+    db.log_audit(user["id"], "SET_ROLE", "profile", person_id, None, {"role": body.role})
+    return {"person": profile}
+
+
+@app.post("/api/admin/people/{person_id}/deactivate")
+def deactivate_person(person_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    existing = db.get_profile_record(person_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Person not found")
+    db.deactivate_profile(person_id)
+    profile = db.get_profile_record(person_id)
+    db.log_audit(user["id"], "DEACTIVATE", "profile", person_id, None, {})
+    return {"person": profile}
+
+
+@app.get("/api/admin/employees")
+def list_employees(company_id: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
+    if company_id:
+        db.ensure_employees_for_company(company_id)
+        db.ensure_directory_from_assignments_for_company(company_id)
+        items = db.list_employees_with_profiles(company_id)
+    else:
+        items = db.list_employees(company_id)
+    db.log_audit(user["id"], "READ", "employee", None, None, {"company_id": company_id})
+    return {"employees": items}
+
+
+@app.get("/api/admin/hr-users")
+def list_hr_users(company_id: Optional[str] = Query(None), user: Dict[str, Any] = Depends(require_admin)):
+    if company_id:
+        db.ensure_hr_users_for_company(company_id)
+        items = db.list_hr_users_with_profiles(company_id)
+    else:
+        items = db.list_hr_users(company_id)
+    db.log_audit(user["id"], "READ", "hr_user", None, None, {"company_id": company_id})
+    return {"hr_users": items}
+
+
+@app.get("/api/admin/relocations")
+def list_relocations(
+    company_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    items = db.list_relocation_cases(company_id=company_id, status=status)
+    db.log_audit(user["id"], "READ", "relocation_case", None, None, {"company_id": company_id, "status": status})
+    return {"relocations": items}
+
+
+@app.get("/api/admin/assignments")
+def list_admin_assignments(
+    company_id: Optional[str] = Query(None),
+    employee_user_id: Optional[str] = Query(None),
+    employee_search: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    destination_country: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    items = db.list_admin_assignments(
+        company_id=company_id,
+        employee_user_id=employee_user_id,
+        employee_search=employee_search,
+        status=status,
+        destination_country=destination_country,
+    )
+    db.log_audit(
+        user["id"], "READ", "admin_assignments", None, None,
+        {"company_id": company_id, "status": status, "destination": destination_country},
+    )
+    return {"assignments": items}
+
+
+@app.get("/api/admin/assignments/{assignment_id}")
+def get_admin_assignment_detail(assignment_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    detail = db.get_admin_assignment_detail(assignment_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.log_audit(user["id"], "READ", "admin_assignment_detail", assignment_id, None, {})
+    return {"assignment": detail}
+
+
+class AdminReassignEmployeeCompanyRequest(BaseModel):
+    reason: str
+    company_id: str
+
+
+class AdminReassignHrOwnerRequest(BaseModel):
+    reason: str
+    hr_user_id: str
+
+
+class AdminFixCompanyLinkageRequest(BaseModel):
+    reason: str
+    company_id: str
+
+
+@app.patch("/api/admin/assignments/{assignment_id}/reassign-employee-company")
+def admin_reassign_employee_company(
+    assignment_id: str,
+    request: AdminReassignEmployeeCompanyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    _require_reason(request.reason)
+    detail = db.get_admin_assignment_detail(assignment_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    emp_id = detail.get("employee_user_id")
+    if not emp_id:
+        raise HTTPException(status_code=400, detail="Assignment has no linked employee")
+    db.admin_reassign_employee_company(emp_id, request.company_id)
+    db.log_audit(user["id"], "REASSIGN_EMPLOYEE_COMPANY", "assignment", assignment_id, request.reason, {"company_id": request.company_id})
+    return {"ok": True}
+
+
+@app.patch("/api/admin/assignments/{assignment_id}/reassign-hr-owner")
+def admin_reassign_hr_owner(
+    assignment_id: str,
+    request: AdminReassignHrOwnerRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    _require_reason(request.reason)
+    detail = db.get_admin_assignment_detail(assignment_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.admin_reassign_hr_owner(assignment_id, request.hr_user_id)
+    db.log_audit(user["id"], "REASSIGN_HR_OWNER", "assignment", assignment_id, request.reason, {"hr_user_id": request.hr_user_id})
+    return {"ok": True}
+
+
+@app.patch("/api/admin/assignments/{assignment_id}/fix-company-linkage")
+def admin_fix_assignment_company_linkage(
+    assignment_id: str,
+    request: AdminFixCompanyLinkageRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    _require_reason(request.reason)
+    detail = db.get_admin_assignment_detail(assignment_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.admin_fix_assignment_company_linkage(assignment_id, request.company_id)
+    db.log_audit(user["id"], "FIX_COMPANY_LINKAGE", "assignment", assignment_id, request.reason, {"company_id": request.company_id})
+    return {"ok": True}
+
+
+class AdminAssignmentStatusRequest(BaseModel):
+    status: str
+
+
+@app.patch("/api/admin/assignments/{assignment_id}/status")
+def admin_update_assignment_status(
+    assignment_id: str,
+    body: AdminAssignmentStatusRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: set assignment status (e.g. Save status change or Archive)."""
+    if not db.get_assignment_by_id(assignment_id):
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    status = (body.status or "").strip()
+    if not status:
+        raise HTTPException(status_code=400, detail="status is required")
+    try:
+        db.update_assignment_status(assignment_id, status, request_id=None)
+    except Exception as e:
+        log.exception("admin_update_assignment_status: update_assignment_status failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update assignment status. Please try again or contact support.",
+        ) from e
+    db.log_audit(user["id"], "UPDATE_STATUS", "assignment", assignment_id, None, {"status": status})
+    return {"ok": True, "status": status}
+
+
+class AdminCreateAssignmentRequest(BaseModel):
+    company_id: str
+    hr_user_id: str
+    employee_user_id: Optional[str] = None
+    employee_identifier: Optional[str] = None
+    employee_first_name: Optional[str] = None
+    employee_last_name: Optional[str] = None
+    destination_country: Optional[str] = None
+
+
+@app.post("/api/admin/assignments")
+def admin_create_assignment(
+    body: AdminCreateAssignmentRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: create a new case and assignment for a company (minimal case, assigned status)."""
+    if not db.get_company(body.company_id):
+        raise HTTPException(status_code=404, detail="Company not found")
+    if not db.get_profile_record(body.hr_user_id):
+        raise HTTPException(status_code=404, detail="HR profile not found")
+    hr_users = db.list_hr_users(body.company_id)
+    if not any(h.get("profile_id") == body.hr_user_id for h in hr_users):
+        raise HTTPException(status_code=400, detail="HR user is not in the selected company")
+    employee_user_id: Optional[str] = None
+    employee_identifier = (body.employee_identifier or "").strip() or None
+    if body.employee_user_id:
+        emp = db.get_employee_by_profile_for_company(body.employee_user_id, body.company_id)
+        if not emp:
+            raise HTTPException(status_code=400, detail="Employee is not in the selected company")
+        employee_user_id = body.employee_user_id
+        employee_identifier = (emp.get("email") or emp.get("full_name") or employee_identifier or "admin-created")
+    elif employee_identifier:
+        # Link to existing user by email/username so employee sees assignment when they log in
+        existing_user = db.get_user_by_identifier(employee_identifier)
+        if existing_user:
+            employee_user_id = existing_user["id"]
+    if not employee_identifier:
+        employee_identifier = "admin-created"
+    employee_first_name = (body.employee_first_name or "").strip() or None
+    employee_last_name = (body.employee_last_name or "").strip() or None
+    case_id = str(uuid.uuid4())
+    try:
+        db.create_case(case_id, body.hr_user_id, {}, company_id=body.company_id)
+        uar = create_assignment_with_contact_and_invites(
+            db,
+            company_id=body.company_id,
+            hr_user_id=body.hr_user_id,
+            case_id=case_id,
+            employee_identifier_raw=employee_identifier,
+            employee_first_name=employee_first_name,
+            employee_last_name=employee_last_name,
+            employee_user_id=employee_user_id,
+            assignment_status=AssignmentStatus.ASSIGNED.value,
+            request_id=None,
+            observability_channel="admin",
+        )
+        assignment_id = str(uar.assignment_id)
+        if body.destination_country:
+            db.update_relocation_case_host_country(case_id, body.destination_country)
+        db.log_audit(
+            user["id"],
+            "CREATE",
+            "assignment",
+            assignment_id,
+            None,
+            {"case_id": case_id, "company_id": body.company_id, "hr_user_id": body.hr_user_id},
+        )
+        return {"ok": True, "assignment_id": assignment_id, "case_id": case_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except IntegrityError:
+        log.exception("admin_create_assignment: integrity constraint (assignment or case)")
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "assignment_create_conflict",
+                "message": "Could not create assignment (database conflict). Try again or check HR/employee linkage.",
+            },
+        )
+    except SQLAlchemyError:
+        log.exception("admin_create_assignment: database error")
+        raise HTTPException(
+            status_code=500,
+            detail="Database error while creating assignment. Please try again.",
+        )
+
+
+@app.get("/api/admin/data-integrity/overview")
+def get_data_integrity_overview(user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: entity counts and orphan flags for data-integrity dashboard."""
+    data = db.get_data_integrity_overview()
+    db.log_audit(user["id"], "READ", "data_integrity_overview", None, None, {})
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Admin reconciliation (repair missing links; no destructive cleanup)
+# ---------------------------------------------------------------------------
+
+class ReconciliationLinkPersonCompanyRequest(BaseModel):
+    profile_id: str
+    company_id: str
+
+
+class ReconciliationLinkAssignmentCompanyRequest(BaseModel):
+    assignment_id: str
+    company_id: str
+    reason: str
+
+
+class ReconciliationLinkAssignmentPersonRequest(BaseModel):
+    assignment_id: str
+    profile_id: str
+
+
+class ReconciliationLinkPolicyCompanyRequest(BaseModel):
+    policy_id: str
+    company_id: str
+
+
+@app.get("/api/admin/reconciliation/report")
+def get_reconciliation_report(user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: full reconciliation report (companies, people, assignments, policies, missing links)."""
+    data = db.get_reconciliation_report()
+    db.log_audit(user["id"], "READ", "reconciliation_report", None, None, {})
+    return data
+
+
+@app.post("/api/admin/reconciliation/backfill-test-company")
+def admin_backfill_test_company(
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """
+    One-time non-destructive backfill: link orphan profiles, hr_users, and relocation_cases
+    to the company named exactly 'Test company'. Does not overwrite existing linkage.
+    """
+    result = db.run_admin_reconciliation_backfill_test_company("Test company")
+    db.log_audit(
+        user["id"],
+        "RECONCILIATION_BACKFILL",
+        "reconciliation",
+        None,
+        None,
+        result.get("summary") or {},
+    )
+    return result
+
+
+@app.post("/api/admin/reconciliation/link-person-company")
+def reconciliation_link_person_company(
+    body: ReconciliationLinkPersonCompanyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: attach a profile (person) to a company. Updates profiles.company_id and employees if present."""
+    if not db.get_profile_record(body.profile_id):
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if not db.get_company(body.company_id):
+        raise HTTPException(status_code=404, detail="Company not found")
+    db.admin_reassign_employee_company(body.profile_id, body.company_id)
+    db.log_audit(user["id"], "RECONCILIATION_LINK_PERSON_COMPANY", "profile", body.profile_id, None, {"company_id": body.company_id})
+    return {"ok": True}
+
+
+@app.post("/api/admin/reconciliation/link-assignment-company")
+def reconciliation_link_assignment_company(
+    body: ReconciliationLinkAssignmentCompanyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: set assignment's case company (relocation_cases.company_id)."""
+    _require_reason(body.reason)
+    if not db.get_assignment_by_id(body.assignment_id):
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not db.get_company(body.company_id):
+        raise HTTPException(status_code=404, detail="Company not found")
+    db.admin_fix_assignment_company_linkage(body.assignment_id, body.company_id)
+    db.log_audit(user["id"], "RECONCILIATION_LINK_ASSIGNMENT_COMPANY", "assignment", body.assignment_id, body.reason, {"company_id": body.company_id})
+    return {"ok": True}
+
+
+@app.post("/api/admin/reconciliation/link-assignment-person")
+def reconciliation_link_assignment_person(
+    body: ReconciliationLinkAssignmentPersonRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: attach a profile (person) as employee to an assignment."""
+    if not db.get_assignment_by_id(body.assignment_id):
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not db.get_profile_record(body.profile_id):
+        raise HTTPException(status_code=404, detail="Profile not found")
+    db.attach_employee_to_assignment(body.assignment_id, body.profile_id)
+    db.log_audit(user["id"], "RECONCILIATION_LINK_ASSIGNMENT_PERSON", "assignment", body.assignment_id, None, {"profile_id": body.profile_id})
+    return {"ok": True}
+
+
+@app.post("/api/admin/reconciliation/link-policy-company")
+def reconciliation_link_policy_company(
+    body: ReconciliationLinkPolicyCompanyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: reassign a company_policy to a company."""
+    if not db.get_company_policy(body.policy_id):
+        raise HTTPException(status_code=404, detail="Policy not found")
+    if not db.get_company(body.company_id):
+        raise HTTPException(status_code=404, detail="Company not found")
+    db.admin_link_policy_company(body.policy_id, body.company_id)
+    db.log_audit(user["id"], "RECONCILIATION_LINK_POLICY_COMPANY", "company_policy", body.policy_id, None, {"company_id": body.company_id})
+    return {"ok": True}
+
+
+@app.get("/api/admin/debug/runtime-database")
+def debug_runtime_database(user: Dict[str, Any] = Depends(require_admin)):
+    """
+    Admin diagnostic: show current DB scheme/target and seed flags.
+    Safe to expose (sanitized, no passwords).
+    """
+    info = Database.get_db_info()
+    db_url = info.get("db_url", "")
+    # Sanitize: drop credentials if present.
+    if "@" in db_url and "://" in db_url:
+        scheme, rest = db_url.split("://", 1)
+        if "@" in rest:
+            rest = rest.split("@", 1)[-1]
+        db_url = f"{scheme}://{rest}"
+    disable_demo_reseed = DISABLE_DEMO_RESEED
+    allow_legacy_demo_seed = ALLOW_LEGACY_DEMO_SEED
+    seed_guard_active = _db_scheme == "sqlite" and disable_demo_reseed
+    return {
+        "db_scheme": info.get("db_url_scheme"),
+        "database_target": db_url,
+        "disable_demo_reseed": disable_demo_reseed,
+        "allow_legacy_demo_seed": allow_legacy_demo_seed,
+        "seed_guard_active": seed_guard_active,
+    }
+
+
+@app.get("/api/admin/debug/test-company-graph")
+def debug_test_company_graph(user: Dict[str, Any] = Depends(require_admin)):
+    """
+    Admin diagnostic: snapshot of Test company graph (counts + sample rows).
+    """
+    TEST_COMPANY_ID = db.TEST_COMPANY_FIXED_ID
+    with db.engine.connect() as conn:
+        company = db.get_company(TEST_COMPANY_ID)
+        profiles = conn.execute(
+            text("SELECT id, role, email, company_id FROM profiles WHERE company_id = :cid ORDER BY id LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        hr_users = conn.execute(
+            text("SELECT id, company_id, profile_id FROM hr_users WHERE company_id = :cid ORDER BY id LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        employees = conn.execute(
+            text("SELECT id, company_id, profile_id, relocation_case_id FROM employees WHERE company_id = :cid ORDER BY id LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        cases = conn.execute(
+            text("SELECT id, company_id, employee_id, hr_user_id, status, stage FROM relocation_cases WHERE company_id = :cid ORDER BY id LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        assignments = conn.execute(
+            text(
+                """
+                SELECT a.id, a.case_id, a.canonical_case_id, a.hr_user_id, a.employee_user_id,
+                       a.employee_identifier, a.status
+                FROM case_assignments a
+                LEFT JOIN relocation_cases rc ON rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)
+                LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
+                WHERE rc.company_id = :cid OR (rc.company_id IS NULL AND hu.company_id = :cid)
+                ORDER BY a.created_at DESC
+                LIMIT 20
+                """
+            ),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+        policies = conn.execute(
+            text("SELECT id, company_id, title, extraction_status FROM company_policies WHERE company_id = :cid ORDER BY created_at DESC LIMIT 20"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchall()
+
+    return {
+        "company": company,
+        "counts": {
+            "profiles": len(profiles),
+            "hr_users": len(hr_users),
+            "employees": len(employees),
+            "relocation_cases": len(cases),
+            "case_assignments": len(assignments),
+            "policies": len(policies),
+        },
+        "sample_profiles": [dict(r._mapping) for r in profiles],
+        "sample_hr_users": [dict(r._mapping) for r in hr_users],
+        "sample_employees": [dict(r._mapping) for r in employees],
+        "sample_cases": [dict(r._mapping) for r in cases],
+        "sample_assignments": [dict(r._mapping) for r in assignments],
+        "sample_policies": [dict(r._mapping) for r in policies],
+    }
+
+
+@app.post("/api/admin/reconciliation/rebuild-test-company-graph")
+def rebuild_test_company_graph(user: Dict[str, Any] = Depends(require_admin)):
+    """
+    Admin: full, idempotent rebuild of Test company graph in the current runtime DB.
+    - Reassigns non-admin demo/test users and related seats/cases to the fixed Test company.
+    - Repairs HR/employee seats and case/assignment linkage when recoverable.
+    """
+    TEST_COMPANY_ID = db.TEST_COMPANY_FIXED_ID
+
+    # Simple before snapshot: counts per table for Test company
+    with db.engine.connect() as conn:
+        before_profiles = conn.execute(
+            text("SELECT COUNT(*) AS n FROM profiles WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        before_hr = conn.execute(
+            text("SELECT COUNT(*) AS n FROM hr_users WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        before_emp = conn.execute(
+            text("SELECT COUNT(*) AS n FROM employees WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        before_cases = conn.execute(
+            text("SELECT COUNT(*) AS n FROM relocation_cases WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        before_policies = conn.execute(
+            text("SELECT COUNT(*) AS n FROM company_policies WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+
+    summary = db.rebuild_test_company_graph()
+
+    with db.engine.connect() as conn:
+        after_profiles = conn.execute(
+            text("SELECT COUNT(*) AS n FROM profiles WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        after_hr = conn.execute(
+            text("SELECT COUNT(*) AS n FROM hr_users WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        after_emp = conn.execute(
+            text("SELECT COUNT(*) AS n FROM employees WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        after_cases = conn.execute(
+            text("SELECT COUNT(*) AS n FROM relocation_cases WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+        after_policies = conn.execute(
+            text("SELECT COUNT(*) AS n FROM company_policies WHERE company_id = :cid"),
+            {"cid": TEST_COMPANY_ID},
+        ).fetchone()._mapping["n"]
+
+    db.log_audit(
+        user["id"],
+        "RECONCILIATION_REBUILD_TEST_COMPANY",
+        "reconciliation",
+        None,
+        None,
+        summary,
     )
 
+    return {
+        "ok": True,
+        "summary": {
+            "test_company_id": db.TEST_COMPANY_FIXED_ID,
+            **summary,
+        },
+        "before": {
+            "profiles": before_profiles,
+            "hr_users": before_hr,
+            "employees": before_emp,
+            "relocation_cases": before_cases,
+            "policies": before_policies,
+        },
+        "after": {
+            "profiles": after_profiles,
+            "hr_users": after_hr,
+            "employees": after_emp,
+            "relocation_cases": after_cases,
+            "policies": after_policies,
+        },
+    }
 
-@app.post("/api/auth/login", response_model=LoginResponse)
-def login(request: LoginRequest):
-    """Login with username or email + password."""
-    identifier = request.identifier.strip()
-    user = db.get_user_by_identifier(identifier)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not user.get("password_hash"):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+class AdminPatchPolicyRequest(BaseModel):
+    title: Optional[str] = None
+    version: Optional[str] = None
+    effective_date: Optional[str] = None
+    publish_version_id: Optional[str] = None
+    unpublish: Optional[bool] = None
 
-    from passlib.context import CryptContext
-    # Use PBKDF2 to avoid bcrypt backend issues on Windows.
-    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-    if not pwd_context.verify(request.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = str(uuid.uuid4())
-    db.create_session(token, user["id"])
+class AdminApplyDefaultTemplateRequest(BaseModel):
+    company_id: str
+    template_id: Optional[str] = None
+    overwrite_existing: Optional[bool] = False
 
-    return LoginResponse(
-        token=token,
-        user=UserResponse(
-            id=user["id"],
-            username=user.get("username"),
-            email=user.get("email"),
-            role=UserRole(user["role"]),
-            name=user.get("name"),
-            company=user.get("company"),
+
+@app.get("/api/admin/policies/overview")
+def list_admin_policy_overview(
+    company_id: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: per-company policy status for overview."""
+    items = db.list_admin_policy_overview(company_id=company_id)
+    db.log_audit(user["id"], "READ", "admin_policy_overview", None, None, {"company_id": company_id})
+    return {"companies": items}
+
+
+@app.get("/api/admin/policies")
+def list_admin_policies(
+    company_id: Optional[str] = Query(None, description="Filter by company; required for company-scoped list"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: list policies for a company. Requires company_id."""
+    if not company_id or not company_id.strip():
+        raise HTTPException(status_code=400, detail="company_id is required")
+    data = db.get_admin_policies_by_company(company_id.strip())
+    if data is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    db.log_audit(user["id"], "READ", "admin_policies", None, None, {"company_id": company_id})
+    return data
+
+
+@app.get("/api/admin/policies/{policy_id}")
+def get_admin_policy_detail(policy_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: single policy with company, versions, published version."""
+    data = db.get_admin_policy_detail(policy_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    db.log_audit(user["id"], "READ", "admin_policy_detail", policy_id, None, {})
+    return data
+
+
+@app.get("/api/admin/policies/{policy_id}/versions")
+def list_admin_policy_versions(policy_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: list all versions for a policy."""
+    policy = db.get_company_policy(policy_id)
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    versions = db.list_policy_versions(policy_id)
+    db.log_audit(user["id"], "READ", "admin_policy_versions", policy_id, None, {})
+    return {"policy_id": policy_id, "versions": versions}
+
+
+@app.patch("/api/admin/policies/{policy_id}")
+def patch_admin_policy(
+    policy_id: str,
+    body: AdminPatchPolicyRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: update policy metadata and/or publish/unpublish a version."""
+    policy = db.get_company_policy(policy_id)
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        return db.get_admin_policy_detail(policy_id)
+
+    if body.title is not None or body.version is not None or body.effective_date is not None:
+        db.update_company_policy_meta(
+            policy_id,
+            title=body.title,
+            version=body.version,
+            effective_date=body.effective_date,
         )
+    if body.unpublish is True:
+        db.archive_all_published_versions(policy_id)
+        db.log_audit(user["id"], "ADMIN_UNPUBLISH_POLICY", "policy_version", policy_id, None, {})
+    elif body.publish_version_id:
+        vid = body.publish_version_id
+        version = db.get_policy_version(vid)
+        if not version or version.get("policy_id") != policy_id:
+            raise HTTPException(status_code=400, detail="Version not found or does not belong to this policy")
+        from .services.policy_publish_gate import require_employee_publishable_policy_version
+
+        require_employee_publishable_policy_version(db, vid)
+        db.archive_other_published_versions(policy_id, vid)
+        db.update_policy_version_status(vid, "published")
+        db.log_audit(user["id"], "ADMIN_PUBLISH_POLICY", "policy_version", policy_id, None, {"version_id": vid})
+
+    updated = db.get_admin_policy_detail(policy_id)
+    db.log_audit(user["id"], "UPDATE", "admin_policy", policy_id, None, payload)
+    return updated
+
+
+@app.get("/api/admin/policies/templates")
+def list_admin_policy_templates(user: Dict[str, Any] = Depends(require_admin)):
+    """Admin: list default platform policy templates (empty list if table or data is unavailable)."""
+    try:
+        templates = db.list_default_policy_templates()
+        db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {})
+        return {"templates": templates}
+    except Exception as e:
+        log.warning("list_admin_policy_templates handler failed (returning empty): %s", e)
+        db.log_audit(user["id"], "READ", "admin_policy_templates", None, None, {"error": "fallback_empty"})
+        return {"templates": []}
+
+
+@app.post("/api/admin/policies/apply-default-template")
+def apply_default_template_to_company(
+    body: AdminApplyDefaultTemplateRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin: apply a default policy template to a company. Creates a new company policy from the template."""
+    template_id = body.template_id
+    if not template_id:
+        templates = db.list_default_policy_templates()
+        default_one = next((t for t in templates if t.get("is_default_template")), templates[0] if templates else None)
+        if not default_one:
+            raise HTTPException(status_code=404, detail="No default template found")
+        template_id = default_one["id"]
+    result = db.apply_default_template_to_company(
+        company_id=body.company_id,
+        template_id=template_id,
+        overwrite_existing=body.overwrite_existing or False,
+        created_by=user.get("id"),
     )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Apply failed"))
+    db.log_audit(
+        user["id"], "APPLY_DEFAULT_TEMPLATE", "admin_policy",
+        result.get("policy_id"), None,
+        {"company_id": body.company_id, "template_id": template_id},
+    )
+    return result
+
+
+@app.get("/api/admin/support-cases")
+def list_support_cases(
+    status: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    company_id: Optional[str] = Query(None),
+    priority: Optional[str] = Query(None, description="low | medium | high | urgent"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """List support cases (tickets) with optional company, status, severity, priority filters."""
+    items = db.list_support_cases(status=status, severity=severity, company_id=company_id, priority=priority)
+    db.log_audit(user["id"], "READ", "support_case", None, None, {"status": status, "severity": severity, "company_id": company_id, "priority": priority})
+    return {"support_cases": items}
+
+
+@app.patch("/api/admin/support-cases/{case_id}")
+def patch_support_case(
+    case_id: str,
+    body: AdminSupportCasePatchRequest,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Update ticket: priority, status, assignee_id, category."""
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        out = db.get_support_case(case_id)
+        if not out:
+            raise HTTPException(status_code=404, detail="Support case not found")
+        return out
+    if body.priority is not None and body.priority not in ("low", "medium", "high", "urgent"):
+        raise HTTPException(status_code=400, detail="priority must be low, medium, high, or urgent")
+    if body.status is not None and body.status not in ("open", "investigating", "blocked", "resolved"):
+        raise HTTPException(status_code=400, detail="status must be open, investigating, blocked, or resolved")
+    out = db.update_support_case(
+        case_id,
+        priority=body.priority,
+        status=body.status,
+        assignee_id=body.assignee_id,
+        category=body.category,
+    )
+    if not out:
+        raise HTTPException(status_code=404, detail="Support case not found")
+    db.log_audit(user["id"], "UPDATE", "support_case", case_id, None, payload)
+    return out
+
+
+@app.get("/api/admin/support-cases/{case_id}/notes")
+def list_support_notes(case_id: str, user: Dict[str, Any] = Depends(require_admin)):
+    items = db.list_support_notes(case_id)
+    db.log_audit(user["id"], "READ", "support_case", case_id, None, {"notes": True})
+    return {"notes": items}
+
+
+@app.post("/api/admin/support-cases/{case_id}/notes")
+def add_support_note(case_id: str, request: AdminSupportNoteRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    db.add_support_note(case_id, user["id"], request.note)
+    db.log_audit(
+        user["id"],
+        "COMMENT",
+        "support_case",
+        case_id,
+        request.reason,
+        {"note": request.note},
+    )
+    return {"ok": True}
+
+
+# Admin Messages - HR/employee threads + internal collaboration
+@app.get("/api/admin/messages/threads")
+def list_admin_message_threads(
+    company_id: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None),
+    thread_type: Optional[str] = Query(None, description="hr_employee | collaboration"),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """List message threads: HR-employee (legacy messages) and/or collaboration (internal admin)."""
+    hr_threads = []
+    collab_threads = []
+    try:
+        if not thread_type or thread_type == "hr_employee":
+            hr_threads = db.list_admin_message_threads(
+                company_id=company_id, user_id=user_id, limit=limit, offset=offset
+            )
+    except Exception as e:
+        log.warning("list_admin_message_threads failed: %s", e)
+        hr_threads = []
+    if not thread_type or thread_type == "collaboration":
+        try:
+            from .services.collaboration_service import list_all_threads
+            collab_threads = list_all_threads(
+                user.get("id", ""),
+                target_type=None,
+                participant_user_id=user_id,
+                status=None,
+                limit=limit,
+                offset=offset,
+            )
+        except Exception as e:
+            log.warning("list_all_threads failed: %s", e)
+    combined = hr_threads + collab_threads
+    combined.sort(key=lambda t: (t.get("last_message_at") or t.get("created_at") or ""), reverse=True)
+    return {"threads": combined[:limit], "total": len(combined)}
+
+
+@app.get("/api/admin/messages/threads/hr-employee/{assignment_id}")
+def get_admin_hr_thread_detail(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Get HR-employee thread messages and context."""
+    assign = db.get_admin_assignment_detail(assignment_id)
+    if not assign:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    messages = db.list_messages_by_assignment(assignment_id)
+    return {
+        "thread_type": "hr_employee",
+        "assignment_id": assignment_id,
+        "company_id": assign.get("case_company_id") or assign.get("hr_company_id"),
+        "company_name": assign.get("company_name"),
+        "employee_name": assign.get("employee_full_name") or assign.get("employee_identifier"),
+        "hr_name": assign.get("hr_full_name"),
+        "participants": [p for p in [assign.get("hr_full_name"), assign.get("employee_full_name") or assign.get("employee_identifier")] if p],
+        "messages": messages,
+        "status": assign.get("status"),
+    }
+
+
+@app.post("/api/admin/actions/resend-invite")
+def admin_resend_invite(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    db.log_audit(user["id"], "RESEND_INVITE", "assignment", payload.get("assignment_id"), request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/reset-onboarding")
+def admin_reset_onboarding(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    assignment_id = payload.get("assignment_id")
+    if assignment_id:
+        # Default active status after reset is 'assigned'.
+        new_status = normalize_status(payload.get("status") or AssignmentStatus.ASSIGNED.value)
+        assert_canonical_status(new_status)
+        db.update_assignment_status(assignment_id, new_status)
+    db.log_audit(user["id"], "RESET", "assignment", assignment_id, request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/unlock-case")
+def admin_unlock_case(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    case_id = payload.get("case_id")
+    if case_id:
+        db.upsert_relocation_case(
+            case_id=case_id,
+            company_id=payload.get("company_id"),
+            employee_id=payload.get("employee_id"),
+            status="active",
+            stage=payload.get("stage"),
+            host_country=payload.get("host_country"),
+            home_country=payload.get("home_country"),
+        )
+    db.log_audit(user["id"], "UPDATE", "relocation_case", case_id, request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/rerun-document")
+def admin_rerun_document(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    db.log_audit(user["id"], "REPROCESS", "document", payload.get("document_id"), request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/refresh-policy")
+def admin_refresh_policy(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    db.log_audit(user["id"], "UPDATE", "policy", payload.get("policy_id"), request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/override-eligibility")
+def admin_override_eligibility(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    assignment_id = payload.get("assignment_id")
+    if assignment_id:
+        db.create_eligibility_override(
+            assignment_id=assignment_id,
+            category=payload.get("category", "unknown"),
+            allowed=bool(payload.get("allowed", True)),
+            expires_at=payload.get("expires_at"),
+            note=payload.get("note"),
+            created_by_user_id=user["id"],
+        )
+    db.log_audit(user["id"], "OVERRIDE", "assignment", assignment_id, request.reason, payload)
+    return {"ok": True}
+
+
+@app.post("/api/admin/actions/export-support-bundle")
+def admin_export_support_bundle(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    bundle = {
+        "support_case_id": payload.get("support_case_id"),
+        "exported_at": datetime.utcnow().isoformat(),
+        "note": "Anonymized snapshot",
+        "policy_ids": payload.get("policy_ids", []),
+        "error_codes": payload.get("error_codes", []),
+        "timestamps": payload.get("timestamps", []),
+    }
+    db.log_audit(user["id"], "EXPORT", "support_case", payload.get("support_case_id"), request.reason, payload)
+    return {"ok": True, "bundle": bundle}
+
+
+@app.post("/api/admin/actions/purge-cases")
+def admin_purge_cases(request: AdminReasonRequest, user: Dict[str, Any] = Depends(require_admin)):
+    _require_reason(request.reason)
+    payload = request.payload or {}
+    active_statuses = payload.get("active_statuses") or [
+        AssignmentStatus.ASSIGNED.value,
+        AssignmentStatus.AWAITING_INTAKE.value,
+        AssignmentStatus.SUBMITTED.value,
+    ]
+    stats = db.purge_inactive_cases(active_statuses)
+    db.log_audit(user["id"], "RESET", "assignment", None, request.reason, {"active_statuses": active_statuses, **stats})
+    return {"ok": True, "stats": stats}
 
 
 @app.get("/api/profile/current", response_model=RelocationProfile)
 def get_current_profile(user: Dict[str, Any] = Depends(get_current_user)):
     """Get current user's profile."""
-    profile = db.get_profile(user["id"])
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    profile = db.get_profile(effective["id"])
     
     if not profile:
         # Return empty profile
-        profile = RelocationProfile(userId=user["id"]).model_dump()
+        profile = RelocationProfile(userId=effective["id"]).model_dump()
     
     return profile
 
@@ -346,13 +2794,14 @@ def get_current_profile(user: Dict[str, Any] = Depends(get_current_user)):
 @app.get("/api/profile/next-question", response_model=NextQuestionResponse)
 def get_next_question(user: Dict[str, Any] = Depends(get_current_user)):
     """Get the next question to ask the user."""
-    profile = db.get_profile(user["id"])
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    profile = db.get_profile(effective["id"])
     
     if not profile:
-        profile = RelocationProfile(userId=user["id"]).model_dump()
+        profile = RelocationProfile(userId=effective["id"]).model_dump()
     
     # Get answered questions
-    answers = db.get_answers(user["id"])
+    answers = db.get_answers(effective["id"])
     answered_question_ids = set(ans["question_id"] for ans in answers)
     
     # Get next question from orchestrator
@@ -367,23 +2816,25 @@ def submit_answer(request: AnswerRequest, user: Dict[str, Any] = Depends(get_cur
     Submit an answer to a question.
     Updates profile and returns next question.
     """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
     # Get current profile
-    profile = db.get_profile(user["id"])
+    profile = db.get_profile(effective["id"])
     
     if not profile:
-        profile = RelocationProfile(userId=user["id"]).model_dump()
+        profile = RelocationProfile(userId=effective["id"]).model_dump()
     
     # Apply answer to profile
     profile = orchestrator.apply_answer(profile, request.questionId, request.answer, request.isUnknown)
     
     # Save profile
-    db.save_profile(user["id"], profile)
+    db.save_profile(effective["id"], profile)
     
     # Save answer to audit trail
-    db.save_answer(user["id"], request.questionId, request.answer, request.isUnknown)
+    db.save_answer(effective["id"], request.questionId, request.answer, request.isUnknown)
     
     # Get next question
-    answers = db.get_answers(user["id"])
+    answers = db.get_answers(effective["id"])
     answered_question_ids = set(ans["question_id"] for ans in answers)
     next_response = orchestrator.get_next_question(profile, answered_question_ids)
     
@@ -399,7 +2850,9 @@ def complete_profile(user: Dict[str, Any] = Depends(get_current_user)):
     Mark profile as complete and compute final state.
     Returns readiness rating and recommendations.
     """
-    profile = db.get_profile(user["id"])
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    profile = db.get_profile(effective["id"])
     
     if not profile:
         raise HTTPException(status_code=400, detail="No profile found")
@@ -410,6 +2863,28 @@ def complete_profile(user: Dict[str, Any] = Depends(get_current_user)):
     return {
         "success": True,
         "completionState": completion_state
+    }
+
+
+@app.get("/api/employee/recommendations")
+def get_employee_recommendations(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """Get recommendations for employee's assignment (uses employee_profile from wizard)."""
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    assignment = db.get_assignment_for_employee(effective["id"], request_id=request.state.request_id)
+    if not assignment:
+        return {"housing": [], "schools": [], "movers": []}
+    profile = db.get_employee_profile(assignment["id"])
+    if not profile:
+        return {"housing": [], "schools": [], "movers": []}
+    completion = orchestrator.compute_completion_state(profile)
+    recs = completion.get("recommendations", {})
+    return {
+        "housing": recs.get("housing", []),
+        "schools": recs.get("schools", []),
+        "movers": recs.get("movers", []),
     }
 
 
@@ -450,7 +2925,7 @@ def get_mover_recommendations(user: Dict[str, Any] = Depends(get_current_user)) 
 
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
-def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
+def get_dashboard(request: Request, user: Dict[str, Any] = Depends(get_current_user)):
     """
     Get complete dashboard data including:
     - Profile completeness
@@ -460,9 +2935,31 @@ def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
     - All recommendations
     """
     profile = db.get_profile(user["id"])
-    
+    # Employees may use case/assignment flow: try assignment's employee_profile
+    if not profile and user.get("role") in (UserRole.EMPLOYEE.value, UserRole.ADMIN.value):
+        if user.get("role") == UserRole.EMPLOYEE.value and not user.get("impersonation"):
+            _best_effort_reconcile_employee_assignments(
+                context="get_dashboard",
+                user_id=user["id"],
+                email=user.get("email"),
+                username=user.get("username"),
+                role=UserRole.EMPLOYEE.value,
+                request_id=request.state.request_id,
+            )
+        assignment = db.get_assignment_for_employee(user["id"], request_id=request.state.request_id)
+        if assignment:
+            profile = db.get_employee_profile(assignment["id"])
+
     if not profile:
-        raise HTTPException(status_code=400, detail="No profile found")
+        # Return minimal dashboard instead of 400 so Providers/other pages can load
+        return DashboardResponse(
+            profileCompleteness=0,
+            immigrationReadiness={"score": 0, "status": "RED", "reasons": ["Complete your case wizard for full dashboard"], "missingDocs": []},
+            nextActions=["Complete your relocation case wizard"],
+            timeline=[],
+            recommendations={"housing": [], "schools": [], "movers": []},
+            overallStatus="incomplete",
+        )
     
     # Compute completion state
     completion_state = orchestrator.compute_completion_state(profile)
@@ -502,91 +2999,1040 @@ def get_dashboard(user: Dict[str, Any] = Depends(get_current_user)):
 
 @app.post("/api/hr/cases", response_model=CreateCaseResponse)
 def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No company linked to your profile. Please complete your company profile first.",
+        )
     case_id = str(uuid.uuid4())
-    profile = RelocationProfile(userId=user["id"]).model_dump()
-    db.create_case(case_id, user["id"], profile)
+    profile = RelocationProfile(userId=effective["id"]).model_dump()
+    db.create_case(case_id, effective["id"], profile, company_id=company_id)
     return CreateCaseResponse(caseId=case_id)
 
 
-@app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
-def assign_case(case_id: str, request: AssignCaseRequest, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    case = db.get_case_by_id(case_id)
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+@app.get("/api/hr/company-profile")
+def get_company_profile(request: Request, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    t0 = time.perf_counter()
+    request_id = getattr(request.state, "request_id", None)
+    effective = _effective_user(user, UserRole.HR)
+    # Align hr_users with profiles.company_id so resolution matches Admin-assigned company
+    db.sync_hr_user_company_from_profile(effective["id"])
+    cid = _get_hr_company_id(effective)
+    company = db.get_company(cid) if cid else db.get_company_for_user(effective["id"])
+    dur_ms = (time.perf_counter() - t0) * 1000
+    _log_endpoint_perf("/api/hr/company-profile", request_id, user.get("id"), dur_ms, 200)
+    if os.getenv("PERF_DEBUG", "").lower() in ("1", "true", "yes") and company:
+        log.info(
+            "company_profile_loaded user_id=%s company_id=%s name=%s",
+            effective.get("id"),
+            company.get("id"),
+            company.get("name"),
+        )
+    return {"company": company}
 
-    employee_identifier = request.employeeIdentifier.strip()
-    if not employee_identifier:
-        raise HTTPException(status_code=400, detail="Employee identifier required")
 
-    employee_user = db.get_user_by_identifier(employee_identifier)
-    assignment_id = str(uuid.uuid4())
-    invite_token = None
+@app.get("/api/company")
+def get_current_user_company(request: Request, user: Dict[str, Any] = Depends(get_current_user)):
+    """Return the authenticated user's company (for header branding). Available to HR and Employee."""
+    t0 = time.perf_counter()
+    request_id = getattr(request.state, "request_id", None)
+    # HR users: same resolution as /api/hr/company-profile (sync + coalesced company_id)
+    if user.get("role") == UserRole.HR.value or user.get("is_admin"):
+        effective = _effective_user(user, UserRole.HR) if user.get("role") == UserRole.HR.value else user
+        if user.get("role") == UserRole.HR.value:
+            db.sync_hr_user_company_from_profile(effective["id"])
+        cid = _get_hr_company_id(effective if user.get("role") == UserRole.HR.value else user)
+        company = db.get_company(cid) if cid else None
+    else:
+        company = db.get_company_for_user(user["id"])
+    dur_ms = (time.perf_counter() - t0) * 1000
+    _log_endpoint_perf("/api/company", request_id, user.get("id"), dur_ms, 200)
+    return {"company": company}
 
-    db.create_assignment(
-        assignment_id=assignment_id,
-        case_id=case_id,
-        hr_user_id=user["id"],
-        employee_user_id=employee_user["id"] if employee_user else None,
-        employee_identifier=employee_identifier,
-        status=AssignmentStatus.DRAFT.value,
+
+@app.post("/api/hr/company-profile")
+def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = (profile.get("company_id") if profile else None) or _get_hr_company_id(effective)
+    if not company_id:
+        company_id = str(uuid.uuid4())
+        db.set_profile_company(effective["id"], company_id)
+    db.create_company(
+        company_id,
+        request.name,
+        request.country,
+        request.size_band,
+        request.address,
+        request.phone,
+        request.hr_contact,
+        legal_name=request.legal_name,
+        website=request.website,
+        hq_city=request.hq_city,
+        industry=request.industry,
+        default_destination_country=request.default_destination_country,
+        support_email=request.support_email,
+        default_working_location=request.default_working_location,
     )
+    db.log_audit(effective["id"], "UPDATE", "company", company_id, "HR company profile update", {
+        "name": request.name,
+        "country": request.country,
+        "size_band": request.size_band,
+        "address": request.address,
+        "phone": request.phone,
+        "hr_contact": request.hr_contact,
+        "legal_name": request.legal_name,
+        "website": request.website,
+        "hq_city": request.hq_city,
+        "industry": request.industry,
+        "default_destination_country": request.default_destination_country,
+        "support_email": request.support_email,
+        "default_working_location": request.default_working_location,
+    })
+    # Ensure hr_users row exists and matches (set_profile_company UPDATE may no-op if row missing)
+    prof_after = db.get_profile_record(effective["id"])
+    if prof_after and (prof_after.get("role") or "").strip().upper() == "HR":
+        db.ensure_hr_user_for_profile(effective["id"], company_id)
+    return {"ok": True, "company_id": company_id}
 
-    if not employee_user:
-        invite_token = str(uuid.uuid4())
-        db.create_assignment_invite(
-            invite_id=str(uuid.uuid4()),
-            case_id=case_id,
-            hr_user_id=user["id"],
-            employee_identifier=employee_identifier,
-            token=invite_token,
+
+# ---------------------------------------------------------------------------
+# HR company-scoped employees
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/hr/employees")
+def list_hr_company_employees(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    """List employees for the HR user's company. Company-scoped only."""
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        # Align with get_company_profile: return empty list instead of 400 when no company
+        return {"employees": [], "has_company": False}
+    # Reconcile profiles (Admin/HR assignments) into employees before listing (same as Admin)
+    db.ensure_employees_for_company(company_id)
+    # People linked only via case_assignments (claimed intake) used to skip profiles.company_id;
+    # backfill so they appear alongside manually-added employees.
+    db.ensure_directory_from_assignments_for_company(company_id)
+    items = db.list_employees_with_profiles(company_id)
+    db.log_audit(effective["id"], "READ", "employee", None, None, {"company_id": company_id})
+    return {"employees": items, "has_company": True}
+
+
+@app.get("/api/hr/employees/{employee_id}")
+def get_hr_company_employee(
+    employee_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Get employee detail for HR's company. 404 if not in company."""
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    employee = db.get_employee_for_company(employee_id, company_id)
+    if not employee:
+        emp_by_profile = db.get_employee_by_profile_for_company(employee_id, company_id)
+        employee = emp_by_profile
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    db.log_audit(effective["id"], "READ", "employee", employee_id, None, {"company_id": company_id})
+    return {"employee": employee}
+
+
+class HrEmployeeUpdateRequest(BaseModel):
+    band: Optional[str] = None
+    assignment_type: Optional[str] = None
+    status: Optional[str] = None
+
+
+@app.patch("/api/hr/employees/{employee_id}")
+def update_hr_company_employee(
+    employee_id: str,
+    request: HrEmployeeUpdateRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Update employee (band, assignment_type, status) within company boundary."""
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    updated = db.update_employee_limited(
+        employee_id,
+        company_id,
+        band=request.band,
+        assignment_type=request.assignment_type,
+        status=request.status,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    db.log_audit(effective["id"], "UPDATE", "employee", employee_id, "HR update", {"company_id": company_id})
+    employee = db.get_employee_for_company(employee_id, company_id)
+    return {"employee": employee or db.get_employee_by_profile_for_company(employee_id, company_id)}
+
+
+ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "svg"}
+ALLOWED_LOGO_CONTENT_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/svg+xml"}
+MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024  # 2MB
+
+
+def _logo_extension_from_filename(filename: str) -> Optional[str]:
+    if not filename or "." not in filename:
+        return None
+    ext = filename.rsplit(".", 1)[-1].lower()
+    return ext if ext in ALLOWED_LOGO_EXTENSIONS else None
+
+
+@app.post("/api/hr/company-profile/logo")
+async def upload_company_logo(
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+
+    ext = _logo_extension_from_filename(file.filename or "")
+    if not ext:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type. Use PNG, JPG, or SVG.",
+        )
+    content_type = file.content_type or ""
+    if content_type and content_type.lower() not in ALLOWED_LOGO_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid content type. Use image/png, image/jpeg, or image/svg+xml.",
         )
 
-    return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
+    content = await file.read()
+    if len(content) > MAX_LOGO_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="Logo must be 2MB or smaller")
+
+    try:
+        supabase = _get_supabase_admin_client()
+        path = f"companies/{company_id}/logo.{ext}"
+        supabase.storage.from_("company-logos").upload(
+            path,
+            content,
+            file_options={"content-type": content_type or "image/png", "upsert": "true"},
+        )
+    except Exception as e:
+        log.warning("company logo upload failed: %s", e)
+        raise HTTPException(
+            status_code=502,
+            detail="Logo upload failed. Check Supabase storage and bucket company-logos.",
+        ) from e
+
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    logo_url = f"{supabase_url}/storage/v1/object/public/company-logos/{path}"
+    db.update_company_logo(company_id, logo_url)
+    db.log_audit(effective["id"], "UPDATE", "company", company_id, "HR company logo upload", {"logo_url": logo_url})
+    return {"ok": True, "logo_url": logo_url}
+
+
+@app.post("/api/hr/company-profile/remove-logo")
+def remove_company_logo(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    db.update_company_logo(company_id, None)
+    db.log_audit(effective["id"], "UPDATE", "company", company_id, "HR company logo removed", {})
+    return {"ok": True}
+
+
+@app.get("/api/hr/preferred-suppliers")
+def list_hr_preferred_suppliers(
+    service_category: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """List company preferred suppliers for the HR user's company."""
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        return {"preferred": []}
+    items = db.list_company_preferred_suppliers(company_id, service_category)
+    return {"preferred": items}
+
+
+@app.post("/api/hr/preferred-suppliers")
+def add_hr_preferred_supplier(
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Add supplier to company preferred list."""
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    supplier_id = (body.get("supplier_id") or "").strip()
+    if not supplier_id:
+        raise HTTPException(status_code=400, detail="supplier_id required")
+    rec = db.add_company_preferred_supplier(
+        company_id=company_id,
+        supplier_id=supplier_id,
+        service_category=(body.get("service_category") or "").strip() or None,
+        priority_rank=int(body.get("priority_rank", 0) or 0),
+        notes=(body.get("notes") or "").strip() or None,
+    )
+    return rec
+
+
+@app.delete("/api/hr/preferred-suppliers/{supplier_id}")
+def remove_hr_preferred_supplier(
+    supplier_id: str,
+    service_category: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Remove supplier from company preferred list."""
+    effective = _effective_user(user, UserRole.HR)
+    profile = db.get_profile_record(effective["id"])
+    company_id = profile.get("company_id") if profile else None
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    n = db.remove_company_preferred_supplier(company_id, supplier_id, service_category)
+    return {"ok": True, "removed": n}
+
+
+@app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
+def assign_case(
+    case_id: str,
+    request: AssignCaseRequest,
+    request_obj: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    request_id = getattr(request_obj.state, "request_id", None) or str(uuid.uuid4())
+    try:
+        _deny_if_impersonating(user)
+        effective = _effective_user(user, UserRole.HR)
+        case = db.get_case_by_id(case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+
+        hr_company_id = _get_hr_company_id(effective)
+        if not hr_company_id:
+            raise HTTPException(
+                status_code=400,
+                detail="No company linked to your profile. Please complete your company profile first.",
+            )
+        if not case.get("company_id"):
+            db.upsert_relocation_case(
+                case_id=case_id,
+                company_id=hr_company_id,
+                employee_id=case.get("employee_id"),
+                status=case.get("status"),
+                stage=case.get("stage"),
+                host_country=case.get("host_country"),
+                home_country=case.get("home_country"),
+            )
+
+        employee_identifier_raw = request.employeeIdentifier.strip()
+        if not employee_identifier_raw:
+            raise HTTPException(status_code=400, detail="Employee identifier required")
+
+        fn = getattr(request, "employeeFirstName", None) or getattr(request, "employee_first_name", None)
+        ln = getattr(request, "employeeLastName", None) or getattr(request, "employee_last_name", None)
+        employee_first_name = (fn or "").strip() or None
+        employee_last_name = (ln or "").strip() or None
+
+        employee_user = db.get_user_by_identifier(employee_identifier_raw)
+        if employee_user and hr_company_id:
+            emp_profile = db.get_profile_record(employee_user["id"])
+            if emp_profile and not emp_profile.get("company_id"):
+                db.ensure_profile_record(
+                    employee_user["id"],
+                    emp_profile.get("email") or employee_identifier_raw,
+                    emp_profile.get("role") or UserRole.EMPLOYEE.value,
+                    emp_profile.get("full_name") or employee_identifier_raw.split("@")[0],
+                    hr_company_id,
+                )
+        # Ensure employees row exists so HR Employees tab shows this employee (real auth accounts only)
+        if employee_user and hr_company_id:
+            db.ensure_employee_for_profile(employee_user["id"], hr_company_id)
+
+        # New assignments created by HR are immediately in the 'assigned' state.
+        assert_canonical_status(AssignmentStatus.ASSIGNED.value)
+        try:
+            with timed("unified_assignment_creation", request_id):
+                uar = create_assignment_with_contact_and_invites(
+                    db,
+                    company_id=hr_company_id,
+                    hr_user_id=effective["id"],
+                    case_id=case_id,
+                    employee_identifier_raw=employee_identifier_raw,
+                    employee_first_name=employee_first_name,
+                    employee_last_name=employee_last_name,
+                    employee_user_id=employee_user["id"] if employee_user else None,
+                    assignment_status=AssignmentStatus.ASSIGNED.value,
+                    request_id=request_id,
+                    observability_channel="hr",
+                )
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve)) from ve
+        assignment_id = uar.assignment_id
+        invite_token = uar.invite_token
+        stored_identifier = uar.stored_identifier
+        now_iso = datetime.utcnow().isoformat()
+        try:
+            db.ensure_case_participant(
+                case_id=case_id,
+                person_id=effective["id"],
+                role="hr_owner",
+                joined_at=now_iso,
+                request_id=request_id,
+            )
+        except Exception as exc:
+            log.warning(
+                "ensure_case_participant skipped assignment_id=%s case_id=%s role=hr_owner error=%s",
+                assignment_id, case_id, str(exc),
+            )
+        event_type = "assignment.created"
+        try:
+            db.insert_case_event(
+                case_id=case_id,
+                assignment_id=assignment_id,
+                actor_principal_id=effective["id"],
+                event_type=event_type,
+                payload={"employee_identifier": stored_identifier},
+                request_id=request_id,
+            )
+        except Exception as exc:
+            log.warning(
+                "insert_case_event skipped assignment_id=%s case_id=%s event_type=%s error=%s",
+                assignment_id,
+                case_id,
+                event_type,
+                str(exc),
+            )
+
+        # Prefill invitation message in Messages
+        invite_line = (
+            f"Invitation token: {invite_token}"
+            if invite_token
+            else "You can claim your assignment after signing in."
+        )
+        message_body = (
+            f"Hello,\n\n"
+            f"You have been assigned a relocation case on ReloPass.\n\n"
+            f"Assignment ID: {assignment_id}\n"
+            f"Employee identifier: {employee_identifier_raw}\n"
+            f"{invite_line}\n\n"
+            f"Sign up or log in at https://relopass.com/auth?mode=login\n"
+            f"Once logged in, go to My Case to start your intake.\n"
+        )
+        try:
+            db.create_message(
+                message_id=str(uuid.uuid4()),
+                assignment_id=assignment_id,
+                hr_user_id=effective["id"],
+                employee_identifier=stored_identifier,
+                subject="Your relocation case is ready",
+                body=message_body,
+                status="draft",
+            )
+        except Exception as exc:
+            log.warning(
+                "create_message skipped assignment_id=%s case_id=%s error=%s",
+                assignment_id, case_id, str(exc),
+            )
+
+        return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
+    except HTTPException:
+        # Let explicit 4xx/404 propagate as-is.
+        raise
+    except Exception as e:
+        err_msg = str(e)
+        log.error(
+            "request_id=%s method=POST route=/api/hr/cases/%s/assign user_id=%s email=%s employee_identifier=%s error=%s",
+            request_id,
+            case_id,
+            user.get("id"),
+            user.get("email"),
+            getattr(request, "employeeIdentifier", None),
+            repr(e),
+            exc_info=True,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Unable to assign case",
+                "detail": err_msg,
+                "request_id": request_id,
+            },
+        )
+
+
+def _sanitize_assignment_row_dict(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """JSON-safe case_assignments row (Postgres may return UUID/datetime-like values)."""
+    if not row:
+        return row
+    from .services.employee_assignment_overview import _json_scalar
+
+    return {k: _json_scalar(v) for k, v in row.items()}
 
 
 @app.get("/api/employee/assignments/current")
-def get_employee_assignment(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
-    assignment = db.get_assignment_for_employee(user["id"])
-    if not assignment:
-        identifier = user.get("username") or user.get("email")
-        if identifier:
-            assignment = db.get_unassigned_assignment_by_identifier(identifier)
-            if assignment:
-                db.attach_employee_to_assignment(assignment["id"], user["id"])
-                db.mark_invites_claimed(identifier)
-                assignment = db.get_assignment_by_id(assignment["id"])
+def get_employee_assignment(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    if not user.get("impersonation"):
+        _best_effort_reconcile_employee_assignments(
+            context="get_employee_assignment",
+            user_id=effective["id"],
+            email=effective.get("email"),
+            username=effective.get("username"),
+            role=UserRole.EMPLOYEE.value,
+            request_id=getattr(request.state, "request_id", None),
+        )
 
+    rid = request.state.request_id
+    eid = effective["id"]
+    try:
+        linked = db.list_linked_assignments_for_employee(eid, request_id=rid)
+        pending_claim = db.list_pending_claim_assignments_for_auth_user(eid, request_id=rid)
+    except Exception as e:
+        log.error(
+            "request_id=%s get_employee_assignment list failed user=%s error=%s",
+            rid,
+            eid,
+            repr(e),
+            exc_info=True,
+        )
+        return {
+            "assignment": None,
+            "linked_assignments": [],
+            "pending_claim_assignments": [],
+            "overview_degraded": True,
+        }
+    linked_safe = []
+    for row in linked:
+        d = dict(row)
+        d["status"] = normalize_status(d.get("status"))
+        linked_safe.append(_sanitize_assignment_row_dict(d))
+    pending_safe = []
+    for row in pending_claim:
+        d = dict(row)
+        d["status"] = normalize_status(d.get("status"))
+        pending_safe.append(_sanitize_assignment_row_dict(d))
+    primary = linked_safe[0] if linked_safe else None
+    if not primary:
+        return {
+            "assignment": None,
+            "linked_assignments": [],
+            "pending_claim_assignments": pending_safe,
+        }
+    return {
+        "assignment": primary,
+        "linked_assignments": linked_safe,
+        "pending_claim_assignments": pending_safe,
+    }
+
+
+@app.get("/api/employee/assignments/overview")
+def get_employee_assignments_overview(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Lightweight linked + pending assignment summaries for the authenticated employee.
+    No case draft/profile hydration.
+    """
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    if not user.get("impersonation"):
+        _best_effort_reconcile_employee_assignments(
+            context="get_employee_assignments_overview",
+            user_id=effective["id"],
+            email=effective.get("email"),
+            username=effective.get("username"),
+            role=UserRole.EMPLOYEE.value,
+            request_id=getattr(request.state, "request_id", None),
+        )
+    rid = getattr(request.state, "request_id", None)
+    try:
+        overview = build_employee_assignment_overview(
+            db,
+            effective["id"],
+            request_id=rid,
+            normalize_assignment_status=normalize_status,
+        )
+    except Exception as e:
+        log.error(
+            "request_id=%s get_employee_assignments_overview failed user=%s error=%s",
+            rid,
+            effective.get("id"),
+            repr(e),
+            exc_info=True,
+        )
+        overview = {"linked": [], "pending": [], "overview_degraded": True}
+    linked_n = len(overview.get("linked") or [])
+    pending_n = len(overview.get("pending") or [])
+    try:
+        identity_event(
+            "identity.assignments.overview",
+            request_id=rid,
+            auth_user_id=str(effective["id"]).strip(),
+            linked_count=linked_n,
+            pending_count=pending_n,
+        )
+    except Exception:
+        log.warning("request_id=%s identity_event overview failed", rid, exc_info=True)
+    return overview
+
+
+@app.post("/api/employee/assignments/{assignment_id}/dismiss-pending")
+def dismiss_pending_claim_assignment(
+    request: Request,
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """Employee declines a pending_claim assignment (same contact as linked account); does not unlink linked work."""
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    ok = db.dismiss_pending_claim_assignment_for_auth_user(
+        assignment_id,
+        effective["id"],
+        request_id=getattr(request.state, "request_id", None),
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=404,
+            detail="Pending assignment not found or not dismissible for this account.",
+        )
+    return {"ok": True}
+
+
+@app.get("/api/employee/me/assignment-package-policy")
+def get_employee_me_assignment_package_policy(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Single lightweight round-trip for the employee HR Policy / Assignment Package page.
+    Resolves current assignment + applicable published policy (or explicit no_policy_found).
+    """
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    eid = effective.get("id")
+    if not eid:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    if not user.get("impersonation"):
+        _best_effort_reconcile_employee_assignments(
+            context="get_employee_me_assignment_package_policy",
+            user_id=eid,
+            email=effective.get("email"),
+            username=effective.get("username"),
+            role=UserRole.EMPLOYEE.value,
+            request_id=getattr(request.state, "request_id", None),
+        )
+
+    assignment = db.get_assignment_for_employee(eid, request_id=request_id)
     if not assignment:
-        return {"assignment": None}
-    assignment["status"] = normalize_status(assignment["status"])
-    return {"assignment": assignment}
+        return {
+            "status": "no_assignment",
+            "ok": True,
+            "assignment_id": None,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "resolved_at": None,
+            "message": "You don't have an active assignment yet.",
+            "message_secondary": None,
+        }
+
+    assignment_id = assignment.get("id")
+    if not assignment_id:
+        return {
+            "status": "no_assignment",
+            "ok": True,
+            "assignment_id": None,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "resolved_at": None,
+            "message": "You don't have an active assignment yet.",
+            "message_secondary": None,
+        }
+
+    try:
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning(
+            "employee_me_assignment_package_policy failed request_id=%s assignment_id=%s exc=%s",
+            request_id,
+            assignment_id,
+            exc,
+            exc_info=True,
+        )
+        return {
+            "status": "error",
+            "ok": False,
+            "assignment_id": assignment_id,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "resolved_at": None,
+            "message": "We couldn't load your policy right now. Please try again shortly.",
+            "message_secondary": None,
+        }
+
+    if not result.get("has_policy"):
+        return {
+            "status": "no_policy_found",
+            "ok": True,
+            "assignment_id": assignment_id,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "resolved_at": None,
+            "message": result.get("reason") or EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+            "message_secondary": result.get("reason_secondary") or EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+            "company_id_used": result.get("company_id_used"),
+            "comparison_readiness": result.get("comparison_readiness"),
+            "comparison_available": result.get("comparison_available"),
+        }
+
+    return {
+        "status": "found",
+        "ok": True,
+        "assignment_id": assignment_id,
+        "has_policy": True,
+        "policy": result.get("policy") or {},
+        "benefits": result.get("benefits") or [],
+        "exclusions": result.get("exclusions") or [],
+        "resolved_at": result.get("resolved_at"),
+        "resolution_context": result.get("resolution_context"),
+        "message": None,
+        "message_secondary": None,
+        "company_id_used": result.get("company_id"),
+        "comparison_readiness": result.get("comparison_readiness"),
+        "comparison_available": result.get("comparison_available"),
+    }
+
+
+@app.get("/api/employee/messages")
+def list_employee_messages(user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    uid = effective["id"]
+    items = db.list_messages_for_employee(uid)
+    quote_threads = db.list_quote_threads_for_employee(uid)
+    return {"messages": items, "quote_threads": quote_threads}
+
+
+def _validated_employee_claim_identifiers(
+    effective: Dict[str, Any],
+    claim: ClaimAssignmentRequest,
+    *,
+    claim_req_id: str,
+    assignment_id: str,
+    failure_event: str,
+) -> List[str]:
+    """Require account + request identifiers; return normalized lowercase identifiers for identity checks."""
+    user_identifiers = [x.lower() for x in [effective.get("email"), effective.get("username")] if x]
+    if not user_identifiers:
+        identity_event(
+            failure_event,
+            failure_code="CLAIM_MISSING_ACCOUNT_IDENTIFIER",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_MISSING_ACCOUNT_IDENTIFIER,
+                "Your account must have an email or username set",
+            ),
+        )
+
+    if not claim.email or not claim.email.strip():
+        identity_event(
+            failure_event,
+            failure_code="CLAIM_MISSING_REQUEST_IDENTIFIER",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_MISSING_REQUEST_IDENTIFIER,
+                "Enter your email or username to claim",
+            ),
+        )
+
+    req_ident = claim.email.strip().lower()
+    if req_ident not in user_identifiers:
+        identity_event(
+            failure_event,
+            failure_code="CLAIM_ACCOUNT_IDENTIFIER_MISMATCH",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ACCOUNT_IDENTIFIER_MISMATCH,
+                "The identifier you entered does not match your account. Use the same email or username you used to log in.",
+            ),
+        )
+    return user_identifiers
 
 
 @app.post("/api/employee/assignments/{assignment_id}/claim")
+@limiter.limit("10/hour;50/day")
 def claim_assignment(
+    request: Request,
     assignment_id: str,
-    request: ClaimAssignmentRequest,
-    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))
+    claim: ClaimAssignmentRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
 ):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    claim_req_id = getattr(request.state, "request_id", None) or ""
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
+        identity_event(
+            "identity.claim.manual.failed",
+            failure_code="ASSIGNMENT_NOT_FOUND",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    if not request.email or not user.get("email"):
-        raise HTTPException(status_code=400, detail="Email required to claim assignment")
+    user_identifiers = _validated_employee_claim_identifiers(
+        effective,
+        claim,
+        claim_req_id=claim_req_id,
+        assignment_id=assignment_id,
+        failure_event="identity.claim.manual.failed",
+    )
 
-    if request.email.strip().lower() != user["email"].lower():
-        raise HTTPException(status_code=403, detail="Email does not match logged-in user")
+    ident_match = db.assignment_identity_matches_user_identifiers(
+        assignment, user_identifiers, request_id=None
+    )
+    if not ident_match:
+        identity_event(
+            "identity.claim.manual.failed",
+            failure_code="CLAIM_ASSIGNMENT_IDENTIFIER_MISMATCH",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ASSIGNMENT_IDENTIFIER_MISMATCH,
+                "This assignment was created for a different employee. HR must have entered your exact email or username "
+                "(e.g. jane@relopass.com or janedoe) when assigning the case.",
+            ),
+        )
 
-    if assignment["employee_identifier"].lower() != user["email"].lower():
-        raise HTTPException(status_code=403, detail="Email does not match assignment")
+    if db.is_assignment_auto_claim_blocked_by_revoked_invites(assignment_id):
+        identity_event(
+            "identity.claim.manual.failed",
+            failure_code="CLAIM_INVITE_REVOKED",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_INVITE_REVOKED,
+                "This invitation was cancelled by HR. Contact HR if you still need access to this case.",
+            ),
+        )
 
-    if assignment.get("employee_user_id") and assignment["employee_user_id"] != user["id"]:
-        raise HTTPException(status_code=403, detail="Assignment already claimed")
+    emp_uid = assignment.get("employee_user_id")
+    effective_id = str(effective["id"]).strip()
+    emp_uid_str = str(emp_uid).strip() if emp_uid else ""
+    # Already linked to this user (same id) -> success
+    if emp_uid_str and emp_uid_str == effective_id:
+        identity_event(
+            "identity.claim.manual",
+            outcome="idempotent_already_linked",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective_id,
+            principal_fingerprint=principal_fingerprint(effective.get("email"), effective.get("username")),
+        )
+        return {"success": True, "assignmentId": assignment_id}
+    # Linked to another id but assignment is for this person (identifier match) -> allow claim and attach this user
+    if emp_uid_str and emp_uid_str != effective_id:
+        if not ident_match:
+            identity_event(
+                "identity.claim.manual.failed",
+                failure_code="CLAIM_ASSIGNMENT_ALREADY_CLAIMED",
+                request_id=claim_req_id or None,
+                assignment_id=assignment_id,
+                auth_user_id=effective_id,
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=err_detail(
+                    IdentityErrorCode.CLAIM_ASSIGNMENT_ALREADY_CLAIMED,
+                    "Assignment already claimed by another account.",
+                ),
+            )
+        # Same person (e.g. assignment has profile id, user logged in with user id): attach and proceed
 
-    db.attach_employee_to_assignment(assignment_id, user["id"])
-    db.mark_invites_claimed(assignment["employee_identifier"])
-    return {"success": True}
+    finalize_assignment_claim_attach(
+        db,
+        assignment_id=assignment_id,
+        employee_user_id=effective["id"],
+        assignment=assignment,
+        request_id=None,
+        identity_event_name="identity.claim.manual",
+        identity_outcome="attached",
+        claim_req_id=claim_req_id,
+        principal_email=effective.get("email"),
+        principal_username=effective.get("username"),
+        case_event_payload={},
+    )
+    return {"success": True, "assignmentId": assignment_id}
+
+
+@app.post("/api/employee/assignments/{assignment_id}/link-pending")
+def link_pending_assignment(
+    request: Request,
+    assignment_id: str,
+    claim: ClaimAssignmentRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Explicit link for hub "pending" rows only: pending_claim + contact already linked to this user +
+    overview-equivalent company alignment + invite gates. Idempotent when already linked to caller.
+    """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    claim_req_id = getattr(request.state, "request_id", None) or ""
+    fail_ev = "identity.claim.pending_explicit.failed"
+
+    user_identifiers = _validated_employee_claim_identifiers(
+        effective,
+        claim,
+        claim_req_id=claim_req_id,
+        assignment_id=assignment_id,
+        failure_event=fail_ev,
+    )
+
+    res = execute_pending_explicit_link(
+        db,
+        auth_user_id=str(effective["id"]).strip(),
+        assignment_id=assignment_id,
+        user_identifiers=user_identifiers,
+        request_id=claim_req_id or None,
+        claim_req_id=claim_req_id,
+        principal_email=effective.get("email"),
+        principal_username=effective.get("username"),
+    )
+
+    if res.get("success"):
+        return {
+            "success": True,
+            "assignmentId": res.get("assignmentId"),
+            "alreadyLinked": bool(res.get("alreadyLinked")),
+        }
+
+    reason = res.get("reason") or "unknown"
+    aid = res.get("assignmentId") or assignment_id
+    eff_id = str(effective["id"]).strip()
+
+    identity_event(
+        fail_ev,
+        failure_code=str(reason).upper(),
+        request_id=claim_req_id or None,
+        assignment_id=aid,
+        auth_user_id=eff_id,
+    )
+
+    if reason == PENDING_LINK_NOT_FOUND:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if reason == PENDING_LINK_OTHER_OWNER:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ASSIGNMENT_ALREADY_CLAIMED,
+                "Assignment already linked to another account.",
+            ),
+        )
+    if reason == PENDING_LINK_NOT_PENDING:
+        raise HTTPException(
+            status_code=409,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ASSIGNMENT_NOT_PENDING,
+                "This assignment is not waiting for explicit link. Use manual claim with your assignment ID if HR gave you one.",
+            ),
+        )
+    if reason in (PENDING_LINK_NO_CONTACT, PENDING_LINK_CONTACT_NOT_LINKED):
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_PENDING_CONTACT_MISMATCH,
+                "This assignment is not linked to your profile for self-serve linking. Contact HR or use manual assignment ID entry.",
+            ),
+        )
+    if reason == PENDING_LINK_IDENTITY_MISMATCH:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ASSIGNMENT_IDENTIFIER_MISMATCH,
+                "This assignment was created for a different employee. HR must have entered your exact email or username when assigning the case.",
+            ),
+        )
+    if reason == PENDING_LINK_COMPANY_MISMATCH:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_PENDING_COMPANY_MISMATCH,
+                "Company details for this assignment do not match your contact record. Contact HR to fix the assignment.",
+            ),
+        )
+    if reason == PENDING_LINK_INVITE_REVOKED:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_INVITE_REVOKED,
+                "This invitation was cancelled by HR. Contact HR if you still need access to this case.",
+            ),
+        )
+    if reason == PENDING_LINK_EXTRA_VERIFICATION:
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_EXTRA_VERIFICATION_REQUIRED,
+                "Additional HR verification is required before this assignment can be linked. Contact your HR contact.",
+            ),
+        )
+
+    raise HTTPException(status_code=400, detail="Unable to link assignment")
 
 
 @app.get("/api/employee/journey/next-question", response_model=EmployeeJourneyNextQuestion)
@@ -594,10 +4040,11 @@ def employee_next_question(
     assignmentId: str = Query(..., alias="assignmentId"),
     user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))
 ):
+    effective = _effective_user(user, UserRole.EMPLOYEE)
     assignment = db.get_assignment_by_id(assignmentId)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    if assignment.get("employee_user_id") != user["id"]:
+    if assignment.get("employee_user_id") != effective["id"]:
         raise HTTPException(status_code=403, detail="Assignment not assigned to user")
 
     return _build_employee_journey_payload(assignment)
@@ -608,15 +4055,19 @@ def employee_submit_answer(
     request: EmployeeJourneyRequest,
     user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))
 ):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
     assignment = db.get_assignment_by_id(request.assignmentId)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    if assignment.get("employee_user_id") != user["id"]:
+    if assignment.get("employee_user_id") != effective["id"]:
         raise HTTPException(status_code=403, detail="Assignment not assigned to user")
-    if normalize_status(assignment["status"]) in [
-        AssignmentStatus.EMPLOYEE_SUBMITTED.value,
-        AssignmentStatus.HR_REVIEW.value,
-        AssignmentStatus.HR_APPROVED.value,
+    normalized_status = normalize_status(assignment["status"])
+    if normalized_status in [
+        AssignmentStatus.SUBMITTED.value,
+        AssignmentStatus.APPROVED.value,
+        AssignmentStatus.REJECTED.value,
+        AssignmentStatus.CLOSED.value,
     ]:
         raise HTTPException(status_code=400, detail="Assignment is read-only")
 
@@ -628,29 +4079,163 @@ def employee_submit_answer(
     db.save_employee_profile(request.assignmentId, profile)
     db.save_employee_answer(request.assignmentId, request.questionId, request.answer)
 
-    if normalize_status(assignment["status"]) == AssignmentStatus.DRAFT.value:
-        db.update_assignment_status(request.assignmentId, AssignmentStatus.IN_PROGRESS.value)
+    if normalized_status in [AssignmentStatus.CREATED.value, AssignmentStatus.ASSIGNED.value]:
+        # First meaningful employee input moves the assignment into awaiting_intake.
+        assert_canonical_status(AssignmentStatus.AWAITING_INTAKE.value)
+        db.update_assignment_status(request.assignmentId, AssignmentStatus.AWAITING_INTAKE.value)
 
     assignment = db.get_assignment_by_id(request.assignmentId)
     return _build_employee_journey_payload(assignment)
 
 
+def _draft_to_relocation_profile(draft: Dict[str, Any], assignment_id: str) -> Dict[str, Any]:
+    """Convert wizard Case draft to RelocationProfile format for submission checks."""
+    basics = draft.get("relocationBasics", {}) or {}
+    ep = draft.get("employeeProfile", {}) or {}
+    fm = draft.get("familyMembers", {}) or {}
+    ac = draft.get("assignmentContext", {}) or {}
+    origin = ", ".join(filter(None, [basics.get("originCity"), basics.get("originCountry")])) or "Unknown"
+    dest = ", ".join(filter(None, [basics.get("destCity"), basics.get("destCountry")])) or "Unknown"
+    profile: Dict[str, Any] = {
+        "userId": assignment_id,
+        "familySize": 1,
+        "movePlan": {
+            "origin": origin,
+            "destination": dest,
+            "targetArrivalDate": basics.get("targetMoveDate"),
+        },
+        "primaryApplicant": {
+            "fullName": ep.get("fullName"),
+            "nationality": ep.get("nationality"),
+            "passport": {
+                "expiryDate": ep.get("passportExpiry"),
+                "issuingCountry": ep.get("passportCountry"),
+            },
+            "employer": {"name": ac.get("employerName"), "roleTitle": ac.get("jobTitle")},
+            "assignment": {"startDate": ac.get("contractStartDate")},
+        },
+        "maritalStatus": fm.get("maritalStatus"),
+        "spouse": {"fullName": (fm.get("spouse") or {}).get("fullName")},
+        "dependents": [],
+    }
+    for c in (fm.get("children") or []):
+        profile["dependents"].append({
+            "firstName": (c or {}).get("fullName", "").split()[0] if (c or {}).get("fullName") else None,
+            "dateOfBirth": (c or {}).get("dateOfBirth"),
+        })
+    emp = profile["primaryApplicant"].setdefault("employer", {})
+    if ac.get("contractType"):
+        emp["contractType"] = ac["contractType"]
+    if ac.get("salaryBand"):
+        emp["salaryBand"] = ac["salaryBand"]
+    return profile
+
+
+def _merge_profiles(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
+    """Deep-merge update into base; update wins for leaf values."""
+    result = dict(base)
+    for k, v in update.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            result[k] = _merge_profiles(result[k], v)
+        else:
+            result[k] = v
+    return result
+
+
 @app.post("/api/employee/assignments/{assignment_id}/submit")
 def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    if assignment.get("employee_user_id") != user["id"]:
+    if assignment.get("employee_user_id") != effective["id"]:
         raise HTTPException(status_code=403, detail="Assignment not assigned to user")
 
     profile = db.get_employee_profile(assignment_id)
+    wizard_complete = False
+    # If profile missing/incomplete, try syncing from wizard Case draft (wizard may use assignment_id or case_id as URL param)
+    if not profile or (orchestrator.compute_completion_state(profile).get("profileCompleteness", 0) < 90):
+        with SessionLocal() as session:
+            case = app_crud.get_case(session, assignment_id) or (
+                app_crud.get_case(session, assignment.get("case_id", "")) if assignment.get("case_id") else None
+            )
+            if case:
+                draft = json.loads(case.draft_json)
+                basics = draft.get("relocationBasics", {}) or {}
+                required_basics = ["originCountry", "originCity", "destCountry", "destCity", "purpose", "targetMoveDate"]
+                # Sync whenever wizard has step 1 basics; wizard_complete bypasses 90% check
+                if all(basics.get(k) for k in required_basics):
+                    wizard_profile = _draft_to_relocation_profile(draft, assignment_id)
+                    profile = _merge_profiles(profile or {}, wizard_profile) if profile else wizard_profile
+                    db.save_employee_profile(assignment_id, profile)
+                    wizard_complete = True
+
     if not profile:
-        raise HTTPException(status_code=400, detail="Profile is not complete")
+        raise HTTPException(
+            status_code=400,
+            detail="Profile is not complete. Please complete all 5 wizard steps (Relocation Basics, Employee Profile, Family, Assignment Context) and try again.",
+        )
     completion_state = orchestrator.compute_completion_state(profile)
-    if completion_state.get("profileCompleteness", 0) < 90:
-        raise HTTPException(status_code=400, detail="Profile is not complete")
+    if not wizard_complete and completion_state.get("profileCompleteness", 0) < 90:
+        raise HTTPException(
+            status_code=400,
+            detail="Profile is not complete. Please fill in all required fields in the wizard steps (Relocation Basics, Employee Profile, Family, Assignment Context).",
+        )
+
+    eff_case_for_sync = _effective_relocation_case_id(assignment)
+    if eff_case_for_sync:
+        try:
+            with SessionLocal() as session:
+                wc = app_crud.get_case(session, eff_case_for_sync) or app_crud.get_case(
+                    session, assignment_id
+                ) or (
+                    app_crud.get_case(session, (assignment.get("case_id") or "").strip())
+                    if (assignment.get("case_id") or "").strip()
+                    else None
+                )
+                if wc:
+                    try:
+                        draft = json.loads(wc.draft_json or "{}")
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        draft = {}
+                    if isinstance(draft, dict):
+                        db.sync_relocation_case_route_from_wizard_draft(eff_case_for_sync, draft)
+        except Exception as exc:
+            log.warning(
+                "submit_assignment: relocation_cases draft sync failed assignment_id=%s case_id=%s error=%s",
+                assignment_id,
+                eff_case_for_sync,
+                str(exc),
+                exc_info=True,
+            )
 
     db.set_assignment_submitted(assignment_id)
+
+    case_id = _effective_relocation_case_id(assignment)
+    event_type = "assignment.submitted"
+    if case_id:
+        try:
+            db.insert_case_event(
+                case_id=case_id,
+                assignment_id=assignment_id,
+                actor_principal_id=effective["id"],
+                event_type=event_type,
+                payload={},
+            )
+        except Exception as exc:
+            log.error(
+                "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+                assignment_id,
+                case_id,
+                event_type,
+                str(exc),
+                exc_info=True,
+            )
+            raise
+    else:
+        log.warning("submit_assignment: missing case_id for event assignment_id=%s", assignment_id)
+
     return {"success": True}
 
 
@@ -678,48 +4263,4766 @@ def update_profile_photo(
     return {"success": True}
 
 
-@app.get("/api/hr/assignments", response_model=List[AssignmentSummary])
-def list_hr_assignments(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    assignments = db.list_all_assignments()
-    summaries = []
-    for assignment in assignments:
-        report = db.get_latest_compliance_report(assignment["id"])
-        summaries.append(AssignmentSummary(
-            id=assignment["id"],
-            caseId=assignment["case_id"],
-            employeeIdentifier=assignment["employee_identifier"],
-            status=AssignmentStatus(normalize_status(assignment["status"])),
-            submittedAt=assignment.get("submitted_at"),
-            complianceStatus=report["overallStatus"] if report else None,
-        ))
-    return summaries
+def _effective_relocation_case_id(assignment: Dict[str, Any]) -> str:
+    """relocation_cases.id for this assignment (canonical wins over legacy case_id)."""
+    cc = (assignment.get("canonical_case_id") or "").strip()
+    if cc:
+        return cc
+    return (assignment.get("case_id") or "").strip()
 
 
-@app.get("/api/hr/assignments/{assignment_id}", response_model=AssignmentDetail)
-def get_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+@app.get("/api/hr/assignments", response_model=AssignmentsListResponse)
+def list_hr_assignments(
+    request: Request,
+    limit: int = Query(25, ge=1, le=100, description="Max assignments per page"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    search: Optional[str] = Query(None, description="Search by employee name or email"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    destination: Optional[str] = Query(None, description="Filter by destination (host/home country)"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    List HR assignments (summary only). Paginated, server-side filtered. No per-row compliance N+1.
+    - Auth: HR (or ADMIN).
+    - Returns lightweight summary; use GET /api/hr/assignments/{id} for full detail.
+    """
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    t0 = time.perf_counter()
+    try:
+        if user.get("is_admin") and not user.get("impersonation"):
+            with timed("db.list_all_assignments", request_id):
+                assignments = db.list_all_assignments()
+            total = len(assignments)
+            assignments = assignments[offset : offset + limit]
+        else:
+            effective = _effective_user(user, UserRole.HR)
+            company_id = _get_hr_company_id(effective)
+            if company_id:
+                with timed("db.list_assignments_for_company_paginated", request_id):
+                    assignments, total = db.list_assignments_for_company_paginated(
+                        company_id,
+                        limit=limit,
+                        offset=offset,
+                        search=search,
+                        status=status,
+                        destination=destination,
+                        request_id=request_id,
+                    )
+            else:
+                with timed("db.list_assignments_for_hr", request_id):
+                    all_assignments = db.list_assignments_for_hr(effective["id"], request_id=request_id)
+                total = len(all_assignments)
+                assignments = all_assignments[offset : offset + limit]
+
+        if not assignments:
+            dur_ms = (time.perf_counter() - t0) * 1000
+            _log_endpoint_perf("/api/hr/assignments", request_id, user.get("id"), dur_ms, 200)
+            return AssignmentsListResponse(assignments=[], total=total)
+
+        case_ids = [_effective_relocation_case_id(a) for a in assignments]
+        cases_by_id: Dict[str, Any] = {}
+        unique_ids = list({cid for cid in case_ids if cid})
+        if unique_ids:
+            placeholders = ", ".join(f":id{i}" for i in range(len(unique_ids)))
+            sql = (
+                "SELECT id, status, stage, home_country, host_country, "
+                "employee_id, company_id, profile_json "
+                "FROM relocation_cases WHERE id IN (" + placeholders + ")"
+            )
+            params = {f"id{i}": cid for i, cid in enumerate(unique_ids)}
+            with db.engine.connect() as conn, timed("db.load_relocation_cases_bulk", request_id):
+                rows = conn.execute(text(sql), params).fetchall()
+            for row in rows:
+                m = row._mapping
+                cases_by_id[m["id"]] = {
+                    "id": m["id"],
+                    "status": m.get("status"),
+                    "stage": m.get("stage"),
+                    "home_country": m.get("home_country"),
+                    "host_country": m.get("host_country"),
+                    "employee_id": m.get("employee_id"),
+                    "company_id": m.get("company_id"),
+                    "profile_json": m.get("profile_json"),
+                }
+
+        # Batch-fetch employee profiles so list rows can resolve corridor with the
+        # same precedence as the case detail view (movePlan -> relocationBasics ->
+        # stored home/host_country). Without this the dashboard shows stale
+        # denormalized columns even when the profile has been updated.
+        profiles_by_aid: Dict[str, Dict[str, Any]] = {}
+        aids_for_profiles = [a.get("id") for a in assignments if a.get("id")]
+        if aids_for_profiles:
+            ep_placeholders = ", ".join(f":aid{i}" for i in range(len(aids_for_profiles)))
+            ep_params = {f"aid{i}": v for i, v in enumerate(aids_for_profiles)}
+            ep_sql = (
+                "SELECT assignment_id, profile_json FROM employee_profiles "
+                "WHERE assignment_id IN (" + ep_placeholders + ")"
+            )
+            try:
+                with db.engine.connect() as conn, timed("db.load_employee_profiles_bulk", request_id):
+                    ep_rows = conn.execute(text(ep_sql), ep_params).fetchall()
+                for r in ep_rows:
+                    m = r._mapping
+                    raw = m.get("profile_json")
+                    try:
+                        parsed = json.loads(raw) if isinstance(raw, str) else (raw or None)
+                    except Exception:
+                        parsed = None
+                    if isinstance(parsed, dict):
+                        profiles_by_aid[m["assignment_id"]] = parsed
+            except Exception:
+                log.warning("load_employee_profiles_bulk failed", exc_info=True)
+
+        deadline_by_case: Dict[str, str] = {}
+        if unique_ids:
+            try:
+                deadline_by_case = db.next_open_milestone_deadlines_for_cases(unique_ids, request_id=request_id)
+            except Exception:
+                log.warning("next_open_milestone_deadlines_for_cases failed", exc_info=True)
+
+        summaries: List[AssignmentSummary] = []
+        for assignment in assignments:
+            eff_case = _effective_relocation_case_id(assignment)
+            base_case_meta = cases_by_id.get(eff_case) if eff_case else None
+            case_meta: Optional[Dict[str, Any]] = None
+            if base_case_meta is not None:
+                case_meta = {k: v for k, v in base_case_meta.items() if k != "profile_json"}
+                resolved_origin, resolved_dest = _resolve_assignment_route_for_list(
+                    case_row=base_case_meta,
+                    employee_profile_json=profiles_by_aid.get(assignment.get("id")),
+                )
+                if resolved_origin:
+                    case_meta["home_country"] = resolved_origin
+                if resolved_dest:
+                    case_meta["host_country"] = resolved_dest
+            case_id = eff_case or assignment.get("case_id") or assignment.get("id") or ""
+            submitted_at = assignment.get("submitted_at")
+            if isinstance(submitted_at, datetime):
+                submitted_at_str = submitted_at.isoformat()
+            else:
+                submitted_at_str = submitted_at
+            nk = db.coalesce_case_lookup_id(eff_case) if eff_case else ""
+            next_deadline = deadline_by_case.get(nk) if nk else None
+            summaries.append(AssignmentSummary(
+                id=assignment["id"],
+                caseId=case_id,
+                employeeIdentifier=assignment["employee_identifier"],
+                status=AssignmentStatus(normalize_status(assignment["status"])),
+                submittedAt=submitted_at_str,
+                complianceStatus=None,
+                employeeFirstName=assignment.get("employee_first_name"),
+                employeeLastName=assignment.get("employee_last_name"),
+                case=case_meta,
+                nextDeadline=next_deadline,
+            ))
+        dur_ms = (time.perf_counter() - t0) * 1000
+        _log_endpoint_perf("/api/hr/assignments", request_id, user.get("id"), dur_ms, 200)
+        return AssignmentsListResponse(assignments=summaries, total=total)
+    except Exception as e:
+        # Structured error log with request_id and user identity.
+        log.error(
+            "request_id=%s method=GET route=/api/hr/assignments user_id=%s email=%s error=%s",
+            request_id,
+            user.get("id"),
+            user.get("email"),
+            repr(e),
+            exc_info=True,
+        )
+        dur_ms = (time.perf_counter() - t0) * 1000
+        _log_endpoint_perf("/api/hr/assignments", request_id, user.get("id"), dur_ms, 500)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to load assignments", "request_id": request_id},
+        )
+
+
+@app.get("/api/debug/supabase")
+def debug_supabase():
+    """
+    Lightweight Supabase admin connectivity check.
+    - Verifies SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are present.
+    - Runs a small SELECT via service-role client.
+    """
+    request_id = str(uuid.uuid4())
+    supabase_url_present = bool(os.getenv("SUPABASE_URL"))
+    service_role_present = bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+
+    if not supabase_url_present or not service_role_present:
+        log.error(
+            "request_id=%s supabase debug missing envs: url_present=%s service_role_present=%s",
+            request_id,
+            supabase_url_present,
+            service_role_present,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": "Supabase environment variables missing",
+                "supabase_url_present": supabase_url_present,
+                "service_role_key_present": service_role_present,
+                "request_id": request_id,
+            },
+        )
+
+    try:
+        client = _get_supabase_admin_client()
+        # Lightweight query: try to select a single row (or none) from notifications.
+        res = client.table("notifications").select("id").limit(1).execute()
+        db_ok = res is not None
+        return {
+            "ok": True,
+            "db_ok": db_ok,
+            "supabase_url_present": True,
+            "service_role_key_present": True,
+            "request_id": request_id,
+        }
+    except Exception as e:
+        log.error("request_id=%s supabase debug query failed: %s", request_id, e, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": "Supabase query failed",
+                "supabase_url_present": True,
+                "service_role_key_present": True,
+                "request_id": request_id,
+            },
+        )
+
+
+@app.get("/api/hr/messages")
+def list_hr_messages(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    effective = _effective_user(user, UserRole.HR)
+    items = db.list_messages_for_hr(effective["id"])
+    return {"messages": items}
+
+
+class HrConversationsArchiveRequest(BaseModel):
+    assignment_ids: List[str]
+    archived: bool = True
+
+
+@app.get("/api/hr/messages/conversations")
+def list_hr_message_conversations(
+    q: Optional[str] = Query(None, description="Search name, email, identifier, case id"),
+    archive: str = Query("active", description="active | archived | all"),
+    unread_only: bool = Query(False),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Company-scoped conversation summaries (one row per assignment / case thread)."""
+    effective = _effective_user(user, UserRole.HR)
+    pref_user_id = effective.get("id") or ""
+    is_admin = bool(effective.get("is_admin"))
+    hr_cid = None if is_admin else _get_hr_company_id(effective)
+    archive_norm = archive if archive in ("active", "archived", "all") else "active"
+    rows = db.list_hr_conversation_summaries(
+        hr_user_id=pref_user_id,
+        hr_company_id=hr_cid,
+        is_admin=is_admin,
+        search_q=q,
+        archive_filter=archive_norm,
+        unread_only=unread_only,
+        limit=limit,
+        offset=offset,
+    )
+    return {"conversations": rows, "has_more": len(rows) >= limit}
+
+
+@app.get("/api/hr/messages/threads/{assignment_id}")
+def get_hr_message_thread(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Full message history for one assignment; authorized via same rules as assignment detail."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    items = db.list_messages_by_assignment(aid)
+    return {"assignment_id": aid, "messages": items}
+
+
+@app.post("/api/hr/messages/conversations/archive")
+def archive_hr_message_conversations(
+    request: HrConversationsArchiveRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Soft-archive or restore conversations for the current user (non-destructive).
+    archived=true sets archived_at; archived=false removes the preference row (visible in active list again).
+    """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    pref_user_id = effective.get("id") or ""
+    if not request.assignment_ids:
+        raise HTTPException(status_code=400, detail="assignment_ids required")
+    normalized: List[str] = []
+    for raw_id in request.assignment_ids:
+        aid = (raw_id or "").strip()
+        if not aid:
+            continue
+        assignment = db.get_assignment_by_id(aid)
+        if not assignment:
+            raise HTTPException(status_code=404, detail=f"Assignment not found: {aid}")
+        if not _hr_can_access_assignment(assignment, user):
+            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+        normalized.append(assignment["id"])
+    for aid in normalized:
+        db.upsert_message_conversation_pref(pref_user_id, aid, request.archived)
+    return {"ok": True, "updated": len(normalized)}
+
+
+@app.delete("/api/hr/messages/{message_id}")
+def delete_hr_message(
+    message_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Permanently remove one message from an assignment thread.
+    Authorized when the caller can access the message's assignment (same rules as thread view).
+    """
+    _deny_if_impersonating(user)
+    mid = (message_id or "").strip()
+    if not mid:
+        raise HTTPException(status_code=400, detail="message_id required")
+    row = db.get_message_by_id(mid)
+    if not row:
+        raise HTTPException(status_code=404, detail="Message not found")
+    aid = row.get("assignment_id")
+    if not aid:
+        raise HTTPException(status_code=400, detail="Message has no assignment")
+    assignment = db.get_assignment_by_id(str(aid)) or db.get_assignment_by_case_id(str(aid))
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this message")
+    deleted = db.delete_message_by_id(mid)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"ok": True}
+
+
+# Message state / notification bell (HR + Employee)
+@app.get("/api/messages/unread-count")
+def get_message_unread_count(user: Dict[str, Any] = Depends(require_hr_or_employee)):
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    count = db.get_unread_message_count(effective["id"])
+    return {"count": count}
+
+
+@app.get("/api/messages/unread-list")
+def list_message_unread(
+    limit: int = 20,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    items = db.list_unread_message_notifications(effective["id"], limit=min(limit, 50))
+    return {"notifications": items}
+
+
+class MarkConversationReadRequest(BaseModel):
+    assignment_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+
+
+class CaseServiceItem(BaseModel):
+    service_key: str
+    category: str
+    selected: bool = True
+    estimated_cost: Optional[float] = None
+    currency: Optional[str] = None
+
+
+class CaseServicesUpsert(BaseModel):
+    services: List[CaseServiceItem]
+
+
+class ServiceAnswerItem(BaseModel):
+    service_key: str
+    answers: Dict[str, Any]
+
+
+class ServiceAnswersUpsert(BaseModel):
+    case_id: str
+    items: List[ServiceAnswerItem]
+
+
+class RfqItemInput(BaseModel):
+    service_key: str
+    requirements: Dict[str, Any] = {}
+
+
+class RfqCreatePayload(BaseModel):
+    case_id: str
+    items: List[RfqItemInput]
+    vendor_ids: Optional[List[str]] = None
+    supplier_ids: Optional[List[str]] = None
+
+
+class QuoteLineInput(BaseModel):
+    label: str
+    amount: float
+
+
+class QuoteCreatePayload(BaseModel):
+    total_amount: float
+    currency: str
+    valid_until: Optional[str] = None
+    status: str = "proposed"
+    quote_lines: List[QuoteLineInput]
+
+
+class PolicyBenefitItem(BaseModel):
+    service_category: str
+    benefit_key: str
+    benefit_label: str
+    eligibility: Optional[Dict[str, Any]] = None
+    limits: Optional[Dict[str, Any]] = None
+    notes: Optional[str] = None
+    source_quote: Optional[str] = None
+    source_section: Optional[str] = None
+    confidence: Optional[float] = None
+
+
+class PolicyBenefitsUpsert(BaseModel):
+    benefits: List[PolicyBenefitItem]
+
+
+@app.post("/api/messages/mark-conversation-read")
+def mark_conversation_read(
+    req: MarkConversationReadRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment_id = req.assignment_id or req.conversation_id
+    if not assignment_id:
+        raise HTTPException(status_code=400, detail="assignment_id or conversation_id required")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    aid = assignment["id"]
+    if effective.get("role") == UserRole.EMPLOYEE.value:
+        if assignment.get("employee_user_id") != effective.get("id"):
+            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    else:
+        if not _hr_can_access_assignment(assignment, user):
+            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    db.mark_conversation_read(aid, effective["id"])
+    return {"success": True}
+
+
+@app.post("/api/messages/dismiss/{message_id}")
+def dismiss_message_notification(
+    message_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    updated = db.dismiss_message_notification(message_id, effective["id"])
+    return {"success": updated}
+
+
+@app.delete("/api/hr/assignments/{assignment_id}")
+def delete_hr_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    """
+    Soft-delete an assignment + its parent case. Sets archived_at and writes
+    an audit_logs row per entity. Non-admin HR callers must own or share a
+    company with the assignment.
+    """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    deleted = db.delete_assignment(assignment_id, actor_id=effective.get("id"))
+    if not deleted:
+        # Either it was already archived or race with concurrent delete.
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return {"success": True, "deleted": assignment_id}
 
-    profile = db.get_employee_profile(assignment_id)
-    report = db.get_latest_compliance_report(assignment_id)
 
-    completeness = None
-    if profile:
-        completion_state = orchestrator.compute_completion_state(profile)
-        completeness = completion_state.get("profileCompleteness", 0)
+@app.post("/api/hr/cases/{case_id}/erasure")
+def erase_case_data(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    GDPR right-to-erasure. Soft-deletes all assignments for this case (which
+    also soft-deletes the case via delete_assignment) and redacts passport,
+    nationality, DOB, and family identity fields from relocation_cases.profile_json.
 
-    return AssignmentDetail(
-        id=assignment["id"],
-        caseId=assignment["case_id"],
-        employeeIdentifier=assignment["employee_identifier"],
-        status=AssignmentStatus(normalize_status(assignment["status"])),
-        submittedAt=assignment.get("submitted_at"),
-        hrNotes=assignment.get("hr_notes"),
-        profile=RelocationProfile(**profile) if profile else None,
-        completeness=completeness,
-        complianceReport=report
+    Authorization: non-admin HR callers must belong to the case's company.
+    Audit: writes a `relocation_case` row with action_type='erase' and a
+    `case_assignment` row with action_type='delete' per soft-deleted assignment.
+    """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    case = db.get_case_by_id(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if not user.get("is_admin"):
+        hr_company = _get_hr_company_id(effective)
+        if not hr_company or hr_company != case.get("company_id"):
+            raise HTTPException(status_code=403, detail="Not authorized for this case")
+
+    # Soft-delete assignments first (each call also soft-deletes the case).
+    with db.engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT id FROM case_assignments WHERE case_id = :cid AND archived_at IS NULL"),
+            {"cid": case_id},
+        ).fetchall()
+    assignment_ids = [r._mapping["id"] for r in rows]
+    for aid in assignment_ids:
+        try:
+            db.delete_assignment(aid, actor_id=effective.get("id"))
+        except Exception as ex:
+            log.warning("erase_case_data: delete_assignment(%s) failed: %s", aid[:8], ex)
+
+    # Redact identity PII on the case row (audit row written inside).
+    db.redact_case_identity_data(case_id, actor_id=effective.get("id"))
+
+    log.info(
+        "gdpr_erasure case_id=%s company_id=%s actor=%s assignments_soft_deleted=%d",
+        case_id[:8],
+        (case.get("company_id") or "")[:8],
+        (effective.get("id") or "")[:8],
+        len(assignment_ids),
     )
+    return {
+        "success": True,
+        "case_id": case_id,
+        "assignments_soft_deleted": len(assignment_ids),
+        "pii_redacted": True,
+    }
+
+
+def _resolve_assignment_route_for_list(
+    *,
+    case_row: Dict[str, Any],
+    employee_profile_json: Optional[Dict[str, Any]],
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Mirror the precedence used by GET /api/hr/assignments/{id} (caseOriginHint /
+    caseDestinationHint + frontend deriveCaseEssentials) so the dashboard list
+    and the case detail show the same corridor.
+
+    Precedence:
+      1. employee_profiles.profile_json -> movePlan.origin / movePlan.destination
+      2. relocation_cases.profile_json  -> relocationBasics.originCountry / destCountry
+      3. relocation_cases.home_country  / host_country (stored denormalized cols)
+    """
+    origin = (case_row.get("home_country") or "").strip() or None
+    dest = (case_row.get("host_country") or "").strip() or None
+
+    raw = case_row.get("profile_json")
+    if raw:
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(data, dict):
+                rb = data.get("relocationBasics") or {}
+                oc = (rb.get("originCountry") or "").strip() if isinstance(rb.get("originCountry"), str) else ""
+                dc = (rb.get("destCountry") or "").strip() if isinstance(rb.get("destCountry"), str) else ""
+                if oc:
+                    origin = oc
+                if dc:
+                    dest = dc
+        except Exception:
+            pass
+
+    if isinstance(employee_profile_json, dict):
+        mp = employee_profile_json.get("movePlan") or {}
+        if isinstance(mp, dict):
+            mp_origin = mp.get("origin")
+            mp_dest = mp.get("destination")
+            if isinstance(mp_origin, str) and mp_origin.strip():
+                origin = mp_origin.strip()
+            if isinstance(mp_dest, str) and mp_dest.strip():
+                dest = mp_dest.strip()
+
+    return origin, dest
+
+
+def _hr_assignment_case_route_hints(case_row: Optional[Dict[str, Any]]) -> tuple:
+    """
+    Origin/destination hints from relocation_cases only (existing stored data).
+    Precedence: relocationBasics in profile_json (wizard draft), then home_country / host_country.
+    """
+    if not case_row:
+        return None, None
+    origin = (case_row.get("home_country") or "").strip() or None
+    dest = (case_row.get("host_country") or "").strip() or None
+    raw = case_row.get("profile_json")
+    if not raw:
+        return origin, dest
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+        if isinstance(data, dict):
+            rb = data.get("relocationBasics") or {}
+            oc = (rb.get("originCountry") or "").strip()
+            dc = (rb.get("destCountry") or "").strip()
+            if oc:
+                origin = oc
+            if dc:
+                dest = dc
+    except Exception:
+        pass
+    return origin, dest
+
+
+@app.get("/api/hr/assignments/{assignment_id}", response_model=AssignmentDetail)
+def get_hr_assignment(
+    request: Request,
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    start = time.perf_counter()
+    try:
+        assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+        if not assignment:
+            raise HTTPException(status_code=404, detail="Assignment not found")
+        if not _hr_can_access_assignment(assignment, user):
+            raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+
+        aid = assignment["id"]
+        case_id = _effective_relocation_case_id(assignment) or assignment.get("id") or ""
+        if not case_id:
+            log.warning("request_id=%s assignment_id=%s assignment has no case_id", req_id, assignment_id)
+
+        profile = None
+        try:
+            profile = db.get_employee_profile(aid)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s get_employee_profile failed: %s",
+                req_id, assignment_id, e, exc_info=True,
+            )
+
+        report = None
+        try:
+            report = db.get_latest_compliance_report(aid)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s get_latest_compliance_report failed: %s",
+                req_id, assignment_id, e, exc_info=True,
+            )
+
+        completeness = None
+        if profile:
+            try:
+                completion_state = orchestrator.compute_completion_state(profile)
+                completeness = completion_state.get("profileCompleteness", 0)
+            except Exception as e:
+                log.warning(
+                    "request_id=%s assignment_id=%s compute_completion_state failed: %s",
+                    req_id, assignment_id, e, exc_info=True,
+                )
+
+        parsed_profile = None
+        if profile:
+            try:
+                parsed_profile = RelocationProfile(**profile)
+            except Exception as e:
+                log.warning(
+                    "request_id=%s assignment_id=%s RelocationProfile validation failed: %s",
+                    req_id, assignment_id, e, exc_info=True,
+                )
+
+        submitted_at = assignment.get("submitted_at")
+        if isinstance(submitted_at, datetime):
+            submitted_at_str = submitted_at.isoformat()
+        else:
+            submitted_at_str = str(submitted_at) if submitted_at is not None else None
+
+        case_row = None
+        try:
+            if case_id:
+                case_row = db.get_case_by_id(case_id)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s get_case_by_id failed: %s",
+                req_id,
+                assignment_id,
+                e,
+            )
+        case_origin_hint, case_dest_hint = _hr_assignment_case_route_hints(case_row)
+
+        linked_email = None
+        linked_full_name = None
+        emp_uid = assignment.get("employee_user_id")
+        if emp_uid:
+            try:
+                prec = db.get_profile_record(str(emp_uid))
+                if prec:
+                    linked_email = prec.get("email")
+                    linked_full_name = prec.get("full_name")
+            except Exception as e:
+                log.warning(
+                    "request_id=%s assignment_id=%s get_profile_record failed: %s",
+                    req_id,
+                    assignment_id,
+                    e,
+                )
+
+        readiness_snap: Optional[Dict[str, Any]] = None
+        try:
+            readiness_snap = db.get_hr_readiness_summary(aid)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s get_hr_readiness_summary failed: %s",
+                req_id,
+                assignment_id,
+                e,
+            )
+            readiness_snap = {
+                "resolved": False,
+                "reason": "error",
+                "user_message": "Readiness summary temporarily unavailable.",
+            }
+
+        profile_dict = profile if isinstance(profile, dict) else None
+        intake_raw = build_intake_checklist_items(profile_dict)
+        ui_raw = build_hr_case_readiness_ui(
+            profile=profile_dict,
+            intake_items=intake_raw,
+            readiness_snap=readiness_snap,
+            compliance_report=report,
+        )
+        case_readiness_ui: Optional[CaseReadinessUi] = None
+        try:
+            case_readiness_ui = CaseReadinessUi.model_validate(ui_raw)
+        except Exception as e:
+            log.warning(
+                "request_id=%s assignment_id=%s CaseReadinessUi validation failed: %s",
+                req_id,
+                assignment_id,
+                e,
+            )
+
+        intake_models: List[IntakeChecklistItem] = []
+        for row in intake_raw:
+            try:
+                intake_models.append(IntakeChecklistItem(**row))
+            except Exception:
+                continue
+
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.info(
+            "request_id=%s assignment_id=%s get_hr_assignment ok dur_ms=%.2f",
+            req_id, assignment_id, dur_ms,
+        )
+        return AssignmentDetail(
+            id=aid,
+            caseId=case_id,
+            employeeIdentifier=assignment.get("employee_identifier") or "",
+            status=AssignmentStatus(normalize_status(assignment.get("status"))),
+            submittedAt=submitted_at_str,
+            hrNotes=assignment.get("hr_notes"),
+            profile=parsed_profile,
+            completeness=completeness,
+            complianceReport=report,
+            employeeFirstName=assignment.get("employee_first_name"),
+            employeeLastName=assignment.get("employee_last_name"),
+            employeeEmail=linked_email,
+            linkedEmployeeFullName=linked_full_name,
+            caseOriginHint=case_origin_hint,
+            caseDestinationHint=case_dest_hint,
+            intakeChecklist=intake_models,
+            readinessSnapshot=readiness_snap,
+            caseReadinessUi=case_readiness_ui,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.error(
+            "request_id=%s assignment_id=%s get_hr_assignment failed dur_ms=%.2f error=%s",
+            req_id, assignment_id, dur_ms, repr(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to load assignment: {str(e)[:200]}",
+        )
+
+
+def _hr_assignment_or_404(assignment_id: str) -> Dict[str, Any]:
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return assignment
+
+
+@app.get("/api/hr/assignments/{assignment_id}/readiness/summary")
+def get_hr_assignment_readiness_summary(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Case Readiness Core — compact summary (no full checklist rows)."""
+    assignment = _hr_assignment_or_404(assignment_id)
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    return db.get_hr_readiness_summary(aid)
+
+
+@app.get("/api/hr/assignments/{assignment_id}/readiness/detail")
+def get_hr_assignment_readiness_detail(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Full checklist + milestones with case state (load after summary / when panel expanded)."""
+    assignment = _hr_assignment_or_404(assignment_id)
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    return db.get_hr_readiness_detail(aid)
+
+
+@app.patch("/api/hr/assignments/{assignment_id}/readiness/checklist-items/{item_id}")
+def patch_hr_readiness_checklist_item(
+    assignment_id: str,
+    item_id: str,
+    body: ReadinessChecklistPatchRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    _deny_if_impersonating(user)
+    assignment = _hr_assignment_or_404(assignment_id)
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    bind = db.ensure_case_readiness_binding(aid)
+    if not bind:
+        raise HTTPException(status_code=400, detail="Readiness not bound for this case (destination or template missing)")
+    tid = bind.get("template_id")
+    with db.engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT 1 FROM readiness_template_checklist_items WHERE id = :iid AND template_id = :tid"),
+            {"iid": item_id, "tid": tid},
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Checklist item not found for this readiness template")
+    try:
+        db.upsert_readiness_checklist_state(aid, item_id, body.status.strip().lower(), body.notes)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    return {"success": True}
+
+
+@app.patch("/api/hr/assignments/{assignment_id}/readiness/milestones/{milestone_id}")
+def patch_hr_readiness_milestone(
+    assignment_id: str,
+    milestone_id: str,
+    body: ReadinessMilestonePatchRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    _deny_if_impersonating(user)
+    assignment = _hr_assignment_or_404(assignment_id)
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    aid = assignment["id"]
+    bind = db.ensure_case_readiness_binding(aid)
+    if not bind:
+        raise HTTPException(status_code=400, detail="Readiness not bound for this case (destination or template missing)")
+    tid = bind.get("template_id")
+    with db.engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT 1 FROM readiness_template_milestones WHERE id = :mid AND template_id = :tid"),
+            {"mid": milestone_id, "tid": tid},
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Milestone not found for this readiness template")
+    db.upsert_readiness_milestone_state(aid, milestone_id, body.completed, body.notes)
+    return {"success": True}
+
+
+@app.get("/api/hr/assignments/{assignment_id}/resolved-policy")
+def get_hr_resolved_policy(
+    assignment_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """HR: Get resolved policy for assignment with diagnostics and context."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+
+    from .services.policy_resolution import resolve_policy_for_assignment
+    case_id = assignment.get("case_id")
+    case = db.get_relocation_case(case_id) if case_id else None
+    profile = None
+    if case and case.get("profile_json"):
+        try:
+            profile = json.loads(case["profile_json"]) if isinstance(case["profile_json"], str) else case["profile_json"]
+        except Exception:
+            profile = None
+    employee_profile = db.get_employee_profile(assignment_id)
+
+    resolved = db.get_resolved_assignment_policy(assignment_id)
+    if not resolved:
+        resolved = resolve_policy_for_assignment(
+            db, assignment_id, assignment, case, profile, employee_profile
+        )
+    if not resolved:
+        return {
+            "resolved": None,
+            "message": "No published policy version for this company. Publish a policy in HR Policy Review.",
+        }
+    benefits = db.list_resolved_policy_benefits(resolved["id"])
+    exclusions = db.list_resolved_policy_exclusions(resolved["id"])
+    return {
+        "resolved": {
+            **resolved,
+            "benefits": benefits,
+            "exclusions": exclusions,
+        },
+        "policy_version": resolved.get("version"),
+        "resolution_context": resolved.get("resolution_context", {}),
+    }
+
+
+@app.post("/api/hr/assignments/{assignment_id}/resolved-policy/recompute")
+def recompute_resolved_policy(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """HR: Force recompute resolved policy (e.g. after policy republish)."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+
+    from .services.policy_resolution import resolve_policy_for_assignment
+    case_id = assignment.get("case_id")
+    case = db.get_relocation_case(case_id) if case_id else None
+    profile = None
+    if case and case.get("profile_json"):
+        try:
+            profile = json.loads(case["profile_json"]) if isinstance(case["profile_json"], str) else case["profile_json"]
+        except Exception:
+            profile = None
+    employee_profile = db.get_employee_profile(assignment_id)
+
+    resolved = resolve_policy_for_assignment(
+        db, assignment_id, assignment, case, profile, employee_profile
+    )
+    if not resolved:
+        return {"resolved": None, "message": "No published policy. Publish a policy first."}
+    benefits = db.list_resolved_policy_benefits(resolved["id"])
+    exclusions = db.list_resolved_policy_exclusions(resolved["id"])
+    return {
+        "resolved": {**resolved, "benefits": benefits, "exclusions": exclusions},
+        "policy_version": resolved.get("version"),
+    }
+
+
+@app.post("/api/hr/assignments/{assignment_id}/feedback")
+def post_hr_feedback(
+    assignment_id: str,
+    request: HrFeedbackRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR))
+):
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    effective = _effective_user(user, UserRole.HR)
+    message = (request.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    row = db.insert_hr_feedback(
+        feedback_id=str(uuid.uuid4()),
+        assignment_id=assignment_id,
+        hr_user_id=effective["id"],
+        employee_user_id=assignment.get("employee_user_id"),
+        message=message,
+    )
+    emp_id = assignment.get("employee_user_id")
+    if emp_id:
+        try:
+            db.create_notification_with_preferences(
+                user_id=emp_id,
+                type_="HR_FEEDBACK_POSTED",
+                title="New feedback from HR",
+                body=(message[:120] + "…") if len(message) > 120 else message,
+                assignment_id=assignment_id,
+                case_id=assignment.get("case_id"),
+                metadata={"feedback_id": row["id"], "assignment_id": assignment_id},
+            )
+        except Exception as e:
+            try:
+                db.insert_notification(
+                    notification_id=str(uuid.uuid4()),
+                    user_id=emp_id,
+                    type_="HR_FEEDBACK_POSTED",
+                    title="New feedback from HR",
+                    body=(message[:120] + "…") if len(message) > 120 else message,
+                    assignment_id=assignment_id,
+                    case_id=assignment.get("case_id"),
+                    metadata={"feedback_id": row["id"], "assignment_id": assignment_id},
+                )
+            except Exception as e2:
+                log.warning("Failed to create notification for HR feedback: %s", e2)
+    return {"ok": True, "id": row["id"], "created_at": row["created_at"]}
+
+
+@app.get("/api/hr/assignments/{assignment_id}/feedback")
+def get_hr_feedback(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    rows = db.list_hr_feedback(assignment_id)
+    return [
+        {"id": r["id"], "assignment_id": r["assignment_id"], "hr_user_id": r["hr_user_id"], "employee_user_id": r.get("employee_user_id"), "message": r["message"], "created_at": r["created_at"]}
+        for r in rows
+    ]
+
+
+@app.get("/api/employee/assignment-feedback")
+def get_employee_assignment_feedback(assignment_id: str = Query(...), user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE))):
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    if assignment.get("employee_user_id") != effective["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    rows = db.list_hr_feedback(assignment_id)
+    return [
+        {"id": r["id"], "assignment_id": r["assignment_id"], "message": r["message"], "created_at": r["created_at"]}
+        for r in rows
+    ]
+
+
+@app.get("/api/case-details-by-assignment")
+def get_case_details_by_assignment(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Load case details through the assignment relationship only.
+    Access is gated by case_assignments (user must be employee or HR for this assignment).
+    """
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found or not visible under RLS")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    effective_id = str(effective["id"]).strip()
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    visible = False
+    if is_employee and emp_id and str(emp_id).strip() == effective_id:
+        visible = True
+    if is_employee and not emp_id:
+        ident = (assignment.get("employee_identifier") or "").strip().lower()
+        user_ids = [x.lower() for x in [effective.get("email"), effective.get("username")] if x]
+        if ident and user_ids and ident in user_ids:
+            visible = True
+    if is_hr and (effective.get("is_admin") or (hr_id and str(hr_id).strip() == effective_id)):
+        visible = True
+    if not visible:
+        raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
+    case_id = _effective_relocation_case_id(assignment)
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case_id")
+
+    mobility_case_id: Optional[str] = None
+    try:
+        mobility_case_id = ensure_mobility_case_link_for_assignment(
+            db, str(assignment["id"]), request_id=None
+        )
+    except Exception as exc:
+        log.warning("ensure_mobility_case_link_for_assignment in case-details: %s", exc)
+    try:
+        ensure_employee_case_person_for_assignment(db, str(assignment["id"]), request_id=None)
+    except Exception as exc:
+        log.warning("ensure_employee_case_person_for_assignment in case-details: %s", exc)
+    try:
+        ensure_passport_case_document_for_assignment(db, str(assignment["id"]), request_id=None)
+    except Exception as exc:
+        log.warning("ensure_passport_case_document_for_assignment in case-details: %s", exc)
+
+    # Prefill employer name/country from company profile (source of truth for HR)
+    company = None
+    employer_name = None
+    employer_country = None
+    if hr_id:
+        company = db.get_company_for_user(hr_id)
+    if not company and case_id:
+        case_row = db.get_case_by_id(case_id)
+        cid = case_row.get("company_id") if case_row else None
+        if cid:
+            company = db.get_company(cid)
+    if company:
+        employer_name = company.get("name") or company.get("legal_name")
+        employer_country = company.get("country")
+
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if not case:
+            case = app_crud.create_case(session, case_id, {
+                "relocationBasics": {},
+                "employeeProfile": {},
+                "familyMembers": {},
+                "assignmentContext": {},
+            })
+        draft = json.loads(case.draft_json or "{}")
+        ac = draft.get("assignmentContext") or {}
+        # Employer name/country are source-of-truth from company profile; always override when available
+        if company:
+            ac["employerName"] = employer_name or ""
+            ac["employerCountry"] = employer_country or ""
+        draft["assignmentContext"] = ac
+        case_dto = cases_router._case_dto(case, draft)
+    # Ensure destCity/destCountry come from draft, then from relocation_cases.host_country (assignment destination)
+    case_dump = case_dto.model_dump(mode="json")
+    basics = draft.get("relocationBasics") or {}
+    if not case_dump.get("destCity") and basics.get("destCity"):
+        case_dump["destCity"] = basics.get("destCity")
+    if not case_dump.get("destCountry") and basics.get("destCountry"):
+        case_dump["destCountry"] = basics.get("destCountry")
+    if not case_dump.get("destCountry"):
+        case_row = db.get_case_by_id(case_id)
+        if case_row and case_row.get("host_country"):
+            case_dump["destCountry"] = case_row["host_country"]
+    employee_full_name = None
+    if emp_id:
+        emp_profile = db.get_profile_record(emp_id)
+        if emp_profile:
+            employee_full_name = emp_profile.get("full_name") or emp_profile.get("email")
+    if not employee_full_name and assignment.get("employee_identifier"):
+        employee_full_name = assignment["employee_identifier"]
+    return {
+        "assignment": {
+            "id": assignment["id"],
+            "case_id": case_id,
+            "employee_user_id": emp_id,
+            "hr_user_id": hr_id,
+            "status": assignment.get("status", ""),
+            "employee_identifier": assignment.get("employee_identifier"),
+            "employee_full_name": employee_full_name,
+            "mobility_case_id": mobility_case_id,
+        },
+        "case": case_dump,
+    }
+
+
+@app.get("/api/assignments/{assignment_id}/timeline")
+def get_assignment_timeline(
+    request: Request,
+    assignment_id: str,
+    ensure_defaults: bool = Query(False, description="Create default milestones if none exist"),
+    include_links: bool = Query(True, description="Include milestone link rows (omit for lighter payloads)"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """List operational relocation tasks (case_milestones) for the case linked to this assignment."""
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = _effective_relocation_case_id(assignment)
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    milestones = db.list_case_milestones(case_id, request_id=request_id)
+    if ensure_defaults and len(milestones) == 0:
+        try:
+            services = []
+            try:
+                svc_rows = db.list_case_services(assignment_id, request_id=request_id)
+                services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
+            except Exception:
+                pass
+            draft, target_move_date = {}, None
+            with SessionLocal() as session:
+                case = app_crud.get_case(session, case_id)
+                if case:
+                    try:
+                        raw_draft = json.loads(getattr(case, "draft_json", None) or "{}")
+                        draft = raw_draft if isinstance(raw_draft, dict) else {}
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        draft = {}
+                    target_move_date = getattr(case, "target_move_date", None)
+            # ── S5 wiring: extract plan-scope context from draft ─────────────
+            _s5_ac = draft.get("assignmentContext") or {}
+            _s5_as = draft.get("assignment") or {}
+            _s5_rb = draft.get("relocationBasics") or {}
+            _s5_contract_type = (
+                _s5_as.get("contractType")
+                or _s5_ac.get("contractType")
+                or _s5_rb.get("contractType")
+                or None
+            )
+            _s5_family = draft.get("family") or None
+            _s5_dest = _s5_rb.get("destCountry") or _s5_rb.get("destination_country") or None
+            _s5_origin = _s5_rb.get("originCountry") or _s5_rb.get("origin_country") or None
+            # ── P2 wiring: nationality for immigration regime detection ────────
+            _s5_ep = draft.get("employeeProfile") or {}
+            _s5_pa = draft.get("primaryApplicant") or {}
+            _s5_nationality = (
+                _s5_pa.get("nationality")
+                or _s5_ep.get("nationality")
+                or _s5_ep.get("nationalityCountry")
+                or _s5_rb.get("nationality")
+                or None
+            )
+            defaults = compute_default_milestones(
+                case_id=case_id,
+                case_draft=draft,
+                selected_services=services,
+                target_move_date=str(target_move_date) if target_move_date else None,
+                contract_type=_s5_contract_type,
+                family_profile=_s5_family,
+                destination_country=_s5_dest,
+                origin_country=_s5_origin,
+                nationality=_s5_nationality,
+            )
+            for m in defaults:
+                try:
+                    db.upsert_case_milestone(
+                        case_id=case_id,
+                        milestone_type=m["milestone_type"],
+                        title=m["title"],
+                        description=m.get("description"),
+                        target_date=m.get("target_date"),
+                        status=m.get("status", "pending"),
+                        sort_order=m.get("sort_order", 0),
+                        owner=m.get("owner", "joint"),
+                        criticality=m.get("criticality", "normal"),
+                        notes=m.get("notes"),
+                        request_id=request_id,
+                    )
+                except Exception as upsert_exc:
+                    log.warning(
+                        "ensure_defaults upsert_case_milestone failed case_id=%s type=%s: %s",
+                        case_id,
+                        m.get("milestone_type"),
+                        upsert_exc,
+                        exc_info=True,
+                    )
+            # ── P3 wiring: detect and persist exception flags ─────────────────
+            try:
+                from backend.services.immigration_regime import ImmigrationRegimeRouter as _RegimeRouter
+                from backend.services.exception_request_service import ExceptionRequestService as _ExcSvc
+                from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
+                _exc_profile = _extract_profile(draft)
+                _exc_profile.setdefault("destination_country", _s5_dest)
+                _exc_profile.setdefault("origin_country", _s5_origin)
+                _exc_profile.setdefault("nationality", _s5_nationality)
+                _exc_profile.setdefault("contract_type", _s5_contract_type)
+                _regime = _RegimeRouter().detect_regime(
+                    nationality=_exc_profile.get("nationality"),
+                    destination_country=_exc_profile.get("destination_country"),
+                    origin_country=_exc_profile.get("origin_country"),
+                    contract_type=_exc_profile.get("contract_type"),
+                )
+                for _flag in _ExcSvc().evaluate_case(profile=_exc_profile, regime=_regime):
+                    try:
+                        db.upsert_exception_request(
+                            case_id=case_id,
+                            exception_type=_flag.exception_type,
+                            reason=_flag.reason,
+                            severity=_flag.severity,
+                            assignment_id=assignment_id,
+                            recommended_action=_flag.recommended_action or None,
+                            request_id=request_id,
+                        )
+                    except Exception as _fe:
+                        log.warning(
+                            "upsert_exception_request failed case_id=%s type=%s: %s",
+                            case_id, _flag.exception_type, _fe,
+                        )
+            except Exception as _exc_err:
+                log.warning(
+                    "get_assignment_timeline exception detection failed case_id=%s: %s",
+                    case_id, _exc_err,
+                )
+            milestones = db.list_case_milestones(case_id, request_id=request_id)
+        except Exception as exc:
+            log.warning(
+                "get_assignment_timeline ensure_defaults failed assignment_id=%s case_id=%s: %s",
+                assignment_id,
+                case_id,
+                exc,
+                exc_info=True,
+            )
+            milestones = db.list_case_milestones(case_id, request_id=request_id)
+    if include_links:
+        for m in milestones:
+            m["links"] = db.list_milestone_links(m["id"], request_id=request_id)
+    else:
+        for m in milestones:
+            m["links"] = []
+    summary = compute_timeline_summary(milestones)
+    return {
+        "case_id": case_id,
+        "assignment_id": assignment_id,
+        "milestones": milestones,
+        "summary": summary,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Country Resources (personalized by wizard profile)
+# ---------------------------------------------------------------------------
+def _get_section_content(country_code: str, city: str, section_key: str) -> Dict[str, Any]:
+    """Fetch section content from DB (Supabase) if available, else from Python defaults."""
+    try:
+        supabase = _get_supabase_admin_client()
+        # Try city-specific first, then country-level (city is null)
+        for city_val in ([city] if city else []) + [None]:
+            q = (
+                supabase.table("country_resource_sections")
+                .select("content_json, title")
+                .eq("country_code", country_code.upper())
+                .eq("section_key", section_key)
+            )
+            if city_val:
+                q = q.eq("city", city_val)
+            else:
+                q = q.is_("city", "null")
+            r = q.limit(1).execute()
+            if r.data and len(r.data) > 0:
+                return r.data[0].get("content_json") or {}
+    except Exception:
+        pass
+    return get_default_section_content(country_code, city, section_key)
+
+
+@app.get("/api/resources/country")
+def get_country_resources(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    filters: Optional[str] = Query(None, description="JSON filters: city, family_type, budget, category, etc."),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Return profile context, sections, events, and recommended resources for the country Resources page."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found or not visible under RLS")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    eid = effective.get("id")
+    visible = (is_employee and eid is not None and emp_id == eid) or (
+        is_hr and (effective.get("is_admin") or (eid is not None and hr_id == eid))
+    )
+    if not visible:
+        raise HTTPException(status_code=403, detail="Assignment not found or not visible under RLS")
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case_id")
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if not case:
+            draft = {}
+        else:
+            try:
+                draft = json.loads(case.draft_json or "{}")
+                if not isinstance(draft, dict):
+                    draft = {}
+            except (json.JSONDecodeError, TypeError, ValueError):
+                draft = {}
+
+    profile = build_profile_context(draft)
+    hints = get_personalization_hints(profile)
+    country_code = (profile.get("country_code") or "NO").upper()
+    city = (profile.get("destination_city") or "").strip()
+
+    filter_dict = {}
+    if filters:
+        try:
+            filter_dict = json.loads(filters)
+        except json.JSONDecodeError:
+            pass
+
+    # Resource context for personalization
+    resource_ctx = get_resource_context(draft)
+
+    # Try RKG structured resources first (when destination is set)
+    try:
+        rkg_resources = []
+        if country_code:
+            ff = filter_dict.get("family_friendly")
+            if isinstance(ff, str):
+                ff = ff.lower() in ("true", "1", "yes") if ff else None
+            child_age = filter_dict.get("child_age", "")
+            child_age_min = child_age_max = None
+            if isinstance(child_age, str) and "-" in child_age:
+                try:
+                    a, b = child_age.split("-", 1)
+                    child_age_min = int(a.strip())
+                    child_age_max = int(b.strip())
+                except (ValueError, TypeError):
+                    pass
+            rkg_resources = rkg_get_country_resources(
+                country_code=country_code,
+                city=city or None,
+                category=filter_dict.get("category"),
+                audience=filter_dict.get("family_type"),
+                budget=filter_dict.get("budget"),
+                family_friendly=ff,
+                child_age_min=child_age_min,
+                child_age_max=child_age_max,
+                published_only=True,
+            )
+        if rkg_resources:
+            sections = resources_to_sections(country_code, city, rkg_resources, resource_ctx)
+        else:
+            # Fallback to legacy section content
+            sections = []
+            for key in RESOURCE_SECTIONS:
+                content = _get_section_content(country_code, city, key)
+                sections.append({
+                    "key": key,
+                    "title": SECTION_LABELS.get(key, key.replace("_", " ").title()),
+                    "content": content,
+                })
+    except Exception as e:
+        log.warning("RKG resources fetch failed, using fallback: %s", e, exc_info=True)
+        sections = []
+        for key in RESOURCE_SECTIONS:
+            content = _get_section_content(country_code, city, key)
+            sections.append({
+                "key": key,
+                "title": SECTION_LABELS.get(key, key.replace("_", " ").title()),
+                "content": content,
+            })
+
+    # Events from RKG
+    events = []
+    try:
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        ev_ff = filter_dict.get("family_friendly")
+        if isinstance(ev_ff, str):
+            ev_ff = ev_ff.lower() in ("true", "1", "yes") if ev_ff else None
+        events = rkg_get_country_events(
+            country_code=country_code,
+            city=city or None,
+            event_type=filter_dict.get("event_type"),
+            date_from=now,
+            date_to=now + timedelta(days=14),
+            family_friendly=ev_ff,
+            limit=20,
+            published_only=True,
+        )
+    except Exception as e:
+        log.debug("RKG events fetch failed: %s", e)
+
+    # Recommended resources for hero
+    recommended = []
+    try:
+        recommended = get_recommended_resources(resource_ctx, limit=5)
+    except Exception as e:
+        log.debug("RKG recommended fetch failed: %s", e)
+
+    return {
+        "profile": profile,
+        "context": resource_ctx,
+        "hints": hints,
+        "sections": sections,
+        "events": events,
+        "recommended": recommended,
+        "filters_applied": filter_dict,
+    }
+
+
+def _require_case_id_assignment_visible(case_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolve case_id to an assignment and enforce visibility (RFQ paths, evidence, etc.). Returns assignment row."""
+    assignment = db.get_assignment_by_case_id(case_id) or db.get_assignment_by_id(case_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return _require_assignment_visibility(assignment["id"], user)
+
+
+def _relocation_plan_view_query_role(user: Dict[str, Any], role: Optional[str]) -> str:
+    """
+    Default lens from the authenticated principal; optional ``role`` must match that principal
+    (HR cannot claim employee, employee cannot claim HR). Admin is treated as HR for defaults.
+    """
+    token_role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, token_role)
+    is_hr = effective.get("role") == UserRole.HR.value or bool(effective.get("is_admin"))
+    if not role or not str(role).strip():
+        return "hr" if is_hr else "employee"
+    want = str(role).strip().lower()
+    if want not in ("employee", "hr"):
+        raise HTTPException(status_code=400, detail="role must be employee or hr")
+    if want == "hr" and not is_hr:
+        raise HTTPException(status_code=403, detail="Not allowed to use role=hr")
+    if want == "employee" and effective.get("role") != UserRole.EMPLOYEE.value:
+        raise HTTPException(status_code=403, detail="Not allowed to use role=employee")
+    return want
+
+
+def _require_assignment_visibility(
+    assignment_id: str,
+    user: Dict[str, Any],
+):
+    """Validate user can access assignment. HR: admin, owner, or assignment in their company."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    eid = effective.get("id")
+    visible = False
+    if is_employee and eid is not None and emp_id == eid:
+        visible = True
+    elif is_hr:
+        visible = effective.get("is_admin") or (eid is not None and hr_id == eid)
+        if not visible and effective.get("role") == UserRole.HR.value:
+            hr_company = _get_hr_company_id(effective)
+            if hr_company and db.assignment_belongs_to_company(assignment_id, hr_company):
+                visible = True
+    if not visible:
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    return assignment
+
+
+def _get_hr_company_id(user: Dict[str, Any]) -> Optional[str]:
+    """Resolve company_id for HR user. Uses hr_users first, then profile."""
+    uid = user.get("id")
+    if not uid:
+        return None
+    cid = db.get_hr_company_id(uid)
+    if cid:
+        return cid
+    profile = db.get_profile_record(uid)
+    return profile.get("company_id") if profile else None
+
+
+def _hr_can_access_assignment(assignment: Dict[str, Any], user: Dict[str, Any]) -> bool:
+    """True if HR user can access this assignment (admin, owner, or company match)."""
+    effective = _effective_user(user, UserRole.HR)
+    if effective.get("is_admin"):
+        return True
+    eid = effective.get("id")
+    if eid is not None and assignment.get("hr_user_id") == eid:
+        return True
+    hr_company = _get_hr_company_id(effective)
+    return bool(hr_company and db.assignment_belongs_to_company(assignment.get("id", ""), hr_company))
+
+
+def _require_company_for_user(user: Dict[str, Any]) -> Dict[str, Any]:
+    profile = db.get_profile_record(user.get("id")) or {}
+    company_id = _get_hr_company_id(user) if user.get("role") == UserRole.HR.value else profile.get("company_id")
+    if not company_id:
+        raise HTTPException(status_code=400, detail="User missing company association")
+    profile["company_id"] = company_id
+    return profile
+
+
+def _resolve_company_for_policy(
+    user: Dict[str, Any], company_id_override: Optional[str] = None
+) -> str:
+    """Resolve company_id for policy matrix APIs.
+
+    Admins may pass company_id_override to act on another tenant. Non-admin HR users always
+    receive their own company; passing companyId on /api/hr/... does not switch tenants.
+    """
+    if user.get("is_admin") and company_id_override:
+        return company_id_override
+    profile = _require_company_for_user(user)
+    return profile.get("company_id") or ""
+
+
+def _require_policy_access(user: Dict[str, Any], policy: Optional[Dict[str, Any]]) -> None:
+    """Raise 404 if policy missing or user lacks access. Admin can access any policy."""
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    if user.get("is_admin"):
+        return
+    profile = _require_company_for_user(user)
+    if policy.get("company_id") != profile.get("company_id"):
+        raise HTTPException(status_code=404, detail="Policy not found")
+
+
+def _http_exception_detail_message(detail: Any) -> str:
+    """Normalize FastAPI HTTPException.detail (string or {code, message}) for logs and API fields."""
+    if isinstance(detail, dict):
+        return str(detail.get("message") or detail.get("detail") or "")
+    if detail is None:
+        return ""
+    return str(detail)
+
+
+def _http_exception_detail_code(detail: Any) -> Optional[str]:
+    if isinstance(detail, dict) and detail.get("code") is not None:
+        return str(detail["code"])
+    return None
+
+
+def _require_document_access(user: Dict[str, Any], doc: Optional[Dict[str, Any]]) -> None:
+    """Raise 404 if doc missing or user lacks access. Admin can access any document."""
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if user.get("is_admin"):
+        return
+    profile = _require_company_for_user(user)
+    if doc.get("company_id") != profile.get("company_id"):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+
+def _hr_publish_policy_version(
+    policy_id: str,
+    policy_version_id: str,
+    user: Dict[str, Any],
+    request_id: Optional[str] = None,
+    *,
+    publish_source: str = "manual",
+) -> Dict[str, Any]:
+    """
+    Publish one policy version for HR: archive other published rows, set status=published.
+    Same rules as POST .../versions/{id}/publish.
+    """
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    company_id = (policy or {}).get("company_id") if policy else None
+    try:
+        from .services.policy_pipeline_analytics import (
+            emit_policy_publish_completed,
+            emit_policy_publish_failed,
+            emit_policy_publish_started,
+        )
+
+        emit_policy_publish_started(
+            request_id=request_id,
+            user_id=user.get("id"),
+            company_id=company_id,
+            policy_id=policy_id,
+            policy_version_id=policy_version_id,
+            source=publish_source,
+        )
+    except Exception:
+        pass
+    from .services.policy_publish_gate import require_employee_publishable_policy_version
+
+    try:
+        require_employee_publishable_policy_version(db, policy_version_id)
+    except HTTPException as gate_exc:
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_publish_failed
+
+            emit_policy_publish_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=company_id,
+                policy_id=policy_id,
+                policy_version_id=policy_version_id,
+                error_code=_http_exception_detail_code(gate_exc.detail) or "publish_gate_failed",
+                detail=_http_exception_detail_message(gate_exc.detail) or str(gate_exc.status_code),
+                source=publish_source,
+            )
+        except Exception:
+            pass
+        raise
+    try:
+        db.archive_other_published_versions(policy_id, policy_version_id)
+        db.update_policy_version_status(policy_version_id, "published")
+        try:
+            from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+
+            invalidate_comparison_readiness_cache(policy_version_id)
+        except Exception:
+            pass
+        updated = db.get_policy_version(policy_version_id) or {}
+    except Exception as exc:
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_publish_failed
+
+            emit_policy_publish_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=company_id,
+                policy_id=policy_id,
+                policy_version_id=policy_version_id,
+                error_code="publish_persist_failed",
+                detail=str(exc)[:400],
+                source=publish_source,
+            )
+        except Exception:
+            pass
+        raise
+    log.info(
+        "publish request_id=%s company_id=%s policy_id=%s version_id=%s status=published visibility=employee_lookup source=%s",
+        request_id,
+        company_id,
+        policy_id,
+        policy_version_id,
+        publish_source,
+    )
+    try:
+        from .services.policy_pipeline_analytics import emit_policy_publish_completed
+
+        emit_policy_publish_completed(
+            request_id=request_id,
+            user_id=user.get("id"),
+            company_id=company_id,
+            policy_id=policy_id,
+            policy_version_id=policy_version_id,
+            source=publish_source,
+        )
+    except Exception:
+        pass
+    return updated
+
+
+def _map_storage_exception_to_response(exc: Exception, bucket: str) -> tuple[str, str]:
+    """Return (error_code, user_safe_message). No secrets."""
+    from .services.policy_storage_health import (
+        STORAGE_MISSING_SERVICE_ROLE,
+        STORAGE_BUCKET_NOT_FOUND,
+        STORAGE_ACCESS_DENIED,
+        get_storage_error_code,
+    )
+    code = get_storage_error_code(exc)
+    if code == STORAGE_MISSING_SERVICE_ROLE:
+        return (code, "Policy document uploads require Supabase storage. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the backend .env (see .env.example) to enable uploads.")
+    if code == STORAGE_BUCKET_NOT_FOUND:
+        return (code, "Policy storage bucket is unavailable.")
+    if code == STORAGE_ACCESS_DENIED:
+        return (code, "Policy storage access denied.")
+    return (code, "Upload failed. Please try again.")
+
+
+def _sanitize_storage_error(exc: Exception, bucket: str) -> str:
+    """Return safe user-facing message for HTTPException detail. Used by non-upload routes."""
+    _, msg = _map_storage_exception_to_response(exc, bucket)
+    return msg
+
+
+def _run_policy_document_ingest_background(
+    *,
+    doc_id: str,
+    content: bytes,
+    mime: str,
+    filename: str,
+    request_id: str,
+    user_id: str,
+    company_id: str,
+) -> None:
+    extraction_failed = False
+    num_clauses = 0
+    try:
+        from .services.policy_document_intake import process_uploaded_document
+        from .services.policy_pipeline_analytics import (
+            emit_policy_classify_completed,
+            emit_policy_classify_failed,
+            emit_policy_classify_started,
+        )
+
+        emit_policy_classify_started(
+            request_id=request_id,
+            user_id=user_id,
+            company_id=company_id,
+            document_id=doc_id,
+            source="upload",
+        )
+        result = process_uploaded_document(content, mime, filename, request_id=request_id)
+        db.update_policy_document(
+            doc_id,
+            processing_status=result.get("processing_status"),
+            detected_document_type=result.get("detected_document_type"),
+            detected_policy_scope=result.get("detected_policy_scope"),
+            version_label=result.get("version_label"),
+            effective_date=result.get("effective_date"),
+            raw_text=result.get("raw_text"),
+            extraction_error=result.get("extraction_error"),
+            extracted_metadata=result.get("extracted_metadata"),
+            assistant_import_status=(
+                "failed"
+                if result.get("processing_status") == "failed"
+                else "classified"
+            ),
+            processed_at=datetime.utcnow().isoformat(),
+            request_id=request_id,
+        )
+        if result.get("processing_status") == "failed":
+            extraction_failed = True
+            try:
+                emit_policy_classify_failed(
+                    request_id=request_id,
+                    user_id=user_id,
+                    company_id=company_id,
+                    document_id=doc_id,
+                    extraction_error=result.get("extraction_error"),
+                    source="upload",
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                emit_policy_classify_completed(
+                    request_id=request_id,
+                    user_id=user_id,
+                    company_id=company_id,
+                    document_id=doc_id,
+                    processing_status=result.get("processing_status"),
+                    detected_document_type=result.get("detected_document_type"),
+                    source="upload",
+                )
+            except Exception:
+                pass
+            if result.get("raw_text"):
+                try:
+                    from .services.policy_document_clauses import segment_document_from_raw_text
+
+                    policy_segment_ctx = {
+                        "id": doc_id,
+                        "document_id": doc_id,
+                        "detected_document_type": result.get("detected_document_type"),
+                        "extracted_metadata": result.get("extracted_metadata") or {},
+                        "filename": filename,
+                    }
+                    clauses, seg_err = segment_document_from_raw_text(
+                        result["raw_text"], mime, data=content, policy_context=policy_segment_ctx
+                    )
+                    if not seg_err and clauses:
+                        db.upsert_policy_document_clauses(doc_id, clauses, request_id=request_id)
+                        num_clauses = len(clauses)
+                except Exception as seg_exc:
+                    log.warning("request_id=%s policy_upload stage=segment failed: %s", request_id, seg_exc)
+    except Exception as exc:
+        extraction_failed = True
+        safe_msg = (str(exc) or type(exc).__name__)[:200]
+        log.error(
+            "request_id=%s policy_pipeline stage=ingest document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
+            request_id, doc_id, company_id, user_id, type(exc).__name__, safe_msg, exc_info=True,
+        )
+        db.update_policy_document(
+            doc_id,
+            processing_status="failed",
+            extraction_error=str(exc),
+            assistant_import_status="failed",
+            processed_at=datetime.utcnow().isoformat(),
+            request_id=request_id,
+        )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_classify_failed
+
+            emit_policy_classify_failed(
+                request_id=request_id,
+                user_id=user_id,
+                company_id=company_id,
+                document_id=doc_id,
+                extraction_error=str(exc),
+                source="upload",
+            )
+        except Exception:
+            pass
+
+    final_doc = db.get_policy_document(doc_id, request_id=request_id) or {}
+    if not num_clauses and final_doc:
+        try:
+            num_clauses = len(db.list_policy_document_clauses(doc_id, request_id=request_id))
+        except Exception:
+            num_clauses = 0
+    log.info(
+        "request_id=%s policy_upload background_complete document_id=%s success=%s clauses=%d status=%s",
+        request_id,
+        doc_id,
+        not extraction_failed,
+        num_clauses,
+        final_doc.get("processing_status"),
+    )
+
+
+@app.get("/api/employee/assignments/{assignment_id}/services")
+def get_assignment_services(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment = _require_assignment_visibility(assignment_id, user)
+    try:
+        services = db.list_case_services(assignment["id"])
+    except Exception as e:
+        log.warning("list_case_services failed for assignment %s: %s", assignment["id"], e, exc_info=True)
+        services = []
+    return {
+        "assignment_id": assignment["id"],
+        "case_id": assignment.get("case_id"),
+        "services": services,
+    }
+
+
+@app.get("/api/services/context")
+def get_services_context(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    fallback_services: Optional[str] = Query(None, description="Comma-separated service keys when DB has none"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Combined endpoint: assignment, case context, services, answers, and questions in one round-trip.
+    Reduces 4 requests to 1 for the services questions page.
+    """
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+
+    services = db.list_case_services(assignment["id"])
+    selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
+    if not selected_keys and fallback_services:
+        fallback = [k.strip().lower() for k in fallback_services.split(",") if k.strip()]
+        valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+        selected_keys = [k for k in fallback if k in valid]
+
+    draft = {}
+    dest_city = dest_country = origin_city = origin_country = None
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if case:
+            try:
+                draft = json.loads(case.draft_json or "{}")
+            except Exception:
+                draft = {}
+            dest_city = getattr(case, "dest_city", None)
+            dest_country = getattr(case, "dest_country", None)
+            origin_city = getattr(case, "origin_city", None)
+            origin_country = getattr(case, "origin_country", None)
+    basics = draft.get("relocationBasics") or {}
+    case_context = {
+        "destCity": basics.get("destCity") or dest_city,
+        "destCountry": basics.get("destCountry") or dest_country,
+        "originCity": basics.get("originCity") or origin_city,
+        "originCountry": origin_country or basics.get("originCountry"),
+    }
+
+    saved_rows = db.list_case_service_answers(case_id)
+    saved_flat: Dict[str, Any] = {}
+    for row in saved_rows:
+        ans = row.get("answers") or {}
+        if isinstance(ans, str):
+            try:
+                ans = json.loads(ans)
+            except Exception:
+                ans = {}
+        for k, v in ans.items():
+            if v is not None:
+                saved_flat[k] = v
+
+    questions = []
+    if selected_keys:
+        questions = generate_questions(
+            selected_services=selected_keys,
+            case_context=case_context,
+            saved_answers=saved_flat,
+        )
+
+    return {
+        "assignment_id": assignment["id"],
+        "case_id": case_id,
+        "case_context": case_context,
+        "services": services,
+        "answers": saved_rows,
+        "questions": questions,
+        "selected_services": selected_keys,
+    }
+
+
+@app.post("/api/employee/assignments/{assignment_id}/services")
+def upsert_assignment_services(
+    assignment_id: str,
+    payload: CaseServicesUpsert,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=400, detail="Assignment missing case_id")
+    items = [
+        {
+            "service_key": item.service_key,
+            "category": item.category,
+            "selected": item.selected,
+            "estimated_cost": item.estimated_cost,
+            "currency": item.currency,
+        }
+        for item in payload.services
+    ]
+    try:
+        db.upsert_case_services(assignment["id"], case_id, items)
+        updated = db.list_case_services(assignment["id"])
+        invalidate_relocation_plan_cache(case_id=case_id, assignment_id=assignment["id"])
+        try:
+            from .services.analytics_service import emit_event, EVENT_SERVICES_SELECTED
+            selected = [s["service_key"] for s in items if s.get("selected")]
+            emit_event(
+                EVENT_SERVICES_SELECTED,
+                request_id=getattr(req.state, "request_id", None),
+                assignment_id=assignment_id,
+                case_id=case_id,
+                user_id=user.get("id"),
+                user_role=user.get("role"),
+                service_categories=selected,
+                counts={"selected": len(selected), "total": len(items)},
+            )
+        except Exception:
+            pass
+        return {"ok": True, "services": updated}
+    except Exception as e:
+        log.warning("upsert_case_services failed for assignment %s: %s", assignment["id"], e, exc_info=True)
+        return {"ok": False, "services": []}
+
+
+@app.get("/api/services/answers")
+def get_service_answers(
+    case_id: Optional[str] = Query(None),
+    assignment_id: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Load saved service answers. Pass case_id or assignment_id."""
+    if assignment_id:
+        assignment = _require_assignment_visibility(assignment_id, user)
+        effective_case_id = assignment.get("case_id")
+    elif case_id:
+        assignment = _require_assignment_visibility(case_id, user)
+        effective_case_id = assignment.get("case_id") or case_id
+    else:
+        raise HTTPException(status_code=400, detail="case_id or assignment_id required")
+    if not effective_case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+    answers = db.list_case_service_answers(effective_case_id)
+    return {"case_id": effective_case_id, "answers": answers}
+
+
+@app.get("/api/services/questions")
+def get_service_questions(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    fallback_services: Optional[str] = Query(None, description="Comma-separated service keys when DB has none (e.g. housing,schools)"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Return dynamic questions for selected services. Adapts to case context and saved answers."""
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+
+    # Selected services (only those with selected=True)
+    services = db.list_case_services(assignment["id"])
+    selected_keys = [r["service_key"] for r in services if r.get("selected") in (True, 1)]
+    # Fallback: when DB has none but frontend passed selection (handles save race / direct visit)
+    if not selected_keys and fallback_services:
+        fallback = [k.strip().lower() for k in fallback_services.split(",") if k.strip()]
+        valid = {"housing", "schools", "movers", "banks", "insurances", "electricity"}
+        selected_keys = [k for k in fallback if k in valid]
+    if not selected_keys:
+        return {"questions": [], "selected_services": []}
+
+    # Case context (draft + top-level) via app_crud
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+    draft = {}
+    dest_city = None
+    dest_country = None
+    origin_city = None
+    origin_country = None
+    if case:
+        try:
+            draft = json.loads(case.draft_json or "{}")
+        except Exception:
+            draft = {}
+        dest_city = getattr(case, "dest_city", None)
+        dest_country = getattr(case, "dest_country", None)
+        origin_city = getattr(case, "origin_city", None)
+        origin_country = getattr(case, "origin_country", None)
+    basics = draft.get("relocationBasics") or {}
+    case_context = {
+        "destCity": basics.get("destCity") or dest_city,
+        "destCountry": basics.get("destCountry") or dest_country,
+        "originCity": basics.get("originCity") or origin_city,
+        "originCountry": origin_country or basics.get("originCountry"),
+    }
+
+    # Saved answers (flatten service_key -> answers into one dict)
+    saved_rows = db.list_case_service_answers(case_id)
+    saved_flat: Dict[str, Any] = {}
+    for row in saved_rows:
+        ans = row.get("answers") or {}
+        if isinstance(ans, str):
+            try:
+                ans = json.loads(ans)
+            except Exception:
+                ans = {}
+        for k, v in ans.items():
+            if v is not None:
+                saved_flat[k] = v
+
+    questions = generate_questions(
+        selected_services=selected_keys,
+        case_context=case_context,
+        saved_answers=saved_flat,
+    )
+    return {"questions": questions, "selected_services": selected_keys}
+
+
+def _normalize_answers_for_compare(answers: Dict[str, Any]) -> str:
+    """Stable JSON for duplicate detection."""
+    if not answers:
+        return "{}"
+    return json.dumps(answers, sort_keys=True)
+
+
+@app.post("/api/services/answers")
+def upsert_service_answers(
+    payload: ServiceAnswersUpsert,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    start = time.perf_counter()
+    assignment = _require_assignment_visibility(payload.case_id, user)
+    effective_case_id = assignment.get("case_id") or payload.case_id
+    assignment_id = assignment.get("id")
+
+    try:
+        existing = db.list_case_service_answers(effective_case_id, request_id=request_id)
+        existing_by_key = {r["service_key"]: _normalize_answers_for_compare(r.get("answers") or {}) for r in existing}
+        incoming_by_key = {item.service_key: _normalize_answers_for_compare(item.answers) for item in payload.items}
+        if set(existing_by_key.keys()) == set(incoming_by_key.keys()) and all(
+            existing_by_key.get(k) == incoming_by_key.get(k) for k in incoming_by_key
+        ):
+            dur_ms = (time.perf_counter() - start) * 1000
+            log.info(
+                "request_id=%s case_id=%s assignment_id=%s services_answers skipped_duplicate dur_ms=%.2f",
+                request_id, effective_case_id, assignment_id, dur_ms,
+            )
+            return {"ok": True, "skipped_duplicate": True}
+
+        for item in payload.items:
+            db.upsert_case_service_answers(
+                case_id=effective_case_id,
+                service_key=item.service_key,
+                answers=item.answers,
+                request_id=request_id,
+            )
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.info(
+            "request_id=%s case_id=%s assignment_id=%s services_answers saved dur_ms=%.2f",
+            request_id, effective_case_id, assignment_id, dur_ms,
+        )
+        try:
+            from .services.analytics_service import emit_event, EVENT_SERVICES_ANSWERS_SAVED
+            emit_event(
+                EVENT_SERVICES_ANSWERS_SAVED,
+                request_id=request_id,
+                assignment_id=assignment_id,
+                case_id=effective_case_id,
+                user_id=user.get("id"),
+                user_role=user.get("role"),
+                duration_ms=dur_ms,
+                service_categories=[i.service_key for i in payload.items],
+                counts={"answers_saved": len(payload.items)},
+            )
+        except Exception:
+            pass
+        return {"ok": True}
+    except Exception as e:
+        dur_ms = (time.perf_counter() - start) * 1000
+        log.warning(
+            "request_id=%s case_id=%s assignment_id=%s services_answers failed dur_ms=%.2f error=%s",
+            request_id, effective_case_id, assignment_id, dur_ms, repr(e), exc_info=True,
+        )
+        raise
+
+
+@app.post("/api/rfqs")
+def create_rfq(
+    payload: RfqCreatePayload,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    assignment = _require_assignment_visibility(payload.case_id, user)
+    effective_case_id = assignment.get("case_id") or payload.case_id
+
+    vendor_ids: List[str] = list(payload.vendor_ids or [])
+    if payload.supplier_ids:
+        from .app.services.rfq_recipient_mapping import resolve_recipient_ids
+        resolved, errors = resolve_recipient_ids(payload.supplier_ids)
+        if errors:
+            raise HTTPException(
+                status_code=400,
+                detail="; ".join(errors),
+            )
+        vendor_ids = list(resolved)
+    if not vendor_ids:
+        raise HTTPException(status_code=400, detail="At least one vendor_id or supplier_id required")
+
+    req_id = getattr(req.state, "request_id", None)
+    valid_vids, vid_errors = db.validate_vendor_ids(vendor_ids, request_id=req_id)
+    if vid_errors:
+        log.warning(
+            "create_rfq vendor validation failed request_id=%s vendor_ids=%s errors=%s",
+            req_id, vendor_ids, vid_errors,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="; ".join(vid_errors),
+        )
+    if not valid_vids:
+        raise HTTPException(status_code=400, detail="No valid vendor_ids; each must exist in vendors table")
+
+    try:
+        result = db.create_rfq(
+            case_id=effective_case_id,
+            creator_user_id=user.get("id"),
+            items=[i.model_dump(mode="json") for i in payload.items],
+            vendor_ids=valid_vids,
+            request_id=req_id,
+        )
+    except Exception as e:
+        log.error(
+            "create_rfq failed request_id=%s case_id=%s vendor_ids=%s error=%s",
+            req_id, effective_case_id, valid_vids, e,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="RFQ creation failed. Check logs for details.")
+
+    try:
+        from .services.analytics_service import (
+            emit_event,
+            EVENT_RFQ_CREATED,
+            EVENT_SUPPLIER_SELECTED,
+        )
+        emit_event(
+            EVENT_RFQ_CREATED,
+            request_id=req_id,
+            assignment_id=assignment.get("id"),
+            case_id=effective_case_id,
+            user_id=user.get("id"),
+            user_role=user.get("role"),
+            counts={"items": len(payload.items), "vendors": len(vendor_ids)},
+            extra={"rfq_id": result.get("id"), "rfq_ref": result.get("rfq_ref"), "vendor_ids": vendor_ids},
+        )
+        for vid in vendor_ids:
+            emit_event(
+                EVENT_SUPPLIER_SELECTED,
+                request_id=req_id,
+                assignment_id=assignment.get("id"),
+                case_id=effective_case_id,
+                user_id=user.get("id"),
+                user_role=user.get("role"),
+                extra={"vendor_id": vid, "rfq_id": result.get("id")},
+            )
+    except Exception:
+        pass
+    return {"ok": True, "rfq": result}
+
+
+@app.get("/api/employee/assignments/{assignment_id}/rfqs")
+def list_rfqs_for_assignment(
+    assignment_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """List RFQs for an assignment (require_assignment_visibility)."""
+    _ = _require_assignment_visibility(assignment_id, user)
+    request_id = getattr(req.state, "request_id", None)
+    rfqs = db.list_rfqs_for_assignment(assignment_id, request_id=request_id)
+    return {"rfqs": rfqs}
+
+
+@app.get("/api/rfqs/{rfq_id}")
+def get_rfq(
+    rfq_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Get RFQ detail (require case access via rfq.case_id)."""
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    _ = _require_case_id_assignment_visible(rfq["case_id"], user)
+    case_id = rfq.get("case_id")
+    if case_id:
+        assign = db.get_assignment_by_case_id(str(case_id))
+        if assign and assign.get("id"):
+            rfq["assignment_id"] = str(assign["id"])
+    return rfq
+
+
+@app.get("/api/rfqs/{rfq_id}/quotes")
+def list_quotes_for_rfq(
+    rfq_id: str,
+    req: Request,
+    comparison: bool = Query(False, description="Opening quote comparison view"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """List quotes for RFQ (require case access). Emits quote_compared when comparison=1 and 2+ quotes."""
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    _ = _require_case_access(rfq["case_id"], user)
+    quotes = db.list_quotes_for_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if comparison and len(quotes) >= 2:
+        try:
+            from .services.analytics_service import emit_event, EVENT_QUOTE_COMPARED
+            emit_event(
+                EVENT_QUOTE_COMPARED,
+                request_id=getattr(req.state, "request_id", None),
+                case_id=rfq.get("case_id"),
+                user_id=user.get("id"),
+                user_role=user.get("role"),
+                counts={"quotes": len(quotes)},
+                extra={"rfq_id": rfq_id},
+            )
+        except Exception:
+            pass
+    return {"rfq_id": rfq_id, "quotes": quotes}
+
+
+@app.patch("/api/rfqs/{rfq_id}/quotes/{quote_id}/accept")
+def accept_quote(
+    rfq_id: str,
+    quote_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Accept a quote (require case access)."""
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    _ = _require_case_id_assignment_visible(rfq["case_id"], user)
+    updated = db.update_quote_status(quote_id, "accepted", request_id=getattr(req.state, "request_id", None))
+    if not updated:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    try:
+        from .services.analytics_service import emit_event, EVENT_QUOTE_ACCEPTED
+        emit_event(
+            EVENT_QUOTE_ACCEPTED,
+            request_id=getattr(req.state, "request_id", None),
+            case_id=rfq.get("case_id"),
+            canonical_case_id=rfq.get("canonical_case_id"),
+            user_id=user.get("id"),
+            user_role=user.get("role"),
+            extra={
+                "rfq_id": rfq_id,
+                "quote_id": quote_id,
+                "vendor_id": updated.get("vendor_id"),
+            },
+        )
+    except Exception:
+        pass
+    return {"ok": True, "quote": updated}
+
+
+# ---------------------------------------------------------------------------
+# Vendor API (RFQs and quotes)
+# ---------------------------------------------------------------------------
+@app.get("/api/vendor/rfqs")
+def list_vendor_rfqs(
+    req: Request,
+    user: Dict[str, Any] = Depends(require_vendor),
+):
+    """List RFQs for current vendor (require_vendor)."""
+    vendor_id = user.get("vendor_id")
+    if not vendor_id:
+        raise HTTPException(status_code=403, detail="Vendor access only")
+    request_id = getattr(req.state, "request_id", None)
+    rfqs = db.list_rfqs_for_vendor(vendor_id, request_id=request_id)
+    return {"rfqs": rfqs}
+
+
+@app.get("/api/vendor/rfqs/{rfq_id}")
+def get_vendor_rfq(
+    rfq_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_vendor),
+):
+    """Get RFQ detail for vendor. Ensures vendor is a recipient."""
+    vendor_id = user.get("vendor_id")
+    if not vendor_id:
+        raise HTTPException(status_code=403, detail="Vendor access only")
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    recipient_vendor_ids = [r.get("vendor_id") for r in rfq.get("recipients", []) if r.get("vendor_id")]
+    if vendor_id not in recipient_vendor_ids:
+        raise HTTPException(status_code=403, detail="Not a recipient of this RFQ")
+    return rfq
+
+
+@app.post("/api/vendor/rfqs/{rfq_id}/quotes")
+def submit_vendor_quote(
+    rfq_id: str,
+    payload: QuoteCreatePayload,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_vendor),
+):
+    """Submit a quote for an RFQ (require_vendor)."""
+    vendor_id = user.get("vendor_id")
+    if not vendor_id:
+        raise HTTPException(status_code=403, detail="Vendor access only")
+    rfq = db.get_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
+    if not rfq:
+        raise HTTPException(status_code=404, detail="RFQ not found")
+    recipient_vendor_ids = [r.get("vendor_id") for r in rfq.get("recipients", []) if r.get("vendor_id")]
+    if vendor_id not in recipient_vendor_ids:
+        raise HTTPException(status_code=403, detail="Not a recipient of this RFQ")
+    request_id = getattr(req.state, "request_id", None)
+    quote_lines = [{"label": ln.label, "amount": ln.amount} for ln in payload.quote_lines]
+    quote = db.create_quote(
+        rfq_id=rfq_id,
+        vendor_id=vendor_id,
+        currency=payload.currency,
+        total_amount=payload.total_amount,
+        valid_until=payload.valid_until,
+        quote_lines=quote_lines,
+        created_by_user_id=user.get("id"),
+        request_id=request_id,
+    )
+    try:
+        from .services.analytics_service import emit_event, EVENT_QUOTE_RECEIVED
+        emit_event(
+            EVENT_QUOTE_RECEIVED,
+            request_id=request_id,
+            case_id=rfq.get("case_id"),
+            canonical_case_id=rfq.get("canonical_case_id"),
+            extra={
+                "rfq_id": rfq_id,
+                "vendor_id": vendor_id,
+                "quote_id": quote.get("id"),
+                "total_amount": payload.total_amount,
+                "currency": payload.currency,
+            },
+        )
+    except Exception:
+        pass
+    return {"ok": True, "quote": quote}
+
+
+EMPLOYEE_POLICY_FALLBACK_PRIMARY = (
+    "Your HR team has not published your company's assignment policy in ReloPass yet."
+)
+EMPLOYEE_POLICY_FALLBACK_SECONDARY = (
+    "This page will show your package and limits after HR publishes from the HR Policy workspace "
+    "or publishes your company's Compensation & Allowance matrix in ReloPass."
+)
+
+
+def _finalize_employee_policy_resolution(
+    db: Any,
+    out: Dict[str, Any],
+    *,
+    comparison_readiness_precalc: Optional[Dict[str, Any]] = None,
+    telemetry: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Attach comparison_readiness / comparison_available for employee policy consumers."""
+    from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
+
+    if not out.get("has_policy"):
+        out["comparison_readiness"] = {
+            "comparison_ready": False,
+            "comparison_blockers": ["NO_MATCHING_PUBLISHED_POLICY"],
+            "partial_numeric_coverage": False,
+        }
+        out["comparison_available"] = False
+        _emit_employee_policy_telemetry(out, telemetry)
+        return out
+    if comparison_readiness_precalc is not None:
+        cr = comparison_readiness_precalc
+    else:
+        vid = out.get("version_id") or (out.get("version") or {}).get("id")
+        cr = evaluate_version_comparison_readiness(db, str(vid) if vid else None)
+    out["comparison_readiness"] = cr
+    out["comparison_available"] = bool(cr.get("comparison_ready"))
+    vid_enrich = out.get("version_id") or (out.get("version") or {}).get("id")
+    if out.get("benefits") and vid_enrich:
+        try:
+            from .services.policy_rule_comparison_readiness import enrich_resolved_benefits_with_rule_comparison
+
+            out["benefits"] = enrich_resolved_benefits_with_rule_comparison(
+                db, str(vid_enrich), list(out["benefits"])
+            )
+        except Exception:
+            pass
+    _emit_employee_policy_telemetry(out, telemetry)
+    return out
+
+
+def _emit_employee_policy_telemetry(out: Dict[str, Any], telemetry: Optional[Dict[str, Any]]) -> None:
+    if not telemetry:
+        return
+    try:
+        from .services.policy_pipeline_analytics import record_employee_policy_resolution
+
+        record_employee_policy_resolution(
+            request_id=telemetry.get("request_id"),
+            assignment_id=telemetry.get("assignment_id") or out.get("assignment_id"),
+            case_id=telemetry.get("case_id") or out.get("case_id"),
+            user_id=telemetry.get("user_id"),
+            user_role=telemetry.get("user_role"),
+            has_policy=bool(out.get("has_policy")),
+            comparison_available=bool(out.get("comparison_available")),
+            comparison_readiness=out.get("comparison_readiness"),
+            policy_id=out.get("policy_id") or (out.get("policy") or {}).get("id"),
+            policy_version_id=out.get("version_id") or (out.get("version") or {}).get("id"),
+            company_id_used=out.get("company_id") or out.get("company_id_used"),
+            resolution_cache_hit=telemetry.get("resolution_cache_hit"),
+        )
+    except Exception:
+        pass
+
+
+def _resolve_published_policy_for_employee(
+    assignment_id: str,
+    user: Dict[str, Any],
+    request_id: Optional[str] = None,
+    *,
+    read_only: bool = False,
+) -> Dict[str, Any]:
+    """
+    Resolve published company policy for an employee's assignment context.
+    Canonical resolution order: relocation_cases.company_id → HR owner's company → employee profile company_id.
+    Returns structured result; never raises for "no policy" (only for auth via _require_assignment_visibility).
+
+    read_only: do not create cases or back-fill company_id on profile/case (GET employee policy paths).
+    """
+    from .services.policy_resolution import (
+        resolve_policy_for_assignment,
+        collect_company_id_candidates_for_assignment,
+        find_first_published_company_policy,
+        extract_resolution_context,
+    )
+    from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
+
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    case = db.get_relocation_case(case_id) if case_id else None
+    hr_user_id = assignment.get("hr_user_id") or ((case or {}).get("hr_user_id") if case else None)
+    hr_company_id = db.get_hr_company_id(hr_user_id) if hr_user_id else None
+    profile_company_id = None
+    emp_profile = None
+    emp_user_id = assignment.get("employee_user_id")
+    if emp_user_id:
+        emp_profile = db.get_profile_record(emp_user_id)
+        if emp_profile:
+            profile_company_id = emp_profile.get("company_id")
+
+    if not read_only:
+        if not case and case_id and hr_user_id and hr_company_id:
+            try:
+                db.create_case(case_id, hr_user_id, {}, company_id=hr_company_id)
+                case = db.get_relocation_case(case_id)
+            except Exception:
+                pass
+        case_company_id = (case or {}).get("company_id") if case else None
+        company_id_for_resolution = case_company_id or hr_company_id or profile_company_id
+        if company_id_for_resolution:
+            if case and not case.get("company_id"):
+                try:
+                    db.upsert_relocation_case(
+                        case_id=case_id,
+                        company_id=company_id_for_resolution,
+                        employee_id=case.get("employee_id"),
+                        status=case.get("status"),
+                        stage=case.get("stage"),
+                        host_country=case.get("host_country"),
+                        home_country=case.get("home_country"),
+                    )
+                    case = db.get_relocation_case(case_id) or case
+                except Exception:
+                    pass
+            if emp_user_id:
+                ep = emp_profile or db.get_profile_record(emp_user_id)
+                if ep and not ep.get("company_id"):
+                    try:
+                        db.ensure_profile_record(
+                            emp_user_id,
+                            ep.get("email") or "",
+                            ep.get("role") or "EMPLOYEE",
+                            ep.get("full_name"),
+                            company_id_for_resolution,
+                        )
+                    except Exception:
+                        pass
+
+    case_company_id = (case or {}).get("company_id") if case else None
+    company_id_used = case_company_id or hr_company_id or profile_company_id
+
+    profile = None
+    if case and case.get("profile_json"):
+        try:
+            profile = json.loads(case["profile_json"]) if isinstance(case["profile_json"], str) else case["profile_json"]
+        except Exception:
+            profile = None
+    try:
+        employee_profile = db.get_employee_profile(assignment_id)
+    except Exception:
+        employee_profile = None
+
+    candidates = collect_company_id_candidates_for_assignment(db, assignment, case)
+    pub = find_first_published_company_policy(db, candidates) if candidates else None
+    if not pub:
+        from .services.employee_policy_matrix_bridge import find_published_matrix_version, build_matrix_assignment_package
+
+        ctx = extract_resolution_context(assignment, case, profile, employee_profile)
+        search_company_ids = list(candidates) if candidates else []
+        seen_cids = {str(x) for x in search_company_ids if x is not None}
+
+        def _push_matrix_company(cid: Optional[Any]) -> None:
+            if cid is None:
+                return
+            s = str(cid).strip()
+            if not s or s in seen_cids:
+                return
+            seen_cids.add(s)
+            search_company_ids.append(s)
+
+        _push_matrix_company(company_id_used)
+        _push_matrix_company(profile_company_id)
+        if emp_user_id:
+            try:
+                er = db.get_profile_record(emp_user_id)
+                _push_matrix_company((er or {}).get("company_id"))
+            except Exception:
+                pass
+        mid, mver = find_published_matrix_version(db, search_company_ids)
+        if mver and mid:
+            comp = db.get_company(mid) if mid else None
+            cname = (comp or {}).get("name") if comp else None
+            resolved, precalc = build_matrix_assignment_package(
+                db,
+                company_id=mid,
+                pub_version=mver,
+                assignment_type_ctx=ctx.get("assignment_type"),
+                family_status_ctx=ctx.get("family_status"),
+                employee_level_ctx=ctx.get("employee_level"),
+                company_name=cname,
+                assignment_id=assignment_id,
+                case_id=case_id,
+            )
+            if resolved.get("has_policy"):
+                log.info(
+                    "employee_policy matrix_fallback request_id=%s assignment_id=%s company_id=%s version_id=%s",
+                    request_id,
+                    assignment_id,
+                    mid,
+                    mver.get("id"),
+                )
+                return _finalize_employee_policy_resolution(
+                    db,
+                    resolved,
+                    comparison_readiness_precalc=precalc,
+                    telemetry={
+                        "request_id": request_id,
+                        "assignment_id": assignment_id,
+                        "case_id": case_id,
+                        "user_id": user.get("id"),
+                        "user_role": user.get("role"),
+                        "resolution_cache_hit": False,
+                    },
+                )
+        try:
+            with_policy = db.list_company_ids_with_published_policy()
+            log.info(
+                "employee_policy no_policy_fast request_id=%s assignment_id=%s case_id=%s candidates=%s published_sample=%s",
+                request_id,
+                assignment_id,
+                case_id,
+                candidates,
+                [c.get("company_id") for c in with_policy] if with_policy else [],
+            )
+        except Exception:
+            log.info(
+                "employee_policy no_policy_fast request_id=%s assignment_id=%s case_id=%s candidates=%s",
+                request_id,
+                assignment_id,
+                case_id,
+                candidates,
+            )
+        # Surface why resolution failed so HR/admin testers can fix the
+        # linkage without trawling backend logs. Employees never see this
+        # block — the frontend only renders it for role in (HR, ADMIN).
+        # We deliberately include only non-sensitive shape info (presence
+        # flags + counts), never the raw IDs of other companies.
+        diagnostics = {
+            "assignment_present": True,  # we'd have 404'd earlier otherwise
+            "case_linked": bool(case_id),
+            "case_has_company_id": bool(case_company_id),
+            "hr_owner_present": bool(hr_user_id),
+            "hr_owner_company_resolved": bool(hr_company_id),
+            "employee_profile_present": bool(emp_profile),
+            "employee_profile_company_id_present": bool(profile_company_id),
+            "company_id_candidates_count": len(list(candidates or [])),
+            "matrix_searched_company_ids_count": len(search_company_ids),
+            "published_matrix_found": bool(mver and mid),
+            "canonical_policy_found": False,  # we only reach this branch when pub is None
+        }
+        return _finalize_employee_policy_resolution(
+            db,
+            {
+                "has_policy": False,
+                "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+                "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "company_id_used": company_id_used,
+                "resolution_diagnostics": diagnostics,
+            },
+            telemetry={
+                "request_id": request_id,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "user_id": user.get("id"),
+                "user_role": user.get("role"),
+                "resolution_cache_hit": False,
+            },
+        )
+
+    company_id_pub, policy_row, version_row = pub
+    vid_pub = (version_row or {}).get("id")
+
+    cached_row = None
+    try:
+        cached_row = db.get_resolved_assignment_policy(assignment_id)
+    except Exception:
+        cached_row = None
+
+    if (
+        cached_row
+        and cached_row.get("id")
+        and vid_pub
+        and str(cached_row.get("policy_version_id") or "") == str(vid_pub)
+    ):
+        rid = cached_row["id"]
+        readiness = evaluate_version_comparison_readiness(db, str(vid_pub))
+        benefits: List[Any] = []
+        exclusions: List[Any] = []
+        if readiness.get("comparison_ready"):
+            try:
+                benefits = db.list_resolved_policy_benefits(rid)
+                exclusions = db.list_resolved_policy_exclusions(rid)
+            except Exception as exc:
+                log.warning("employee_policy cache list_benefits request_id=%s resolved_id=%s exc=%s", request_id, rid, exc)
+                benefits = []
+                exclusions = []
+        policy = cached_row.get("policy") or policy_row or {}
+        version = cached_row.get("version") or version_row or {}
+        ctx = cached_row.get("resolution_context") or cached_row.get("resolution_context_json") or {}
+        company_id_used = cached_row.get("resolution_company_id") or cached_row.get("company_id") or company_id_pub
+        company = db.get_company(company_id_used) if company_id_used else None
+        company_name = (company or {}).get("name") if company else None
+        log.info(
+            "employee_policy cache_hit request_id=%s assignment_id=%s policy_version_id=%s comparison_ready=%s",
+            request_id,
+            assignment_id,
+            vid_pub,
+            readiness.get("comparison_ready"),
+        )
+        return _finalize_employee_policy_resolution(
+            db,
+            {
+                "has_policy": True,
+                "company_id": company_id_used,
+                "policy_id": (policy or {}).get("id"),
+                "version_id": (version or {}).get("id") or vid_pub,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "policy": {
+                    "id": (policy or {}).get("id"),
+                    "title": (policy or {}).get("title"),
+                    "version": (version or {}).get("version_number"),
+                    "effective_date": (policy or {}).get("effective_date"),
+                    "company_name": company_name,
+                },
+                "benefits": benefits,
+                "exclusions": exclusions,
+                "resolved_at": cached_row.get("resolved_at"),
+                "resolution_context": ctx,
+            },
+            comparison_readiness_precalc=readiness,
+            telemetry={
+                "request_id": request_id,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "user_id": user.get("id"),
+                "user_role": user.get("role"),
+                "resolution_cache_hit": True,
+            },
+        )
+
+    resolved = None
+    try:
+        resolved = resolve_policy_for_assignment(
+            db, assignment_id, assignment, case, profile, employee_profile
+        )
+    except Exception as exc:
+        log.warning(
+            "employee_policy resolve_policy_for_assignment request_id=%s assignment_id=%s company_id_used=%s exc=%s",
+            request_id,
+            assignment_id,
+            company_id_used,
+            exc,
+        )
+        resolved = None
+    if not resolved:
+        return _finalize_employee_policy_resolution(
+            db,
+            {
+                "has_policy": False,
+                "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+                "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "company_id_used": company_id_used,
+            },
+            telemetry={
+                "request_id": request_id,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "user_id": user.get("id"),
+                "user_role": user.get("role"),
+                "resolution_cache_hit": False,
+            },
+        )
+    company_id_used = resolved.get("resolution_company_id") or company_id_used or company_id_pub
+    if not read_only and case_id and case and not case.get("company_id") and company_id_used:
+        try:
+            db.upsert_relocation_case(
+                case_id=case_id,
+                company_id=company_id_used,
+                employee_id=case.get("employee_id"),
+                status=case.get("status"),
+                stage=case.get("stage"),
+                host_country=case.get("host_country"),
+                home_country=case.get("home_country"),
+            )
+        except Exception:
+            pass
+    rid = resolved.get("id")
+    if not rid:
+        return _finalize_employee_policy_resolution(
+            db,
+            {
+                "has_policy": False,
+                "reason": EMPLOYEE_POLICY_FALLBACK_PRIMARY,
+                "reason_secondary": EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "company_id_used": company_id_used,
+            },
+            telemetry={
+                "request_id": request_id,
+                "assignment_id": assignment_id,
+                "case_id": case_id,
+                "user_id": user.get("id"),
+                "user_role": user.get("role"),
+                "resolution_cache_hit": False,
+            },
+        )
+    policy = resolved.get("policy") or {}
+    version = resolved.get("version") or {}
+    vid_res = version.get("id") or vid_pub
+    readiness = evaluate_version_comparison_readiness(db, str(vid_res) if vid_res else None)
+    benefits: List[Any] = []
+    exclusions: List[Any] = []
+    if readiness.get("comparison_ready"):
+        try:
+            benefits = db.list_resolved_policy_benefits(rid)
+            exclusions = db.list_resolved_policy_exclusions(rid)
+        except Exception as exc:
+            log.warning("employee_policy list_benefits/exclusions request_id=%s resolved_id=%s exc=%s", request_id, rid, exc)
+            benefits = []
+            exclusions = []
+    ctx = resolved.get("resolution_context") or resolved.get("resolution_context_json") or {}
+    company = db.get_company(company_id_used) if company_id_used else None
+    company_name = (company or {}).get("name") if company else None
+    log.info(
+        "employee_policy resolved request_id=%s assignment_id=%s case_id=%s company_id=%s policy_id=%s version_id=%s has_policy=true comparison_ready=%s",
+        request_id,
+        assignment_id,
+        case_id,
+        company_id_used,
+        policy.get("id"),
+        version.get("id"),
+        readiness.get("comparison_ready"),
+    )
+    return _finalize_employee_policy_resolution(
+        db,
+        {
+            "has_policy": True,
+            "company_id": company_id_used,
+            "policy_id": policy.get("id"),
+            "version_id": version.get("id"),
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "policy": {
+                "id": policy.get("id"),
+                "title": policy.get("title"),
+                "version": version.get("version_number"),
+                "effective_date": policy.get("effective_date"),
+                "company_name": company_name,
+            },
+            "benefits": benefits,
+            "exclusions": exclusions,
+            "resolved_at": resolved.get("resolved_at"),
+            "resolution_context": ctx,
+        },
+        comparison_readiness_precalc=readiness,
+        telemetry={
+            "request_id": request_id,
+            "assignment_id": assignment_id,
+            "case_id": case_id,
+            "user_id": user.get("id"),
+            "user_role": user.get("role"),
+            "resolution_cache_hit": False,
+        },
+    )
+
+
+def _log_employee_policy(
+    route: str,
+    request_id: Optional[str],
+    user_id: Optional[str],
+    role: Optional[str],
+    assignment_id: str,
+    case_id: Optional[str],
+    company_id_used: Optional[str],
+    has_policy: bool,
+    policy_id: Optional[str] = None,
+    version_id: Optional[str] = None,
+    exc_type: Optional[str] = None,
+    exc_message: Optional[str] = None,
+):
+    """Structured log for employee policy retrieval (no stack traces)."""
+    log.info(
+        "employee_policy request_id=%s route=%s user_id=%s role=%s assignment_id=%s case_id=%s "
+        "company_id_used=%s has_policy=%s policy_id=%s version_id=%s exc_type=%s exc_message=%s",
+        request_id or "",
+        route,
+        user_id or "",
+        role or "",
+        assignment_id,
+        case_id or "",
+        company_id_used or "",
+        has_policy,
+        policy_id or "",
+        version_id or "",
+        exc_type or "",
+        (exc_message or "")[:200] if exc_message else "",
+    )
+
+
+@app.get("/api/employee/assignments/{assignment_id}/policy")
+def get_employee_assignment_policy(
+    assignment_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Employee: Get resolved policy for this assignment (read-only, published only). Never 500 for missing policy."""
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    try:
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                None,
+                None,
+                False,
+                exc_type=type(exc).__name__,
+                exc_message=str(exc),
+            )
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "message": "No published policy for your assignment.",
+            "comparison_readiness": {
+                "comparison_ready": False,
+                "comparison_blockers": ["ERROR_LOADING_POLICY"],
+                "partial_numeric_coverage": False,
+            },
+            "comparison_available": False,
+        }
+    if not result.get("has_policy"):
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                result.get("case_id"),
+                result.get("company_id_used"),
+                False,
+            )
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "has_policy": False,
+            "policy": None,
+            "benefits": [],
+            "exclusions": [],
+            "resolution_context": None,
+            "message": result.get("reason", EMPLOYEE_POLICY_FALLBACK_PRIMARY),
+            "message_secondary": result.get("reason_secondary") or EMPLOYEE_POLICY_FALLBACK_SECONDARY,
+            "company_id_used": result.get("company_id_used"),
+            "comparison_readiness": result.get("comparison_readiness"),
+            "comparison_available": result.get("comparison_available"),
+        }
+    try:
+        _log_employee_policy(
+            "GET /api/employee/assignments/{id}/policy",
+            request_id,
+            user.get("id"),
+            user.get("role"),
+            assignment_id,
+            result.get("case_id"),
+            result.get("company_id"),
+            True,
+            result.get("policy_id"),
+            result.get("version_id"),
+        )
+    except Exception:
+        pass
+    return {
+        "ok": True,
+        "has_policy": True,
+        "policy": result.get("policy") or {},
+        "benefits": result.get("benefits") or [],
+        "exclusions": result.get("exclusions") or [],
+        "resolved_at": result.get("resolved_at"),
+        "resolution_context": result.get("resolution_context"),
+        "comparison_readiness": result.get("comparison_readiness"),
+        "comparison_available": result.get("comparison_available"),
+    }
+
+
+@app.get("/api/employee/assignments/{assignment_id}/entitlements")
+def get_employee_assignment_entitlements(
+    assignment_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Employee read model: policy maturity (draft vs published, comparison readiness) and per-service
+    entitlement rows. Read-only; does not fabricate caps.
+    """
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    from .services.employee_entitlement_read_model import build_employee_entitlement_read_model
+    from .services.employee_entitlement_serializer import serialize_employee_entitlement_payload
+
+    try:
+        assignment = _require_assignment_visibility(assignment_id, user)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning(
+            "entitlements visibility request_id=%s assignment_id=%s exc=%s",
+            request_id,
+            assignment_id,
+            exc,
+        )
+        raise HTTPException(status_code=403, detail="Assignment not accessible") from exc
+
+    case_id = assignment.get("case_id")
+    case = db.get_relocation_case(case_id) if case_id else None
+    profile = None
+    if case and case.get("profile_json"):
+        try:
+            profile = json.loads(case["profile_json"]) if isinstance(case["profile_json"], str) else case["profile_json"]
+        except Exception:
+            profile = None
+    try:
+        employee_profile = db.get_employee_profile(assignment_id)
+    except Exception:
+        employee_profile = None
+
+    try:
+        raw = build_employee_entitlement_read_model(
+            db, assignment_id, assignment, case, profile, employee_profile
+        )
+        return serialize_employee_entitlement_payload(raw)
+    except Exception as exc:
+        log.warning(
+            "entitlements build request_id=%s assignment_id=%s exc=%s",
+            request_id,
+            assignment_id,
+            exc,
+        )
+        return serialize_employee_entitlement_payload(
+            {
+                "policy_status": "no_policy",
+                "policy_source": None,
+                "publish_readiness": {
+                    "status": "not_ready",
+                    "issues": [{"code": "ENTITLEMENTS_ERROR", "message": "Unable to load entitlements."}],
+                },
+                "comparison_readiness": {
+                    "comparison_ready": False,
+                    "comparison_blockers": ["ERROR"],
+                    "partial_numeric_coverage": False,
+                    "evaluated": False,
+                    "explanation": "Entitlements could not be loaded; comparison does not apply.",
+                },
+                "explanation": "Your employer has not linked a relocation policy to this assignment yet.",
+                "entitlements": [],
+                "assignment_id": assignment_id,
+                "company_id": None,
+                "policy_id": None,
+                "version_id": None,
+            }
+        )
+
+
+@app.get("/api/employee/assignments/{assignment_id}/policy-envelope")
+def get_employee_policy_envelope(
+    assignment_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Employee: Get policy envelope (envelope cards ready) for comparison/budget logic."""
+    data = get_employee_assignment_policy(assignment_id, req, user)
+    if data.get("has_policy") and data.get("comparison_available") is False:
+        return {**data, "benefits": [], "exclusions": [], "envelopes": []}
+    if not data.get("benefits"):
+        return data
+    # Map to envelope shape: included, capped, excluded, approval-required
+    from .services.policy_taxonomy import get_benefit_meta
+    envelopes = []
+    for b in data["benefits"]:
+        meta = get_benefit_meta(b.get("benefit_key", ""))
+        label = (meta.get("keywords") or [b.get("benefit_key", "")])[0].replace("_", " ").title()
+        envelopes.append({
+            "key": b.get("benefit_key"),
+            "label": label,
+            "included": bool(b.get("included")),
+            "capped": b.get("max_value") is not None or b.get("standard_value") is not None,
+            "min_value": b.get("min_value"),
+            "standard_value": b.get("standard_value"),
+            "max_value": b.get("max_value"),
+            "currency": b.get("currency") or "USD",
+            "approval_required": bool(b.get("approval_required")),
+            "evidence_required": b.get("evidence_required_json") or [],
+        })
+    return {
+        **data,
+        "envelopes": envelopes,
+    }
+
+
+@app.get("/api/employee/assignments/{assignment_id}/policy-service-comparison")
+def get_employee_policy_service_comparison(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Employee: Compare selected case services vs resolved policy (read-only).
+
+    Response includes legacy ``comparisons`` and ``effective_service_comparison`` (canonical service_key
+    slice: rule ``comparison_readiness`` + envelope status; no fabricated deltas).
+    """
+    _ = _require_assignment_visibility(assignment_id, user)
+    from .services.policy_service_comparison import compute_policy_service_comparison
+    return compute_policy_service_comparison(
+        db, assignment_id, include_diagnostics=False, employee_gate=True
+    )
+
+
+@app.post("/api/employee/assignments/{assignment_id}/service-comparison-engine")
+def post_employee_service_comparison_engine(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+    body: Optional[Dict[str, Any]] = Body(None),
+):
+    """
+    Run the effective-entitlement comparison engine with an explicit ``selected_services`` list
+    (e.g. wizard preview before case_services persist). Body: ``{ "selected_services": [ { "service_key",
+    "estimated_cost", "currency", ... }, ... ] }``. Same auth as policy-service-comparison.
+    """
+    _ = _require_assignment_visibility(assignment_id, user)
+    from .services.policy_service_comparison import compute_policy_service_comparison
+
+    payload = body or {}
+    raw = payload.get("selected_services")
+    selected = raw if isinstance(raw, list) else []
+    employee_gate = user.get("role") == UserRole.EMPLOYEE.value
+    result = compute_policy_service_comparison(
+        db,
+        assignment_id,
+        include_diagnostics=False,
+        employee_gate=employee_gate,
+        selected_services_override=selected,
+    )
+    return {
+        "effective_service_comparison": result.get("effective_service_comparison") or [],
+        "comparison_readiness": result.get("comparison_readiness"),
+        "comparison_available": result.get("comparison_available"),
+        "resolved_policy": result.get("resolved_policy"),
+        "message": result.get("message"),
+    }
+
+
+@app.get("/api/hr/assignments/{assignment_id}/policy-service-comparison")
+def get_hr_policy_service_comparison(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """HR: Get comparison of selected services vs resolved policy with diagnostics."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    from .services.policy_service_comparison import compute_policy_service_comparison
+    return compute_policy_service_comparison(db, assignment_id, assignment=assignment, include_diagnostics=True)
+
+
+@app.get("/api/employee/assignments/{assignment_id}/services-policy-context")
+def get_employee_services_policy_context(
+    assignment_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Employee Services: per-wizard-category policy view model from resolved published policy only (Layer 2).
+    Does not use document extraction metadata.
+    """
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    _ = _require_assignment_visibility(assignment_id, user)
+    try:
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning(
+            "services_policy_context failed request_id=%s assignment_id=%s exc=%s",
+            request_id,
+            assignment_id,
+            exc,
+        )
+        return {
+            "ok": False,
+            "has_policy": False,
+            "comparison_available": False,
+            "comparison_readiness": {
+                "comparison_ready": False,
+                "comparison_blockers": ["ERROR_LOADING_POLICY"],
+                "partial_numeric_coverage": False,
+            },
+            "currency": "USD",
+            "categories": {},
+            "source": "resolved_assignment_policy",
+        }
+
+    from .services.employee_services_policy_context import build_employee_services_policy_context
+
+    payload = build_employee_services_policy_context(result)
+    pol = result.get("policy")
+    if isinstance(pol, dict) and pol:
+        payload["policy_surface"] = pol
+    rc = result.get("resolution_context")
+    if isinstance(rc, dict) and rc:
+        payload["resolution_context"] = rc
+    return payload
+
+
+@app.get("/api/employee/assignments/{assignment_id}/policy-budget")
+def get_assignment_policy_budget(
+    assignment_id: str,
+    req: Request,
+    display_currency: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Employee: Get policy caps for this assignment. Same resolution as policy route. Never 500 for missing policy.
+
+    When `display_currency` is set, the response includes a `caps_display`
+    object with the same per-category caps converted from USD via the same
+    rate table the frontend uses. T1.4 — server-side canonical so HR and
+    employee see identical numbers.
+    """
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    from .services.policy_adapter import caps_from_resolved_benefits, DEFAULT_CURRENCY
+    from .services.fx_service import convert_usd_to_display, normalize_display_currency
+
+    try:
+        result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy-budget",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                None,
+                None,
+                False,
+                exc_type=type(exc).__name__,
+                exc_message=str(exc),
+            )
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "has_policy": False,
+            "comparison_available": False,
+            "comparison_readiness": {
+                "comparison_ready": False,
+                "comparison_blockers": ["ERROR_LOADING_POLICY"],
+                "partial_numeric_coverage": False,
+            },
+            "budget": None,
+            "currency": DEFAULT_CURRENCY,
+            "caps": {},
+            "total_cap": None,
+        }
+
+    if not result.get("has_policy"):
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy-budget",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                result.get("case_id"),
+                result.get("company_id_used"),
+                False,
+            )
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "has_policy": False,
+            "comparison_available": False,
+            "comparison_readiness": result.get("comparison_readiness")
+            or {
+                "comparison_ready": False,
+                "comparison_blockers": ["NO_MATCHING_PUBLISHED_POLICY"],
+                "partial_numeric_coverage": False,
+            },
+            "budget": None,
+            "currency": DEFAULT_CURRENCY,
+            "caps": {},
+            "total_cap": None,
+        }
+
+    if not result.get("comparison_available", False):
+        try:
+            _log_employee_policy(
+                "GET /api/employee/assignments/{id}/policy-budget",
+                request_id,
+                user.get("id"),
+                user.get("role"),
+                assignment_id,
+                result.get("case_id"),
+                result.get("company_id"),
+                True,
+                result.get("policy_id"),
+                result.get("version_id"),
+            )
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "has_policy": True,
+            "comparison_available": False,
+            "comparison_readiness": result.get("comparison_readiness"),
+            "budget": None,
+            "currency": DEFAULT_CURRENCY,
+            "caps": {},
+            "total_cap": None,
+        }
+
+    benefits = result.get("benefits") or []
+    try:
+        budget = caps_from_resolved_benefits(benefits)
+    except Exception:
+        budget = {"currency": DEFAULT_CURRENCY, "caps": {}, "total_cap": None}
+    try:
+        _log_employee_policy(
+            "GET /api/employee/assignments/{id}/policy-budget",
+            request_id,
+            user.get("id"),
+            user.get("role"),
+            assignment_id,
+            result.get("case_id"),
+            result.get("company_id"),
+            True,
+            result.get("policy_id"),
+            result.get("version_id"),
+        )
+    except Exception:
+        pass
+    response: Dict[str, Any] = {
+        "ok": True,
+        "has_policy": True,
+        "comparison_available": True,
+        "comparison_readiness": result.get("comparison_readiness"),
+        "budget": budget,
+        **budget,
+    }
+    if display_currency:
+        cur = normalize_display_currency(display_currency)
+        caps = budget.get("caps") or {}
+        response["display_currency"] = cur
+        response["caps_display"] = {
+            k: convert_usd_to_display(v, cur) if isinstance(v, (int, float)) else v
+            for k, v in caps.items()
+        }
+        if isinstance(budget.get("total_cap"), (int, float)):
+            response["total_cap_display"] = convert_usd_to_display(
+                budget["total_cap"], cur
+            )
+    return response
+
+
+@app.post("/api/employee/policy-assistant/query")
+def post_employee_policy_assistant_query(
+    body: EmployeePolicyAssistantQueryRequest,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Employee-facing policy Q&A: classifies the message, resolves **published** policy for the assignment,
+    and returns a structured assistant answer or refusal. Draft or unpublished HR data is never used.
+    """
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    aid = (body.assignment_id or "").strip()
+    if not aid:
+        raise HTTPException(status_code=400, detail="assignment_id is required")
+    msg = (body.message or "").strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="message is required")
+    if len(msg) > 8000:
+        raise HTTPException(status_code=400, detail="message too long")
+    try:
+        return employee_policy_assistant_query_response_dict(
+            aid,
+            msg,
+            user,
+            request_id=request_id,
+            session=body.session,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("employee policy assistant query failed assignment_id=%s", aid)
+        raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
+
+
+@app.post("/api/hr/policy-assistant/query")
+def post_hr_policy_assistant_query(
+    body: HrPolicyAssistantQueryRequest,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    HR-facing policy Q&A over the same review aggregate as policy review: working draft, published matrix
+    signals, and Layer-2 rows. Refuses out-of-domain strategy, legal advice, and unrelated authoring.
+    """
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    pid = (body.policy_id or "").strip()
+    if not pid:
+        raise HTTPException(status_code=400, detail="policy_id is required")
+    msg = (body.message or "").strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="message is required")
+    if len(msg) > 8000:
+        raise HTTPException(status_code=400, detail="message too long")
+
+    pol_row = db.get_company_policy(pid)
+    if not pol_row:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    _require_policy_access(user, pol_row)
+
+    did = str(body.document_id).strip() if body.document_id else None
+    if did:
+        doc_row = db.get_policy_document(did, request_id=request_id)
+        if not doc_row:
+            raise HTTPException(status_code=404, detail="Document not found")
+        _require_document_access(user, doc_row)
+        if pol_row.get("company_id") and doc_row.get("company_id") != pol_row.get("company_id"):
+            raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        return hr_policy_assistant_query_response_dict(
+            msg,
+            user,
+            pid,
+            document_id=did,
+            request_id=request_id,
+            session=body.session,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("hr policy assistant query failed policy_id=%s", pid)
+        raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
+
+
+@app.post("/api/policy-assistant/rag-query")
+def post_policy_assistant_rag_query(
+    body: Dict[str, Any] = Body(...),
+    req: Request = None,  # type: ignore[assignment]
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Sprint B: RAG-grounded Policy Assistant entry point. Replaces the
+    deterministic engine for the new flow; the existing endpoints stay
+    for backwards compatibility until Sprint C wires the frontend over.
+
+    Body:
+      { "question": str (required, max 4000 chars),
+        "session_id": str | null,
+        "top_k": int | null  (default 8, capped at 16) }
+
+    Auth: HR or EMPLOYEE for the user's company. Cross-company access
+    is impossible at the data layer — the retriever filters by
+    company_id pulled from the user's profile, not from the body.
+    """
+    request_id = getattr(req.state, "request_id", None) if req else None
+    question = (body.get("question") or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question is required")
+    if len(question) > 4000:
+        raise HTTPException(status_code=400, detail="question too long")
+    session_id = (body.get("session_id") or "").strip() or None
+    top_k = int(body.get("top_k") or 8)
+    if top_k < 1 or top_k > 16:
+        top_k = 8
+
+    # Company scoping comes from the authenticated user, NEVER the
+    # request body. This is the load-bearing isolation guarantee:
+    # the user cannot ask about another company by passing a different
+    # company_id.
+    profile = db.get_profile_record(user.get("id")) or {}
+    company_id = profile.get("company_id")
+    if not company_id:
+        raise HTTPException(status_code=400, detail="user has no company")
+
+    # Optional employee context for Section C resolution hints in the
+    # prompt — pulled from profile, not user-supplied.
+    emp_ctx = {
+        "employee_level": profile.get("employee_level") or profile.get("band"),
+        # country/assignment_type would come from active assignment;
+        # leaving for Sprint C (frontend can pass them when known).
+    }
+
+    try:
+        from .services.policy_assistant_rag_engine import answer_policy_question
+        result = answer_policy_question(
+            company_id=str(company_id),
+            user_id=str(user.get("id") or ""),
+            question=question,
+            session_id=session_id,
+            employee_context={k: v for k, v in emp_ctx.items() if v},
+            top_k=top_k,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        log.exception(
+            "policy_assistant rag query failed company=%s request_id=%s",
+            company_id, request_id,
+        )
+        raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
+    return result
+
+
+@app.post("/api/policy-assistant/analytics/beacon")
+def post_policy_assistant_analytics_beacon(
+    body: PolicyAssistantAnalyticsBeaconRequest,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Lightweight client-side policy assistant signals (no question text).
+
+    Sprint 1.5 widens this from a single-event endpoint to a discriminated
+    union covering the five UI-side beacons:
+      - assistant_follow_up_clicked  (pre-Sprint-1, unchanged behavior)
+      - assistant_opened
+      - assistant_question_submitted
+      - assistant_answer_received
+      - assistant_dismissed
+
+    The discriminator lives on the request model (`event` literal); each
+    event dispatches to its own emit function which writes to the same
+    analytics_events stream as record_policy_assistant_turn. No PII —
+    surface label, source enum, status enum, booleans, request_id only.
+    """
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    from .services.policy_assistant_analytics import (
+        emit_assistant_follow_up_clicked,
+        emit_assistant_opened,
+        emit_assistant_question_submitted,
+        emit_assistant_answer_received,
+        emit_assistant_dismissed,
+    )
+    from .services.policy_assistant_contract import PolicyAssistantRoleScope
+
+    role_upper = (user.get("role") or "").upper()
+    rs = PolicyAssistantRoleScope.HR if role_upper == "HR" else PolicyAssistantRoleScope.EMPLOYEE
+
+    # `body` is a RootModel — the actual discriminated event lives at
+    # `body.root`. Pydantic has already routed the dict to the right
+    # subclass based on the `event` literal.
+    event_obj = body.root
+    if isinstance(event_obj, FollowUpClickedBeacon):
+        emit_assistant_follow_up_clicked(
+            role=rs,
+            request_id=request_id,
+            follow_up_intent=event_obj.follow_up_intent,
+            follow_up_index=event_obj.follow_up_index,
+            canonical_topic=event_obj.canonical_topic,
+            assistant_turn_request_id=event_obj.assistant_turn_request_id,
+        )
+    elif isinstance(event_obj, AssistantOpenedBeacon):
+        emit_assistant_opened(role=rs, request_id=request_id, surface=event_obj.surface)
+    elif isinstance(event_obj, AssistantQuestionSubmittedBeacon):
+        emit_assistant_question_submitted(
+            role=rs,
+            request_id=request_id,
+            surface=event_obj.surface,
+            source=event_obj.source,
+        )
+    elif isinstance(event_obj, AssistantAnswerReceivedBeacon):
+        emit_assistant_answer_received(
+            role=rs,
+            request_id=request_id,
+            surface=event_obj.surface,
+            answer_type=event_obj.answer_type,
+            status=event_obj.status,
+            assistant_turn_request_id=event_obj.request_id,
+        )
+    elif isinstance(event_obj, AssistantDismissedBeacon):
+        emit_assistant_dismissed(
+            role=rs,
+            request_id=request_id,
+            surface=event_obj.surface,
+            had_question=event_obj.had_question,
+            had_answer=event_obj.had_answer,
+        )
+    else:
+        # Defensive: the discriminated union should never produce another type.
+        raise HTTPException(status_code=400, detail="Unsupported analytics event")
+    return {"ok": True}
+
+
+@app.post("/api/assignments/{assignment_id}/evidence", response_model=AddEvidenceResponse)
+def add_assignment_evidence(
+    assignment_id: str,
+    request: AddEvidenceRequest,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Phase 1 Step 3: Insert case_evidence for an assignment. Controlled insertion."""
+    assignment = _require_assignment_visibility(assignment_id, user)
+    case_id = assignment.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=400, detail="Assignment missing case_id")
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    try:
+        evidence_id = db.insert_case_evidence(
+            case_id=case_id,
+            assignment_id=assignment_id,
+            participant_id=request.participant_id,
+            requirement_id=request.requirement_id,
+            evidence_type=request.evidence_type,
+            file_url=request.file_url,
+            metadata=request.metadata,
+            status="submitted",
+            request_id=request_id,
+        )
+        try:
+            ensure_mobility_case_link_for_assignment(db, assignment_id, request_id=request_id)
+            ensure_employee_case_person_for_assignment(db, assignment_id, request_id=request_id)
+            ensure_passport_case_document_for_assignment(db, assignment_id, request_id=request_id)
+        except Exception as exc:
+            log.warning("mobility graph sync after evidence upload: %s", exc)
+        invalidate_relocation_plan_cache(case_id=case_id, assignment_id=assignment_id)
+        return AddEvidenceResponse(evidenceId=evidence_id)
+    except IntegrityError:
+        raise HTTPException(
+            status_code=400,
+            detail="Evidence requires case_id in wizard_cases. HR-created cases use relocation_cases.",
+        )
+
+
+@app.get("/api/cases/{case_id}/evidence")
+def get_case_evidence(
+    case_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Phase 1 Step 3: List case_evidence for a case. For verification and debugging."""
+    _ = _require_case_id_assignment_visible(case_id, user)
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    items = db.list_case_evidence(case_id, request_id=request_id)
+    return {"case_id": case_id, "evidence": items}
+
+
+# ---------------------------------------------------------------------------
+# Timeline (case milestones)
+# ---------------------------------------------------------------------------
+@app.get("/api/cases/{case_id}/timeline")
+def get_case_timeline(
+    case_id: str,
+    req: Request,
+    ensure_defaults: bool = Query(False, description="Create default milestones if none exist"),
+    include_links: bool = Query(True, description="Include milestone link rows (omit for lighter payloads)"),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """List operational relocation tasks (case_milestones). Optionally ensure default set exists."""
+    access = _require_case_access(case_id, user)
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    milestones = db.list_case_milestones(case_id, request_id=request_id)
+
+    if ensure_defaults:
+        try:
+            assignment = access.get("assignment", {})
+            assignment_id = assignment.get("id")
+            services = []
+            if assignment_id:
+                try:
+                    svc_rows = db.list_case_services(assignment_id, request_id=request_id)
+                    services = [r["service_key"] for r in svc_rows if r.get("selected") in (True, 1)]
+                except Exception:
+                    pass
+            draft: Dict[str, Any] = {}
+            target_move_date = None
+            with SessionLocal() as session:
+                case = app_crud.get_case(session, case_id)
+                if case:
+                    try:
+                        raw_draft = json.loads(getattr(case, "draft_json", None) or "{}")
+                        draft = raw_draft if isinstance(raw_draft, dict) else {}
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        draft = {}
+                    target_move_date = getattr(case, "target_move_date", None)
+            # ── S5 wiring: extract plan-scope context from draft ─────────────
+            _s5_ac = draft.get("assignmentContext") or {}
+            _s5_as = draft.get("assignment") or {}
+            _s5_rb = draft.get("relocationBasics") or {}
+            _raw_ct = (
+                _s5_as.get("contractType")
+                or _s5_ac.get("contractType")
+                or _s5_rb.get("contractType")
+                or None
+            )
+            # Normalise wizard contract type labels → internal case_type tokens.
+            # The wizard presents "assignment" / "permanent" / "contract" while
+            # plan_scope and immigration_regime expect "lta" / "permanent_transfer".
+            _CT_MAP = {
+                "assignment": "lta",
+                "permanent":  "permanent_transfer",
+                "contract":   "short_term_project",
+            }
+            _s5_contract_type = _CT_MAP.get((_raw_ct or "").lower(), _raw_ct)
+            _s5_family = draft.get("family") or None
+            _s5_dest = _s5_rb.get("destCountry") or _s5_rb.get("destination_country") or None
+            _s5_origin = _s5_rb.get("originCountry") or _s5_rb.get("origin_country") or None
+            # ── P2 wiring: nationality for immigration regime detection ────────
+            _s5_ep = draft.get("employeeProfile") or {}
+            _s5_pa = draft.get("primaryApplicant") or {}
+            _s5_nationality = (
+                _s5_pa.get("nationality")
+                or _s5_ep.get("nationality")
+                or _s5_ep.get("nationalityCountry")
+                or _s5_rb.get("nationality")
+                or None
+            )
+
+            # ── Create default milestones only when none exist yet ────────────
+            if len(milestones) == 0:
+                defaults = compute_default_milestones(
+                    case_id=case_id,
+                    case_draft=draft,
+                    selected_services=services,
+                    target_move_date=str(target_move_date) if target_move_date else None,
+                    contract_type=_s5_contract_type,
+                    family_profile=_s5_family,
+                    destination_country=_s5_dest,
+                    origin_country=_s5_origin,
+                    nationality=_s5_nationality,
+                )
+                for m in defaults:
+                    try:
+                        db.upsert_case_milestone(
+                            case_id=case_id,
+                            milestone_type=m["milestone_type"],
+                            title=m["title"],
+                            description=m.get("description"),
+                            target_date=m.get("target_date"),
+                            status=m.get("status", "pending"),
+                            sort_order=m.get("sort_order", 0),
+                            owner=m.get("owner", "joint"),
+                            criticality=m.get("criticality", "normal"),
+                            notes=m.get("notes"),
+                            request_id=request_id,
+                        )
+                    except Exception as upsert_exc:
+                        log.warning(
+                            "get_case_timeline ensure_defaults upsert failed case_id=%s type=%s: %s",
+                            case_id,
+                            m.get("milestone_type"),
+                            upsert_exc,
+                            exc_info=True,
+                        )
+
+            # ── P3 wiring: detect and persist exception flags ─────────────────
+            # Runs on every ensure_defaults=True call (idempotent via upsert),
+            # so flags are always current even when milestones already exist.
+            try:
+                from backend.services.immigration_regime import ImmigrationRegimeRouter as _RegimeRouter
+                from backend.services.exception_request_service import ExceptionRequestService as _ExcSvc
+                from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
+                _exc_profile = _extract_profile(draft)
+                _exc_profile.setdefault("destination_country", _s5_dest)
+                _exc_profile.setdefault("origin_country", _s5_origin)
+                _exc_profile.setdefault("nationality", _s5_nationality)
+                _exc_profile.setdefault("contract_type", _s5_contract_type)
+                _regime = _RegimeRouter().detect_regime(
+                    nationality=_exc_profile.get("nationality"),
+                    destination_country=_exc_profile.get("destination_country"),
+                    origin_country=_exc_profile.get("origin_country"),
+                    contract_type=_exc_profile.get("contract_type"),
+                )
+                for _flag in _ExcSvc().evaluate_case(profile=_exc_profile, regime=_regime):
+                    try:
+                        db.upsert_exception_request(
+                            case_id=case_id,
+                            exception_type=_flag.exception_type,
+                            reason=_flag.reason,
+                            severity=_flag.severity,
+                            assignment_id=None,
+                            recommended_action=_flag.recommended_action or None,
+                            request_id=request_id,
+                        )
+                    except Exception as _fe:
+                        log.warning(
+                            "upsert_exception_request failed case_id=%s type=%s: %s",
+                            case_id, _flag.exception_type, _fe,
+                        )
+            except Exception as _exc_err:
+                log.warning(
+                    "get_case_timeline exception detection failed case_id=%s: %s",
+                    case_id, _exc_err,
+                )
+            milestones = db.list_case_milestones(case_id, request_id=request_id)
+        except Exception as exc:
+            log.warning(
+                "get_case_timeline ensure_defaults failed case_id=%s: %s",
+                case_id,
+                exc,
+                exc_info=True,
+            )
+            milestones = db.list_case_milestones(case_id, request_id=request_id)
+
+    if include_links:
+        for m in milestones:
+            m["links"] = db.list_milestone_links(m["id"], request_id=request_id)
+    else:
+        for m in milestones:
+            m["links"] = []
+    summary = compute_timeline_summary(milestones)
+    return {"case_id": case_id, "milestones": milestones, "summary": summary}
+
+
+@app.get(
+    "/api/cases/{case_id}/exceptions",
+    summary="List exception flags for a case",
+    tags=["timeline"],
+)
+def list_case_exceptions(
+    case_id: str,
+    request: Request,
+    status: Optional[str] = Query(
+        None,
+        description="Filter by status: pending | approved | denied | escalated | withdrawn. "
+                    "Omit to return all.",
+    ),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Return all exception_request flags for a case, ordered blockers-first.
+
+    HR sees all flags. Employees see only non-sensitive warning summaries
+    (blocker flags are returned in full for all roles here — HR can decide
+    what to surface in the UI layer).
+
+    Response shape:
+      {
+        "case_id": str,
+        "blockers": [...],      # severity == "blocker"
+        "warnings": [...],      # severity == "warning"
+        "total": int
+      }
+    """
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    _require_case_id_assignment_visible(case_id, user)
+    flags = db.list_exception_requests(case_id, request_id=request_id)
+    if status:
+        flags = [f for f in flags if f.get("status") == status]
+    blockers = [f for f in flags if f.get("severity") == "blocker"]
+    warnings = [f for f in flags if f.get("severity") == "warning"]
+    return {
+        "case_id": case_id,
+        "blockers": blockers,
+        "warnings": warnings,
+        "total": len(flags),
+    }
+
+
+class ExceptionUpdateBody(BaseModel):
+    status: str  # approved | denied | escalated | withdrawn
+    resolution_notes: Optional[str] = None
+
+
+@app.patch(
+    "/api/cases/{case_id}/exceptions/{exception_id}",
+    summary="Approve, deny, or escalate an exception flag",
+    tags=["timeline"],
+)
+def update_case_exception(
+    case_id: str,
+    exception_id: str,
+    body: ExceptionUpdateBody,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Update the resolution status of a single exception_request flag.
+
+    HR-only endpoint (employees cannot resolve their own exception flags).
+
+    Allowed target statuses:
+      • approved   — HR reviewed and signed off; case may proceed
+      • denied     — HR reviewed and refused; case is blocked
+      • escalated  — HR escalating to leadership / legal / finance
+      • withdrawn  — flag is no longer relevant (e.g. circumstances changed)
+
+    Body:
+      { "status": "approved", "resolution_notes": "Optional HR note" }
+
+    Returns the updated exception_request row.
+    """
+    _VALID_RESOLUTION_STATUSES = {"approved", "denied", "escalated", "withdrawn"}
+    if body.status not in _VALID_RESOLUTION_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Invalid status {body.status!r}. "
+                f"Must be one of: {', '.join(sorted(_VALID_RESOLUTION_STATUSES))}."
+            ),
+        )
+
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    _require_case_id_assignment_visible(case_id, user)
+
+    resolved_by = user.get("id") or user.get("user_id") or None
+
+    updated = db.update_exception_request(
+        case_id=case_id,
+        exception_id=exception_id,
+        status=body.status,
+        resolved_by=resolved_by,
+        resolution_notes=body.resolution_notes or None,
+        request_id=request_id,
+    )
+
+    if updated is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Exception flag {exception_id!r} not found for case {case_id!r}, "
+                "or you do not have visibility of this case."
+            ),
+        )
+
+    log.info(
+        "exception_flag_resolved case_id=%s exception_id=%s status=%s resolved_by=%s",
+        case_id, exception_id, body.status, resolved_by,
+    )
+    return updated
+
+
+@app.get(
+    "/api/relocation-plans/{case_id}/view",
+    response_model=RelocationPlanViewResponse,
+    summary="Phased relocation plan (canonical view)",
+)
+def get_relocation_plan_view(
+    case_id: str,
+    request: Request,
+    role: Optional[str] = Query(
+        None,
+        description="Optional UX lens; must match caller (employee or hr). Defaults from auth.",
+    ),
+    debug: bool = Query(False, description="Include internal derivation diagnostics when true."),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Canonical phased plan + derived statuses + primary next action.
+    Authorization matches other case routes: employee (own assignment) or HR (owner or same company).
+    """
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    resolve_started_at = time.perf_counter()
+    assignment = _require_case_id_assignment_visible(case_id, user)
+    resolve_visibility_ms = (time.perf_counter() - resolve_started_at) * 1000
+    eff_case_id = _effective_relocation_case_id(assignment)
+    if not eff_case_id:
+        raise HTTPException(status_code=404, detail="Assignment has no linked case")
+    viewer_role_started_at = time.perf_counter()
+    viewer_role = _relocation_plan_view_query_role(user, role)
+    viewer_role_ms = (time.perf_counter() - viewer_role_started_at) * 1000
+    response_started_at = time.perf_counter()
+    response = get_relocation_plan_view_for_case_assignment(
+        db=db,
+        session_factory=SessionLocal,
+        case_id_effective=eff_case_id,
+        assignment=assignment,
+        viewer_role=viewer_role,
+        debug=debug,
+        request_id=request_id,
+    )
+    response_ms = (time.perf_counter() - response_started_at) * 1000
+    log.info(
+        "request_id=%s relocation_plan_route case_id=%s assignment_id=%s resolve_visibility_ms=%.2f resolve_role_ms=%.2f response_ms=%.2f total_ms=%.2f",
+        request_id,
+        eff_case_id,
+        assignment.get("id"),
+        resolve_visibility_ms,
+        viewer_role_ms,
+        response_ms,
+        resolve_visibility_ms + viewer_role_ms + response_ms,
+    )
+    return response
+
+
+@app.patch("/api/cases/{case_id}/timeline/milestones/{milestone_id}")
+def update_case_milestone(
+    case_id: str,
+    milestone_id: str,
+    req: Request,
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Update a milestone (title, description, target_date, actual_date, status, sort_order)."""
+    _ = _require_case_id_assignment_visible(case_id, user)
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    existing = next((m for m in db.list_case_milestones(case_id, request_id=request_id) if m.get("id") == milestone_id), None)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    merged = {
+        "milestone_type": body.get("milestone_type") or existing.get("milestone_type", ""),
+        "title": body.get("title") if body.get("title") is not None else existing.get("title", ""),
+        "description": body.get("description") if "description" in body else existing.get("description"),
+        "target_date": body.get("target_date") if "target_date" in body else existing.get("target_date"),
+        "actual_date": body.get("actual_date") if "actual_date" in body else existing.get("actual_date"),
+        "status": body.get("status") if body.get("status") is not None else existing.get("status", "pending"),
+        "sort_order": body.get("sort_order") if body.get("sort_order") is not None else existing.get("sort_order", 0),
+        "owner": body.get("owner") if "owner" in body else existing.get("owner", "joint"),
+        "criticality": body.get("criticality") if "criticality" in body else existing.get("criticality", "normal"),
+        "notes": body.get("notes") if "notes" in body else existing.get("notes"),
+    }
+    if merged.get("status") == "done" and not merged.get("actual_date"):
+        merged["actual_date"] = date.today().isoformat()
+    updated = db.upsert_case_milestone(
+        case_id=case_id,
+        milestone_type=merged["milestone_type"],
+        title=merged["title"],
+        description=merged["description"],
+        target_date=merged["target_date"],
+        actual_date=merged["actual_date"],
+        status=merged["status"],
+        sort_order=merged["sort_order"],
+        owner=str(merged.get("owner") or "joint"),
+        criticality=str(merged.get("criticality") or "normal"),
+        notes=merged.get("notes"),
+        milestone_id=milestone_id,
+        request_id=request_id,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    invalidate_relocation_plan_cache(case_id=case_id)
+    links = db.list_milestone_links(milestone_id, request_id=request_id)
+    updated["links"] = links
+    return updated
+
+
+@app.post("/api/cases/{case_id}/timeline/milestones/{milestone_id}/links")
+def add_milestone_link(
+    case_id: str,
+    milestone_id: str,
+    req: Request,
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Link milestone to an entity (evidence, event, rfq, service). Body: { linked_entity_type, linked_entity_id }."""
+    _ = _require_case_id_assignment_visible(case_id, user)
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    entity_type = body.get("linked_entity_type")
+    entity_id = body.get("linked_entity_id")
+    if not entity_type or not entity_id:
+        raise HTTPException(status_code=400, detail="linked_entity_type and linked_entity_id required")
+    db.link_milestone_entity(milestone_id, entity_type, entity_id, request_id=request_id)
+    return {"ok": True}
+
+
+@app.get("/api/dossier/questions", response_model=DossierQuestionsResponse)
+def get_dossier_questions(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    access = _require_case_access(case_id, user)
+    effective = access["effective_user"]
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, case_id)
+        if not case:
+            case = app_crud.create_case(session, case_id, {
+                "relocationBasics": {},
+                "employeeProfile": {},
+                "familyMembers": {},
+                "assignmentContext": {},
+            })
+        draft = json.loads(case.draft_json or "{}")
+    dest = _normalize_destination_country(
+        (draft.get("relocationBasics") or {}).get("destCountry") or case.dest_country
+    )
+    if not dest:
+        return DossierQuestionsResponse(
+            destination_country=None,
+            questions=[],
+            answers={},
+            mandatory_unanswered_count=0,
+            is_step5_complete=True,
+            sources_used=[],
+        )
+    profile = _build_profile_snapshot(draft)
+    raw_questions = db.list_dossier_questions(dest)
+    questions: List[DossierQuestionDTO] = []
+    for q in raw_questions:
+        if not evaluate_applies_if(q.get("applies_if"), profile):
+            continue
+        questions.append(DossierQuestionDTO(
+            id=q["id"],
+            question_text=q["question_text"],
+            answer_type=q["answer_type"],
+            options=q.get("options"),
+            is_mandatory=bool(q.get("is_mandatory")),
+            domain=q.get("domain") or "other",
+            question_key=q.get("question_key"),
+            source="library",
+        ))
+    case_questions = db.list_dossier_case_questions(case_id)
+    for q in case_questions:
+        questions.append(DossierQuestionDTO(
+            id=q["id"],
+            question_text=q["question_text"],
+            answer_type=q["answer_type"],
+            options=q.get("options"),
+            is_mandatory=bool(q.get("is_mandatory")),
+            domain="other",
+            question_key=None,
+            source="case",
+        ))
+
+    answers = {a["question_id"]: a["answer"] for a in db.list_dossier_answers(case_id, effective["id"])}
+    case_answers = {a["case_question_id"]: a["answer"] for a in db.list_dossier_case_answers(case_id, effective["id"])}
+
+    def _is_answered(value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.strip() != ""
+        if isinstance(value, list):
+            return len(value) > 0
+        return True
+
+    mandatory_unanswered = 0
+    for q in questions:
+        if not q.is_mandatory:
+            continue
+        value = answers.get(q.id) if q.source == "library" else case_answers.get(q.id)
+        if not _is_answered(value):
+            mandatory_unanswered += 1
+
+    sources_rows = db.list_dossier_source_suggestions(case_id)
+    seen_urls = set()
+    sources_used: List[Dict[str, Any]] = []
+    for row in sources_rows:
+        for item in row.get("results") or []:
+            url = item.get("url")
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            sources_used.append({"title": item.get("title"), "url": url, "snippet": item.get("snippet", "")})
+
+    return DossierQuestionsResponse(
+        destination_country=dest,
+        questions=questions,
+        answers={**answers, **case_answers},
+        mandatory_unanswered_count=mandatory_unanswered,
+        is_step5_complete=mandatory_unanswered == 0,
+        sources_used=sources_used,
+    )
+
+
+# Maps dossier question_key → wizard draft assignmentContext field for exception bridging
+_DOSSIER_KEY_TO_DRAFT_FIELD: Dict[str, str] = {
+    "gb.sponsor_licence": "ukSponsorLicenceConfirmed",
+    "gb.points_eligibility": "ukPointsThresholdConfirmed",
+}
+
+
+def _bridge_dossier_to_draft(case_id: str, library_payload: List[Dict[str, Any]], question_lookup: Dict[str, Any]) -> None:
+    """After saving dossier answers, patch wizard draft fields consumed by the exception engine."""
+    patches: Dict[str, Any] = {}
+    for item in library_payload:
+        q = question_lookup.get(item.get("question_id", ""))
+        if not q:
+            continue
+        draft_field = _DOSSIER_KEY_TO_DRAFT_FIELD.get(q.get("question_key") or "")
+        if draft_field is not None:
+            patches[draft_field] = item["answer"]
+    if not patches:
+        return
+    try:
+        with SessionLocal() as session:
+            case = app_crud.get_case(session, case_id)
+            if not case:
+                return
+            draft = json.loads(case.draft_json or "{}")
+            ac = draft.setdefault("assignmentContext", {})
+            ac.update(patches)
+            case.draft_json = json.dumps(draft)
+            session.commit()
+            log.info("dossier_bridge case_id=%s patched=%s", case_id, list(patches.keys()))
+    except Exception as exc:
+        log.warning("_bridge_dossier_to_draft failed case_id=%s: %s", case_id, exc)
+
+
+@app.post("/api/dossier/answers")
+def save_dossier_answers(
+    request: DossierAnswersRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    access = _require_case_access(request.case_id, user)
+    effective = access["effective_user"]
+    # Include all supported destinations so answers are never rejected as "Unknown"
+    raw_questions = (
+        db.list_dossier_questions("SG") +
+        db.list_dossier_questions("US") +
+        db.list_dossier_questions("GB") +
+        db.list_dossier_questions("FR") +
+        db.list_dossier_questions("DE") +
+        db.list_dossier_questions("NO") +
+        db.list_dossier_questions("BR") +
+        db.list_dossier_questions("IT") +
+        db.list_dossier_questions("ES") +
+        db.list_dossier_questions("AU") +
+        db.list_dossier_questions("CA") +
+        db.list_dossier_questions("CH") +
+        db.list_dossier_questions("HK") +
+        db.list_dossier_questions("JP") +
+        db.list_dossier_questions("NL") +
+        db.list_dossier_questions("AE") +
+        db.list_dossier_questions("ZA")
+    )
+    question_lookup = {q["id"]: q for q in raw_questions}
+    case_questions = db.list_dossier_case_questions(request.case_id)
+    case_lookup = {q["id"]: q for q in case_questions}
+
+    library_payload: List[Dict[str, Any]] = []
+    case_payload: List[Dict[str, Any]] = []
+    for item in request.answers:
+        if item.question_id:
+            q = question_lookup.get(item.question_id)
+            if not q:
+                raise HTTPException(status_code=400, detail="Unknown dossier question")
+            err = validate_answer(item.answer, q["answer_type"], q.get("options"))
+            if err:
+                raise HTTPException(status_code=400, detail=err)
+            library_payload.append({"question_id": item.question_id, "answer": item.answer})
+        elif item.case_question_id:
+            q = case_lookup.get(item.case_question_id)
+            if not q:
+                raise HTTPException(status_code=400, detail="Unknown case dossier question")
+            err = validate_answer(item.answer, q["answer_type"], q.get("options"))
+            if err:
+                raise HTTPException(status_code=400, detail=err)
+            case_payload.append({"case_question_id": item.case_question_id, "answer": item.answer})
+        else:
+            raise HTTPException(status_code=400, detail="question_id or case_question_id required")
+
+    if library_payload:
+        db.upsert_dossier_answers(request.case_id, effective["id"], library_payload)
+    if case_payload:
+        db.upsert_dossier_case_answers(request.case_id, effective["id"], case_payload)
+
+    # Bridge exception-relevant answers back into the wizard draft
+    if library_payload:
+        _bridge_dossier_to_draft(request.case_id, library_payload, question_lookup)
+
+    return {"ok": True}
+
+
+@app.post("/api/dossier/search-suggestions", response_model=DossierSearchSuggestionsResponse)
+def dossier_search_suggestions(
+    request: DossierSearchSuggestionsRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    _require_case_id_assignment_visible(request.case_id, user)
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, request.case_id)
+        if not case:
+            return DossierSearchSuggestionsResponse(destination_country=None, sources=[], suggestions=[])
+        draft = json.loads(case.draft_json or "{}")
+    dest = _normalize_destination_country(
+        (draft.get("relocationBasics") or {}).get("destCountry") or case.dest_country
+    )
+    if not dest:
+        return DossierSearchSuggestionsResponse(destination_country=None, sources=[], suggestions=[])
+    profile = _build_profile_snapshot(draft)
+    search = fetch_search_results(dest, profile)
+    results = search.get("results", [])
+    if results:
+        grouped: Dict[str, List[Dict[str, Any]]] = {}
+        for r in results:
+            grouped.setdefault(r.get("query") or "query", []).append({
+                "title": r.get("title"),
+                "url": r.get("url"),
+                "snippet": r.get("snippet", ""),
+            })
+        for q, items in grouped.items():
+            db.add_dossier_source_suggestion(request.case_id, dest, q, items)
+    suggestions = build_suggested_questions(dest, results)
+    sources = [
+        {"title": r.get("title"), "url": r.get("url"), "snippet": r.get("snippet", "")}
+        for r in results
+    ]
+    return DossierSearchSuggestionsResponse(
+        destination_country=dest,
+        sources=sources,
+        suggestions=[DossierSuggestionDTO(**s) for s in suggestions],
+    )
+
+
+@app.post("/api/dossier/case-questions")
+def add_dossier_case_question(
+    request: DossierCaseQuestionRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    _require_case_id_assignment_visible(request.case_id, user)
+    allowed_types = {"text", "boolean", "select", "date", "multiselect"}
+    if request.answer_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Unsupported answer_type")
+    row = db.add_dossier_case_question(
+        request.case_id,
+        request.question_text,
+        request.answer_type,
+        request.options,
+        request.is_mandatory,
+        request.sources,
+    )
+    return {"question": row}
+
+
+@app.post("/api/guidance/generate")
+def generate_guidance(
+    request: GuidanceGenerateRequest,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    if os.getenv("GUIDANCE_PACK_ENABLED", "true").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=404, detail="Guidance pack is disabled")
+    access = _require_case_access(request.case_id, user)
+    effective = access["effective_user"]
+    guidance_mode = os.getenv("GUIDANCE_MODE", "demo").lower()
+    if request.mode and user.get("is_admin"):
+        if request.mode in ("demo", "strict"):
+            guidance_mode = request.mode
+
+    with SessionLocal() as session:
+        case = app_crud.get_case(session, request.case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        draft = json.loads(case.draft_json or "{}")
+    dest = _normalize_destination_country(
+        (draft.get("relocationBasics") or {}).get("destCountry") or case.dest_country
+    )
+    if not dest:
+        raise HTTPException(status_code=400, detail="Destination country not available")
+    if dest not in ("SG", "US"):
+        raise HTTPException(status_code=400, detail="Unsupported destination corridor")
+
+    packs = [p for p in db.list_knowledge_packs(dest) if p.get("status") == "active"]
+    pack_ids = [p["id"] for p in packs]
+    docs = db.list_knowledge_docs(pack_ids)
+    rules = db.list_knowledge_rules(pack_ids)
+    pack_versions = {p["id"]: p.get("version", 1) for p in packs}
+    for rule in rules:
+        rule["pack_version"] = pack_versions.get(rule.get("pack_id"), 1)
+    docs_by_id = {d["id"]: d for d in docs}
+
+    # Map dossier answers using question_key for stability
+    dossier_answers = {}
+    questions = db.list_dossier_questions(dest)
+    q_by_id = {q["id"]: q for q in questions}
+    for ans in db.list_dossier_answers(request.case_id, effective["id"]):
+        q = q_by_id.get(ans["question_id"])
+        if q and q.get("question_key"):
+            dossier_answers[q["question_key"]] = ans["answer"]
+
+    trace_id = str(uuid.uuid4())
+    db.insert_trace_event(trace_id, request.case_id, "build_snapshot", {"dest": dest}, {}, "ok", None)
+    outputs = generate_guidance_pack(
+        case_id=request.case_id,
+        user_id=effective["id"],
+        destination_country=dest,
+        draft=draft,
+        dossier_answers=dossier_answers,
+        rules=rules,
+        docs_by_id=docs_by_id,
+        guidance_mode=guidance_mode,
+    )
+    db.insert_trace_event(trace_id, request.case_id, "build_plan", {}, {"items": len(outputs["plan"].get("items", []))}, "ok", None)
+
+    row = db.insert_guidance_pack(
+        case_id=request.case_id,
+        user_id=effective["id"],
+        destination_country=dest,
+        profile_snapshot=outputs["snapshot"],
+        plan=outputs["plan"],
+        checklist=outputs["checklist"],
+        markdown=outputs["markdown"],
+        sources=outputs["sources"],
+        not_covered=outputs["not_covered"],
+        coverage=outputs["coverage"],
+        guidance_mode=guidance_mode,
+        pack_hash=outputs["pack_hash"],
+        rule_set=outputs["rule_set"],
+    )
+    now = datetime.utcnow().isoformat() + "Z"
+    log_rows = []
+    for log_item in outputs.get("rule_logs", []):
+        log_rows.append({
+            "id": str(uuid.uuid4()),
+            "trace_id": trace_id,
+            "case_id": request.case_id,
+            "user_id": effective["id"],
+            "destination_country": dest,
+            "rule_id": log_item.get("rule_id"),
+            "rule_key": log_item.get("rule_key"),
+            "rule_version": log_item.get("rule_version", 1),
+            "pack_id": log_item.get("pack_id"),
+            "pack_version": log_item.get("pack_version", 1),
+            "applies_if": json.dumps(log_item.get("applies_if")) if log_item.get("applies_if") is not None else None,
+            "evaluation_result": 1 if log_item.get("evaluation_result") else 0,
+            "was_baseline": 1 if log_item.get("was_baseline") else 0,
+            "injected_for_minimum": 1 if log_item.get("injected_for_minimum") else 0,
+            "citations": json.dumps(log_item.get("citations") or []),
+            "snapshot_subset": json.dumps(log_item.get("snapshot_subset") or {}),
+            "created_at": now,
+        })
+    db.insert_rule_evaluation_logs(log_rows)
+    db.insert_trace_event(trace_id, request.case_id, "persist_pack", {"id": row["id"]}, {}, "ok", None)
+    return {
+        "guidance_pack_id": row["id"],
+        "guidance_mode": guidance_mode,
+        "pack_hash": outputs["pack_hash"],
+        "rule_set": outputs["rule_set"],
+        "plan": outputs["plan"],
+        "checklist": outputs["checklist"],
+        "markdown": outputs["markdown"],
+        "sources": outputs["sources"],
+        "not_covered": outputs["not_covered"],
+        "coverage": outputs["coverage"],
+    }
+
+
+@app.get("/api/guidance/latest")
+def get_guidance_latest(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    if os.getenv("GUIDANCE_PACK_ENABLED", "true").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=404, detail="Guidance pack is disabled")
+    access = _require_case_access(case_id, user)
+    effective = access["effective_user"]
+    row = db.get_latest_guidance_pack(case_id, effective["id"])
+    if not row:
+        raise HTTPException(status_code=404, detail="No guidance pack found")
+    return row
+
+
+@app.get("/api/guidance/trace")
+def get_guidance_trace(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    _require_case_id_assignment_visible(case_id, user)
+    return {"events": db.list_trace_events(case_id)}
+
+
+@app.get("/api/guidance/explain")
+def get_guidance_explain(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    _require_case_id_assignment_visible(case_id, user)
+    trace_events = db.list_trace_events(case_id)
+    trace_id = trace_events[0]["trace_id"] if trace_events else None
+    logs = db.list_rule_evaluation_logs(case_id, trace_id)
+    if not user.get("is_admin"):
+        rejected_count = len([l for l in logs if not l.get("evaluation_result")])
+        logs = [l for l in logs if l.get("evaluation_result")]
+    else:
+        rejected_count = len([l for l in logs if not l.get("evaluation_result")])
+    return {
+        "trace_id": trace_id,
+        "rejected_count": rejected_count,
+        "logs": [
+            {
+                "rule_key": l.get("rule_key"),
+                "version": l.get("rule_version"),
+                "evaluation_result": l.get("evaluation_result"),
+                "was_baseline": l.get("was_baseline"),
+                "injected_for_minimum": l.get("injected_for_minimum"),
+                "snapshot_subset": l.get("snapshot_subset"),
+                "citations": l.get("citations"),
+                "pack_version": l.get("pack_version"),
+            }
+            for l in logs
+        ],
+    }
+
+
+@app.get("/api/requirements/sufficiency")
+def get_requirements_sufficiency(
+    case_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    access = _require_case_access(case_id, user)
+    effective = access["effective_user"]
+    uid = effective.get("id")
+    if not uid:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        data = compute_requirements_sufficiency(case_id, str(uid))
+        return {
+            "compute_status": "ok",
+            "message": None,
+            **data,
+        }
+    except ValueError as e:
+        if "Case not found" in str(e):
+            raise HTTPException(status_code=404, detail="Case not found")
+        log.warning("compute_requirements_sufficiency value error case %s: %s", case_id, e)
+        return {
+            "compute_status": "insufficient_data",
+            "message": "More case information is needed before this recommendation can be calculated.",
+            "destination_country": None,
+            "missing_fields": [],
+            "supporting_requirements": [],
+        }
+    except Exception as e:
+        log.warning("compute_requirements_sufficiency failed for case %s: %s", case_id, e, exc_info=True)
+        return {
+            "compute_status": "unavailable",
+            "message": "More case information is needed before this recommendation can be calculated.",
+            "destination_country": None,
+            "missing_fields": [],
+            "supporting_requirements": [],
+        }
+
+
+@app.get("/api/notifications")
+def list_notifications(
+    request: Request,
+    limit: int = Query(25, ge=1, le=100),
+    only_unread: bool = Query(False),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    role = UserRole.EMPLOYEE if user.get("role") == UserRole.EMPLOYEE.value else UserRole.HR
+    effective = _effective_user(user, role)
+    uid = effective.get("id")
+    if not uid:
+        return []
+    rows = db.list_notifications(
+        uid,
+        limit=limit,
+        only_unread=only_unread,
+        request_id=getattr(request.state, "request_id", None),
+    )
+    return [
+        {
+            "id": r["id"],
+            "created_at": r["created_at"],
+            "assignment_id": r.get("assignment_id"),
+            "case_id": r.get("case_id"),
+            "type": r["type"],
+            "title": r["title"],
+            "body": r.get("body"),
+            "metadata": json.loads(r["metadata"]) if isinstance(r.get("metadata"), str) else (r.get("metadata") or {}),
+            "read_at": r.get("read_at"),
+        }
+        for r in rows
+    ]
+
+
+@app.get("/api/notifications/unread-count")
+def get_unread_count(request: Request, user: Dict[str, Any] = Depends(get_current_user)):
+    role = UserRole.EMPLOYEE if user.get("role") == UserRole.EMPLOYEE.value else UserRole.HR
+    effective = _effective_user(user, role)
+    uid = effective.get("id")
+    if not uid:
+        return {"count": 0}
+    return {
+        "count": db.count_unread_notifications(
+            uid, request_id=getattr(request.state, "request_id", None)
+        )
+    }
+
+
+@app.patch("/api/notifications/{notification_id}/read")
+def mark_notification_read(
+    notification_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    role = UserRole.EMPLOYEE if user.get("role") == UserRole.EMPLOYEE.value else UserRole.HR
+    effective = _effective_user(user, role)
+    uid = effective.get("id")
+    if not uid:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if not db.mark_notification_read(notification_id, uid):
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"ok": True}
+
+
+class NotifyHrRequest(BaseModel):
+    assignment_id: str
+
+
+@app.post("/api/notifications/notify-hr")
+def notify_hr_employee_saved(
+    request: NotifyHrRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    assignment = db.get_assignment_by_id(request.assignment_id) or db.get_assignment_by_case_id(request.assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    if assignment.get("employee_user_id") != effective["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized for this assignment")
+    hr_id = assignment.get("hr_user_id")
+    if not hr_id:
+        return {"ok": True}
+    try:
+        db.create_notification_with_preferences(
+            user_id=hr_id,
+            type_="EMPLOYEE_SAVED",
+            title="Employee updated the case",
+            body=f"New updates were saved for case {request.assignment_id[:8]}…",
+            assignment_id=request.assignment_id,
+            case_id=assignment.get("case_id"),
+            metadata={"assignment_id": request.assignment_id},
+        )
+    except Exception as e:
+        try:
+            db.insert_notification(
+                notification_id=str(uuid.uuid4()),
+                user_id=hr_id,
+                type_="EMPLOYEE_SAVED",
+                title="Employee updated the case",
+                body=f"New updates were saved for case {request.assignment_id[:8]}…",
+                assignment_id=request.assignment_id,
+                case_id=assignment.get("case_id"),
+                metadata={"assignment_id": request.assignment_id},
+            )
+        except Exception as e2:
+            log.warning("Failed to create notification for employee save: %s", e2)
+    return {"ok": True}
+
+
+@app.get("/api/debug/cases/{case_id}/events")
+def debug_case_events(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Dev/admin: list case_events for a case to verify event emission."""
+    events = db.list_case_events(case_id)
+    return {"case_id": case_id, "events": events, "count": len(events)}
+
+
+@app.get("/api/debug/assignment-check")
+def debug_assignment_check(
+    assignment_id: str = Query(...),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Dev-only: verify assignment visibility for current user. Uses backend auth (relopass_token)."""
+    assignment = db.get_assignment_by_id(assignment_id) or db.get_assignment_by_case_id(assignment_id)
+    if not assignment:
+        return {"found": False, "row": None, "current_user_id": user.get("id")}
+    role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+    effective = _effective_user(user, role)
+    emp_id = assignment.get("employee_user_id")
+    hr_id = assignment.get("hr_user_id")
+    is_employee = effective.get("role") == UserRole.EMPLOYEE.value
+    is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+    visible = False
+    eid_dbg = effective.get("id")
+    if is_employee and eid_dbg is not None and emp_id == eid_dbg:
+        visible = True
+    if is_hr and (effective.get("is_admin") or (eid_dbg is not None and hr_id == eid_dbg)):
+        visible = True
+    if not visible:
+        return {"found": False, "row": None, "current_user_id": effective.get("id")}
+    return {
+        "found": True,
+        "row": {
+            "id": assignment["id"],
+            "case_id": assignment["case_id"],
+            "employee_user_id": emp_id,
+            "hr_user_id": hr_id,
+            "status": assignment.get("status", ""),
+            "created_at": assignment.get("created_at", ""),
+            "updated_at": assignment.get("updated_at", ""),
+        },
+        "current_user_id": effective.get("id"),
+    }
 
 
 @app.post("/api/hr/assignments/{assignment_id}/identifier")
@@ -742,44 +9045,2663 @@ def update_assignment_identifier(
 
 @app.post("/api/hr/assignments/{assignment_id}/run-compliance")
 def run_compliance(assignment_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     profile = db.get_employee_profile(assignment_id)
+    profile_present = profile is not None
     if not profile:
-        raise HTTPException(status_code=400, detail="No employee profile available")
+        profile = {}
 
     report = compliance_engine.run(profile)
+    from .provenance_catalog import enrich_assignment_compliance_report
+
+    report = enrich_assignment_compliance_report(
+        report, assignment_id=assignment_id, profile_present=profile_present
+    )
     db.save_compliance_report(str(uuid.uuid4()), assignment_id, report)
-    if normalize_status(assignment["status"]) in [
-        AssignmentStatus.EMPLOYEE_SUBMITTED.value,
-        AssignmentStatus.CHANGES_REQUESTED.value,
-    ]:
-        db.update_assignment_status(assignment_id, AssignmentStatus.HR_REVIEW.value)
+
+    status = normalize_status(assignment["status"])
+    # For canonical workflow, keep the assignment in 'submitted' once compliance has run
+    # (or move awaiting_intake -> submitted if HR runs compliance pre-submission).
+    if status in [AssignmentStatus.SUBMITTED.value, AssignmentStatus.AWAITING_INTAKE.value]:
+        assert_canonical_status(AssignmentStatus.SUBMITTED.value)
+        db.update_assignment_status(assignment_id, AssignmentStatus.SUBMITTED.value)
     return report
 
 
 @app.post("/api/hr/assignments/{assignment_id}/decision")
 def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    case_id = assignment.get("case_id") or ""
 
-    if request.decision not in [AssignmentStatus.HR_APPROVED, AssignmentStatus.CHANGES_REQUESTED]:
+    if request.decision not in [AssignmentStatus.APPROVED, AssignmentStatus.REJECTED]:
         raise HTTPException(status_code=400, detail="Invalid decision")
 
     notes_payload = request.notes
-    if request.decision == AssignmentStatus.CHANGES_REQUESTED and request.requestedSections:
-        notes_payload = json.dumps(
-            {
-                "notes": request.notes,
-                "requestedSections": request.requestedSections,
-            }
+    # For the simplified canonical lifecycle we treat decisions as final approved / rejected.
+    assert_canonical_status(request.decision.value)
+    db.set_assignment_decision(assignment_id, request.decision.value, notes_payload)
+
+    event_type = "assignment.approved" if request.decision == AssignmentStatus.APPROVED else "assignment.rejected"
+    try:
+        db.insert_case_event(
+            case_id=case_id,
+            assignment_id=assignment_id,
+            actor_principal_id=effective["id"],
+            event_type=event_type,
+            payload={"notes": notes_payload} if notes_payload else {},
+        )
+    except Exception as exc:
+        log.error(
+            "event_insert_error assignment_id=%s case_id=%s event_type=%s error=%s",
+            assignment_id,
+            case_id,
+            event_type,
+            str(exc),
+            exc_info=True,
+        )
+        raise
+
+    return {"success": True}
+
+
+@app.get("/api/employee/policy/caps")
+def get_employee_policy_caps(
+    display_currency: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    Return policy caps for package comparison (housing/month, movers, schools, immigration).
+
+    When `display_currency` is set (e.g. EUR, GBP), the response also includes a
+    `display_currency` field naming the currency used and a `caps_display` map
+    with the same amounts converted from USD using indicative FX rates that
+    match the frontend's table — so HR and the employee see the same numbers
+    regardless of who's calling. Existing `*_usd` fields are preserved for
+    backward compatibility (T1.4 from Sprint 2 plan).
+    """
+    from .services.fx_service import convert_usd_to_display, normalize_display_currency
+
+    policy = policy_engine.load_policy()
+    caps = policy.get("caps", {})
+    housing_usd = caps.get("housing", {}).get("amount", 5000)
+    movers_usd = caps.get("movers", {}).get("amount", 10000)
+    schools_usd = caps.get("schools", {}).get("amount", 20000)
+    immigration_usd = caps.get("immigration", {}).get("amount", 4000)
+
+    payload: Dict[str, Any] = {
+        "housing_monthly_usd": housing_usd,
+        "movers_usd": movers_usd,
+        "schools_usd": schools_usd,
+        "immigration_usd": immigration_usd,
+    }
+    if display_currency:
+        cur = normalize_display_currency(display_currency)
+        payload["display_currency"] = cur
+        payload["caps_display"] = {
+            "housing_monthly": convert_usd_to_display(housing_usd, cur),
+            "movers": convert_usd_to_display(movers_usd, cur),
+            "schools": convert_usd_to_display(schools_usd, cur),
+            "immigration": convert_usd_to_display(immigration_usd, cur),
+        }
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# HR Policy Management (full policy spec - create, edit, upload)
+# ---------------------------------------------------------------------------
+@app.get("/api/hr/policies")
+def list_hr_policies(
+    status: Optional[str] = Query(None),
+    companyEntity: Optional[str] = Query(None, alias="companyEntity"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    policies = db.list_hr_policies(status_filter=status, company_entity=companyEntity)
+    return {"policies": policies}
+
+
+@app.post("/api/hr/policies")
+def create_hr_policy(
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    policy_id = body.get("policyId") or str(uuid.uuid4())
+    body["policyId"] = policy_id
+    body["status"] = body.get("status", "draft")
+    body["version"] = body.get("version", 1)
+    db.create_hr_policy(policy_id, body, created_by=user.get("id"))
+    return {"policyId": policy_id, "policy": body}
+
+
+@app.post("/api/hr/policies/upload")
+async def upload_hr_policy(
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Upload HR policy JSON or YAML file. Creates a new policy from the file content."""
+    content = await file.read()
+    try:
+        raw = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded")
+    try:
+        if file.filename and (file.filename.endswith(".yaml") or file.filename.endswith(".yml")):
+            try:
+                import yaml
+                policy = yaml.safe_load(raw)
+            except ImportError:
+                raise HTTPException(status_code=400, detail="YAML support requires PyYAML. Use JSON format.")
+        else:
+            policy = json.loads(raw)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON/YAML: {str(e)}")
+    if not isinstance(policy, dict):
+        raise HTTPException(status_code=400, detail="Policy must be a JSON object")
+    policy_id = policy.get("policyId") or str(uuid.uuid4())
+    policy["policyId"] = policy_id
+    policy["status"] = policy.get("status", "draft")
+    policy["version"] = policy.get("version", 1)
+    if not policy.get("effectiveDate"):
+        policy["effectiveDate"] = datetime.utcnow().strftime("%Y-%m-%d")
+    if not policy.get("employeeBands"):
+        policy["employeeBands"] = ["Band1", "Band2", "Band3", "Band4"]
+    if not policy.get("assignmentTypes"):
+        policy["assignmentTypes"] = ["Permanent", "Long-Term", "Short-Term"]
+    if not policy.get("benefitCategories"):
+        policy["benefitCategories"] = {}
+    db.create_hr_policy(policy_id, policy, created_by=user.get("id"))
+    return {"policyId": policy_id, "policy": policy, "message": "Policy uploaded successfully"}
+
+
+# ---------------------------------------------------------------------------
+# Company Policy Documents (docx/pdf + extracted benefits)
+# ---------------------------------------------------------------------------
+@app.get("/api/company-policies")
+def list_company_policies(
+    company_id: Optional[str] = Query(None, description="Admin override: scope to this company"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    cid = _resolve_company_for_policy(user, company_id)
+    policies = db.list_company_policies(cid)
+    return {"policies": policies}
+
+
+@app.post("/api/hr/company-policy/initialize-from-template")
+def hr_initialize_company_policy_from_template(
+    req: Request,
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Create company_policies + a **draft** policy_version from a platform starter template
+    (conservative / standard / premium). Does not publish; not an approved company policy until HR publishes.
+    Body: { "template_key": "standard", "comparison_ready_structure": true }
+    """
+    request_id = getattr(req.state, "request_id", None)
+    profile = _require_company_for_user(user)
+    company_id = profile.get("company_id")
+    if not company_id:
+        raise HTTPException(status_code=400, detail="User missing company association")
+
+    from .services.policy_company_policy_template_init import (
+        StarterPolicyTemplateInitError,
+        initialize_company_policy_from_starter_template,
+    )
+
+    try:
+        return initialize_company_policy_from_starter_template(
+            db,
+            company_id=str(company_id),
+            template_key=str((body or {}).get("template_key") or ""),
+            comparison_ready_structure=bool((body or {}).get("comparison_ready_structure", True)),
+            created_by=user.get("id"),
+            request_id=request_id,
+        )
+    except StarterPolicyTemplateInitError as exc:
+        detail: Dict[str, Any] = {"code": exc.code, "message": str(exc)}
+        if exc.code == "POLICY_ALREADY_EXISTS":
+            raise HTTPException(status_code=409, detail=detail) from exc
+        raise HTTPException(status_code=400, detail=detail) from exc
+    except SQLAlchemyError as exc:
+        log.error(
+            "request_id=%s hr_initialize_company_policy_from_template db_error=%s",
+            request_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "POLICY_INIT_DB_ERROR",
+                "message": "Database error while creating policy from template. Retry or contact support with the request ID.",
+                "request_id": request_id,
+            },
+        ) from exc
+
+
+# ---------------------------------------------------------------------------
+# Policy Document Intake (staging layer before company_policies)
+#
+# Three-stage pipeline:
+# - Ingest (upload): store file, extract raw text and metadata, segment clauses.
+#   One document -> one policy_documents row; clauses in policy_document_clauses.
+# - Reprocess: re-run extraction and clause segmentation from stored file.
+#   Used when extraction/segmentation logic improves or to fix failures.
+# - Normalize: transform clauses into company_policies, policy_versions, benefit_rules,
+#   exclusions, evidence_requirements, conditions, source_links. Separate so HR can
+#   reprocess without overwriting normalized edits and so we can re-normalize after
+#   taxonomy changes while keeping versioning and traceability.
+# ---------------------------------------------------------------------------
+
+BUCKET_HR_POLICIES = "hr-policies"
+
+# Download-url error codes (stable, for frontend mapping)
+POLICY_POLICY_NOT_FOUND = "policy_policy_not_found"
+POLICY_FILE_MISSING = "policy_file_missing"
+POLICY_FILE_PATH_INVALID = "policy_file_path_invalid"
+POLICY_FILE_SIGN_FAILED = "policy_file_sign_failed"
+POLICY_STORAGE_UNEXPECTED_ERROR = "policy_storage_unexpected_error"
+
+
+def resolve_policy_storage_object_key(raw: str) -> str:
+    """
+    Resolve raw file_url / storage_path to object key only for storage.from_(BUCKET_HR_POLICIES).
+    Handles:
+    - legacy bucket-prefixed: hr-policies/companies/...
+    - object-key-only: companies/...
+    - full signed/public URL: extract object key from path
+    Returns empty string if invalid.
+    """
+    if not raw or not isinstance(raw, str):
+        return ""
+    s = raw.strip()
+    if not s:
+        return ""
+    # Full URL: extract path and resolve
+    if s.startswith("http://") or s.startswith("https://"):
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(s)
+            path = parsed.path or ""
+            # Supabase: .../object/public/hr-policies/KEY or .../object/sign/hr-policies/KEY
+            if "/hr-policies/" in path:
+                return path.split("/hr-policies/", 1)[-1].lstrip("/")
+            return ""
+        except Exception:
+            return ""
+    # Strip leading bucket prefix
+    if s.startswith("hr-policies/"):
+        return s[len("hr-policies/"):]
+    if "/hr-policies/" in s:
+        return s.split("/hr-policies/", 1)[-1]
+    # Already object key (companies/...)
+    if s.startswith("companies/"):
+        return s
+    return s
+
+
+def normalize_policy_storage_object_key(path: str) -> str:
+    """Alias for resolve_policy_storage_object_key. Used by extract/reprocess."""
+    return resolve_policy_storage_object_key(path)
+
+
+def _sanitize_storage_filename(name: str) -> str:
+    """Make filename S3/storage-safe: replace spaces and problematic chars."""
+    import re
+    import unicodedata
+    base, _, ext = name.rpartition(".")
+    safe = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode()
+    safe = re.sub(r"[^a-zA-Z0-9._-]", "-", safe).strip("-._") or "file"
+    safe = re.sub(r"-+", "-", safe)
+    ext = (ext or "").lower()
+    return f"{safe}.{ext}" if ext else safe
+
+
+# Policy upload error codes (stable, for frontend mapping)
+UPLOAD_MISSING_FILE = "upload_missing_file"
+UPLOAD_INVALID_MIME_TYPE = "upload_invalid_mime_type"
+UPLOAD_EMPTY_FILE = "upload_empty_file"
+UPLOAD_STORAGE_FAILED = "upload_storage_failed"
+UPLOAD_DB_INSERT_FAILED = "upload_db_insert_failed"
+UPLOAD_EXTRACT_FAILED = "upload_extract_failed"
+UPLOAD_PROCESSING_FAILED = "upload_processing_failed"
+UPLOAD_UNEXPECTED_EXCEPTION = "upload_unexpected_exception"
+
+
+def _upload_error_response(
+    error_code: str,
+    message: str,
+    status: int = 500,
+    request_id: Optional[str] = None,
+) -> JSONResponse:
+    """Return structured JSON error for policy upload."""
+    content: Dict[str, Any] = {"ok": False, "error_code": error_code, "message": message}
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status, content=content)
+
+
+@app.get("/api/hr/policy-documents/health")
+def policy_documents_health(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    """
+    Diagnostic endpoint for policy document upload readiness.
+    Returns: supabase_project_ref, database_project_ref, project_refs_match,
+    bucket_probe (list_buckets, list_objects, diagnosis), table checks.
+    """
+    from .services.policy_storage_health import check_policy_storage_health
+    health = check_policy_storage_health(db)
+    return health
+
+
+@app.post("/api/hr/policy-documents/upload")
+async def upload_policy_document(
+    req: Request,
+    background_tasks: BackgroundTasks,
+    file: Optional[UploadFile] = File(None),
+    company_id: Optional[str] = Query(None, description="Admin override: scope upload to this company"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Upload policy PDF/DOCX for intake: store the file and queue background extraction/classification.
+    When admin is viewing a company's policy workspace, pass company_id so the document is stored for that company.
+    Stages: A.validate -> B.storage -> C.db_insert -> D.queue_background_ingest -> E.return
+    """
+    from .services.policy_storage_health import (
+        check_policy_storage_health,
+        STORAGE_MISSING_SERVICE_ROLE,
+        STORAGE_BUCKET_NOT_FOUND,
+        POLICY_DOCUMENTS_TABLE_MISSING,
+    )
+    request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
+    user_id = user.get("id", "")
+    filename = ""
+    mime = ""
+    file_size = 0
+    content: bytes = b""
+
+    # --- Stage A: Resolve company (admin may override with company_id) ---
+    log.info(
+        "request_id=%s policy_upload started user_id=%s",
+        request_id, user_id[:8] + "…" if user_id and len(user_id) > 8 else user_id,
+    )
+    try:
+        cid = _resolve_company_for_policy(user, company_id)
+        if not cid or not str(cid).strip():
+            return _upload_error_response(
+                "upload_company_required",
+                "Company is required for upload. When viewing a company's policy workspace, uploads are scoped to that company.",
+                400,
+                request_id=request_id,
+            )
+        company_id = cid.strip()
+        from .services.policy_assistant_access import require_company_access
+
+        require_company_access(user, company_id, db)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.error("request_id=%s policy_upload company lookup failed: %s", request_id, exc, exc_info=True)
+        return _upload_error_response(
+            UPLOAD_UNEXPECTED_EXCEPTION,
+            "Failed to resolve company for user.",
+            500,
+            request_id=request_id,
         )
 
-    db.set_assignment_decision(assignment_id, request.decision.value, notes_payload)
+    if not file or not getattr(file, "filename", None) or not str(file.filename).strip():
+        log.warning("request_id=%s policy_upload stage=validate error=upload_missing_file", request_id)
+        return _upload_error_response(
+            UPLOAD_MISSING_FILE,
+            "Please choose a file first.",
+            400,
+            request_id=request_id,
+        )
+
+    filename = str(file.filename).strip()
+    ext = filename.split(".")[-1].lower() if "." in filename else ""
+    if ext not in ("docx", "pdf"):
+        log.warning("request_id=%s policy_upload stage=validate error=upload_invalid_mime_type filename=%s ext=%s", request_id, filename, ext)
+        return _upload_error_response(
+            UPLOAD_INVALID_MIME_TYPE,
+            "Only PDF or DOCX files are supported.",
+            400,
+            request_id=request_id,
+        )
+
+    try:
+        content = await file.read()
+    except Exception as exc:
+        log.error("request_id=%s policy_upload stage=validate read failed: %s", request_id, exc, exc_info=True)
+        return _upload_error_response(
+            UPLOAD_UNEXPECTED_EXCEPTION,
+            "Failed to read uploaded file.",
+            500,
+            request_id=request_id,
+        )
+
+    file_size = len(content)
+    if file_size == 0:
+        log.warning("request_id=%s policy_upload stage=validate error=upload_empty_file filename=%s", request_id, filename)
+        return _upload_error_response(
+            UPLOAD_EMPTY_FILE,
+            "The selected file is empty.",
+            400,
+            request_id=request_id,
+        )
+
+    # Typed-rejection pre-gate: size ceiling + magic-byte sniff + PDF
+    # encryption check. Any failure here maps to a typed HTTP status;
+    # fires BEFORE storage upload so rejected files never leave a trail
+    # in Supabase storage.
+    try:
+        from .services.policy_filetype import validate_upload_bytes
+        from .services.policy_intake_errors import (
+            DocumentSizeError,
+            EncryptedDocumentError,
+            IntakePipelineUnavailableError,
+            MalformedDocumentError,
+            PolicyIntakeError,
+            UnsupportedFileTypeError,
+        )
+        sniff_result = validate_upload_bytes(content)
+    except PolicyIntakeError as exc:
+        # Map exception class → HTTP status. Exceptions are transport-agnostic;
+        # the status lives here (the API layer) per recipe §4.4.
+        _INTAKE_HTTP_STATUS = {
+            UnsupportedFileTypeError: 415,        # Unsupported Media Type
+            MalformedDocumentError: 422,          # Unprocessable Entity
+            EncryptedDocumentError: 422,
+            DocumentSizeError: 413,               # Payload Too Large (also fires on empty)
+            IntakePipelineUnavailableError: 503,  # Service Unavailable (missing parser dep)
+        }
+        status = _INTAKE_HTTP_STATUS.get(type(exc), 422)
+        log.info(
+            "request_id=%s policy_upload stage=validate rejection=%s status=%d msg=%s",
+            request_id, exc.code, status, exc,
+        )
+        return _upload_error_response(exc.code, str(exc), status, request_id=request_id)
+
+    mime = file.content_type or (
+        "application/pdf" if sniff_result.kind == "pdf"
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    log.info(
+        "request_id=%s policy_upload stage=validate ok filename=%s mime=%s file_size=%d company_id=%s",
+        request_id, filename, mime, file_size, company_id[:8] + "…" if company_id and len(company_id) > 8 else company_id,
+    )
+
+    _upload_wall_start = time.monotonic()
+    try:
+        from .services.policy_pipeline_analytics import emit_policy_upload_started
+
+        emit_policy_upload_started(
+            request_id=request_id,
+            user_id=user_id,
+            company_id=company_id,
+            filename=filename,
+            file_size_bytes=file_size,
+        )
+    except Exception:
+        pass
+
+    # Validate config before upload
+    health = check_policy_storage_health(db)
+    if not health["supabase_url_present"] or not health["service_role_present"]:
+        log.error(
+            "request_id=%s policy_upload stage=config error=config_missing url=%s service_role=%s",
+            request_id, health["supabase_url_present"], health["service_role_present"],
+        )
+        return _upload_error_response(
+            STORAGE_MISSING_SERVICE_ROLE,
+            "Policy document uploads require Supabase storage. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the backend .env (see .env.example) to enable uploads.",
+            503,
+            request_id=request_id,
+        )
+    if not health["bucket_access_ok"]:
+        config_err = health.get("config_error")
+        if config_err in ("wrong_key_type", "wrong_project_url_key_mismatch"):
+            log.error("request_id=%s policy_upload stage=config error=config_error diagnosis=%s", request_id, config_err)
+            return _upload_error_response(
+                STORAGE_MISSING_SERVICE_ROLE,
+                "Invalid API key: in the backend .env use SUPABASE_URL from your project (e.g. https://xxxxx.supabase.co) "
+                "and SUPABASE_SERVICE_ROLE_KEY from Supabase → Settings → API (the service_role secret, not the anon key). "
+                "Restart the backend after changing .env.",
+                503,
+                request_id=request_id,
+            )
+        log.error("request_id=%s policy_upload stage=config error=bucket_not_ok", request_id)
+        return _upload_error_response(
+            STORAGE_BUCKET_NOT_FOUND,
+            "Policy storage bucket is unavailable. In Supabase go to Storage → New bucket, create a bucket named hr-policies (public or private), then try again.",
+            503,
+            request_id=request_id,
+        )
+    if not health["policy_documents_table_ok"]:
+        log.error("request_id=%s policy_upload stage=config error=policy_documents_table_missing", request_id)
+        return _upload_error_response(
+            POLICY_DOCUMENTS_TABLE_MISSING,
+            "Policy database tables are missing.",
+            503,
+            request_id=request_id,
+        )
+
+    checksum = None
+    try:
+        from .services.policy_document_intake import compute_checksum
+        checksum = compute_checksum(content)
+    except Exception as e:
+        log.warning("request_id=%s policy_upload checksum failed: %s", request_id, e)
+
+    # --- Idempotency: skip re-upload if the same file (by checksum) was already
+    # processed successfully for this company. Protects against double-clicks,
+    # refresh-resubmits, and LLM-cost duplication. Failed prior attempts fall
+    # through so the user can retry by re-uploading.
+    if checksum:
+        try:
+            existing = db.get_active_policy_document_by_checksum(
+                company_id, checksum, request_id=request_id
+            )
+        except Exception as e:
+            log.warning(
+                "request_id=%s policy_upload idempotency lookup failed: %s",
+                request_id, e,
+            )
+            existing = None
+        if existing:
+            log.info(
+                "request_id=%s policy_upload idempotent_reuse existing_doc_id=%s status=%s",
+                request_id,
+                existing.get("id"),
+                existing.get("processing_status"),
+            )
+            return {
+                "ok": True,
+                "document": existing,
+                "request_id": request_id,
+                "processing_queued": False,
+                "reused": True,
+            }
+
+    doc_id = str(uuid.uuid4())
+    storage_filename = _sanitize_storage_filename(filename)
+    path = f"companies/{company_id}/policy-documents/{doc_id}/{storage_filename}"
+
+    # --- Stage B: Upload to Supabase Storage ---
+    try:
+        supabase = _get_supabase_admin_client()
+        supabase.storage.from_(BUCKET_HR_POLICIES).upload(
+            path, content,
+            {"content-type": mime, "upsert": "true"},
+        )
+        log.info("request_id=%s policy_upload stage=storage ok path=%s", request_id, path)
+    except Exception as exc:
+        # Extract StorageException details for logging (storage3 passes dict as exc.args)
+        exc_detail = {}
+        if hasattr(exc, "args") and exc.args and isinstance(exc.args[0], dict):
+            d = exc.args[0]
+            exc_detail = {
+                "status_code": d.get("statusCode") or d.get("status_code"),
+                "error_code": d.get("error") or d.get("code"),
+                "message": (d.get("message") or str(d))[:200],
+            }
+        log.error(
+            "request_id=%s policy_upload stage=storage failed filename=%s path=%s exc=%s exc_detail=%s",
+            request_id, filename, path, exc, exc_detail, exc_info=True,
+        )
+        code, msg = _map_storage_exception_to_response(exc, BUCKET_HR_POLICIES)
+        return _upload_error_response(code, msg, 500, request_id=request_id)
+
+    # --- Stage C: Insert row in policy_documents ---
+    try:
+        db.create_policy_document(
+            doc_id=doc_id,
+            company_id=company_id,
+            uploaded_by_user_id=user_id,
+            filename=filename,
+            mime_type=mime,
+            storage_path=path,
+            checksum=checksum,
+            file_size_bytes=file_size,
+            assistant_import_status="extracting_text",
+            request_id=request_id,
+        )
+        log.info("request_id=%s policy_upload stage=db_insert ok doc_id=%s", request_id, doc_id)
+    except Exception as exc:
+        safe_msg = (str(exc) or type(exc).__name__)[:200]
+        log.error(
+            "request_id=%s policy_pipeline stage=ingest document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
+            request_id, doc_id, company_id, user_id, type(exc).__name__, safe_msg, exc_info=True,
+        )
+        try:
+            supabase = _get_supabase_admin_client()
+            supabase.storage.from_(BUCKET_HR_POLICIES).remove([path])
+            log.info("request_id=%s policy_upload stage=db_insert cleanup ok removed path=%s", request_id, path)
+        except Exception as cleanup_exc:
+            log.warning("request_id=%s policy_upload stage=db_insert cleanup failed: %s", request_id, cleanup_exc)
+        return _upload_error_response(
+            UPLOAD_DB_INSERT_FAILED,
+            "Failed to save uploaded policy document.",
+            500,
+            request_id=request_id,
+        )
+
+    background_tasks.add_task(
+        _run_policy_document_ingest_background,
+        doc_id=doc_id,
+        content=content,
+        mime=mime,
+        filename=filename,
+        request_id=request_id,
+        user_id=user_id,
+        company_id=company_id,
+    )
+    doc = db.get_policy_document(doc_id, request_id=request_id)
+    success = True
+    log.info(
+        "request_id=%s policy_pipeline stage=ingest_queued document_id=%s company_id=%s user_id=%s success=%s",
+        request_id, doc_id, company_id, user_id, success,
+    )
+    try:
+        from .services.policy_pipeline_analytics import emit_policy_upload_completed
+
+        emit_policy_upload_completed(
+            request_id=request_id,
+            user_id=user_id,
+            company_id=company_id,
+            document_id=doc_id,
+            processing_status=doc.get("processing_status"),
+            clause_count=0,
+            duration_ms=(time.monotonic() - _upload_wall_start) * 1000.0,
+        )
+    except Exception:
+        pass
+    total_ms = (time.monotonic() - _upload_wall_start) * 1000.0
+    log.info(
+        "request_id=%s policy_upload stage=complete_queued ok document_id=%s total_ms=%.1f",
+        request_id,
+        doc_id,
+        total_ms,
+    )
+    return {
+        "ok": True,
+        "document": doc,
+        "request_id": request_id,
+        "processing_queued": True,
+        "ingest_duration_ms": round(total_ms, 1),
+    }
+
+
+@app.get("/api/hr/policy-documents")
+def list_policy_documents(
+    req: Request,
+    company_id: Optional[str] = Query(None, description="Admin override: scope to this company"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """List policy documents for company. Admin without company_id gets empty list (no error)."""
+    request_id = getattr(req.state, "request_id", None)
+    # Admin with no company scope: return empty list so the page loads; they can use Admin → company → Policy for scope.
+    if user.get("is_admin") and not (company_id and str(company_id).strip()):
+        return {"documents": []}
+    cid = _resolve_company_for_policy(user, company_id)
+    docs = db.list_policy_documents(cid, request_id=request_id)
+    return {"documents": docs}
+
+
+@app.get("/api/hr/policy-documents/{doc_id}")
+def get_policy_document(
+    doc_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Get policy document by id."""
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(doc_id, request_id=request_id)
+    _require_document_access(user, doc)
+    from .services.policy_pipeline_layers import enrich_policy_document_for_hr
+
+    return {"document": enrich_policy_document_for_hr(doc)}
+
+
+@app.get("/api/hr/policy-review")
+def get_hr_policy_review(
+    req: Request,
+    document_id: Optional[str] = Query(None, description="Source policy_documents.id"),
+    policy_id: Optional[str] = Query(None, description="company_policies.id (e.g. template with no source doc)"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Single payload for HR review: source document classification, normalization draft (parser/mapper),
+    Layer-2 publishable rows, readiness tiers, and aggregated issues.
+    """
+    request_id = getattr(req.state, "request_id", None)
+    did = str(document_id).strip() if document_id else None
+    pid = str(policy_id).strip() if policy_id else None
+    if not did and not pid:
+        raise HTTPException(status_code=400, detail="Provide document_id and/or policy_id")
+
+    if did:
+        doc_row = db.get_policy_document(did, request_id=request_id)
+        if not doc_row:
+            raise HTTPException(status_code=404, detail="Document not found")
+        _require_document_access(user, doc_row)
+    if pid:
+        pol_row = db.get_company_policy(pid)
+        if not pol_row:
+            raise HTTPException(status_code=404, detail="Policy not found")
+        _require_policy_access(user, pol_row)
+
+    from .services.policy_hr_review_service import build_hr_policy_review_payload
+    from .services.policy_hr_review_serializer import serialize_hr_policy_review_payload
+
+    try:
+        payload = build_hr_policy_review_payload(
+            db,
+            document_id=did,
+            policy_id=pid,
+            request_id=request_id,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "not found" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
+
+    out = serialize_hr_policy_review_payload(payload)
+    if request_id:
+        out["support"] = {"request_id": str(request_id)}
+    return out
+
+
+@app.post("/api/hr/policy-documents/bulk-delete")
+def bulk_delete_policy_documents(
+    body: Dict[str, Any] = Body(...),
+    req: Request = None,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Delete uploaded policy document records by id. Skips documents that are referenced
+    by any policy_version (source_policy_document_id). Only deletes source document
+    records; does not delete published policy versions.
+    """
+    request_id = getattr(req.state, "request_id", None) if req else None
+    doc_ids = body.get("document_ids") or []
+    if not isinstance(doc_ids, list):
+        raise HTTPException(status_code=400, detail="document_ids must be a list")
+    deleted = 0
+    skipped: List[Dict[str, Any]] = []
+    for doc_id in doc_ids:
+        doc_id = str(doc_id).strip()
+        if not doc_id:
+            continue
+        doc = db.get_policy_document(doc_id, request_id=request_id)
+        if not doc:
+            skipped.append({"id": doc_id, "reason": "not_found"})
+            continue
+        try:
+            _require_document_access(user, doc)
+        except HTTPException:
+            skipped.append({"id": doc_id, "reason": "forbidden"})
+            continue
+        if db.policy_version_references_document(doc_id):
+            skipped.append({"id": doc_id, "reason": "referenced_by_version"})
+            continue
+        if db.delete_policy_document(doc_id, request_id=request_id):
+            deleted += 1
+    return {"ok": True, "deleted": deleted, "skipped": skipped}
+
+
+@app.get("/api/hr/policy-documents/{doc_id}/clauses")
+def list_policy_document_clauses(
+    doc_id: str,
+    req: Request,
+    clause_type: Optional[str] = None,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """List clauses for a policy document. Optional filter by clause_type."""
+    request_id = getattr(req.state, "request_id", None) if req else None
+    doc = db.get_policy_document(doc_id, request_id=request_id)
+    _require_document_access(user, doc)
+    clauses = db.list_policy_document_clauses(doc_id, clause_type=clause_type, request_id=request_id)
+    return {"clauses": clauses}
+
+
+@app.get("/api/hr/policy-documents/{doc_id}/clauses/{clause_id}")
+def get_policy_document_clause(
+    doc_id: str,
+    clause_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Get a single clause for source comparison / view source."""
+    request_id = getattr(req.state, "request_id", None) if req else None
+    doc = db.get_policy_document(doc_id, request_id=request_id)
+    _require_document_access(user, doc)
+    clause = db.get_policy_document_clause(clause_id, request_id=request_id)
+    if not clause or clause.get("policy_document_id") != doc_id:
+        raise HTTPException(status_code=404, detail="Clause not found")
+    return {"clause": clause}
+
+
+@app.patch("/api/hr/policy-documents/{doc_id}/clauses/{clause_id}")
+def patch_policy_document_clause(
+    doc_id: str,
+    clause_id: str,
+    req: Request,
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """HR override: update clause_type, title, or hr_override_notes."""
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(doc_id, request_id=request_id)
+    _require_document_access(user, doc)
+    clause = db.get_policy_document_clause(clause_id, request_id=request_id)
+    if not clause or clause.get("policy_document_id") != doc_id:
+        raise HTTPException(status_code=404, detail="Clause not found")
+    db.update_policy_document_clause(
+        clause_id,
+        clause_type=body.get("clause_type"),
+        title=body.get("title"),
+        hr_override_notes=body.get("hr_override_notes"),
+        request_id=request_id,
+    )
+    updated = db.get_policy_document_clause(clause_id, request_id=request_id)
+    return {"clause": updated}
+
+
+@app.post("/api/hr/policy-documents/{doc_id}/reprocess")
+async def reprocess_policy_document(
+    doc_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Reprocess stage: re-run text extraction, classification, and clause segmentation from stored file.
+    Does not re-upload; uses existing storage_path. Use when extraction logic improves or to fix failures.
+    Does not overwrite normalized policy_versions/benefit_rules; those are created only by normalize.
+    """
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(doc_id, request_id=request_id)
+    _require_document_access(user, doc)
+    company_id_rp = (doc or {}).get("company_id")
+    file_path = doc.get("storage_path") or ""
+    object_key = normalize_policy_storage_object_key(file_path)
+    log.info("request_id=%s policy_document_reprocess bucket=%s object_key=%s", request_id, BUCKET_HR_POLICIES, object_key)
+    try:
+        supabase = _get_supabase_admin_client()
+        data = supabase.storage.from_(BUCKET_HR_POLICIES).download(object_key)
+    except Exception as exc:
+        log.warning("request_id=%s policy_document_reprocess download failed: %s", request_id, exc)
+        raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, BUCKET_HR_POLICIES))
+    try:
+        from .services.policy_document_intake import process_uploaded_document
+        from .services.policy_pipeline_analytics import (
+            emit_policy_classify_completed,
+            emit_policy_classify_failed,
+            emit_policy_classify_started,
+        )
+
+        emit_policy_classify_started(
+            request_id=request_id,
+            user_id=user.get("id"),
+            company_id=company_id_rp,
+            document_id=doc_id,
+            source="reprocess",
+        )
+        result = process_uploaded_document(
+            data, doc.get("mime_type", ""), doc.get("filename", ""), request_id=request_id
+        )
+        db.update_policy_document(
+            doc_id,
+            processing_status=result.get("processing_status"),
+            detected_document_type=result.get("detected_document_type"),
+            detected_policy_scope=result.get("detected_policy_scope"),
+            version_label=result.get("version_label"),
+            effective_date=result.get("effective_date"),
+            raw_text=result.get("raw_text"),
+            extraction_error=result.get("extraction_error"),
+            extracted_metadata=result.get("extracted_metadata"),
+            request_id=request_id,
+        )
+        if result.get("processing_status") == "failed":
+            try:
+                emit_policy_classify_failed(
+                    request_id=request_id,
+                    user_id=user.get("id"),
+                    company_id=company_id_rp,
+                    document_id=doc_id,
+                    extraction_error=result.get("extraction_error"),
+                    source="reprocess",
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                emit_policy_classify_completed(
+                    request_id=request_id,
+                    user_id=user.get("id"),
+                    company_id=company_id_rp,
+                    document_id=doc_id,
+                    processing_status=result.get("processing_status"),
+                    detected_document_type=result.get("detected_document_type"),
+                    source="reprocess",
+                )
+            except Exception:
+                pass
+        # Re-segment clauses
+        if result.get("raw_text") and result.get("processing_status") != "failed":
+            try:
+                from .services.policy_document_clauses import segment_document_from_raw_text
+                policy_segment_ctx = {
+                    "id": doc_id,
+                    "document_id": doc_id,
+                    "detected_document_type": result.get("detected_document_type"),
+                    "extracted_metadata": result.get("extracted_metadata") or {},
+                    "filename": doc.get("filename") or "",
+                }
+                clauses, seg_err = segment_document_from_raw_text(
+                    result["raw_text"], doc.get("mime_type", ""), data=data, policy_context=policy_segment_ctx
+                )
+                if not seg_err and clauses:
+                    db.upsert_policy_document_clauses(doc_id, clauses, request_id=request_id)
+                    log.info("request_id=%s policy_document_reprocess segmented %d clauses", request_id, len(clauses))
+            except Exception as seg_exc:
+                log.warning("request_id=%s policy_document_reprocess segmentation failed: %s", request_id, seg_exc)
+    except Exception as exc:
+        safe_msg = (str(exc) or type(exc).__name__)[:200]
+        log.warning(
+            "request_id=%s policy_pipeline stage=reprocess document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
+            request_id, doc_id, doc.get("company_id") if doc else None, user.get("id") if user else None,
+            type(exc).__name__, safe_msg, exc_info=True,
+        )
+        db.update_policy_document(
+            doc_id, processing_status="failed", extraction_error=str(exc), request_id=request_id
+        )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_classify_failed
+
+            emit_policy_classify_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=company_id_rp,
+                document_id=doc_id,
+                extraction_error=str(exc),
+                source="reprocess",
+            )
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Reprocess failed: {str(exc)}")
+    doc = db.get_policy_document(doc_id, request_id=request_id)
+    num_clauses = len(db.list_policy_document_clauses(doc_id, request_id=request_id))
+    log.info(
+        "request_id=%s policy_pipeline stage=reprocess document_id=%s company_id=%s user_id=%s success=true clauses=%d",
+        request_id, doc_id, doc.get("company_id") if doc else None, user.get("id") if user else None, num_clauses,
+    )
+    return {"document": doc}
+
+
+@app.post("/api/hr/policy-documents/{doc_id}/normalize")
+def normalize_policy_document(
+    doc_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Normalize stage: transform extracted clauses into structured policy objects.
+    Creates/attaches company_policy, policy_version, benefit_rules, exclusions, evidence_requirements,
+    conditions, assignment/family applicability, and source_links (traceability to clauses).
+
+    Normalization (draft persistence) is separate from employee publish: a draft may be saved with
+    ``publishable: false`` when Layer 2 is empty or strict conditions are missing. Auto-publish runs
+    only when ``publishable`` is true; publish gate failures return HTTP 200 with ``outcome`` =
+    ``publish_blocked`` so they are not confused with normalization errors.
+    """
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(doc_id, request_id=request_id)
+    _require_document_access(user, doc)
+    clauses = db.list_policy_document_clauses(doc_id, request_id=request_id)
+    try:
+        from .services.policy_pipeline_analytics import emit_policy_normalize_started
+
+        emit_policy_normalize_started(
+            request_id=request_id,
+            user_id=user.get("id"),
+            company_id=(doc or {}).get("company_id"),
+            document_id=doc_id,
+        )
+    except Exception:
+        pass
+    try:
+        from .services.normalization_input import (
+            NormalizationInputInvalid,
+            issues_to_jsonable,
+            validate_and_prepare_normalization_input,
+        )
+
+        doc_prepared, clauses_prepared, input_issues = validate_and_prepare_normalization_input(
+            doc, clauses, doc_id, request_id=request_id
+        )
+    except NormalizationInputInvalid as inv:
+        log.warning(
+            "request_id=%s normalization_not_ready document_id=%s issues=%s",
+            request_id,
+            doc_id,
+            [i.code for i in inv.issues],
+        )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+
+            emit_policy_normalize_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=(doc or {}).get("company_id"),
+                document_id=doc_id,
+                error_code="NORMALIZATION_NOT_READY",
+                detail=",".join([i.code for i in inv.issues])[:400],
+                http_status=422,
+            )
+        except Exception:
+            pass
+        return JSONResponse(
+            status_code=422,
+            content={
+                "ok": False,
+                "normalized": False,
+                "publishable": False,
+                "published": False,
+                "outcome": "normalization_not_ready",
+                "error_code": "NORMALIZATION_NOT_READY",
+                "message": (
+                    "This document is not ready to normalize. Fix the issues below, then use Reprocess if needed. "
+                    "Your file and extracted text in the database are unchanged."
+                ),
+                "errors": issues_to_jsonable([i for i in inv.issues if i.severity == "blocking"]),
+                "request_id": request_id,
+            },
+        )
+    repair_only = [i for i in input_issues if i.severity == "repair"]
+    if repair_only:
+        log.info(
+            "request_id=%s normalization_input_repairs document_id=%s count=%s",
+            request_id,
+            doc_id,
+            len(repair_only),
+        )
+    try:
+        from .services.policy_normalization import run_normalization
+        from .services.policy_normalization_errors import PolicyNormalizationPayloadInvalid
+
+        result = run_normalization(
+            db, doc_prepared, clauses_prepared, created_by=user.get("id"), request_id=request_id
+        )
+        summary = result.get("summary") or {}
+        policy_id = str(result["policy_id"])
+        version_id = str(result["policy_version_id"])
+        publishable = bool(result.get("publishable"))
+        readiness_status = result.get("readiness_status")
+        readiness_issues = result.get("readiness_issues") or []
+        policy_readiness = result.get("policy_readiness")
+
+        published = False
+        published_version: Optional[Dict[str, Any]] = None
+        publish_block_detail: Optional[str] = None
+        publish_block_code: Optional[str] = None
+
+        if publishable:
+            if request_id:
+                log.info(
+                    "request_id=%s policy_norm stage=publish_eval document_id=%s policy_id=%s policy_version_id=%s action=attempt",
+                    request_id,
+                    doc_id,
+                    policy_id,
+                    version_id,
+                )
+            try:
+                published_version = _hr_publish_policy_version(
+                    policy_id, version_id, user, request_id=request_id, publish_source="normalize"
+                )
+                published = True
+            except HTTPException as gate_exc:
+                publish_block_code = _http_exception_detail_code(gate_exc.detail)
+                publish_block_detail = _http_exception_detail_message(gate_exc.detail) or str(
+                    gate_exc.status_code
+                )
+                log.warning(
+                    "request_id=%s policy_norm stage=publish_blocked document_id=%s policy_id=%s policy_version_id=%s http_status=%s code=%s detail=%s",
+                    request_id,
+                    doc_id,
+                    policy_id,
+                    version_id,
+                    getattr(gate_exc, "status_code", "?"),
+                    publish_block_code or "",
+                    publish_block_detail[:400] if publish_block_detail else "",
+                )
+            except Exception as pub_exc:
+                log.warning(
+                    "request_id=%s policy_norm stage=publish_blocked document_id=%s policy_id=%s policy_version_id=%s exc=%s",
+                    request_id,
+                    doc_id,
+                    policy_id,
+                    version_id,
+                    pub_exc,
+                    exc_info=True,
+                )
+                try:
+                    from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+
+                    emit_policy_normalize_failed(
+                        request_id=request_id,
+                        user_id=user.get("id"),
+                        company_id=(doc or {}).get("company_id"),
+                        document_id=doc_id,
+                        error_code="publish_failed_after_normalize",
+                        detail=str(pub_exc)[:400],
+                        http_status=500,
+                    )
+                except Exception:
+                    pass
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "ok": False,
+                        "normalized": True,
+                        "publishable": True,
+                        "published": False,
+                        "outcome": "publish_failed_after_normalize",
+                        "readiness_status": readiness_status,
+                        "readiness_issues": readiness_issues,
+                        "error_code": "publish_failed_after_normalize",
+                        "message": (
+                            "Policy data was saved, but publishing failed so employees will not see it yet. "
+                            "Use “Publish version” in the HR Policy review workspace, or contact support."
+                        ),
+                        "request_id": request_id,
+                        "detail": str(pub_exc)[:500],
+                        "policy_id": policy_id,
+                        "policy_version_id": version_id,
+                        "summary": summary,
+                        "policy_readiness": policy_readiness,
+                        "normalization_draft": result.get("normalization_draft"),
+                    },
+                )
+        elif request_id:
+            log.info(
+                "request_id=%s policy_norm stage=publish_eval document_id=%s policy_id=%s policy_version_id=%s action=skipped publishable=false readiness_status=%s",
+                request_id,
+                doc_id,
+                policy_id,
+                version_id,
+                readiness_status,
+            )
+
+        if publishable and published:
+            outcome = "normalized_draft_created"
+        elif not publishable:
+            outcome = "normalized_but_not_publishable"
+        else:
+            outcome = "publish_blocked"
+
+        normalization_result_code = {
+            "normalized_draft_created": "NORMALIZED_AND_PUBLISHED",
+            "normalized_but_not_publishable": "NORMALIZED_DRAFT_ONLY",
+            "publish_blocked": "NORMALIZED_PUBLISH_BLOCKED",
+        }.get(outcome)
+
+        ndraft = result.get("normalization_draft") if isinstance(result.get("normalization_draft"), dict) else {}
+        rc = (ndraft.get("rule_candidates") or {}) if isinstance(ndraft.get("rule_candidates"), dict) else {}
+        rule_candidates_summary = {
+            "benefit_rules": len(rc.get("benefit_rules") or []),
+            "exclusions": len(rc.get("exclusions") or []),
+            "evidence_requirements": len(rc.get("evidence_requirements") or []),
+            "conditions": len(rc.get("conditions") or []),
+            "draft_rule_candidates": len(ndraft.get("draft_rule_candidates") or []),
+        }
+
+        comparison_readiness_code: Optional[str] = None
+        if isinstance(policy_readiness, dict):
+            cr = policy_readiness.get("comparison_readiness")
+            if isinstance(cr, dict):
+                st = (cr.get("status") or "").strip().lower()
+                if st and st != "ready":
+                    comparison_readiness_code = "COMPARISON_NOT_READY"
+
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_normalize_completed
+
+            emit_policy_normalize_completed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=(doc or {}).get("company_id"),
+                document_id=doc_id,
+                policy_id=policy_id,
+                policy_version_id=version_id,
+                summary=summary,
+                auto_published=published,
+            )
+        except Exception:
+            pass
+        log.info(
+            "request_id=%s policy_norm stage=normalize_done document_id=%s company_id=%s user_id=%s outcome=%s "
+            "publishable=%s published=%s policy_id=%s policy_version_id=%s benefit_rules=%d exclusions=%d rows_created=%d",
+            request_id,
+            doc_id,
+            doc.get("company_id") if doc else None,
+            user.get("id") if user else None,
+            outcome,
+            publishable,
+            published,
+            policy_id,
+            version_id,
+            summary.get("benefit_rules", 0),
+            summary.get("exclusions", 0),
+            summary.get("benefit_rules", 0)
+            + summary.get("exclusions", 0)
+            + summary.get("evidence_requirements", 0)
+            + summary.get("conditions", 0),
+        )
+        out: Dict[str, Any] = {
+            "ok": True,
+            "normalized": True,
+            "publishable": publishable,
+            "published": published,
+            "outcome": outcome,
+            "normalization_result_code": normalization_result_code,
+            "readiness_status": readiness_status,
+            "readiness_issues": readiness_issues,
+            "policy_id": policy_id,
+            "policy_version_id": version_id,
+            "summary": result["summary"],
+            "rule_candidates_summary": rule_candidates_summary,
+        }
+        if policy_readiness is not None:
+            out["policy_readiness"] = policy_readiness
+        if result.get("normalization_draft") is not None:
+            out["normalization_draft"] = result["normalization_draft"]
+        if published and published_version is not None:
+            out["version"] = published_version
+        if publish_block_code:
+            out["publish_block_code"] = publish_block_code
+        if publish_block_detail:
+            out["publish_block_detail"] = publish_block_detail
+        if comparison_readiness_code:
+            out["comparison_readiness_code"] = comparison_readiness_code
+        if repair_only:
+            out["input_repairs"] = issues_to_jsonable(repair_only)
+        return out
+    except PolicyNormalizationPayloadInvalid as inv:
+        body = inv.to_response_body()
+        stage = body.get("outcome") or "normalization_blocked"
+        log.warning(
+            "request_id=%s policy_norm stage=%s document_id=%s error_code=%s details=%s",
+            request_id,
+            stage,
+            doc_id,
+            inv.error_code,
+            [d.get("field") for d in body.get("details") or []],
+        )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+
+            emit_policy_normalize_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=(doc or {}).get("company_id"),
+                document_id=doc_id,
+                error_code=inv.error_code,
+                detail=inv.message[:400],
+                http_status=422,
+            )
+        except Exception:
+            pass
+        return JSONResponse(status_code=422, content=body)
+    except ValueError as exc:
+        err_str = str(exc)
+        log.warning("request_id=%s normalize validation: %s", request_id, err_str)
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+
+            emit_policy_normalize_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=(doc or {}).get("company_id"),
+                document_id=doc_id,
+                error_code="normalize_validation_error",
+                detail=err_str[:400],
+                http_status=400,
+            )
+        except Exception:
+            pass
+        raise HTTPException(status_code=400, detail=err_str)
+    except Exception as exc:
+        err_str = str(exc)
+        safe_msg = err_str[:200]
+        log.warning(
+            "request_id=%s policy_pipeline stage=normalize document_id=%s company_id=%s user_id=%s success=false exc_type=%s exc_msg=%s",
+            request_id, doc_id, doc.get("company_id") if doc else None, user.get("id") if user else None,
+            type(exc).__name__, safe_msg, exc_info=True,
+        )
+        try:
+            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+
+            emit_policy_normalize_failed(
+                request_id=request_id,
+                user_id=user.get("id"),
+                company_id=(doc or {}).get("company_id"),
+                document_id=doc_id,
+                error_code="normalization_failed",
+                detail=safe_msg,
+                http_status=500,
+            )
+        except Exception:
+            pass
+        if "DatatypeMismatch" in err_str or "auto_generated" in err_str or "boolean" in err_str:
+            msg = (
+                "The database rejected a policy row (often a boolean/column type mismatch). "
+                "Your policy document and clauses were not deleted—run Reprocess and try again, or apply pending migrations. "
+                f"Detail: {err_str[:220]}"
+            )
+        elif "UndefinedColumn" in err_str or "does not exist" in err_str or "template_source" in err_str or "template_name" in err_str or "is_default_template" in err_str:
+            msg = "Normalization failed: database schema is missing columns the app expects. Apply migrations, then retry."
+        elif "violates check constraint" in err_str.lower() or "check constraint" in err_str.lower():
+            msg = (
+                "A value did not satisfy a database check (for example policy_versions.status or benefit calc_type). "
+                f"Detail: {err_str[:280]}"
+            )
+        elif "foreign key" in err_str.lower() or "violates foreign key" in err_str.lower():
+            msg = "Normalization failed: a referenced id is missing (policy, document, or clause). Reprocess or re-upload."
+        else:
+            msg = f"Normalization failed: {err_str[:500]}"
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error_code": "normalization_failed",
+                "message": msg,
+                "request_id": request_id,
+                "detail": err_str[:500],
+                "hint": (
+                    "Extraction data is unchanged. Try Reprocess, then Normalize again. "
+                    "If this persists, capture request_id for support."
+                ),
+            },
+        )
+
+
+# ---------------------------------------------------------------------------
+# Policy Assistant — document-grounded knowledge (admin + case context)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/admin/policies/upload")
+async def admin_policy_assistant_upload(
+    req: Request,
+    file: Optional[UploadFile] = File(None),
+    company_id: Optional[str] = Query(None, description="Admin override: scope upload to this company"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Multipart upload for policy assistant import. Same storage + policy_documents row as HR upload;
+    use POST /api/admin/policies/{document_id}/extract to run the assistant pipeline.
+    """
+    return await upload_policy_document(req, file, company_id, user)
+
+
+@app.post("/api/admin/policies/{document_id}/extract")
+def admin_policy_assistant_extract(
+    document_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Run text → chunks → facts → snapshot → graph sync (synchronous)."""
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(document_id, request_id=request_id)
+    _require_document_access(user, doc)
+    if not db.policy_assistant_tables_available():
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "policy_assistant_tables_missing",
+                "message": "Apply database migrations for policy assistant import.",
+            },
+        )
+    from .services.policy_assistant_import_pipeline import run_policy_assistant_import_pipeline
+
+    out = run_policy_assistant_import_pipeline(
+        db, document_id, request_id=request_id, user_id=user.get("id")
+    )
+    if not out.get("ok"):
+        if out.get("http_status") == 409:
+            raise HTTPException(status_code=409, detail=out)
+        raise HTTPException(status_code=400, detail=out)
+    return out
+
+
+@app.get("/api/admin/policies/{document_id}/status")
+def admin_policy_assistant_status(
+    document_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Processing status, chunk/fact counts, latest run."""
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(document_id, request_id=request_id)
+    _require_document_access(user, doc)
+    if not db.policy_assistant_tables_available():
+        return {
+            "document_id": document_id,
+            "assistant_import_status": doc.get("assistant_import_status"),
+            "chunks_count": 0,
+            "facts_count": 0,
+            "latest_run": None,
+            "tables_available": False,
+        }
+    snap = db.get_latest_policy_knowledge_snapshot_for_document(document_id)
+    facts_n = db.count_policy_facts_for_snapshot(str(snap["id"])) if snap else 0
+    latest = db.latest_policy_processing_run(document_id)
+    chunks_n = (
+        len(db.list_policy_document_chunks_for_snapshot(document_id, str(snap["id"])))
+        if snap
+        else db.count_policy_document_chunks(document_id)
+    )
+    return {
+        "document_id": document_id,
+        "assistant_import_status": doc.get("assistant_import_status"),
+        "legacy_processing_status": doc.get("processing_status"),
+        "chunks_count": chunks_n,
+        "facts_count": facts_n,
+        "latest_snapshot_id": str(snap["id"]) if snap else None,
+        "latest_run": latest,
+        "extraction_error": doc.get("extraction_error"),
+        "tables_available": True,
+    }
+
+
+@app.get("/api/admin/policies/{document_id}/preview")
+def admin_policy_assistant_preview(
+    document_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Summary for UI: metadata, section list, fact counts by type, readiness."""
+    request_id = getattr(req.state, "request_id", None)
+    doc = db.get_policy_document(document_id, request_id=request_id)
+    _require_document_access(user, doc)
+    if not db.policy_assistant_tables_available():
+        return {
+            "document": doc,
+            "ready_for_assistant": False,
+            "sections": [],
+            "fact_counts_by_type": {},
+            "message": "policy_assistant_tables_missing",
+        }
+    snap = db.get_latest_policy_knowledge_snapshot_for_document(document_id)
+    chunks = (
+        db.list_policy_document_chunks_for_snapshot(document_id, str(snap["id"]))
+        if snap
+        else []
+    )
+    sections = sorted(
+        {str(c.get("section_title")) for c in chunks if c.get("section_title")}
+    )
+    fact_counts = db.policy_fact_counts_by_type(str(snap["id"])) if snap else {}
+    ais = doc.get("assistant_import_status")
+    act = (snap or {}).get("activation_state") or (snap or {}).get("status")
+    ready = ais == "ready_for_assistant" and bool(snap and act == "active_for_assistant")
+    return {
+        "document": {
+            "id": doc.get("id"),
+            "company_id": doc.get("company_id"),
+            "filename": doc.get("filename"),
+            "mime_type": doc.get("mime_type"),
+            "uploaded_at": doc.get("uploaded_at"),
+            "file_size_bytes": doc.get("file_size_bytes"),
+            "assistant_import_status": ais,
+            "processed_at": doc.get("processed_at"),
+            "extraction_error": doc.get("extraction_error"),
+        },
+        "ready_for_assistant": ready,
+        "sections": sections,
+        "fact_counts_by_type": fact_counts,
+        "chunks_count": len(chunks),
+        "snapshot": snap,
+    }
+
+
+@app.get("/api/admin/policies/company/{company_id}/assistant-source")
+def admin_policy_assistant_company_source(
+    company_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Active assistant policy source for a company."""
+    from .services.policy_assistant_access import require_company_access
+
+    cid = _resolve_company_for_policy(user, company_id)
+    require_company_access(user, cid, db)
+    if not db.policy_assistant_tables_available():
+        return {
+            "company_id": cid,
+            "active_snapshot": None,
+            "source_document": None,
+            "readiness": {"ready": False, "reason": "tables_missing"},
+        }
+    snap = db.get_active_policy_knowledge_snapshot_for_company(cid)
+    if not snap:
+        return {
+            "company_id": cid,
+            "active_snapshot": None,
+            "source_document": None,
+            "readiness": {"ready": False, "reason": "no_active_snapshot"},
+        }
+    doc = db.get_policy_document(str(snap.get("policy_document_id")))
+    binding = db.get_company_policy_assistant_binding(cid)
+    ready = (snap.get("activation_state") or snap.get("status")) == "active_for_assistant"
+    return {
+        "company_id": cid,
+        "active_snapshot": snap,
+        "source_document": doc,
+        "binding": binding,
+        "readiness": {
+            "ready": ready,
+            "assistant_import_status": (doc or {}).get("assistant_import_status"),
+            "uploaded_at": (doc or {}).get("uploaded_at"),
+        },
+    }
+
+
+@app.get("/api/policy-assistant/cases/{case_id}/context")
+def policy_assistant_case_context(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    PolicyAssistantContext for grounding: company, case profile, applicable facts, supporting chunks.
+    """
+    from .services.policy_assistant_access import require_company_access
+    from .services.policy_assistant_case_context_service import build_policy_assistant_context
+
+    ctx = build_policy_assistant_context(db, case_id)
+    cid = ctx.get("company_id")
+    if cid:
+        require_company_access(user, str(cid), db)
+    return ctx
+
+
+@app.get("/api/admin/policies/company/{company_id}/history")
+def admin_policy_assistant_company_history(
+    company_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Documents, extraction runs, snapshots (append-only), activation metadata."""
+    from .services.policy_assistant_access import require_company_access
+
+    cid = _resolve_company_for_policy(user, company_id)
+    require_company_access(user, cid, db)
+    if not db.policy_assistant_tables_available():
+        return {"company_id": cid, "documents": [], "message": "tables_missing"}
+    docs = db.list_policy_documents(cid)
+    out_docs: list = []
+    for d in docs:
+        did = str(d.get("id"))
+        snaps = db.list_policy_knowledge_snapshots_for_document(did)
+        runs = db.list_policy_processing_runs_for_document(did)
+        out_docs.append(
+            {
+                "document": {
+                    "id": did,
+                    "filename": d.get("filename"),
+                    "uploaded_at": d.get("uploaded_at"),
+                    "uploaded_by_user_id": d.get("uploaded_by_user_id"),
+                    "assistant_import_status": d.get("assistant_import_status"),
+                    "file_size_bytes": d.get("file_size_bytes"),
+                },
+                "snapshots": snaps,
+                "processing_runs": runs,
+            }
+        )
+    binding = db.get_company_policy_assistant_binding(cid)
+    active = db.get_active_policy_knowledge_snapshot_for_company(cid)
+    return {
+        "company_id": cid,
+        "documents": out_docs,
+        "company_binding": binding,
+        "active_snapshot": active,
+    }
+
+
+@app.get("/api/admin/policies/answers/audits")
+def admin_policy_assistant_answer_audits(
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+    company_id: Optional[str] = Query(None),
+    case_id: Optional[str] = Query(None),
+    snapshot_id: Optional[str] = Query(None),
+    evidence_status: Optional[str] = Query(None),
+    created_after: Optional[str] = Query(None, description="ISO8601 lower bound"),
+    created_before: Optional[str] = Query(None, description="ISO8601 upper bound"),
+    limit: int = Query(100, ge=1, le=500),
+):
+    from .services.policy_assistant_access import require_company_access
+
+    if user.get("is_admin"):
+        if not company_id or not str(company_id).strip():
+            raise HTTPException(
+                status_code=400,
+                detail="company_id query parameter is required for admin",
+            )
+        cid = str(company_id).strip()
+    else:
+        cid = _resolve_company_for_policy(user, company_id)
+    if not cid:
+        raise HTTPException(status_code=400, detail="company_id required")
+    require_company_access(user, cid, db)
+    rows = db.list_policy_assistant_answer_audits(
+        company_id=cid,
+        case_id=case_id,
+        snapshot_id=snapshot_id,
+        evidence_status=evidence_status,
+        created_after=created_after,
+        created_before=created_before,
+        limit=limit,
+    )
+    return {"audits": rows}
+
+
+@app.get("/api/admin/policies/company/{company_id}/diff")
+def admin_policy_assistant_snapshot_diff(
+    company_id: str,
+    older_snapshot_id: str = Query(..., description="Earlier snapshot"),
+    newer_snapshot_id: str = Query(..., description="Later snapshot"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    from .services.policy_assistant_access import require_company_access, require_two_snapshots_same_company
+    from .services.policy_snapshot_diff_service import compare_snapshots
+
+    cid = _resolve_company_for_policy(user, company_id)
+    require_company_access(user, cid, db)
+    a, b = require_two_snapshots_same_company(db, older_snapshot_id, newer_snapshot_id)
+    if str(a.get("company_id")) != str(cid) or str(b.get("company_id")) != str(cid):
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return compare_snapshots(db, older_snapshot_id, newer_snapshot_id)
+
+
+# ---------------------------------------------------------------------------
+# Company Policies (extracted benefits, linked to policy_documents later)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/company-policies/{policy_id}/normalized")
+def get_normalized_policy(
+    policy_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+    detail: str = Query(
+        "full",
+        description="Use detail=summary for pipeline/publish headers only (no benefit matrix rows).",
+    ),
+    include_readiness: bool = Query(
+        True,
+        description="If false, skips published comparison readiness and policy_readiness (faster polling).",
+    ),
+):
+    """Get normalized policy version with benefits, exclusions, evidence, conditions, source links."""
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    mode = (detail or "full").strip().lower()
+    version = db.get_latest_policy_version(policy_id)
+    published_version = db.get_published_policy_version(policy_id)
+
+    def _version_and_draft(v: Optional[Dict[str, Any]]) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        if not v:
+            return None, None
+        raw_draft = v.get("normalization_draft_json")
+        public = {k: val for k, val in v.items() if k != "normalization_draft_json"}
+        draft_out = raw_draft if isinstance(raw_draft, dict) else None
+        return public, draft_out
+
+    version_public, normalization_draft = _version_and_draft(version)
+    published_comparison_readiness = None
+    if published_version and published_version.get("id") and include_readiness:
+        from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
+
+        published_comparison_readiness = evaluate_version_comparison_readiness(db, str(published_version["id"]))
+
+    def _policy_readiness_for_version(
+        br: List[Dict[str, Any]],
+        ex: List[Dict[str, Any]],
+        cond: List[Dict[str, Any]],
+        aa: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        if not include_readiness:
+            return None
+        from .services.policy_processing_readiness import evaluate_stored_policy_readiness
+
+        src_doc = None
+        if version and version.get("source_policy_document_id"):
+            try:
+                src_doc = db.get_policy_document(str(version["source_policy_document_id"]), request_id=request_id)
+            except Exception:
+                src_doc = None
+        return evaluate_stored_policy_readiness(
+            latest_version=version,
+            published_version=published_version,
+            benefit_rules=br,
+            exclusions=ex,
+            conditions=cond,
+            assignment_applicability=aa,
+            source_document=src_doc,
+        )
+
+    if mode == "summary":
+        pr_summary = None
+        if include_readiness and version and version.get("id"):
+            vid0 = str(version["id"])
+            from .services.policy_hr_rule_override_layer import merge_benefit_rules_for_effective_readiness
+
+            br0 = db.list_policy_benefit_rules(vid0)
+            try:
+                br0 = merge_benefit_rules_for_effective_readiness(db, vid0, br0)
+            except Exception:
+                pass
+            pr_summary = _policy_readiness_for_version(
+                br0,
+                db.list_policy_exclusions(vid0),
+                db.list_policy_rule_conditions(vid0),
+                db.list_policy_assignment_applicability(vid0),
+            )
+        elif include_readiness:
+            from .services.policy_processing_readiness import evaluate_stored_policy_readiness
+
+            pr_summary = evaluate_stored_policy_readiness(
+                latest_version=version,
+                published_version=published_version,
+                benefit_rules=[],
+                exclusions=[],
+                conditions=[],
+                assignment_applicability=[],
+                source_document=None,
+            )
+        return {
+            "policy": policy,
+            "version": version_public,
+            "normalization_draft": normalization_draft,
+            "benefit_rules": [],
+            "exclusions": [],
+            "evidence_requirements": [],
+            "conditions": [],
+            "assignment_applicability": [],
+            "family_applicability": [],
+            "source_links": [],
+            "published_version": published_version,
+            "published_comparison_readiness": published_comparison_readiness if include_readiness else None,
+            "policy_readiness": pr_summary,
+            "detail": "summary",
+        }
+
+    if not version:
+        from .services.policy_processing_readiness import evaluate_stored_policy_readiness
+
+        pr_empty = (
+            evaluate_stored_policy_readiness(
+                latest_version=None,
+                published_version=published_version,
+                benefit_rules=[],
+                exclusions=[],
+                conditions=[],
+                assignment_applicability=[],
+                source_document=None,
+            )
+            if include_readiness
+            else None
+        )
+        return {
+            "policy": policy,
+            "version": None,
+            "normalization_draft": None,
+            "benefit_rules": [],
+            "exclusions": [],
+            "evidence_requirements": [],
+            "conditions": [],
+            "assignment_applicability": [],
+            "family_applicability": [],
+            "source_links": [],
+            "published_version": published_version,
+            "published_comparison_readiness": published_comparison_readiness,
+            "policy_readiness": pr_empty,
+        }
+    vid = version["id"]
+    benefit_rules = db.list_policy_benefit_rules(vid)
+    exclusions = db.list_policy_exclusions(vid)
+    evidence_requirements = db.list_policy_evidence_requirements(vid)
+    conditions = db.list_policy_rule_conditions(vid)
+    assignment_applicability = db.list_policy_assignment_applicability(vid)
+    family_applicability = db.list_policy_family_applicability(vid)
+    source_links = db.list_policy_source_links(vid)
+    from .services.policy_hr_rule_override_layer import (
+        build_effective_entitlement_preview,
+        merge_benefit_rules_for_effective_readiness,
+    )
+
+    br_readiness = benefit_rules
+    try:
+        br_readiness = merge_benefit_rules_for_effective_readiness(db, str(vid), benefit_rules)
+    except Exception:
+        br_readiness = benefit_rules
+    pr_full = _policy_readiness_for_version(br_readiness, exclusions, conditions, assignment_applicability)
+    try:
+        hr_ov = db.list_hr_benefit_rule_overrides(str(vid))
+    except Exception:
+        hr_ov = []
+    try:
+        ent_prev = build_effective_entitlement_preview(db, str(vid), benefit_rules)
+    except Exception:
+        ent_prev = []
+    return {
+        "policy": policy,
+        "version": version_public,
+        "normalization_draft": normalization_draft,
+        "benefit_rules": benefit_rules,
+        "exclusions": exclusions,
+        "evidence_requirements": evidence_requirements,
+        "conditions": conditions,
+        "assignment_applicability": assignment_applicability,
+        "family_applicability": family_applicability,
+        "source_links": source_links,
+        "published_version": published_version,
+        "published_comparison_readiness": published_comparison_readiness,
+        "policy_readiness": pr_full,
+        "hr_overrides": hr_ov,
+        "entitlement_effective_preview": ent_prev,
+    }
+
+
+@app.patch("/api/company-policies/{policy_id}/benefits/{benefit_rule_id}")
+def patch_benefit_rule(
+    policy_id: str,
+    benefit_rule_id: str,
+    req: Request,
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """HR override: update benefit rule fields."""
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    rule = db.get_policy_benefit_rule(benefit_rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="Benefit rule not found")
+    version = db.get_policy_version(rule["policy_version_id"])
+    if not version or version.get("policy_id") != policy_id:
+        raise HTTPException(status_code=404, detail="Benefit rule not found")
+    db.update_policy_benefit_rule(
+        benefit_rule_id,
+        amount_value=body.get("amount_value"),
+        amount_unit=body.get("amount_unit"),
+        currency=body.get("currency"),
+        frequency=body.get("frequency"),
+        description=body.get("description"),
+        review_status=body.get("review_status"),
+        benefit_key=body.get("benefit_key"),
+        metadata_json=body.get("metadata_json"),
+    )
+    updated = db.get_policy_benefit_rule(benefit_rule_id)
+    try:
+        from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+
+        pv = updated.get("policy_version_id") if updated else None
+        if pv:
+            invalidate_comparison_readiness_cache(str(pv))
+    except Exception:
+        pass
+    return {"benefit_rule": updated}
+
+
+@app.patch("/api/company-policies/{policy_id}/versions/{version_id}/benefits/{benefit_rule_id}/hr-override")
+def patch_hr_benefit_rule_override(
+    policy_id: str,
+    version_id: str,
+    benefit_rule_id: str,
+    body: Dict[str, Any] = Body(...),
+    req: Request = None,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    HR override layer: adjust effective caps / visibility / approval / notes without editing
+    normalized Layer-2 rows or extraction artifacts. Partial JSON body merges into the current override row.
+    """
+    request_id = getattr(req.state, "request_id", None) if req else None
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    ver = db.get_policy_version(version_id)
+    if not ver or str(ver.get("policy_id")) != str(policy_id):
+        raise HTTPException(status_code=404, detail="Policy version not found")
+    rule = db.get_policy_benefit_rule(benefit_rule_id)
+    if not rule or str(rule.get("policy_version_id")) != str(version_id):
+        raise HTTPException(status_code=404, detail="Benefit rule not found")
+    allowed_keys = (
+        "service_visibility",
+        "amount_value_override",
+        "amount_unit_override",
+        "currency_override",
+        "duration_quantity_json",
+        "approval_required_override",
+        "hr_notes",
+    )
+    patch = {k: body[k] for k in allowed_keys if k in body}
+    if not patch:
+        raise HTTPException(status_code=400, detail="No valid override fields in body")
+    try:
+        db.upsert_hr_benefit_rule_override(
+            str(version_id),
+            str(benefit_rule_id),
+            patch,
+            actor_id=user.get("id"),
+        )
+    except Exception as exc:
+        log.warning(
+            "request_id=%s hr_override upsert failed policy_id=%s version_id=%s rule_id=%s exc=%s",
+            request_id,
+            policy_id,
+            version_id,
+            benefit_rule_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to save HR override") from exc
+    try:
+        from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+
+        invalidate_comparison_readiness_cache(str(version_id))
+    except Exception:
+        pass
+    row = db.get_hr_benefit_rule_override(str(version_id), str(benefit_rule_id))
+    return {"hr_override": row, "request_id": request_id}
+
+
+@app.delete("/api/company-policies/{policy_id}/versions/{version_id}/benefits/{benefit_rule_id}/hr-override")
+def delete_hr_benefit_rule_override(
+    policy_id: str,
+    version_id: str,
+    benefit_rule_id: str,
+    req: Request = None,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Remove HR override row for this benefit rule (audit row retained)."""
+    request_id = getattr(req.state, "request_id", None) if req else None
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    ver = db.get_policy_version(version_id)
+    if not ver or str(ver.get("policy_id")) != str(policy_id):
+        raise HTTPException(status_code=404, detail="Policy version not found")
+    rule = db.get_policy_benefit_rule(benefit_rule_id)
+    if not rule or str(rule.get("policy_version_id")) != str(version_id):
+        raise HTTPException(status_code=404, detail="Benefit rule not found")
+    ok = db.delete_hr_benefit_rule_override(str(version_id), str(benefit_rule_id), actor_id=user.get("id"))
+    if not ok:
+        raise HTTPException(status_code=404, detail="No HR override to delete")
+    try:
+        from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+
+        invalidate_comparison_readiness_cache(str(version_id))
+    except Exception:
+        pass
+    return {"ok": True, "request_id": request_id}
+
+
+@app.patch("/api/company-policies/{policy_id}/versions/latest/status")
+def patch_policy_version_status_latest(
+    policy_id: str,
+    req: Request,
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Update the latest policy version status. Avoids version_id mismatch."""
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    version = db.get_latest_policy_version(policy_id)
+    if not version:
+        log.warning("request_id=%s patch_version_status_latest policy_id=%s no_version", request_id, policy_id)
+        raise HTTPException(status_code=404, detail="No policy version found. Normalize a document first.")
+    version_id = version["id"]
+    status = body.get("status")
+    if status not in ("draft", "review_required", "reviewed", "published", "archived"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+    if status == "published":
+        from .services.policy_publish_gate import require_employee_publishable_policy_version
+
+        require_employee_publishable_policy_version(db, version_id)
+    try:
+        db.update_policy_version_status(version_id, status)
+        updated = db.get_policy_version(version_id)
+        return {"version": updated}
+    except Exception as exc:
+        log.warning("request_id=%s patch_version_status_latest failed policy_id=%s exc=%s", request_id, policy_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Status update failed")
+
+
+@app.post("/api/company-policies/{policy_id}/versions/latest/publish")
+def publish_policy_version_latest(
+    policy_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Publish the latest policy version. Avoids version_id mismatch."""
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    version = db.get_latest_policy_version(policy_id)
+    if not version:
+        log.warning("request_id=%s publish_version_latest policy_id=%s no_version", request_id, policy_id)
+        raise HTTPException(status_code=404, detail="No policy version found. Normalize a document first.")
+    version_id = version["id"]
+    try:
+        updated = _hr_publish_policy_version(policy_id, version_id, user, request_id=request_id)
+        return {"version": updated}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning("request_id=%s publish_version_latest failed policy_id=%s exc=%s", request_id, policy_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Publish failed")
+
+
+@app.patch("/api/company-policies/{policy_id}/versions/{version_id}/status")
+def patch_policy_version_status(
+    policy_id: str,
+    version_id: str,
+    req: Request,
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Update policy version status: draft, review_required, reviewed, published."""
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    version = db.get_policy_version(version_id)
+    if not version:
+        log.warning("request_id=%s patch_version_status policy_id=%s version_id=%s version_not_found", request_id, policy_id, version_id)
+        raise HTTPException(status_code=404, detail="Version not found")
+    if version.get("policy_id") != policy_id:
+        log.warning("request_id=%s patch_version_status policy_id=%s version_id=%s version_policy_mismatch version_policy=%s", request_id, policy_id, version_id, version.get("policy_id"))
+        raise HTTPException(status_code=404, detail="Version not found")
+    status = body.get("status")
+    if status not in ("draft", "review_required", "reviewed", "published", "archived"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+    if status == "published":
+        from .services.policy_publish_gate import require_employee_publishable_policy_version
+
+        require_employee_publishable_policy_version(db, version_id)
+    try:
+        db.update_policy_version_status(version_id, status)
+        updated = db.get_policy_version(version_id)
+        return {"version": updated}
+    except Exception as exc:
+        log.warning("request_id=%s patch_version_status failed policy_id=%s version_id=%s exc=%s", request_id, policy_id, version_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Status update failed")
+
+
+@app.post("/api/company-policies/{policy_id}/versions/{version_id}/publish")
+def publish_policy_version(
+    policy_id: str,
+    version_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Publish this version and archive any previously published version. Employees see only published."""
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    version = db.get_policy_version(version_id)
+    if not version:
+        log.warning("request_id=%s publish_version policy_id=%s version_id=%s version_not_found", request_id, policy_id, version_id)
+        raise HTTPException(status_code=404, detail="Version not found")
+    if version.get("policy_id") != policy_id:
+        log.warning("request_id=%s publish_version policy_id=%s version_id=%s version_policy_mismatch", request_id, policy_id, version_id)
+        raise HTTPException(status_code=404, detail="Version not found")
+    try:
+        updated = _hr_publish_policy_version(policy_id, version_id, user, request_id=request_id)
+        return {"version": updated}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning("request_id=%s publish_version failed policy_id=%s version_id=%s exc=%s", request_id, policy_id, version_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Publish failed")
+
+
+@app.get("/api/company-policies/{policy_id}/diff")
+def get_canonical_policy_diff(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Draft vs Live diff for a canonical document-normalized policy
+    — parallel of /api/hr/policy-config/diff (the matrix diff from PR #4)
+    but covering company_policies → policy_versions + benefit_rules +
+    policy_exclusions.
+
+    Response shape mirrors the matrix diff: {live, draft, diff:
+    {rules, exclusions, summary}}. Never raises for "no policy" —
+    returns empty summary counts and version=null instead so the UI
+    can render the clean-state message.
+    """
+    from .services.policy_canonical_diff import compute_canonical_diff
+
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    return compute_canonical_diff(db, policy_id)
+
+
+@app.get("/api/hr/canonical-policy/diff")
+def hr_get_canonical_policy_diff_for_company(
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Convenience wrapper: the frontend top-level HR Policy page knows
+    the company_id but not the canonical policy_id. This endpoint
+    resolves the primary company_policy for the HR user's company
+    (or the admin-specified companyId) and returns its diff.
+
+    Returns {has_policy: false, ...} when no canonical policy exists
+    for the company so the frontend can render a neutral "no canonical
+    policy yet" state instead of a 404.
+    """
+    from .services.policy_canonical_diff import (
+        compute_canonical_diff,
+        resolve_primary_policy_id_for_company,
+    )
+
+    cid = _policy_matrix_company_hr(user, companyId)
+    pid = resolve_primary_policy_id_for_company(db, cid)
+    if not pid:
+        return {
+            "has_policy": False,
+            "company_id": cid,
+            "policy_id": None,
+            "live": {"version": None, "rules": [], "exclusions": []},
+            "draft": {"version": None, "rules": [], "exclusions": []},
+            "diff": {
+                "rules": {"added": [], "removed": [], "changed": [], "unchanged_count": 0},
+                "exclusions": {"added": [], "removed": [], "changed": [], "unchanged_count": 0},
+                "summary": {
+                    "rules": {"added": 0, "removed": 0, "changed": 0, "unchanged": 0},
+                    "exclusions": {"added": 0, "removed": 0, "changed": 0, "unchanged": 0},
+                },
+            },
+        }
+    out = compute_canonical_diff(db, pid)
+    out["has_policy"] = True
+    out["company_id"] = cid
+    out["policy_id"] = pid
+    return out
+
+
+@app.post("/api/company-policies/{policy_id}/versions/{version_id}/unpublish")
+def unpublish_policy_version(
+    policy_id: str,
+    version_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Archive a currently-published policy version. After unpublish the
+    company has no live canonical policy (the matrix may still be live if
+    published separately). HR can then:
+      - delete the source document the version was built from, or
+      - import a new document / generate a template-based draft, review,
+        and publish a replacement.
+
+    Employees stop seeing this version's benefits as soon as the archive
+    transaction commits; the matrix bridge path keeps working for any
+    matrix that's published separately.
+
+    Audit: no rows are destroyed — status flips draft→archived and the
+    row stays queryable for history.
+    """
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    version = db.get_policy_version(version_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+    if version.get("policy_id") != policy_id:
+        raise HTTPException(status_code=404, detail="Version not found")
+    status = str(version.get("status") or "").lower()
+    if status != "published":
+        # Idempotent: return current status so the frontend can reconcile.
+        return {"version": version, "already": status}
+    try:
+        db.update_policy_version_status(version_id, "archived")
+        updated = db.get_policy_version(version_id)
+        log.info(
+            "request_id=%s unpublish_policy_version policy_id=%s version_id=%s user_id=%s",
+            request_id,
+            policy_id,
+            version_id,
+            user.get("id"),
+        )
+        return {"version": updated, "already": None}
+    except Exception as exc:
+        log.warning(
+            "request_id=%s unpublish_policy_version failed policy_id=%s version_id=%s exc=%s",
+            request_id,
+            policy_id,
+            version_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Unpublish failed")
+
+
+@app.patch("/api/company-policies/{policy_id}/exclusions/{excl_id}")
+def patch_exclusion(
+    policy_id: str,
+    excl_id: str,
+    req: Request,
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """HR override: update exclusion."""
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    with db.engine.connect() as conn:
+        row = conn.execute(text("SELECT * FROM policy_exclusions WHERE id = :id"), {"id": excl_id}).fetchone()
+    excl = db._row_to_dict(row) if row else None
+    if not excl:
+        raise HTTPException(status_code=404, detail="Exclusion not found")
+    version = db.get_policy_version(excl["policy_version_id"])
+    if not version or version.get("policy_id") != policy_id:
+        raise HTTPException(status_code=404, detail="Exclusion not found")
+    db.update_policy_exclusion(excl_id, description=body.get("description"), review_status=body.get("review_status"))
+    with db.engine.connect() as conn:
+        row = conn.execute(text("SELECT * FROM policy_exclusions WHERE id = :id"), {"id": excl_id}).fetchone()
+    return {"exclusion": db._row_to_dict(row)}
+
+
+@app.patch("/api/company-policies/{policy_id}/conditions/{cond_id}")
+def patch_condition(
+    policy_id: str,
+    cond_id: str,
+    req: Request,
+    body: Dict[str, Any] = Body(...),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """HR override: update condition."""
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    with db.engine.connect() as conn:
+        row = conn.execute(text("SELECT * FROM policy_rule_conditions WHERE id = :id"), {"id": cond_id}).fetchone()
+    cond = db._row_to_dict(row) if row else None
+    if not cond:
+        raise HTTPException(status_code=404, detail="Condition not found")
+    version = db.get_policy_version(cond["policy_version_id"])
+    if not version or version.get("policy_id") != policy_id:
+        raise HTTPException(status_code=404, detail="Condition not found")
+    db.update_policy_rule_condition(cond_id, condition_value_json=body.get("condition_value_json"), review_status=body.get("review_status"))
+    with db.engine.connect() as conn:
+        row = conn.execute(text("SELECT * FROM policy_rule_conditions WHERE id = :id"), {"id": cond_id}).fetchone()
+    d = db._row_to_dict(row)
+    if d and d.get("condition_value_json") and isinstance(d["condition_value_json"], str):
+        try:
+            d["condition_value_json"] = json.loads(d["condition_value_json"])
+        except Exception:
+            pass
+    return {"condition": d}
+
+
+@app.get("/api/company-policies/latest")
+def get_latest_company_policy(
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    profile = _require_company_for_user(user)
+    policy = db.get_latest_company_policy(profile["company_id"])
+    if not policy:
+        return {"policy": None, "benefits": [], "company_name": None}
+    benefits = db.list_policy_benefits(policy["id"])
+    company = db.get_company(profile["company_id"])
+    company_name = company.get("name") if company else None
+    return {"policy": policy, "benefits": benefits, "company_name": company_name}
+
+
+@app.get("/api/company-policies/{policy_id}")
+def get_company_policy(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    benefits = db.list_policy_benefits(policy_id)
+    return {"policy": policy, "benefits": benefits}
+
+
+def _download_url_error_response(
+    error_code: str,
+    message: str,
+    status: int = 500,
+    request_id: Optional[str] = None,
+) -> JSONResponse:
+    """Return structured JSON error for download-url."""
+    content: Dict[str, Any] = {"ok": False, "error_code": error_code, "message": message}
+    if request_id:
+        content["request_id"] = request_id
+    return JSONResponse(status_code=status, content=content)
+
+
+def _map_download_storage_exception(exc: Exception) -> tuple[str, str]:
+    """Map storage exception to (error_code, user_safe_message) for download-url."""
+    msg = str(exc).lower()
+    status = None
+    if hasattr(exc, "args") and exc.args and isinstance(exc.args[0], dict):
+        d = exc.args[0]
+        if isinstance(d.get("statusCode"), int):
+            status = d["statusCode"]
+    if status == 404 or "not found" in msg or "does not exist" in msg or "object not found" in msg:
+        return (POLICY_FILE_MISSING, "Policy file not found in storage.")
+    if status == 400 or "bad request" in msg or "invalid" in msg and "path" in msg:
+        return (POLICY_FILE_PATH_INVALID, "Invalid policy file path.")
+    if "sign" in msg or "signed" in msg:
+        return (POLICY_FILE_SIGN_FAILED, "Failed to create signed download URL.")
+    return (POLICY_STORAGE_UNEXPECTED_ERROR, "Policy download failed. Please try again.")
+
+
+@app.get("/api/company-policies/{policy_id}/download-url")
+def get_company_policy_download_url(
+    policy_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    request_id = getattr(req.state, "request_id", None)
+    profile = _require_company_for_user(user)
+    company_id = profile.get("company_id", "")
+
+    policy = db.get_company_policy(policy_id)
+    if not policy or policy.get("company_id") != company_id:
+        log.warning(
+            "request_id=%s download-url policy_id=%s company_id=%s policy_not_found",
+            request_id, policy_id, company_id[:8] + "…" if company_id and len(company_id) > 8 else company_id,
+        )
+        return _download_url_error_response(
+            POLICY_POLICY_NOT_FOUND,
+            "Policy not found.",
+            404,
+            request_id=request_id,
+        )
+
+    raw_file_url = policy.get("file_url") or ""
+    raw_storage_path = policy.get("storage_path") or ""
+    object_key = resolve_policy_storage_object_key(raw_file_url or raw_storage_path)
+
+    # Fallback: if company_policies has no file, use source policy_document from latest policy_version
+    if not object_key:
+        versions = db.list_policy_versions(policy_id)
+        for ver in versions:
+            source_doc_id = ver.get("source_policy_document_id")
+            if not source_doc_id:
+                continue
+            doc = db.get_policy_document(source_doc_id)
+            if not doc:
+                continue
+            doc_storage = (doc.get("storage_path") or "").strip()
+            if doc_storage:
+                object_key = resolve_policy_storage_object_key(doc_storage)
+                if object_key:
+                    log.info(
+                        "request_id=%s download-url policy_id=%s fallback source_doc=%s object_key=%s",
+                        request_id, policy_id, source_doc_id[:8] + "…", object_key[:60] + "…" if len(object_key) > 60 else object_key,
+                    )
+                    break
+
+    log.info(
+        "request_id=%s download-url policy_id=%s company_id=%s raw_file_url=%s raw_storage_path=%s object_key=%s bucket=%s",
+        request_id,
+        policy_id,
+        company_id[:8] + "…" if company_id and len(company_id) > 8 else company_id,
+        (raw_file_url[:80] + "…" if raw_file_url and len(raw_file_url) > 80 else raw_file_url) or "(empty)",
+        (raw_storage_path[:80] + "…" if raw_storage_path and len(raw_storage_path) > 80 else raw_storage_path) or "(empty)",
+        (object_key[:80] + "…" if object_key and len(object_key) > 80 else object_key) or "(empty)",
+        BUCKET_HR_POLICIES,
+    )
+
+    if not object_key:
+        # No downloadable file: return 200 with ok false so UI shows muted message, not 404/500
+        return JSONResponse(
+            status_code=200,
+            content={
+                "ok": False,
+                "reason": "No downloadable file available for this policy version.",
+            },
+        )
+
+    try:
+        supabase = _get_supabase_admin_client()
+        signed = supabase.storage.from_(BUCKET_HR_POLICIES).create_signed_url(object_key, 3600)
+        url = signed.get("signedURL") or signed.get("signed_url") or ""
+        if not url:
+            return JSONResponse(
+                status_code=200,
+                content={"ok": False, "reason": "No downloadable file available for this policy version."},
+            )
+        return JSONResponse(status_code=200, content={"ok": True, "url": url})
+    except Exception as exc:
+        exc_type = type(exc).__name__
+        exc_msg = str(exc)[:300] if str(exc) else "(no message)"
+        log.warning(
+            "request_id=%s download-url policy_id=%s exc_type=%s exc_msg=%s",
+            request_id, policy_id, exc_type, exc_msg,
+        )
+        return JSONResponse(
+            status_code=200,
+            content={"ok": False, "reason": "No downloadable file available for this policy version."},
+        )
+
+
+@app.post("/api/company-policies/upload")
+async def upload_company_policy(
+    req: Request,
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    version: Optional[str] = Form(None),
+    effective_date: Optional[str] = Form(None),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    request_id = getattr(req.state, "request_id", None) if req else None
+    profile = _require_company_for_user(user)
+    filename = file.filename or "policy"
+    ext = filename.split(".")[-1].lower()
+    if ext not in ("docx", "pdf"):
+        raise HTTPException(status_code=400, detail="Only .docx or .pdf supported")
+    policy_id = str(uuid.uuid4())
+    path = f"companies/{profile['company_id']}/policies/{policy_id}/{filename}"
+    content = await file.read()
+    try:
+        supabase = _get_supabase_admin_client()
+        supabase.storage.from_(BUCKET_HR_POLICIES).upload(
+            path,
+            content,
+            {
+                "content-type": file.content_type or "application/octet-stream",
+                "upsert": "true",
+            },
+        )
+    except Exception as exc:
+        log.error("request_id=%s company_policy_upload storage failed: %s", request_id or "?", exc, exc_info=True)
+        detail = _sanitize_storage_error(exc, BUCKET_HR_POLICIES)
+        raise HTTPException(status_code=500, detail=detail)
+    db.create_company_policy(
+        policy_id=policy_id,
+        company_id=profile["company_id"],
+        title=title,
+        version=version,
+        effective_date=effective_date,
+        file_url=path,
+        file_type=ext,
+        created_by=user.get("id"),
+    )
+    policy = db.get_company_policy(policy_id)
+    return {"policy": policy}
+
+
+@app.put("/api/company-policies/{policy_id}/benefits")
+def update_company_policy_benefits(
+    policy_id: str,
+    payload: PolicyBenefitsUpsert,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    db.replace_policy_benefits(
+        policy_id,
+        [b.model_dump(mode="json") for b in payload.benefits],
+        updated_by=user.get("id"),
+    )
+    benefits = db.list_policy_benefits(policy_id)
+    return {"policy": policy, "benefits": benefits}
+
+
+@app.post("/api/policies/{policy_id}/extract")
+def extract_company_policy(
+    policy_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    file_path = policy.get("file_url") or ""
+    object_key = normalize_policy_storage_object_key(file_path)
+    log.info("request_id=%s extract bucket=%s object_key=%s", request_id, BUCKET_HR_POLICIES, object_key)
+    try:
+        supabase = _get_supabase_admin_client()
+        data = supabase.storage.from_(BUCKET_HR_POLICIES).download(object_key)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, BUCKET_HR_POLICIES))
+    try:
+        extraction = extract_policy_from_bytes(data, policy.get("file_type") or "docx")
+        meta = extraction.get("policy_meta", {})
+        db.update_company_policy_meta(
+            policy_id,
+            title=meta.get("title") if not policy.get("title") else None,
+            version=meta.get("version") if not policy.get("version") else None,
+            effective_date=meta.get("effective_date") if not policy.get("effective_date") else None,
+        )
+        db.replace_policy_benefits(policy_id, extraction.get("benefits", []), updated_by=user.get("id"))
+        db.update_company_policy_status(policy_id, "extracted", extracted_at=extraction.get("extracted_at"))
+    except Exception as exc:
+        db.update_company_policy_status(policy_id, "failed", extracted_at=None)
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {str(exc)}")
+    policy = db.get_company_policy(policy_id)
+    benefits = db.list_policy_benefits(policy_id)
+    return {"policy": policy, "benefits": benefits}
+
+
+@app.get("/api/hr/policies/{policy_id}")
+def get_hr_policy_by_id(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    policy = db.get_hr_policy(policy_id)
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    return policy
+
+
+@app.put("/api/hr/policies/{policy_id}")
+def update_hr_policy(
+    policy_id: str,
+    body: Dict[str, Any],
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    existing = db.get_hr_policy(policy_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    body["policyId"] = policy_id
+    version = existing.get("version", 1)
+    if body.get("status") == "published" and existing.get("_meta", {}).get("status") != "published":
+        version = version + 1
+    body["version"] = body.get("version", version)
+    db.update_hr_policy(policy_id, body)
+    return {"policyId": policy_id, "policy": body}
+
+
+@app.delete("/api/hr/policies/{policy_id}")
+def delete_hr_policy(
+    policy_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    ok = db.delete_hr_policy(policy_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Policy not found")
     return {"success": True}
+
+
+# Employee: get applicable policy and wizard criteria for auto-fill
+@app.get("/api/employee/policy/applicable")
+def get_applicable_employee_policy(
+    assignmentId: Optional[str] = Query(None, alias="assignmentId"),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Return applicable HR policy for the employee's assignment, plus wizard criteria for auto-fill."""
+    from .app.services.hr_policy_resolver import resolve_applicable_benefits, policy_to_wizard_criteria
+
+    assignment = None
+    profile = None
+    if assignmentId:
+        assignment = db.get_assignment_by_id(assignmentId)
+        if assignment and assignment.get("employee_user_id") == user.get("id"):
+            profile = db.get_employee_profile(assignmentId)
+    if not assignment:
+        res = db.get_assignment_for_employee(user.get("id", ""))
+        if res:
+            assignment = res
+            assignmentId = res["id"]
+            profile = db.get_employee_profile(res["id"])
+
+    if not assignment:
+        return {"policy": None, "allowedBenefits": [], "wizardCriteria": {}, "message": "No assignment"}
+
+    profile = profile or {}
+    mp = profile.get("movePlan") or {}
+    dest = mp.get("destination", "Singapore")
+    country_code = None
+    if isinstance(dest, str) and "," in dest:
+        parts = dest.split(",")
+        if len(parts) >= 2:
+            country_code = parts[-1].strip()[:2].upper() if parts[-1].strip() else "SG"
+    if not country_code and "Singapore" in str(dest):
+        country_code = "SG"
+    employee_band = profile.get("primaryApplicant", {}).get("employer", {}).get("jobLevel") or "Band2"
+    if "L" in str(employee_band) and "Band" not in str(employee_band):
+        employee_band = f"Band{employee_band.replace('L', '')}" if employee_band.replace("L", "").isdigit() else "Band2"
+    assignment_type = "Long-Term"
+    policy = db.get_published_hr_policy_for_employee(
+        employee_band=employee_band,
+        assignment_type=assignment_type,
+        country_code=country_code,
+    )
+    if not policy:
+        return {"policy": None, "allowedBenefits": [], "wizardCriteria": {}, "message": "No matching published policy"}
+
+    allowed = resolve_applicable_benefits(policy, employee_band, assignment_type, country_code)
+    wizard_criteria = policy_to_wizard_criteria(policy, employee_band, assignment_type, country_code, profile)
+    return {
+        "policy": {
+            "policyId": policy.get("policyId"),
+            "policyName": policy.get("policyName"),
+            "effectiveDate": policy.get("effectiveDate"),
+            "employeeBands": policy.get("employeeBands"),
+            "assignmentTypes": policy.get("assignmentTypes"),
+        },
+        "allowedBenefits": allowed,
+        "wizardCriteria": wizard_criteria,
+        "employeeBand": employee_band,
+        "assignmentType": assignment_type,
+    }
 
 
 @app.get("/api/hr/policy")
@@ -802,6 +11724,8 @@ def create_policy_exception(
     request: PolicyExceptionRequest,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
     assignment = db.get_assignment_by_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -815,7 +11739,7 @@ def create_policy_exception(
         "PENDING",
         request.reason,
         request.amount,
-        user["id"],
+        effective["id"],
     )
     return {"success": True, "exceptionId": exception_id}
 
@@ -842,6 +11766,7 @@ def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_rol
 
 @app.post("/api/hr/cases/{case_id}/compliance/run")
 def run_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    _deny_if_impersonating(user)
     assignment = db.get_assignment_by_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -863,6 +11788,7 @@ def record_compliance_action(
     request: ComplianceActionRequest,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
+    _deny_if_impersonating(user)
     assignment = db.get_assignment_by_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -877,6 +11803,100 @@ def record_compliance_action(
         user["id"],
     )
     return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# HR Command Center (Portfolio & Risk Dashboard)
+# ---------------------------------------------------------------------------
+class CommandCenterKPIs(BaseModel):
+    activeCases: int
+    atRiskCount: int
+    attentionNeededCount: int
+    overdueTasksCount: int
+    avgVisaDurationDays: Optional[float] = None
+    budgetOverrunsCount: int
+    actionRequiredCount: int
+    departingSoonCount: int
+    completedCount: int
+
+
+class CommandCenterCaseRow(BaseModel):
+    id: str
+    employeeIdentifier: str
+    destCountry: Optional[str] = None
+    status: str
+    riskStatus: str
+    tasksDonePercent: int
+    budgetLimit: Optional[float] = None
+    budgetEstimated: Optional[float] = None
+    nextDeadline: Optional[str] = None
+
+
+class CommandCenterCaseDetail(BaseModel):
+    id: str
+    employeeIdentifier: str
+    destCountry: Optional[str] = None
+    status: str
+    riskStatus: str
+    budgetLimit: Optional[float] = None
+    budgetEstimated: Optional[float] = None
+    expectedStartDate: Optional[str] = None
+    tasksTotal: int
+    tasksDone: int
+    tasksOverdue: int
+    phases: List[Dict[str, Any]] = []
+    events: List[Dict[str, Any]] = []
+
+
+def _effective_hr_user(user: Dict[str, Any]) -> Optional[str]:
+    if user.get("is_admin") and not user.get("impersonation"):
+        return None
+    return user.get("id")
+
+
+def _command_center_scope(user: Dict[str, Any]) -> tuple:
+    """Return (company_id, hr_user_id) for command center queries. Prefer company scope."""
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    hr_user_id = _effective_hr_user(user)
+    if company_id:
+        return (company_id, None)
+    return (None, hr_user_id)
+
+
+@app.get("/api/hr/command-center/kpis", response_model=CommandCenterKPIs)
+def get_command_center_kpis(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    company_id, hr_user_id = _command_center_scope(user)
+    kpis = db.get_command_center_kpis(company_id=company_id, hr_user_id=hr_user_id)
+    return CommandCenterKPIs(**kpis)
+
+
+@app.get("/api/hr/command-center/cases", response_model=List[CommandCenterCaseRow])
+def list_command_center_cases(
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=100),
+    risk_filter: Optional[str] = Query(None, pattern="^(green|yellow|red)$"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    company_id, hr_user_id = _command_center_scope(user)
+    rows = db.list_command_center_cases(
+        company_id=company_id, hr_user_id=hr_user_id, page=page, limit=limit, risk_filter=risk_filter
+    )
+    return [CommandCenterCaseRow(**r) for r in rows]
+
+
+@app.get("/api/hr/command-center/cases/{assignment_id}", response_model=CommandCenterCaseDetail)
+def get_command_center_case_detail(
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    company_id, hr_user_id = _command_center_scope(user)
+    detail = db.get_command_center_case_detail(
+        assignment_id=assignment_id, company_id=company_id, hr_user_id=hr_user_id
+    )
+    if not detail:
+        raise HTTPException(status_code=404, detail="Case not found or not visible")
+    return CommandCenterCaseDetail(**detail)
 
 
 def _build_next_actions(profile: Dict[str, Any], completion_state: Dict[str, Any]) -> List[str]:
@@ -916,10 +11936,20 @@ def _build_employee_journey_payload(
     assignment: Dict[str, Any],
 ) -> EmployeeJourneyNextQuestion:
     assignment_id = assignment["id"]
+    normalized_status = normalize_status(assignment.get("status"))
     profile = db.get_employee_profile(assignment_id)
     if not profile:
         profile = RelocationProfile(userId=assignment_id).model_dump()
         db.save_employee_profile(assignment_id, profile)
+    else:
+        # Coerce empty strings to None to avoid date/enum parsing errors.
+        profile = _normalize_profile_values(profile)
+        # Normalize profile fields before validation (legacy wizard can store Title Case).
+        marital = profile.get("maritalStatus")
+        if isinstance(marital, str):
+            normalized = marital.strip().lower()
+            allowed = {"married", "single", "divorced", "widowed"}
+            profile["maritalStatus"] = normalized if normalized in allowed else marital
     answers = db.get_employee_answers(assignment_id)
     answered_question_ids = set(ans["question_id"] for ans in answers)
 
@@ -937,13 +11967,20 @@ def _build_employee_journey_payload(
 
     response = orchestrator.get_next_question(profile, answered_question_ids)
 
-    if normalize_status(assignment["status"]) in [
-        AssignmentStatus.EMPLOYEE_SUBMITTED.value,
-        AssignmentStatus.HR_REVIEW.value,
-        AssignmentStatus.HR_APPROVED.value,
+    if normalized_status in [
+        AssignmentStatus.SUBMITTED.value,
+        AssignmentStatus.APPROVED.value,
+        AssignmentStatus.REJECTED.value,
+        AssignmentStatus.CLOSED.value,
     ]:
         response.question = None
         response.isComplete = True
+
+    try:
+        parsed_profile = RelocationProfile(**profile)
+    except Exception as exc:  # pragma: no cover - defensive
+        log.warning("Invalid employee profile for assignment %s: %s", assignment_id, exc)
+        parsed_profile = RelocationProfile(userId=assignment_id)
 
     return EmployeeJourneyNextQuestion(
         question=response.question,
@@ -953,8 +11990,19 @@ def _build_employee_journey_payload(
         missingItems=missing_items,
         assignmentStatus=AssignmentStatus(normalize_status(assignment["status"])),
         hrNotes=assignment.get("hr_notes"),
-        profile=RelocationProfile(**profile),
+        profile=parsed_profile,
     )
+
+
+def _normalize_profile_values(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _normalize_profile_values(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_normalize_profile_values(v) for v in value]
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped if stripped else None
+    return value
 
 
 def _build_timeline(profile: Dict[str, Any], completion_state: Dict[str, Any]) -> List[TimelinePhase]:
@@ -1055,6 +12103,744 @@ def _determine_overall_status(completion_state: Dict[str, Any]) -> OverallStatus
         return OverallStatus.ON_TRACK
     else:
         return OverallStatus.AT_RISK
+
+
+# ---------------------------------------------------------------------------
+# Compensation & Allowance — structured policy matrix (routers)
+#
+# Company scope:
+# - HR routes: companyId query is ignored unless the user is admin (is_admin); HR always uses
+#   their own company from profile / hr_users (_resolve_company_for_policy).
+# - Admin routes: companyId is required and selects the tenant.
+# - Employee route: company comes from the employee profile; assignmentId/caseId only tighten context.
+# ---------------------------------------------------------------------------
+def _policy_matrix_validation_http(exc: ValueError) -> HTTPException:
+    try:
+        payload = json.loads(str(exc))
+        return HTTPException(status_code=422, detail=payload)
+    except Exception:
+        return HTTPException(
+            status_code=422,
+            detail={"code": "validation_error", "errors": [{"message": str(exc)}]},
+        )
+
+
+def _policy_matrix_company_hr(user: Dict[str, Any], company_id: Optional[str]) -> str:
+    return _resolve_company_for_policy(user, company_id)
+
+
+def _policy_matrix_resolve_company_caps(
+    user: Dict[str, Any],
+    company_id: Optional[str],
+    assignment_id: Optional[str],
+    case_id: Optional[str],
+) -> str:
+    if user.get("is_admin"):
+        if company_id and str(company_id).strip():
+            return str(company_id).strip()
+        if assignment_id:
+            c = db.get_company_id_for_assignment_id(str(assignment_id))
+            if c:
+                return c
+        if case_id:
+            a = db.get_assignment_by_case_id(str(case_id))
+            if a:
+                c = db.get_company_id_for_assignment_id(str(a.get("id")))
+                if c:
+                    return c
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "missing_scope", "message": "Provide company_id, assignment_id, or case_id"},
+        )
+    role = (user.get("role") or "").upper()
+    if role == UserRole.HR.value:
+        cid = _get_hr_company_id(user)
+        if not cid:
+            raise HTTPException(status_code=400, detail="HR user missing company")
+        if assignment_id and not db.assignment_belongs_to_company(str(assignment_id), cid):
+            raise HTTPException(status_code=403, detail="Assignment not in your company")
+        if case_id:
+            a = db.get_assignment_by_case_id(str(case_id))
+            if not a or not db.assignment_belongs_to_company(str(a.get("id")), cid):
+                raise HTTPException(status_code=403, detail="Case not in your company")
+        return cid
+    if role == UserRole.EMPLOYEE.value:
+        prof = db.get_profile_record(user.get("id")) or {}
+        cid = prof.get("company_id")
+        if not cid:
+            raise HTTPException(status_code=400, detail="Employee missing company")
+        if assignment_id:
+            a = db.get_assignment_by_id(str(assignment_id))
+            if not a:
+                raise HTTPException(status_code=404, detail="Assignment not found")
+            if a.get("employee_user_id") != user.get("id"):
+                raise HTTPException(status_code=403, detail="Assignment not assigned to user")
+            c = db.get_company_id_for_assignment_id(str(assignment_id))
+            if c and c != cid:
+                raise HTTPException(status_code=403, detail="Assignment company mismatch")
+        if case_id:
+            a = db.get_assignment_by_case_id(str(case_id))
+            if not a:
+                raise HTTPException(status_code=404, detail="Case not found")
+            if a.get("employee_user_id") != user.get("id"):
+                raise HTTPException(status_code=403, detail="Not authorized for this case")
+            c = db.get_company_id_for_assignment_id(str(a.get("id")))
+            if c and c != cid:
+                raise HTTPException(status_code=403, detail="Case company mismatch")
+        return str(cid)
+    raise HTTPException(status_code=403, detail="Not authorized for policy-config caps")
+
+
+hr_policy_config_router = APIRouter(prefix="/api/hr", tags=["compensation-policy-config"])
+admin_policy_config_router = APIRouter(prefix="/api/admin", tags=["admin-compensation-policy-config"])
+employee_policy_config_router = APIRouter(prefix="/api/employee", tags=["employee-compensation-policy-config"])
+public_policy_config_router = APIRouter(prefix="/api", tags=["policy-config-caps"])
+
+
+@hr_policy_config_router.get("/policy-config")
+def hr_get_policy_config(
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    assignmentType: Optional[str] = Query(None, alias="assignmentType"),
+    familyStatus: Optional[str] = Query(None, alias="familyStatus"),
+    employeeLevel: Optional[str] = Query(None, alias="employeeLevel"),
+    effectiveRowsOnly: bool = Query(False, alias="effectiveRowsOnly"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    cid = _policy_matrix_company_hr(user, companyId)
+    try:
+        at = validate_optional_query_assignment_type(assignmentType)
+        fs = validate_optional_query_family_status(familyStatus)
+        el = validate_optional_query_employee_level(employeeLevel)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return policy_config_matrix_svc.get_working_payload(
+        cid,
+        assignment_type=at,
+        family_status=fs,
+        employee_level=el,
+        effective_rows_only=effectiveRowsOnly,
+    )
+
+
+@hr_policy_config_router.post("/policy-config/draft")
+def hr_post_policy_config_draft(
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    cid = _policy_matrix_company_hr(user, companyId)
+    return policy_config_matrix_svc.ensure_draft(cid, created_by=user.get("id"))
+
+
+@hr_policy_config_router.put("/policy-config/draft")
+def hr_put_policy_config_draft(
+    body: Dict[str, Any] = Body(...),
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    cid = _policy_matrix_company_hr(user, companyId)
+    try:
+        return policy_config_matrix_svc.put_draft(cid, body)
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError:
+        raise HTTPException(status_code=404, detail={"code": "draft_not_found", "message": "Draft not found"})
+    except PermissionError:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "not_draft", "message": "Only draft versions can be overwritten"},
+        )
+
+
+@hr_policy_config_router.post("/policy-config/publish")
+def hr_post_policy_config_publish(
+    body: Optional[Dict[str, Any]] = Body(default=None),
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    cid = _policy_matrix_company_hr(user, companyId)
+    payload = body or {}
+    try:
+        return policy_config_matrix_svc.publish_draft(
+            cid,
+            policy_version_id=payload.get("policy_version"),
+            created_by=user.get("id"),
+        )
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        if code == "no_draft":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "no_draft", "message": "No draft exists to publish"},
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Draft not found"})
+    except PermissionError:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "draft_mismatch", "message": "policy_version does not match current draft"},
+        )
+
+
+@hr_policy_config_router.get("/policy-config/templates")
+def hr_get_policy_config_templates(
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    List the admin-curated starter templates available to HR for the
+    "Start from a template" card. Returns lightweight metadata only;
+    the full row expansion happens server-side when HR applies one.
+    """
+    from .services.policy_config_templates import list_templates
+
+    _ = user  # auth already enforced by require_role
+    return {"templates": list_templates()}
+
+
+@hr_policy_config_router.post("/policy-config/draft/apply-template")
+def hr_post_policy_config_apply_template(
+    body: Dict[str, Any] = Body(...),
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Apply a starter template to the company's draft. Body:
+      { template_key: "conservative"|"standard"|"premium",
+        replace_existing_draft?: bool }
+
+    Returns the fresh working payload on success. Live published
+    version is NOT touched — employees continue seeing the current
+    policy until HR publishes the replacement.
+    """
+    cid = _policy_matrix_company_hr(user, companyId)
+    template_key = str(body.get("template_key") or "").strip().lower()
+    replace = bool(body.get("replace_existing_draft", False))
+    if not template_key:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "validation_error", "message": "template_key is required"},
+        )
+    try:
+        return policy_config_matrix_svc.apply_template_to_draft(
+            cid,
+            template_key=template_key,
+            replace_existing_draft=replace,
+            created_by=user.get("id"),
+        )
+    except KeyError as exc:
+        code = exc.args[0] if exc.args else ""
+        if isinstance(code, str) and code.startswith("unknown_template:"):
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "unknown_template", "message": "Unknown template"},
+            )
+        if code == "draft_has_rows":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "draft_has_rows",
+                    "message": (
+                        "A draft with existing rows is already in progress. "
+                        "Confirm to replace it with the template, or edit the "
+                        "current draft in the row drawer."
+                    ),
+                },
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
+
+
+@hr_policy_config_router.get("/policy-config/diff")
+def hr_get_policy_config_diff(
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Draft vs Live snapshot for the HR Policy "Draft vs Live" section.
+    See PolicyConfigMatrixService.compute_diff for the response shape.
+    """
+    cid = _policy_matrix_company_hr(user, companyId)
+    return policy_config_matrix_svc.compute_diff(cid)
+
+
+@hr_policy_config_router.post("/policy-config/draft/revert-row")
+def hr_post_policy_config_revert_row(
+    body: Dict[str, Any] = Body(...),
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Revert one benefit row of the current draft back to the live
+    version. Body: {benefit_key, targeting_signature}. Returns the
+    refreshed diff so the UI can re-render without a second request.
+    """
+    cid = _policy_matrix_company_hr(user, companyId)
+    try:
+        return policy_config_matrix_svc.revert_row_to_live(
+            cid,
+            benefit_key=str(body.get("benefit_key") or "").strip(),
+            targeting_signature=str(body.get("targeting_signature") or "global").strip(),
+        )
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        if code == "no_draft":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "no_draft", "message": "No draft exists to revert"},
+            )
+        if code == "row_not_found":
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "row_not_found", "message": "Benefit row not found in live or draft"},
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
+
+
+@hr_policy_config_router.get("/policy-config/history")
+def hr_get_policy_config_history(
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    cid = _policy_matrix_company_hr(user, companyId)
+    return {"versions": policy_config_matrix_svc.history(cid)}
+
+
+@hr_policy_config_router.get("/policy-config/versions/{version_id}")
+def hr_get_policy_config_version(
+    version_id: str,
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    cid = _policy_matrix_company_hr(user, companyId)
+    try:
+        return policy_config_matrix_svc.get_version_readonly_payload(cid, version_id)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Version not found"})
+    except PermissionError:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "version_not_readable", "message": "Only published or archived versions can be opened from history"},
+        )
+
+
+@hr_policy_config_router.get("/policy-config/published")
+def hr_get_policy_config_published(
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    assignmentType: Optional[str] = Query(None, alias="assignmentType"),
+    familyStatus: Optional[str] = Query(None, alias="familyStatus"),
+    employeeLevel: Optional[str] = Query(None, alias="employeeLevel"),
+    effectiveRowsOnly: bool = Query(False, alias="effectiveRowsOnly"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    cid = _policy_matrix_company_hr(user, companyId)
+    try:
+        at = validate_optional_query_assignment_type(assignmentType)
+        fs = validate_optional_query_family_status(familyStatus)
+        el = validate_optional_query_employee_level(employeeLevel)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return policy_config_matrix_svc.get_published_payload(
+        cid,
+        assignment_type=at,
+        family_status=fs,
+        employee_level=el,
+        effective_rows_only=effectiveRowsOnly,
+    )
+
+
+@admin_policy_config_router.get("/policy-config")
+def admin_get_policy_config(
+    company_id: str = Query(..., alias="companyId"),
+    assignmentType: Optional[str] = Query(None, alias="assignmentType"),
+    familyStatus: Optional[str] = Query(None, alias="familyStatus"),
+    employeeLevel: Optional[str] = Query(None, alias="employeeLevel"),
+    effectiveRowsOnly: bool = Query(False, alias="effectiveRowsOnly"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    try:
+        at = validate_optional_query_assignment_type(assignmentType)
+        fs = validate_optional_query_family_status(familyStatus)
+        el = validate_optional_query_employee_level(employeeLevel)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return policy_config_matrix_svc.get_working_payload(
+        company_id,
+        assignment_type=at,
+        family_status=fs,
+        employee_level=el,
+        effective_rows_only=effectiveRowsOnly,
+    )
+
+
+@admin_policy_config_router.post("/policy-config/draft")
+def admin_post_policy_config_draft(
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    return policy_config_matrix_svc.ensure_draft(company_id, created_by=user.get("id"))
+
+
+@admin_policy_config_router.put("/policy-config/draft")
+def admin_put_policy_config_draft(
+    body: Dict[str, Any] = Body(...),
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    try:
+        return policy_config_matrix_svc.put_draft(company_id, body)
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError:
+        raise HTTPException(status_code=404, detail={"code": "draft_not_found", "message": "Draft not found"})
+    except PermissionError:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "not_draft", "message": "Only draft versions can be overwritten"},
+        )
+
+
+@admin_policy_config_router.post("/policy-config/publish")
+def admin_post_policy_config_publish(
+    company_id: str = Query(..., alias="companyId"),
+    body: Optional[Dict[str, Any]] = Body(default=None),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    payload = body or {}
+    try:
+        return policy_config_matrix_svc.publish_draft(
+            company_id,
+            policy_version_id=payload.get("policy_version"),
+            created_by=user.get("id"),
+        )
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        if code == "no_draft":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "no_draft", "message": "No draft exists to publish"},
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Draft not found"})
+    except PermissionError:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "draft_mismatch", "message": "policy_version does not match current draft"},
+        )
+
+
+@admin_policy_config_router.get("/policy-config/published")
+def admin_get_policy_config_published(
+    company_id: str = Query(..., alias="companyId"),
+    assignmentType: Optional[str] = Query(None, alias="assignmentType"),
+    familyStatus: Optional[str] = Query(None, alias="familyStatus"),
+    employeeLevel: Optional[str] = Query(None, alias="employeeLevel"),
+    effectiveRowsOnly: bool = Query(False, alias="effectiveRowsOnly"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    try:
+        at = validate_optional_query_assignment_type(assignmentType)
+        fs = validate_optional_query_family_status(familyStatus)
+        el = validate_optional_query_employee_level(employeeLevel)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return policy_config_matrix_svc.get_published_payload(
+        company_id,
+        assignment_type=at,
+        family_status=fs,
+        employee_level=el,
+        effective_rows_only=effectiveRowsOnly,
+    )
+
+
+@admin_policy_config_router.get("/policy-config/versions/{version_id}")
+def admin_get_policy_config_version(
+    version_id: str,
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    try:
+        return policy_config_matrix_svc.get_version_readonly_payload(company_id, version_id)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Version not found"})
+    except PermissionError:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "version_not_readable", "message": "Only published or archived versions can be opened from history"},
+        )
+
+
+@admin_policy_config_router.get("/policy-config/history")
+def admin_get_policy_config_history(
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    return {"versions": policy_config_matrix_svc.history(company_id)}
+
+
+@admin_policy_config_router.get("/policy-config/templates")
+def admin_get_policy_config_templates(
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    from .services.policy_config_templates import list_templates
+
+    _ = user
+    return {"templates": list_templates()}
+
+
+@admin_policy_config_router.post("/policy-config/draft/apply-template")
+def admin_post_policy_config_apply_template(
+    body: Dict[str, Any] = Body(...),
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    template_key = str(body.get("template_key") or "").strip().lower()
+    replace = bool(body.get("replace_existing_draft", False))
+    if not template_key:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "validation_error", "message": "template_key is required"},
+        )
+    try:
+        return policy_config_matrix_svc.apply_template_to_draft(
+            company_id,
+            template_key=template_key,
+            replace_existing_draft=replace,
+            created_by=user.get("id"),
+        )
+    except KeyError as exc:
+        code = exc.args[0] if exc.args else ""
+        if isinstance(code, str) and code.startswith("unknown_template:"):
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "unknown_template", "message": "Unknown template"},
+            )
+        if code == "draft_has_rows":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "draft_has_rows",
+                    "message": (
+                        "A draft with existing rows is already in progress. "
+                        "Confirm to replace it with the template, or edit the "
+                        "current draft in the row drawer."
+                    ),
+                },
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
+
+
+@admin_policy_config_router.get("/policy-config/diff")
+def admin_get_policy_config_diff(
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    """Admin-scoped draft vs live snapshot. Mirrors the HR endpoint."""
+    return policy_config_matrix_svc.compute_diff(company_id)
+
+
+@admin_policy_config_router.post("/policy-config/draft/revert-row")
+def admin_post_policy_config_revert_row(
+    body: Dict[str, Any] = Body(...),
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    try:
+        return policy_config_matrix_svc.revert_row_to_live(
+            company_id,
+            benefit_key=str(body.get("benefit_key") or "").strip(),
+            targeting_signature=str(body.get("targeting_signature") or "global").strip(),
+        )
+    except ValueError as e:
+        raise _policy_matrix_validation_http(e)
+    except KeyError as e:
+        code = e.args[0] if e.args else ""
+        if code == "no_draft":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "no_draft", "message": "No draft exists to revert"},
+            )
+        if code == "row_not_found":
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "row_not_found", "message": "Benefit row not found in live or draft"},
+            )
+        raise HTTPException(status_code=404, detail={"code": str(code), "message": "Not found"})
+
+
+@employee_policy_config_router.get("/policy-config")
+def employee_get_policy_config(
+    assignment_id: Optional[str] = Query(None, alias="assignmentId"),
+    case_id: Optional[str] = Query(None, alias="caseId"),
+    assignment_type: Optional[str] = Query(None, alias="assignmentType"),
+    family_status: Optional[str] = Query(None, alias="familyStatus"),
+    # Section C: explicit overrides for the destination country and the
+    # employee's level. Both default to None; when None, the resolver
+    # treats them as missing context and Section C overrides do not
+    # collapse onto the base row (overrides still surface alongside it).
+    country: Optional[str] = Query(None, alias="country"),
+    employee_level: Optional[str] = Query(None, alias="employeeLevel"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    prof = db.get_profile_record(effective.get("id")) or {}
+    cid = prof.get("company_id")
+    if not cid:
+        raise HTTPException(status_code=400, detail="Employee missing company")
+    atype, fstat = assignment_type, family_status
+    assign_for_ctx: Optional[Dict[str, Any]] = None
+    if assignment_id:
+        a = db.get_assignment_by_id(str(assignment_id))
+        if not a:
+            raise HTTPException(status_code=404, detail="Assignment not found")
+        if a.get("employee_user_id") != effective.get("id"):
+            raise HTTPException(status_code=403, detail="Assignment not assigned to user")
+        emp = db.get_employee_by_profile_for_company(effective.get("id"), cid)
+        if emp and emp.get("assignment_type") and not atype:
+            atype = emp.get("assignment_type")
+        coid = db.get_company_id_for_assignment_id(str(assignment_id))
+        if coid and coid != cid:
+            raise HTTPException(status_code=403, detail="Assignment company mismatch")
+        assign_for_ctx = a
+    elif case_id:
+        a = db.get_assignment_by_case_id(str(case_id))
+        if not a:
+            raise HTTPException(status_code=404, detail="Case not found")
+        if a.get("employee_user_id") != effective.get("id"):
+            raise HTTPException(status_code=403, detail="Not authorized for this case")
+        emp = db.get_employee_by_profile_for_company(effective.get("id"), cid)
+        if emp and emp.get("assignment_type") and not atype:
+            atype = emp.get("assignment_type")
+        coid = db.get_company_id_for_assignment_id(str(a.get("id")))
+        if coid and coid != cid:
+            raise HTTPException(status_code=403, detail="Case company mismatch")
+        assign_for_ctx = a
+    else:
+        fa = db.get_assignment_for_employee(effective.get("id"), request_id=None)
+        if fa:
+            coid = db.get_company_id_for_assignment_id(str(fa.get("id")))
+            if not coid or coid == cid:
+                assign_for_ctx = fa
+
+    # Resolve country + employee_level from case context when not passed
+    # in. Country lives on the relocation case (host_country); employee
+    # level is on the employee profile.
+    resolved_country = country
+    resolved_level = employee_level
+    if assign_for_ctx and (not atype or not fstat or not resolved_country or not resolved_level):
+        from .services.policy_resolution import extract_resolution_context
+
+        aid = str(assign_for_ctx.get("id") or "").strip()
+        case_id_inner = assign_for_ctx.get("case_id")
+        case_row = db.get_relocation_case(case_id_inner) if case_id_inner else None
+        prof_j = None
+        if case_row and case_row.get("profile_json"):
+            try:
+                raw_pj = case_row["profile_json"]
+                prof_j = json.loads(raw_pj) if isinstance(raw_pj, str) else raw_pj
+            except Exception:
+                prof_j = None
+        emp_pf = None
+        if aid:
+            try:
+                emp_pf = db.get_employee_profile(aid)
+            except Exception:
+                emp_pf = None
+        ctx = extract_resolution_context(assign_for_ctx, case_row, prof_j, emp_pf)
+        if not atype:
+            atype = ctx.get("assignment_type")
+        if not fstat:
+            fstat = ctx.get("family_status")
+        # Section C: pull country from host_country on the case, level
+        # from the employee profile band when not passed explicitly.
+        # readiness_service already has the country-name → ISO2 mapper
+        # (Germany → DE, Singapore → SG, etc.) — reuse it instead of
+        # duplicating the alias table.
+        if not resolved_country and case_row:
+            from .readiness_service import normalize_destination_key
+            host = case_row.get("host_country") or case_row.get("destination_country")
+            if host:
+                resolved_country = normalize_destination_key(str(host))
+        if not resolved_level and emp_pf:
+            band = emp_pf.get("employee_level") or emp_pf.get("band")
+            if band:
+                resolved_level = str(band).strip().lower()
+
+    return policy_config_matrix_svc.employee_grouped_payload(
+        cid,
+        assignment_type=atype,
+        family_status=fstat,
+        country=resolved_country,
+        employee_level=resolved_level,
+    )
+
+
+@public_policy_config_router.get("/policy-config/caps")
+def get_policy_config_caps(
+    company_id: Optional[str] = Query(None, alias="companyId"),
+    assignment_id: Optional[str] = Query(None, alias="assignmentId"),
+    case_id: Optional[str] = Query(None, alias="caseId"),
+    assignment_type: Optional[str] = Query(None, alias="assignmentType"),
+    family_status: Optional[str] = Query(None, alias="familyStatus"),
+    benefit_keys: Optional[List[str]] = Query(None, alias="benefitKeys"),
+    service_module: Optional[str] = Query(None, alias="serviceModule"),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    cid = _policy_matrix_resolve_company_caps(user, company_id, assignment_id, case_id)
+    keys = benefit_keys if benefit_keys else None
+    at = normalize_assignment_type(assignment_type)
+    fs = normalize_family_status(family_status)
+    return policy_config_matrix_svc.caps_payload(
+        cid,
+        assignment_type=at,
+        family_status=fs,
+        benefit_keys=keys,
+        service_module=service_module,
+    )
+
+
+@hr_policy_config_router.post("/policy-config/caps/compare")
+def hr_post_policy_caps_compare(
+    body: CapsCompareRequest,
+    companyId: Optional[str] = Query(None, alias="companyId"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    cid = _policy_matrix_company_hr(user, companyId)
+    at = normalize_assignment_type(body.assignment_type)
+    fs = normalize_family_status(body.family_status)
+    estimates = [e.model_dump() for e in body.estimates]
+    return policy_config_matrix_svc.compare_provider_estimates_to_published_caps(
+        cid,
+        assignment_type=at,
+        family_status=fs,
+        estimates=estimates,
+    )
+
+
+@admin_policy_config_router.post("/policy-config/caps/compare")
+def admin_post_policy_caps_compare(
+    body: CapsCompareRequest,
+    company_id: str = Query(..., alias="companyId"),
+    user: Dict[str, Any] = Depends(require_admin),
+):
+    at = normalize_assignment_type(body.assignment_type)
+    fs = normalize_family_status(body.family_status)
+    estimates = [e.model_dump() for e in body.estimates]
+    return policy_config_matrix_svc.compare_provider_estimates_to_published_caps(
+        company_id,
+        assignment_type=at,
+        family_status=fs,
+        estimates=estimates,
+    )
+
+
+app.include_router(hr_policy_config_router)
+app.include_router(admin_policy_config_router)
+app.include_router(employee_policy_config_router)
+app.include_router(public_policy_config_router)
 
 
 if __name__ == "__main__":

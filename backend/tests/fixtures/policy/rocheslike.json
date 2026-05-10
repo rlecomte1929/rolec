@@ -1,0 +1,90 @@
+{
+  "_comment": "RocheLike fixture — Swiss-HQ pharma profile inspired by published Roche mobility practices. CHF baseline, with permanent vs permanent-international slicing for assignee bands. NOT a real Roche policy; values are illustrative.",
+  "fixture_key": "rocheslike",
+  "company_name": "RocheLike Pharma (test)",
+  "categories": [
+    {
+      "category_key": "compensation_allowances",
+      "benefits": [
+        {
+          "benefit_key": "housing_allowance",
+          "benefit_label": "Housing allowance",
+          "covered": true,
+          "value_type": "currency",
+          "amount_value": 4200,
+          "currency_code": "CHF",
+          "unit_frequency": "monthly",
+          "jurisdiction_overrides": [
+            {
+              "jurisdiction_countries": ["CH"],
+              "employee_level": "manager",
+              "amount_value": 5500,
+              "currency_code": "CHF",
+              "reimbursement_md": "Basel and Zurich tenancies require 3 months' deposit assistance, refundable at end of assignment."
+            },
+            {
+              "jurisdiction_countries": ["US"],
+              "employee_level": "director",
+              "assignment_type": "permanent",
+              "amount_value": 7200,
+              "currency_code": "USD"
+            },
+            {
+              "jurisdiction_countries": ["GB"],
+              "amount_value": 3100,
+              "currency_code": "GBP"
+            },
+            {
+              "jurisdiction_countries": ["JP"],
+              "employee_level": "director",
+              "amount_value": 850000,
+              "currency_code": "JPY",
+              "reimbursement_md": "Tokyo housing covers tenancy fees (rei-kin, shiki-kin) up to 2 months' rent equivalent."
+            }
+          ]
+        },
+        {
+          "benefit_key": "spouse_assistance",
+          "benefit_label": "Spouse career assistance",
+          "covered": true,
+          "value_type": "currency",
+          "amount_value": 5000,
+          "currency_code": "CHF",
+          "unit_frequency": "one_time",
+          "jurisdiction_overrides": [
+            {
+              "jurisdiction_countries": ["JP"],
+              "assignment_type": "international",
+              "amount_value": 8000,
+              "currency_code": "CHF",
+              "reimbursement_md": "Japan international assignees: spouse career grant covers language tuition + relocation career coaching for up to 12 months."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "category_key": "leave_repatriation",
+      "benefits": [
+        {
+          "benefit_key": "home_leave",
+          "benefit_label": "Home leave allowance",
+          "covered": true,
+          "value_type": "currency",
+          "amount_value": 3500,
+          "currency_code": "CHF",
+          "unit_frequency": "yearly",
+          "jurisdiction_overrides": [
+            {
+              "jurisdiction_countries": ["JP", "US", "GB"],
+              "assignment_type": "permanent",
+              "amount_value": 5000,
+              "currency_code": "CHF",
+              "reimbursement_md": "Long-haul home leave (US, GB, JP) includes spouse + dependents under 18; one round-trip per calendar year."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

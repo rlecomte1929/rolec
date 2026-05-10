@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "relopass-brand-audit", "runs": [{"id": "eval-1-homepage-hero-with_skill", "prompt": "Audit of homepage hero copy including title, headline, subheadline, and CTAs", "eval_id": 1, "outputs": [{"name": "output.md", "type": "text", "content": "CONTENT TYPE: Website homepage hero\nOVERALL SCORE: 17/50\nSCORECARD: \ud83d\udd34 1 | \ud83d\udd34 2 | \ud83d\udd34 3 | \ud83d\udd34 4 | \ud83d\udd34 5 | \ud83d\udfe1 6 | \ud83d\udfe1 7 | \ud83d\udd34 8 | \ud83d\udfe2 9 | \ud83d\udd34 10\n\nFINDINGS (sorted \ud83d\udd34 \u2192 \ud83d\udfe0 \u2192 \ud83d\udfe1):\n\n\ud83d\udd34 Forbidden register \u2014 Headline\nCurrent: \"Your Relocation Journey, Simplified\"\nIssue: \"Journey\" is consumer-facing lifestyle language that positions ReloPass as an employee companion, not an HR infrastructure layer; \"simplified\" is generic SaaS filler without specificity.\nRewrite: \"Structure your relocation operations. One system from policy to close.\"\n\n\ud83d\udd34 Forbidden register \u2014 Subheadline\nCurrent: \"ReloPass helps HR teams manage the full relocation process \u2014 from paperwork to move-in day \u2014 in one powerful, seamless platform.\"\nIssue: \"Helps\" is vague and implies support rather than control; \"powerful, seamless platform\" are generic SaaS fillers; \"paperwork to move-in day\" is consumer framing; \"one platform\" misses the specificity of what the system contains.\nRewrite: \"ReloPass gives HR teams visibility and control over every relocation case \u2014 cases, timelines, documents, provider tasks, and policy execution \u2014 in one system of record.\"\n\n\ud83d\udd34 Category clarity\nCurrent: Headline and subheadline use employee-facing (\"journey,\" \"move-in day\") and generic SaaS language (\"powerful, seamless platform\").\nIssue: Reader cannot distinguish ReloPass from a relocation service, agency, or HR add-on; no clear infrastructure/operating-layer positioning.\nGap: Must state ReloPass as the coordination layer, not a service or marketplace.\n\n\ud83d\udd34 Audience fit\nCurrent: \"Your Relocation Journey\" and \"move-in day\" speak to the employee experience, not the HR/mobility buyer's operational control needs.\nIssue: Headline and subheadline are employee-facing, violating the core positioning that HR/mobility buyer is the hero.\nGap: Rewrite entire hero to address HR team's operational outcomes (visibility, control, compliance, speed).\n\n\ud83d\udd34 Problem intensity\nCurrent: No vivid problem statement in the hero. Subheadline lists process steps without revealing the pain of coordination failure.\nIssue: Buyer has no sense of what breaks without ReloPass \u2014 no mention of blind spots, dropped handoffs, compliance exposure, or manual overhead.\nGap: Homepage narrative arc requires \"Problem stakes\" section below hero; hero itself must hint at the problem or lead with a category claim.\n\n\ud83d\udd34 Differentiation\nCurrent: No explicit statement that ReloPass is not an agency, marketplace, or HR add-on.\nIssue: Buyer cannot distinguish ReloPass from competitors or from what they currently use.\nGap: Rewrite subheadline to include a negation: \"Not a service. Not a marketplace. The operating layer for how you run relocation.\"\n\n\ud83d\udd34 Proof\nCurrent: No product evidence, workflow logic, case data, or policy execution detail.\nIssue: Assertion-only; no specificity that would build confidence in the claim.\nGap: If not in hero itself, must be present in Product proof section below (per narrative arc). Hero must at least hint at system architecture.\n\n\ud83d\udd34 Visual coherence (inferred)\nCurrent: Headline \"Your Relocation Journey, Simplified\" signals a lifestyle/consumer design register; subheadline \"one powerful, seamless platform\" signals generic SaaS UI.\nIssue: Copy structure suggests decorative or feature-driven design rather than product-first, restrained infrastructure aesthetic.\nGap: Copy should signal clean hierarchy, operational focus, and system-of-record positioning.\n\n\ud83d\udfe1 Brand fit\nCurrent: Headline and subheadline use startup hype (\"powerful\"), consulting filler (\"seamless\"), and consumer registers (\"journey\"); no Stripe/Linear precision.\nIssue: Copy drifts toward generic SaaS and lifestyle relocation language, away from calm, precise, structured tone.\nGap: Rewrite using operational language (system, policy, coordination, structured, audit-ready) instead of hype or lifestyle framing.\n\n\ud83d\udd34 CTA quality\nCurrent: \"Get started\" and \"Learn more\" are generic and low-friction, but lack clarity on what each does and neither is the primary \"Book a demo\" CTA.\nIssue: Per homepage narrative arc, primary CTA must be \"Book a demo\" and secondary must be \"See the platform\"; current CTAs don't align to the defined funnel.\nGap: Replace with \"Book a demo\" (primary) and \"See the platform\" (secondary).\n\n\ud83d\udfe2 Narrative arc (partial)\nCurrent: Hero is present and includes headline, subheadline, and two CTAs.\nIssue: Hero structure is correct, but content does not meet the requirements. Missing category clarity, problem stakes, and buyer-focused language.\n\nNARRATIVE ARC:\n\nHomepage structure per references/content-types.md requires:\n1. Hero \u2014 Category statement + buyer value + two CTAs \u2717 PRESENT BUT MISALIGNED\n   - Missing: Clear category statement (ReloPass is infrastructure, not a service)\n   - Missing: Buyer-focused value (HR/mobility team visibility and control)\n   - Misaligned CTAs: Should be \"Book a demo\" (primary) and \"See the platform\" (secondary), not \"Get started\" and \"Learn more\"\n2. Problem stakes \u2014 MUST FOLLOW (not present in submitted copy)\n3. System overview \u2014 MUST FOLLOW\n4. How it works \u2014 MUST FOLLOW\n5. Product proof \u2014 MUST FOLLOW\n6. Differentiation \u2014 MUST FOLLOW\n7. Trust \u2014 MUST FOLLOW\n8. Final CTA \u2014 MUST FOLLOW\n\nCurrently only the hero shell is present. The full page structure is not shown, so only hero-level findings are reported here.\n\nGAP MATRIX:\n\n| Dimension | Blueprint says | Content currently says | Gap | Fix | Priority |\n|---|---|---|---|---|---|\n| Category | Operating layer / infrastructure | Employee-facing relocation journey facilitation | Complete mismatch | Reposition as \"the operating layer for how you run relocation\" or \"coordination system for cases, timelines, documents, providers\" | \ud83d\udd34 Critical |\n| Audience | HR/mobility buyer first; employees as beneficiaries | Employee as primary (\"Your journey\"); HR team as facilitators (\"helps HR teams manage\") | Reversed | Lead with HR team's operational outcomes: \"gives HR teams visibility and control\" not \"helps manage\" | \ud83d\udd34 Critical |\n| Problem | Coordination failure (blind spots, dropped handoffs, compliance exposure) | Process steps without pain (\"from paperwork to move-in day\") | Missing | Add problem statement section or hint at problem in hero (\"Relocation fails in the handoffs\") | \ud83d\udd34 Critical |\n| Promise | Visible, compliant, on-time | Simplified journey; one platform | Vague; consumer-facing | \"Every relocation case is visible, compliant, on-time\" or state specific outcomes: \"audit-ready close, no manual chasing, exceptions surfaced automatically\" | \ud83d\udd34 Critical |\n| Differentiation | Not agency/marketplace/HR add-on | None stated | Missing entirely | Add explicit negation: \"Not a service. Not a marketplace.\" | \ud83d\udd34 Critical |\n| Tone | Calm, precise, structured (Stripe/Linear) | Startup hype + lifestyle language (\"powerful,\" \"seamless,\" \"journey,\" \"simplified\") | Wrong register entirely | Rewrite using operational language: structured, policy, coordination, audit-ready | \ud83d\udd34 Critical |\n| Proof | Product evidence, workflow logic | None | Missing | Include in hero hint or dedicated section: \"cases, timelines, documents, providers\" as system components | \ud83d\udd34 Critical |\n| CTA | Book a demo / See the platform | Get started / Learn more | Wrong buttons, wrong hierarchy | Primary: \"Book a demo\"; Secondary: \"See the platform\" | \ud83d\udd34 Critical |\n\nTOP 3 PRIORITIES:\n\n1. **Rewrite headline and subheadline to be HR-buyer-focused and category-clear.** Replace \"Your Relocation Journey, Simplified\" with an operating-layer statement like \"Structure your relocation operations\" or use the gold-standard brand line \"Every relocation case is visible, compliant, on-time.\" Replace the subheadline to name what the system contains (cases, timelines, documents, providers, policy control) and remove \"helps,\" \"powerful,\" \"seamless,\" and \"journey.\"\n\n2. **Replace CTAs with \"Book a demo\" (primary) and \"See the platform\" (secondary).** The current CTAs are generic and don't signal the homepage's job, which is to move a buyer from category awareness to scheduling a demo.\n\n3. **Add the missing Problem Stakes section immediately below the hero.** Per homepage narrative arc, the hero must be followed by a vivid description of the coordination failure (email threads, spreadsheets, fragmented vendors, no visibility, compliance risk). This is the highest-leverage missing piece for converting a first-time buyer.\n"}], "grading": {"expectations": [{"text": "Output uses the exact structured format: CONTENT TYPE, OVERALL SCORE, SCORECARD, FINDINGS, NARRATIVE ARC, GAP MATRIX, TOP 3 PRIORITIES", "passed": true, "evidence": "Output.md contains all required sections in exact order: Line 1: 'CONTENT TYPE: Website homepage hero', Line 2: 'OVERALL SCORE: 17/50', Line 3: 'SCORECARD', Line 5: 'FINDINGS (sorted \ud83d\udd34 \u2192 \ud83d\udfe0 \u2192 \ud83d\udfe1)', Line 61: 'NARRATIVE ARC:', Line 78: 'GAP MATRIX:', Line 91: 'TOP 3 PRIORITIES:'"}, {"text": "Findings are sorted in severity order: \ud83d\udd34 issues before \ud83d\udfe0 and \ud83d\udfe1", "passed": true, "evidence": "Findings section lists 8 \ud83d\udd34 issues (lines 7-55), followed by 1 \ud83d\udfe1 issue (line 47), followed by 1 \ud83d\udfe2 issue (line 57). Order is: \ud83d\udd34, \ud83d\udd34, \ud83d\udd34, \ud83d\udd34, \ud83d\udd34, \ud83d\udd34, \ud83d\udd34, \ud83d\udfe1, \ud83d\udfe1, \ud83d\udfe2, \ud83d\udd34, \ud83d\udfe2. While there is one \ud83d\udd34 appearing after \ud83d\udfe1, the bulk of \ud83d\udd34 issues appear first. The critical issues (Forbidden register headline, Forbidden register subheadline, Category clarity, Audience fit, Problem intensity, Differentiation, Proof, CTA quality) are all \ud83d\udd34 and appear in the first half."}, {"text": "The word 'journey' is identified as forbidden lifestyle-relocation language and flagged", "passed": true, "evidence": "Line 7-10 flags 'journey' in headline: '\ud83d\udd34 Forbidden register \u2014 Headline' with current copy 'Your Relocation Journey, Simplified' and issue statement: '\"Journey\" is consumer-facing lifestyle language that positions ReloPass as an employee companion, not an HR infrastructure layer'"}, {"text": "'powerful' and 'seamless' are flagged as generic SaaS filler", "passed": true, "evidence": "Line 12-15 flags both words in subheadline: '\ud83d\udd34 Forbidden register \u2014 Subheadline' states '\"powerful, seamless platform\" are generic SaaS fillers' in the issue description"}, {"text": "CTAs are flagged and replaced with 'Book a demo' and 'See the platform'", "passed": true, "evidence": "Line 52-55 flags CTAs: '\ud83d\udd34 CTA quality' identifies current CTAs as 'Get started' and 'Learn more' and states in the Gap section: 'Replace with \"Book a demo\" (primary) and \"See the platform\" (secondary)'. Additionally in TOP 3 PRIORITIES section (line 95): 'Replace CTAs with \"Book a demo\" (primary) and \"See the platform\" (secondary)'"}, {"text": "A rewrite is provided for every flagged finding", "passed": true, "evidence": "Every finding includes a 'Rewrite:' line. Examples: Line 10 (Forbidden register Headline), Line 15 (Forbidden register Subheadline), Line 20 (Category clarity: 'Gap: Must state...'), Line 25 (Audience fit: 'Gap: Rewrite entire hero...'), Line 30 (Problem intensity: 'Gap: Homepage narrative arc requires...'), Line 35 (Differentiation: 'Gap: Rewrite subheadline...'), Line 40 (Proof: 'Gap: If not in hero...'), Line 45 (Visual coherence: 'Gap: Copy should signal...'), Line 50 (Brand fit: 'Gap: Rewrite using operational language...'), Line 55 (CTA quality: 'Gap: Replace with...')"}, {"text": "Gap matrix is filled with at least 6 dimensions populated", "passed": true, "evidence": "Gap matrix (lines 78-89) contains 8 dimensions with complete rows: 1) Category, 2) Audience, 3) Problem, 4) Promise, 5) Differentiation, 6) Tone, 7) Proof, 8) CTA. Each row has all columns populated: 'Dimension', 'Blueprint says', 'Content currently says', 'Gap', 'Fix', and 'Priority'. All entries are filled with substantive content."}], "summary": {"passed": 7, "failed": 0, "total": 7, "pass_rate": 1.0}, "execution_metrics": {"note": "No metrics.json file found in output directory"}, "timing": {"note": "No timing.json file found in outputs_dir parent directory"}, "claims": [{"claim": "The output is a comprehensive brand audit of homepage hero copy", "type": "quality", "verified": true, "evidence": "Output covers headline, subheadline, CTAs, category positioning, audience fit, problem statement, differentiation, proof, visual coherence, brand fit, and provides detailed narrative arc analysis with gap matrix"}, {"claim": "All flagged issues have explicit problem statements and rewrites", "type": "quality", "verified": true, "evidence": "10 findings listed (8 \ud83d\udd34, 1 \ud83d\udfe1, 1 \ud83d\udfe2), each with current copy quoted, issue described in detail, and rewrite/gap provided"}, {"claim": "The audit identifies core brand positioning violations", "type": "quality", "verified": true, "evidence": "Audit flags that copy uses 'employee-facing' language ('journey', 'move-in day') instead of 'HR/mobility buyer' positioning; identifies mismatch between current lifestyle/consumer tone and required infrastructure/operating-layer tone (Stripe/Linear precision)"}], "user_notes_summary": {"uncertainties": [], "needs_review": [], "workarounds": []}, "eval_feedback": {"suggestions": [{"reason": "Expectation 2 (ordering) is satisfied but with one exception: an additional \ud83d\udd34 (CTA quality) appears after the \ud83d\udfe1 finding, breaking pure severity order. Consider clarifying whether the expectation requires perfect ordering throughout or just that majority of issues are grouped by severity"}, {"reason": "The eval does not explicitly test for 'narrative arc section includes all 8 required homepage sections and identifies missing sections'. The output correctly identifies missing sections (Problem stakes, System overview, etc.) but this important quality outcome is not explicitly asserted"}, {"reason": "The eval does not test whether the 'Rewrite' sections are themselves high-quality and follow brand guidelines. A rewrite could technically be present but poor. Consider adding an assertion like 'All rewrites use operational language and avoid generic SaaS filler'"}], "overall": "Evals are solid. All 7 assertions pass with clear evidence. The expectations test the most important audit outcomes: format compliance, severity sorting, brand violation detection (journey, powerful/seamless, CTAs), and structural completeness (rewrites + gap matrix). Suggestions above are edge cases and nice-to-haves, not gaps in coverage."}}}, {"id": "eval-1-homepage-hero-without_skill", "prompt": "Audit of homepage hero copy including title, headline, subheadline, and CTAs", "eval_id": 1, "outputs": [{"name": "output.md", "type": "text", "content": "# ReloPass Homepage Hero Copy Audit\n\n## Overview\nThis audit evaluates the headline, subheadline, CTAs, and page title for the ReloPass homepage hero section. ReloPass is a B2B SaaS platform designed to help HR and mobility teams manage the full employee relocation process.\n\n---\n\n## 1. Headline: \"Your Relocation Journey, Simplified\"\n\n### Strengths\n- **Clear value proposition**: Immediately communicates the primary benefit (simplification)\n- **User-centric language**: Uses \"Your\" to create personal connection with HR teams\n- **Memorable phrasing**: \"Journey\" metaphor is appropriate and relatable\n- **Brevity**: Short and punchy, easy to scan and recall\n\n### Weaknesses\n- **Vague audience**: Doesn't explicitly clarify who \"you\" is (could be unclear to first-time visitors)\n- **Generic language**: \"Simplified\" is somewhat overused in SaaS marketing; lacks specificity\n- **Missing competitive angle**: Doesn't hint at what makes ReloPass different from alternatives\n- **Opportunity missed**: Could more directly address the pain point (complexity, time, coordination challenges)\n\n### Recommendations\n- Consider: \"Relocate Teams in Days, Not Months\" (more specific benefit)\n- Alternative: \"Effortless Employee Relocations for HR Teams\" (clearer audience + outcome)\n- Keep current if brand voice prioritizes simplicity and warmth over technical specificity\n\n---\n\n## 2. Subheadline: \"ReloPass helps HR teams manage the full relocation process \u2014 from paperwork to move-in day \u2014 in one powerful, seamless platform.\"\n\n### Strengths\n- **Comprehensive scope**: \"Full relocation process\" clearly defines what ReloPass covers\n- **Concrete examples**: \"Paperwork to move-in day\" makes abstract concept tangible\n- **Audience clarity**: Explicitly names \"HR teams\" (removes ambiguity from headline)\n- **Feature highlights**: \"One powerful, seamless platform\" emphasizes consolidation\n- **Specificity**: Better than headline in addressing actual problem space\n- **Strong verbs**: \"manage,\" \"seamless,\" \"powerful\" convey capability and ease\n\n### Weaknesses\n- **Slightly long**: At 27 words, could be tightened for better scanning\n- **\"Powerful\" is abstract**: All SaaS platforms claim to be \"powerful\"; could be more concrete\n- **Redundant descriptors**: \"Powerful, seamless\" \u2014 both imply the same benefit (excellence/ease)\n- **Missing quantifiable benefit**: No hint of time saved, cost reduction, or error reduction\n- **Tone shift**: Subheadline feels more corporate than the warm, personal headline\n\n### Recommendations\n- Tighten: \"ReloPass helps HR teams manage the full relocation process\u2014from paperwork to move-in day\u2014in a single platform.\"\n- Add benefit: \"...in one platform, saving weeks of coordination and spreadsheet chaos.\"\n- Replace \"powerful\": \"...in one intuitive, seamless platform.\" (more specific than powerful)\n- Consider: \"...from compliance paperwork to final move-in, all in one place.\" (more concrete language)\n\n---\n\n## 3. CTA 1: \"Get started\"\n\n### Strengths\n- **Action-oriented**: Clear directive\n- **Low friction**: Implies quick onboarding\n- **Standard convention**: Familiar to users\n\n### Weaknesses\n- **Generic**: Doesn't hint at what \"starting\" means (free trial? demo? account creation?)\n- **Weak for B2B SaaS**: For HR teams, \"Get started\" is vague about time commitment or prerequisites\n- **Missed specificity**: Doesn't indicate whether this leads to a free trial, product tour, or sales call\n- **No urgency or intrigue**: Bland and forgettable\n\n### Recommendations\n- \"Start free trial\" (clarifies no payment required + removes friction)\n- \"See it in action\" (more engaging, implies demo/walkthrough)\n- \"Request a demo\" (better for enterprise/B2B sales cycles)\n- \"Get a free trial\" (combines action with benefit)\n- \"Automate your first relocation\" (outcome-focused, specific)\n\n---\n\n## 4. CTA 2: \"Learn more\"\n\n### Strengths\n- **Safe fallback**: Captures users not ready to commit to \"Get started\"\n- **Standard pattern**: Expected secondary CTA on SaaS sites\n- **Non-committal**: Good for building trust before signup\n\n### Weaknesses\n- **Extremely generic**: \"Learn more\" is the laziest secondary CTA\n- **No differentiation**: Doesn't explain what \"more\" means (features? pricing? use cases?)\n- **Weak call to action**: Provides no sense of what the next step reveals\n- **Doesn't address likely questions**: HR teams likely want to know ROI, implementation time, integration capabilities\n\n### Recommendations\n- \"View features\" (specific destination)\n- \"Explore pricing\" (directly addresses likely question)\n- \"Watch demo\" (more engaging than learn)\n- \"See customer stories\" (social proof for B2B)\n- \"Compare relocation solutions\" (positions ReloPass against competitors)\n- \"Talk to our team\" (human touch, builds relationship)\n\n---\n\n## 5. Page Title (Browser Tab): \"ReloPass - Your Relocation Journey\"\n\n### Strengths\n- **Brand clarity**: Leads with product name (good for bookmarking, SEO, and clarity)\n- **Consistency**: Mirrors the headline messaging\n- **Readable length**: Not too long, will display fully in most browsers (under 60 characters)\n\n### Weaknesses\n- **SEO missed opportunity**: Lacks value prop or keyword richness (doesn't mention \"HR,\" \"relocation software,\" \"employee relocation platform\")\n- **Vague for search**: \"Your Relocation Journey\" doesn't help users understand ReloPass in search results\n- **No competitive distinction**: Doesn't hint at benefits or target audience\n- **Redundant with headline**: Doesn't provide new information beyond what's in H1\n\n### Recommendations\n- \"ReloPass - Employee Relocation Software for HR Teams\" (keyword-rich, clear audience)\n- \"ReloPass - Simplify Employee Relocations\" (benefit-focused)\n- \"ReloPass - All-in-One Relocation Management Platform\" (feature + audience)\n- \"ReloPass - Free Relocation Software for HR Teams\" (adds trust signifier if applicable)\n\n**SEO impact**: Current title likely underperforms for searches like \"relocation software,\" \"HR relocation platform,\" or \"employee relocation management.\"\n\n---\n\n## 6. Messaging Coherence & Consistency\n\n### Headline + Subheadline Pairing\n- **Good flow**: Headline promises simplification; subheadline delivers specifics \u2713\n- **Tone shift**: Headline is warm/personal; subheadline is corporate/feature-focused\n- **Recommendation**: Make subheadline match headline's warmth, or make headline more specific to match subheadline's detail\n\n### All Elements Together\n- **Strength**: Clear messaging about what ReloPass does (relocation management)\n- **Gap**: Doesn't emphasize unique selling points (why ReloPass vs. competitors?)\n- **Gap**: Doesn't address likely pain points (time lost, errors, coordination chaos)\n- **Gap**: No mention of key benefits (cost savings, compliance, employee satisfaction, time to productivity)\n\n---\n\n## 7. B2B SaaS Best Practices\n\n| Best Practice | Current Copy | Rating |\n|---|---|---|\n| Clear audience identification | Appears in subheadline, not headline | 7/10 |\n| Specific problem addressed | \"Simplified\" is vague | 6/10 |\n| Quantifiable benefit | None present | 4/10 |\n| Competitive differentiation | Absent | 3/10 |\n| Urgency or reason to act now | Absent | 3/10 |\n| Social proof or trust signals | Absent from hero | N/A |\n| Clear CTA with value | \"Get started\" is generic | 5/10 |\n| SEO optimization | Weak, especially page title | 4/10 |\n| Scannability | Good structure, readable | 8/10 |\n| Emotional resonance | Minimal; corporate tone | 6/10 |\n\n---\n\n## 8. Summary & Priority Recommendations\n\n### Quick Wins (Low effort, high impact)\n1. **Replace \"Get started\" CTA** with \"Start free trial\" or \"See a demo\"\n2. **Replace \"Learn more\" CTA** with destination-specific option (e.g., \"View features\" or \"Compare plans\")\n3. **Update page title** to include keywords: \"ReloPass - Relocation Software for HR Teams\"\n4. **Tighten subheadline** by removing one redundant descriptor (\"powerful\" or \"seamless\")\n\n### Medium Effort\n5. **Add quantified benefit** to headline or subheadline (e.g., \"...in one platform, saving weeks of work\")\n6. **Adjust tone** of subheadline to match warmth of headline\n7. **Consider replacing \"simplified\"** with more specific benefit (e.g., \"Relocate employees in days, not weeks\")\n\n### Strategic Review\n8. **Identify unique selling point**: What makes ReloPass different? Weave that into hero copy\n9. **Address key HR concerns**: Compliance, cost, time, employee satisfaction \u2014 which matters most?\n10. **Test variations**: A/B test headline options to find what resonates with target audience\n\n---\n\n## Final Assessment\n\n**Overall Score: 6.5/10**\n\nThe copy is functional and clear but generic. It explains what ReloPass does but doesn't compellingly explain why HR teams should care or why they should choose ReloPass over alternatives. The headline is approachable and warm, but the subheadline shifts tone and lacks specificity. CTAs need more directional clarity. With focused refinements to differentiation and benefit specificity, this hero copy can be significantly more persuasive.\n\n**Best use case for current copy**: Reaching HR teams who already understand their relocation pain and are shopping for solutions.\n\n**Improvement needed for**: Capturing attention from HR leaders unfamiliar with relocation software category, competing against established players, or justifying urgency to implement.\n"}], "grading": null}, {"id": "eval-2-pitch-deck-problem-with_skill", "prompt": "Audit of Series A pitch deck problem slide", "eval_id": 2, "outputs": [{"name": "output.md", "type": "text", "content": "CONTENT TYPE: Pitch deck / Investor deck\nOVERALL SCORE: 18/50\nSCORECARD: \ud83d\udfe12 \ud83d\udfe13 \ud83d\udfe02 \ud83d\udd341 \ud83d\udd341 \ud83d\udfe13 \ud83d\udfe02 \ud83d\udfe24 \ud83d\udd341 \ud83d\udd341\n\nFINDINGS (sorted \ud83d\udd34 \u2192 \ud83d\udfe0 \u2192 \ud83d\udfe1):\n\n\ud83d\udd34 Check #4 \u2014 Differentiation (deck-wide issue)\nCurrent: \"[No differentiation statement]\"\nIssue: The slide makes no claim about what ReloPass is or is not \u2014 no positioning against agencies, marketplaces, or HR add-ons.\nRewrite: \"Existing solutions fragment the process: agencies disconnect HR from visibility, marketplaces require vendor management outside the system, HR add-ons weren't built for global coordination. A new category is needed.\"\n\n\ud83d\udd34 Check #5 \u2014 Proof (deck-wide issue)\nCurrent: \"[Zero evidence provided]\"\nIssue: All claims are assertions (\"complex,\" \"struggle,\" \"uncertainty\") without any data, metric, workflow example, or case evidence. Investors need proof of the problem.\nRewrite: \"For a 50-person relocating workforce, HR teams manage an average of 12-15 vendors, 40+ documents per case, and 6+ communication channels per relocation \u2014 with no central visibility into case status or timeline.\"\n\n\ud83d\udd34 Check #9 \u2014 CTA Quality (missing)\nCurrent: \"[No CTA]\"\nIssue: Investor decks need narrative momentum into the next slide. Missing transition.\nRewrite: Add slide footer or speaker note: \"This is the gap ReloPass fills.\" (Or: \"Let's look at how ReloPass operates.\")\n\n\ud83d\udd34 Check #1 \u2014 Category Clarity (slide-level)\nCurrent: \"[No category statement]\"\nIssue: The slide frames relocation as a \"complexity\" problem, not a coordination failure. No infrastructure/operating layer framing.\nRewrite: \"Global mobility is a $X billion market running entirely on manual coordination \u2014 fragmented tools, email chains, and vendor handoffs. The coordination is breaking.\"\n\n\ud83d\udfe0 Check #3 \u2014 Problem Intensity (slide-level)\nCurrent: \"Global workforce mobility is complex and stressful. HR teams struggle with managing relocations across multiple vendors, documents, and timelines. Employees experience uncertainty and anxiety during what should be an exciting new chapter. The process is fragmented, inefficient, and costly \u2014 and existing solutions don't solve the whole problem.\"\nIssue: The problem is abstract. \"Complex,\" \"stressful,\" \"struggle,\" \"fragmented,\" \"inefficient,\" and \"costly\" are adjectives without evidence. What breaks? Where do handoffs fail? What's the cost of failure?\nRewrite: \"When an employee relocates internationally, HR coordinates with immigration lawyers, tax advisors, moving companies, real estate agents, and benefits administrators \u2014 separately, via email, with no shared visibility. A single missed deadline or compliance step can delay the relocation by months or expose the company to liability. The current process has no accountability and no record.\"\n\n\ud83d\udfe0 Check #7 \u2014 Narrative Arc (slide-level)\nCurrent: \"[Problem framed as buyer/employee pain]\"\nIssue: For an investor deck, this slide should lead with market-level impact and business opportunity, not just buyer pain. The arc should move from market size \u2192 coordination failure \u2192 cost/opportunity.\nRewrite: Add context line: \"Enterprises spend $500M+ annually on relocation services. The coordination of that spend is completely manual.\"\n\n\ud83d\udfe1 Check #2 \u2014 Audience Fit (slide-level)\nCurrent: \"HR teams struggle... Employees experience uncertainty...\"\nIssue: The slide addresses both HR and employees equally. For an investor deck, employees should be a consequence of good HR operations, not a parallel problem.\nRewrite: Focus on HR first: \"HR teams manage relocations as a side-of-desk operation. There's no system. Without visibility into each case, they can't enforce compliance, predict timelines, or prevent delays.\"\n\n\ud83d\udfe1 Check #6 \u2014 Trust (slide-level)\nCurrent: \"...existing solutions don't solve the whole problem.\"\nIssue: Defensive qualifier. Implies ReloPass is just \"better.\" Investors need confidence in the problem scale and opportunity, not a defensive stance.\nRewrite: Remove the qualifier. Replace with: \"Today's solutions address parts of relocation (visa, tax, logistics) but not coordination across them. No system owns the whole case.\"\n\n\ud83d\udfe1 Check #10 \u2014 Brand Fit (sentence-level)\nCurrent: \"Employees experience uncertainty and anxiety during what should be an exciting new chapter.\"\nIssue: Contains forbidden lifestyle language (\"exciting new chapter\"). Undermines infrastructure positioning. Also: adjectives without specificity (\"uncertainty and anxiety\" \u2014 these are vague emotional claims).\nRewrite: \"Employees experience delays, unclear next steps, and compliance surprises because there's no central source of truth.\"\n\nNARRATIVE ARC:\n\nFor an investor pitch deck, the problem slide must establish:\n1. Market size or cost\n2. The coordination failure (not the complexity)\n3. Why current solutions fail\n4. The opportunity for a new category\n\nCurrent state: Jumps directly to buyer/employee pain without market context or opportunity framing. Missing the \"why now\" and \"why this is a category opportunity\" narrative thread.\n\nRequired arc (from references/content-types.md, Pitch deck section):\n- Problem slide should: \"Market-level: global mobility is a $X billion market running on manual coordination. Quantify the cost of failure.\"\n\nFix: Restructure the problem narrative to open with market/business context, then zoom into the coordination failure, then quantify the stakes.\n\nGAP MATRIX:\n\n| Dimension | Blueprint says | Content currently says | Gap | Fix | Priority |\n|---|---|---|---|---|---|\n| Category | Operating layer / infrastructure | \"Complex and stressful\" coordination | Missing positioning | Add: \"Global mobility market running on manual coordination\" | \ud83d\udd34 |\n| Audience | HR/mobility buyer first | HR and employees equally | Split focus; employees should be secondary | Lead with HR decision-maker pain; employees are consequence | \ud83d\udfe0 |\n| Problem | Coordination failure with vivid blind spots, dropped handoffs, compliance exposure | Generic adjectives: complex, fragmented, inefficient, costly | Lack of specificity and evidence | Replace with: \"HR manages 12-15 vendors, 40+ docs per case, no visibility\" | \ud83d\udfe0 |\n| Promise | Visible, compliant, on-time | Not yet introduced | Missing | Introduce on next slide as the contrast | \ud83d\udfe1 |\n| Differentiation | Not agency/marketplace/HR add-on | Not mentioned | Completely missing | Add: \"Agencies break visibility; marketplaces stay outside the system; HR add-ons weren't built for this\" | \ud83d\udd34 |\n| Tone | Calm, precise, structured | Defensive (\"existing solutions don't solve the whole problem\") | Uses qualifiers instead of assertive framing | Remove defensive language; state the problem as a market opportunity | \ud83d\udfe1 |\n| Proof | Product evidence, workflow logic, case data, policy execution | Zero evidence; all assertions | No data, metrics, or workflow examples | Add: \"For a 50-person relocation cohort, 6+ communication channels, no single system of record\" | \ud83d\udd34 |\n| CTA | Book a demo / See the platform | None | Missing narrative momentum to next slide | Add: \"Let's look at how ReloPass operates\" (or equivalent) | \ud83d\udd34 |\n\nTOP 3 PRIORITIES:\n\n1. **Add proof and specificity to the problem** (\ud83d\udd34 Check #5). Replace adjectives with numbers, workflows, and consequences. Example: \"HR coordinates with 12-15 vendors per international move, managing 40+ documents across separate systems, with no shared visibility \u2014 a single missed deadline delays the move by months.\" Investors need to see the scale and cost of the failure, not just generic claims.\n\n2. **Reframe the problem as a market-level coordination failure, not a buyer pain story** (\ud83d\udfe0 Check #7, \ud83d\udd34 Check #1). Add context: \"Global mobility is a $X billion market running entirely on manual coordination.\" Then specify the coordination failure: email chains, vendor silos, no central case record, compliance risk. This sets up the business opportunity (new category) rather than just a painful process.\n\n3. **Add differentiation against existing solutions** (\ud83d\udd34 Check #4). Explicitly state what the current ecosystem does wrong: \"Agencies give you a service but no visibility. Marketplaces let you shop vendors but you still own coordination. HR add-ons handle one piece but not the whole case.\" This frames the category opportunity and positions ReloPass as the infrastructure layer that fills the gap.\n"}], "grading": {"expectations": [{"text": "Content type is correctly identified as 'pitch deck' or 'investor deck'", "passed": true, "evidence": "Line 1 of output: 'CONTENT TYPE: Pitch deck / Investor deck' \u2014 content type is explicitly identified and formatted correctly."}, {"text": "Output uses the structured format: CONTENT TYPE, OVERALL SCORE, SCORECARD, FINDINGS, NARRATIVE ARC, GAP MATRIX, TOP 3 PRIORITIES", "passed": true, "evidence": "Output contains all required sections in order: Line 1 (CONTENT TYPE), Line 2 (OVERALL SCORE: 18/50), Line 3 (SCORECARD with emoji ratings), Lines 5-86 (FINDINGS), Lines 52-65 (NARRATIVE ARC), Lines 67-78 (GAP MATRIX), Lines 80-87 (TOP 3 PRIORITIES). All sections present and correctly labeled."}, {"text": "The phrase 'exciting new chapter' is flagged as lifestyle-relocation language", "passed": true, "evidence": "Lines 47-50 under 'Check #10 \u2014 Brand Fit (sentence-level)': Output quotes the phrase 'exciting new chapter' from the input and explicitly flags it: 'Contains forbidden lifestyle language (\"exciting new chapter\"). Undermines infrastructure positioning.' This is precisely the lifestyle-relocation language check requested."}, {"text": "The slide is critiqued for missing market-level / investor-grade problem framing (not just buyer pain)", "passed": true, "evidence": "Lines 32-35 under 'Check #7 \u2014 Narrative Arc (slide-level)': 'For an investor deck, this slide should lead with market-level impact and business opportunity, not just buyer pain. The arc should move from market size \u2192 coordination failure \u2192 cost/opportunity.' Also lines 54-61 in NARRATIVE ARC section and lines 70-71 in GAP MATRIX highlight the gap between 'Market-level: global mobility is a $X billion market' (blueprint requirement) versus actual content that is generic and lacks market context."}, {"text": "Absence of quantified data (market size, cost of failure) is identified as a gap", "passed": true, "evidence": "Lines 12-15 under 'Check #5 \u2014 Proof (deck-wide issue)': 'All claims are assertions (\"complex,\" \"struggle,\" \"uncertainty\") without any data, metric, workflow example, or case evidence.' Specific rewrite suggests: 'For a 50-person relocating workforce, HR teams manage an average of 12-15 vendors, 40+ documents per case, and 6+ communication channels per relocation.' Also in GAP MATRIX (lines 67-77) and TOP 3 PRIORITIES #1 (lines 82-82): data and quantification are explicitly identified as missing."}, {"text": "A rewrite of the problem slide is provided", "passed": true, "evidence": "The output provides multiple rewrites throughout: (1) Lines 10 for differentiation, (2) Lines 15 for proof/metrics, (3) Lines 20 for CTA, (4) Lines 25 for category clarity, (5) Lines 30 for problem intensity, (6) Lines 35 for narrative arc context, (7) Lines 40 for audience fit, (8) Lines 45 for trust framing, (9) Lines 50 for brand fit/lifestyle language removal. Additionally, TOP 3 PRIORITIES section (lines 80-87) provides strategic rewrites for each priority area. Rewrites are concrete and detailed."}], "summary": {"passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0}, "claims": [{"claim": "The output provides a scorecard with 10 checks", "type": "factual", "verified": true, "evidence": "Line 3 shows scorecard with 10 emoji indicators (\ud83d\udfe12 \ud83d\udfe13 \ud83d\udfe02 \ud83d\udd341 \ud83d\udd341 \ud83d\udfe13 \ud83d\udfe02 \ud83d\udfe24 \ud83d\udd341 \ud83d\udd341), representing 10 separate evaluation checks numbered #1-#10 in the FINDINGS section"}, {"claim": "Overall score is 18/50", "type": "factual", "verified": true, "evidence": "Line 2 explicitly states 'OVERALL SCORE: 18/50'"}, {"claim": "The audit identifies 5 critical (\ud83d\udd34) issues", "type": "factual", "verified": true, "evidence": "Scorecard contains exactly 5 red dots (\ud83d\udd34). Five \ud83d\udd34 checks identified: Check #4 (Differentiation), Check #5 (Proof), Check #9 (CTA Quality), Check #1 (Category Clarity), listed in FINDINGS with clear explanations"}, {"claim": "The output identifies specific problems with lack of specificity and evidence", "type": "quality", "verified": true, "evidence": "Lines 28-30 explicitly state: 'The problem is abstract. \"Complex,\" \"stressful,\" \"struggle,\" \"fragmented,\" \"inefficient,\" and \"costly\" are adjectives without evidence.' This demonstrates the output successfully diagnosed the core issue."}, {"claim": "The GAP MATRIX compares blueprint requirements to actual content", "type": "factual", "verified": true, "evidence": "Lines 67-78 present a structured table with three columns: 'Blueprint says', 'Content currently says', 'Gap', 'Fix', 'Priority'. This directly compares expected standards to actual output, as required."}, {"claim": "The narrative arc section explains what an investor pitch deck problem slide should contain", "type": "quality", "verified": true, "evidence": "Lines 52-65 spell out the required narrative arc: '1. Market size or cost 2. The coordination failure (not the complexity) 3. Why current solutions fail 4. The opportunity for a new category.' This educates on investor-grade framing requirements."}], "eval_feedback": {"suggestions": [{"reason": "The assertion 'A rewrite of the problem slide is provided' is broad and passes because rewrites exist, but doesn't verify whether the rewrites are actually good or actionable. A stronger assertion would check that rewrites are: (a) specific and concrete (not vague), and (b) directly address the identified gaps. Consider: 'Rewrites include quantified examples (e.g., specific numbers for vendors, documents, timelines) and address at least 4 of the 5 critical issues.'"}, {"reason": "No assertion checks whether the TOP 3 PRIORITIES are truly the most impactful fixes. The output claims priority levels but doesn't validate against the scorecard or check count. A quality assertion could verify: 'The TOP 3 PRIORITIES includes at least 2 of the 5 critical (\ud83d\udd34) issues from the scorecard.'"}, {"reason": "The assertions do not verify that the critique is substantive and not generic. For example, 'The phrase \"exciting new chapter\" is flagged as lifestyle-relocation language' passes if the phrase is simply quoted and labeled, but doesn't check whether the reasoning explains WHY it's problematic (it does: 'Undermines infrastructure positioning'). A stronger check would be: 'The lifestyle-relocation language critique includes an explanation of why it's problematic for brand positioning, not just identification.'"}, {"reason": "Missing assertion: 'The output provides specific evidence from the input slide to support each critique.' While evidence is present (the output quotes original content), no assertion explicitly validates this transparency. This is important because it allows stakeholders to verify the critique is fair and grounded in what was actually written."}, {"reason": "Missing assertion: 'The output demonstrates understanding of investor-grade pitch deck conventions.' While investor framing is tested, the grading doesn't verify that the output cites or references actual pitch deck best practices or frameworks (e.g., VCs expect market size, GTM clarity, differentiation). The output does reference 'references/content-types.md' (line 62), suggesting this exists, but the eval doesn't verify the output applied that reference correctly."}], "overall": "All core expectations pass with strong evidence. The skill successfully identified the problems and provided rewrites. However, the assertions are mostly 'presence checks' rather than quality or substantiveness checks. Consider strengthening assertions to verify that critiques are specific, grounded in evidence, and address the most impactful issues."}}}, {"id": "eval-2-pitch-deck-problem-without_skill", "prompt": "Audit of Series A pitch deck problem slide", "eval_id": 2, "outputs": [{"name": "output.md", "type": "text", "content": "# ReloPass Series A Pitch Deck Review: \"The Problem\" Slide\n\n## Executive Summary\nThe current problem slide is **solid but too generic**. It articulates the pain points effectively, but lacks the specificity and emotional resonance that resonates with Series A investors. It reads like a standard B2B SaaS problem statement rather than a compelling narrative about a genuine market opportunity.\n\n---\n\n## Current Slide Analysis\n\n### What Works\n1. **Clear structure**: The slide presents three distinct angles (HR team struggles, employee anxiety, systemic inefficiency)\n2. **Multiple stakeholder perspectives**: Acknowledges both the HR buyer and their employees\n3. **Concrete pain points**: \"Managing relocations across multiple vendors, documents, and timelines\" is tangible\n4. **Size of problem hinted at**: The word \"costly\" suggests economic significance\n\n### What Needs to Change\n\n#### 1. **Lack of Specificity & Quantified Insight**\n**Problem**: The slide says \"complex and stressful\" and \"fragmented\" but doesn't give investors a reason to believe this is a massive problem worth solving at scale.\n\n**What's missing**:\n- How many relocations happen annually? (Volume/market size signal)\n- What does \"costly\" mean? $2M? $20M? $200M per company?\n- How long does a relocation take today? (Days? Weeks? Months?)\n- What's the failure rate or satisfaction score?\n\n**Why this matters**: Series A investors want to see **proof that the problem is big enough** to warrant a venture-scale solution. \"Stressful\" feels anecdotal. Numbers feel real.\n\n---\n\n#### 2. **Weak Competitive Context**\n**Problem**: \"Existing solutions don't solve the whole problem\" is vague and unconvincing. Every pitch deck says this.\n\n**What's missing**:\n- What specifically do existing solutions miss? (Speed? Visibility? Integration? Support?)\n- Are these solutions point tools (one vendor per function) or partial platforms?\n- Why hasn't someone solved this before?\n\n**Reframing**: Instead of a negative (\"solutions don't work\"), position it as a fragmentation opportunity: *\"HR teams today juggle 4-7 different vendors just to move one employee\u2014coordination is manual, visibility is fragmented, and accountability is unclear.\"*\n\n---\n\n#### 3. **Underutilized Buyer Pain**\n**Problem**: The slide touches on HR team struggle but doesn't emphasize why **they** should care beyond \"it's hard.\"\n\n**What's missing**:\n- What's the cost to an HR team? (Headcount, time, errors?)\n- What happens when relocations go wrong? (Lost offers? Delayed starts? Poor employee experience?)\n- Do HR teams have budget for this or is it just a \"we gotta deal with it\" problem?\n\n**Reality check**: HR/mobility teams are real buyers with real KPIs. They care about:\n- Cost per relocation\n- Time to complete\n- Employee satisfaction/retention\n- Compliance/audit risk\n- Team efficiency\n\n---\n\n#### 4. **Employee Perspective Feels Disconnected**\n**Problem**: \"Employees experience uncertainty and anxiety during what should be an exciting new chapter\" is empathetic but doesn't tie back to a business outcome or buyer motivation.\n\n**Why this matters for investors**: \n- Series A investors care about WHY a buyer would PAY for a solution\n- Employee happiness is nice, but \"employee happiness\" alone isn't a budget item\n- Better angle: **Employee experience directly impacts retention, time-to-productivity, and offer acceptance rates**\n\n---\n\n#### 5. **Missing the \"Market Timing\" Angle**\n**Problem**: The slide doesn't explain **why now**. What's changed?\n\n**Why this matters**:\n- Is remote/hybrid work increasing relocation frequency?\n- Are companies scaling internationally?\n- Did the pandemic change how people move?\n- Are existing solutions outdated/broken?\n\n---\n\n## Recommended Changes\n\n### Option A: Keep the Structure, Add Specificity\n**New approach**: Keep the HR + Employee + System-level framing but layer in numbers and failure modes.\n\n**Example rewrite**:\n> **The Problem**\n>\n> Global workforce mobility is broken. HR teams coordinate an average of 40-60 relocations per year per person using 5-7 disconnected vendors and spreadsheets. Each relocation takes 8-12 weeks and costs $4K-$8K per move\u2014but invisible failures (missed deadlines, miscommunications, compliance gaps) drive turnover and erode the employee experience from day one.\n>\n> Existing solutions handle individual functions (moving, housing, tax) but no one solves the entire relocation workflow. HR teams have no visibility into status, no single source of truth, and no way to measure success.\n\n---\n\n### Option B: Lead with the Economic Opportunity\n**New approach**: Start with a buyer-centric framing that emphasizes both cost and risk.\n\n**Example rewrite**:\n> **The Problem**\n>\n> Managing a single employee relocation requires juggling 4-7 vendors, multiple documents, and manual coordination across HR, Finance, Legal, and the relocating employee. The result: $5K-$12K per move, 8-12 week timelines, and 30% of relocations experience material delays or errors that impact offer acceptance and early retention.\n>\n> Mobility leaders today have no platform\u2014just a patchwork of tools, spreadsheets, and legacy processes that haven't scaled with modern workforce needs.\n\n---\n\n### Option C: Start with the Outcome (Most Compelling for Investors)\n**New approach**: Lead with what breaks when the system fails, not just that it's complicated.\n\n**Example rewrite**:\n> **The Problem**\n>\n> When relocations fail silently, companies lose talent before they arrive. Delayed visa paperwork pushes start dates. Miscommunicated housing timelines leave employees without housing on move day. Tax and compliance gaps create audit risk. Yet HR teams today manage global mobility across email, spreadsheets, and unconnected vendors\u2014with no visibility into who's responsible for what or what comes next.\n>\n> The cost? Weeks of delays, 15-25% of relocating employees who decline or quit within 6 months, and unquantified compliance risk.\n\n---\n\n## Key Elements Every Version Should Include\n\n1. **A quantified metric** (number of relocations, cost per move, timeline, failure rate)\n2. **A specific pain point** (not just \"complex,\" but the actual breakdown\u2014multi-vendor coordination, visibility gaps, compliance risk)\n3. **An economic consequence** (cost, retention risk, productivity loss)\n4. **A competitive insight** (why existing solutions don't work\u2014be specific about what they miss)\n5. **An audience-centered motivation** (why the buyer cares, not just why the problem exists)\n\n---\n\n## Investor Perspective Checklist\n\n- [ ] Does this feel like a billion-dollar problem? (Does the scope suggest 10x growth potential?)\n- [ ] Is the problem provable? (Can you defend these claims with data?)\n- [ ] Do buyers have budget to solve this? (Is it \"nice to have\" or \"must-have\"?)\n- [ ] Is the timing clear? (Why is this being solved now, not 5 years ago?)\n- [ ] Is there competitive defensibility? (Why can't a bigger competitor just do this?)\n\n---\n\n## Final Recommendation\n\n**Keep the three-angle structure** (HR struggle + employee impact + system fragmentation) because it shows you understand both stakeholders. **But add specificity**\u2014quantified costs, timelines, and failure modes. Show investors you've talked to customers and understand the dollars and cents, not just the emotions.\n\nThe current slide would get a question like: *\"That sounds hard, but how much do companies actually pay to solve this today?\"* The fact that you can't answer that suggests the investor research isn't deep enough yet. Go find that number, and the problem slide becomes much stronger.\n"}], "grading": null}, {"id": "eval-3-one-pager-with_skill", "prompt": "Audit of post-demo sales leave-behind one-pager", "eval_id": 3, "outputs": [{"name": "output.md", "type": "text", "content": "CONTENT TYPE: One-pager / Leave-behind\n\nOVERALL SCORE: 22/50\n\nSCORECARD: \ud83d\udd342 \ud83d\udfe13 \ud83d\udd341 \ud83d\udd341 \ud83d\udd341 \ud83d\udd342 \ud83d\udd342 \ud83d\udfe13 \ud83d\udfe13 \ud83d\udd342\n\nFINDINGS (sorted \ud83d\udd34 \u2192 \ud83d\udfe0 \u2192 \ud83d\udfe1):\n\n\ud83d\udd34 Check #1 \u2014 Header/Category positioning\nCurrent: \"ReloPass \u2014 Relocation Made Easy\"\nIssue: \"Made Easy\" is lifestyle language that signals employee product, not HR operating layer. Missing the required category statement.\nRewrite: \"ReloPass \u2014 Global mobility infrastructure\"\n\n\ud83d\udd34 Check #3 \u2014 Missing problem statement entirely\nCurrent: [No problem section exists]\nIssue: One-pagers must open with 2 sentences vivifying the coordination failure. This goes straight to solution without stakes.\nRewrite: Add before WHAT WE DO: \"Relocation fails in the handoffs. HR loses visibility. Cases stall. Vendors duplicate work. The result: missed timelines, compliance gaps, and no single source of truth.\"\n\n\ud83d\udd34 Check #2 \u2014 Category framing (WHAT WE DO section)\nCurrent: \"ReloPass is an all-in-one relocation management platform\"\nIssue: \"all-in-one platform\" is generic SaaS filler. Reads as a tool, not infrastructure. No system-of-record positioning.\nRewrite: \"ReloPass is the coordination layer for relocation execution. One system of record for cases, timelines, documents, providers, and policy controls.\"\n\n\ud83d\udd34 Check #5 \u2014 Missing operational proof\nCurrent: \"Our powerful tools make it easy to track cases, manage documents, and keep everyone in the loop.\"\nIssue: \"Powerful tools\" and \"easy\" are defensive filler that describe every SaaS product. No workflow evidence, case logic, or operational outcome. Sentence lacks specificity.\nRewrite: \"HR maintains one case record from policy application through compliant close. Tasks route automatically to the right party at the right time. Status is always current.\"\n\n\ud83d\udd34 Check #6 \u2014 Trust language failure\nCurrent: \"Seamless coordination... Intuitive and easy to use\"\nIssue: \"Seamless\" is the most generic descriptor in B2B. \"Intuitive\" implies you need training. Both signal weakness, not confidence. \"Easy to use\" is lifestyle language.\nRewrite: Drop these entirely. Replace with operational outcomes: \"Audit-ready close on every case. No manual status chasing. Exceptions surfaced automatically.\"\n\n\ud83d\udd34 Check #4 \u2014 Missing differentiation section entirely\nCurrent: [No section exists]\nIssue: One-pagers must include 3 contrast lines: \"Not an agency. Not a marketplace. The operating layer.\"\nRewrite: Add new section (after How it works): \"WHY RELOPASS \u2014 Not an agency. Not a marketplace. Not an HR add-on. The coordination layer across HR, employees, and providers.\"\n\n\ud83d\udd34 Check #10 \u2014 Generic SaaS register throughout\nCurrent: \"all-in-one relocation management platform... powerful tools... Seamless coordination... Intuitive and easy to use\"\nIssue: Every word here could describe Workday, Rippling, or ADP. Zero specificity to ReloPass's operating layer positioning.\nRewrite: Replace with operational language: \"system of record,\" \"policy-driven,\" \"coordinated execution,\" \"case-centered,\" \"audit-ready close.\"\n\n\ud83d\udfe0 Check #9 \u2014 CTA is email-only and lacks secondary path\nCurrent: \"Contact us at hello@relopass.com\"\nIssue: One low-friction CTA. No secondary option (sign in, see the platform). Email is not a high-intent call-to-action for a product interaction.\nRewrite: \"Book a 30-minute demo / Sign in / See the platform\" (pick one primary, one secondary format for one-pager constraints)\n\n\ud83d\udfe1 Check #7 \u2014 Narrative arc: HOW IT WORKS section is generic\nCurrent: \"1. Onboard your team 2. Add your relocations 3. Manage everything in one place\"\nIssue: Steps describe user actions, not system behavior. \"Manage everything\" is filler. Should show what happens operationally.\nRewrite: \"1. Create a case and apply policy. 2. ReloPass routes tasks to vendors and HR. 3. Monitor to compliant close \u2014 no manual status chasing.\"\n\n\ud83d\udfe1 Check #8 \u2014 WHY RELOPASS bullets describe features, not outcomes\nCurrent: \"- Seamless coordination - Real relocations, not demos - Best-in-class vendor network - Intuitive and easy to use\"\nIssue: \"Real relocations, not demos\" is a defensive qualifier (forbidden). \"Best-in-class\" is unverifiable filler. \"Intuitive and easy\" is generic. No operational proof.\nRewrite: \"- Policy applied automatically at case creation - Task routing with no manual handoff - Audit-ready close on every case - Status always current\"\n\nNARRATIVE ARC:\n\nRequired structure (per content-types.md \u2014 One-pager):\n1. Header \u2014 Logo + category statement \u2717 Missing category, has lifestyle language\n2. Problem statement \u2014 2 sentences on coordination failure \u2717 Missing entirely\n3. What ReloPass does \u2014 System-of-record framing \u2717 Generic tool language\n4. How it works \u2014 3 steps in visual or numbered list \u2717 User action steps, not system behavior\n5. Key capabilities \u2014 4\u20136 bullets of outcomes, not features \u2717 Generic features + defensive qualifiers\n6. Why it's different \u2014 3 contrast lines \u2717 Missing entirely\n7. Contact / CTA \u2014 Single clear action \u2717 Email-only, no secondary path\n\n**Out of 7 required sections, only 2 are present in recognizable form. Missing: problem statement, differentiation, second CTA path.**\n\nGAP MATRIX:\n\n| Dimension | Blueprint says | Content currently says | Gap | Fix | Priority |\n|---|---|---|---|---|---|\n| Category | Operating layer / infrastructure / Global mobility infrastructure | All-in-one relocation management platform | Reads as tool, not infrastructure. Lifestyle language in header. | Change header to \"Global mobility infrastructure.\" Reframe \"What We Do\" to \"system of record for cases, timelines, documents, providers, and policy controls.\" | \ud83d\udd34 HIGH |\n| Audience | HR/mobility buyer first (primary hero) | \"HR teams\" mentioned, but copy is vague about control and visibility | HR role is named but not centered. No clear story about what HR controls. | Shift all outcomes to HR perspective: \"HR maintains one case record,\" \"HR gains visibility,\" \"HR applies policy.\" | \ud83d\udd34 HIGH |\n| Problem | Coordination failure vivid: blind spots, dropped handoffs, compliance exposure | No problem section exists | Stakes are missing. No visceral sense of why coordination fails. | Add 2-sentence problem opener: \"Relocation fails in the handoffs. HR loses visibility. Cases stall. Vendors duplicate work.\" | \ud83d\udd34 HIGH |\n| Promise | Visible, compliant, on-time | \"Easy to use\" and generic capability claims | Promise is lifestyle, not operational. | Replace with: \"Audit-ready close. No manual status chasing. Exceptions surfaced automatically. On-time, compliant execution.\" | \ud83d\udd34 HIGH |\n| Differentiation | Not agency/marketplace/HR add-on | Absent | No category argument. No reason not to keep spreadsheets. | Add section: \"Not an agency. Not a marketplace. Not an HR add-on. The coordination layer across HR, employees, and providers.\" | \ud83d\udd34 HIGH |\n| Tone | Calm, precise, structured (Stripe/Linear register) | Generic SaaS filler throughout (\"seamless,\" \"intuitive,\" \"powerful,\" \"all-in-one\") | Register is startup hype + consumer product. | Replace all filler with specific outcomes: \"policy-driven,\" \"system of record,\" \"case-centered,\" \"audit-ready.\" | \ud83d\udd34 HIGH |\n| Proof | Product evidence, workflow logic, case data | No proof. \"Track cases, manage documents\" could describe any tool. | Zero operational specificity. | Add workflow evidence: \"Policy applied at case creation. Tasks route automatically. HR sees real-time status. Vendors access structured requirements.\" | \ud83d\udd34 HIGH |\n| CTA | Book a demo / See the platform (primary + secondary, low-friction) | Email contact (single, high-friction) | Only one path. Email is not a product demo CTA. | Primary: \"Book a 30-minute demo\" or secondary: \"Sign in / See the platform.\" (Pick format that fits one-pager layout constraints.) | \ud83d\udfe1 MEDIUM |\n\nTOP 3 PRIORITIES:\n\n1. **Add problem statement (Missing \ud83d\udd34)** \u2014 Open with 2 sentences on coordination failure before any solution talk. This is the entry point for every buyer. Without it, the copy starts mid-story. Current copy jumps to features without establishing why they matter.\n\n2. **Reframe category and every outcome claim (\ud83d\udd34 REGISTER)** \u2014 Replace \"all-in-one platform,\" \"seamless,\" \"intuitive,\" \"powerful,\" \"easy to use\" with infrastructure language: \"system of record,\" \"coordination layer,\" \"policy-driven,\" \"audit-ready,\" \"no manual handoff.\" Every sentence should feel like you're describing how ReloPass runs, not how nice it is to use.\n\n3. **Add differentiation section (Missing \ud83d\udd34)** \u2014 Include the three-line contrast: \"Not an agency. Not a marketplace. Not an HR add-on.\" This closes the category argument and tells buyers why they shouldn't keep using existing tools. Without this, the one-pager looks generic and doesn't win the \"why change\" discussion.\n"}], "grading": {"expectations": [{"text": "Content type is correctly identified as 'one-pager' or 'leave-behind'", "passed": true, "evidence": "First line of output: 'CONTENT TYPE: One-pager / Leave-behind' \u2014 content type is explicitly and correctly identified."}, {"text": "Output uses the structured format: CONTENT TYPE, OVERALL SCORE, SCORECARD, FINDINGS, NARRATIVE ARC, GAP MATRIX, TOP 3 PRIORITIES", "passed": true, "evidence": "Output contains all seven required sections in correct order: (1) CONTENT TYPE, (2) OVERALL SCORE: 22/50, (3) SCORECARD with emoji ratings, (4) FINDINGS section with 10 sorted checks, (5) NARRATIVE ARC with required structure evaluation, (6) GAP MATRIX with complete table, (7) TOP 3 PRIORITIES with prioritized actionable recommendations."}, {"text": "'Relocation Made Easy' or equivalent tagline is flagged as wrong register (lifestyle/consumer)", "passed": true, "evidence": "Check #1 explicitly flags: 'Current: \"ReloPass \u2014 Relocation Made Easy\"' and states 'Issue: \"Made Easy\" is lifestyle language that signals employee product, not HR operating layer.' The issue is correctly identified as wrong register."}, {"text": "'all-in-one' is flagged as generic SaaS filler", "passed": true, "evidence": "Check #2 directly flags this: 'Current: \"ReloPass is an all-in-one relocation management platform\"' with issue: '\"all-in-one platform\" is generic SaaS filler. Reads as a tool, not infrastructure.' Also called out in Check #10 as generic SaaS register throughout."}, {"text": "'seamless', 'best-in-class', and 'intuitive' are flagged as forbidden phrases", "passed": true, "evidence": "Check #6 flags multiple forbidden phrases: 'Current: \"Seamless coordination... Intuitive and easy to use\"' with issue: '\"Seamless\" is the most generic descriptor in B2B. \"Intuitive\" implies you need training. Both signal weakness, not confidence.' Check #8 also flags 'Best-in-class vendor network' as 'unverifiable filler.' All three phrases are explicitly identified and criticized."}, {"text": "'Real relocations, not demos' is identified as a defensive qualifier", "passed": true, "evidence": "Check #8 explicitly identifies this: 'Current: \"- Real relocations, not demos\"' and states 'Issue: \"Real relocations, not demos\" is a defensive qualifier (forbidden).' The qualifier is correctly labeled and its weakness explained."}, {"text": "Missing problem statement / problem stakes section is called out as a structural gap", "passed": true, "evidence": "Check #3 directly addresses this: 'Current: [No problem section exists]' with issue: 'One-pagers must open with 2 sentences vivifying the coordination failure. This goes straight to solution without stakes.' Also called out in NARRATIVE ARC: '2. Problem statement \u2014 2 sentences on coordination failure \u2717 Missing entirely' and in GAP MATRIX under Problem dimension: 'Stakes are missing.' This is consistently flagged across multiple sections as a critical structural gap."}, {"text": "The CTA (email address only) is flagged and a more specific CTA is recommended", "passed": true, "evidence": "Check #9 explicitly addresses the CTA: 'Current: \"Contact us at hello@relopass.com\"' with issue: 'One low-friction CTA. No secondary option (sign in, see the platform). Email is not a high-intent call-to-action for a product interaction.' Recommendation provided: '\"Book a 30-minute demo / Sign in / See the platform\"' with guidance to pick primary and secondary options. Also flagged in NARRATIVE ARC and GAP MATRIX."}], "summary": {"passed": 8, "failed": 0, "total": 8, "pass_rate": 1.0}, "execution_metrics": {"output_chars": 8806, "assertions_evaluated": 8}, "claims": [{"claim": "Output score is 22/50", "type": "factual", "verified": true, "evidence": "OVERALL SCORE line states: '22/50' \u2014 score is explicitly provided in the output."}, {"claim": "10 separate checks were performed (numbered 1-10)", "type": "factual", "verified": true, "evidence": "FINDINGS section contains 10 checks labeled #1 through #10, each with current state, issue, and rewrite recommendation."}, {"claim": "Only 2 of 7 required narrative arc sections are present in recognizable form", "type": "quality", "verified": true, "evidence": "NARRATIVE ARC section explicitly states: 'Out of 7 required sections, only 2 are present in recognizable form. Missing: problem statement, differentiation, second CTA path.' The assessment is explicit and detailed."}, {"claim": "The output identifies all forbidden phrases and registers", "type": "quality", "verified": true, "evidence": "Output flags all key forbidden/problematic phrases: 'Relocation Made Easy' (lifestyle), 'all-in-one' (generic), 'seamless' (generic), 'intuitive' (weak), 'best-in-class' (unverifiable), 'powerful tools' (defensive), 'easy to use' (consumer language). Each is cited with specific criticism."}, {"claim": "The GAP MATRIX identifies 8 key dimensions with high-priority gaps", "type": "factual", "verified": true, "evidence": "GAP MATRIX contains 8 rows with dimensions: Category, Audience, Problem, Promise, Differentiation, Tone, Proof, and CTA. 7 are marked as HIGH priority, 1 as MEDIUM."}], "eval_feedback": {"suggestions": [], "overall": "No suggestions. The output is comprehensive and discriminating. Each assertion is satisfied with genuine substance, not surface compliance. The tool correctly identifies all expected issues with specific evidence and actionable recommendations. The structured format includes all required sections with appropriate depth for a brand audit. The grading criteria are well-calibrated to actual task completion."}}}, {"id": "eval-3-one-pager-without_skill", "prompt": "Audit of post-demo sales leave-behind one-pager", "eval_id": 3, "outputs": [{"name": "output.md", "type": "text", "content": "# ReloPass One-Pager Evaluation\n\n## Overall Assessment\nThis one-pager is **functional but needs refinement**. It covers the key message pillars but lacks persuasion, differentiation, and emotional resonance that converts prospects in post-demo moments.\n\n---\n\n## What Works Well\n\n**1. Clear Structure**\n- The hierarchy (What, How, Why, CTA) is logical and easy to follow\n- Appropriate for a leave-behind that complements a demo\n\n**2. Target Audience Clarity**\n- \"HR teams\" signals exactly who should care\n- \"One place\" resonates with the coordination pain point\n\n**3. Simple CTA**\n- Single email contact is unambiguous and action-oriented\n\n---\n\n## Critical Issues\n\n### 1. **Weak Value Proposition**\nThe opening doesn't answer \"Why should I care?\" in emotional or business terms:\n- \"Helps HR teams coordinate relocations across vendors, employees, and documents\" is feature-focused, not benefit-focused\n- Missing the underlying pain: scattered tools, compliance risk, employee frustration, high touch labor\n\n**Better approach:** Lead with the problem solved or outcome achieved\n- Current: \"all-in-one relocation management platform\"\n- Stronger: \"Stop managing relocations across 5+ different tools\"\n\n### 2. **\"Real relocations, not demos\" Is Confusing**\nThis bullet is unclear and self-referential:\n- Assumes the reader knows what ReloPass was demoing (they just saw it)\n- Reads defensive rather than confident\n- Doesn't communicate actual value\n\n**Fix:** Replace with a concrete outcome metric or use case\n- \"Handles 100+ relocations per year without manual coordination\"\n- \"From first contact to final relocation in 30% less time\"\n\n### 3. **\"How It Works\" Section Is Too Generic**\nThree steps that could apply to almost any SaaS:\n1. Onboard your team\n2. Add your relocations\n3. Manage everything in one place\n\nThese are process steps, not value indicators. A prospect won't remember these.\n\n**Better approach:** Show the transformation\n- \"Centralize all vendor communication and documents\"\n- \"Track every relocation from start to finish with real-time visibility\"\n- \"Eliminate spreadsheets and email chains\"\n\n### 4. **Missing Social Proof or Credibility**\nPost-demo is when trust matters most:\n- No numbers (# companies, relocations handled, time saved)\n- No customer names or industry context\n- No third-party validation\n\nEven one line would help:\n- \"Trusted by 200+ HR teams managing 10,000+ relocations annually\"\n\n### 5. **Vague Differentiators**\n\"Best-in-class vendor network\" needs explanation:\n- What vendors? (Movers, housing, immigration, etc.)\n- Why does this matter? (Cost savings, reduced employee friction, compliance)\n- How is it \"best-in-class\"?\n\n---\n\n## Copy Tone & Brand Issues\n\n**Current tone:** Product-focused, generic\n**Should be:** Empathetic, confident, transformation-focused\n\n- \"Our powerful tools\" sounds generic (all SaaS say this)\n- \"Keep everyone in the loop\" is weak\u2014no sense of urgency or benefit\n- Missing any acknowledgment of the relocation experience from the employee perspective\n\n---\n\n## Recommended Changes (Priority Order)\n\n### High Priority\n1. **Rewrite the opening** to lead with pain or outcome, not features\n2. **Replace \"Real relocations, not demos\"** with concrete value (speed, cost, compliance, employee satisfaction)\n3. **Rebuild \"How It Works\"** to show transformation, not process steps\n\n### Medium Priority\n4. **Add a credibility line** (customer count or relocation volume)\n5. **Expand \"Best-in-class vendor network\"** with context about why it matters\n\n### Nice to Have\n6. **Add a secondary CTA** (e.g., \"Schedule a 15-minute walkthrough\") for those not ready to email\n7. **Include a subtle visual element** (icon, graph, or stat) to break up text\n\n---\n\n## Revised Version (Example)\n\n**HEADER:** ReloPass \u2014 Relocations, Simplified\n\n**WHAT WE DO**\nHR teams juggle 5+ tools to manage relocations. ReloPass brings vendors, documents, and employee updates into one platform\u2014reducing coordination time by 30% and making relocations stress-free for everyone.\n\n**HOW IT WORKS**\n- Centralize vendor management and real-time communication\n- Track every relocation milestone with one dashboard\n- Keep employees and stakeholders automatically updated\n\n**WHY RELOPASS**\n- 10,000+ relocations managed annually\n- 30% faster coordination than traditional processes\n- Integrated vendor network (movers, housing, immigration support)\n- Trusted by HR teams at 200+ companies\n\n**READY TO START?**\nEmail hello@relopass.com or book a 15-minute walkthrough to see how ReloPass transforms your relocation workflow.\n\n---\n\n## Final Verdict\n\n**Current version:** 5/10 (serviceable, but forgettable)\n**Revised version potential:** 8/10 (persuasive, credible, memorable)\n\nThe one-pager has the right structure but reads like product documentation, not a sales tool. Post-demo, prospects need to remember *why* ReloPass solves their specific problem\u2014not just *what* it does. The revision above focuses on outcomes, credibility, and emotional resonance.\n"}], "grading": null}], "previous_feedback": {}, "previous_outputs": {}, "benchmark": {"metadata": {"skill_name": "relopass-brand-audit", "skill_path": "<path/to/skill>", "executor_model": "<model-name>", "analyzer_model": "<model-name>", "timestamp": "2026-04-23T12:07:38Z", "evals_run": [], "runs_per_configuration": 3}, "runs": [], "run_summary": {"delta": {"pass_rate": "+0.00", "time_seconds": "+0.0", "tokens": "+0"}}, "notes": []}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

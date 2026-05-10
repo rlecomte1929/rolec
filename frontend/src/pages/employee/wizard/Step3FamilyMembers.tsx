@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Button, Card } from '../../../components/antigravity';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import type { CaseDraftDTO, FamilyMemberDTO } from '../../../types';
+import { ROUTES } from '../../../routes';
 
 interface StepProps {
   draft: CaseDraftDTO;
@@ -8,16 +10,19 @@ interface StepProps {
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
   onBack: () => void;
+  isSaving?: boolean;
 }
 
 const isRequired = (requiredFields: string[], key: string) => requiredFields.includes(key);
 
-export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack }) => {
+export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields, onSave, onNext, onBack, isSaving }) => {
+  const navigate = useNavigate();
   const [local, setLocal] = useState({
     ...draft.familyMembers,
     maritalStatus: draft.familyMembers.maritalStatus || 'Single',
   });
   const [children, setChildren] = useState<FamilyMemberDTO[]>(local.children || []);
+  const [draftExitSaving, setDraftExitSaving] = useState(false);
 
   const update = (key: keyof typeof local, value: any) => {
     setLocal({ ...local, [key]: value });
@@ -35,6 +40,15 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
   const hasAnyDependent = Boolean(local.spouse?.fullName || children.some((c) => c.fullName));
   const dependentsMissing = hasDependents && !hasAnyDependent;
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const nextLocal = {
+      ...draft.familyMembers,
+      maritalStatus: draft.familyMembers.maritalStatus || 'Single',
+    };
+    setLocal(nextLocal);
+    setChildren(nextLocal.children || []);
+  }, [draft.familyMembers]);
 
   return (
     <Card padding="lg">
@@ -136,30 +150,45 @@ export const Step3FamilyMembers: React.FC<StepProps> = ({ draft, requiredFields,
       <div className="mt-6 flex items-center justify-between">
         <Button variant="outline" onClick={onBack}>Back</Button>
         <div className="flex gap-2">
-          <Button
+          <LoadingButton
             variant="outline"
+            loading={draftExitSaving}
+            loadingLabel="Saving…"
+            disabled={isSaving}
             onClick={async () => {
-              await onSave(nextDraft);
-              window.location.href = '/employee/journey';
+              setDraftExitSaving(true);
+              setError('');
+              try {
+                await onSave(nextDraft);
+                if (import.meta.env.DEV) {
+                  console.debug('Save & Exit -> /employee/dashboard');
+                }
+                navigate(ROUTES.EMP_DASH);
+              } catch (err: any) {
+                setError(err?.message || "Couldn't save draft. Try again.");
+              } finally {
+                setDraftExitSaving(false);
+              }
             }}
           >
             Save as draft & exit
-          </Button>
+          </LoadingButton>
           <Button
+            disabled={isSaving || draftExitSaving}
             onClick={() => {
               if (maritalMissing) {
-                setError('Please select a marital status.');
+                setError('Select a marital status.');
                 return;
               }
               if (dependentsMissing) {
-                setError('You marked “Relocating with dependents”. Please add at least a spouse or one child.');
+                setError('You marked “Relocating with dependents”. Add at least a spouse or one child.');
                 return;
               }
               setError('');
               onNext(nextDraft);
             }}
           >
-            Next
+            {isSaving ? 'Saving…' : 'Next'}
           </Button>
         </div>
       </div>

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import json
 import os
 
 
 class PolicyEngine:
-    def __init__(self, policy_path: str = "policy_config.json"):
-        self.policy_path = policy_path
+    def __init__(self, policy_path: Optional[str] = None):
+        if policy_path:
+            self.policy_path = policy_path
+        else:
+            self.policy_path = os.path.join(os.path.dirname(__file__), "policy_config.json")
 
     def load_policy(self) -> Dict[str, Any]:
         if os.path.exists(self.policy_path):
@@ -73,7 +76,7 @@ class PolicyEngine:
         policy: Dict[str, Any],
         spend: Dict[str, Any],
         exceptions: List[Dict[str, Any]],
-        assignment_status: str | None = None,
+        assignment_status: Optional[str] = None,
     ) -> Dict[str, Any]:
         checks: List[Dict[str, Any]] = []
         conflicts: List[Dict[str, Any]] = []
@@ -202,7 +205,7 @@ class PolicyEngine:
         return self._check(check_id, f"{label} status unknown", "WARN", "MED", "LOW", owner,
                            f"{label} status not provided.", [label], ["Ask Employee"])
 
-    def _passport_validity_check(self, expiry: date | None, target: date | None) -> Dict[str, Any]:
+    def _passport_validity_check(self, expiry: Optional[date], target: Optional[date]) -> Dict[str, Any]:
         if not expiry or not target:
             return self._check(
                 "passport_validity",
@@ -239,7 +242,7 @@ class PolicyEngine:
             []
         )
 
-    def _lead_time_check(self, planned: date | None, min_days: int) -> Dict[str, Any]:
+    def _lead_time_check(self, planned: Optional[date], min_days: int) -> Dict[str, Any]:
         if not planned:
             return self._check(
                 "lead_time",
@@ -371,19 +374,45 @@ class PolicyEngine:
         return "Consistency & Data Integrity"
 
     def _visa_path(self, profile: Dict[str, Any]) -> str:
-        job_level = profile.get("primaryApplicant", {}).get("employer", {}).get("jobLevel")
-        return f"L-{job_level} Specialized Knowledge" if job_level else "L-1B Specialized Knowledge"
+        # We do not have the immigration knowledge to recommend a specific
+        # visa category per corridor — the previous implementation hardcoded
+        # US L-visa terminology regardless of route. Until a properly
+        # sourced per-corridor immigration model is in place, surface a
+        # corridor-aware referral instead of a confidently wrong category.
+        move = profile.get("movePlan") or {}
+        origin = (move.get("origin") or "").strip() if isinstance(move.get("origin"), str) else ""
+        destination = (move.get("destination") or "").strip() if isinstance(move.get("destination"), str) else ""
+        if origin and destination:
+            return f"Requires immigration counsel review for {origin} → {destination}."
+        if destination:
+            return f"Requires immigration counsel review for relocation to {destination}."
+        return "Requires immigration counsel review."
 
     def _stage_label(self, status: Any) -> str:
-        if status == "EMPLOYEE_SUBMITTED":
-            return "Intake/Pre-Submission"
-        if status == "CHANGES_REQUESTED":
-            return "Changes Requested"
-        if status == "HR_APPROVED":
+        """
+        Map canonical / legacy assignment statuses to human-readable stage labels.
+        """
+        if not status:
+            return "Intake / Created"
+        s = str(status).strip().lower()
+        if s in {"submitted"}:
+            return "Intake / Submitted"
+        if s in {"approved"}:
             return "Approved"
-        return "Intake/In Progress"
+        if s in {"rejected"}:
+            return "Rejected"
+        if s in {"awaiting_intake", "assigned"}:
+            return "Awaiting Intake"
+        # Legacy fallbacks
+        if s in {"employee_submitted"}:
+            return "Intake / Submitted"
+        if s in {"changes_requested"}:
+            return "Awaiting Intake"
+        if s in {"hr_approved"}:
+            return "Approved"
+        return "Intake / In Progress"
 
-    def _parse_date(self, value: Any) -> date | None:
+    def _parse_date(self, value: Any) -> Optional[date]:
         if not value:
             return None
         try:

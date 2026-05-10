@@ -8,6 +8,9 @@ interface ButtonProps {
   disabled?: boolean;
   fullWidth?: boolean;
   type?: 'button' | 'submit';
+  className?: string;
+  /** Native tooltip (e.g. disabled buttons) */
+  title?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -18,6 +21,8 @@ export const Button: React.FC<ButtonProps> = ({
   disabled = false,
   fullWidth = false,
   type = 'button',
+  className = '',
+  title,
 }) => {
   const baseStyles = 'font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
   
@@ -42,7 +47,8 @@ export const Button: React.FC<ButtonProps> = ({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${widthClass} ${disabledClass}`}
+      title={title}
+      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${widthClass} ${disabledClass} ${className}`}
     >
       {children}
     </button>

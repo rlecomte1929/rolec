@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Card, Button, Input, Select, Alert } from '../components/antigravity';
-import { AppShell } from '../components/AppShell';
+import React, { useEffect, useRef, useState } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
+import { Card, Input, Select, Alert, LoadingButton } from '../components/antigravity';
+import { PublicLayout } from '../components/public';
 import type { UserRole } from '../types';
-import { clearAuthItems } from '../utils/demo';
 import { useAuth } from '../hooks/useAuth';
+import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
+import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
+import { getAuthItem } from '../utils/demo';
 
 export const Auth: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -18,6 +20,8 @@ export const Auth: React.FC = () => {
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
   const { login, register } = useAuth();
+  /** Blocks double-submit before React re-renders (e.g. double-click + Enter). */
+  const authInFlight = useRef(false);
 
 
   useEffect(() => {
@@ -30,20 +34,31 @@ export const Auth: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authInFlight.current || isLoading) return;
     setError('');
+    authInFlight.current = true;
     setIsLoading(true);
 
     try {
       await login({ identifier, password });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed. Please try again.');
+      const transport = getClientTransportErrorMessage(err);
+      const msg = transport ?? getApiErrorMessage(err, 'Login failed. Check your email and password, then try again.');
+      try {
+        localStorage.setItem('debug_last_auth_error', msg);
+      } catch {
+        /* ignore */
+      }
+      setError(msg);
     } finally {
+      authInFlight.current = false;
       setIsLoading(false);
     }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authInFlight.current || isLoading) return;
     setError('');
 
     const hasUsername = username.trim().length > 0;
@@ -68,6 +83,7 @@ export const Auth: React.FC = () => {
       return;
     }
 
+    authInFlight.current = true;
     setIsLoading(true);
     try {
       await register({
@@ -78,38 +94,73 @@ export const Auth: React.FC = () => {
         name: name.trim() || undefined,
       });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      const transport = getClientTransportErrorMessage(err);
+      if (transport) {
+        try {
+          localStorage.setItem('debug_last_auth_error', transport);
+        } catch {
+          /* ignore */
+        }
+        setError(transport);
+        return;
+      }
+      const detail = err.response?.data?.detail;
+      let msg: string;
+      if (err.response?.status === 400 && detail && typeof detail === 'object' && !Array.isArray(detail)) {
+        const code = (detail as { code?: string }).code;
+        const message = (detail as { message?: string }).message;
+        if (code === 'AUTH_EMAIL_TAKEN' && message) {
+          msg = message;
+        } else if (code === 'AUTH_USERNAME_TAKEN' && message) {
+          msg = message;
+        } else if (message) {
+          msg = message;
+        } else {
+          msg = 'Registration failed. Check email and password format, then try again.';
+        }
+      } else if (err.response?.status === 400 && detail) {
+        msg = Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail);
+      } else if (!err.response) {
+        msg = 'Cannot reach the server. Check your connection and try again.';
+      } else {
+        msg = detail ? (Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail)) : 'Registration failed. Try again.';
+      }
+      try {
+        localStorage.setItem('debug_last_auth_error', msg);
+      } catch {
+        /* ignore */
+      }
+      setError(msg);
     } finally {
+      authInFlight.current = false;
       setIsLoading(false);
     }
   };
 
-  const handleResetTest = () => {
-    clearAuthItems();
-    setIdentifier('');
-    setPassword('');
-    setUsername('');
-    setEmail('');
-    setName('');
-    setError('');
-  };
+  if (getAuthItem('relopass_token')) {
+    const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
+    if (key !== 'landing') {
+      return <Navigate to={buildRoute(key)} replace />;
+    }
+  }
 
   return (
-    <AppShell>
+    <PublicLayout>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
         <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <img src="/relopass-logo.png?v=1" alt="ReloPass logo" className="h-11 w-11 rounded-2xl object-contain" />
-            <div>
-              <h1 className="text-3xl font-semibold text-[#0b2b43]">ReloPass</h1>
-              <p className="text-[#4b5563]">Guided relocation management for HR and employees.</p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-semibold text-[#0b2b43] leading-tight">
+              Run every relocation on one record.
+            </h1>
+            <p className="mt-3 text-[#4b5563] leading-relaxed">
+              ReloPass keeps cases, documents, and provider activity in one place — so HR stops chasing updates and employees always know what's next.
+            </p>
           </div>
-          <div className="space-y-2 text-sm text-[#4b5563]">
-            <div>• Centralized relocation intake and compliance checks.</div>
-            <div>• Track readiness, housing, schooling, and movers.</div>
-            <div>• HR review workflow with clear decisions.</div>
-          </div>
+          <ul className="space-y-2 text-sm text-[#4b5563]">
+            <li>• Open cases, track readiness, and run compliance on one workflow.</li>
+            <li>• Coordinate housing, schools, and providers from the same record.</li>
+            <li>• HR sees every case. Employees see their own next steps.</li>
+          </ul>
         </div>
 
         <Card padding="lg">
@@ -121,7 +172,7 @@ export const Auth: React.FC = () => {
                   mode === 'login' ? 'bg-[#0b2b43] text-white' : 'bg-[#f3f4f6] text-[#4b5563]'
                 }`}
               >
-                Sign In
+                Sign in
               </button>
               <button
                 onClick={() => setMode('register')}
@@ -135,6 +186,18 @@ export const Auth: React.FC = () => {
 
             {error && <Alert variant="error">{error}</Alert>}
 
+            {mode === 'register' && role === 'EMPLOYEE' && (
+              <Alert variant="info" title="Signing up with a work email">
+                <p className="text-sm text-[#374151] leading-relaxed">
+                  HR can add your work email to a case before you register. You can still create an account here.
+                </p>
+                <p className="text-sm text-[#374151] mt-2 leading-relaxed">
+                  &quot;Email already in use&quot; means that address is already a login on ReloPass. Use the same email
+                  HR used and pending cases usually attach. If not, enter the assignment ID from HR on your dashboard.
+                </p>
+              </Alert>
+            )}
+
             {mode === 'login' && (
               <form onSubmit={handleLogin} className="space-y-4">
                 <Input
@@ -142,6 +205,7 @@ export const Auth: React.FC = () => {
                   onChange={setIdentifier}
                   label="Username or Email"
                   placeholder="username or you@example.com"
+                  autoComplete="username"
                   fullWidth
                 />
                 <Input
@@ -149,12 +213,19 @@ export const Auth: React.FC = () => {
                   value={password}
                   onChange={setPassword}
                   label="Password"
-                  placeholder="Enter your password"
+                  placeholder="Password"
+                  autoComplete="current-password"
                   fullWidth
                 />
-                <Button type="submit" fullWidth disabled={!identifier || !password || isLoading}>
-                  {isLoading ? 'Signing in...' : 'Sign In'}
-                </Button>
+                <LoadingButton
+                  type="submit"
+                  fullWidth
+                  loading={isLoading}
+                  loadingLabel="Signing in…"
+                  disabled={!identifier || !password}
+                >
+                  Sign in
+                </LoadingButton>
               </form>
             )}
 
@@ -172,6 +243,7 @@ export const Auth: React.FC = () => {
                   onChange={setUsername}
                   label="Username"
                   placeholder="username (3–30 chars, letters/numbers/_)"
+                  autoComplete="username"
                   fullWidth
                 />
                 <Input
@@ -180,6 +252,7 @@ export const Auth: React.FC = () => {
                   onChange={setEmail}
                   label="Email"
                   placeholder="you@example.com"
+                  autoComplete="email"
                   fullWidth
                 />
                 <Input
@@ -188,6 +261,7 @@ export const Auth: React.FC = () => {
                   onChange={setPassword}
                   label="Password"
                   placeholder="Create a password"
+                  autoComplete="new-password"
                   fullWidth
                 />
                 <Select
@@ -197,23 +271,24 @@ export const Auth: React.FC = () => {
                   options={[
                     { value: 'HR', label: 'HR manager' },
                     { value: 'EMPLOYEE', label: 'Employee' },
+                    { value: 'ADMIN', label: 'Admin (full access)' },
                   ]}
                   fullWidth
                 />
-                <Button type="submit" fullWidth disabled={isLoading}>
-                  {isLoading ? 'Creating account...' : 'Create Account'}
-                </Button>
+                <LoadingButton
+                  type="submit"
+                  fullWidth
+                  loading={isLoading}
+                  loadingLabel="Creating account…"
+                  disabled={!password.trim() || (!username.trim() && !email.trim())}
+                >
+                  Create account
+                </LoadingButton>
               </form>
             )}
           </div>
         </Card>
       </div>
-      <button
-        onClick={handleResetTest}
-        className="fixed bottom-6 right-6 text-xs bg-slate-900 text-white px-3 py-2 rounded-full shadow-lg hover:bg-slate-800"
-      >
-        Reset test data
-      </button>
-    </AppShell>
+    </PublicLayout>
   );
 };

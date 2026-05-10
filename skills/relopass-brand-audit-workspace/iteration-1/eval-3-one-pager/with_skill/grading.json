@@ -1,0 +1,90 @@
+{
+  "expectations": [
+    {
+      "text": "Content type is correctly identified as 'one-pager' or 'leave-behind'",
+      "passed": true,
+      "evidence": "First line of output: 'CONTENT TYPE: One-pager / Leave-behind' — content type is explicitly and correctly identified."
+    },
+    {
+      "text": "Output uses the structured format: CONTENT TYPE, OVERALL SCORE, SCORECARD, FINDINGS, NARRATIVE ARC, GAP MATRIX, TOP 3 PRIORITIES",
+      "passed": true,
+      "evidence": "Output contains all seven required sections in correct order: (1) CONTENT TYPE, (2) OVERALL SCORE: 22/50, (3) SCORECARD with emoji ratings, (4) FINDINGS section with 10 sorted checks, (5) NARRATIVE ARC with required structure evaluation, (6) GAP MATRIX with complete table, (7) TOP 3 PRIORITIES with prioritized actionable recommendations."
+    },
+    {
+      "text": "'Relocation Made Easy' or equivalent tagline is flagged as wrong register (lifestyle/consumer)",
+      "passed": true,
+      "evidence": "Check #1 explicitly flags: 'Current: \"ReloPass — Relocation Made Easy\"' and states 'Issue: \"Made Easy\" is lifestyle language that signals employee product, not HR operating layer.' The issue is correctly identified as wrong register."
+    },
+    {
+      "text": "'all-in-one' is flagged as generic SaaS filler",
+      "passed": true,
+      "evidence": "Check #2 directly flags this: 'Current: \"ReloPass is an all-in-one relocation management platform\"' with issue: '\"all-in-one platform\" is generic SaaS filler. Reads as a tool, not infrastructure.' Also called out in Check #10 as generic SaaS register throughout."
+    },
+    {
+      "text": "'seamless', 'best-in-class', and 'intuitive' are flagged as forbidden phrases",
+      "passed": true,
+      "evidence": "Check #6 flags multiple forbidden phrases: 'Current: \"Seamless coordination... Intuitive and easy to use\"' with issue: '\"Seamless\" is the most generic descriptor in B2B. \"Intuitive\" implies you need training. Both signal weakness, not confidence.' Check #8 also flags 'Best-in-class vendor network' as 'unverifiable filler.' All three phrases are explicitly identified and criticized."
+    },
+    {
+      "text": "'Real relocations, not demos' is identified as a defensive qualifier",
+      "passed": true,
+      "evidence": "Check #8 explicitly identifies this: 'Current: \"- Real relocations, not demos\"' and states 'Issue: \"Real relocations, not demos\" is a defensive qualifier (forbidden).' The qualifier is correctly labeled and its weakness explained."
+    },
+    {
+      "text": "Missing problem statement / problem stakes section is called out as a structural gap",
+      "passed": true,
+      "evidence": "Check #3 directly addresses this: 'Current: [No problem section exists]' with issue: 'One-pagers must open with 2 sentences vivifying the coordination failure. This goes straight to solution without stakes.' Also called out in NARRATIVE ARC: '2. Problem statement — 2 sentences on coordination failure ✗ Missing entirely' and in GAP MATRIX under Problem dimension: 'Stakes are missing.' This is consistently flagged across multiple sections as a critical structural gap."
+    },
+    {
+      "text": "The CTA (email address only) is flagged and a more specific CTA is recommended",
+      "passed": true,
+      "evidence": "Check #9 explicitly addresses the CTA: 'Current: \"Contact us at hello@relopass.com\"' with issue: 'One low-friction CTA. No secondary option (sign in, see the platform). Email is not a high-intent call-to-action for a product interaction.' Recommendation provided: '\"Book a 30-minute demo / Sign in / See the platform\"' with guidance to pick primary and secondary options. Also flagged in NARRATIVE ARC and GAP MATRIX."
+    }
+  ],
+  "summary": {
+    "passed": 8,
+    "failed": 0,
+    "total": 8,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "output_chars": 8806,
+    "assertions_evaluated": 8
+  },
+  "claims": [
+    {
+      "claim": "Output score is 22/50",
+      "type": "factual",
+      "verified": true,
+      "evidence": "OVERALL SCORE line states: '22/50' — score is explicitly provided in the output."
+    },
+    {
+      "claim": "10 separate checks were performed (numbered 1-10)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "FINDINGS section contains 10 checks labeled #1 through #10, each with current state, issue, and rewrite recommendation."
+    },
+    {
+      "claim": "Only 2 of 7 required narrative arc sections are present in recognizable form",
+      "type": "quality",
+      "verified": true,
+      "evidence": "NARRATIVE ARC section explicitly states: 'Out of 7 required sections, only 2 are present in recognizable form. Missing: problem statement, differentiation, second CTA path.' The assessment is explicit and detailed."
+    },
+    {
+      "claim": "The output identifies all forbidden phrases and registers",
+      "type": "quality",
+      "verified": true,
+      "evidence": "Output flags all key forbidden/problematic phrases: 'Relocation Made Easy' (lifestyle), 'all-in-one' (generic), 'seamless' (generic), 'intuitive' (weak), 'best-in-class' (unverifiable), 'powerful tools' (defensive), 'easy to use' (consumer language). Each is cited with specific criticism."
+    },
+    {
+      "claim": "The GAP MATRIX identifies 8 key dimensions with high-priority gaps",
+      "type": "factual",
+      "verified": true,
+      "evidence": "GAP MATRIX contains 8 rows with dimensions: Category, Audience, Problem, Promise, Differentiation, Tone, Proof, and CTA. 7 are marked as HIGH priority, 1 as MEDIUM."
+    }
+  ],
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "No suggestions. The output is comprehensive and discriminating. Each assertion is satisfied with genuine substance, not surface compliance. The tool correctly identifies all expected issues with specific evidence and actionable recommendations. The structured format includes all required sections with appropriate depth for a brand audit. The grading criteria are well-calibrated to actual task completion."
+  }
+}

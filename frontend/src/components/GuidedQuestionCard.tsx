@@ -131,7 +131,7 @@ export const GuidedQuestionCard: React.FC<GuidedQuestionCardProps> = ({
               type="text"
               value={answer}
               onChange={setAnswer}
-              placeholder="Enter your answer"
+              placeholder="Your answer"
               fullWidth
             />
           )}

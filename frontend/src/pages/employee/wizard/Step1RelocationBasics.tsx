@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { Button, Card } from '../../../components/antigravity';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button, Card, LoadingButton } from '../../../components/antigravity';
 import type { CaseDraftDTO } from '../../../types';
+import { ROUTES } from '../../../routes';
+import { COUNTRY_OPTIONS, getCitiesForCountry, isCityInList } from '../../../utils/countries';
 
 interface StepProps {
   caseId: string;
@@ -9,21 +12,23 @@ interface StepProps {
   banner?: string;
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
+  isSaving?: boolean;
 }
 
-const COUNTRY_OPTIONS = [
-  { code: 'NO', name: 'Norway', cities: ['Oslo', 'Bergen'] },
-  { code: 'SG', name: 'Singapore', cities: ['Singapore'] },
-  { code: 'US', name: 'United States', cities: ['New York', 'San Francisco'] },
-  { code: 'UK', name: 'United Kingdom', cities: ['London', 'Manchester'] },
-  { code: 'DE', name: 'Germany', cities: ['Berlin', 'Munich'] },
-];
-
-export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, banner, onSave, onNext }) => {
+export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, banner, onSave, onNext, isSaving }) => {
+  const navigate = useNavigate();
   const [local, setLocal] = useState(draft.relocationBasics);
-  const [customOriginCity, setCustomOriginCity] = useState('');
-  const [customDestCity, setCustomDestCity] = useState('');
   const [error, setError] = useState('');
+  const [draftExitSaving, setDraftExitSaving] = useState(false);
+
+  useEffect(() => {
+    setLocal(draft.relocationBasics || {});
+  }, [draft.relocationBasics]);
+
+  const originCities = getCitiesForCountry(local.originCountry || '');
+  const destCities = getCitiesForCountry(local.destCountry || '');
+  const showOriginOtherInput = !local.originCity || !isCityInList(local.originCountry || '', local.originCity || '');
+  const showDestOtherInput = !local.destCity || !isCityInList(local.destCountry || '', local.destCity || '');
 
   const update = (key: keyof typeof local, value: any) => {
     setLocal({ ...local, [key]: value });
@@ -76,10 +81,10 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
           <label className="text-sm text-[#0b2b43]">
             Origin City{missing.originCity && <span className="text-red-600"> *</span>}
             <select
-              value={local.originCity || ''}
+              value={originCities.includes(local.originCity || '') ? local.originCity! : (local.originCity ? 'Other' : '')}
               onChange={(event) => {
                 if (event.target.value === 'Other') {
-                  update('originCity', '');
+                  update('originCity', originCities.includes(local.originCity || '') ? '' : (local.originCity || ''));
                 } else {
                   update('originCity', event.target.value);
                 }
@@ -87,27 +92,25 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
               className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
             >
               <option value="">Select city</option>
-              {(COUNTRY_OPTIONS.find((c) => c.name === local.originCountry)?.cities || []).map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
+              {originCities.map((city) => (
+                <option key={city} value={city}>{city}</option>
               ))}
               <option value="Other">Other</option>
             </select>
-            {!local.originCity && (
+            {showOriginOtherInput && (
               <input
-                value={customOriginCity}
-                onChange={(event) => {
-                  setCustomOriginCity(event.target.value);
-                  update('originCity', event.target.value);
-                }}
+                value={local.originCity || ''}
+                onChange={(event) => update('originCity', event.target.value)}
                 className="mt-2 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-                placeholder="Enter city"
+                placeholder="Enter city name"
               />
             )}
           </label>
           <label className="text-sm text-[#0b2b43]">
             Destination Country{missing.destCountry && <span className="text-red-600"> *</span>}
+            {local.destCountry && (
+              <span className="ml-2 text-xs text-[#1f8e8b]">(Set by HR: you can change if needed)</span>
+            )}
             <select
               value={local.destCountry || ''}
               onChange={(event) => update('destCountry', event.target.value)}
@@ -124,10 +127,10 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
           <label className="text-sm text-[#0b2b43]">
             Destination City{missing.destCity && <span className="text-red-600"> *</span>}
             <select
-              value={local.destCity || ''}
+              value={destCities.includes(local.destCity || '') ? local.destCity! : (local.destCity ? 'Other' : '')}
               onChange={(event) => {
                 if (event.target.value === 'Other') {
-                  update('destCity', '');
+                  update('destCity', destCities.includes(local.destCity || '') ? '' : (local.destCity || ''));
                 } else {
                   update('destCity', event.target.value);
                 }
@@ -135,22 +138,17 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
               className="mt-1 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
             >
               <option value="">Select city</option>
-              {(COUNTRY_OPTIONS.find((c) => c.name === local.destCountry)?.cities || []).map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
+              {destCities.map((city) => (
+                <option key={city} value={city}>{city}</option>
               ))}
               <option value="Other">Other</option>
             </select>
-            {!local.destCity && (
+            {showDestOtherInput && (
               <input
-                value={customDestCity}
-                onChange={(event) => {
-                  setCustomDestCity(event.target.value);
-                  update('destCity', event.target.value);
-                }}
+                value={local.destCity || ''}
+                onChange={(event) => update('destCity', event.target.value)}
                 className="mt-2 w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm"
-                placeholder="Enter city"
+                placeholder="Enter city name"
               />
             )}
           </label>
@@ -203,26 +201,41 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
       </div>
 
       <div className="mt-6 flex items-center justify-between">
-        <Button
+        <LoadingButton
           variant="outline"
+          loading={draftExitSaving}
+          loadingLabel="Saving…"
+          disabled={isSaving}
           onClick={async () => {
-            await onSave(nextDraft);
-            window.location.href = '/employee/journey';
+            setDraftExitSaving(true);
+            setError('');
+            try {
+              await onSave(nextDraft);
+              if (import.meta.env.DEV) {
+                console.debug('Save & Exit -> /employee/dashboard');
+              }
+              navigate(ROUTES.EMP_DASH);
+            } catch (err: any) {
+              setError(err?.message || "Couldn't save draft. Try again.");
+            } finally {
+              setDraftExitSaving(false);
+            }
           }}
         >
           Save as draft & exit
-        </Button>
+        </LoadingButton>
         <Button
+          disabled={isSaving || draftExitSaving}
           onClick={() => {
             if (hasMissing) {
-              setError('Please complete all required fields (marked with *).');
+              setError('Complete required fields (marked with *).');
               return;
             }
             setError('');
             onNext(nextDraft);
           }}
         >
-          Next
+          {isSaving ? 'Saving…' : 'Next'}
         </Button>
       </div>
     </Card>

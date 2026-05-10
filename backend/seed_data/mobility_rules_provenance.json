@@ -1,0 +1,9 @@
+{
+  "rule_pack": {
+    "source_type": "company_policy",
+    "source_title": "ReloPass internal mobility rule pack (mobility_rules.json)",
+    "reference_strength": "internal",
+    "source_last_reviewed_at": "2026-03-24",
+    "notes": "Housing caps, lead time, and required document flags are ReloPass product configuration — not immigration law."
+  }
+}

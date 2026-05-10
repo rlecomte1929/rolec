@@ -1,0 +1,121 @@
+# Example HR Policy (filled)
+# Use with HR Profile editable screen
+
+hr_policy_example:
+  policyId: "550e8400-e29b-41d4-a716-446655440000"
+  version: 2
+  policyName: "Global Relocation Policy 2024"
+  companyEntity: "NOR-INV-001"
+  effectiveDate: "2024-01-01"
+  expiryDate: null
+  status: published
+  employeeBands: [Band1, Band2, Band3, Band4]
+  assignmentTypes: [Permanent, Long-Term, Short-Term]
+
+  benefitCategories:
+    preAssignmentVisit:
+      allowed: true
+      maxAllowed: { min: 1500, medium: 3000, extensive: 5000, premium: 8000 }
+      unit: currency
+      currency: USD
+      documentationRequired: [Travel receipts, Approval email]
+      preApprovalRequired: false
+      notes: Covers flights and accommodation for pre-assignment visit.
+
+    travel:
+      allowed: true
+      maxAllowed: { min: 3000, medium: 6000, extensive: 10000, premium: 15000 }
+      unit: currency
+      currency: USD
+      documentationRequired: [Flight receipts, Boarding passes]
+      preApprovalRequired: true
+
+    temporaryHousing:
+      allowed: true
+      maxAllowed: { min: 3000, medium: 5000, extensive: 7000, premium: 10000 }
+      unit: currency
+      currency: USD
+      documentationRequired: [Lease agreement, Receipts]
+      preApprovalRequired: true
+
+    shipment:
+      allowed: true
+      maxAllowed: { min: 5000, medium: 10000, extensive: 15000, premium: 25000 }
+      unit: currency
+      currency: USD
+      documentationRequired: [Vendor quote, Inventory list]
+      preApprovalRequired: true
+
+    spousalSupport:
+      allowed: true
+      maxAllowed: { min: 2000, medium: 5000, extensive: 8000, premium: 12000 }
+      unit: currency
+      currency: USD
+      documentationRequired: [Spouse CV, Job search evidence]
+      preApprovalRequired: true
+      notes: Only for Permanent and Long-Term assignments.
+
+  bandAssignmentRules:
+    Band1_Permanent:
+      benefitOverrides:
+        shipment:
+          allowed: true
+          maxAllowed: { min: 8000, medium: 15000, extensive: 20000, premium: 30000 }
+
+  jurisdictionOverrides:
+    SG:
+      countryCode: SG
+      overrideBenefitCategories:
+        temporaryHousing:
+          allowed: true
+          maxAllowed: { min: 4000, medium: 6000, extensive: 9000, premium: 12000 }
+          currency: SGD
+      notes: Singapore cost-of-living adjustment
+
+  conditionalDependencies:
+    - benefit: rentalAssistance
+      requires: [settlingInAllowance]
+      condition: Rental assistance only available if settling-in allowance is accepted
+
+---
+# Example Employee View (rendered)
+# Read-only, filtered by band + assignment + jurisdiction
+
+employee_view_example:
+  employeeId: emp-001
+  band: Band2
+  assignment:
+    type: Long-Term
+    destination: Singapore
+    countryCode: SG
+
+  applicablePolicy:
+    policyId: "550e8400-e29b-41d4-a716-446655440000"
+    effectiveDate: "2024-01-01"
+
+  allowedBenefits:
+    - key: preAssignmentVisit
+      label: Pre-Assignment Visit
+      allowed: true
+      maxAllowed: { min: 3000, medium: 6000, extensive: 5000, premium: 8000 }
+      currency: USD
+      preApprovalRequired: false
+      documentationRequired: [Travel receipts, Approval email]
+      explanatoryText: "Maximum traveling allowance for pre-assignment visit: up to $8,000 USD (Premium tier)"
+
+    - key: temporaryHousing
+      label: Temporary Housing
+      allowed: true
+      maxAllowed: { min: 4000, medium: 6000, extensive: 9000, premium: 12000 }
+      currency: SGD
+      preApprovalRequired: true
+      documentationRequired: [Lease agreement, Receipts]
+      explanatoryText: "Singapore cost-of-living adjustment applies. Pre-approval required. Housing options must be submitted before arrival."
+
+  acknowledgementsRequired:
+    - id: ack-1
+      text: I understand pre-approval is required for rental deposit reimbursement
+      required: true
+    - id: ack-2
+      text: I accept that documentation must be provided within 30 days
+      required: true

@@ -1,70 +1,134 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, Button, Input, Alert, Badge } from '../components/antigravity';
 import { hrAPI } from '../api/client';
-import type { AssignmentSummary, AssignmentDetail } from '../types';
+import type { AssignmentSummary } from '../types';
+import { startInteraction, endInteraction } from '../perf/perf';
+import { trackAuthPerf } from '../perf/authPerf';
 import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { useSelectedCase } from '../contexts/SelectedCaseContext';
+import { getAuthItem, normalizeStoredRole } from '../utils/demo';
+import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
+
+const PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export const HrDashboard: React.FC = () => {
+  const { setSelectedCaseId } = useSelectedCase();
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [caseId, setCaseId] = useState<string | null>(null);
   const [employeeIdentifier, setEmployeeIdentifier] = useState('');
+  const [employeeFirstName, setEmployeeFirstName] = useState('');
+  const [employeeLastName, setEmployeeLastName] = useState('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
-  const [assignmentDetails, setAssignmentDetails] = useState<Record<string, AssignmentDetail>>({});
   const [search, setSearch] = useState('');
+  const [searchDebounced, setSearchDebounced] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [destinationFilter, setDestinationFilter] = useState('');
-  const [departingSoonOnly, setDepartingSoonOnly] = useState(false);
+  const [appliedStatus, setAppliedStatus] = useState<string>('all');
+  const [appliedDestination, setAppliedDestination] = useState('');
+  const [isManageMode, setIsManageMode] = useState(false);
+  const [selectedForRemoval, setSelectedForRemoval] = useState<Set<string>>(new Set());
+  const [isConfirmingRemoval, setIsConfirmingRemoval] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState(false);
   const navigate = useNavigate();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const acRef = useRef<AbortController | null>(null);
+  const offsetRef = useRef(0);
+  const routePerfStartedAt = useRef<number | null>(null);
+  useEffect(() => {
+    offsetRef.current = offset;
+  }, [offset]);
 
-  const loadAssignments = async () => {
-    setIsLoading(true);
+  useEffect(() => {
+    routePerfStartedAt.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackRouteEntry('/hr/dashboard');
+    trackShellRender('/hr/dashboard');
+  }, []);
+
+  const loadAssignments = useCallback(async (append = false, signal?: AbortSignal) => {
+    const nextOffset = append ? offsetRef.current : 0;
+    const nextLimit = PAGE_SIZE;
+    const isAppend = append && nextOffset > 0;
+    if (isAppend) setIsLoadingMore(true);
+    else setIsLoading(true);
+    setError('');
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackAuthPerf({ stage: 'bootstrap_start', route: '/hr/dashboard', meta: { endpoint: 'listAssignments' } });
     try {
-      const data = await hrAPI.listAssignments();
-      setAssignments(data);
-      if (data.length > 0) {
-        localStorage.setItem('relopass_last_assignment_id', data[0].id);
+      const res = await hrAPI.listAssignments({
+        signal,
+        limit: nextLimit,
+        offset: nextOffset,
+        search: searchDebounced.trim() || undefined,
+        status: appliedStatus !== 'all' ? appliedStatus : undefined,
+        destination: appliedDestination.trim() || undefined,
+      });
+      if (signal?.aborted) return;
+      const list = Array.isArray(res.assignments) ? res.assignments : [];
+      const totalCount = typeof res.total === 'number' && Number.isFinite(res.total) ? res.total : list.length;
+      if (list.length > 0 && !append) {
+        localStorage.setItem('relopass_last_assignment_id', list[0].id);
       }
-      if (data.length > 0) {
-        const detailEntries = await Promise.all(
-          data.map(async (assignment) => {
-            try {
-              const detail = await hrAPI.getAssignment(assignment.id);
-              return [assignment.id, detail] as const;
-            } catch {
-              return [assignment.id, null] as const;
-            }
-          })
-        );
-        const nextDetails: Record<string, AssignmentDetail> = {};
-        detailEntries.forEach(([id, detail]) => {
-          if (detail) nextDetails[id] = detail;
-        });
-        setAssignmentDetails(nextDetails);
-      } else {
-        setAssignmentDetails({});
+      setAssignments((prev) => (append ? [...prev, ...list] : list));
+      setTotal(totalCount);
+      setOffset(nextOffset + list.length);
+      if (!append && routePerfStartedAt.current != null) {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        trackFirstMeaningfulContent('/hr/dashboard', now - routePerfStartedAt.current);
+        routePerfStartedAt.current = null;
       }
+      const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+      trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments', count: list.length } });
     } catch (err: any) {
+      if (err?.name === 'AbortError' || signal?.aborted) return;
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
       } else {
         setError('Unable to load assignments.');
       }
+      const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+      trackAuthPerf({ stage: 'bootstrap_end', route: '/hr/dashboard', durationMs: dur, meta: { endpoint: 'listAssignments', error: true } });
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  };
+  }, [searchDebounced, appliedStatus, appliedDestination, navigate]);
 
   useEffect(() => {
-    loadAssignments();
-  }, []);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => setSearchDebounced(search), SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [search]);
+
+  useEffect(() => {
+    acRef.current = new AbortController();
+    loadAssignments(false, acRef.current.signal);
+    return () => {
+      acRef.current?.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when filters change, not when loadAssignments identity changes
+  }, [searchDebounced, appliedStatus, appliedDestination]);
+
+  useEffect(() => {
+    if (isFilterOpen) {
+      setStatusFilter(appliedStatus);
+      setDestinationFilter(appliedDestination);
+    }
+  }, [isFilterOpen]);
 
   useRegisterNav('HrDashboard', [
     { label: 'Case Summary', routeKey: 'hrCaseSummary' },
@@ -76,9 +140,13 @@ export const HrDashboard: React.FC = () => {
     setError('');
     setInviteToken(null);
     setAssignmentId(null);
+    setEmployeeIdentifier('');
+    setEmployeeFirstName('');
+    setEmployeeLastName('');
     try {
       const response = await hrAPI.createCase();
       setCaseId(response.caseId);
+      await loadAssignments(false);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Unable to create case.');
     }
@@ -92,248 +160,135 @@ export const HrDashboard: React.FC = () => {
     setError('');
     setInviteToken(null);
     setAssignmentId(null);
+    const interaction = startInteraction('HR_ASSIGN_CLICK');
     try {
-      const response = await hrAPI.assignCase(caseId, employeeIdentifier.trim());
+      const response = await hrAPI.assignCase(caseId, employeeIdentifier.trim(), {
+        firstName: employeeFirstName || undefined,
+        lastName: employeeLastName || undefined,
+      });
       setAssignmentId(response.assignmentId);
       if (response.inviteToken) {
         setInviteToken(response.inviteToken);
       }
-      await loadAssignments();
+      await loadAssignments(false);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Unable to assign case.');
+      const data = err.response?.data;
+      const msg = data?.detail || data?.error || 'Unable to assign case.';
+      setError(msg);
+      // Log full error to console for debugging (see docs/DEBUG_ASSIGN_ERROR.md)
+      console.error('[Assign failed]', msg, data || err);
+    } finally {
+      // Measure click -> UI render (best-effort).
+      void endInteraction(interaction);
     }
   };
 
+  const toggleSelection = (id: string) => {
+    setSelectedForRemoval((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleRemoveSelected = async () => {
+    setIsDeleting(true);
+    setError('');
+    try {
+      const results = await Promise.allSettled(
+        Array.from(selectedForRemoval, (id) => hrAPI.deleteAssignment(id))
+      );
+      const failed = results.filter((result) => result.status === 'rejected');
+      if (failed.length > 0) {
+        throw failed[0];
+      }
+      setSelectedForRemoval(new Set());
+      setIsConfirmingRemoval(false);
+      setIsManageMode(false);
+      await loadAssignments(false);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to remove some cases.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelManageMode = () => {
+    setIsManageMode(false);
+    setSelectedForRemoval(new Set());
+    setIsConfirmingRemoval(false);
+  };
+
   const caseStatusBadge = (status: AssignmentSummary['status']) => {
-    if (status === 'HR_APPROVED') return <Badge variant="success">Approved</Badge>;
-    if (status === 'CHANGES_REQUESTED') return <Badge variant="warning">Changes requested</Badge>;
-    if (status === 'EMPLOYEE_SUBMITTED' || status === 'HR_REVIEW') return <Badge variant="info">HR review</Badge>;
-    if (status === 'IN_PROGRESS') return <Badge variant="warning">Intake in progress</Badge>;
-    return <Badge variant="neutral">Awaiting intake</Badge>;
-  };
-
-  const parseDate = (value?: string | null) => (value ? new Date(value) : null);
-  const daysUntil = (date?: Date | null) => {
-    if (!date) return null;
-    const diffMs = date.getTime() - new Date().getTime();
-    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  };
-
-  const clampPercent = (value?: number | null) => {
-    if (value === null || value === undefined) return 0;
-    return Math.max(0, Math.min(100, Math.round(value)));
-  };
-
-  const formatRoute = (detail?: AssignmentDetail) => {
-    const origin = detail?.profile?.movePlan?.origin;
-    const destination = detail?.profile?.movePlan?.destination;
-    if (origin && destination) return `${origin} \u2192 ${destination}`;
-    return '—';
-  };
-
-  const formatDeadline = (detail?: AssignmentDetail) => {
-    const target = parseDate(detail?.profile?.movePlan?.targetArrivalDate);
-    if (!target) return { label: '—', helper: '' };
-    const remaining = daysUntil(target);
-    return {
-      label: target.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      helper: remaining !== null ? `${remaining} days remaining` : '',
-    };
+    if (status === 'approved') return <Badge variant="success">Complete</Badge>;
+    if (status === 'rejected') return <Badge variant="warning">Rejected</Badge>;
+    if (status === 'closed') return <Badge variant="neutral">Canceled</Badge>;
+    if (status === 'submitted') return <Badge variant="info">Awaiting HR review</Badge>;
+    if (status === 'awaiting_intake') return <Badge variant="warning">Intake in progress</Badge>;
+    if (status === 'assigned' || status === 'created') {
+      return <Badge variant="neutral">Not started</Badge>;
+    }
+    return <Badge variant="neutral">Not started</Badge>;
   };
 
   const displayName = (assignment: AssignmentSummary) => {
-    const detail = assignmentDetails[assignment.id];
-    const name = detail?.profile?.primaryApplicant?.fullName;
-    return name || assignment.employeeIdentifier;
+    const safe = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '');
+    const fromHr = [safe(assignment.employeeFirstName), safe(assignment.employeeLastName)].filter(Boolean).join(' ');
+    return fromHr || assignment.employeeIdentifier;
   };
 
-  const filteredAssignments = assignments.filter((assignment) => {
-    if (!search.trim()) return true;
-    const query = search.trim().toLowerCase();
-    const detail = assignmentDetails[assignment.id];
-    const name = detail?.profile?.primaryApplicant?.fullName || assignment.employeeIdentifier;
-    return name.toLowerCase().includes(query);
-  }).filter((assignment) => {
-    if (statusFilter === 'all') return true;
-    return assignment.status === statusFilter;
-  }).filter((assignment) => {
-    if (!destinationFilter.trim()) return true;
-    const detail = assignmentDetails[assignment.id];
-    const destination = detail?.profile?.movePlan?.destination || '';
-    return destination.toLowerCase().includes(destinationFilter.trim().toLowerCase());
-  }).filter((assignment) => {
-    if (!departingSoonOnly) return true;
-    const detail = assignmentDetails[assignment.id];
-    const target = parseDate(detail?.profile?.movePlan?.targetArrivalDate);
-    const targetDays = daysUntil(target);
-    if (targetDays !== null) return targetDays >= 0 && targetDays <= 30;
-    const fallback = parseDate(detail?.submittedAt);
-    const fallbackDays = daysUntil(fallback);
-    return fallbackDays !== null && fallbackDays >= 0 && fallbackDays <= 14;
-  });
-
-  const highlightedAssignment = filteredAssignments[0] || assignments[0] || null;
-  const highlightedDetail = highlightedAssignment ? assignmentDetails[highlightedAssignment.id] : null;
-  const highlightedCompleteness = clampPercent(highlightedDetail?.completeness ?? 0);
-  const highlightedCompliance = highlightedDetail?.complianceReport?.overallStatus || 'Not run';
-  const highlightedBlocking =
-    highlightedDetail?.complianceReport?.checks?.filter((check) => check.status !== 'COMPLIANT').length || 0;
-
-  const activeStatuses = new Set([
-    'DRAFT',
-    'IN_PROGRESS',
-    'EMPLOYEE_SUBMITTED',
-    'HR_REVIEW',
-    'CHANGES_REQUESTED',
-    'HR_APPROVED',
-  ]);
-
-  const totalActive = assignments.filter((assignment) => activeStatuses.has(assignment.status)).length;
-  const completed = assignments.filter((assignment) => assignment.status === 'HR_APPROVED').length;
-  const actionRequired = assignments.filter((assignment) => {
-    const requiresStatus = ['CHANGES_REQUESTED', 'HR_REVIEW', 'EMPLOYEE_SUBMITTED'].includes(assignment.status);
-    const detail = assignmentDetails[assignment.id];
-    const blockingCount = detail?.complianceReport?.checks?.filter((check) => check.status !== 'COMPLIANT').length || 0;
-    return requiresStatus || blockingCount > 0;
-  }).length;
-  const departingSoon = assignments.filter((assignment) => {
-    const detail = assignmentDetails[assignment.id];
-    const target = parseDate(detail?.profile?.movePlan?.targetArrivalDate);
-    const targetDays = daysUntil(target);
-    if (targetDays !== null) return targetDays >= 0 && targetDays <= 30;
-    const fallback = parseDate(detail?.submittedAt);
-    const fallbackDays = daysUntil(fallback);
-    return fallbackDays !== null && fallbackDays >= 0 && fallbackDays <= 14;
-  }).length;
+  const displayDestination = (assignment: AssignmentSummary) => {
+    const c = assignment.case;
+    const dest = (c?.host_country || '').trim();
+    if (dest) return dest;
+    const home = (c?.home_country || '').trim();
+    return home || '-';
+  };
 
   return (
-    <AppShell title="HR Dashboard" subtitle="Monitor relocations, readiness, and approvals.">
+    <AppShell title="Assignments" subtitle="Create cases, assign people, track status.">
       <div className="space-y-6">
         {error && <Alert variant="error">{error}</Alert>}
 
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <input
-                id="hr-search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search employees..."
-                className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setIsFilterOpen(true)}>
-              Filter
-            </Button>
-            <Button onClick={handleCreateCase}>New Case</Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Total active cases</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{totalActive}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Currently in progress</div>
-          </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Action required</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{actionRequired}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Needs HR attention</div>
-          </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Departing soon</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{departingSoon}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Next 30 days</div>
-          </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Completed (YTD)</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{completed}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Approved cases</div>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Profile completeness</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{highlightedCompleteness}%</div>
-            <div className="text-xs text-[#6b7280] mt-1">Highlighted case</div>
-          </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Compliance status</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{highlightedCompliance}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Latest checks</div>
-          </Card>
-          <Card padding="md">
-            <div className="text-xs uppercase tracking-wide text-[#6b7280]">Blocking items</div>
-            <div className="text-2xl font-semibold text-[#0b2b43] mt-2">{highlightedBlocking}</div>
-            <div className="text-xs text-[#6b7280] mt-1">Needs HR attention</div>
-          </Card>
-        </div>
-
-        <Card padding="lg">
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-sm font-semibold text-[#0b2b43]">Active relocation cases</div>
-            <Button variant="outline" onClick={loadAssignments}>Refresh</Button>
-          </div>
-
-          {isLoading && <div className="text-sm text-[#6b7280]">Loading assignments...</div>}
-          {!isLoading && filteredAssignments.length === 0 && (
-            <div className="text-sm text-[#4b5563]">No assignments yet.</div>
+        <div className="flex flex-wrap items-center gap-3 mb-2">
+          <input
+            id="hr-search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search employees..."
+            className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
+          />
+          <Button variant="outline" onClick={() => setIsFilterOpen(true)}>Filter</Button>
+          {normalizeStoredRole(getAuthItem('relopass_role')) === 'ADMIN' ? (
+            <Link to={buildRoute('adminAssignments')}>
+              <Button>Add assignment</Button>
+            </Link>
+          ) : (
+            <Button onClick={handleCreateCase}>Add assignment</Button>
           )}
-
-          {!isLoading && filteredAssignments.length > 0 && (
-            <div className="border border-[#e2e8f0] rounded-xl overflow-hidden">
-              <div className="grid grid-cols-[1.6fr,1.6fr,1fr,1fr,0.3fr] gap-4 bg-[#f8fafc] px-4 py-3 text-[11px] uppercase tracking-wide text-[#6b7280]">
-                <div>Employee name</div>
-                <div>Route (origin → dest)</div>
-                <div>Status</div>
-                <div>Next deadline</div>
-                <div className="text-right">View</div>
-              </div>
-              {filteredAssignments.map((assignment) => {
-                const detail = assignmentDetails[assignment.id];
-                const deadline = formatDeadline(detail);
-                return (
-                  <div
-                    key={assignment.id}
-                    onClick={() => {
-                      localStorage.setItem('relopass_last_assignment_id', assignment.id);
-                      navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
-                    }}
-                    className="grid grid-cols-[1.6fr,1.6fr,1fr,1fr,0.3fr] gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer hover:bg-[#f8fafc]"
-                  >
-                    <div>
-                      <div className="text-sm font-semibold text-[#0b2b43]">{displayName(assignment)}</div>
-                      <div className="text-xs text-[#6b7280]">{assignment.employeeIdentifier}</div>
-                      <div className="text-xs text-[#94a3b8]">Assignment ID: {assignment.id}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-[#0b2b43]">{formatRoute(detail)}</div>
-                      <div className="text-xs text-[#6b7280]">
-                        {detail?.profile?.movePlan?.housing?.budgetMonthlySGD || 'Relocation pathway'}
-                      </div>
-                    </div>
-                    <div>{caseStatusBadge(assignment.status)}</div>
-                    <div>
-                      <div className="text-sm text-[#0b2b43]">{deadline.label}</div>
-                      <div className="text-xs text-[#6b7280]">{deadline.helper}</div>
-                    </div>
-                    <div className="text-right text-[#94a3b8] text-lg">
-                      →
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
+          <Button variant="outline" onClick={handleCreateCase}>Create case</Button>
+        </div>
 
         {caseId && (
           <Card padding="lg">
             <div className="space-y-3">
-              <div className="text-sm text-[#4b5563]">Case created: {caseId}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  value={employeeFirstName}
+                  onChange={setEmployeeFirstName}
+                  label="First name"
+                  placeholder="Jane"
+                  fullWidth
+                />
+                <Input
+                  value={employeeLastName}
+                  onChange={setEmployeeLastName}
+                  label="Last name"
+                  placeholder="Doe"
+                  fullWidth
+                />
+              </div>
               <Input
                 value={employeeIdentifier}
                 onChange={setEmployeeIdentifier}
@@ -344,17 +299,248 @@ export const HrDashboard: React.FC = () => {
               <Button onClick={handleAssign}>Assign</Button>
               {assignmentId && (
                 <Alert variant="info" title="Assignment created">
-                  Assignment ID: <strong>{assignmentId}</strong>
+                  <div className="space-y-3 text-[#0b2b43]">
+                    <p className="text-sm leading-relaxed">
+                      The employee does not need an account yet. They can <strong>register</strong> with the same email
+                      or username you entered, or <strong>sign in</strong> if they already have one. The case attaches
+                      when the login matches.
+                    </p>
+                    <p className="text-sm leading-relaxed">
+                      For a <strong>manual claim</strong> (e.g. typo in the identifier), send the assignment ID below.
+                      They should enter:
+                    </p>
+                    <ol className="text-sm leading-relaxed list-decimal pl-5 space-y-1.5 text-[#0b2b43]">
+                      <li>
+                        Field 1: <strong>ReloPass email or username</strong> (what they use to sign in, not the ID).
+                      </li>
+                      <li>
+                        Field 2: <strong>Assignment ID</strong> (UUID only). Do not swap the two fields.
+                      </li>
+                    </ol>
+                    <p className="text-sm leading-relaxed mt-2">Invite token below is optional for your records.</p>
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
+                      <span className="text-sm">
+                        Assignment ID: <strong className="font-mono">{assignmentId}</strong>
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(assignmentId);
+                            setCopyFeedback(true);
+                            setTimeout(() => setCopyFeedback(false), 2000);
+                          } catch {
+                            const el = document.createElement('input');
+                            el.value = assignmentId;
+                            document.body.appendChild(el);
+                            el.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(el);
+                            setCopyFeedback(true);
+                            setTimeout(() => setCopyFeedback(false), 2000);
+                          }
+                        }}
+                      >
+                        {copyFeedback ? 'Copied!' : 'Copy Assignment ID'}
+                      </Button>
+                    </div>
+                  </div>
                 </Alert>
               )}
               {inviteToken && (
-                <Alert variant="info" title="Invite created">
-                  Share this invite token with the employee: <strong>{inviteToken}</strong>
+                <Alert variant="info" title="Invite token (optional)">
+                  <p className="text-sm mb-2">
+                    You can share this token with the employee; they can still access the case by signing up or signing
+                    in with the identifier you used, without the token.
+                  </p>
+                  <span className="font-mono text-sm break-all">{inviteToken}</span>
                 </Alert>
               )}
             </div>
           </Card>
         )}
+
+        <Card padding="lg">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-[#0b2b43]">Active relocation cases</span>
+              {normalizeStoredRole(getAuthItem('relopass_role')) === 'ADMIN' && (
+                <Link to={buildRoute('adminAssignments')} className="text-xs text-[#0b2b43] hover:underline">
+                  Admin Assignments →
+                </Link>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {!isManageMode ? (
+                <>
+                  <Button variant="outline" onClick={() => loadAssignments(false)}>Refresh</Button>
+                  <Button variant="outline" onClick={() => setIsManageMode(true)}>Manage Cases</Button>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-[#6b7280]">
+                    {selectedForRemoval.size} selected
+                  </span>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedForRemoval.size === 0) {
+                        setError('Select at least one case to remove.');
+                        return;
+                      }
+                      setIsConfirmingRemoval(true);
+                    }}
+                    disabled={selectedForRemoval.size === 0}
+                  >
+                    Remove selected
+                  </Button>
+                  <Button variant="outline" onClick={cancelManageMode}>Cancel</Button>
+                </>
+              )}
+            </div>
+          </div>
+          {assignments.length < total && !isManageMode && (
+            <div className="mb-3 text-xs text-[#6b7280] flex items-center gap-2">
+              Showing {assignments.length} of {total} cases.
+              <Button
+                variant="outline"
+                onClick={() => loadAssignments(true)}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? 'Loading…' : 'Load more'}
+              </Button>
+            </div>
+          )}
+
+          {isConfirmingRemoval && (
+            <div className="mb-4 border border-red-200 bg-red-50 rounded-xl p-4">
+              <div className="text-sm font-semibold text-red-800 mb-2">
+                Confirm removal of {selectedForRemoval.size} case{selectedForRemoval.size > 1 ? 's' : ''}
+              </div>
+              <div className="text-xs text-red-700 mb-3">
+                This will permanently delete the selected case{selectedForRemoval.size > 1 ? 's' : ''} and all associated data.
+                This action cannot be undone.
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRemoveSelected}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isDeleting ? 'Removing...' : 'Confirm removal'}
+                </button>
+                <Button variant="outline" onClick={() => setIsConfirmingRemoval(false)} disabled={isDeleting}>
+                  Go back
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isLoading && (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="grid grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] gap-4 px-4 py-4 border-t border-[#e2e8f0] first:border-t-0">
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-32" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-20" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-24" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-16" />
+                  <div className="h-5 rounded bg-[#e2e8f0] animate-pulse w-20" />
+                  <div className="h-4 rounded bg-[#e2e8f0] animate-pulse w-4 ml-auto" />
+                </div>
+              ))}
+            </div>
+          )}
+          {!isLoading && assignments.length === 0 && (
+            <div className="text-sm text-[#4b5563]">No assignments yet.</div>
+          )}
+
+          {!isLoading && assignments.length > 0 && (
+            <div className="border border-[#e2e8f0] rounded-xl overflow-hidden">
+              <div className={`grid gap-4 bg-[#f8fafc] px-4 py-3 text-[11px] uppercase tracking-wide text-[#6b7280] ${isManageMode ? 'grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,0.3fr]' : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr]'}`}>
+                {isManageMode && <div></div>}
+                <div>Employee name</div>
+                <div>Destination</div>
+                <div>Route (origin → dest)</div>
+                <div>Status</div>
+                <div>Next deadline</div>
+                <div className="text-right">View</div>
+              </div>
+              {assignments.map((assignment) => {
+                const isSelected = selectedForRemoval.has(assignment.id);
+                return (
+                  <div
+                    key={assignment.id}
+                    onClick={() => {
+                      if (isManageMode) {
+                        toggleSelection(assignment.id);
+                        return;
+                      }
+                      setSelectedCaseId(assignment.id);
+                      navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
+                    }}
+                    {...(!isManageMode && {
+                      role: 'button',
+                      tabIndex: 0,
+                      onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedCaseId(assignment.id);
+                          navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
+                        }
+                      },
+                    })}
+                    className={`grid gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer ${
+                      isManageMode
+                        ? `grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] ${isSelected ? 'bg-red-50' : 'hover:bg-[#f8fafc]'}`
+                        : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:outline-none'
+                    }`}
+                  >
+                    {isManageMode && (
+                      <div className="flex items-center justify-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(assignment.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 rounded border-[#d1d5db] text-red-600 focus:ring-red-500"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-sm font-semibold text-[#0b2b43]">{displayName(assignment)}</div>
+                      <div className="text-xs font-semibold text-[#0b2b43]">{assignment.employeeIdentifier}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-[#0b2b43]">{displayDestination(assignment)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-[#0b2b43]">
+                        {assignment.case?.home_country && assignment.case?.host_country
+                          ? `${assignment.case.home_country} \u2192 ${assignment.case.host_country}`
+                          : '-'}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {caseStatusBadge(assignment.status)}
+                    </div>
+                    <div>
+                      <div className="text-sm text-[#0b2b43]">
+                        {assignment.nextDeadline?.trim() || '—'}
+                      </div>
+                      <div className="text-xs text-[#6b7280]">
+                        {assignment.nextDeadline?.trim() ? 'Next milestone' : 'No upcoming date'}
+                      </div>
+                    </div>
+                    <div className="text-right text-[#94a3b8] text-lg">
+                      {isManageMode ? '' : '→'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
       </div>
 
       {isFilterOpen && (
@@ -378,12 +564,13 @@ export const HrDashboard: React.FC = () => {
                   className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm"
                 >
                   <option value="all">All statuses</option>
-                  <option value="DRAFT">Draft</option>
-                  <option value="IN_PROGRESS">In progress</option>
-                  <option value="EMPLOYEE_SUBMITTED">Employee submitted</option>
-                  <option value="HR_REVIEW">HR review</option>
-                  <option value="CHANGES_REQUESTED">Changes requested</option>
-                  <option value="HR_APPROVED">Approved</option>
+                  <option value="created">Created</option>
+                  <option value="assigned">Assigned</option>
+                  <option value="awaiting_intake">Awaiting intake</option>
+                  <option value="submitted">HR review</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="closed">Closed</option>
                 </select>
               </div>
               <div>
@@ -395,26 +582,28 @@ export const HrDashboard: React.FC = () => {
                   className="w-full rounded-lg border border-[#e2e8f0] bg-white px-3 py-2 text-sm"
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm text-[#4b5563]">
-                <input
-                  type="checkbox"
-                  checked={departingSoonOnly}
-                  onChange={(event) => setDepartingSoonOnly(event.target.checked)}
-                />
-                Departing soon only
-              </label>
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setStatusFilter('all');
                     setDestinationFilter('');
-                    setDepartingSoonOnly(false);
+                    setAppliedStatus('all');
+                    setAppliedDestination('');
+                    setIsFilterOpen(false);
                   }}
                 >
                   Reset
                 </Button>
-                <Button onClick={() => setIsFilterOpen(false)}>Apply filters</Button>
+                <Button
+                  onClick={() => {
+                    setAppliedStatus(statusFilter);
+                    setAppliedDestination(destinationFilter);
+                    setIsFilterOpen(false);
+                  }}
+                >
+                  Apply filters
+                </Button>
               </div>
             </div>
           </Card>

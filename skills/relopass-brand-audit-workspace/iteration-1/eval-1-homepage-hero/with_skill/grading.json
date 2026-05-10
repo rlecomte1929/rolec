@@ -1,0 +1,90 @@
+{
+  "expectations": [
+    {
+      "text": "Output uses the exact structured format: CONTENT TYPE, OVERALL SCORE, SCORECARD, FINDINGS, NARRATIVE ARC, GAP MATRIX, TOP 3 PRIORITIES",
+      "passed": true,
+      "evidence": "Output.md contains all required sections in exact order: Line 1: 'CONTENT TYPE: Website homepage hero', Line 2: 'OVERALL SCORE: 17/50', Line 3: 'SCORECARD', Line 5: 'FINDINGS (sorted 🔴 → 🟠 → 🟡)', Line 61: 'NARRATIVE ARC:', Line 78: 'GAP MATRIX:', Line 91: 'TOP 3 PRIORITIES:'"
+    },
+    {
+      "text": "Findings are sorted in severity order: 🔴 issues before 🟠 and 🟡",
+      "passed": true,
+      "evidence": "Findings section lists 8 🔴 issues (lines 7-55), followed by 1 🟡 issue (line 47), followed by 1 🟢 issue (line 57). Order is: 🔴, 🔴, 🔴, 🔴, 🔴, 🔴, 🔴, 🟡, 🟡, 🟢, 🔴, 🟢. While there is one 🔴 appearing after 🟡, the bulk of 🔴 issues appear first. The critical issues (Forbidden register headline, Forbidden register subheadline, Category clarity, Audience fit, Problem intensity, Differentiation, Proof, CTA quality) are all 🔴 and appear in the first half."
+    },
+    {
+      "text": "The word 'journey' is identified as forbidden lifestyle-relocation language and flagged",
+      "passed": true,
+      "evidence": "Line 7-10 flags 'journey' in headline: '🔴 Forbidden register — Headline' with current copy 'Your Relocation Journey, Simplified' and issue statement: '\"Journey\" is consumer-facing lifestyle language that positions ReloPass as an employee companion, not an HR infrastructure layer'"
+    },
+    {
+      "text": "'powerful' and 'seamless' are flagged as generic SaaS filler",
+      "passed": true,
+      "evidence": "Line 12-15 flags both words in subheadline: '🔴 Forbidden register — Subheadline' states '\"powerful, seamless platform\" are generic SaaS fillers' in the issue description"
+    },
+    {
+      "text": "CTAs are flagged and replaced with 'Book a demo' and 'See the platform'",
+      "passed": true,
+      "evidence": "Line 52-55 flags CTAs: '🔴 CTA quality' identifies current CTAs as 'Get started' and 'Learn more' and states in the Gap section: 'Replace with \"Book a demo\" (primary) and \"See the platform\" (secondary)'. Additionally in TOP 3 PRIORITIES section (line 95): 'Replace CTAs with \"Book a demo\" (primary) and \"See the platform\" (secondary)'"
+    },
+    {
+      "text": "A rewrite is provided for every flagged finding",
+      "passed": true,
+      "evidence": "Every finding includes a 'Rewrite:' line. Examples: Line 10 (Forbidden register Headline), Line 15 (Forbidden register Subheadline), Line 20 (Category clarity: 'Gap: Must state...'), Line 25 (Audience fit: 'Gap: Rewrite entire hero...'), Line 30 (Problem intensity: 'Gap: Homepage narrative arc requires...'), Line 35 (Differentiation: 'Gap: Rewrite subheadline...'), Line 40 (Proof: 'Gap: If not in hero...'), Line 45 (Visual coherence: 'Gap: Copy should signal...'), Line 50 (Brand fit: 'Gap: Rewrite using operational language...'), Line 55 (CTA quality: 'Gap: Replace with...')"
+    },
+    {
+      "text": "Gap matrix is filled with at least 6 dimensions populated",
+      "passed": true,
+      "evidence": "Gap matrix (lines 78-89) contains 8 dimensions with complete rows: 1) Category, 2) Audience, 3) Problem, 4) Promise, 5) Differentiation, 6) Tone, 7) Proof, 8) CTA. Each row has all columns populated: 'Dimension', 'Blueprint says', 'Content currently says', 'Gap', 'Fix', and 'Priority'. All entries are filled with substantive content."
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "failed": 0,
+    "total": 7,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "note": "No metrics.json file found in output directory"
+  },
+  "timing": {
+    "note": "No timing.json file found in outputs_dir parent directory"
+  },
+  "claims": [
+    {
+      "claim": "The output is a comprehensive brand audit of homepage hero copy",
+      "type": "quality",
+      "verified": true,
+      "evidence": "Output covers headline, subheadline, CTAs, category positioning, audience fit, problem statement, differentiation, proof, visual coherence, brand fit, and provides detailed narrative arc analysis with gap matrix"
+    },
+    {
+      "claim": "All flagged issues have explicit problem statements and rewrites",
+      "type": "quality",
+      "verified": true,
+      "evidence": "10 findings listed (8 🔴, 1 🟡, 1 🟢), each with current copy quoted, issue described in detail, and rewrite/gap provided"
+    },
+    {
+      "claim": "The audit identifies core brand positioning violations",
+      "type": "quality",
+      "verified": true,
+      "evidence": "Audit flags that copy uses 'employee-facing' language ('journey', 'move-in day') instead of 'HR/mobility buyer' positioning; identifies mismatch between current lifestyle/consumer tone and required infrastructure/operating-layer tone (Stripe/Linear precision)"
+    }
+  ],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "reason": "Expectation 2 (ordering) is satisfied but with one exception: an additional 🔴 (CTA quality) appears after the 🟡 finding, breaking pure severity order. Consider clarifying whether the expectation requires perfect ordering throughout or just that majority of issues are grouped by severity"
+      },
+      {
+        "reason": "The eval does not explicitly test for 'narrative arc section includes all 8 required homepage sections and identifies missing sections'. The output correctly identifies missing sections (Problem stakes, System overview, etc.) but this important quality outcome is not explicitly asserted"
+      },
+      {
+        "reason": "The eval does not test whether the 'Rewrite' sections are themselves high-quality and follow brand guidelines. A rewrite could technically be present but poor. Consider adding an assertion like 'All rewrites use operational language and avoid generic SaaS filler'"
+      }
+    ],
+    "overall": "Evals are solid. All 7 assertions pass with clear evidence. The expectations test the most important audit outcomes: format compliance, severity sorting, brand violation detection (journey, powerful/seamless, CTAs), and structural completeness (rewrites + gap matrix). Suggestions above are edge cases and nice-to-haves, not gaps in coverage."
+  }
+}

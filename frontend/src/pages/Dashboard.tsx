@@ -62,8 +62,8 @@ export const Dashboard: React.FC = () => {
       <AppShell title="Relocation Dashboard">
         <Card padding="lg">
           <Alert variant="info">
-            <p className="mb-4">No profile data yet. Start your journey first.</p>
-            <Button onClick={() => navigate('/journey')}>Start Journey</Button>
+            <p className="mb-4">Profile is empty. Complete setup to see your relocation plan.</p>
+            <Button onClick={() => navigate('/journey')}>Complete profile</Button>
           </Alert>
         </Card>
       </AppShell>
@@ -92,9 +92,9 @@ export const Dashboard: React.FC = () => {
               </div>
               <ProgressBar value={dashboard.profileCompleteness} showLabel={false} />
               <p className="text-sm text-[#4b5563]">
-                {dashboard.profileCompleteness >= 80 
-                  ? 'Profile is well-detailed'
-                  : 'Continue adding details for better recommendations'}
+                {dashboard.profileCompleteness >= 80
+                  ? 'Profile is complete enough for tailored recommendations.'
+                  : 'Add more profile details to unlock housing and school recommendations.'}
               </p>
             </div>
           </Card>
@@ -273,9 +273,7 @@ export const Dashboard: React.FC = () => {
           <Card padding="lg">
             <h2 className="text-2xl font-bold text-[#0b2b43] mb-4">Document Checklist</h2>
             <div className="space-y-4">
-              <Alert variant="info">
-                These are the core documents you'll need for your relocation.
-              </Alert>
+              <Alert variant="info">Core documents for this relocation.</Alert>
 
               <div className="space-y-3">
                 {[

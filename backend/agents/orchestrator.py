@@ -4,11 +4,11 @@ Owns the question flow and state machine.
 Produces next_question and completion_state.
 """
 from typing import Dict, Any, Optional, List, Set
-from schemas import Question, NextQuestionResponse, RelocationProfile
-from question_bank import get_all_questions, get_question_by_id
-from agents.validator import ProfileValidator
-from agents.readiness_rater import ReadinessRater
-from agents.recommendation_engine import RecommendationEngine
+from ..schemas import Question, NextQuestionResponse, RelocationProfile
+from ..question_bank import get_all_questions, get_question_by_id
+from .validator import ProfileValidator
+from .readiness_rater import ReadinessRater
+from .recommendation_engine import RecommendationEngine
 
 
 class IntakeOrchestrator:
@@ -136,14 +136,99 @@ class IntakeOrchestrator:
     
     def _check_dependencies(self, question: Question, profile: Dict[str, Any]) -> bool:
         """
-        Check if question dependencies are satisfied.
-        For this MVP, we have no complex dependencies, so always return True.
+        Check if all dependsOn conditions are satisfied for this question.
+
+        dependsOn format (Dict[question_id, condition]):
+          {"q_has_spouse": True}                  — prerequisite must equal True
+          {"q_has_spouse": False}                 — prerequisite must equal False
+          {"q_child_count": {"gte": 1}}           — numeric >=
+          {"q_child_count": {"gt": 0}}            — numeric >
+          {"q_contract_type": {"not": "domestic_move"}}     — not equal
+          {"q_contract_type": {"in": ["lta", "short_term_project"]}}  — any of
+
+        All conditions in the dict must pass (AND semantics).
+        If a prerequisite question has not been answered yet (value is None or
+        absent from the profile), the condition is treated as NOT satisfied —
+        i.e. the dependent question is not shown yet.
         """
         if not question.dependsOn:
             return True
-        
-        # Simple dependency check (can be extended)
+
+        for prereq_question_id, condition in question.dependsOn.items():
+            prereq_q = get_question_by_id(prereq_question_id)
+            if prereq_q is None:
+                # Unknown prerequisite — skip this condition (fail open for
+                # unknown question IDs to avoid silently hiding questions).
+                continue
+
+            actual_value = self._get_nested_value(profile, prereq_q.mapsTo)
+
+            if actual_value is None:
+                # Prerequisite not yet answered — block the dependent question.
+                return False
+
+            if not self._evaluate_condition(actual_value, condition):
+                return False
+
         return True
+
+    def _evaluate_condition(self, actual_value: Any, condition: Any) -> bool:
+        """
+        Evaluate a single condition against an actual profile value.
+
+        Supports:
+          - Scalar equality: condition is a literal (str, int, bool)
+          - Dict operators: {"not": v}, {"in": [...]}, {"gt": n}, {"gte": n},
+            {"lt": n}, {"lte": n}
+        """
+        if isinstance(condition, dict):
+            if "not" in condition:
+                return actual_value != condition["not"]
+            if "in" in condition:
+                return actual_value in condition["in"]
+            if "gt" in condition:
+                return self._to_numeric(actual_value) > condition["gt"]
+            if "gte" in condition:
+                return self._to_numeric(actual_value) >= condition["gte"]
+            if "lt" in condition:
+                return self._to_numeric(actual_value) < condition["lt"]
+            if "lte" in condition:
+                return self._to_numeric(actual_value) <= condition["lte"]
+            # Unknown operator — fail open
+            return True
+
+        # Scalar: exact match
+        return actual_value == condition
+
+    def _to_numeric(self, value: Any) -> float:
+        """
+        Coerce a profile value to a number for comparison operators.
+        Handles string digits ("2") and numeric types.
+        Returns 0 for non-coercible values.
+        """
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _get_nested_value(self, obj: Dict[str, Any], path: str) -> Any:
+        """
+        Read a value from a nested dictionary using dot notation.
+        Returns None if any segment of the path is missing.
+        """
+        parts = path.split(".")
+        current: Any = obj
+        for part in parts:
+            if isinstance(current, dict):
+                current = current.get(part)
+            elif isinstance(current, list) and part.isdigit():
+                idx = int(part)
+                current = current[idx] if idx < len(current) else None
+            else:
+                return None
+            if current is None:
+                return None
+        return current
     
     def _set_nested_value(self, obj: Dict[str, Any], path: str, value: Any) -> None:
         """

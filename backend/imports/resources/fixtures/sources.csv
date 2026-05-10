@@ -1,0 +1,7 @@
+source_name,publisher,source_type,url,trust_tier
+Skatteetaten,Norwegian Tax Administration,official,https://www.skatteetaten.no/,T0
+Helsenorge,Norwegian Health Network,official,https://helsenorge.no/,T0
+Oslo Kommune,City of Oslo,official,https://www.oslo.kommune.no/,T0
+Ruter,Oslo Public Transport,institutional,https://ruter.no/,T0
+Finn.no,Schibsted,commercial,https://www.finn.no/,T2
+Internations,Internations.org,community,https://www.internations.org/,T3

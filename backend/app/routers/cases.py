@@ -1,17 +1,32 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from typing import Any, Dict
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from ..db import SessionLocal
 from .. import crud, schemas
+from ...database import db as main_db
+from ...services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.research import run_country_research
 from ..services.requirements_builder import compute_case_requirements
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
+logger = logging.getLogger(__name__)
+
+
+def _deep_merge_case_drafts(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge PATCH payload into stored draft so partial saves never wipe other wizard sections."""
+    out = dict(base)
+    for key, val in update.items():
+        if key in out and isinstance(out[key], dict) and isinstance(val, dict):
+            out[key] = _deep_merge_case_drafts(out[key], val)
+        else:
+            out[key] = val
+    return out
 
 
 @router.get("/{case_id}", response_model=schemas.CaseDTO)
@@ -27,11 +42,19 @@ def get_case(case_id: str):
 @router.patch("/{case_id}", response_model=schemas.CaseDTO)
 def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
     with SessionLocal() as db:
+        incoming = patch.model_dump(mode="json")
         case = crud.get_case(db, case_id)
         if not case:
-            case = crud.create_case(db, case_id, patch.model_dump(mode="json"))
-
-        draft = patch.model_dump(mode="json")
+            case = crud.create_case(db, case_id, incoming)
+            draft = incoming
+        else:
+            try:
+                existing = json.loads(case.draft_json or "{}")
+            except (json.JSONDecodeError, TypeError, ValueError):
+                existing = {}
+            if not isinstance(existing, dict):
+                existing = {}
+            draft = _deep_merge_case_drafts(existing, incoming)
         basics = draft.get("relocationBasics", {})
         derived = {
             "origin_country": basics.get("originCountry"),
@@ -45,6 +68,11 @@ def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
             "hasDependents": basics.get("hasDependents"),
         }
         case = crud.update_case(db, case, draft, derived, flags)
+        try:
+            main_db.apply_wizard_patch_side_effects(case_id, draft, derived)
+        except Exception:
+            logger.exception("apply_wizard_patch_side_effects failed case_id=%s", case_id)
+        invalidate_relocation_plan_cache(case_id=case_id)
         return _case_dto(case, draft)
 
 
@@ -73,7 +101,7 @@ def get_case_requirements(case_id: str):
 
 
 @router.post("/{case_id}/create")
-def create_case(case_id: str):
+def create_case(case_id: str, request: Request):
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
@@ -96,6 +124,7 @@ def create_case(case_id: str):
             )
 
         requirements = compute_case_requirements(case_id)
+
         snapshot_id = str(uuid.uuid4())
         crud.create_snapshot(
             db,
@@ -106,12 +135,26 @@ def create_case(case_id: str):
                 "purpose": basics.get("purpose"),
                 "created_at": datetime.utcnow(),
                 "snapshot_json": requirements.model_dump_json(),
-                "sources_json": json.dumps([source.model_dump() for source in requirements.sources]),
+                "sources_json": json.dumps([source.model_dump(mode="json") for source in requirements.sources]),
             },
         )
+
         case.status = "CREATED"
         case.requirements_snapshot_id = snapshot_id
         db.commit()
+
+    try:
+        from ...services.analytics_service import emit_event, EVENT_CASE_CREATED
+        req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+        emit_event(
+            EVENT_CASE_CREATED,
+            request_id=req_id,
+            case_id=case_id,
+            canonical_case_id=case_id,
+            extra={"requirementsSnapshotId": snapshot_id},
+        )
+    except Exception:
+        pass
 
     return {"createdCaseId": case_id, "requirementsSnapshotId": snapshot_id}
 

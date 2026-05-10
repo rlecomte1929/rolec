@@ -1,8 +1,25 @@
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/client';
+import { signInSupabase } from '../api/supabaseAuth';
 import type { LoginRequest, RegisterRequest, UserRole } from '../types';
-import { setAuthItem } from '../utils/demo';
+import { normalizeStoredRole, setAuthItem } from '../utils/demo';
 import { safeNavigate } from '../navigation/safeNavigate';
+import { homeRouteKeyForRole, type RouteKey } from '../navigation/routes';
+import { trackAuthPerf } from '../perf/authPerf';
+import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
+import type { PostSignupReconciliation } from '../types';
+
+function shouldPersistReconciliation(rec: PostSignupReconciliation | null | undefined): boolean {
+  if (!rec) return false;
+  const has = (s?: string | null) => Boolean(s && String(s).trim());
+  if (has(rec.headline) || has(rec.message)) return true;
+  if (rec.attachedAssignmentIds && rec.attachedAssignmentIds.length > 0) return true;
+  if (rec.linkedContactIds && rec.linkedContactIds.length > 0) return true;
+  if ((rec.skippedRevokedInvites ?? 0) > 0) return true;
+  if ((rec.skippedContactsLinkedToOtherUser ?? 0) > 0) return true;
+  if ((rec.skippedAssignmentsLinkedToOtherUser ?? 0) > 0) return true;
+  return false;
+}
 
 export const useAuth = () => {
   const navigate = useNavigate();
@@ -13,24 +30,87 @@ export const useAuth = () => {
     if (user.email) setAuthItem('relopass_email', user.email);
     if (user.username) setAuthItem('relopass_username', user.username);
     if (user.name) setAuthItem('relopass_name', user.name);
-    setAuthItem('relopass_role', user.role);
+    setAuthItem('relopass_role', normalizeStoredRole(user.role));
   };
 
+  const postAuthRouteKey = (role: UserRole | string): RouteKey => homeRouteKeyForRole(normalizeStoredRole(role));
+
   const redirectByRole = (role: UserRole) => {
-    safeNavigate(navigate, role === 'HR' ? 'hrDashboard' : 'employeeJourney');
+    safeNavigate(navigate, postAuthRouteKey(role));
   };
 
   const login = async (payload: LoginRequest) => {
+    trackAuthPerf({ stage: 'sign_in_click' });
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+    trackAuthPerf({ stage: 'auth_request_start' });
     const response = await authAPI.login(payload);
+    const authDur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+    trackAuthPerf({ stage: 'auth_request_end', durationMs: authDur });
+
     setSession(response.token, response.user);
-    redirectByRole(response.user.role);
+    const loginRec = response.reconciliation;
+    if (shouldPersistReconciliation(loginRec)) {
+      try {
+        sessionStorage.setItem('post_auth_claim_reconciliation', JSON.stringify(loginRec));
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // Establish Supabase session so tokens auto-refresh (feedback, review, RPC).
+    // Deferred to after redirect so the user sees the app immediately.
+    const email = response.user.email ?? (payload.identifier?.includes('@') ? payload.identifier.trim() : null);
+    if (email && payload.password) {
+      const supabaseT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      trackAuthPerf({ stage: 'token_refresh_start' });
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
+        role: response.user.role,
+        targetRouteKey: postAuthRouteKey(response.user.role),
+        source: 'login',
+      });
+      redirectByRole(response.user.role);
+      void signInSupabase(email, payload.password).then(() => {
+        const dur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - supabaseT0;
+        trackAuthPerf({ stage: 'token_refresh_end', durationMs: dur });
+      });
+    } else {
+      trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
+        role: response.user.role,
+        targetRouteKey: postAuthRouteKey(response.user.role),
+        source: 'login',
+      });
+      redirectByRole(response.user.role);
+    }
     return response;
   };
 
   const register = async (payload: RegisterRequest) => {
+    trackAuthPerf({ stage: 'sign_in_click' });
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    trackAuthPerf({ stage: 'auth_request_start' });
     const response = await authAPI.register(payload);
+    const authDur = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
+    trackAuthPerf({ stage: 'auth_request_end', durationMs: authDur });
     setSession(response.token, response.user);
+    const rec = response.reconciliation;
+    if (shouldPersistReconciliation(rec)) {
+      try {
+        sessionStorage.setItem('post_auth_claim_reconciliation', JSON.stringify(rec));
+      } catch {
+        /* ignore */
+      }
+    }
+    const emailForSb = response.user.email ?? payload.email?.trim() ?? null;
+    trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.postLoginRoute, {
+      role: response.user.role,
+      targetRouteKey: postAuthRouteKey(response.user.role),
+      source: 'register',
+    });
     redirectByRole(response.user.role);
+    if (emailForSb && payload.password) {
+      void signInSupabase(emailForSb, payload.password);
+    }
     return response;
   };
 

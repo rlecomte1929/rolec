@@ -1,255 +1,221 @@
-# ReloPass MVP
+# ReloPass
 
-**Guided relocation journeys for HR teams**
+**International relocation operations platform for HR teams**
 
-ReloPass is a multi-agent guided intake system that helps HR teams manage relocations across multiple scenarios. This MVP collects the minimum viable data needed to:
+ReloPass helps HR leaders at SMEs manage employee relocations end-to-end: structured intake, compliance checks, policy enforcement, and clear decision workflows.
 
-1. Start/prepare the immigration journey (informational readiness rating)
-2. Request quotes from moving companies
-3. Apply for temporary apartments
-4. Shortlist schools for children
+**Live**: https://relopass.com · **API**: https://api.relopass.com
 
 ---
 
-## 🏗️ Architecture
+## Stack
 
-### Backend
-- **Framework**: FastAPI (Python)
-- **Database**: SQLite
-- **Multi-Agent System**:
-  - **Agent A**: Intake Orchestrator (manages question flow)
-  - **Agent B**: Profile Validator & Normalizer
-  - **Agent C**: Immigration Readiness Rater (informational only)
-  - **Agent D**: Recommendation Engine (housing, schools, movers)
+| Layer      | Technology                                                       | Hosted on            |
+| ---------- | ---------------------------------------------------------------- | -------------------- |
+| Frontend   | React 18 + TypeScript 5.3 + Vite 5 + Tailwind 3                  | Render Static Site   |
+| Backend    | FastAPI 0.115 + Uvicorn 0.32 (Python 3.11)                       | Render Web Service   |
+| Database   | **Postgres via Supabase** (SQLite only as a dev fallback)        | Supabase             |
+| Auth       | Supabase Auth + legacy PBKDF2 token layer (hybrid, see below)    | Supabase             |
+| Storage    | Supabase Storage (policy PDFs, logos)                            | Supabase             |
+| Realtime   | Supabase Realtime (notifications)                                | Supabase             |
+| LLM        | OpenAI (`openai==1.51`) — policy PDF extraction + policy Q&A      | OpenAI               |
+| DNS / CDN  | Cloudflare                                                       | Cloudflare           |
 
-### Frontend
-- **Framework**: React + TypeScript
-- **Build Tool**: Vite
-- **Component Library**: Antigravity (custom modern UI components)
-- **Routing**: React Router
-- **API Client**: Axios
+Authoritative schema lives in `supabase/migrations/` (92+ migrations as of 2026-04). `backend/database.py` includes idempotent DDL so SQLite-backed local dev works without running migrations.
 
 ---
 
-## 📋 Features
+## Product surface (what's actually shipped)
 
-### ✅ Guided Intake
-- Progressive disclosure: one question at a time
-- Contextual "why we ask this" microcopy
-- Support for "I don't know yet" answers
-- Auto-save progress
-- Visual progress tracking
+- **HR persona** — Command Center, case summary, assignment review, compliance check, policy upload + assistant, preferred suppliers, company profile, messages, services RFQ inbox
+- **Employee persona** — 5-step relocation wizard, case summary, relocation plan, policy page, services flow (questions → estimate → recommendations → RFQ)
+- **Admin persona** — countries + resources CMS, policies, tags, categories, events, sources, research, mobility case inspect, ops/freshness dashboards, staging, review queue, suppliers, support
 
-### 🎯 Multi-Agent Intelligence
-- Deterministic question flow based on previous answers
-- Input validation and normalization (dates, formats)
-- Immigration readiness scoring (0-100) with status (GREEN/AMBER/RED)
-- Personalized recommendations based on profile
-
-### 🏠 Recommendations
-- **Housing**: 10+ serviced apartments with filtering by budget, bedrooms, area
-- **Schools**: 10+ international schools with curriculum filtering
-- **Movers**: 5 international moving companies with RFQ templates
-
-### 📊 Status Dashboard
-- Profile completeness tracking
-- Immigration readiness with detailed reasons
-- Timeline with task phases
-- Next actions queue
-- Document checklist
+> Three pages are intentionally placeholders (Resources HR view, Submission Center): wired into the router but not yet built. See `frontend/src/pages/PlaceholderPage.tsx`.
 
 ---
 
-## 🚀 Quick Start
-
-### Prerequisites
-- Python 3.9+
-- Node.js 18+
-- npm or yarn
-
-### Backend Setup
-
-```bash
-cd backend
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the server
-python main.py
-```
-
-### Frontend Setup
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run the dev server
-npm run dev
-```
-
----
-
-
-The backend will start at `http://localhost:8000`
-
-### Frontend Setup
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run the dev server
-npm run dev
-```
-
-The frontend will start at `http://localhost:3000`
-
----
-
-## 🔑 Usage
-
-1. **Open** `http://localhost:3000` in your browser
-2. **Sign in** with any email (mock authentication)
-3. **Answer questions** in the guided journey
-4. **View your dashboard** with recommendations and status
-
----
-
-## 📁 Project Structure
+## Architecture, at a glance
 
 ```
-/workspace
-├── backend/
-│   ├── main.py                 # FastAPI app with all endpoints
-│   ├── schemas.py              # Pydantic models
-│   ├── database.py             # SQLite operations
-│   ├── question_bank.py        # Question definitions
-│   ├── seed_data.py            # Housing, schools, movers data
-│   ├── agents/
-│   │   ├── orchestrator.py     # Agent A: Question flow
-│   │   ├── validator.py        # Agent B: Validation
-│   │   ├── readiness_rater.py  # Agent C: Readiness scoring
-│   │   └── recommendation_engine.py  # Agent D: Recommendations
+                      Cloudflare DNS
+                             │
+                    ┌────────┴────────┐
+                    ▼                 ▼
+          Render static site   Render web service
+           (React/Vite)          (FastAPI)
+                                      │
+                    ┌─────────────────┼─────────────────┐
+                    ▼                 ▼                 ▼
+            Supabase Postgres   Supabase Auth    Supabase Storage
+                    │
+                    └── Supabase Realtime (notifications)
+
+                    FastAPI also calls:
+                    • OpenAI (policy extraction + Q&A)
+                    • Supabase service-role for admin ops
+```
+
+The backend is a single FastAPI app. The legacy surface lives in `backend/main.py` (large, being decomposed). Newer work sits under `backend/app/routers/` with SQLAlchemy + Pydantic. Both are mounted on the same app — see `backend/main.py` for the router registration.
+
+### "Agents" — rule-based, not LLM
+
+You'll see `backend/agents/` (orchestrator, validator, readiness_rater, compliance_engine, recommendation_engine). These are **deterministic rule engines**, not LLM agents. The only LLM calls in production are in `backend/services/policy_canonical_extraction.py` and `backend/services/policy_query_answering.py`.
+
+### Hybrid auth — what this means
+
+Accounts are stored in **both** the legacy `public.users` table (PBKDF2 via `passlib`) and Supabase Auth (mirrored via `backend/services/supabase_auth_sync.py`). `POST /api/auth/login` returns a ReloPass session token. Supabase JWTs are used for RLS-enforced Postgres access. Logout invalidates the ReloPass session but not the Supabase JWT — a migration to a single source of truth is tracked as a follow-up.
+
+---
+
+## Repo layout
+
+```
+rolec/
+├── backend/            FastAPI backend (main.py monolith + app/ modular subsystem)
+│   ├── main.py         ~12k lines of routes; being decomposed into backend/app/routers/
+│   ├── database.py     SQLAlchemy engine + CRUD class (cross-DB SQLite/Postgres)
+│   ├── app/            New modular backend (routers/, services/, models, crud)
+│   ├── agents/         Rule-based orchestrators (NOT LLM agents)
+│   ├── services/       ~110 service modules — policy pipeline is the biggest cluster
+│   ├── routes/         Legacy routers (being retired in favor of app/routers)
+│   ├── crawler/        Country-requirements research crawler
+│   ├── scripts/        Dev bootstrap, audit harnesses, verification scripts
+│   ├── tests/          pytest suite (~90 files)
 │   └── requirements.txt
-│
-├── frontend/
+├── frontend/           React + Vite + Tailwind
 │   ├── src/
-│   │   ├── api/
-│   │   │   └── client.ts       # API client
-│   │   ├── components/
-│   │   │   ├── antigravity/    # UI component library
-│   │   │   ├── ProgressHeader.tsx
-│   │   │   ├── GuidedQuestionCard.tsx
-│   │   │   ├── ProfileSidebar.tsx
-│   │   │   └── RecommendationPanel.tsx
-│   │   ├── pages/
-│   │   │   ├── Auth.tsx        # Login page
-│   │   │   ├── Journey.tsx     # Guided intake
-│   │   │   └── Dashboard.tsx   # Status dashboard
-│   │   ├── types.ts            # TypeScript types
-│   │   ├── App.tsx             # Main app with routing
-│   │   └── main.tsx            # Entry point
-│   ├── package.json
-│   └── vite.config.ts
-│
-└── README.md
+│   │   ├── pages/      Top-level screens (HR, Employee, Admin, Services, Public)
+│   │   ├── features/   Feature-folder modules (policy, services, relocation-plan, …)
+│   │   ├── components/ Shared UI (antigravity is the in-house component lib)
+│   │   ├── api/        Axios client + typed service wrappers
+│   │   └── navigation/ Route table + role guards
+│   └── package.json
+├── supabase/
+│   ├── migrations/     Authoritative schema (92+ files)
+│   ├── functions/      Edge functions (currently: send-notification-email)
+│   └── seed_resources_cms.sql
+├── docs/               See docs/INDEX.md for the curated list
+└── scripts/            Root build/verify scripts
 ```
 
 ---
 
-## 🔌 API Endpoints
+## Quick start (local dev)
 
-### Authentication
-- `POST /api/auth/login` - Mock login
+Prerequisites: Python 3.11, Node 20.18+, a Supabase project for anything that touches policy upload, notifications, or storage.
 
-### Profile
-- `GET /api/profile/current` - Get current profile
-- `GET /api/profile/next-question` - Get next question
-- `POST /api/profile/answer` - Submit answer
-- `POST /api/profile/complete` - Finalize profile
+```bash
+# 1. Clone and enter the repo
+git clone <repo-url> rolec && cd rolec
 
-### Recommendations
-- `GET /api/recommendations/housing` - Get housing options
-- `GET /api/recommendations/schools` - Get school options
-- `GET /api/recommendations/movers` - Get mover options
+# 2. Backend
+python3.11 -m venv venv
+source venv/bin/activate
+pip install -r backend/requirements.txt
 
-### Dashboard
-- `GET /api/dashboard` - Get complete dashboard data
+# 3. Environment — copy templates and fill in
+cp .env.example .env                                        # backend
+cp frontend/.env.development.example frontend/.env.development   # frontend
+# Edit frontend/.env.development and set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
+# Backend .env only needed for features that touch Supabase storage / auth sync
 
----
+# 4. Run backend (SQLite fallback — tables created on first boot)
+PYTHONPATH=. uvicorn backend.main:app --reload --port 8000
 
-## 🎨 Design Principles
+# 5. Frontend (new terminal)
+cd frontend
+npm install
+npm run dev          # runs on http://localhost:5173
+```
 
-1. **Low friction**: Ask only what's necessary
-2. **Progressive disclosure**: One question at a time
-3. **Transparent**: Always explain why we ask
-4. **Flexible**: Support "unknown" answers
-5. **Clear outcomes**: Status dashboard, not form pile
+### Tests
 
----
+```bash
+# Backend tests (run from repo root)
+cd backend && PYTHONPATH=. pytest tests/ -q
+# Rate limits are disabled in tests via RELOPASS_DISABLE_RATE_LIMITS=1 (set in conftest.py)
 
-## ⚠️ Important Notes
+# Frontend tests
+cd frontend && npm test
+```
 
-### Scope Limitations
-- **No payments** - MVP doesn't handle transactions
-- **No external integrations** - Google login is mocked
-- **Informational only** - Not legal advice (disclaimer shown)
-- **Single use case** - Oslo → Singapore, family of four only
-- **Mock data** - Recommendations use seeded datasets
+### Policy assistant audit (opt-in)
 
-### Data Model
-The system tracks:
-- **Household**: Family size, spouse, 2 children
-- **Primary Applicant**: Passport, employer (Norwegian Investment), assignment
-- **Move Plan**: Housing, schooling, moving preferences
-- **Compliance**: Document checklist
-
----
-
-## 🧪 Testing the Flow
-
-1. **Login** with `test@example.com`
-2. **Answer core questions**:
-   - Arrival date
-   - Assignment start date
-   - Personal details (names, nationalities)
-   - Housing preferences (budget, areas, bedrooms)
-   - School preferences (curriculum, budget)
-   - Moving details (inventory size)
-   - Document availability
-3. **View Dashboard** to see:
-   - Readiness score
-   - Recommendations
-   - Timeline with tasks
-   - Next actions
+```bash
+PYTHONPATH=. python backend/scripts/bootstrap_backend_database.py
+export RELOPASS_AUDIT_POLICY_GOPS="/absolute/path/GOPS 12102.pdf"
+export RELOPASS_AUDIT_POLICY_LTA="/absolute/path/Long Term Assignment Policy Summary.pdf"
+PYTHONPATH=. python backend/scripts/audit_policy_assistant.py
+```
 
 ---
 
-## 🔒 Security Notes
+## Deployment
 
-- Mock authentication (production would use OAuth2)
-- No password storage
-- Token-based session management
-- CORS enabled for local development
+### Backend — Render Web Service
+
+| Setting       | Value                                                                  |
+| ------------- | ---------------------------------------------------------------------- |
+| Runtime       | Python 3.11 (`.python-version`)                                         |
+| Build Command | `pip install -r backend/requirements.txt`                              |
+| Start Command | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers ${WEB_CONCURRENCY:-4} --proxy-headers` |
+
+Required env vars:
+
+```
+DATABASE_URL=postgresql://...@aws-0-region.pooler.supabase.com:6543/postgres
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<legacy-service-role-jwt>
+CORS_ORIGINS=https://relopass.com,https://www.relopass.com
+OPENAI_API_KEY=<if policy assistant is enabled>
+```
+
+### Frontend — Render Static Site
+
+| Setting           | Value                                                              |
+| ----------------- | ------------------------------------------------------------------ |
+| Build Command     | `npm --prefix frontend ci && npm --prefix frontend run build`      |
+| Publish Directory | `frontend/dist`                                                    |
+| Node Version      | Pinned by `.nvmrc` (20.18.1)                                        |
+
+Required env vars (both are safe in client bundles; anon key must rely on RLS):
+
+```
+VITE_API_URL=https://api.relopass.com
+VITE_SUPABASE_URL=https://<project>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon jwt>
+```
+
+### Health check
+
+```bash
+curl https://api.relopass.com/health
+```
 
 ---
 
-## 📝 License
+## Security notes
 
-This is an MVP for demonstration purposes.
+- Password hashing: PBKDF2-SHA256 via `passlib` (pinned at 1.7.4 — latest release; argon2 migration is a tracked follow-up)
+- Rate limiting: `slowapi` on `/api/auth/login` (10/min), `/api/auth/register` (5/hour), `/api/employee/assignments/:id/claim` (10/hour). Disable for tests via `RELOPASS_DISABLE_RATE_LIMITS=1`
+- CORS origins pinned to `*.relopass.com` + `localhost` dev ports
+- Supabase anon key is intentionally public; RLS is the real boundary
+- `frontend/.env.development` is git-ignored; use the `.example` template
+- Legacy service-role key has never been committed; if it ever is, rotate via Supabase → JWT Keys → rotate standby
+
+Full security context and open items: see [docs/INDEX.md](docs/INDEX.md).
 
 ---
 
-## 🤝 Support
+## Contributing
 
-For questions or issues, please check the code comments or reach out to the development team.
+- Treat `backend/main.py` as a live monolith being decomposed. New routes should go into `backend/app/routers/` when possible.
+- Frontend components with `:any` are technical debt — prefer typed props.
+- Test the golden path before opening a PR. CI is not yet in place (see docs/INDEX.md open items).
 
 ---
 
-**Built with ❤️ for smooth relocations**
+## License
+
+Proprietary. MVP stage.
