@@ -479,10 +479,21 @@ export const HrDashboard: React.FC = () => {
                       setSelectedCaseId(assignment.id);
                       navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
                     }}
+                    {...(!isManageMode && {
+                      role: 'button',
+                      tabIndex: 0,
+                      onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedCaseId(assignment.id);
+                          navigate(buildRoute('hrCaseSummary', { caseId: assignment.id }));
+                        }
+                      },
+                    })}
                     className={`grid gap-4 px-4 py-4 border-t border-[#e2e8f0] items-center cursor-pointer ${
                       isManageMode
                         ? `grid-cols-[2rem,1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] ${isSelected ? 'bg-red-50' : 'hover:bg-[#f8fafc]'}`
-                        : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] hover:bg-[#f8fafc]'
+                        : 'grid-cols-[1.5fr,1fr,1.5fr,1fr,1fr,0.3fr] hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:outline-none'
                     }`}
                   >
                     {isManageMode && (

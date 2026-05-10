@@ -2,7 +2,105 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+# ── S5 wiring: workstream_id → (milestone_types, timing, criticality) ────────
+# Maps WorkstreamRequirement.workstream_id from FamilyPropagator to the
+# milestone_type(s) that should be seeded into case_milestones, along with
+# a days_before_move anchor and criticality label.
+#
+# Order within each tuple is: (milestone_type, title, owner, criticality, sort_order, days_before_move)
+# Mirror timing from WorkstreamRequirement.typical_lead_time_weeks × 7.
+_WORKSTREAM_MILESTONE_SPECS: Dict[str, List[Tuple[str, str, str, str, int, int]]] = {
+    "partner_mvv": [
+        (
+            "task_partner_mvv",
+            "Apply for Dutch MVV (partner family entry visa)",
+            "joint",
+            "critical",
+            12,          # sort_order — before main visa prep (sort_order 40)
+            84,          # days_before_move (12 weeks)
+        ),
+    ],
+    "partner_family_visa": [
+        (
+            "task_partner_family_visa",
+            "Apply for partner / family reunification visa",
+            "joint",
+            "critical",
+            13,
+            70,          # 10 weeks
+        ),
+    ],
+    "dependent_visa": [
+        (
+            "task_dependent_visa",
+            "Apply for dependent / spouse visa",
+            "joint",
+            "normal",
+            48,          # after main visa submit (sort_order 45)
+            42,          # 6 weeks
+        ),
+    ],
+    "spouse_work_authorization": [
+        (
+            "task_spouse_work_permit",
+            "Obtain spouse / partner work authorisation",
+            "joint",
+            "normal",
+            42,
+            63,          # 9 weeks
+        ),
+    ],
+    "school_enrollment": [
+        (
+            "task_school_research",
+            "Research and shortlist schools",
+            "employee",
+            "normal",
+            27,          # pre-departure, after family details (sort_order 10)
+            84,
+        ),
+        (
+            "task_school_application",
+            "Submit school applications",
+            "employee",
+            "normal",
+            43,          # immigration phase, alongside visa
+            56,          # 8 weeks
+        ),
+    ],
+}
+
+# ── S5/P2 wiring: regime_id → ordered list of (milestone_type, title, owner, criticality, sort_order, days_before_move)
+# Maps ImmigrationRegimeResult.regime_id → concrete milestone specs to seed.
+# Timing anchored to days_before_move from compute_default_milestones base anchor.
+_REGIME_MILESTONE_SPECS: Dict[str, List[Tuple[str, str, str, str, int, int]]] = {
+    "us_l1b": [
+        ("task_l1b_support_letter",   "Prepare US entity L1B support letter",           "hr",       "critical", 6,  140),
+        ("task_l1b_petition_prep",    "Prepare I-129 L1B petition package",              "hr",       "critical", 7,  133),
+        ("task_l1b_petition_filing",  "File I-129 L1B petition with USCIS",              "hr",       "critical", 5,  126),
+        ("task_l1b_visa_interview",   "Complete DS-160 and attend US consulate interview","employee", "critical", 20,  56),
+        ("task_l1b_port_of_entry",    "US port of entry — CBP inspection and I-94",      "employee", "critical", 2,    0),  # arrival day
+        ("task_l1b_ssn",              "Apply for US Social Security Number",             "employee", "normal",   6,  -14), # 2 weeks after move
+    ],
+    "japan_coe": [
+        ("task_japan_coe_prep",       "Prepare COE application",                         "hr",       "critical", 6,  112),
+        ("task_japan_coe_visa",       "Apply for Japan work visa using COE",             "employee", "critical", 6,   28),
+        ("task_japan_residence_card", "Collect Residence Card at port of entry",         "employee", "critical", 3,    0),  # arrival day
+        ("task_japan_municipal_reg",  "Register at municipal office and obtain My Number","employee","critical", 3,  -14),
+    ],
+    "eu_free_movement": [
+        ("task_eu_registration",      "Register as EU/EEA resident at local authority",  "employee", "normal",   4,  -21), # 3 weeks after move
+    ],
+    "uk_skilled_worker": [
+        ("task_uk_cos_request",           "Request Certificate of Sponsorship (CoS) from employer",   "hr",       "critical", 6,   70),
+        ("task_uk_visa_application",      "Submit UK Skilled Worker visa application online",          "employee", "critical", 7,   49),
+        ("task_uk_biometric_appointment", "Attend biometric appointment at UKVCAS centre",             "employee", "critical", 5,   35),
+        ("task_uk_brp_collection",        "Collect Biometric Residence Permit (BRP) on arrival",      "employee", "critical", 2,    0),  # arrival day
+        ("task_uk_right_to_work_check",   "Complete employer right-to-work verification",              "hr",       "critical", 3,   -7), # 1 week after arrival
+    ],
+}
 
 # Practical relocation tasks (stored as case_milestones; linked to same case as readiness/checklist).
 # milestone_type is stable for future sync with readiness checklist keys if needed.
@@ -191,19 +289,61 @@ def compute_default_milestones(
     case_draft: Optional[Dict[str, Any]] = None,
     selected_services: Optional[List[str]] = None,
     target_move_date: Optional[str] = None,
+    # ── S5 wiring additions (all optional — backward-compatible) ────────────
+    contract_type: Optional[str] = None,
+    family_profile: Optional[Dict[str, Any]] = None,
+    destination_country: Optional[str] = None,
+    origin_country: Optional[str] = None,
+    # ── P2 wiring addition ───────────────────────────────────────────────────
+    nationality: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Compute default operational tasks for a case (inserted into case_milestones when none exist).
     Dates are anchored on target move / arrival when available.
+
+    S5 additions:
+    - contract_type gates which phases are included (domestic_move suppresses immigration,
+      short_term_project suppresses logistics + post_arrival).
+    - family_profile triggers additional family workstream milestones via FamilyPropagator.
     """
     _ = case_id
     services = set(selected_services or [])
     base = _parse_move_anchor(case_draft, target_move_date)
 
+    # ── Determine active phases (S5) ─────────────────────────────────────────
+    active_phases: Optional[set] = None
+    if contract_type and contract_type not in ("unknown", ""):
+        try:
+            from ...services.plan_scope import active_phases_for_case_type
+            from ...relocation_plan_task_library import TASK_BY_MILESTONE_TYPE
+            _active_list = active_phases_for_case_type(contract_type)
+            active_phases = set(_active_list)
+            _task_by_mt = TASK_BY_MILESTONE_TYPE
+        except ImportError:
+            active_phases = None
+            _task_by_mt = {}
+    else:
+        try:
+            from ...relocation_plan_task_library import TASK_BY_MILESTONE_TYPE
+            _task_by_mt = TASK_BY_MILESTONE_TYPE
+        except ImportError:
+            _task_by_mt = {}
+
+    def _phase_allowed(milestone_type: str) -> bool:
+        """Return True if this milestone_type's phase is in the active set (or if unknown)."""
+        if active_phases is None:
+            return True
+        entry = _task_by_mt.get(milestone_type)  # type: ignore[name-defined]
+        if entry is None:
+            return True   # unknown milestone_type → fail open
+        return entry.phase_key in active_phases
+
     result: List[Dict[str, Any]] = []
     for spec in OPERATIONAL_TASK_DEFAULTS:
         mt = spec["milestone_type"]
         if mt == "task_provider_coordination" and not services:
+            continue
+        if not _phase_allowed(mt):
             continue
         target: Optional[str] = None
         if base:
@@ -226,6 +366,88 @@ def compute_default_milestones(
                 "notes": None,
             }
         )
+
+    # ── Inject family workstream milestones (S5) ─────────────────────────────
+    if family_profile:
+        try:
+            from ...services.family_propagation import FamilyPropagator
+            propagator = FamilyPropagator()
+            workstreams = propagator.get_required_workstreams(
+                family_profile=family_profile,
+                destination_country=destination_country,
+                origin_country=origin_country,
+            )
+            existing_milestone_types = {r["milestone_type"] for r in result}
+            for ws in workstreams:
+                specs_for_ws = _WORKSTREAM_MILESTONE_SPECS.get(ws.workstream_id, [])
+                for (mt, title, owner, criticality, sort_order, days_before) in specs_for_ws:
+                    if mt in existing_milestone_types:
+                        continue   # already present (shouldn't happen but guard it)
+                    if active_phases is not None:
+                        entry = _task_by_mt.get(mt)  # type: ignore[name-defined]
+                        if entry and entry.phase_key not in active_phases:
+                            continue  # suppressed phase
+                    target: Optional[str] = None
+                    if base:
+                        target = (base - timedelta(days=days_before)).strftime("%Y-%m-%d")
+                    result.append({
+                        "milestone_type": mt,
+                        "title": title,
+                        "description": ws.reason,
+                        "sort_order": sort_order,
+                        "target_date": target,
+                        "status": "pending",
+                        "owner": owner,
+                        "criticality": criticality,
+                        "notes": ws.notes or None,
+                    })
+                    existing_milestone_types.add(mt)
+        except ImportError:
+            pass  # family_propagation not available — skip silently
+
+    # ── Inject immigration-regime milestones (P2) ─────────────────────────────
+    # Runs whenever nationality or destination_country is known.
+    if destination_country or nationality:
+        try:
+            from ...services.immigration_regime import ImmigrationRegimeRouter
+            regime_router = ImmigrationRegimeRouter()
+            regime = regime_router.detect_regime(
+                nationality=nationality,
+                destination_country=destination_country,
+                origin_country=origin_country,
+                contract_type=contract_type,
+            )
+            specs_for_regime = _REGIME_MILESTONE_SPECS.get(regime.regime_id, [])
+            existing_milestone_types_set = {r["milestone_type"] for r in result}
+            for (mt, title, owner, criticality, sort_order, offset_days) in specs_for_regime:
+                if mt in existing_milestone_types_set:
+                    continue
+                if active_phases is not None:
+                    entry = _task_by_mt.get(mt)  # type: ignore[name-defined]
+                    if entry and entry.phase_key not in active_phases:
+                        continue
+                target: Optional[str] = None
+                if base:
+                    if offset_days >= 0:
+                        target = (base - timedelta(days=offset_days)).strftime("%Y-%m-%d")
+                    else:
+                        # Negative offset = days AFTER move date
+                        target = (base + timedelta(days=abs(offset_days))).strftime("%Y-%m-%d")
+                result.append({
+                    "milestone_type": mt,
+                    "title": title,
+                    "description": regime.notes or None,
+                    "sort_order": sort_order,
+                    "target_date": target,
+                    "status": "pending",
+                    "owner": owner,
+                    "criticality": criticality,
+                    "notes": None,
+                })
+                existing_milestone_types_set.add(mt)
+        except ImportError:
+            pass  # immigration_regime not available — skip silently
+
     return result
 
 

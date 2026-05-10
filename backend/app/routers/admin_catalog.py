@@ -155,11 +155,24 @@ def admin_notification_counts(
     Lightweight summary admin uses for nav badges:
       - pending_tickets: HR-opened destination requests waiting on admin
       - allowlisted_destinations: total approved destinations
+
+    Computed via COUNT aggregates in a single connection. The earlier version
+    fetched up to 500 row payloads from each table just to take len() — wasteful
+    on the SQLAlchemy pool when polled every minute by the admin shell.
     """
-    from ...services import scrape_safety
-    pending = scrape_safety.list_destination_requests(status="pending", limit=500)
-    allowlist = scrape_safety.list_allowlist()
+    from sqlalchemy import text as _sql
+    from ...database import db
+    with db.engine.connect() as conn:
+        pending = conn.execute(
+            _sql(
+                "SELECT COUNT(*) FROM catalog_destination_requests "
+                "WHERE status = 'pending'"
+            )
+        ).scalar() or 0
+        allowlist = conn.execute(
+            _sql("SELECT COUNT(*) FROM catalog_destination_allowlist")
+        ).scalar() or 0
     return {
-        "pending_tickets": len(pending),
-        "allowlisted_destinations": len(allowlist),
+        "pending_tickets": int(pending),
+        "allowlisted_destinations": int(allowlist),
     }

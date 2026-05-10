@@ -37,7 +37,7 @@ import {
 import type { PolicyConfigWorkingPayload } from '../policy-config/types';
 import { HrPolicyReviewWorkspace } from './HrPolicyReviewWorkspace';
 import { HrPolicyAssistantPanel } from './HrPolicyAssistantPanel';
-import { PolicyAssistantFab } from './PolicyAssistantFab';
+import { PolicyAssistantDockedShell } from './PolicyAssistantDockedShell';
 import { CanonicalPolicyDiffView } from './CanonicalPolicyDiffView';
 import { PolicyDiffView } from './PolicyDiffView';
 import { PolicyTemplatePicker } from './PolicyTemplatePicker';
@@ -171,14 +171,32 @@ const StatusStrip: React.FC<StatusStripProps> = ({
 const TopicSummarySection: React.FC<{
   matrixPayload: PolicyConfigWorkingPayload | null;
   onRequestDetails: () => void;
-}> = ({ matrixPayload, onRequestDetails }) => (
-  <Card padding="lg">
-    <PolicyTopicSummaryList
-      matrixPayload={matrixPayload}
-      onRequestDetails={onRequestDetails}
-    />
-  </Card>
-);
+}> = ({ matrixPayload, onRequestDetails }) => {
+  // The HR endpoint hands back EITHER the published clone (read-only)
+  // OR the draft (editable, never been published). The accordion has
+  // historically said "What employees see today" for both — which is a
+  // lie when the payload is a draft, because employees see nothing
+  // until HR publishes. Switch the title + subtitle on that flag so
+  // HR isn't surprised when the employee surface is empty.
+  const isLive =
+    matrixPayload?.status === 'published' ||
+    matrixPayload?.source === 'published' ||
+    matrixPayload?.source === 'published_clone';
+  const heading = isLive ? 'What employees see today' : 'Your draft preview (not live yet)';
+  const subtitle = isLive
+    ? 'Summary of the currently live relocation policy by theme. Click a theme to see its individual benefit rows — read-only here. Edits happen in the Detailed review drawer.'
+    : 'This draft is HR-only — employees see nothing from this on /hr/policy until you Publish draft. Click a theme to preview the benefit rows that would go live.';
+  return (
+    <Card padding="lg">
+      <PolicyTopicSummaryList
+        matrixPayload={matrixPayload}
+        onRequestDetails={onRequestDetails}
+        heading={heading}
+        subtitle={subtitle}
+      />
+    </Card>
+  );
+};
 
 // --- Build next version -----------------------------------------------------
 
@@ -329,23 +347,6 @@ const VersionHistorySection: React.FC<{
   );
 };
 
-// --- Floating Policy Assistant FAB -----------------------------------------
-
-/**
- * HR-flavored floating assistant. The shared PolicyAssistantFab owns the
- * button + sheet chrome; this wrapper only provides the HR assistant
- * panel as the sheet body. Kept inline here so page-scoped props
- * (policyId) stay local — a future employee equivalent will use the
- * same PolicyAssistantFab with EmployeePolicyAssistantPanel as body.
- */
-const FloatingPolicyAssistantButton: React.FC<{
-  policyId: string | null;
-}> = ({ policyId }) => (
-  <PolicyAssistantFab label="Open Policy Assistant — ask about this HR policy">
-    {() => <HrPolicyAssistantPanel policyId={policyId} variant="card" />}
-  </PolicyAssistantFab>
-);
-
 // --- Main page --------------------------------------------------------------
 
 export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }) => {
@@ -416,8 +417,54 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       matrixPayload?.source !== 'published_clone'
   );
 
-  const publishEnabled = Boolean(normalized?.version?.id) && !hasLivePolicy;
-  const [publishBusy, _setPublishBusy] = useState(false);
+  // Publish gate: matrix-only deployments (the common case) need to be
+  // able to publish too. Previously this required a `normalized.version.id`
+  // (a document-extracted/canonical policy), which meant matrix-only HR
+  // teams had a forever-disabled top "Publish draft" button — and the
+  // legacy "Publish version" button further down published a different
+  // system (`policy_versions`) that the employee endpoint doesn't read.
+  // Result: HR clicked Publish, employee saw "No published policy yet".
+  // Enable the top button whenever there's a matrix draft to publish or a
+  // canonical version ready to ship; the publish handler picks the right
+  // path based on what's available.
+  const matrixHasUnpublishedChanges =
+    Boolean(matrixPayload?.editable) &&
+    matrixPayload?.source !== 'published' &&
+    matrixPayload?.source !== 'published_clone';
+  const publishEnabled =
+    matrixHasUnpublishedChanges || (Boolean(normalized?.version?.id) && !hasLivePolicy);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+
+  const publishMatrix = useCallback(async () => {
+    if (!matrixHasUnpublishedChanges) {
+      // Nothing matrix-side to publish — fall through to scroll-to-detail
+      // so the canonical/document-extracted publish controls in the
+      // workspace below pick up the action.
+      const el = document.getElementById('hr-policy-detailed-review');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    setPublishBusy(true);
+    setPublishError(null);
+    try {
+      await policyConfigMatrixAPI.hrPublish({}, adminCompanyId ?? undefined);
+      // Bump refreshes both the matrix payload and the workspace state so
+      // the topic accordion flips from "Your draft preview" to "What
+      // employees see today" without a hard reload.
+      bump();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail;
+      setPublishError(
+        typeof detail === 'string' && detail
+          ? detail
+          : 'Could not publish your draft. Try the legacy publish controls in the Detailed review section, or contact support.'
+      );
+    } finally {
+      setPublishBusy(false);
+    }
+  }, [matrixHasUnpublishedChanges, adminCompanyId, bump]);
 
   const handleImportClick = () => {
     // Scroll to the workspace; the Document intake card lives at the top
@@ -428,6 +475,11 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
 
   const policyId = normalized?.version?.policy_id ?? normalized?.policy?.id ?? null;
 
+  // Sprint 2: docked-shell open state lifted to the page so the trigger
+  // button and the shell share it. Replaces the modal-overlay flow that
+  // PolicyAssistantFab + PolicyAssistantSideSheet owned previously.
+  const [assistantOpen, setAssistantOpen] = useState(false);
+
   if (loading) {
     return (
       <Card padding="lg">
@@ -437,8 +489,37 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
   }
 
   return (
+    <PolicyAssistantDockedShell
+      open={assistantOpen}
+      onOpenChange={setAssistantOpen}
+      title="Ask about this policy"
+      subtitle="Bounded Q&A on this workspace's policy data."
+      titleId="hr-policy-assistant-shell-title"
+      assistant={() => <HrPolicyAssistantPanel policyId={policyId} variant="embedded" />}
+    >
     <div className="space-y-6 pb-12">
       {loadError && <Alert variant="error">{loadError}</Alert>}
+      {publishError && <Alert variant="error">{publishError}</Alert>}
+
+      {/* Sprint 2 trigger — replaces the old PolicyAssistantFab. Sits
+          flush-right above the status strip so it's discoverable
+          without competing with the page heading. The docked shell
+          owns the close affordance via its header X — the trigger
+          hides when the panel is open so we don't render two ways to
+          close the same panel. */}
+      {assistantOpen ? null : (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setAssistantOpen(true)}
+            aria-expanded={false}
+            aria-controls="hr-policy-assistant-shell-title"
+          >
+            Ask about this policy
+          </Button>
+        </div>
+      )}
 
       {/* 1. Status strip */}
       <StatusStrip
@@ -451,23 +532,48 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
           const el = document.getElementById('hr-policy-detailed-review');
           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }}
-        onPublish={() => {
-          const el = document.getElementById('hr-policy-detailed-review');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
+        onPublish={() => void publishMatrix()}
         publishEnabled={publishEnabled}
         publishBusy={publishBusy}
       />
 
-      {/* 2. What employees see today */}
-      <TopicSummarySection
-        matrixPayload={matrixPayload}
-        onRequestDetails={() => {
-          // Workspace is now flat (no collapsible) — scroll to it.
-          const el = document.getElementById('hr-policy-detailed-review');
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
-      />
+      {/* 2. What employees see today — collapsed disclosure (slice 3d).
+          The benefit table further down is HR's primary work surface;
+          this read-only summary is reference, not action. Stays in DOM
+          (data still pre-fetched) so opening is instant.
+          Disclosure label flips to "Preview your draft" when the
+          payload is a draft (matches the inner heading from
+          TopicSummarySection so HR isn't misled into thinking employees
+          can see the draft). */}
+      <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-base font-semibold text-[#0b2b43]">
+              {(matrixPayload?.status === 'published' ||
+                matrixPayload?.source === 'published' ||
+                matrixPayload?.source === 'published_clone')
+                ? '▸ See what employees see today'
+                : '▸ Preview your draft (not live for employees yet)'}
+            </span>
+            <span className="text-xs text-[#64748b]">
+              {(matrixPayload?.status === 'published' ||
+                matrixPayload?.source === 'published' ||
+                matrixPayload?.source === 'published_clone')
+                ? 'read-only summary by theme'
+                : 'publish to make this visible to employees'}
+            </span>
+          </div>
+        </summary>
+        <div className="px-5 pb-5">
+          <TopicSummarySection
+            matrixPayload={matrixPayload}
+            onRequestDetails={() => {
+              const el = document.getElementById('hr-policy-detailed-review');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          />
+        </div>
+      </details>
 
       {/* 3. Build your next version (only shown when there is no live policy
           OR no draft in progress — once HR has a working version, the matrix
@@ -495,20 +601,46 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
         adminCompanyId={adminCompanyId}
       />
 
-      {/* 4. Draft vs Live — two diffs, one per pipeline:
-          - matrix (PR #4): compensation & allowance caps
-          - canonical (this PR): document-normalized benefit rules
-          CanonicalPolicyDiffView renders null when the company has no
-          canonical policy at all, so matrix-only deployments don't see
-          a dangling empty section. */}
-      <PolicyDiffView
-        adminCompanyId={adminCompanyId ?? null}
-        refreshTrigger={workspaceRefreshTrigger}
-      />
-      <CanonicalPolicyDiffView
-        adminCompanyId={adminCompanyId ?? null}
-        refreshTrigger={workspaceRefreshTrigger}
-      />
+      {/* 4. Draft vs Live diffs — collapsed disclosures (slice 3d).
+          Big diffs need to stay one click away, not push the editable
+          benefit table further down the page. The category-grouped
+          accordions inside (slice 3a) keep the open state scannable.
+          Slice 2 still gates the canonical diff to deployments with
+          uploaded documents. */}
+      <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-base font-semibold text-[#0b2b43]">
+              ▸ See draft vs live changes
+            </span>
+            <span className="text-xs text-[#64748b]">matrix diff with revert per row</span>
+          </div>
+        </summary>
+        <div className="px-5 pb-5">
+          <PolicyDiffView
+            adminCompanyId={adminCompanyId ?? null}
+            refreshTrigger={workspaceRefreshTrigger}
+          />
+        </div>
+      </details>
+      {documents.length > 0 && (
+        <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+          <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-base font-semibold text-[#0b2b43]">
+                ▸ See document-extraction diff
+              </span>
+              <span className="text-xs text-[#64748b]">canonical rules from your uploaded files</span>
+            </div>
+          </summary>
+          <div className="px-5 pb-5">
+            <CanonicalPolicyDiffView
+              adminCompanyId={adminCompanyId ?? null}
+              refreshTrigger={workspaceRefreshTrigger}
+            />
+          </div>
+        </details>
+      )}
 
       {/* 5. Benefit table & publish (was: "Detailed review" collapsible).
           PR 0.5 simplification flattens this — the table is the primary
@@ -531,9 +663,7 @@ export const HrPolicyPageV2: React.FC<HrPolicyPageV2Props> = ({ adminCompanyId }
       <div aria-hidden className="hidden">
         <button type="button" onClick={bump} />
       </div>
-
-      {/* Floating Policy Assistant */}
-      <FloatingPolicyAssistantButton policyId={policyId} />
     </div>
+    </PolicyAssistantDockedShell>
   );
 };

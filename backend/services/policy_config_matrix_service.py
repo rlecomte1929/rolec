@@ -949,6 +949,18 @@ class PolicyConfigMatrixService:
         self._db.publish_policy_config_version_atomic(vid)
         pub = self._db.get_policy_config_version_row(vid)
         benefits = self._db.list_policy_config_benefits(vid)
+        # Sprint A: rebuild Policy Assistant RAG index for this company
+        # so the assistant answers from the just-published version. Best-
+        # effort: never let an indexer failure block the publish (HR did
+        # the work; the assistant is downstream).
+        try:
+            from .policy_chunk_indexer import index_company_policy
+            index_company_policy(str(company_id))
+        except Exception:
+            log.exception(
+                "policy_assistant index rebuild failed after publish company=%s vid=%s",
+                company_id, vid,
+            )
         return self.build_payload(company_id, version=pub, benefits=benefits, editable=False, source="published")
 
     # ------------------------------------------------------------------

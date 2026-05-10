@@ -374,8 +374,19 @@ class PolicyEngine:
         return "Consistency & Data Integrity"
 
     def _visa_path(self, profile: Dict[str, Any]) -> str:
-        job_level = profile.get("primaryApplicant", {}).get("employer", {}).get("jobLevel")
-        return f"L-{job_level} Specialized Knowledge" if job_level else "L-1B Specialized Knowledge"
+        # We do not have the immigration knowledge to recommend a specific
+        # visa category per corridor — the previous implementation hardcoded
+        # US L-visa terminology regardless of route. Until a properly
+        # sourced per-corridor immigration model is in place, surface a
+        # corridor-aware referral instead of a confidently wrong category.
+        move = profile.get("movePlan") or {}
+        origin = (move.get("origin") or "").strip() if isinstance(move.get("origin"), str) else ""
+        destination = (move.get("destination") or "").strip() if isinstance(move.get("destination"), str) else ""
+        if origin and destination:
+            return f"Requires immigration counsel review for {origin} → {destination}."
+        if destination:
+            return f"Requires immigration counsel review for relocation to {destination}."
+        return "Requires immigration counsel review."
 
     def _stage_label(self, status: Any) -> str:
         """

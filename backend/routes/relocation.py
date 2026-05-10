@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from .._jwt_claims import get_unverified_claims as _jwt_unverified_claims
 from ..services.relocation_profile import compute_missing_fields
+from ..services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
 from ..services.relocation_classification import (
     compute_case_classification,
     persist_case_classification,
@@ -28,35 +29,13 @@ def looks_like_supabase_jwt(token: str) -> bool:
 
 
 def _profile_from_wizard_draft(draft: Dict[str, Any]) -> Dict[str, Any]:
-    """Map wizard Case draft into relocation_profile.compute_missing_fields shape."""
-    basics = draft.get("relocationBasics") or {}
-    ac = draft.get("assignmentContext") or {}
-    out: Dict[str, Any] = {}
-    oc = basics.get("originCountry") or basics.get("origin_country")
-    dc = (
-        basics.get("destCountry")
-        or basics.get("destination_country")
-        or basics.get("hostCountry")
-        or basics.get("host_country")
-    )
-    if oc:
-        out["origin_country"] = oc
-    if dc:
-        out["destination_country"] = dc
-    md = basics.get("targetMoveDate") or basics.get("move_date")
-    if md:
-        out["move_date"] = md
-    et = basics.get("employmentType") or basics.get("employment_type")
-    if et:
-        out["employment_type"] = et
-    ec = ac.get("employerCountry") or ac.get("employer_country") or basics.get("employerCountry")
-    if ec:
-        out["employer_country"] = ec
-    if basics.get("worksRemote") is not None:
-        out["works_remote"] = basics.get("worksRemote")
-    if basics.get("hasCorporateTaxSupport") is not None:
-        out["has_corporate_tax_support"] = basics.get("hasCorporateTaxSupport")
-    return out
+    """Map wizard Case draft into relocation_profile.compute_missing_fields shape.
+
+    Delegates to backend.services.wizard_draft_mapper.extract_profile_from_wizard_draft
+    which is independently testable (no FastAPI dependency).
+    Includes S3 (contract_type) and S4 (family.*) fields.
+    """
+    return _extract_profile(draft)
 
 
 def _relopass_can_access_assignment(user: Dict[str, Any], assignment: Dict[str, Any]) -> bool:

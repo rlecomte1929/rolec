@@ -21,12 +21,12 @@ log = logging.getLogger(__name__)
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Annotated, Literal, Optional, Dict, Any, List, Tuple, Union
 import uuid
 from datetime import datetime, date
 import re
 import json
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -137,6 +137,7 @@ from .routes import relocation as relocation_router
 from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
 from .routes import resources as resources_router
+from .routes import hr_resources as hr_resources_router
 from .app.recommendations.router import router as recommendations_router
 from .app.recommendations.admin_debug import router as admin_recommendations_debug_router
 from .app.routers import suppliers as suppliers_router
@@ -516,6 +517,7 @@ app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")
 app.include_router(policy_canonical_router.read_router, prefix="/api")
 app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
+app.include_router(hr_resources_router.router)
 app.include_router(recommendations_router)
 app.include_router(relocation_router.router)
 app.include_router(relocation_router.api_router)
@@ -1174,10 +1176,17 @@ class HrPolicyAssistantQueryRequest(BaseModel):
     session: Optional[Dict[str, Any]] = None
 
 
-class PolicyAssistantAnalyticsBeaconRequest(BaseModel):
-    """Non-PII client beacon (e.g. follow-up chip). No free-text beyond whitelisted fields."""
+class _BeaconBase(BaseModel):
+    """Common beacon model config. ``extra='forbid'`` keeps the surface
+    tight — a client can't sneak in PII fields by appending them."""
 
-    event: str
+    model_config = {"extra": "forbid"}
+
+
+class FollowUpClickedBeacon(_BeaconBase):
+    """Pre-Sprint-1 event. Locks down the original required fields."""
+
+    event: Literal["assistant_follow_up_clicked"]
     follow_up_intent: Optional[str] = Field(None, max_length=80)
     follow_up_index: int = Field(..., ge=0, le=20)
     canonical_topic: Optional[str] = Field(None, max_length=64)
@@ -1186,6 +1195,60 @@ class PolicyAssistantAnalyticsBeaconRequest(BaseModel):
         max_length=128,
         description="Correlates to request_id from the policy assistant query that showed the chip.",
     )
+
+
+# Sprint 1.5: surface label for the four new events. Enum (not free
+# string) so dashboards can group cleanly.
+_BeaconSurface = Literal["employee_fab", "hr_sidesheet", "employee_card"]
+
+
+class AssistantOpenedBeacon(_BeaconBase):
+    event: Literal["assistant_opened"]
+    surface: _BeaconSurface
+
+
+class AssistantQuestionSubmittedBeacon(_BeaconBase):
+    event: Literal["assistant_question_submitted"]
+    surface: _BeaconSurface
+    source: Literal["free_text", "shortcut", "follow_up"]
+
+
+class AssistantAnswerReceivedBeacon(_BeaconBase):
+    event: Literal["assistant_answer_received"]
+    surface: _BeaconSurface
+    answer_type: Optional[str] = Field(None, max_length=64)
+    status: str = Field(..., max_length=64)
+    request_id: Optional[str] = Field(None, max_length=128)
+
+
+class AssistantDismissedBeacon(_BeaconBase):
+    event: Literal["assistant_dismissed"]
+    surface: _BeaconSurface
+    had_question: bool
+    had_answer: bool
+
+
+# Discriminated union wrapped in RootModel so FastAPI accepts it as a
+# request body. Pydantic v2 picks the right model from the `event`
+# tag, so 422 errors point at the actual mismatch ("missing field
+# 'surface' for assistant_opened") instead of conflating all events
+# under one schema. RootModel preserves the JSON shape — the body is
+# just the event object, not wrapped in a parent key.
+class PolicyAssistantAnalyticsBeaconRequest(
+    RootModel[
+        Annotated[
+            Union[
+                FollowUpClickedBeacon,
+                AssistantOpenedBeacon,
+                AssistantQuestionSubmittedBeacon,
+                AssistantAnswerReceivedBeacon,
+                AssistantDismissedBeacon,
+            ],
+            Field(discriminator="event"),
+        ]
+    ]
+):
+    pass
 
 
 def _require_reason(reason: Optional[str]) -> None:
@@ -1216,8 +1279,47 @@ def _normalize_destination_country(value: Optional[str]) -> Optional[str]:
     normalized = value.strip().upper()
     if normalized in ("SG", "SINGAPORE"):
         return "SG"
-    if normalized in ("US", "USA", "UNITED STATES"):
+    if normalized in ("US", "USA", "UNITED STATES", "NEW YORK", "NEW YORK CITY", "NYC"):
         return "US"
+    if normalized in ("GB", "UK", "UNITED KINGDOM", "LONDON", "ENGLAND"):
+        return "GB"
+    if normalized in ("FR", "FRANCE", "PARIS"):
+        return "FR"
+    if normalized in ("DE", "GERMANY", "DEUTSCHLAND", "BERLIN", "MUNICH", "MÜNCHEN"):
+        return "DE"
+    if normalized in ("NO", "NORWAY", "NORGE", "OSLO"):
+        return "NO"
+    if normalized in ("BR", "BRAZIL", "BRASIL", "RIO DE JANEIRO", "RIO", "SÃO PAULO", "SAO PAULO"):
+        return "BR"
+    if normalized in ("IT", "ITALY", "ITALIA", "ROME", "ROMA", "MILAN", "MILANO"):
+        return "IT"
+    if normalized in ("ES", "SPAIN", "ESPAÑA", "ESPANA", "MADRID", "BARCELONA"):
+        return "ES"
+    if normalized in ("AU", "AUSTRALIA", "SYDNEY", "MELBOURNE", "BRISBANE", "PERTH",
+                      "ADELAIDE", "CANBERRA", "GOLD COAST", "NEWCASTLE", "SUNSHINE COAST", "WOLLONGONG"):
+        return "AU"
+    if normalized in ("CA", "CANADA", "TORONTO", "VANCOUVER", "MONTREAL", "CALGARY",
+                      "EDMONTON", "OTTAWA", "WINNIPEG", "HAMILTON", "KITCHENER", "QUEBEC CITY"):
+        return "CA"
+    if normalized in ("CH", "SWITZERLAND", "SCHWEIZ", "SUISSE", "ZURICH", "ZÜRICH",
+                      "GENEVA", "GENÈVE", "GENEVE", "BERN", "BERNE", "BASEL", "BIEL",
+                      "LAUSANNE", "LUCERNE", "LUGANO", "ST. GALLEN", "ST GALLEN", "WINTERTHUR"):
+        return "CH"
+    if normalized in ("HK", "HONG KONG", "KOWLOON", "NEW TERRITORIES"):
+        return "HK"
+    if normalized in ("JP", "JAPAN", "TOKYO", "OSAKA", "FUKUOKA", "NAGOYA", "SAPPORO",
+                      "KAWASAKI", "KOBE", "KYOTO", "SAITAMA", "YOKOHAMA"):
+        return "JP"
+    if normalized in ("NL", "NETHERLANDS", "NEDERLAND", "AMSTERDAM", "ROTTERDAM",
+                      "THE HAGUE", "DEN HAAG", "UTRECHT", "EINDHOVEN", "GRONINGEN",
+                      "ALMERE", "BREDA", "NIJMEGEN", "TILBURG"):
+        return "NL"
+    if normalized in ("AE", "UAE", "UNITED ARAB EMIRATES", "DUBAI", "ABU DHABI",
+                      "SHARJAH", "AJMAN", "FUJAIRAH", "RAS AL KHAIMAH", "UMM AL QUWAIN"):
+        return "AE"
+    if normalized in ("ZA", "SOUTH AFRICA", "JOHANNESBURG", "CAPE TOWN", "DURBAN",
+                      "PRETORIA", "BLOEMFONTEIN", "PORT ELIZABETH", "EAST LONDON", "PIETERMARITZBURG"):
+        return "ZA"
     return None
 
 
@@ -4224,7 +4326,7 @@ def list_hr_assignments(
             placeholders = ", ".join(f":id{i}" for i in range(len(unique_ids)))
             sql = (
                 "SELECT id, status, stage, home_country, host_country, "
-                "employee_id, company_id "
+                "employee_id, company_id, profile_json "
                 "FROM relocation_cases WHERE id IN (" + placeholders + ")"
             )
             params = {f"id{i}": cid for i, cid in enumerate(unique_ids)}
@@ -4240,7 +4342,36 @@ def list_hr_assignments(
                     "host_country": m.get("host_country"),
                     "employee_id": m.get("employee_id"),
                     "company_id": m.get("company_id"),
+                    "profile_json": m.get("profile_json"),
                 }
+
+        # Batch-fetch employee profiles so list rows can resolve corridor with the
+        # same precedence as the case detail view (movePlan -> relocationBasics ->
+        # stored home/host_country). Without this the dashboard shows stale
+        # denormalized columns even when the profile has been updated.
+        profiles_by_aid: Dict[str, Dict[str, Any]] = {}
+        aids_for_profiles = [a.get("id") for a in assignments if a.get("id")]
+        if aids_for_profiles:
+            ep_placeholders = ", ".join(f":aid{i}" for i in range(len(aids_for_profiles)))
+            ep_params = {f"aid{i}": v for i, v in enumerate(aids_for_profiles)}
+            ep_sql = (
+                "SELECT assignment_id, profile_json FROM employee_profiles "
+                "WHERE assignment_id IN (" + ep_placeholders + ")"
+            )
+            try:
+                with db.engine.connect() as conn, timed("db.load_employee_profiles_bulk", request_id):
+                    ep_rows = conn.execute(text(ep_sql), ep_params).fetchall()
+                for r in ep_rows:
+                    m = r._mapping
+                    raw = m.get("profile_json")
+                    try:
+                        parsed = json.loads(raw) if isinstance(raw, str) else (raw or None)
+                    except Exception:
+                        parsed = None
+                    if isinstance(parsed, dict):
+                        profiles_by_aid[m["assignment_id"]] = parsed
+            except Exception:
+                log.warning("load_employee_profiles_bulk failed", exc_info=True)
 
         deadline_by_case: Dict[str, str] = {}
         if unique_ids:
@@ -4252,7 +4383,18 @@ def list_hr_assignments(
         summaries: List[AssignmentSummary] = []
         for assignment in assignments:
             eff_case = _effective_relocation_case_id(assignment)
-            case_meta = cases_by_id.get(eff_case) if eff_case else None
+            base_case_meta = cases_by_id.get(eff_case) if eff_case else None
+            case_meta: Optional[Dict[str, Any]] = None
+            if base_case_meta is not None:
+                case_meta = {k: v for k, v in base_case_meta.items() if k != "profile_json"}
+                resolved_origin, resolved_dest = _resolve_assignment_route_for_list(
+                    case_row=base_case_meta,
+                    employee_profile_json=profiles_by_aid.get(assignment.get("id")),
+                )
+                if resolved_origin:
+                    case_meta["home_country"] = resolved_origin
+                if resolved_dest:
+                    case_meta["host_country"] = resolved_dest
             case_id = eff_case or assignment.get("case_id") or assignment.get("id") or ""
             submitted_at = assignment.get("submitted_at")
             if isinstance(submitted_at, datetime):
@@ -4662,6 +4804,52 @@ def erase_case_data(
         "assignments_soft_deleted": len(assignment_ids),
         "pii_redacted": True,
     }
+
+
+def _resolve_assignment_route_for_list(
+    *,
+    case_row: Dict[str, Any],
+    employee_profile_json: Optional[Dict[str, Any]],
+) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Mirror the precedence used by GET /api/hr/assignments/{id} (caseOriginHint /
+    caseDestinationHint + frontend deriveCaseEssentials) so the dashboard list
+    and the case detail show the same corridor.
+
+    Precedence:
+      1. employee_profiles.profile_json -> movePlan.origin / movePlan.destination
+      2. relocation_cases.profile_json  -> relocationBasics.originCountry / destCountry
+      3. relocation_cases.home_country  / host_country (stored denormalized cols)
+    """
+    origin = (case_row.get("home_country") or "").strip() or None
+    dest = (case_row.get("host_country") or "").strip() or None
+
+    raw = case_row.get("profile_json")
+    if raw:
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(data, dict):
+                rb = data.get("relocationBasics") or {}
+                oc = (rb.get("originCountry") or "").strip() if isinstance(rb.get("originCountry"), str) else ""
+                dc = (rb.get("destCountry") or "").strip() if isinstance(rb.get("destCountry"), str) else ""
+                if oc:
+                    origin = oc
+                if dc:
+                    dest = dc
+        except Exception:
+            pass
+
+    if isinstance(employee_profile_json, dict):
+        mp = employee_profile_json.get("movePlan") or {}
+        if isinstance(mp, dict):
+            mp_origin = mp.get("origin")
+            mp_dest = mp.get("destination")
+            if isinstance(mp_origin, str) and mp_origin.strip():
+                origin = mp_origin.strip()
+            if isinstance(mp_dest, str) and mp_dest.strip():
+                dest = mp_dest.strip()
+
+    return origin, dest
 
 
 def _hr_assignment_case_route_hints(case_row: Optional[Dict[str, Any]]) -> tuple:
@@ -5270,11 +5458,39 @@ def get_assignment_timeline(
                     except (json.JSONDecodeError, TypeError, ValueError):
                         draft = {}
                     target_move_date = getattr(case, "target_move_date", None)
+            # ── S5 wiring: extract plan-scope context from draft ─────────────
+            _s5_ac = draft.get("assignmentContext") or {}
+            _s5_as = draft.get("assignment") or {}
+            _s5_rb = draft.get("relocationBasics") or {}
+            _s5_contract_type = (
+                _s5_as.get("contractType")
+                or _s5_ac.get("contractType")
+                or _s5_rb.get("contractType")
+                or None
+            )
+            _s5_family = draft.get("family") or None
+            _s5_dest = _s5_rb.get("destCountry") or _s5_rb.get("destination_country") or None
+            _s5_origin = _s5_rb.get("originCountry") or _s5_rb.get("origin_country") or None
+            # ── P2 wiring: nationality for immigration regime detection ────────
+            _s5_ep = draft.get("employeeProfile") or {}
+            _s5_pa = draft.get("primaryApplicant") or {}
+            _s5_nationality = (
+                _s5_pa.get("nationality")
+                or _s5_ep.get("nationality")
+                or _s5_ep.get("nationalityCountry")
+                or _s5_rb.get("nationality")
+                or None
+            )
             defaults = compute_default_milestones(
                 case_id=case_id,
                 case_draft=draft,
                 selected_services=services,
                 target_move_date=str(target_move_date) if target_move_date else None,
+                contract_type=_s5_contract_type,
+                family_profile=_s5_family,
+                destination_country=_s5_dest,
+                origin_country=_s5_origin,
+                nationality=_s5_nationality,
             )
             for m in defaults:
                 try:
@@ -5299,6 +5515,43 @@ def get_assignment_timeline(
                         upsert_exc,
                         exc_info=True,
                     )
+            # ── P3 wiring: detect and persist exception flags ─────────────────
+            try:
+                from backend.services.immigration_regime import ImmigrationRegimeRouter as _RegimeRouter
+                from backend.services.exception_request_service import ExceptionRequestService as _ExcSvc
+                from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
+                _exc_profile = _extract_profile(draft)
+                _exc_profile.setdefault("destination_country", _s5_dest)
+                _exc_profile.setdefault("origin_country", _s5_origin)
+                _exc_profile.setdefault("nationality", _s5_nationality)
+                _exc_profile.setdefault("contract_type", _s5_contract_type)
+                _regime = _RegimeRouter().detect_regime(
+                    nationality=_exc_profile.get("nationality"),
+                    destination_country=_exc_profile.get("destination_country"),
+                    origin_country=_exc_profile.get("origin_country"),
+                    contract_type=_exc_profile.get("contract_type"),
+                )
+                for _flag in _ExcSvc().evaluate_case(profile=_exc_profile, regime=_regime):
+                    try:
+                        db.upsert_exception_request(
+                            case_id=case_id,
+                            exception_type=_flag.exception_type,
+                            reason=_flag.reason,
+                            severity=_flag.severity,
+                            assignment_id=assignment_id,
+                            recommended_action=_flag.recommended_action or None,
+                            request_id=request_id,
+                        )
+                    except Exception as _fe:
+                        log.warning(
+                            "upsert_exception_request failed case_id=%s type=%s: %s",
+                            case_id, _flag.exception_type, _fe,
+                        )
+            except Exception as _exc_err:
+                log.warning(
+                    "get_assignment_timeline exception detection failed case_id=%s: %s",
+                    case_id, _exc_err,
+                )
             milestones = db.list_case_milestones(case_id, request_id=request_id)
         except Exception as exc:
             log.warning(
@@ -7539,6 +7792,75 @@ def post_hr_policy_assistant_query(
         raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
 
 
+@app.post("/api/policy-assistant/rag-query")
+def post_policy_assistant_rag_query(
+    body: Dict[str, Any] = Body(...),
+    req: Request = None,  # type: ignore[assignment]
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Sprint B: RAG-grounded Policy Assistant entry point. Replaces the
+    deterministic engine for the new flow; the existing endpoints stay
+    for backwards compatibility until Sprint C wires the frontend over.
+
+    Body:
+      { "question": str (required, max 4000 chars),
+        "session_id": str | null,
+        "top_k": int | null  (default 8, capped at 16) }
+
+    Auth: HR or EMPLOYEE for the user's company. Cross-company access
+    is impossible at the data layer — the retriever filters by
+    company_id pulled from the user's profile, not from the body.
+    """
+    request_id = getattr(req.state, "request_id", None) if req else None
+    question = (body.get("question") or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question is required")
+    if len(question) > 4000:
+        raise HTTPException(status_code=400, detail="question too long")
+    session_id = (body.get("session_id") or "").strip() or None
+    top_k = int(body.get("top_k") or 8)
+    if top_k < 1 or top_k > 16:
+        top_k = 8
+
+    # Company scoping comes from the authenticated user, NEVER the
+    # request body. This is the load-bearing isolation guarantee:
+    # the user cannot ask about another company by passing a different
+    # company_id.
+    profile = db.get_profile_record(user.get("id")) or {}
+    company_id = profile.get("company_id")
+    if not company_id:
+        raise HTTPException(status_code=400, detail="user has no company")
+
+    # Optional employee context for Section C resolution hints in the
+    # prompt — pulled from profile, not user-supplied.
+    emp_ctx = {
+        "employee_level": profile.get("employee_level") or profile.get("band"),
+        # country/assignment_type would come from active assignment;
+        # leaving for Sprint C (frontend can pass them when known).
+    }
+
+    try:
+        from .services.policy_assistant_rag_engine import answer_policy_question
+        result = answer_policy_question(
+            company_id=str(company_id),
+            user_id=str(user.get("id") or ""),
+            question=question,
+            session_id=session_id,
+            employee_context={k: v for k, v in emp_ctx.items() if v},
+            top_k=top_k,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as exc:
+        log.exception(
+            "policy_assistant rag query failed company=%s request_id=%s",
+            company_id, request_id,
+        )
+        raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
+    return result
+
+
 @app.post("/api/policy-assistant/analytics/beacon")
 def post_policy_assistant_analytics_beacon(
     body: PolicyAssistantAnalyticsBeaconRequest,
@@ -7547,24 +7869,75 @@ def post_policy_assistant_analytics_beacon(
 ):
     """
     Lightweight client-side policy assistant signals (no question text).
-    Currently supports: assistant_follow_up_clicked.
+
+    Sprint 1.5 widens this from a single-event endpoint to a discriminated
+    union covering the five UI-side beacons:
+      - assistant_follow_up_clicked  (pre-Sprint-1, unchanged behavior)
+      - assistant_opened
+      - assistant_question_submitted
+      - assistant_answer_received
+      - assistant_dismissed
+
+    The discriminator lives on the request model (`event` literal); each
+    event dispatches to its own emit function which writes to the same
+    analytics_events stream as record_policy_assistant_turn. No PII —
+    surface label, source enum, status enum, booleans, request_id only.
     """
-    if body.event != "assistant_follow_up_clicked":
-        raise HTTPException(status_code=400, detail="Unsupported analytics event")
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
-    from .services.policy_assistant_analytics import emit_assistant_follow_up_clicked
+    from .services.policy_assistant_analytics import (
+        emit_assistant_follow_up_clicked,
+        emit_assistant_opened,
+        emit_assistant_question_submitted,
+        emit_assistant_answer_received,
+        emit_assistant_dismissed,
+    )
     from .services.policy_assistant_contract import PolicyAssistantRoleScope
 
     role_upper = (user.get("role") or "").upper()
     rs = PolicyAssistantRoleScope.HR if role_upper == "HR" else PolicyAssistantRoleScope.EMPLOYEE
-    emit_assistant_follow_up_clicked(
-        role=rs,
-        request_id=request_id,
-        follow_up_intent=body.follow_up_intent,
-        follow_up_index=body.follow_up_index,
-        canonical_topic=body.canonical_topic,
-        assistant_turn_request_id=body.assistant_turn_request_id,
-    )
+
+    # `body` is a RootModel — the actual discriminated event lives at
+    # `body.root`. Pydantic has already routed the dict to the right
+    # subclass based on the `event` literal.
+    event_obj = body.root
+    if isinstance(event_obj, FollowUpClickedBeacon):
+        emit_assistant_follow_up_clicked(
+            role=rs,
+            request_id=request_id,
+            follow_up_intent=event_obj.follow_up_intent,
+            follow_up_index=event_obj.follow_up_index,
+            canonical_topic=event_obj.canonical_topic,
+            assistant_turn_request_id=event_obj.assistant_turn_request_id,
+        )
+    elif isinstance(event_obj, AssistantOpenedBeacon):
+        emit_assistant_opened(role=rs, request_id=request_id, surface=event_obj.surface)
+    elif isinstance(event_obj, AssistantQuestionSubmittedBeacon):
+        emit_assistant_question_submitted(
+            role=rs,
+            request_id=request_id,
+            surface=event_obj.surface,
+            source=event_obj.source,
+        )
+    elif isinstance(event_obj, AssistantAnswerReceivedBeacon):
+        emit_assistant_answer_received(
+            role=rs,
+            request_id=request_id,
+            surface=event_obj.surface,
+            answer_type=event_obj.answer_type,
+            status=event_obj.status,
+            assistant_turn_request_id=event_obj.request_id,
+        )
+    elif isinstance(event_obj, AssistantDismissedBeacon):
+        emit_assistant_dismissed(
+            role=rs,
+            request_id=request_id,
+            surface=event_obj.surface,
+            had_question=event_obj.had_question,
+            had_answer=event_obj.had_answer,
+        )
+    else:
+        # Defensive: the discriminated union should never produce another type.
+        raise HTTPException(status_code=400, detail="Unsupported analytics event")
     return {"ok": True}
 
 
@@ -7637,7 +8010,7 @@ def get_case_timeline(
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
     milestones = db.list_case_milestones(case_id, request_id=request_id)
 
-    if ensure_defaults and len(milestones) == 0:
+    if ensure_defaults:
         try:
             assignment = access.get("assignment", {})
             assignment_id = assignment.get("id")
@@ -7659,35 +8032,115 @@ def get_case_timeline(
                     except (json.JSONDecodeError, TypeError, ValueError):
                         draft = {}
                     target_move_date = getattr(case, "target_move_date", None)
-            defaults = compute_default_milestones(
-                case_id=case_id,
-                case_draft=draft,
-                selected_services=services,
-                target_move_date=str(target_move_date) if target_move_date else None,
+            # ── S5 wiring: extract plan-scope context from draft ─────────────
+            _s5_ac = draft.get("assignmentContext") or {}
+            _s5_as = draft.get("assignment") or {}
+            _s5_rb = draft.get("relocationBasics") or {}
+            _raw_ct = (
+                _s5_as.get("contractType")
+                or _s5_ac.get("contractType")
+                or _s5_rb.get("contractType")
+                or None
             )
-            for m in defaults:
-                try:
-                    db.upsert_case_milestone(
-                        case_id=case_id,
-                        milestone_type=m["milestone_type"],
-                        title=m["title"],
-                        description=m.get("description"),
-                        target_date=m.get("target_date"),
-                        status=m.get("status", "pending"),
-                        sort_order=m.get("sort_order", 0),
-                        owner=m.get("owner", "joint"),
-                        criticality=m.get("criticality", "normal"),
-                        notes=m.get("notes"),
-                        request_id=request_id,
-                    )
-                except Exception as upsert_exc:
-                    log.warning(
-                        "get_case_timeline ensure_defaults upsert failed case_id=%s type=%s: %s",
-                        case_id,
-                        m.get("milestone_type"),
-                        upsert_exc,
-                        exc_info=True,
-                    )
+            # Normalise wizard contract type labels → internal case_type tokens.
+            # The wizard presents "assignment" / "permanent" / "contract" while
+            # plan_scope and immigration_regime expect "lta" / "permanent_transfer".
+            _CT_MAP = {
+                "assignment": "lta",
+                "permanent":  "permanent_transfer",
+                "contract":   "short_term_project",
+            }
+            _s5_contract_type = _CT_MAP.get((_raw_ct or "").lower(), _raw_ct)
+            _s5_family = draft.get("family") or None
+            _s5_dest = _s5_rb.get("destCountry") or _s5_rb.get("destination_country") or None
+            _s5_origin = _s5_rb.get("originCountry") or _s5_rb.get("origin_country") or None
+            # ── P2 wiring: nationality for immigration regime detection ────────
+            _s5_ep = draft.get("employeeProfile") or {}
+            _s5_pa = draft.get("primaryApplicant") or {}
+            _s5_nationality = (
+                _s5_pa.get("nationality")
+                or _s5_ep.get("nationality")
+                or _s5_ep.get("nationalityCountry")
+                or _s5_rb.get("nationality")
+                or None
+            )
+
+            # ── Create default milestones only when none exist yet ────────────
+            if len(milestones) == 0:
+                defaults = compute_default_milestones(
+                    case_id=case_id,
+                    case_draft=draft,
+                    selected_services=services,
+                    target_move_date=str(target_move_date) if target_move_date else None,
+                    contract_type=_s5_contract_type,
+                    family_profile=_s5_family,
+                    destination_country=_s5_dest,
+                    origin_country=_s5_origin,
+                    nationality=_s5_nationality,
+                )
+                for m in defaults:
+                    try:
+                        db.upsert_case_milestone(
+                            case_id=case_id,
+                            milestone_type=m["milestone_type"],
+                            title=m["title"],
+                            description=m.get("description"),
+                            target_date=m.get("target_date"),
+                            status=m.get("status", "pending"),
+                            sort_order=m.get("sort_order", 0),
+                            owner=m.get("owner", "joint"),
+                            criticality=m.get("criticality", "normal"),
+                            notes=m.get("notes"),
+                            request_id=request_id,
+                        )
+                    except Exception as upsert_exc:
+                        log.warning(
+                            "get_case_timeline ensure_defaults upsert failed case_id=%s type=%s: %s",
+                            case_id,
+                            m.get("milestone_type"),
+                            upsert_exc,
+                            exc_info=True,
+                        )
+
+            # ── P3 wiring: detect and persist exception flags ─────────────────
+            # Runs on every ensure_defaults=True call (idempotent via upsert),
+            # so flags are always current even when milestones already exist.
+            try:
+                from backend.services.immigration_regime import ImmigrationRegimeRouter as _RegimeRouter
+                from backend.services.exception_request_service import ExceptionRequestService as _ExcSvc
+                from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
+                _exc_profile = _extract_profile(draft)
+                _exc_profile.setdefault("destination_country", _s5_dest)
+                _exc_profile.setdefault("origin_country", _s5_origin)
+                _exc_profile.setdefault("nationality", _s5_nationality)
+                _exc_profile.setdefault("contract_type", _s5_contract_type)
+                _regime = _RegimeRouter().detect_regime(
+                    nationality=_exc_profile.get("nationality"),
+                    destination_country=_exc_profile.get("destination_country"),
+                    origin_country=_exc_profile.get("origin_country"),
+                    contract_type=_exc_profile.get("contract_type"),
+                )
+                for _flag in _ExcSvc().evaluate_case(profile=_exc_profile, regime=_regime):
+                    try:
+                        db.upsert_exception_request(
+                            case_id=case_id,
+                            exception_type=_flag.exception_type,
+                            reason=_flag.reason,
+                            severity=_flag.severity,
+                            assignment_id=None,
+                            recommended_action=_flag.recommended_action or None,
+                            request_id=request_id,
+                        )
+                    except Exception as _fe:
+                        log.warning(
+                            "upsert_exception_request failed case_id=%s type=%s: %s",
+                            case_id, _flag.exception_type, _fe,
+                        )
+            except Exception as _exc_err:
+                log.warning(
+                    "get_case_timeline exception detection failed case_id=%s: %s",
+                    case_id, _exc_err,
+                )
             milestones = db.list_case_milestones(case_id, request_id=request_id)
         except Exception as exc:
             log.warning(
@@ -7706,6 +8159,124 @@ def get_case_timeline(
             m["links"] = []
     summary = compute_timeline_summary(milestones)
     return {"case_id": case_id, "milestones": milestones, "summary": summary}
+
+
+@app.get(
+    "/api/cases/{case_id}/exceptions",
+    summary="List exception flags for a case",
+    tags=["timeline"],
+)
+def list_case_exceptions(
+    case_id: str,
+    request: Request,
+    status: Optional[str] = Query(
+        None,
+        description="Filter by status: pending | approved | denied | escalated | withdrawn. "
+                    "Omit to return all.",
+    ),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    Return all exception_request flags for a case, ordered blockers-first.
+
+    HR sees all flags. Employees see only non-sensitive warning summaries
+    (blocker flags are returned in full for all roles here — HR can decide
+    what to surface in the UI layer).
+
+    Response shape:
+      {
+        "case_id": str,
+        "blockers": [...],      # severity == "blocker"
+        "warnings": [...],      # severity == "warning"
+        "total": int
+      }
+    """
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    _require_case_id_assignment_visible(case_id, user)
+    flags = db.list_exception_requests(case_id, request_id=request_id)
+    if status:
+        flags = [f for f in flags if f.get("status") == status]
+    blockers = [f for f in flags if f.get("severity") == "blocker"]
+    warnings = [f for f in flags if f.get("severity") == "warning"]
+    return {
+        "case_id": case_id,
+        "blockers": blockers,
+        "warnings": warnings,
+        "total": len(flags),
+    }
+
+
+class ExceptionUpdateBody(BaseModel):
+    status: str  # approved | denied | escalated | withdrawn
+    resolution_notes: Optional[str] = None
+
+
+@app.patch(
+    "/api/cases/{case_id}/exceptions/{exception_id}",
+    summary="Approve, deny, or escalate an exception flag",
+    tags=["timeline"],
+)
+def update_case_exception(
+    case_id: str,
+    exception_id: str,
+    body: ExceptionUpdateBody,
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Update the resolution status of a single exception_request flag.
+
+    HR-only endpoint (employees cannot resolve their own exception flags).
+
+    Allowed target statuses:
+      • approved   — HR reviewed and signed off; case may proceed
+      • denied     — HR reviewed and refused; case is blocked
+      • escalated  — HR escalating to leadership / legal / finance
+      • withdrawn  — flag is no longer relevant (e.g. circumstances changed)
+
+    Body:
+      { "status": "approved", "resolution_notes": "Optional HR note" }
+
+    Returns the updated exception_request row.
+    """
+    _VALID_RESOLUTION_STATUSES = {"approved", "denied", "escalated", "withdrawn"}
+    if body.status not in _VALID_RESOLUTION_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Invalid status {body.status!r}. "
+                f"Must be one of: {', '.join(sorted(_VALID_RESOLUTION_STATUSES))}."
+            ),
+        )
+
+    request_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    _require_case_id_assignment_visible(case_id, user)
+
+    resolved_by = user.get("id") or user.get("user_id") or None
+
+    updated = db.update_exception_request(
+        case_id=case_id,
+        exception_id=exception_id,
+        status=body.status,
+        resolved_by=resolved_by,
+        resolution_notes=body.resolution_notes or None,
+        request_id=request_id,
+    )
+
+    if updated is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Exception flag {exception_id!r} not found for case {case_id!r}, "
+                "or you do not have visibility of this case."
+            ),
+        )
+
+    log.info(
+        "exception_flag_resolved case_id=%s exception_id=%s status=%s resolved_by=%s",
+        case_id, exception_id, body.status, resolved_by,
+    )
+    return updated
 
 
 @app.get(
@@ -7930,6 +8501,40 @@ def get_dossier_questions(
     )
 
 
+# Maps dossier question_key → wizard draft assignmentContext field for exception bridging
+_DOSSIER_KEY_TO_DRAFT_FIELD: Dict[str, str] = {
+    "gb.sponsor_licence": "ukSponsorLicenceConfirmed",
+    "gb.points_eligibility": "ukPointsThresholdConfirmed",
+}
+
+
+def _bridge_dossier_to_draft(case_id: str, library_payload: List[Dict[str, Any]], question_lookup: Dict[str, Any]) -> None:
+    """After saving dossier answers, patch wizard draft fields consumed by the exception engine."""
+    patches: Dict[str, Any] = {}
+    for item in library_payload:
+        q = question_lookup.get(item.get("question_id", ""))
+        if not q:
+            continue
+        draft_field = _DOSSIER_KEY_TO_DRAFT_FIELD.get(q.get("question_key") or "")
+        if draft_field is not None:
+            patches[draft_field] = item["answer"]
+    if not patches:
+        return
+    try:
+        with SessionLocal() as session:
+            case = app_crud.get_case(session, case_id)
+            if not case:
+                return
+            draft = json.loads(case.draft_json or "{}")
+            ac = draft.setdefault("assignmentContext", {})
+            ac.update(patches)
+            case.draft_json = json.dumps(draft)
+            session.commit()
+            log.info("dossier_bridge case_id=%s patched=%s", case_id, list(patches.keys()))
+    except Exception as exc:
+        log.warning("_bridge_dossier_to_draft failed case_id=%s: %s", case_id, exc)
+
+
 @app.post("/api/dossier/answers")
 def save_dossier_answers(
     request: DossierAnswersRequest,
@@ -7937,7 +8542,26 @@ def save_dossier_answers(
 ):
     access = _require_case_access(request.case_id, user)
     effective = access["effective_user"]
-    raw_questions = db.list_dossier_questions("SG") + db.list_dossier_questions("US")
+    # Include all supported destinations so answers are never rejected as "Unknown"
+    raw_questions = (
+        db.list_dossier_questions("SG") +
+        db.list_dossier_questions("US") +
+        db.list_dossier_questions("GB") +
+        db.list_dossier_questions("FR") +
+        db.list_dossier_questions("DE") +
+        db.list_dossier_questions("NO") +
+        db.list_dossier_questions("BR") +
+        db.list_dossier_questions("IT") +
+        db.list_dossier_questions("ES") +
+        db.list_dossier_questions("AU") +
+        db.list_dossier_questions("CA") +
+        db.list_dossier_questions("CH") +
+        db.list_dossier_questions("HK") +
+        db.list_dossier_questions("JP") +
+        db.list_dossier_questions("NL") +
+        db.list_dossier_questions("AE") +
+        db.list_dossier_questions("ZA")
+    )
     question_lookup = {q["id"]: q for q in raw_questions}
     case_questions = db.list_dossier_case_questions(request.case_id)
     case_lookup = {q["id"]: q for q in case_questions}
@@ -7968,6 +8592,11 @@ def save_dossier_answers(
         db.upsert_dossier_answers(request.case_id, effective["id"], library_payload)
     if case_payload:
         db.upsert_dossier_case_answers(request.case_id, effective["id"], case_payload)
+
+    # Bridge exception-relevant answers back into the wizard draft
+    if library_payload:
+        _bridge_dossier_to_draft(request.case_id, library_payload, question_lookup)
+
     return {"ok": True}
 
 

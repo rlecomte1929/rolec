@@ -14,6 +14,7 @@ import { ROUTE_DEFS, buildRoute } from '../../navigation/routes';
 import type { ServiceKey } from '../../features/services/serviceConfig';
 import { recommendationsEngineAPI } from '../../features/recommendations/api';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
+import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 
 const SERVICES_QUESTIONS_PATH = ROUTE_DEFS.servicesQuestions.path;
 
@@ -53,6 +54,12 @@ export const ServicesQuestions: React.FC = () => {
     [linkedSummaries, primaryAssignmentId, queryAssignmentId]
   );
   const workflow = useServicesWorkflowState();
+
+  // Services lives outside /employee/case/* but is still part of the
+  // user's relocation flow — record the route + assignment query so
+  // returning from the dashboard lands them right back on this step.
+  useTrackLastVisited(assignmentId || null);
+
   const [caseId, setCaseId] = useState<string | null>(null);
   const [initialAnswers, setInitialAnswers] = useState<Record<string, unknown>>({});
   const [questions, setQuestions] = useState<DynamicQuestion[]>([]);

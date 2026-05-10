@@ -6,6 +6,7 @@ import {
   HR_POLICY_ASSISTANT_SUBTITLE,
   HR_POLICY_ASSISTANT_TITLE,
   HR_POLICY_ASSISTANT_SUGGESTIONS,
+  HR_POLICY_ASSISTANT_TRUST_PILL,
 } from '../hrPolicyAssistantCopy';
 import type { PolicyAssistantAnswer } from '../../../types/policyAssistant';
 
@@ -15,6 +16,9 @@ vi.mock('../../../api/client', () => ({
   hrAPI: {
     postPolicyAssistantQuery: (...args: unknown[]) => postPolicyAssistantQuery(...args),
   },
+  // Sprint 1 analytics beacons go through apiPost — stub here so the
+  // mocked module exposes the symbol; calls are fire-and-forget.
+  apiPost: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
 function baseAnswer(overrides: Partial<PolicyAssistantAnswer> = {}): PolicyAssistantAnswer {
@@ -53,12 +57,18 @@ describe('HrPolicyAssistantPanel', () => {
     render(<HrPolicyAssistantPanel policyId="pol-1" />);
     expect(screen.getByText(HR_POLICY_ASSISTANT_TITLE)).toBeInTheDocument();
     expect(screen.getByText(HR_POLICY_ASSISTANT_SUBTITLE)).toBeInTheDocument();
-    expect(screen.getByText(/normalized policy data/i)).toBeInTheDocument();
+    // Slice 3 replaced the SCOPE_NOTE paragraph with a trust-signal pill.
+    expect(screen.getByText(HR_POLICY_ASSISTANT_TRUST_PILL)).toBeInTheDocument();
   });
 
   it('shows no-policy guidance when policy id missing', () => {
     render(<HrPolicyAssistantPanel policyId={null} />);
-    expect(screen.getByText(/select or create a company policy/i)).toBeInTheDocument();
+    // Sprint 3.5: copy now explains the actual limitation (matrix-only
+    // policies aren't supported by the assistant backend) and tells the
+    // user the action that unlocks Q&A — uploading a policy document.
+    expect(
+      screen.getByText(/upload a policy document to enable Q&A/i)
+    ).toBeInTheDocument();
   });
 
   it('applies a suggestion chip to the textarea', () => {
@@ -78,7 +88,7 @@ describe('HrPolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
       target: { value: 'What changes if I publish?' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() =>
       expect(postPolicyAssistantQuery).toHaveBeenCalledWith('pol-1', 'What changes if I publish?', undefined)
     );
@@ -100,7 +110,7 @@ describe('HrPolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
       target: { value: 'Test' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(postPolicyAssistantQuery).toHaveBeenCalledWith('pol-1', 'Test', 'doc-9'));
   });
 
@@ -119,7 +129,7 @@ describe('HrPolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
       target: { value: 'Why informational?' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     const region = await screen.findByRole('region', { name: /HR policy answer/i });
     expect(within(region).getByText('Comparison readiness:')).toBeInTheDocument();
     expect(within(region).getByText('informational only', { exact: false })).toBeInTheDocument();
@@ -151,7 +161,7 @@ describe('HrPolicyAssistantPanel', () => {
     fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
       target: { value: 'How should we beat competitors on benefits?' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /get answer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
     await waitFor(() => expect(screen.getByText(/no policy answer/i)).toBeInTheDocument());
     expect(screen.getByText(/within-policy examples/i)).toBeInTheDocument();
     expect(screen.getByText('What do employees see for temporary housing?')).toBeInTheDocument();

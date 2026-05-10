@@ -1,338 +1,408 @@
-import React, { useState, useEffect } from 'react';
-import { Card } from '../../components/antigravity';
-import { employeeAPI } from '../../api/client';
+/**
+ * Single source of truth for the employee-side policy view.
+ *
+ * Renders the same theme accordion HR sees on /hr/policy under
+ * "What employees see today", but driven by the employee-scoped
+ * `/api/employee/policy-config` endpoint. The endpoint already:
+ *   - filters to `covered === true` (no excluded rows leak through)
+ *   - matches the employee's assignment_type + family_status
+ *   - returns the latest published version (auto-updates when HR
+ *     republishes — no client-side cache to bust)
+ *
+ * Used by:
+ *   - EmployeePolicyPage (route /employee/policy)
+ *   - HrPolicy dispatcher when role === EMPLOYEE (route /hr/policy)
+ *
+ * Self-contained: owns its own data fetch + URL-param resolution.
+ * Renders body only (no AppShell, no Container) so the parent page
+ * controls the page chrome.
+ */
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Alert, Button, Card } from '../../components/antigravity';
+import { employeeAPI, policyConfigMatrixAPI } from '../../api/client';
+import { buildRoute } from '../../navigation/routes';
+import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
+import type {
+  PolicyConfigBenefitRow,
+  PolicyConfigCategoryBlock,
+  PolicyConfigWorkingPayload,
+} from '../policy-config/types';
+import { POLICY_CONFIG_CATEGORIES } from '../policy-config/constants';
 import {
-  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY,
-  EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
-} from './employeePolicyMessages';
+  humanizeAssignmentTypeLabel,
+  humanizeFamilyStatusLabel,
+  normalizeAssignmentType,
+  normalizeFamilyStatus,
+} from '../policy-config/policyTargeting';
+import {
+  EMPLOYEE_POLICY_PER_BENEFIT_EXPLANATION,
+  formatBenefitBudgetSummary,
+  humanizeUnitFrequency,
+  mergeNotesAndConditions,
+} from '../../pages/employee/employeePolicyMatrixDisplay';
+import { glossaryIdForBenefitKey } from '../policy-config/compensationGlossary';
+import { PolicyGlossarySection } from '../policy-config/PolicyGlossarySection';
+import { TermHelpIcon } from '../policy-config/TermHelpIcon';
+import { PolicyTopicSummaryList } from './PolicyTopicSummaryList';
+import { referenceToElementId } from './policyAssistantCitations';
 
-const formatBenefitLabel = (key: string): string =>
-  key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+type ServicesPolicyContext = Awaited<ReturnType<typeof employeeAPI.getServicesPolicyContext>>;
 
-const BENEFIT_ICONS: Record<string, React.ReactNode> = {
-  temporary_housing: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  ),
-  schooling: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-      <line x1="8" y1="7" x2="16" y2="7" />
-      <line x1="8" y1="11" x2="16" y2="11" />
-    </svg>
-  ),
-  shipment: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="1" y="3" width="15" height="13" />
-      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-      <circle cx="5.5" cy="18.5" r="2.5" />
-      <circle cx="18.5" cy="18.5" r="2.5" />
-    </svg>
-  ),
-  housing: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  ),
-  tax: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <line x1="12" y1="1" x2="12" y2="23" />
-      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-    </svg>
-  ),
-  spouse_support: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  ),
-  language_training: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="12" cy="12" r="10" />
-      <line x1="2" y1="12" x2="22" y2="12" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  ),
-  transport: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-      <line x1="12" y1="11" x2="12" y2="17" />
-    </svg>
-  ),
-  temporaryHousing: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  ),
-  educationSupport: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-      <line x1="8" y1="7" x2="16" y2="7" />
-      <line x1="8" y1="11" x2="16" y2="11" />
-    </svg>
-  ),
-  houseHunting: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  ),
-  taxAssistance: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <line x1="12" y1="1" x2="12" y2="23" />
-      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-    </svg>
-  ),
-  spousalSupport: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  ),
-  languageTraining: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="12" cy="12" r="10" />
-      <line x1="2" y1="12" x2="22" y2="12" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  ),
-  travel: (
-    <svg className="w-5 h-5 text-[#0b2b43] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-      <line x1="12" y1="11" x2="12" y2="17" />
-    </svg>
-  ),
+const EMPTY_UNPUBLISHED =
+  'Your company has not yet published a policy for this assignment.';
+
+type EmployeePolicyPayload = {
+  has_policy_config?: boolean;
+  effective_date?: string | null;
+  policy_version?: string | null;
+  version_number?: number | null;
+  categories?: PolicyConfigCategoryBlock[];
+  message?: string;
+  assignment_context?: { assignment_type?: string | null; family_status?: string | null };
 };
 
-const getBenefitIcon = (key: string) => BENEFIT_ICONS[key] ?? BENEFIT_ICONS[key.replace(/_/g, '')] ?? null;
-
-interface AllowedBenefit {
-  key: string;
-  label: string;
-  allowed: boolean;
-  maxAllowed: { min?: number; medium?: number; extensive?: number; premium?: number };
-  currency: string;
-  preApprovalRequired: boolean;
-  documentationRequired: string[];
-  explanatoryText: string;
+function countBenefits(cats: PolicyConfigCategoryBlock[] | undefined): number {
+  return (cats ?? []).reduce((acc, c) => acc + (c.benefits?.length ?? 0), 0);
 }
 
-interface ApplicablePolicy {
-  policy: {
-    policyId: string;
-    policyName: string;
-    effectiveDate: string;
-    employeeBands: string[];
-    assignmentTypes: string[];
-  } | null;
-  allowedBenefits: AllowedBenefit[];
-  wizardCriteria: Record<string, unknown>;
-  employeeBand?: string;
-  assignmentType?: string;
-}
-
-export const EmployeePolicyView: React.FC<{
-  assignmentId?: string;
-  compact?: boolean;
-}> = ({ assignmentId, compact }) => {
-  const [data, setData] = useState<ApplicablePolicy | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(false);
-  const [comparisonUnavailable, setComparisonUnavailable] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    const load = async () => {
-      try {
-        setComparisonUnavailable(false);
-        if (assignmentId) {
-          const resolved = await employeeAPI.getResolvedPolicy(assignmentId);
-          if (!cancelled && resolved.has_policy && resolved.comparison_available === false) {
-            setComparisonUnavailable(true);
-            setData({
-              policy: resolved.policy
-                ? {
-                    policyId: resolved.policy.id,
-                    policyName: resolved.policy.title,
-                    effectiveDate: resolved.policy.effective_date,
-                    employeeBands: [],
-                    assignmentTypes: [],
-                  }
-                : null,
-              allowedBenefits: [],
-              wizardCriteria: {},
-            });
-            return;
-          }
-          if (!cancelled && resolved.policy && resolved.benefits?.length) {
-            const allowedBenefits: AllowedBenefit[] = resolved.benefits
-              .filter((b: { included?: boolean }) => b.included)
-              .map((b: { benefit_key: string; min_value?: number; standard_value?: number; max_value?: number; currency?: string; approval_required?: boolean; evidence_required_json?: string[] }) => ({
-                key: b.benefit_key,
-                label: formatBenefitLabel(b.benefit_key),
-                allowed: true,
-                maxAllowed: { min: b.min_value, medium: b.standard_value, premium: b.max_value },
-                currency: b.currency || 'USD',
-                preApprovalRequired: !!b.approval_required,
-                documentationRequired: Array.isArray(b.evidence_required_json) ? b.evidence_required_json : [],
-                explanatoryText: [b.min_value, b.standard_value, b.max_value].filter((v) => v != null).length
-                  ? `Up to ${b.currency || 'USD'} ${(b.max_value ?? b.standard_value ?? 0).toLocaleString()}`
-                  : 'Per policy',
-              }));
-            setData({
-              policy: {
-                policyId: resolved.policy.id,
-                policyName: resolved.policy.title,
-                effectiveDate: resolved.policy.effective_date,
-                employeeBands: [],
-                assignmentTypes: [],
-              },
-              allowedBenefits,
-              wizardCriteria: {},
-            });
-            return;
-          }
-        }
-        const legacy = await employeeAPI.getApplicablePolicy(assignmentId);
-        if (!cancelled) setData(legacy as unknown as ApplicablePolicy);
-      } catch {
-        if (!cancelled) setData(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
-    return () => { cancelled = true; };
-  }, [assignmentId]);
-
-  if (loading) return <div className="text-sm text-[#6b7280] py-8">Loading policy...</div>;
-  if (!data) return null;
-  if (comparisonUnavailable && data.policy) {
-    return (
-      <Card padding="lg" className="border-[#e2e8f0] bg-[#fafbfc]">
-        <p className="text-[#4b5563] font-medium">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_PRIMARY}</p>
-        <p className="text-sm text-[#6b7280] mt-2">{EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY}</p>
-        <p className="text-sm text-[#6b7280] mt-4">
-          <span className="font-medium text-[#0b2b43]">Policy on file:</span> {data.policy.policyName}
-        </p>
-      </Card>
-    );
-  }
-  if (!data.policy || data.allowedBenefits.length === 0) {
-    return (
-      <Card padding="lg">
-        <p className="text-[#4b5563]">
-          No matching policy has been published for your band and assignment type yet. Contact HR to confirm your benefit limits.
-        </p>
-      </Card>
-    );
-  }
-
-  const formatTier = (ma: AllowedBenefit['maxAllowed']) => {
-    const parts: string[] = [];
-    if (ma.min != null && ma.min > 0) parts.push(`Min: ${ma.min.toLocaleString()}`);
-    if (ma.medium != null && ma.medium > 0) parts.push(`Med: ${ma.medium.toLocaleString()}`);
-    if (ma.extensive != null && ma.extensive > 0) parts.push(`Ext: ${ma.extensive.toLocaleString()}`);
-    if (ma.premium != null && ma.premium > 0) parts.push(`Prem: ${ma.premium.toLocaleString()}`);
-    return parts.join(' · ') || '-';
-  };
-
-  if (compact) {
-    return (
-      <Card padding="md" className="bg-[#eef4f8] border border-[#0b2b43]/20">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold text-[#0b2b43]">
-              Your policy: {data.policy.policyName}
-            </div>
-            <div className="text-xs text-[#6b7280] mt-0.5">
-              {data.employeeBand} · {data.assignmentType} · {data.allowedBenefits.length} benefits
-            </div>
-          </div>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-sm text-[#0b2b43] hover:underline"
-          >
-            {expanded ? 'Hide' : 'View details'}
-          </button>
-        </div>
-        {expanded && (
-          <div className="mt-4 pt-4 border-t border-[#0b2b43]/20 space-y-2">
-            {data.allowedBenefits.map((b) => (
-              <div key={b.key} className="text-sm flex items-center gap-2">
-                {getBenefitIcon(b.key)}
-                <span className="font-medium text-[#0b2b43]">{b.label}:</span>{' '}
-                <span className="text-[#4b5563]">
-                  {b.currency} {formatTier(b.maxAllowed)}
-                  {b.preApprovalRequired && ' · Pre-approval required'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-    );
-  }
+function BenefitReadOnlyCard({ b }: { b: PolicyConfigBenefitRow }) {
+  const budget = formatBenefitBudgetSummary(b);
+  const unit = humanizeUnitFrequency(b.unit_frequency);
+  const notesBlock = mergeNotesAndConditions(b);
+  const glossaryId = glossaryIdForBenefitKey(b.benefit_key);
+  const sourceRef = b.id ? `policy_config_benefits.${b.id}` : undefined;
+  // Anchor for Policy Assistant citation deep-linking. The backend
+  // returns evidence.reference == benefit_key for matrix-derived rows;
+  // mirroring that as both an id and a data attribute lets either
+  // lookup path resolve.
+  const policyAnchorId = b.benefit_key ? referenceToElementId(b.benefit_key) : undefined;
 
   return (
-    <Card padding="lg">
-      <h3 className="text-lg font-semibold text-[#0b2b43] mb-2">Applicable policy summary</h3>
-      <div className="text-sm text-[#6b7280] mb-4">
-        Employee band: {data.employeeBand || '-'} · Assignment: {data.assignmentType || '-'} · Effective:{' '}
-        {data.policy.effectiveDate ? new Date(data.policy.effectiveDate).toLocaleDateString() : '-'}
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[#e2e8f0]">
-              <th className="text-left py-2 pr-4">Benefit</th>
-              <th className="text-left py-2 pr-4">Tier ranges</th>
-              <th className="text-left py-2">Pre-approval</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.allowedBenefits.map((b) => (
-              <tr key={b.key} className="border-b border-[#e2e8f0]">
-                <td className="py-2 pr-4 font-medium text-[#0b2b43]">
-                  <span className="flex items-center gap-2">
-                    {getBenefitIcon(b.key)}
-                    {b.label}
-                  </span>
-                </td>
-                <td className="py-2 pr-4 text-[#4b5563]">
-                  {b.currency} {formatTier(b.maxAllowed)}
-                </td>
-                <td className="py-2">{b.preApprovalRequired ? 'Yes' : 'No'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {data.allowedBenefits.some((b) => b.documentationRequired?.length) && (
-        <div className="mt-4 pt-4 border-t border-[#e2e8f0]">
-          <div className="text-xs font-semibold text-[#6b7280] mb-2">Required documentation</div>
-          <ul className="text-sm text-[#4b5563] space-y-1">
-            {data.allowedBenefits.flatMap((b) =>
-              (b.documentationRequired || []).map((d) => (
-                <li key={`${b.key}-${d}`}>
-                  • {b.label}: {d}
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
+    <li
+      id={policyAnchorId}
+      className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-sm"
+      data-policy-source-ref={sourceRef}
+      data-policy-reference={b.benefit_key || undefined}
+    >
+      <h3 className="text-base font-semibold text-[#0b2b43] leading-snug flex flex-wrap items-center gap-1.5">
+        <span>{b.benefit_label || 'Benefit'}</span>
+        {glossaryId ? <TermHelpIcon glossaryId={glossaryId} /> : null}
+      </h3>
+
+      <dl className="mt-4 space-y-3 text-sm">
+        {budget && (
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-[#64748b]">Maximum budget / cap</dt>
+            <dd className="mt-0.5 text-[#1e293b]">{budget}</dd>
+          </div>
+        )}
+        {unit && (
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-[#64748b]">How often it applies</dt>
+            <dd className="mt-0.5 text-[#1e293b] capitalize">{unit}</dd>
+          </div>
+        )}
+        {notesBlock && (
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-[#64748b]">Notes &amp; conditions</dt>
+            <dd className="mt-0.5 text-[#475569] whitespace-pre-wrap leading-relaxed">{notesBlock}</dd>
+          </div>
+        )}
+      </dl>
+
+      <p className="mt-4 text-xs text-[#64748b] leading-relaxed border-t border-[#f1f5f9] pt-3">
+        {EMPLOYEE_POLICY_PER_BENEFIT_EXPLANATION}
+      </p>
+    </li>
+  );
+}
+
+export type EmployeePolicyViewProps = {
+  /** Caller may already have an assignment id from context — passing it
+   *  here skips the URL-param fallback. */
+  assignmentIdOverride?: string | null;
+};
+
+export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
+  assignmentIdOverride,
+}) => {
+  const [searchParams] = useSearchParams();
+  const { assignmentId: contextAssignmentId } = useEmployeeAssignment();
+  const assignmentId =
+    assignmentIdOverride ??
+    searchParams.get('assignmentId') ??
+    contextAssignmentId ??
+    undefined;
+  const caseId = searchParams.get('caseId') || undefined;
+  const assignmentTypeRaw = searchParams.get('assignmentType');
+  const familyStatusRaw = searchParams.get('familyStatus');
+  const assignmentType = normalizeAssignmentType(assignmentTypeRaw ?? '') ?? undefined;
+  const familyStatus = normalizeFamilyStatus(familyStatusRaw ?? '') ?? undefined;
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<EmployeePolicyPayload | null>(null);
+  const [servicesPolicyCtx, setServicesPolicyCtx] = useState<ServicesPolicyContext | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await policyConfigMatrixAPI.employeeGet({
+        assignmentId: assignmentId ?? undefined,
+        caseId,
+        assignmentType,
+        familyStatus,
+      });
+      setData(res as EmployeePolicyPayload);
+    } catch {
+      setError('We could not load your compensation policy right now. Please try again later.');
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [assignmentId, caseId, assignmentType, familyStatus]);
+
+  useEffect(() => {
+    load().catch(() => undefined);
+  }, [load]);
+
+  useEffect(() => {
+    if (!assignmentId) {
+      setServicesPolicyCtx(null);
+      return;
+    }
+    let cancelled = false;
+    employeeAPI
+      .getServicesPolicyContext(assignmentId)
+      .then((ctx) => {
+        if (!cancelled) setServicesPolicyCtx(ctx);
+      })
+      .catch(() => {
+        if (!cancelled) setServicesPolicyCtx(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId]);
+
+  const categoryOrder = useMemo(
+    () => new Map(POLICY_CONFIG_CATEGORIES.map((c, i) => [c.key, i])),
+    []
+  );
+
+  const sortedCategories = useMemo(() => {
+    const list = [...(data?.categories ?? [])].sort(
+      (a, b) =>
+        (categoryOrder.get(a.category_key || '') ?? 99) -
+        (categoryOrder.get(b.category_key || '') ?? 99)
+    );
+    return list.filter((c) => (c.benefits?.length ?? 0) > 0);
+  }, [data?.categories, categoryOrder]);
+
+  const totalBenefits = countBenefits(data?.categories);
+
+  const ctx = data?.assignment_context;
+  const assignmentLabel = humanizeAssignmentTypeLabel(ctx?.assignment_type ?? undefined);
+  const familyLabel = humanizeFamilyStatusLabel(ctx?.family_status ?? undefined);
+  const versionLabel =
+    data?.version_number != null && data.version_number > 0
+      ? `Version ${data.version_number}`
+      : data?.policy_version
+        ? `Reference ${String(data.policy_version).slice(0, 8)}…`
+        : '—';
+  const effectiveLabel = data?.effective_date ? String(data.effective_date).slice(0, 10) : '—';
+
+  return (
+    <div className="space-y-6" data-employee-policy-view="v1">
+      {error && (
+        <Alert variant="error" title="Unable to load">
+          {error}
+        </Alert>
       )}
-    </Card>
+
+      {loading ? (
+        <Card padding="lg" className="border-[#e2e8f0]">
+          <p className="text-sm text-[#64748b]">Loading your company policy…</p>
+        </Card>
+      ) : !data?.has_policy_config ? (
+        <Card padding="lg" className="border-[#e2e8f0] bg-[#fafbfc]">
+          <h2 className="text-lg font-semibold text-[#0b2b43] mb-2">No published policy yet</h2>
+          <p className="text-sm text-[#475569] leading-relaxed max-w-2xl">
+            {EMPTY_UNPUBLISHED} Your HR team may have a draft in progress — it
+            becomes visible here as soon as they click <strong>Publish</strong>.
+            Reach out to HR via <Link to={buildRoute('messages')} className="text-[#0b2b43] underline">Messages</Link>{' '}
+            if you have benefit questions in the meantime.
+          </p>
+          {(assignmentLabel !== '—' || familyLabel !== '—') && (
+            <p className="text-xs text-[#94a3b8] mt-4">
+              Context we used: {assignmentLabel} · {familyLabel}
+            </p>
+          )}
+        </Card>
+      ) : totalBenefits === 0 ? (
+        <>
+          <Card padding="lg" className="border border-[#e2e8f0] bg-[#f8fafc]">
+            <h2 className="text-sm font-semibold text-[#0b2b43] mb-3">Your situation</h2>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-[#64748b]">Assignment type</dt>
+                <dd className="font-medium text-[#0b2b43] mt-0.5">{assignmentLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-[#64748b]">Family status</dt>
+                <dd className="font-medium text-[#0b2b43] mt-0.5">{familyLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-[#64748b]">Company policy</dt>
+                <dd className="font-medium text-[#0b2b43] mt-0.5">{versionLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-[#64748b]">Effective date</dt>
+                <dd className="font-medium text-[#0b2b43] mt-0.5">{effectiveLabel}</dd>
+              </div>
+            </dl>
+          </Card>
+          <Card padding="lg" className="border-[#e2e8f0] bg-white">
+            <p className="text-sm text-[#475569] leading-relaxed max-w-2xl">
+              Your employer has published a policy, but <strong>no allowance rows apply</strong> to your assignment
+              and household context as we understand it today. If this looks wrong, contact your mobility or HR
+              contact.
+            </p>
+          </Card>
+        </>
+      ) : (
+        <>
+          <Card padding="lg" className="border border-[#e2e8f0] bg-[#f8fafc]">
+            <h2 className="text-sm font-semibold text-[#0b2b43] mb-3">What this page shows</h2>
+            <p className="text-sm text-[#475569] leading-relaxed max-w-3xl mb-4">
+              Below are the <strong>covered</strong> benefits from your company&apos;s published compensation &amp;
+              allowance policy that <strong>apply to you</strong> for this assignment. This page is{' '}
+              <strong>read-only</strong>—only your employer can change policy rules.
+            </p>
+            <div className="rounded-lg border border-[#e2e8f0] bg-white px-4 py-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
+                Case &amp; policy context
+              </h3>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <dt className="text-xs text-[#64748b]">Assignment type</dt>
+                  <dd className="font-medium text-[#0b2b43] mt-0.5">{assignmentLabel}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[#64748b]">Family status</dt>
+                  <dd className="font-medium text-[#0b2b43] mt-0.5">{familyLabel}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[#64748b]">Company policy version</dt>
+                  <dd className="font-medium text-[#0b2b43] mt-0.5">{versionLabel}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-[#64748b]">Effective date</dt>
+                  <dd className="font-medium text-[#0b2b43] mt-0.5">{effectiveLabel}</dd>
+                </div>
+              </dl>
+            </div>
+          </Card>
+
+          {servicesPolicyCtx?.has_policy && servicesPolicyCtx.policy_surface && (
+            <Card padding="lg" className="border border-[#e2e8f0] bg-white">
+              <h2 className="text-base font-semibold text-[#0b2b43]">
+                {servicesPolicyCtx.policy_surface.title?.trim() || 'Compensation & allowance (published)'}
+              </h2>
+              <div className="text-xs text-[#64748b] mt-2 space-y-0.5">
+                {servicesPolicyCtx.policy_surface.company_name && (
+                  <div>Company: {servicesPolicyCtx.policy_surface.company_name}</div>
+                )}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                  {servicesPolicyCtx.policy_surface.version != null && (
+                    <span>Version {servicesPolicyCtx.policy_surface.version}</span>
+                  )}
+                  {servicesPolicyCtx.policy_surface.effective_date && (
+                    <span>Effective {String(servicesPolicyCtx.policy_surface.effective_date).slice(0, 10)}</span>
+                  )}
+                </div>
+                {servicesPolicyCtx.resolution_context && (
+                  <div className="mt-2 text-[#475569]">
+                    Your profile for policy matching:{' '}
+                    {humanizeAssignmentTypeLabel(
+                      normalizeAssignmentType(servicesPolicyCtx.resolution_context.assignment_type ?? '') ?? undefined
+                    )}
+                    {' · '}
+                    {humanizeFamilyStatusLabel(
+                      normalizeFamilyStatus(servicesPolicyCtx.resolution_context.family_status ?? '') ?? undefined
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-[#64748b] mt-2 leading-relaxed">
+                This matrix, the Services flow, and HR Policy use the same published policy snapshot where available.
+              </p>
+              <div className="mt-4 p-3 bg-[#eef4f8] border border-[#0b2b43]/20 rounded-lg">
+                <p className="text-sm text-[#4b5563] mb-2">
+                  Full policy wording and benefit details are on the HR Policy page. For questions, contact your
+                  company HR.
+                </p>
+                <Link to={buildRoute('hrPolicy')}>
+                  <Button variant="outline" className="mt-1">
+                    View HR Policy &amp; limits
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          )}
+
+          <PolicyGlossarySection variant="employee" />
+
+          {/* Theme-grouped read-only summary mirroring the HR-side
+              "What employees see today" card. The employee endpoint
+              already filters to covered + applicable rows, so every
+              row in `data.categories` is something HR has approved
+              for this assignment & level. */}
+          {sortedCategories.length > 0 && (
+            <Card padding="lg" className="border-[#e2e8f0]">
+              <PolicyTopicSummaryList
+                matrixPayload={
+                  {
+                    ...(data ?? {}),
+                    categories: sortedCategories,
+                  } as PolicyConfigWorkingPayload
+                }
+                heading="Your benefits at a glance"
+                subtitle="Approved benefits for your assignment, grouped by theme. Click a theme to see the individual benefit rows. Read-only — only your employer can change policy."
+              />
+            </Card>
+          )}
+
+          <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+            <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-base font-semibold text-[#0b2b43]">
+                  ▸ See per-benefit detail
+                </span>
+                <span className="text-xs text-[#64748b]">cap, frequency, notes for each row</span>
+              </div>
+            </summary>
+            <div className="px-5 pb-5 space-y-6">
+              {sortedCategories.map((cat) => (
+                <Card key={cat.category_key} padding="lg" className="border-[#e2e8f0]">
+                  <h2 className="text-lg font-semibold text-[#0b2b43] mb-4 pb-2 border-b border-[#f1f5f9]">
+                    {(POLICY_CONFIG_CATEGORIES.find((c) => c.key === cat.category_key)?.label) ??
+                      cat.category_label ??
+                      'Benefits'}
+                  </h2>
+                  <ul className="space-y-4">
+                    {(cat.benefits ?? []).map((b) => (
+                      <BenefitReadOnlyCard key={`${cat.category_key}-${b.benefit_key}`} b={b} />
+                    ))}
+                  </ul>
+                </Card>
+              ))}
+            </div>
+          </details>
+        </>
+      )}
+    </div>
   );
 };

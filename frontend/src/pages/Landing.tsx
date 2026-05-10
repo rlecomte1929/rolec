@@ -25,7 +25,7 @@ export const Landing: React.FC = () => {
   ]);
 
   usePageMeta({
-    title: 'ReloPass — The operating layer for cross-border relocation',
+    title: 'ReloPass · The operating layer for cross-border relocation',
     description: 'Cases, documents, providers, and status on one record. Built for HR and mobility teams.',
     ogUrl: 'https://www.relopass.com',
   });

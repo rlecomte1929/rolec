@@ -1,142 +1,69 @@
 /**
- * Shared floating "Policy Assistant" FAB used on every policy surface.
+ * Pure trigger button for the Policy Assistant.
  *
- * Product direction (2026-04-22): the assistant should not compete with
- * page content. It lives as a fixed 💬 button bottom-right, visible on
- * every HR and employee policy page. When opened it slides in as a
- * right-anchored sheet (desktop) or a full-width sheet (mobile).
+ * Sprint 2 reduces this from "FAB + modal sheet" to "FAB only" — the
+ * actual panel chrome lives in PolicyAssistantDockedShell now, and the
+ * page lifts open state to share between the trigger and the shell.
  *
- * This component is a pure shell — it does not know which role is using
- * it. Callers pass the assistant panel (HR or Employee) as children in
- * its `card` variant so we don't get the double-chrome that the panel's
- * own `sideSheet` mode ships with. The FAB owns:
+ * Why FAB-as-trigger only: the previous component owned its own modal
+ * overlay AND tried to render a sheet around the assistant. After
+ * Sprint 2 the docked shell pushes content (no overlay, no dimming),
+ * so the FAB's only job is to flip the page-level open flag. Less
+ * duplicated focus-management code, no dead modal rendering, no risk
+ * of two competing dismissal flows.
  *
- *   - the fixed button + its accessible label
- *   - the overlay + right-anchored sheet
- *   - open/close state + Escape-to-close
- *   - focus trap on the close button when opening so keyboard users get
- *     predictable tab order
- *   - outside-click dismissal
- *
- * Non-goals for this component: conversation history, answer rendering,
- * question suggestions — those live in the assistant panels themselves.
+ * Position is fixed bottom-right so the trigger stays reachable across
+ * scroll. The page hides it via a `hideWhenOpen` prop (or by not
+ * rendering it) when the docked shell is open on lg+ — see Sprint 2's
+ * Task 2.3 for the recommended pattern.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React from 'react';
 
-type Props = {
+export type PolicyAssistantFabProps = {
+  /** Click handler — should toggle the docked shell's open state on
+   *  the parent page. */
+  onClick: () => void;
   /**
-   * Accessible label announced by screen readers when the FAB is focused.
-   * Defaults to "Open Policy Assistant"; overridable if the surrounding
-   * page prefers more specific wording ("Ask about your HR policy").
+   * Accessible label for the trigger. Mount sites pass role-aware
+   * wording: "Ask about your policy" / "Ask about this policy".
    */
   label?: string;
-  /**
-   * Sheet title rendered in the header when open. Defaults to "Policy
-   * Assistant". Kept short so mobile sheet headers don't wrap.
-   */
-  sheetTitle?: string;
-  /**
-   * Render-prop for the sheet body. Called with the onClose handler so
-   * the child can offer its own dismissal affordances (e.g. "Close"
-   * buttons inside a long thread) without duplicating the state owner.
-   */
-  children: (ctx: { close: () => void }) => React.ReactNode;
-  /**
-   * Optional hook that fires when the sheet opens — useful for
-   * analytics ("policy_assistant_opened") without pulling a provider
-   * into the component.
-   */
-  onOpen?: () => void;
+  /** True when the docked panel is open. Drives aria-expanded and
+   *  optionally hides the FAB on lg+ to avoid overlap with the panel. */
+  isPanelOpen?: boolean;
+  /** When true (default), the FAB is hidden on lg+ while the panel is
+   *  open — the panel's own close button is the dismissal affordance.
+   *  Set to false if the page wants the FAB always visible. */
+  hideOnPanelOpenLg?: boolean;
 };
 
-export const PolicyAssistantFab: React.FC<Props> = ({
-  label = 'Open Policy Assistant',
-  sheetTitle = 'Policy Assistant',
-  children,
-  onOpen,
+export const PolicyAssistantFab: React.FC<PolicyAssistantFabProps> = ({
+  onClick,
+  label = 'Open policy assistant',
+  isPanelOpen = false,
+  hideOnPanelOpenLg = true,
 }) => {
-  const [open, setOpen] = useState(false);
-  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
-  const fabRef = useRef<HTMLButtonElement | null>(null);
-
-  const openSheet = useCallback(() => {
-    setOpen(true);
-    onOpen?.();
-  }, [onOpen]);
-
-  const close = useCallback(() => {
-    setOpen(false);
-    // Restore focus to the FAB so keyboard users aren't dumped at the
-    // top of the page after dismissal.
-    fabRef.current?.focus();
-  }, []);
-
-  // Escape closes the sheet. Bound only while open to avoid leaking a
-  // listener across every page that mounts the FAB.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, close]);
-
-  // When the sheet opens, move focus to the close button so tab order
-  // starts inside the sheet. Small setTimeout lets the sheet mount.
-  useEffect(() => {
-    if (!open) return;
-    const id = window.setTimeout(() => closeBtnRef.current?.focus(), 50);
-    return () => window.clearTimeout(id);
-  }, [open]);
+  // On lg+ the docked panel takes the right column, so showing a FAB
+  // in the same corner is visually awkward and would also overlap the
+  // panel scroll area. Default behavior: hide on lg+ when open. On
+  // mobile (<lg) we always keep the FAB visible because the bottom-
+  // sheet covers the page; the FAB sits behind it but reappears on close.
+  const hideClass = isPanelOpen && hideOnPanelOpenLg ? 'lg:hidden' : '';
 
   return (
-    <>
-      <button
-        ref={fabRef}
-        type="button"
-        onClick={openSheet}
-        aria-label={label}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        title={label}
-        className="fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full bg-[#0b2b43] text-white shadow-lg hover:bg-[#0f3a5a] focus:outline-none focus:ring-4 focus:ring-[#0b2b43]/30 flex items-center justify-center text-2xl"
-        data-testid="policy-assistant-fab"
-      >
-        <span aria-hidden>💬</span>
-      </button>
-
-      {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={sheetTitle}
-          className="fixed inset-0 z-50 bg-black/30 flex justify-end"
-          onClick={close}
-        >
-          <div
-            className="h-full w-full max-w-md bg-white shadow-2xl overflow-y-auto flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-            data-testid="policy-assistant-fab-sheet"
-          >
-            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
-              <div className="font-semibold text-[#0b2b43]">{sheetTitle}</div>
-              <button
-                ref={closeBtnRef}
-                type="button"
-                onClick={close}
-                className="text-slate-500 hover:text-[#0b2b43] px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/30"
-                aria-label="Close Policy Assistant"
-              >
-                Close
-              </button>
-            </div>
-            <div className="p-4 flex-1">
-              {children({ close })}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-expanded={isPanelOpen}
+      title={label}
+      // Stacks above FeedbackWidget (bottom-6 right-6). Same right-6
+      // column for visual alignment; bottom-24 leaves ~16px clearance
+      // above the Feedback chip.
+      className={`fixed bottom-24 right-6 z-40 h-14 w-14 rounded-full bg-[#0b2b43] text-white shadow-lg hover:bg-[#0f3a5a] focus:outline-none focus:ring-4 focus:ring-[#0b2b43]/30 flex items-center justify-center text-2xl ${hideClass}`}
+      data-testid="policy-assistant-fab"
+    >
+      <span aria-hidden>💬</span>
+    </button>
   );
 };

@@ -13,24 +13,154 @@
         "IPA validity window is tight — align travel and entry dates with HR."
       ],
       "checklist": [
-        { "sort_order": 1, "stable_key": "sg_ep_contract", "title": "Signed employment contract & job description", "owner_role": "employer", "required": true, "notes_employee": "Your HR team provides these for the pass application.", "notes_hr": "Ensure JD matches MOM role classification." },
-        { "sort_order": 2, "stable_key": "sg_passport_bio", "title": "Passport bio page (all travellers)", "owner_role": "employee", "required": true, "notes_employee": "Valid for at least 6 months beyond intended entry.", "notes_hr": null },
-        { "sort_order": 3, "stable_key": "sg_education_certs", "title": "Educational certificates & transcripts", "owner_role": "employee", "required": true, "notes_employee": "May require certified translations.", "notes_hr": "Used for EP qualification evidence." },
-        { "sort_order": 4, "stable_key": "sg_mom_photos", "title": "Passport photos (MOM specifications)", "owner_role": "employee", "required": true, "notes_employee": null, "notes_hr": null },
-        { "sort_order": 5, "stable_key": "sg_company_ep_submit", "title": "Company EP application submission", "owner_role": "hr", "required": true, "notes_employee": "Handled by HR or immigration partner.", "notes_hr": "Track MOM reference number." },
-        { "sort_order": 6, "stable_key": "sg_ipa", "title": "In-Principle Approval (IPA) received", "owner_role": "hr", "required": true, "depends_on_sort_order": 5, "notes_employee": "You will need IPA for entry when instructed.", "notes_hr": null },
-        { "sort_order": 7, "stable_key": "sg_medical", "title": "Medical examination (if required)", "owner_role": "employee", "required": false, "notes_employee": "Clinic list usually provided with IPA.", "notes_hr": null },
-        { "sort_order": 8, "stable_key": "sg_issue_pass", "title": "Issue pass & register fingerprints", "owner_role": "employee", "required": true, "depends_on_sort_order": 6, "notes_employee": "Completed after arrival in Singapore.", "notes_hr": null },
-        { "sort_order": 9, "stable_key": "sg_housing_school", "title": "Housing & schooling shortlist (if family)", "owner_role": "employee", "required": false, "notes_employee": "Parallel track to immigration.", "notes_hr": "Align with target move date." },
-        { "sort_order": 10, "stable_key": "sg_relocation_vendor", "title": "Relocation services booking", "owner_role": "provider", "required": false, "notes_employee": null, "notes_hr": "Optional vendor engagement." }
+        {
+          "sort_order": 1,
+          "stable_key": "sg_ep_contract",
+          "title": "Signed employment contract & job description",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Your HR team provides these for the pass application.",
+          "notes_hr": "Ensure JD matches MOM role classification."
+        },
+        {
+          "sort_order": 2,
+          "stable_key": "sg_passport_bio",
+          "title": "Passport bio page (all travellers)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Valid for at least 6 months beyond intended entry.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 3,
+          "stable_key": "sg_education_certs",
+          "title": "Educational certificates & transcripts",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "May require certified translations.",
+          "notes_hr": "Used for EP qualification evidence."
+        },
+        {
+          "sort_order": 4,
+          "stable_key": "sg_mom_photos",
+          "title": "Passport photos (MOM specifications)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": null,
+          "notes_hr": null
+        },
+        {
+          "sort_order": 5,
+          "stable_key": "sg_company_ep_submit",
+          "title": "Company EP application submission",
+          "owner_role": "hr",
+          "required": true,
+          "notes_employee": "Handled by HR or immigration partner.",
+          "notes_hr": "Track MOM reference number."
+        },
+        {
+          "sort_order": 6,
+          "stable_key": "sg_ipa",
+          "title": "In-Principle Approval (IPA) received",
+          "owner_role": "hr",
+          "required": true,
+          "depends_on_sort_order": 5,
+          "notes_employee": "You will need IPA for entry when instructed.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 7,
+          "stable_key": "sg_medical",
+          "title": "Medical examination (if required)",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Clinic list usually provided with IPA.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 8,
+          "stable_key": "sg_issue_pass",
+          "title": "Issue pass & register fingerprints",
+          "owner_role": "employee",
+          "required": true,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Completed after arrival in Singapore.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 9,
+          "stable_key": "sg_housing_school",
+          "title": "Housing & schooling shortlist (if family)",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Parallel track to immigration.",
+          "notes_hr": "Align with target move date."
+        },
+        {
+          "sort_order": 10,
+          "stable_key": "sg_relocation_vendor",
+          "title": "Relocation services booking",
+          "owner_role": "provider",
+          "required": false,
+          "notes_employee": null,
+          "notes_hr": "Optional vendor engagement."
+        }
       ],
       "milestones": [
-        { "sort_order": 1, "phase": "pre", "title": "Kickoff & route confirmation", "body_employee": "HR confirms the sponsored pass route and timeline with you.", "body_hr": "Lock salary band, role title, and dependency on EP vs S Pass.", "owner_role": "hr", "relative_timing": "T-10 to 12 weeks" },
-        { "sort_order": 2, "phase": "pre", "title": "Document pack complete", "body_employee": "You upload passport, education, and family documents as requested.", "body_hr": "Validate completeness before MOM submission.", "owner_role": "employee", "relative_timing": "T-8 weeks" },
-        { "sort_order": 3, "phase": "immigration", "title": "MOM submission", "body_employee": "Handled by employer; you may be asked for clarifications.", "body_hr": "Submit EP/S Pass application; monitor status.", "owner_role": "hr", "relative_timing": "T-6 weeks" },
-        { "sort_order": 4, "phase": "immigration", "title": "IPA issued", "body_employee": "Review entry instructions and validity dates.", "body_hr": "Share IPA; plan entry and pass issuance appointment.", "owner_role": "hr", "relative_timing": "T-4 weeks" },
-        { "sort_order": 5, "phase": "move", "title": "Enter Singapore & complete pass formalities", "body_employee": "Follow IPA conditions; attend appointment if required.", "body_hr": "Coordinate onboarding and compliance checks.", "owner_role": "employee", "relative_timing": "T-2 to 0 weeks" },
-        { "sort_order": 6, "phase": "post", "title": "Settle-in & local registrations", "body_employee": "Bank, phone, housing handover as applicable.", "body_hr": "Optional vendor touchpoints.", "owner_role": "employee", "relative_timing": "T+0 to 4 weeks" }
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff & route confirmation",
+          "body_employee": "HR confirms the sponsored pass route and timeline with you.",
+          "body_hr": "Lock salary band, role title, and dependency on EP vs S Pass.",
+          "owner_role": "hr",
+          "relative_timing": "T-10 to 12 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "Document pack complete",
+          "body_employee": "You upload passport, education, and family documents as requested.",
+          "body_hr": "Validate completeness before MOM submission.",
+          "owner_role": "employee",
+          "relative_timing": "T-8 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "MOM submission",
+          "body_employee": "Handled by employer; you may be asked for clarifications.",
+          "body_hr": "Submit EP/S Pass application; monitor status.",
+          "owner_role": "hr",
+          "relative_timing": "T-6 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "immigration",
+          "title": "IPA issued",
+          "body_employee": "Review entry instructions and validity dates.",
+          "body_hr": "Share IPA; plan entry and pass issuance appointment.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "move",
+          "title": "Enter Singapore & complete pass formalities",
+          "body_employee": "Follow IPA conditions; attend appointment if required.",
+          "body_hr": "Coordinate onboarding and compliance checks.",
+          "owner_role": "employee",
+          "relative_timing": "T-2 to 0 weeks"
+        },
+        {
+          "sort_order": 6,
+          "phase": "post",
+          "title": "Settle-in & local registrations",
+          "body_employee": "Bank, phone, housing handover as applicable.",
+          "body_hr": "Optional vendor touchpoints.",
+          "owner_role": "employee",
+          "relative_timing": "T+0 to 4 weeks"
+        }
       ]
     },
     {
@@ -46,21 +176,2405 @@
         "Housing proof may be needed early for some visa types."
       ],
       "checklist": [
-        { "sort_order": 1, "title": "Work contract & assignment letter", "owner_role": "employer", "required": true, "notes_employee": null, "notes_hr": "French or certified translation as required." },
-        { "sort_order": 2, "title": "Passport & prior visas", "owner_role": "employee", "required": true, "notes_employee": null, "notes_hr": null },
-        { "sort_order": 3, "title": "Police clearance / casier (if requested)", "owner_role": "employee", "required": false, "notes_employee": "Depends on consulate checklist.", "notes_hr": null },
-        { "sort_order": 4, "title": "Long-stay visa application", "owner_role": "employee", "required": true, "notes_employee": "Book consulate appointment when HR confirms pack.", "notes_hr": "Track VLS-TS vs other visa types." },
-        { "sort_order": 5, "title": "Arrival declaration & medical (OFII)", "owner_role": "employee", "required": true, "notes_employee": "Follow instructions stamped in passport.", "notes_hr": null },
-        { "sort_order": 6, "title": "Titre de séjour appointment", "owner_role": "employee", "required": true, "notes_employee": "Prefecture scheduling varies by location.", "notes_hr": "Support with employer attestations." },
-        { "sort_order": 7, "title": "Social security & bank setup", "owner_role": "employee", "required": false, "notes_employee": "Often after titre issuance.", "notes_hr": null },
-        { "sort_order": 8, "title": "Housing lease or temporary accommodation proof", "owner_role": "employee", "required": false, "notes_employee": null, "notes_hr": "May be required for some steps." }
+        {
+          "sort_order": 1,
+          "title": "Work contract & assignment letter",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": null,
+          "notes_hr": "French or certified translation as required."
+        },
+        {
+          "sort_order": 2,
+          "title": "Passport & prior visas",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": null,
+          "notes_hr": null
+        },
+        {
+          "sort_order": 3,
+          "title": "Police clearance / casier (if requested)",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Depends on consulate checklist.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 4,
+          "title": "Long-stay visa application",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Book consulate appointment when HR confirms pack.",
+          "notes_hr": "Track VLS-TS vs other visa types."
+        },
+        {
+          "sort_order": 5,
+          "title": "Arrival declaration & medical (OFII)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Follow instructions stamped in passport.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 6,
+          "title": "Titre de séjour appointment",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Prefecture scheduling varies by location.",
+          "notes_hr": "Support with employer attestations."
+        },
+        {
+          "sort_order": 7,
+          "title": "Social security & bank setup",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Often after titre issuance.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 8,
+          "title": "Housing lease or temporary accommodation proof",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": null,
+          "notes_hr": "May be required for some steps."
+        }
       ],
       "milestones": [
-        { "sort_order": 1, "phase": "pre", "title": "Route & counsel alignment", "body_employee": "HR explains expected permit path and timing.", "body_hr": "Confirm category with immigration counsel.", "owner_role": "hr", "relative_timing": "T-12 weeks" },
-        { "sort_order": 2, "phase": "pre", "title": "Document pack & translations", "body_employee": "Gather civil and education documents.", "body_hr": "Review translations and apostilles.", "owner_role": "employee", "relative_timing": "T-10 weeks" },
-        { "sort_order": 3, "phase": "immigration", "title": "Consulate visa appointment", "body_employee": "Attend with full pack.", "body_hr": "Track outcomes and validity.", "owner_role": "employee", "relative_timing": "T-6 weeks" },
-        { "sort_order": 4, "phase": "move", "title": "Arrival in France", "body_employee": "Start visa validation / OFII steps as instructed.", "body_hr": "Coordinate start date.", "owner_role": "employee", "relative_timing": "T-2 weeks" },
-        { "sort_order": 5, "phase": "post", "title": "Titre de séjour issued", "body_employee": "Secure physical card and copies.", "body_hr": "HR file for compliance.", "owner_role": "employee", "relative_timing": "T+0 to 8 weeks" }
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Route & counsel alignment",
+          "body_employee": "HR explains expected permit path and timing.",
+          "body_hr": "Confirm category with immigration counsel.",
+          "owner_role": "hr",
+          "relative_timing": "T-12 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "Document pack & translations",
+          "body_employee": "Gather civil and education documents.",
+          "body_hr": "Review translations and apostilles.",
+          "owner_role": "employee",
+          "relative_timing": "T-10 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "Consulate visa appointment",
+          "body_employee": "Attend with full pack.",
+          "body_hr": "Track outcomes and validity.",
+          "owner_role": "employee",
+          "relative_timing": "T-6 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "move",
+          "title": "Arrival in France",
+          "body_employee": "Start visa validation / OFII steps as instructed.",
+          "body_hr": "Coordinate start date.",
+          "owner_role": "employee",
+          "relative_timing": "T-2 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "post",
+          "title": "Titre de séjour issued",
+          "body_employee": "Secure physical card and copies.",
+          "body_hr": "HR file for compliance.",
+          "owner_role": "employee",
+          "relative_timing": "T+0 to 8 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "GB",
+      "route_key": "employment",
+      "route_title": "United Kingdom — Skilled Worker visa (sponsored route)",
+      "employee_summary": "Your employer holds a sponsor licence and will assign you a Certificate of Sponsorship (CoS). You then apply for a Skilled Worker visa before travelling to the UK. ReloPass tracks each step so nothing slips.",
+      "hr_summary": "Confirm sponsor licence is active, assign an undefined or defined CoS as appropriate, and support the employee's visa application. Right-to-work check on Day 1 is mandatory.",
+      "internal_notes_hr": "Check CoS assignment lead time (defined CoS needs Home Office approval, ~5 business days). Ensure salary meets minimum threshold for role SOC code. BRP collection from Post Office within 10 days of arrival.",
+      "watchouts": [
+        "CoS must be assigned before the employee submits their visa application — allow at least 1 week buffer.",
+        "Salary must meet both the general threshold and the specific SOC code going rate; verify before issuing CoS.",
+        "BRP card is sent to a UK address — employee must collect within 10 days of arrival.",
+        "Right-to-work check must be completed on or before Day 1; share code expires in 90 days."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "stable_key": "gb_sw_offer_letter",
+          "title": "Formal offer letter confirming role, salary & SOC code",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Required for CoS assignment and visa application.",
+          "notes_hr": "Salary must satisfy both general threshold and going rate for the SOC code."
+        },
+        {
+          "sort_order": 2,
+          "stable_key": "gb_sw_cos_assigned",
+          "title": "Certificate of Sponsorship (CoS) assigned",
+          "owner_role": "hr",
+          "required": true,
+          "notes_employee": "You will need the CoS reference number to apply for your visa.",
+          "notes_hr": "Use undefined CoS for most new hires; defined CoS if employee is already in UK on another route."
+        },
+        {
+          "sort_order": 3,
+          "stable_key": "gb_sw_passport",
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Must be valid for the duration of your intended stay.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 4,
+          "stable_key": "gb_sw_english_evidence",
+          "title": "English language evidence",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Degree taught in English, or approved test (IELTS/LanguageCert). Check UKVI approved providers.",
+          "notes_hr": "Exempt if national of majority English-speaking country."
+        },
+        {
+          "sort_order": 5,
+          "stable_key": "gb_sw_finance_evidence",
+          "title": "Maintenance funds evidence (if not covered by employer)",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "£1,270 in bank for 28 consecutive days unless employer certifies maintenance.",
+          "notes_hr": "Certify maintenance on CoS to remove this requirement for the employee."
+        },
+        {
+          "sort_order": 6,
+          "stable_key": "gb_sw_visa_application",
+          "title": "Online visa application submitted & biometrics booked",
+          "owner_role": "employee",
+          "required": true,
+          "depends_on_sort_order": 2,
+          "notes_employee": "Apply at least 3 months before start date. Biometrics at UKVCAS service point.",
+          "notes_hr": "Provide IHS surcharge payment confirmation number if employer covers it."
+        },
+        {
+          "sort_order": 7,
+          "stable_key": "gb_sw_visa_granted",
+          "title": "Skilled Worker visa granted",
+          "owner_role": "employee",
+          "required": true,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Check vignette dates — first entry must be on or before the valid from date.",
+          "notes_hr": "Retain copy for sponsor compliance file."
+        },
+        {
+          "sort_order": 8,
+          "stable_key": "gb_sw_rtw_check",
+          "title": "Right-to-work check completed (Day 1)",
+          "owner_role": "hr",
+          "required": true,
+          "depends_on_sort_order": 7,
+          "notes_employee": "Use the UKVI online share code to allow HR to verify.",
+          "notes_hr": "Statutory excuse requires online check for visa nationals — record date and outcome."
+        },
+        {
+          "sort_order": 9,
+          "stable_key": "gb_sw_brp_collection",
+          "title": "BRP card collected from Post Office",
+          "owner_role": "employee",
+          "required": true,
+          "depends_on_sort_order": 7,
+          "notes_employee": "Collect within 10 days of arrival. Address on visa letter shows which Post Office branch.",
+          "notes_hr": "Retain copy for compliance file; chase if not confirmed collected."
+        },
+        {
+          "sort_order": 10,
+          "stable_key": "gb_sw_housing_school",
+          "title": "Housing & schooling shortlist (if family)",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Dependant visas can be applied at the same time.",
+          "notes_hr": "Confirm whether employer covers relocation costs."
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff & sponsorship check",
+          "body_employee": "HR confirms your employer is a licensed sponsor and outlines the Skilled Worker timeline.",
+          "body_hr": "Verify sponsor licence is active, check CoS allocation, confirm salary vs SOC code thresholds.",
+          "owner_role": "hr",
+          "relative_timing": "T-12 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "CoS assigned",
+          "body_employee": "You receive your CoS reference number — keep it safe for the visa application.",
+          "body_hr": "Assign CoS via sponsor management system; note expiry (3 months from assignment).",
+          "owner_role": "hr",
+          "relative_timing": "T-10 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "pre",
+          "title": "Document pack ready",
+          "body_employee": "Gather passport, English evidence, finances (if needed), and any dependant documents.",
+          "body_hr": "Review pack for completeness before employee submits application.",
+          "owner_role": "employee",
+          "relative_timing": "T-9 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "immigration",
+          "title": "Visa application submitted & biometrics",
+          "body_employee": "Submit online, pay IHS surcharge, attend biometrics appointment.",
+          "body_hr": "Confirm IHS paid (or reimbursed per policy); track application reference.",
+          "owner_role": "employee",
+          "relative_timing": "T-8 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "immigration",
+          "title": "Visa decision received",
+          "body_employee": "Check vignette validity. First entry before 'valid from' date.",
+          "body_hr": "File decision copy; update compliance record.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 weeks"
+        },
+        {
+          "sort_order": 6,
+          "phase": "move",
+          "title": "Arrival in UK & right-to-work check",
+          "body_employee": "Generate share code; HR will complete the online check on Day 1.",
+          "body_hr": "Complete UKVI online right-to-work check on or before start date.",
+          "owner_role": "hr",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 7,
+          "phase": "post",
+          "title": "BRP collected & settle-in",
+          "body_employee": "Collect BRP within 10 days. Start bank account, NI number, GP registration.",
+          "body_hr": "Confirm BRP collected; file copy; schedule 6-month compliance check.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 2 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "DE",
+      "route_key": "employment",
+      "route_title": "Germany — EU Blue Card / Skilled Worker Visa",
+      "employee_summary": "Your employer will sponsor either an EU Blue Card (for high earners) or a Skilled Worker Visa under Germany's Fachkräftezuwanderungsgesetz. You apply at the German consulate before travelling, then complete Anmeldung and the residence permit after arrival.",
+      "hr_summary": "Confirm visa route based on salary and qualification recognition status. Support the employee's consulate application and ensure Anmeldung and Ausländerbehörde steps are completed promptly after arrival.",
+      "internal_notes_hr": "EU Blue Card requires salary ≥ €45,300 (2024 threshold) or €56,400 for shortage occupations. Qualification recognition may take 4–12 weeks — start early. Anmeldung must be done within 14 days of arrival.",
+      "watchouts": [
+        "Qualification recognition (Anerkennung) can be the critical-path item — initiate before the consulate appointment.",
+        "Anmeldung must be completed within 14 days of arrival; the confirmation letter (Anmeldebestätigung) is needed for the Aufenthaltstitel and bank accounts.",
+        "Statutory health insurance (gesetzliche Krankenversicherung) must be in place before the Ausländerbehörde appointment.",
+        "EU Blue Card holders can bring family without a separate income threshold — a useful selling point."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "stable_key": "de_offer_letter",
+          "title": "Signed employment contract confirming salary and role",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Required for visa application and qualification recognition.",
+          "notes_hr": "Confirm salary meets Blue Card or Skilled Worker threshold."
+        },
+        {
+          "sort_order": 2,
+          "stable_key": "de_qualification_recognition",
+          "title": "Professional qualification recognition (Anerkennung)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Submit via anabin database or relevant chamber. Allow 4–12 weeks.",
+          "notes_hr": "Required for regulated professions and Blue Card applications."
+        },
+        {
+          "sort_order": 3,
+          "stable_key": "de_passport",
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Must be valid for at least 6 months beyond intended stay.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 4,
+          "stable_key": "de_consulate_appointment",
+          "title": "Consulate appointment booked",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Book at the German consulate in your current country of residence.",
+          "notes_hr": "Lead time varies by consulate — book at T-12 weeks."
+        },
+        {
+          "sort_order": 5,
+          "stable_key": "de_visa_application",
+          "title": "Visa application submitted",
+          "owner_role": "employee",
+          "required": true,
+          "depends_on_sort_order": 4,
+          "notes_employee": "Bring full document pack: passport, contract, qualifications, biometric photos, health insurance proof.",
+          "notes_hr": "Track application reference number."
+        },
+        {
+          "sort_order": 6,
+          "stable_key": "de_visa_granted",
+          "title": "Visa granted",
+          "owner_role": "employee",
+          "required": true,
+          "depends_on_sort_order": 5,
+          "notes_employee": "Check visa validity dates and permitted activities.",
+          "notes_hr": "Retain copy for HR file."
+        },
+        {
+          "sort_order": 7,
+          "stable_key": "de_anmeldung",
+          "title": "Anmeldung (address registration) completed",
+          "owner_role": "employee",
+          "required": true,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Register at the local Einwohnermeldeamt within 14 days of arrival. Bring passport and rental contract.",
+          "notes_hr": "Anmeldebestätigung is needed for bank account and Ausländerbehörde."
+        },
+        {
+          "sort_order": 8,
+          "stable_key": "de_health_insurance",
+          "title": "Statutory or private health insurance enrolled",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Must be in place before the Ausländerbehörde appointment.",
+          "notes_hr": "Check employer's health insurance contribution obligations."
+        },
+        {
+          "sort_order": 9,
+          "stable_key": "de_aufenthaltstitel",
+          "title": "Residence permit (Aufenthaltstitel) application submitted",
+          "owner_role": "employee",
+          "required": true,
+          "depends_on_sort_order": 7,
+          "notes_employee": "Apply at the Ausländerbehörde. Bring: passport, Anmeldebestätigung, contract, health insurance proof.",
+          "notes_hr": "Process can take 4–8 weeks; employee may work in the meantime if visa permits."
+        },
+        {
+          "sort_order": 10,
+          "stable_key": "de_housing_school",
+          "title": "Housing & schooling shortlist (if family)",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Family members need separate Aufenthaltstitel — apply at the same time.",
+          "notes_hr": "Confirm relocation budget covers family costs."
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff & visa route confirmation",
+          "body_employee": "HR confirms whether you qualify for the EU Blue Card or Skilled Worker Visa and outlines the timeline.",
+          "body_hr": "Verify salary vs Blue Card threshold; initiate qualification recognition if needed.",
+          "owner_role": "hr",
+          "relative_timing": "T-14 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "Qualification recognition submitted",
+          "body_employee": "Submit your qualifications to the relevant German authority (anabin, IHK, or professional chamber).",
+          "body_hr": "Track recognition status — this is often the critical path.",
+          "owner_role": "employee",
+          "relative_timing": "T-12 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "pre",
+          "title": "Document pack ready & consulate booked",
+          "body_employee": "Gather passport, contract, qualification recognition, biometric photos, and health insurance evidence.",
+          "body_hr": "Review pack for completeness before consulate appointment.",
+          "owner_role": "employee",
+          "relative_timing": "T-10 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "immigration",
+          "title": "Consulate appointment & visa application",
+          "body_employee": "Attend consulate with full document pack and submit visa application.",
+          "body_hr": "Track application reference; prepare for any additional document requests.",
+          "owner_role": "employee",
+          "relative_timing": "T-8 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "immigration",
+          "title": "Visa granted",
+          "body_employee": "Check visa validity dates. First entry must be within the validity window.",
+          "body_hr": "File copy; update compliance record; coordinate start date.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 weeks"
+        },
+        {
+          "sort_order": 6,
+          "phase": "move",
+          "title": "Arrival & Anmeldung",
+          "body_employee": "Arrive in Germany and register your address (Anmeldung) within 14 days at the Einwohnermeldeamt.",
+          "body_hr": "Confirm arrival and Anmeldung completion; support with rental contract if needed.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 7,
+          "phase": "post",
+          "title": "Aufenthaltstitel & settle-in",
+          "body_employee": "Apply for residence permit at Ausländerbehörde. Open bank account, enroll in health insurance, register with tax office.",
+          "body_hr": "Confirm Aufenthaltstitel submitted; schedule 3-month check-in.",
+          "owner_role": "employee",
+          "relative_timing": "T+2 to 4 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "NO",
+      "route_key": "employment",
+      "route_title": "Norway — Skilled Worker Permit / EEA Registration",
+      "employee_summary": "Non-EU/EEA nationals need a Skilled Worker Permit (faglært arbeidstillatelse) applied through UDI before or shortly after arrival. EU/EEA nationals register a certificate of residence (registreringsbevis) at Statsforvalteren. Both groups need a tax card (Skattekort) and Folkeregisteret address registration before payroll can run.",
+      "hr_summary": "Confirm nationality to choose the correct route (UDI permit vs EU/EEA registration). Initiate UDI application as soon as the job offer is signed — processing times vary from 1–12 weeks. Ensure Skattekort and Folkeregisteret steps are completed before first pay date.",
+      "internal_notes_hr": "Skilled Worker Permit requires a concrete job offer with Norwegian standard salary. EU/EEA registration is simpler but still requires proof of employment. D-number is issued first; fødselsnummer comes after 6 months of registered residence.",
+      "watchouts": [
+        "UDI processing for Skilled Worker Permits can take 1–12 weeks — apply immediately after job offer is signed.",
+        "Skattekort must be obtained before first payroll run; delays cause higher withholding tax (50%).",
+        "Folkeregisteret address registration must be done within 8 days of establishing residence.",
+        "D-number is issued for short stays; fødselsnummer (permanent ID) is issued after 6 months — bank accounts often require the latter."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "stable_key": "no_offer_letter",
+          "title": "Signed employment contract confirming salary and role",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Required for UDI application and Skattekort.",
+          "notes_hr": "Confirm salary meets Norwegian standard market rate for the role."
+        },
+        {
+          "sort_order": 2,
+          "stable_key": "no_passport",
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Must be valid for the intended duration of stay.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 3,
+          "stable_key": "no_udi_application",
+          "title": "UDI permit application submitted (non-EU/EEA) or EEA registration (EU/EEA)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Non-EU/EEA: apply at udi.no. EU/EEA: register at Statsforvalteren within 3 months.",
+          "notes_hr": "Track UDI reference number; processing time 1–12 weeks.",
+          "depends_on_sort_order": 1
+        },
+        {
+          "sort_order": 4,
+          "stable_key": "no_permit_granted",
+          "title": "Work permit / EEA registration certificate granted",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Check permit validity dates and conditions before travelling.",
+          "notes_hr": "Retain copy for HR file; confirm permitted start date.",
+          "depends_on_sort_order": 3
+        },
+        {
+          "sort_order": 5,
+          "stable_key": "no_d_number",
+          "title": "D-number or fødselsnummer obtained from Skatteetaten",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Apply at Skatteetaten or tax office. D-number issued within days; fødselsnummer after 6 months.",
+          "notes_hr": "Required for Skattekort and Folkeregisteret registration."
+        },
+        {
+          "sort_order": 6,
+          "stable_key": "no_skattekort",
+          "title": "Tax card (Skattekort) obtained",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Obtain at skatteetaten.no before first payroll — without it, 50% tax is withheld.",
+          "notes_hr": "Payroll cannot run correctly without Skattekort on file.",
+          "depends_on_sort_order": 5
+        },
+        {
+          "sort_order": 7,
+          "stable_key": "no_folkeregisteret",
+          "title": "Address registered with Folkeregisteret (Norwegian Population Register)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Register within 8 days of establishing Norwegian residence. Bring housing contract.",
+          "notes_hr": "Confirm registration so fødselsnummer conversion can be triggered at 6 months."
+        },
+        {
+          "sort_order": 8,
+          "stable_key": "no_bank_account",
+          "title": "Norwegian bank account opened",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Most banks require D-number or fødselsnummer; some accept passport for initial account.",
+          "notes_hr": "Required for salary payment to Norwegian account."
+        },
+        {
+          "sort_order": 9,
+          "stable_key": "no_housing_school",
+          "title": "Housing & schooling shortlist (if family)",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Family members require separate immigration applications — apply in parallel.",
+          "notes_hr": "Confirm relocation budget covers family costs."
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff & permit route confirmation",
+          "body_employee": "HR confirms whether you need a UDI Skilled Worker Permit (non-EU/EEA) or EEA registration certificate (EU/EEA) and outlines the timeline.",
+          "body_hr": "Verify nationality and choose route; initiate UDI application immediately after offer is signed.",
+          "owner_role": "hr",
+          "relative_timing": "T-12 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "UDI application / EEA registration submitted",
+          "body_employee": "Submit Skilled Worker Permit application via udi.no, or gather documents for EEA registration.",
+          "body_hr": "Track reference number; processing can take 1–12 weeks for Skilled Worker Permits.",
+          "owner_role": "employee",
+          "relative_timing": "T-10 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "Permit granted",
+          "body_employee": "Check permit validity and conditions. Confirm entry date with HR.",
+          "body_hr": "Retain permit copy; update compliance record; confirm start date.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 to 6 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "move",
+          "title": "Arrival & address registration",
+          "body_employee": "Arrive in Norway and register your address with Folkeregisteret within 8 days. Bring housing contract.",
+          "body_hr": "Confirm arrival and registration; schedule Skatteetaten visit.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 5,
+          "phase": "post",
+          "title": "D-number, Skattekort & bank account",
+          "body_employee": "Obtain D-number from Skatteetaten, then immediately apply for Skattekort to avoid 50% withholding tax. Open bank account.",
+          "body_hr": "Confirm Skattekort is on file before first payroll run.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 2 weeks"
+        },
+        {
+          "sort_order": 6,
+          "phase": "post",
+          "title": "Settle-in complete",
+          "body_employee": "Enrol in Folketrygden (National Insurance), register dependants if applicable, schedule 3-month check-in.",
+          "body_hr": "Confirm all registrations complete; schedule fødselsnummer transition at 6 months.",
+          "owner_role": "hr",
+          "relative_timing": "T+4 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "BR",
+      "route_key": "employment",
+      "route_title": "Brazil — VITEM V Work Visa / CRNM",
+      "employee_summary": "Your employer must first obtain work authorisation from Brazil's Ministry of Labour (SINFRE/MTE), which unlocks your VITEM V (temporary worker) visa at the consulate. After arrival, you must register with the Federal Police within 90 days to obtain your CRNM (national migration registration card) and then obtain a CPF (tax ID) with Receita Federal.",
+      "hr_summary": "Initiate the MTE employer authorisation as the critical path item — this can take 4–8 weeks before the employee can even apply at the consulate. Ensure CRNM and CPF steps are completed within 90 days of arrival to maintain legal status.",
+      "internal_notes_hr": "VITEM V is the standard route for employed workers. The CRNM replaces the old RNE card. CPF is required for bank accounts, payroll, and any Brazilian contracts. CTPS (Carteira de Trabalho) digital registration with the employer is also required. Private health insurance is strongly recommended as public SUS access for foreigners is limited.",
+      "watchouts": [
+        "Ministry of Labour (MTE/SINFRE) authorisation is the critical path — allow 4–8 weeks before consulate application.",
+        "CRNM Federal Police registration must be completed within 90 days of first entry or legal status lapses.",
+        "CPF (Cadastro de Pessoas Físicas) is required for payroll, bank accounts, and almost all official transactions.",
+        "CTPS (digital employment card) must be registered with the employer at hiring.",
+        "Private health insurance is strongly recommended; public SUS access for non-citizens can be limited."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "stable_key": "br_mte_authorization",
+          "title": "Ministry of Labour (MTE/SINFRE) work authorisation obtained",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Your employer applies via SINFRE. Allow 4–8 weeks.",
+          "notes_hr": "Critical path item — start immediately after offer is confirmed."
+        },
+        {
+          "sort_order": 2,
+          "stable_key": "br_offer_letter",
+          "title": "Signed employment contract (CLT or assignment agreement)",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Required for MTE application and consulate visa.",
+          "notes_hr": "Specify contract type — CLT (direct hire) or assignment/secondment."
+        },
+        {
+          "sort_order": 3,
+          "stable_key": "br_passport",
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Must be valid for at least 6 months beyond intended stay.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 4,
+          "stable_key": "br_consulate_appointment",
+          "title": "Consulate appointment booked for VITEM V",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Book at the Brazilian consulate in your country of residence after MTE authorisation is granted.",
+          "notes_hr": "Lead time varies by consulate — book at T-8 weeks.",
+          "depends_on_sort_order": 1
+        },
+        {
+          "sort_order": 5,
+          "stable_key": "br_vitem_v_submitted",
+          "title": "VITEM V visa application submitted",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Bring: passport, MTE authorisation, employment contract, biometric photos, police clearance certificate.",
+          "notes_hr": "Track application; prepare for additional document requests.",
+          "depends_on_sort_order": 4
+        },
+        {
+          "sort_order": 6,
+          "stable_key": "br_vitem_v_granted",
+          "title": "VITEM V visa granted",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Check validity dates and entry conditions. First entry must be within validity window.",
+          "notes_hr": "Retain copy for HR file; confirm planned entry date.",
+          "depends_on_sort_order": 5
+        },
+        {
+          "sort_order": 7,
+          "stable_key": "br_crnm",
+          "title": "CRNM registration at Federal Police (within 90 days of arrival)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Register at the nearest Federal Police (Polícia Federal) unit with passport, visa, photos, and employment contract. Do not miss the 90-day deadline.",
+          "notes_hr": "Monitor 90-day clock from arrival date; delays result in fines and irregular status.",
+          "depends_on_sort_order": 6
+        },
+        {
+          "sort_order": 8,
+          "stable_key": "br_cpf",
+          "title": "CPF (Cadastro de Pessoas Físicas) registered with Receita Federal",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Apply at a Receita Federal office or Banco do Brasil branch. Required for bank account and payroll.",
+          "notes_hr": "CPF is needed before payroll can run legally."
+        },
+        {
+          "sort_order": 9,
+          "stable_key": "br_health_insurance",
+          "title": "Private health insurance enrolled",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Public SUS access may be limited — private plano de saúde is strongly recommended.",
+          "notes_hr": "Check whether employer provides health plan; confirm coverage starts from first day."
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff — MTE employer authorisation",
+          "body_employee": "HR initiates the work authorisation request with Brazil's Ministry of Labour (SINFRE/MTE). This is the critical-path step.",
+          "body_hr": "File MTE application immediately — 4–8 week process before consulate can be approached.",
+          "owner_role": "hr",
+          "relative_timing": "T-14 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "MTE authorisation granted & consulate booked",
+          "body_employee": "MTE authorisation letter received. Book consulate appointment for VITEM V application.",
+          "body_hr": "Issue authorisation document to employee; track consulate booking.",
+          "owner_role": "employee",
+          "relative_timing": "T-10 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "VITEM V application submitted",
+          "body_employee": "Attend consulate with full document pack: passport, MTE authorisation, contract, photos, police clearance.",
+          "body_hr": "Track application reference; prepare for supplemental document requests.",
+          "owner_role": "employee",
+          "relative_timing": "T-8 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "immigration",
+          "title": "VITEM V visa granted",
+          "body_employee": "Check validity window. Plan entry date to align with start date.",
+          "body_hr": "Retain visa copy; update compliance record; align start date.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "move",
+          "title": "Arrival in Brazil",
+          "body_employee": "Enter Brazil. The 90-day clock for CRNM Federal Police registration starts from first entry.",
+          "body_hr": "Log arrival date; set CRNM 90-day reminder immediately.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 6,
+          "phase": "post",
+          "title": "Federal Police CRNM registration",
+          "body_employee": "Visit the Federal Police (Polícia Federal) with passport, VITEM V visa, photos, and employment contract. Obtain CRNM card.",
+          "body_hr": "Confirm CRNM completed well before 90-day deadline to avoid fines.",
+          "owner_role": "employee",
+          "relative_timing": "T+4 to 8 weeks"
+        },
+        {
+          "sort_order": 7,
+          "phase": "post",
+          "title": "CPF, CTPS & settle-in",
+          "body_employee": "Register CPF at Receita Federal. Confirm CTPS digital registration with employer. Open bank account. Enrol in health plan.",
+          "body_hr": "Confirm CPF and CTPS on file before first payroll run; schedule 3-month check-in.",
+          "owner_role": "employee",
+          "relative_timing": "T+2 to 4 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "IT",
+      "route_key": "employment",
+      "route_title": "Italy — Nulla Osta / National Visa + Permesso di Soggiorno",
+      "employee_summary": "Non-EU/EEA nationals require a Nulla Osta (work authorisation) issued by the Sportello Unico per l'Immigrazione, followed by a National (Type D) visa at the Italian consulate. Within 8 working days of arrival, you must submit a Permesso di Soggiorno (residence permit) application at the Post Office or Questura. EU/EEA nationals need only an Iscrizione anagrafica. All workers need a Codice Fiscale (tax code) and Residenza registration.",
+      "hr_summary": "Nulla Osta is the critical path item for non-EU/EEA employees — apply via the Sportello Unico as soon as the job offer is confirmed, as processing can take 8–16 weeks. The Permesso di Soggiorno 8-working-day window after arrival is legally strict. EU Blue Card is available for high earners (salary ≥ €32,000/year for 2024).",
+      "internal_notes_hr": "Italy's Decreto Flussi (annual quota decree) restricts some non-EU work visa categories — confirm the route is open. The Codice Fiscale is required for payroll, contracts, banking, and rental agreements. Permesso di Soggiorno can take 3–6 months to be issued but the kit receipt (ricevuta) is accepted as proof in the meantime.",
+      "watchouts": [
+        "Nulla Osta from the Sportello Unico can take 8–16 weeks — start immediately after job offer is confirmed.",
+        "Permesso di Soggiorno application must be submitted within 8 working days of arrival — missing this window creates irregular status.",
+        "The kit receipt (ricevuta del kit postale) acts as temporary proof while the Permesso is processed (3–6 months).",
+        "Codice Fiscale is required for payroll, contracts, banking, and leases — obtain it as soon as possible.",
+        "Decreto Flussi annual quotas may restrict certain non-EU work categories — confirm route availability in advance."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "stable_key": "it_offer_letter",
+          "title": "Signed employment contract confirming role and salary",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Required for Nulla Osta application.",
+          "notes_hr": "Confirm salary meets EU Blue Card threshold (€32,000+) if applicable."
+        },
+        {
+          "sort_order": 2,
+          "stable_key": "it_nulla_osta",
+          "title": "Nulla Osta (work authorisation) obtained from Sportello Unico per l'Immigrazione",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Your employer files with the Sportello Unico. Processing: 8–16 weeks.",
+          "notes_hr": "Critical path — initiate the moment offer is confirmed. May fall under Decreto Flussi quota.",
+          "depends_on_sort_order": 1
+        },
+        {
+          "sort_order": 3,
+          "stable_key": "it_passport",
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Must be valid for at least 3 months beyond intended stay.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 4,
+          "stable_key": "it_type_d_visa",
+          "title": "National (Type D) visa application submitted at Italian consulate",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Apply at the Italian consulate in your country of residence. Bring: Nulla Osta, passport, contract, photos, medical certificate.",
+          "notes_hr": "Lead time varies by consulate — book immediately after Nulla Osta is granted.",
+          "depends_on_sort_order": 2
+        },
+        {
+          "sort_order": 5,
+          "stable_key": "it_type_d_granted",
+          "title": "National (Type D) visa granted",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Check validity window and permitted activities.",
+          "notes_hr": "Retain copy; align start date with visa validity.",
+          "depends_on_sort_order": 4
+        },
+        {
+          "sort_order": 6,
+          "stable_key": "it_permesso_soggiorno",
+          "title": "Permesso di Soggiorno application submitted (within 8 working days of arrival)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Purchase and submit the kit at any post office (Poste Italiane) within 8 working days of arrival. Bring passport, visa, Nulla Osta, photos, and contract.",
+          "notes_hr": "Monitor the 8-day window strictly; retain kit receipt (ricevuta) as interim proof.",
+          "depends_on_sort_order": 5
+        },
+        {
+          "sort_order": 7,
+          "stable_key": "it_codice_fiscale",
+          "title": "Codice Fiscale (Italian tax code) obtained from Agenzia delle Entrate",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Apply at the Agenzia delle Entrate or Italian consulate abroad. Required for payroll, contracts, and banking.",
+          "notes_hr": "Obtain before first payroll run."
+        },
+        {
+          "sort_order": 8,
+          "stable_key": "it_residenza",
+          "title": "Residenza anagrafica (address registration) at local municipality",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Register at your local Comune (municipal office) within 20 days of establishing residence.",
+          "notes_hr": "Required for some banking and public services."
+        },
+        {
+          "sort_order": 9,
+          "stable_key": "it_asl_enrollment",
+          "title": "Healthcare enrollment (SSN/ASL) or private insurance",
+          "owner_role": "employee",
+          "required": false,
+          "notes_employee": "Enrol in the Servizio Sanitario Nazionale (SSN) at your local ASL. Requires Codice Fiscale and Permesso di Soggiorno kit receipt.",
+          "notes_hr": "Confirm employer health benefit coverage from day one."
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff — Nulla Osta application",
+          "body_employee": "HR initiates the Nulla Osta work authorisation request at the Sportello Unico. This is the critical path step.",
+          "body_hr": "File with Sportello Unico immediately — processing takes 8–16 weeks. Confirm quota availability under Decreto Flussi.",
+          "owner_role": "hr",
+          "relative_timing": "T-16 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "Nulla Osta granted",
+          "body_employee": "Work authorisation issued. Employer sends you the original document for the consulate application.",
+          "body_hr": "Issue original Nulla Osta to employee; book consulate appointment immediately.",
+          "owner_role": "employer",
+          "relative_timing": "T-8 to 10 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "Consulate appointment & Type D visa application",
+          "body_employee": "Attend Italian consulate with full pack: Nulla Osta, passport, contract, photos, medical certificate.",
+          "body_hr": "Track application; prepare for supplemental document requests.",
+          "owner_role": "employee",
+          "relative_timing": "T-6 to 8 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "immigration",
+          "title": "Type D visa granted",
+          "body_employee": "Check visa validity. Plan entry date accordingly.",
+          "body_hr": "Retain copy; update compliance record; confirm start date.",
+          "owner_role": "hr",
+          "relative_timing": "T-3 to 4 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "move",
+          "title": "Arrival & Permesso di Soggiorno kit",
+          "body_employee": "Arrive in Italy. Within 8 working days, buy the Permesso di Soggiorno kit at Poste Italiane and submit your application. Keep the ricevuta as proof.",
+          "body_hr": "Confirm arrival; monitor 8-day window; support with Poste Italiane visit if needed.",
+          "owner_role": "employee",
+          "relative_timing": "T-0 to T+8 days"
+        },
+        {
+          "sort_order": 6,
+          "phase": "post",
+          "title": "Codice Fiscale, Residenza & healthcare",
+          "body_employee": "Obtain Codice Fiscale from Agenzia delle Entrate. Register Residenza at local Comune. Enrol in ASL healthcare.",
+          "body_hr": "Confirm Codice Fiscale is on file before payroll run; schedule 3-month check-in.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 2 weeks"
+        },
+        {
+          "sort_order": 7,
+          "phase": "post",
+          "title": "Permesso di Soggiorno issued & settle-in complete",
+          "body_employee": "Collect Permesso di Soggiorno card (typically 3–6 months after application). Open bank account, finalise rental contract.",
+          "body_hr": "File Permesso di Soggiorno copy; update renewal calendar (typically valid 2 years, then renewable).",
+          "owner_role": "hr",
+          "relative_timing": "T+12 to 24 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "ES",
+      "route_key": "employment",
+      "route_title": "Spain — Work & Residence Authorisation / NIE / TIE",
+      "employee_summary": "Non-EU/EEA nationals require a combined work and residence authorisation (autorización de residencia y trabajo por cuenta ajena) initiated by the employer in Spain, followed by a visa at the Spanish consulate. After arrival, you obtain your NIE (foreigner ID), complete Empadronamiento (municipal registration), and apply for the TIE (residence card). EU/EEA nationals only need NIE, Empadronamiento, and EU registration certificate. All workers need a Social Security number.",
+      "hr_summary": "The employer must file the work and residence authorisation application in Spain as the critical path step (allow 1–3 months). Ensure NIE, Empadronamiento, and TIE steps are completed promptly after arrival. Social Security number registration must precede payroll.",
+      "internal_notes_hr": "Non-EU/EEA nationals: the autorización is issued in Spain by the immigration office (Delegación del Gobierno), then the employee collects their visa at the Spanish consulate abroad. NIE is the core identifier used in all Spanish official processes. TIE replaces the old green certificate for non-EU nationals. Highly Qualified Professional (EU Blue Card) route available for salaries ≥ 1.5× average salary.",
+      "watchouts": [
+        "The employer-filed work and residence authorisation can take 1–3 months — start immediately after offer is confirmed.",
+        "NIE (Número de Identidad de Extranjero) is required for almost all Spanish official and commercial transactions.",
+        "Empadronamiento (municipal registration) is required for healthcare access, school enrolment, and many administrative processes.",
+        "TIE application must be submitted within 30 days of entering Spain on the work visa.",
+        "Social Security number must be registered before payroll can run — obtain via employer or INSS office."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "stable_key": "es_offer_letter",
+          "title": "Signed employment contract",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Required for the work and residence authorisation application.",
+          "notes_hr": "Confirm contract specifies role, salary, and work location in Spain."
+        },
+        {
+          "sort_order": 2,
+          "stable_key": "es_work_auth",
+          "title": "Work and residence authorisation (autorización de residencia y trabajo) application filed",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Your employer files with the Delegación del Gobierno in Spain. Allow 1–3 months.",
+          "notes_hr": "Critical path — initiate immediately after offer is signed. Track expediente number.",
+          "depends_on_sort_order": 1
+        },
+        {
+          "sort_order": 3,
+          "stable_key": "es_work_auth_granted",
+          "title": "Work and residence authorisation granted",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Employer receives resolution; you can then apply for the visa at the Spanish consulate.",
+          "notes_hr": "Send resolution to employee promptly; consulate step must follow within validity window.",
+          "depends_on_sort_order": 2
+        },
+        {
+          "sort_order": 4,
+          "stable_key": "es_passport",
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Must be valid for at least 1 year beyond the intended stay.",
+          "notes_hr": null
+        },
+        {
+          "sort_order": 5,
+          "stable_key": "es_visa_granted",
+          "title": "Spanish work/residence visa obtained at consulate",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Apply at the Spanish consulate in your country of residence with the authorisation resolution.",
+          "notes_hr": "The visa is typically valid for 90 days entry — must be used within this window.",
+          "depends_on_sort_order": 3
+        },
+        {
+          "sort_order": 6,
+          "stable_key": "es_nie",
+          "title": "NIE (Número de Identidad de Extranjero) obtained",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Apply at the local Policía Nacional comisaría or via consulate. Required for all official and commercial transactions in Spain.",
+          "notes_hr": "NIE is the key identifier — payroll, bank accounts, and lease agreements all require it."
+        },
+        {
+          "sort_order": 7,
+          "stable_key": "es_empadronamiento",
+          "title": "Empadronamiento (municipal address registration) completed",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Register at your local Ayuntamiento (town hall) with passport, visa, and rental contract. Required for healthcare and school enrolment.",
+          "notes_hr": "Confirm registration; needed for healthcare access from day one."
+        },
+        {
+          "sort_order": 8,
+          "stable_key": "es_tie",
+          "title": "TIE (Tarjeta de Identidad de Extranjero) residence card application submitted",
+          "owner_role": "employee",
+          "required": true,
+          "notes_employee": "Apply at the Policía Nacional within 30 days of entering Spain. Bring: passport, visa, NIE, Empadronamiento certificate, photos, and employment contract.",
+          "notes_hr": "Retain appointment receipt as interim proof; TIE takes 4–6 weeks to issue.",
+          "depends_on_sort_order": 6
+        },
+        {
+          "sort_order": 9,
+          "stable_key": "es_social_security",
+          "title": "Social Security number (Número de Afiliación) registered",
+          "owner_role": "employer",
+          "required": true,
+          "notes_employee": "Your employer registers you with the INSS (Instituto Nacional de la Seguridad Social) before your first working day.",
+          "notes_hr": "Required before payroll — employer registers affiliation number at INSS."
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff — work and residence authorisation application",
+          "body_employee": "HR files the work and residence authorisation with the Delegación del Gobierno in Spain. This is the critical path step.",
+          "body_hr": "File autorización de residencia y trabajo immediately — processing can take 1–3 months.",
+          "owner_role": "hr",
+          "relative_timing": "T-14 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "Authorisation granted",
+          "body_employee": "HR sends you the resolution. Book your consulate appointment promptly — the resolution has a validity window.",
+          "body_hr": "Send resolution to employee; ensure they book consulate within validity window.",
+          "owner_role": "employer",
+          "relative_timing": "T-8 to 10 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "Consulate appointment & visa obtained",
+          "body_employee": "Visit Spanish consulate with resolution, passport, photos, and supporting documents. Collect visa.",
+          "body_hr": "Track visa collection; confirm planned entry date.",
+          "owner_role": "employee",
+          "relative_timing": "T-6 to 8 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "move",
+          "title": "Arrival in Spain",
+          "body_employee": "Enter Spain. The 30-day TIE application window starts from entry.",
+          "body_hr": "Log arrival date; set TIE 30-day reminder immediately.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 5,
+          "phase": "post",
+          "title": "NIE, Empadronamiento & Social Security",
+          "body_employee": "Obtain NIE at Policía Nacional. Complete Empadronamiento at Ayuntamiento. Employer registers your Social Security affiliation (INSS).",
+          "body_hr": "Confirm NIE and Social Security number on file before first payroll run.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 2 weeks"
+        },
+        {
+          "sort_order": 6,
+          "phase": "post",
+          "title": "TIE application submitted",
+          "body_employee": "Apply for TIE (residence card) at Policía Nacional within 30 days of entry. Retain appointment receipt as interim proof.",
+          "body_hr": "File appointment receipt; TIE card typically issued in 4–6 weeks.",
+          "owner_role": "employee",
+          "relative_timing": "T+2 to 4 weeks"
+        },
+        {
+          "sort_order": 7,
+          "phase": "post",
+          "title": "TIE received & settle-in complete",
+          "body_employee": "Collect TIE card. Open Spanish bank account. Enrol children in school if applicable. Schedule 3-month check-in.",
+          "body_hr": "File TIE copy; update TIE renewal calendar (typically valid 1–2 years, then renewable); confirm payroll and healthcare active.",
+          "owner_role": "hr",
+          "relative_timing": "T+6 to 8 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "AU",
+      "route_key": "employment",
+      "route_title": "Australia — TSS Subclass 482 / Employer Nomination Subclass 186",
+      "employee_summary": "Your employer nominates you for either a Temporary Skill Shortage (subclass 482) visa or the permanent Employer Nomination Scheme (subclass 186). Labour Market Testing and, for some occupations, a skills assessment are required before lodgement. After arrival, obtain a Tax File Number (TFN) and enrol in superannuation.",
+      "hr_summary": "Labour Market Testing must be documented before the nomination is lodged. Confirm occupation eligibility on the MLTSSL/STSOL lists. Subclass 186 (ENS) offers a permanent pathway. Ensure TFN and superannuation are set up before first payroll.",
+      "internal_notes_hr": "Subclass 482 (TSS) requires Labour Market Testing unless covered by international agreement. Occupation must be on the relevant skilled occupation list. Superannuation is compulsory (currently 11%). Medical examination may be required depending on nationality/occupation.",
+      "watchouts": [
+        "Labour Market Testing (LMT) must be conducted and documented within 12 months before lodging the nomination — advertising requirements apply.",
+        "Skills assessments may be required for some occupations — confirm with the relevant assessing authority before starting the process.",
+        "Subclass 482 is a temporary visa; align renewal dates with contract length and plan permanent pathway (subclass 186 or 191) early.",
+        "TFN must be obtained before payroll — without it, the employer must withhold tax at the highest marginal rate.",
+        "Superannuation contributions are compulsory — employer must enrol the employee within 28 days of eligibility.",
+        "Visa holders on subclass 482 may only work for the sponsoring employer — any role change requires a new nomination."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "title": "Signed employment contract confirming role, salary, and work location",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Required for nomination lodgement.",
+          "notes_hr": "Confirm role is on eligible occupation list (MLTSSL/STSOL/PMSOL).",
+          "stable_key": "au_offer_letter"
+        },
+        {
+          "sort_order": 2,
+          "title": "Labour Market Testing (LMT) completed and documented",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Your employer must advertise the role and show no suitable Australian worker was available.",
+          "notes_hr": "LMT advertising must be within 12 months prior to nomination lodgement — keep records of all ads and applicants.",
+          "stable_key": "au_lmt"
+        },
+        {
+          "sort_order": 3,
+          "title": "Skills assessment submitted (if required for occupation)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Contact the relevant assessing authority for your occupation. Lead time: 4–12 weeks.",
+          "notes_hr": "Confirm if skills assessment is required for the specific ANZSCO occupation code.",
+          "stable_key": "au_skills_assessment"
+        },
+        {
+          "sort_order": 4,
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Must be valid for the intended visa period.",
+          "notes_hr": null,
+          "stable_key": "au_passport"
+        },
+        {
+          "sort_order": 5,
+          "title": "Visa nomination and application lodged with Home Affairs",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 2,
+          "notes_employee": "Employer lodges the nomination; you then lodge the visa application online.",
+          "notes_hr": "Track nomination and visa application reference numbers. Processing: 2–8 months depending on stream.",
+          "stable_key": "au_visa_lodged"
+        },
+        {
+          "sort_order": 6,
+          "title": "Visa granted",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 5,
+          "notes_employee": "Check visa grant notice for conditions, validity dates, and any travel restrictions.",
+          "notes_hr": "Retain grant notice; confirm planned entry date and start date.",
+          "stable_key": "au_visa_granted"
+        },
+        {
+          "sort_order": 7,
+          "title": "Tax File Number (TFN) applied for with ATO",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Apply at ato.gov.au or at a Medicare office. Required for payroll and banking.",
+          "notes_hr": "Withhold maximum tax rate until TFN is provided — chase promptly after arrival.",
+          "stable_key": "au_tfn"
+        },
+        {
+          "sort_order": 8,
+          "title": "Superannuation fund nominated",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "You may choose your own fund or use the employer's default. Complete the Standard Choice Form.",
+          "notes_hr": "Enrol within 28 days of becoming eligible; SG contributions currently 11%.",
+          "stable_key": "au_super"
+        },
+        {
+          "sort_order": 9,
+          "title": "Medicare or private health insurance arranged",
+          "owner_role": "employee",
+          "required": 0,
+          "depends_on_sort_order": null,
+          "notes_employee": "Medicare eligibility depends on your nationality and visa type. If not eligible, arrange OSHC (Overseas Student/Worker health cover).",
+          "notes_hr": "Confirm Medicare eligibility; some nationalities and visa holders require private OVHC cover.",
+          "stable_key": "au_health"
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff — LMT and nomination preparation",
+          "body_employee": "HR begins Labour Market Testing, confirms your occupation is eligible, and prepares the nomination.",
+          "body_hr": "Conduct LMT advertising; document all applicants; confirm occupation list eligibility before lodging nomination.",
+          "owner_role": "hr",
+          "relative_timing": "T-20 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "Nomination and visa application lodged",
+          "body_employee": "Nomination lodged by HR; you receive an invitation to complete your visa application online.",
+          "body_hr": "Track nomination reference; guide employee through online visa application.",
+          "owner_role": "employer",
+          "relative_timing": "T-16 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "Visa granted",
+          "body_employee": "Check grant notice for conditions and validity. Plan your travel date accordingly.",
+          "body_hr": "Record grant date and visa expiry; align start date.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 to 8 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "move",
+          "title": "Arrival in Australia",
+          "body_employee": "Enter Australia. Your visa is electronically linked to your passport — no label required.",
+          "body_hr": "Log arrival date; initiate TFN and superannuation onboarding.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 5,
+          "phase": "post",
+          "title": "TFN, superannuation & healthcare",
+          "body_employee": "Apply for TFN online. Complete the superannuation choice form. Enrol in Medicare or arrange private health cover.",
+          "body_hr": "Confirm TFN and super fund on file before first payroll run.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 2 weeks"
+        },
+        {
+          "sort_order": 6,
+          "phase": "post",
+          "title": "Settle-in complete",
+          "body_employee": "Open Australian bank account. Register with local GP. Organise schooling for children if applicable.",
+          "body_hr": "Schedule 3-month and 12-month check-ins; set visa renewal reminder.",
+          "owner_role": "hr",
+          "relative_timing": "T+4 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "CA",
+      "route_key": "employment",
+      "route_title": "Canada — Employer-Specific Work Permit (LMIA / LMIA-Exempt)",
+      "employee_summary": "Most foreign workers in Canada require an employer-specific work permit. The route is either LMIA-based (employer obtains a positive Labour Market Impact Assessment from ESDC) or LMIA-exempt (e.g. CUSMA/USMCA, Intracompany Transfer, or international agreements). After arrival, obtain a Social Insurance Number (SIN) and enrol in provincial health insurance.",
+      "hr_summary": "Confirm the correct route: LMIA-based vs LMIA-exempt (CUSMA, ICT, C-11, etc.). LMIA takes 2–5 months — start immediately. LMIA-exempt routes are faster but require the correct legal basis. SIN must be obtained before payroll; provincial health insurance has a 3-month waiting period in most provinces.",
+      "internal_notes_hr": "LMIA-based: employer must advertise and show no qualified Canadian was available. LMIA-exempt: document the legal basis carefully (e.g. CUSMA profession list, ICT relationship). Intracompany Transfers (C-12) require the employee to have worked abroad for 1 year with the same company. Express Entry PR pathway available in parallel.",
+      "watchouts": [
+        "LMIA processing can take 2–5 months — initiate immediately if LMIA route is required.",
+        "Most provinces have a 3-month waiting period for provincial health insurance — arrange private health coverage from day one.",
+        "The work permit is employer-specific (tied to the employer and role) — a new work permit is required for role changes.",
+        "SIN must be obtained from Service Canada before payroll can run legally.",
+        "Open work permits are available for spouses of skilled workers and international students — apply in parallel for dependents."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "title": "Work permit route confirmed (LMIA-based or LMIA-exempt)",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "HR will confirm whether an LMIA is required based on your role and nationality.",
+          "notes_hr": "Review CUSMA profession list, C-12 ICT eligibility, or other LMIA-exempt codes before pursuing LMIA route.",
+          "stable_key": "ca_route_confirmed"
+        },
+        {
+          "sort_order": 2,
+          "title": "LMIA obtained from ESDC (if required)",
+          "owner_role": "employer",
+          "required": 0,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Your employer applies to ESDC. Allow 2–5 months. You will be notified of the outcome.",
+          "notes_hr": "Advertise per ESDC requirements; retain all records. Process takes 2–5 months in high-wage stream.",
+          "stable_key": "ca_lmia"
+        },
+        {
+          "sort_order": 3,
+          "title": "Signed employment contract and offer letter",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Required for work permit application.",
+          "notes_hr": "Ensure offer specifies NOC code, wage, hours, and duration.",
+          "stable_key": "ca_offer_letter"
+        },
+        {
+          "sort_order": 4,
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Must be valid for the intended work permit period.",
+          "notes_hr": null,
+          "stable_key": "ca_passport"
+        },
+        {
+          "sort_order": 5,
+          "title": "Work permit application submitted online or at port of entry",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Apply at ircc.canada.ca or at the port of entry (CUSMA professionals only).",
+          "notes_hr": "Track application number; IRCC online processing typically 2–8 weeks for most exemptions.",
+          "stable_key": "ca_work_permit_submitted"
+        },
+        {
+          "sort_order": 6,
+          "title": "Work permit granted",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 5,
+          "notes_employee": "Check permit conditions — it will specify employer, location, and expiry date.",
+          "notes_hr": "Retain copy; align start date with permit validity.",
+          "stable_key": "ca_work_permit_granted"
+        },
+        {
+          "sort_order": 7,
+          "title": "Social Insurance Number (SIN) obtained from Service Canada",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Apply at a Service Canada centre with your work permit and passport. Required for payroll and tax filing.",
+          "notes_hr": "SIN required before first payroll — chase within first week of arrival.",
+          "stable_key": "ca_sin"
+        },
+        {
+          "sort_order": 8,
+          "title": "Provincial health insurance enrolled (or interim private insurance arranged)",
+          "owner_role": "employee",
+          "required": 0,
+          "depends_on_sort_order": null,
+          "notes_employee": "Most provinces have a 3-month waiting period — arrange private international health coverage from day one.",
+          "notes_hr": "Confirm employer provides interim private health cover for the waiting period.",
+          "stable_key": "ca_health"
+        },
+        {
+          "sort_order": 9,
+          "title": "Canadian bank account opened",
+          "owner_role": "employee",
+          "required": 0,
+          "depends_on_sort_order": null,
+          "notes_employee": "Required for salary deposit. Most major banks allow opening with passport and work permit.",
+          "notes_hr": "Required for salary payment; arrange before first pay date.",
+          "stable_key": "ca_bank_account"
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Route determination & LMIA kick-off (if required)",
+          "body_employee": "HR determines the correct work permit route. If LMIA is required, HR begins the ESDC application process.",
+          "body_hr": "Confirm route; initiate LMIA if required — allow 2–5 months. For exempt routes, prepare supporting documentation.",
+          "owner_role": "hr",
+          "relative_timing": "T-16 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "LMIA granted / exempt route confirmed",
+          "body_employee": "HR provides LMIA confirmation or exempt route documentation. You may now apply for the work permit.",
+          "body_hr": "Issue LMIA and offer letter; guide employee through online work permit application.",
+          "owner_role": "employer",
+          "relative_timing": "T-8 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "Work permit application submitted",
+          "body_employee": "Apply online at ircc.canada.ca or at the port of entry (for CUSMA professionals).",
+          "body_hr": "Track IRCC application reference; prepare for supplemental document requests.",
+          "owner_role": "employee",
+          "relative_timing": "T-6 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "immigration",
+          "title": "Work permit granted",
+          "body_employee": "Check permit conditions, employer, and expiry date. Plan travel date.",
+          "body_hr": "Retain copy; confirm start date; arrange private health insurance for 3-month waiting period.",
+          "owner_role": "hr",
+          "relative_timing": "T-2 to 4 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "move",
+          "title": "Arrival in Canada",
+          "body_employee": "Enter Canada with your work permit approval letter and passport.",
+          "body_hr": "Log arrival; initiate SIN and banking onboarding immediately.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 6,
+          "phase": "post",
+          "title": "SIN, provincial health & banking",
+          "body_employee": "Obtain SIN at Service Canada. Open a Canadian bank account. Register for provincial health insurance to start the waiting period clock.",
+          "body_hr": "Confirm SIN on file before first payroll run; track provincial health waiting period.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 2 weeks"
+        },
+        {
+          "sort_order": 7,
+          "phase": "post",
+          "title": "Settle-in complete",
+          "body_employee": "Enrol children in school if applicable. Arrange rental contract. Set up provincial health insurance after waiting period.",
+          "body_hr": "Schedule 3-month check-in; set work permit renewal reminder.",
+          "owner_role": "hr",
+          "relative_timing": "T+4 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "CH",
+      "route_key": "employment",
+      "route_title": "Switzerland — Residence & Work Permit (Permit L / B)",
+      "employee_summary": "Non-EU/EEA nationals require an employer-sponsored residence and work permit (Permit L for stays under 1 year, Permit B for stays of 1–5 years) issued by the cantonal migration office (Migrationsdienst/SMIG). EU/EEA nationals register directly under the Agreement on Free Movement of Persons. Mandatory Swiss health insurance must be arranged within 3 months of arrival.",
+      "hr_summary": "Non-EU/EEA permits are subject to annual cantonal and federal quotas — confirm availability before making an offer. The cantonal migration authority issues the permit; the employer sponsors it. Health insurance, AHV social security, and commune registration are mandatory post-arrival steps.",
+      "internal_notes_hr": "Permit B (B-Bewilligung) is the standard annual permit for employed workers; renewable annually. Permit L is for short assignments under 12 months (not renewable). EU/EEA nationals register at the Einwohnerkontrolle with employer confirmation. Non-EU/EEA quota availability should be checked with the canton before offer stage.",
+      "watchouts": [
+        "Non-EU/EEA work permit quotas are limited per canton — check availability before making a job offer.",
+        "Mandatory Swiss health insurance (Krankenkasse) must be arranged within 3 months of taking up residence — late enrollment incurs retroactive premiums.",
+        "Address registration at the commune (Einwohnerkontrolle) must be completed within 14 days of arrival.",
+        "AHV/AVS social security contributions are mandatory and deducted from payroll — employee must receive their AHV number.",
+        "Spouses of permit holders need their own permit application — apply in parallel."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "title": "Signed employment contract confirming role, salary, and start date",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Required for cantonal permit application.",
+          "notes_hr": "Salary must comply with Swiss standard of living; cantonal minimum wage thresholds apply.",
+          "stable_key": "ch_offer_letter"
+        },
+        {
+          "sort_order": 2,
+          "title": "Cantonal permit quota availability confirmed (non-EU/EEA)",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Your employer will check with the cantonal migration authority whether a quota is available.",
+          "notes_hr": "EU/EEA nationals skip quota check. For non-EU/EEA, confirm quota before offer is extended.",
+          "stable_key": "ch_quota"
+        },
+        {
+          "sort_order": 3,
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Must be valid for the intended permit period.",
+          "notes_hr": null,
+          "stable_key": "ch_passport"
+        },
+        {
+          "sort_order": 4,
+          "title": "Cantonal migration office permit application submitted",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 2,
+          "notes_employee": "Your employer files with the cantonal migration office (Migrationsdienst/SMIG). Processing: 4–8 weeks.",
+          "notes_hr": "File immediately after quota confirmed. Include contract, diplomas, and employer declaration.",
+          "stable_key": "ch_permit_submitted"
+        },
+        {
+          "sort_order": 5,
+          "title": "Residence and work permit granted",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 4,
+          "notes_employee": "You will receive a permit document to collect on arrival or at a Swiss mission.",
+          "notes_hr": "Retain permit copy; confirm start date; track permit expiry for renewal.",
+          "stable_key": "ch_permit_granted"
+        },
+        {
+          "sort_order": 6,
+          "title": "Address registered at commune (Einwohnerkontrolle)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 5,
+          "notes_employee": "Register at your local Einwohnerkontrolle (German CH) or contrôle des habitants (French CH) within 14 days of arrival. Bring passport, permit, rental contract.",
+          "notes_hr": "Confirm registration — required for AHV enrollment and health insurance.",
+          "stable_key": "ch_commune_registration"
+        },
+        {
+          "sort_order": 7,
+          "title": "Mandatory health insurance (Krankenkasse) enrolled",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Arrange basic Swiss health insurance within 3 months of taking up residence. Retroactive premiums apply from first day if late.",
+          "notes_hr": "Confirm employee has enrolled; check if employer contributes to supplemental insurance.",
+          "stable_key": "ch_health_insurance"
+        },
+        {
+          "sort_order": 8,
+          "title": "AHV/AVS social security number received",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Issued automatically via employer payroll registration. Required for pension contributions.",
+          "notes_hr": "Register employee with cantonal compensation office; AHV number needed before first payroll.",
+          "stable_key": "ch_ahv"
+        },
+        {
+          "sort_order": 9,
+          "title": "Swiss bank account opened",
+          "owner_role": "employee",
+          "required": 0,
+          "depends_on_sort_order": null,
+          "notes_employee": "Required for salary. Most banks require permit and commune registration confirmation.",
+          "notes_hr": "Required for CHF salary payment.",
+          "stable_key": "ch_bank_account"
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Quota check & permit application",
+          "body_employee": "HR confirms quota availability for your nationality and files the cantonal permit application.",
+          "body_hr": "Check quota with canton; initiate permit application immediately — processing 4–8 weeks.",
+          "owner_role": "hr",
+          "relative_timing": "T-10 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "immigration",
+          "title": "Permit granted",
+          "body_employee": "Permit issued. You may now plan your move and travel date.",
+          "body_hr": "Issue permit document to employee; confirm start date; set permit renewal reminder.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "move",
+          "title": "Arrival & commune registration",
+          "body_employee": "Arrive in Switzerland. Register your address at the commune (Einwohnerkontrolle) within 14 days.",
+          "body_hr": "Confirm arrival and commune registration; initiate AHV enrollment and health insurance onboarding.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 4,
+          "phase": "post",
+          "title": "Health insurance & AHV enrollment",
+          "body_employee": "Arrange mandatory Krankenkasse health insurance within 3 months. Receive your AHV social security number via employer.",
+          "body_hr": "Confirm health insurance enrollment; register AHV number before first payroll.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 4 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "post",
+          "title": "Settle-in complete",
+          "body_employee": "Open Swiss bank account. Register children in school. Note permit expiry for renewal.",
+          "body_hr": "Schedule 3-month check-in; set permit renewal reminder (Permit B renewed annually).",
+          "owner_role": "hr",
+          "relative_timing": "T+6 to 8 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "HK",
+      "route_key": "employment",
+      "route_title": "Hong Kong — Employment Visa (General Employment Policy / Admission Scheme for Mainland Talents and Professionals)",
+      "employee_summary": "Foreign nationals require an employment visa from the Hong Kong Immigration Department. The employer sponsors the application under the General Employment Policy (GEP) or a specific admission scheme. After arrival, obtain your Hong Kong Identity Card (HKID) within 30 days and ensure your employer enrolls you in the Mandatory Provident Fund (MPF).",
+      "hr_summary": "Employment visa applications are employer-sponsored and processed by the HKID Department. Processing: 4–6 weeks. HKID must be obtained within 30 days of arrival. MPF enrollment is mandatory within 60 days of employment commencement. Hong Kong has no personal income tax filing requirement for most employees — salaries tax is assessed by IRD.",
+      "internal_notes_hr": "GEP requires proof the position cannot be filled locally. Salary should be commensurate with the local market rate. The Quality Migrant Admission Scheme (QMAS) is an alternative for high-talent individuals (points-based, no job offer needed). Dependent visas available for spouses and unmarried children under 18.",
+      "watchouts": [
+        "HKID must be obtained within 30 days of first landing — fines apply for non-compliance.",
+        "MPF enrollment is mandatory within 60 days of employment commencement — employer must register and make contributions.",
+        "Employment visa is employer-specific — a new visa is required if the employee changes employer.",
+        "No general income tax filing for most employees, but a tax return may be issued by IRD — respond within the deadline.",
+        "Dependent visa holders may not work without a separate work visa."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "title": "Employment offer letter confirming role, salary, and duration",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Required for visa application.",
+          "notes_hr": "Demonstrate that the position cannot be filled locally.",
+          "stable_key": "hk_offer_letter"
+        },
+        {
+          "sort_order": 2,
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Must be valid for at least 1 month beyond intended stay.",
+          "notes_hr": null,
+          "stable_key": "hk_passport"
+        },
+        {
+          "sort_order": 3,
+          "title": "Employment visa application submitted to Hong Kong Immigration Department",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Employer-sponsored; application includes proof of qualifications and employment contract.",
+          "notes_hr": "Processing typically 4–6 weeks. Apply online at immd.gov.hk.",
+          "stable_key": "hk_visa_submitted"
+        },
+        {
+          "sort_order": 4,
+          "title": "Employment visa granted",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 3,
+          "notes_employee": "Check visa approval letter for conditions and entry instructions.",
+          "notes_hr": "Retain copy; confirm start date.",
+          "stable_key": "hk_visa_granted"
+        },
+        {
+          "sort_order": 5,
+          "title": "HKID (Hong Kong Identity Card) obtained within 30 days of arrival",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 4,
+          "notes_employee": "Visit an Immigration Services Centre (ISC) within 30 days of arrival with your passport and visa approval letter.",
+          "notes_hr": "Track HKID registration date — mandatory legal requirement.",
+          "stable_key": "hk_hkid"
+        },
+        {
+          "sort_order": 6,
+          "title": "MPF (Mandatory Provident Fund) enrollment within 60 days",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Your employer registers you with an MPF scheme. Both employer and employee contribute 5% of relevant income.",
+          "notes_hr": "Enroll within 60 days of employment commencement. Choose an MPF trustee.",
+          "stable_key": "hk_mpf"
+        },
+        {
+          "sort_order": 7,
+          "title": "Hong Kong bank account opened",
+          "owner_role": "employee",
+          "required": 0,
+          "depends_on_sort_order": null,
+          "notes_employee": "Requires HKID, employment visa, and employer letter. Required for HKD salary payment.",
+          "notes_hr": "Required for payroll — arrange before first pay date.",
+          "stable_key": "hk_bank_account"
+        },
+        {
+          "sort_order": 8,
+          "title": "Tax obligations with IRD noted",
+          "owner_role": "employee",
+          "required": 0,
+          "depends_on_sort_order": null,
+          "notes_employee": "IRD may issue a salaries tax return — respond within 1 month. You are not required to file proactively in most years.",
+          "notes_hr": "Inform employee of IRD obligations and tax equalization policy if applicable.",
+          "stable_key": "hk_tax"
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Visa application submitted",
+          "body_employee": "Employer submits employment visa application to Immigration Department.",
+          "body_hr": "Prepare full application pack including employment contract, qualifications, and employer letter. Processing: 4–6 weeks.",
+          "owner_role": "hr",
+          "relative_timing": "T-8 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "immigration",
+          "title": "Visa granted",
+          "body_employee": "Visa approval letter received. Plan your travel and entry date.",
+          "body_hr": "Retain copy; confirm start date; brief employee on HKID 30-day rule.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "move",
+          "title": "Arrival & HKID registration",
+          "body_employee": "Enter Hong Kong. Register for HKID at an Immigration Services Centre within 30 days.",
+          "body_hr": "Log arrival date; set HKID 30-day reminder; initiate MPF enrollment.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 4,
+          "phase": "post",
+          "title": "MPF & banking",
+          "body_employee": "Employer enrolls you in MPF. Open Hong Kong bank account for salary payments.",
+          "body_hr": "Complete MPF enrollment within 60 days; confirm bank account details for payroll.",
+          "owner_role": "employer",
+          "relative_timing": "T+1 to 4 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "post",
+          "title": "Settle-in complete",
+          "body_employee": "Obtain HKID, open bank account. Arrange schooling for children if applicable.",
+          "body_hr": "Confirm all registrations; schedule annual visa renewal check-in.",
+          "owner_role": "hr",
+          "relative_timing": "T+4 to 6 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "JP",
+      "route_key": "employment",
+      "route_title": "Japan — Work Visa (Certificate of Eligibility / Engineer / Specialist in Humanities)",
+      "employee_summary": "Working in Japan requires a Certificate of Eligibility (COE) obtained by your employer from the Regional Immigration Services Bureau, followed by a work visa at the Japanese consulate in your home country. After arrival, you must complete resident registration (Juminhyo) at the municipal office within 14 days and receive your My Number card.",
+      "hr_summary": "The employer files the COE with MHLW/Immigration — processing takes 1–3 months. The most common visa categories are 'Engineer/Specialist in Humanities/International Services' and 'Highly Skilled Professional' (HSP points). Juminhyo registration and My Number enrollment are mandatory within 14 days of establishing residence.",
+      "internal_notes_hr": "COE is valid for 3 months — employee must use it within this window to obtain the visa and enter Japan. The Highly Skilled Professional (HSP) visa offers a points-based accelerated path to permanent residency. Dependent (Kazoku Taizai) visas required for family members. Residence card (Zairyū Card) issued at port of entry for stays over 90 days.",
+      "watchouts": [
+        "Certificate of Eligibility (COE) processing takes 1–3 months — initiate the moment the offer is confirmed.",
+        "COE is valid for only 3 months from issuance — employee must obtain the visa and enter Japan within this window.",
+        "Juminhyo (resident registration) must be completed at the municipal office within 14 days of establishing residence.",
+        "My Number (Individual Number) is required for tax filing, payroll withholding, and social insurance enrollment.",
+        "Social insurance (Shakai Hoken: health + pension) enrollment is mandatory for employees and deducted from payroll.",
+        "Residence card (Zairyū Card) is issued at the airport for stays over 90 days — carry it at all times."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "title": "Employment contract signed confirming role and start date",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Required for COE application.",
+          "notes_hr": "Confirm job category aligns with COE visa category (Engineer/Specialist, Highly Skilled, etc.).",
+          "stable_key": "jp_offer_letter"
+        },
+        {
+          "sort_order": 2,
+          "title": "Certificate of Eligibility (COE) obtained from Regional Immigration Services Bureau",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Your employer applies to the Immigration Services Bureau in Japan. Processing: 1–3 months. You must enter Japan within 3 months of COE issuance.",
+          "notes_hr": "Critical path — file immediately after offer is confirmed. Retain original COE for employee.",
+          "stable_key": "jp_coe"
+        },
+        {
+          "sort_order": 3,
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Must be valid for the intended visa period.",
+          "notes_hr": null,
+          "stable_key": "jp_passport"
+        },
+        {
+          "sort_order": 4,
+          "title": "Work visa application submitted at Japanese consulate",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 2,
+          "notes_employee": "Apply at the Japanese consulate in your country of residence with COE, passport, and photos.",
+          "notes_hr": "Lead time varies by consulate — book immediately after COE receipt.",
+          "stable_key": "jp_visa_submitted"
+        },
+        {
+          "sort_order": 5,
+          "title": "Work visa granted",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 4,
+          "notes_employee": "Check visa sticker validity and permitted activities. Enter Japan before COE expiry.",
+          "notes_hr": "Retain visa copy; confirm entry date.",
+          "stable_key": "jp_visa_granted"
+        },
+        {
+          "sort_order": 6,
+          "title": "Juminhyo (resident registration) at municipal office within 14 days",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 5,
+          "notes_employee": "Register at your local city hall (Shiyakusho/Kuyakusho) within 14 days of establishing residence. Bring residence card, passport, and rental contract.",
+          "notes_hr": "Juminhyo is required for My Number notification and bank accounts.",
+          "stable_key": "jp_juminhyo"
+        },
+        {
+          "sort_order": 7,
+          "title": "My Number (Individual Number) notification received",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Delivered by post to your registered address after Juminhyo. Required for tax and social insurance.",
+          "notes_hr": "Obtain My Number from employee for payroll tax withholding and social insurance.",
+          "stable_key": "jp_my_number"
+        },
+        {
+          "sort_order": 8,
+          "title": "Social insurance (Shakai Hoken) enrolled via employer",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Your employer enrols you in health insurance (Kenko Hoken) and pension (Kosei Nenkin) from day one.",
+          "notes_hr": "Mandatory for employees — deducted from payroll; employer contributes equal amount.",
+          "stable_key": "jp_shakai_hoken"
+        },
+        {
+          "sort_order": 9,
+          "title": "Japanese bank account opened",
+          "owner_role": "employee",
+          "required": 0,
+          "depends_on_sort_order": null,
+          "notes_employee": "Requires residence card and Juminhyo. Required for salary in JPY.",
+          "notes_hr": "Required for payroll — arrange within first 2 weeks.",
+          "stable_key": "jp_bank_account"
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff — COE application",
+          "body_employee": "HR applies for the Certificate of Eligibility at the Regional Immigration Services Bureau.",
+          "body_hr": "File COE immediately — processing takes 1–3 months. COE is valid for 3 months from issuance.",
+          "owner_role": "hr",
+          "relative_timing": "T-16 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "COE issued",
+          "body_employee": "COE received. HR sends the original to you for the consulate visa application.",
+          "body_hr": "Issue original COE; book consulate appointment immediately — must enter Japan within 3 months.",
+          "owner_role": "employer",
+          "relative_timing": "T-8 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "Consulate visa application & grant",
+          "body_employee": "Apply at Japanese consulate with COE, passport, and photos. Collect visa.",
+          "body_hr": "Track visa application; confirm planned entry date.",
+          "owner_role": "employee",
+          "relative_timing": "T-4 to 6 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "move",
+          "title": "Arrival in Japan",
+          "body_employee": "Enter Japan. Residence card (Zairyū Card) issued at port of entry. Carry it at all times.",
+          "body_hr": "Log arrival date; set Juminhyo 14-day reminder.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 5,
+          "phase": "post",
+          "title": "Juminhyo & My Number",
+          "body_employee": "Register at city hall within 14 days. Receive My Number notification by post.",
+          "body_hr": "Confirm Juminhyo registration; obtain My Number for payroll and social insurance.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 2 weeks"
+        },
+        {
+          "sort_order": 6,
+          "phase": "post",
+          "title": "Social insurance & settle-in complete",
+          "body_employee": "Employer enrolls you in Shakai Hoken (health + pension). Open Japanese bank account.",
+          "body_hr": "Confirm Shakai Hoken enrollment; confirm bank account for payroll; schedule 3-month check-in.",
+          "owner_role": "hr",
+          "relative_timing": "T+2 to 4 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "NL",
+      "route_key": "employment",
+      "route_title": "Netherlands — Highly Skilled Migrant Permit (Kennismigrant) / IND",
+      "employee_summary": "The Highly Skilled Migrant (Kennismigrant) permit is the main route for non-EU/EEA skilled workers in the Netherlands. Your employer — a recognised IND sponsor — files the application; the residence permit is typically issued within 2 weeks. EU/EEA nationals have free movement rights and only need to register at the municipality. All residents need a BSN (citizen service number) and mandatory Dutch health insurance.",
+      "hr_summary": "The employer must be a recognised IND sponsor (register separately if not). The Kennismigrant salary threshold (€70,200+/year for 30+ years old, or €51,826 for under 30 in 2025 — check current rates) must be met. The 30% ruling may provide a tax advantage for incoming skilled workers. BSN is issued at the municipality on arrival and is mandatory before payroll.",
+      "internal_notes_hr": "IND processing for Kennismigrant: typically 2 weeks once application is complete. 30% ruling application should be filed within 4 months of first employment in NL. EU Blue Card is an alternative for high-salary roles. Spouse of Kennismigrant holder receives an unrestricted work permit automatically. Dutch health insurance (basisverzekering) must be arranged within 4 months of registration.",
+      "watchouts": [
+        "The employer must be a recognised IND sponsor before the Kennismigrant permit can be filed — register early if not already a sponsor.",
+        "Salary threshold for the Kennismigrant permit must be met — verify current IND thresholds (updated annually).",
+        "BSN (Burgerservicenummer) must be obtained before payroll can be processed legally.",
+        "Mandatory Dutch health insurance (basisverzekering) must be arranged within 4 months of registering as a resident.",
+        "The 30% tax ruling provides significant tax relief for incoming workers — apply within 4 months of first employment.",
+        "DigiD (Dutch digital identity) is required for online government services — apply as early as possible."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "title": "Employer confirmed as recognised IND sponsor",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Your employer must be registered as a recognised sponsor with the IND before filing your permit.",
+          "notes_hr": "Check IND sponsor status at ind.nl. If not yet registered, allow 4–6 weeks to become a recognised sponsor.",
+          "stable_key": "nl_ind_sponsor"
+        },
+        {
+          "sort_order": 2,
+          "title": "Signed employment contract meeting Kennismigrant salary threshold",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Salary must meet the IND annual threshold (check current rates at ind.nl).",
+          "notes_hr": "Verify salary threshold meets current year requirement; threshold is updated annually.",
+          "stable_key": "nl_offer_letter"
+        },
+        {
+          "sort_order": 3,
+          "title": "Kennismigrant permit application submitted to IND",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 2,
+          "notes_employee": "Employer files online via the IND portal. Processing: typically 2 weeks for recognised sponsors.",
+          "notes_hr": "File as soon as contract is signed. Track IND reference number.",
+          "stable_key": "nl_ind_application"
+        },
+        {
+          "sort_order": 4,
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Must be valid for the permit duration.",
+          "notes_hr": null,
+          "stable_key": "nl_passport"
+        },
+        {
+          "sort_order": 5,
+          "title": "Residence permit (verblijfsvergunning) granted",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 3,
+          "notes_employee": "Permit sticker issued at the Dutch mission in your home country (non-EEA nationals) or at IND in NL.",
+          "notes_hr": "Confirm collection method — IND will advise.",
+          "stable_key": "nl_residence_permit"
+        },
+        {
+          "sort_order": 6,
+          "title": "BSN (Burgerservicenummer) obtained at municipality",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 5,
+          "notes_employee": "Register at the local municipality (gemeente) with passport, residence permit, and rental contract. BSN is issued immediately or within a few days.",
+          "notes_hr": "BSN is required before payroll can run — chase immediately after arrival.",
+          "stable_key": "nl_bsn"
+        },
+        {
+          "sort_order": 7,
+          "title": "Mandatory Dutch health insurance (basisverzekering) enrolled",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Arrange through a Dutch insurer (Zorgverzekeraar) within 4 months of registering as a resident. Coverage is retroactive to registration date.",
+          "notes_hr": "Confirm enrollment; check if employer provides collective supplemental insurance.",
+          "stable_key": "nl_health_insurance"
+        },
+        {
+          "sort_order": 8,
+          "title": "DigiD applied for",
+          "owner_role": "employee",
+          "required": 0,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Apply at digid.nl — required for online government services (tax, healthcare registration, DigiD app).",
+          "notes_hr": "Strongly recommended for the 30% ruling application and other government interactions.",
+          "stable_key": "nl_digid"
+        },
+        {
+          "sort_order": 9,
+          "title": "30% ruling application submitted (if eligible)",
+          "owner_role": "employer",
+          "required": 0,
+          "depends_on_sort_order": 6,
+          "notes_employee": "If eligible, the 30% ruling allows 30% of your salary to be paid tax-free. Apply within 4 months of first employment.",
+          "notes_hr": "30% ruling can be significant — file jointly with employee within 4 months of start date.",
+          "stable_key": "nl_30pct_ruling"
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "IND sponsor confirmation & application",
+          "body_employee": "Employer confirms IND sponsor status and files Kennismigrant permit application.",
+          "body_hr": "Verify IND sponsor status; file Kennismigrant application immediately after contract is signed. Processing: ~2 weeks.",
+          "owner_role": "hr",
+          "relative_timing": "T-6 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "immigration",
+          "title": "Residence permit granted",
+          "body_employee": "Permit granted. Collect from Dutch mission (non-EEA) or IND in NL.",
+          "body_hr": "Confirm collection; brief employee on BSN and health insurance steps.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "move",
+          "title": "Arrival & BSN registration",
+          "body_employee": "Arrive in the Netherlands. Register at the municipality (gemeente) to obtain your BSN.",
+          "body_hr": "Log arrival; initiate BSN onboarding and health insurance enrollment.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 4,
+          "phase": "post",
+          "title": "BSN, health insurance & DigiD",
+          "body_employee": "Obtain BSN at gemeente. Arrange basisverzekering health insurance within 4 months. Apply for DigiD.",
+          "body_hr": "Confirm BSN on file before first payroll; file 30% ruling within 4 months of start.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 2 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "post",
+          "title": "30% ruling & settle-in complete",
+          "body_employee": "30% ruling filed (if eligible). Open Dutch bank account. Arrange schooling for children if applicable.",
+          "body_hr": "Confirm 30% ruling filed; schedule 3-month and annual permit renewal check-ins.",
+          "owner_role": "hr",
+          "relative_timing": "T+2 to 4 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "AE",
+      "route_key": "employment",
+      "route_title": "UAE — Employment Entry Permit / Residence Visa / Emirates ID",
+      "employee_summary": "Working in the UAE requires an Employment Entry Permit from MOHRE (Ministry of Human Resources and Emiratisation), followed by a mandatory medical fitness test, a residence visa stamped in your passport by GDRFA (General Directorate of Residency and Foreigners Affairs), and an Emirates ID from the ICP (Federal Authority for Identity, Citizenship, Customs and Port Security).",
+      "hr_summary": "The employer initiates the process by obtaining the Employment Entry Permit. The employee then enters the UAE, passes the medical fitness test, and the residence visa is stamped. Emirates ID is applied for alongside the residence visa application. MOHRE work permit (labour card) must be issued. The entire process takes 4–8 weeks from entry permit to active residence visa.",
+      "internal_notes_hr": "UAE has a 2-year renewable residence visa for most employees (3 or 5 years for highly skilled under Golden Visa). Health insurance is mandatory by law and is the employer's responsibility in Dubai and Abu Dhabi. No income tax in UAE. End-of-Service Gratuity (EOSG) must be accrued for all employees. DIFC and ADGM operate under separate common law jurisdictions.",
+      "watchouts": [
+        "The Employment Entry Permit must be obtained before the employee enters the UAE — they cannot legally work without it.",
+        "Mandatory medical fitness test (HIV, tuberculosis, hepatitis tests) must be passed — some conditions result in visa refusal.",
+        "Emirates ID must be applied for alongside the residence visa — it is the primary identification document in UAE.",
+        "UAE mandatory health insurance is the employer's legal responsibility in Dubai and Abu Dhabi — must be arranged from day one.",
+        "MOHRE work permit must be issued and aligned with the residence visa — the employee cannot be on payroll without both.",
+        "Dependents require separate sponsored residence visas — income threshold requirements apply."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "title": "Employment offer / contract signed",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Required for MOHRE entry permit application.",
+          "notes_hr": "Contract must be attested and meet MOHRE standard — use the Tadbeer standard contract template.",
+          "stable_key": "ae_offer_letter"
+        },
+        {
+          "sort_order": 2,
+          "title": "Employment Entry Permit (EEP) obtained from MOHRE",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Your employer obtains the EEP online. You cannot legally work until this is obtained.",
+          "notes_hr": "Apply via MOHRE/MOHAP portal. EEP is valid for 60 days from issuance. Critical path item.",
+          "stable_key": "ae_entry_permit"
+        },
+        {
+          "sort_order": 3,
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Must be valid for at least 6 months. Passport is held during residence visa stamping.",
+          "notes_hr": null,
+          "stable_key": "ae_passport"
+        },
+        {
+          "sort_order": 4,
+          "title": "Entry into UAE on employment entry permit",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 2,
+          "notes_employee": "Enter UAE using the entry permit (not a tourist visa). Arrange arrival with HR.",
+          "notes_hr": "Confirm employee enters on the correct permit; tourist visa entry is invalid for employment.",
+          "stable_key": "ae_entry"
+        },
+        {
+          "sort_order": 5,
+          "title": "Medical fitness test completed",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 4,
+          "notes_employee": "Blood test and chest X-ray at an accredited UAE medical facility. Usually results within 1–2 days.",
+          "notes_hr": "Failing the fitness test will void the visa process — confirm employee health before initiating.",
+          "stable_key": "ae_medical"
+        },
+        {
+          "sort_order": 6,
+          "title": "UAE residence visa stamped in passport",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 5,
+          "notes_employee": "Employer submits residence visa application to GDRFA. Passport held for 3–7 days for stamping.",
+          "notes_hr": "Apply via GDRFA immediately after medical clearance. Issue Emirates ID application in parallel.",
+          "stable_key": "ae_residence_visa"
+        },
+        {
+          "sort_order": 7,
+          "title": "Emirates ID applied for and received",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Apply at an ICP service centre or via the UAEPASS app. Emirates ID issued within 5–10 working days.",
+          "notes_hr": "Emirates ID is the primary document for all UAE services and contracts.",
+          "stable_key": "ae_emirates_id"
+        },
+        {
+          "sort_order": 8,
+          "title": "MOHRE work permit (labour card) issued",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Issued by MOHRE alongside the residence visa. Required for lawful employment.",
+          "notes_hr": "File MOHRE work permit application aligned with residence visa timeline.",
+          "stable_key": "ae_work_permit"
+        },
+        {
+          "sort_order": 9,
+          "title": "Mandatory health insurance arranged",
+          "owner_role": "employer",
+          "required": 0,
+          "depends_on_sort_order": null,
+          "notes_employee": "UAE law requires your employer to provide health insurance in Dubai and Abu Dhabi from day one.",
+          "notes_hr": "Mandatory for employers in Dubai (all employees) and Abu Dhabi (all residents). Arrange before first working day.",
+          "stable_key": "ae_health_insurance"
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "Kickoff — Employment Entry Permit",
+          "body_employee": "HR obtains the Employment Entry Permit from MOHRE. You must enter UAE using this permit.",
+          "body_hr": "Apply via MOHRE portal immediately after contract is signed. EEP valid 60 days — do not delay entry.",
+          "owner_role": "hr",
+          "relative_timing": "T-4 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "move",
+          "title": "Arrival & medical fitness test",
+          "body_employee": "Enter UAE on entry permit. Complete mandatory medical fitness test at an accredited facility.",
+          "body_hr": "Log arrival; book medical test on arrival day if possible; retain medical clearance certificate.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "Residence visa & Emirates ID",
+          "body_employee": "Employer submits residence visa application. Passport held 3–7 days. Emirates ID application submitted in parallel.",
+          "body_hr": "Apply to GDRFA for residence visa and ICP for Emirates ID simultaneously. Provide interim copy of entry permit as ID.",
+          "owner_role": "employer",
+          "relative_timing": "T+1 to 2 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "immigration",
+          "title": "Residence visa stamped & work permit issued",
+          "body_employee": "Collect stamped passport. Receive Emirates ID (5–10 working days after application).",
+          "body_hr": "Confirm MOHRE work permit issued alongside visa. Update HR system with visa/permit expiry dates.",
+          "owner_role": "hr",
+          "relative_timing": "T+2 to 3 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "post",
+          "title": "Settle-in & banking",
+          "body_employee": "Open UAE bank account with Emirates ID and residence visa. Arrange accommodation. Enrol dependents if applicable.",
+          "body_hr": "Confirm health insurance active; schedule visa renewal reminder (2 years); confirm end-of-service gratuity accrual starts.",
+          "owner_role": "employee",
+          "relative_timing": "T+3 to 4 weeks"
+        }
+      ]
+    },
+    {
+      "destination_key": "ZA",
+      "route_key": "employment",
+      "route_title": "South Africa — Critical Skills Work Visa / General Work Visa",
+      "employee_summary": "Non-citizens working in South Africa require a work visa. The Critical Skills Work Visa is available for occupations on the DoL Critical Skills List (no job offer required if skilled). The General Work Visa requires a Labour Market Test confirming no suitable South African candidate was available. Foreign qualifications must be evaluated by SAQA. After arrival, register with SARS for a tax number.",
+      "hr_summary": "Visa route depends on whether the occupation appears on the DTIC/DoL Critical Skills List. The General Work Visa requires the employer to conduct and document a Labour Market Test via the Department of Employment and Labour. Intracompany Transfer (ICT) visas are available for multinationals. Processing typically takes 4–8 weeks at a VFS centre.",
+      "internal_notes_hr": "Critical Skills Work Visa: valid for 3–5 years, renewable; no formal job offer needed but proof of qualification and critical skills required. General Work Visa: employer must prove no suitable SA/permanent resident candidate available. ICT: employee must have worked for the same employer for 6 months and have skills not available in SA. Biometric data collected at a VFS Global centre. Police clearance certificate required.",
+      "watchouts": [
+        "SAQA foreign qualification evaluation takes 4–6 weeks — initiate early as it is required for most visa categories.",
+        "Police clearance certificate from every country of residence for 12+ months in the past 5 years is required — allow 4–8 weeks.",
+        "General Work Visa requires Labour Market Testing proof — employer must advertise and document search for a suitable SA candidate.",
+        "Visa processing at VFS can take 4–8 weeks — submit well in advance of the planned start date.",
+        "SARS registration is required for tax compliance — must be completed before employment begins.",
+        "Private health insurance (medical aid) is strongly recommended — public hospitals have very long waiting times."
+      ],
+      "checklist": [
+        {
+          "sort_order": 1,
+          "title": "Visa type determined (Critical Skills, General Work, or ICT)",
+          "owner_role": "employer",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "HR will advise on which visa category applies to your occupation and circumstances.",
+          "notes_hr": "Check DTIC/DoL Critical Skills List. If not on the list, proceed with General Work Visa and arrange Labour Market Test.",
+          "stable_key": "za_visa_type"
+        },
+        {
+          "sort_order": 2,
+          "title": "SAQA foreign qualification evaluation submitted",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Submit your foreign qualification documents to SAQA (saqa.org.za). Processing: 4–6 weeks.",
+          "notes_hr": "SAQA evaluation is required for most work visa categories. Initiate as early as possible.",
+          "stable_key": "za_saqa"
+        },
+        {
+          "sort_order": 3,
+          "title": "Police clearance certificate(s) obtained",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Required from every country you have lived in for 12+ months in the past 5 years. Allow 4–8 weeks.",
+          "notes_hr": "International police clearances take time — initiate in parallel with SAQA evaluation.",
+          "stable_key": "za_police_clearance"
+        },
+        {
+          "sort_order": 4,
+          "title": "Labour Market Test completed (General Work Visa only)",
+          "owner_role": "employer",
+          "required": 0,
+          "depends_on_sort_order": 1,
+          "notes_employee": "Your employer must advertise the role and show no suitable South African candidate was found.",
+          "notes_hr": "Document all advertising and applicant responses. Obtain a 'no objection' letter from the Dept of Employment and Labour.",
+          "stable_key": "za_lmt"
+        },
+        {
+          "sort_order": 5,
+          "title": "Valid passport (all travellers)",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": null,
+          "notes_employee": "Must be valid for at least 30 days beyond the intended visa validity.",
+          "notes_hr": null,
+          "stable_key": "za_passport"
+        },
+        {
+          "sort_order": 6,
+          "title": "Work visa application submitted at VFS Global / SA mission",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 2,
+          "notes_employee": "Submit full application pack at VFS Global: passport, SAQA evaluation, police clearance, medical certificate, photos, and employment contract.",
+          "notes_hr": "Track VFS reference; processing 4–8 weeks. Prepare for supplemental document requests.",
+          "stable_key": "za_visa_submitted"
+        },
+        {
+          "sort_order": 7,
+          "title": "Work visa granted",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 6,
+          "notes_employee": "Check visa validity dates and conditions.",
+          "notes_hr": "Retain copy; align start date; set renewal reminder.",
+          "stable_key": "za_visa_granted"
+        },
+        {
+          "sort_order": 8,
+          "title": "SARS tax registration completed",
+          "owner_role": "employee",
+          "required": 1,
+          "depends_on_sort_order": 7,
+          "notes_employee": "Register with SARS at a SARS branch or via eFiling. Obtain a South African tax number.",
+          "notes_hr": "Tax number required before payroll; employer must register employee for PAYE.",
+          "stable_key": "za_sars"
+        },
+        {
+          "sort_order": 9,
+          "title": "Private health insurance (medical aid) arranged",
+          "owner_role": "employee",
+          "required": 0,
+          "depends_on_sort_order": null,
+          "notes_employee": "Public healthcare has long wait times — private medical aid scheme (Discovery, Medihelp, etc.) is strongly recommended.",
+          "notes_hr": "Confirm employer medical aid scheme inclusion; arrange from first working day.",
+          "stable_key": "za_health_insurance"
+        }
+      ],
+      "milestones": [
+        {
+          "sort_order": 1,
+          "phase": "pre",
+          "title": "SAQA evaluation, police clearance & LMT",
+          "body_employee": "Submit SAQA qualification evaluation. Obtain police clearances from all relevant countries. HR initiates Labour Market Test if required.",
+          "body_hr": "Run SAQA, police clearance, and LMT in parallel — allow 4–8 weeks.",
+          "owner_role": "employer",
+          "relative_timing": "T-16 weeks"
+        },
+        {
+          "sort_order": 2,
+          "phase": "pre",
+          "title": "Full document pack compiled",
+          "body_employee": "All documents gathered: SAQA evaluation, police clearances, medical certificate, passport, photos, employment contract.",
+          "body_hr": "Review document pack for completeness before VFS submission.",
+          "owner_role": "employee",
+          "relative_timing": "T-8 weeks"
+        },
+        {
+          "sort_order": 3,
+          "phase": "immigration",
+          "title": "Work visa application submitted at VFS",
+          "body_employee": "Attend VFS Global appointment with full document pack. Biometric data collected.",
+          "body_hr": "Track VFS reference; processing 4–8 weeks; prepare for supplemental requests.",
+          "owner_role": "employee",
+          "relative_timing": "T-6 weeks"
+        },
+        {
+          "sort_order": 4,
+          "phase": "immigration",
+          "title": "Work visa granted",
+          "body_employee": "Check visa conditions. Plan travel date.",
+          "body_hr": "Retain visa copy; confirm start date; set renewal reminder.",
+          "owner_role": "hr",
+          "relative_timing": "T-2 to 4 weeks"
+        },
+        {
+          "sort_order": 5,
+          "phase": "move",
+          "title": "Arrival in South Africa",
+          "body_employee": "Enter South Africa. Retain your passport entry stamp.",
+          "body_hr": "Log arrival; initiate SARS registration and banking onboarding.",
+          "owner_role": "employee",
+          "relative_timing": "T-0"
+        },
+        {
+          "sort_order": 6,
+          "phase": "post",
+          "title": "SARS registration & banking",
+          "body_employee": "Register with SARS for a tax number (eFiling or SARS branch). Open a South African bank account.",
+          "body_hr": "Confirm SARS number before first payroll run; ensure PAYE registration.",
+          "owner_role": "employee",
+          "relative_timing": "T+1 to 2 weeks"
+        },
+        {
+          "sort_order": 7,
+          "phase": "post",
+          "title": "Settle-in complete",
+          "body_employee": "Arrange private medical aid. Enrol children in school if applicable. Obtain a South African driving licence if needed.",
+          "body_hr": "Confirm medical aid active; schedule 3-month check-in; set visa renewal reminder.",
+          "owner_role": "hr",
+          "relative_timing": "T+2 to 4 weeks"
+        }
       ]
     }
   ]

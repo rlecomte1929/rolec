@@ -6,28 +6,25 @@ import React, { useMemo } from 'react';
 import { Card } from '../../components/antigravity';
 import type { HrPolicyWorkspaceResolved } from './hrPolicyWorkspaceState';
 import {
-  buildOverrideRuleIdSet,
   confidencePercent,
-  deriveReviewStatusBanner,
   employeeComparisonVisibilityLabel,
   type ReadinessSlice,
   formatDocumentTypeLabel,
-  formatExclusionBusinessLine,
-  formatBenefitRuleBusinessLine,
   formatIssueTierLabel,
   formatPolicyScopeLabel,
   formatProcessingStatusLabel,
   formatPublishabilityAssessment,
   formatReadinessIssueForDisplay,
-  groupLayer2BenefitRules,
-  groupLayer2Exclusions,
 } from './hrPolicyReviewFormatters';
 
 export type HrPolicyDraftReviewPanelProps = {
   policyReview: Record<string, unknown> | null;
   workspaceResolved: HrPolicyWorkspaceResolved;
   /** Latest version status from normalized payload (e.g. draft vs published). */
-  versionStatus: string;
+  /** Reserved — was used by the dropped "Working version status: Draft"
+   *  hint in the Review-status banner (see slice 3b). Kept on the props
+   *  contract so call sites don't need to change. */
+  versionStatus?: string;
   reviewLoading?: boolean;
 };
 
@@ -63,7 +60,7 @@ function TraceAmount(line: Record<string, unknown> | null | undefined): string {
 export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> = ({
   policyReview,
   workspaceResolved,
-  versionStatus,
+  versionStatus: _versionStatus,
   reviewLoading,
 }) => {
   const readiness = pickReadiness(policyReview);
@@ -72,22 +69,6 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
   const employeeSeesPublished = employeeVis?.employee_sees_published_policy_matrix === true;
   const comparisonReadyStrict = comparisonRule?.comparison_ready_strict as boolean | undefined;
   const comparisonReadinessStatus = (readiness?.comparison_readiness as ReadinessSlice | undefined)?.status;
-
-  const banner = useMemo(
-    () =>
-      deriveReviewStatusBanner({
-        phase: workspaceResolved.phase,
-        comparisonSummary: workspaceResolved.comparisonSummary,
-        comparisonReadyStrict,
-        employeeSeesPublished,
-      }),
-    [
-      workspaceResolved.phase,
-      workspaceResolved.comparisonSummary,
-      comparisonReadyStrict,
-      employeeSeesPublished,
-    ]
-  );
 
   const visibility = useMemo(
     () =>
@@ -135,21 +116,6 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
     return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
   }, [policyReview?.comparison_subrules]);
 
-  const layer2 = (policyReview?.layer2_publishable || null) as Record<string, unknown> | null;
-  const benefitRules = useMemo(() => {
-    const raw = layer2?.benefit_rules;
-    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
-  }, [layer2?.benefit_rules]);
-  const exclusions = useMemo(() => {
-    const raw = layer2?.exclusions;
-    return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
-  }, [layer2?.exclusions]);
-
-  const groupedBenefits = useMemo(() => groupLayer2BenefitRules(benefitRules), [benefitRules]);
-  const groupedExcl = useMemo(() => groupLayer2Exclusions(exclusions), [exclusions]);
-
-  const overrideIds = useMemo(() => buildOverrideRuleIdSet(policyReview?.hr_overrides), [policyReview?.hr_overrides]);
-
   const issues = useMemo(() => {
     const raw = policyReview?.issues;
     return Array.isArray(raw) ? (raw as Array<Record<string, unknown>>) : [];
@@ -170,7 +136,18 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
       ? String((policyReview.support as { request_id?: string }).request_id || '').trim()
       : '';
 
-  const versionLive = String(versionStatus || '').toLowerCase() === 'published';
+  // Slice 2 of the IA simplification gates the doc-only blocks. Matrix-only
+  // deployments (no PDF uploaded, baseline created from a template) used to
+  // see "No file linked", "No clause highlights or pre-rule items" — all dead
+  // pixels. These blocks now collapse entirely when the underlying signals
+  // are absent. Document-imported deployments still see them.
+  const hasSourceDocument = Boolean(
+    sourceDoc && (docFilename || docType || docScope || processing)
+  );
+  const hasExtractedSignals =
+    clauseCandidates.length > 0 ||
+    draftRuleCandidates.length > 0 ||
+    groupedPolicyItems.length > 0;
 
   if (workspaceResolved.phase === 'no_policy') {
     return null;
@@ -178,14 +155,6 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
 
   return (
     <div className="space-y-6" id="hr-policy-draft-review">
-      <div>
-        <h2 className="text-lg font-semibold text-[#0b2b43]">Policy draft review</h2>
-        <p className="text-sm text-[#6b7280] mt-1 max-w-3xl">
-          Read this summary first, then use the benefit table below to edit. What you see here matches the latest save
-          of this policy version.
-        </p>
-      </div>
-
       {reviewLoading && (
         <div className="rounded-lg border border-[#e5e7eb] p-4 animate-pulse space-y-3" role="status" aria-live="polite">
           <div className="h-4 bg-slate-200 rounded w-1/3" />
@@ -194,7 +163,59 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
         </div>
       )}
 
-      {/* 1 — Document summary */}
+      {/* What to fix before going live — promoted to top so the action list
+          ranks above descriptive blocks. */}
+      <Card padding="lg">
+        <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">What to fix before going live</h3>
+        <p className="text-xs text-[#6b7280] mb-3">
+          Plain-language items from readiness checks. Use them together with the workspace banner above.
+        </p>
+        {missingStructure.length > 0 && (
+          <ul className="list-disc list-inside text-sm text-[#374151] space-y-1 mb-4">
+            {missingStructure.map((m, i) => (
+              <li key={i}>{String(m.issue || m.field || 'Structure gap')}</li>
+            ))}
+          </ul>
+        )}
+        {issues.length > 0 ? (
+          <ul className="space-y-2">
+            {issues.slice(0, 40).map((it, i) => (
+              <li key={i} className="text-sm border-l-2 border-amber-300 pl-3 py-0.5">
+                <span className="text-xs text-[#6b7280]">{formatIssueTierLabel(it.tier)}: </span>
+                <span className="text-[#111827]">{formatReadinessIssueForDisplay(it)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          !missingStructure.length && (
+            <p className="text-sm text-[#6b7280]">No open checklist items for this version right now.</p>
+          )
+        )}
+      </Card>
+
+      {/* Slice 3d wraps the doc-only blocks (Document summary + Extracted
+          policy signals) in one shared <details>. Both are reference
+          surfaces — useful for the audit case but noise during the fast
+          "fix + publish" path. The disclosure only renders when at
+          least one of them has data (matrix-only deployments collapse
+          this section away entirely). */}
+      {(hasSourceDocument || hasExtractedSignals) && (
+      <details className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm">
+        <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-base font-semibold text-[#0b2b43]">
+              ▸ See document-extraction signals
+            </span>
+            <span className="text-xs text-[#64748b]">
+              {hasSourceDocument && 'source document'}
+              {hasSourceDocument && hasExtractedSignals && ' · '}
+              {hasExtractedSignals && 'extracted clauses'}
+            </span>
+          </div>
+        </summary>
+        <div className="px-5 pb-5 space-y-6">
+      {/* 1 — Document summary (only when a source document is attached) */}
+      {hasSourceDocument && (
       <Card padding="lg">
         <h3 className="text-sm font-semibold text-[#0b2b43] mb-3">Document summary</h3>
         <dl className="grid gap-3 sm:grid-cols-2 text-sm">
@@ -223,19 +244,16 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           </div>
         )}
       </Card>
+      )}
 
-      {/* 2 — Review status banner */}
-      <div className={`rounded-lg border px-4 py-3 ${bannerToneClasses(banner.tone)}`}>
-        <div className="text-sm font-semibold">{banner.title}</div>
-        <p className="text-sm mt-1 opacity-90 leading-relaxed">{banner.body}</p>
-        {!versionLive && benefitRules.length > 0 && (
-          <p className="text-xs mt-2 opacity-80">
-            Working version status: <strong>Draft</strong> — not shown to employees until published.
-          </p>
-        )}
-      </div>
+      {/* Slice 3b removed the "Review status banner" here — its title +
+          body restated information already shown in the workspace card
+          ("What this means for employees") and the sticky status strip
+          at the top of the page. The Draft-vs-Live distinction stays
+          visible via the publishable-row tags below. */}
 
-      {/* 3 — Extracted policy signals */}
+      {/* 3 — Extracted policy signals (only when extraction produced something) */}
+      {hasExtractedSignals && (
       <Card padding="lg">
         <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">Extracted policy signals</h3>
         <p className="text-xs text-[#6b7280] mb-4">
@@ -378,153 +396,55 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
           </div>
         )}
 
-        {clauseCandidates.length === 0 && draftRuleCandidates.length === 0 && groupedPolicyItems.length === 0 && (
-          <p className="text-sm text-[#6b7280]">
-            No clause highlights or pre-rule items for this version—common for a baseline created without a source file.
-          </p>
-        )}
       </Card>
-
-      {/* 4 — Publishable rules */}
-      <Card padding="lg">
-        <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">Rules on this version</h3>
-        <p className="text-xs text-[#6b7280] mb-4">
-          Saved benefit and exclusion rows are what ReloPass uses when you publish. Tags show whether a row is still
-          HR-only, included in the live policy, or adjusted by your overrides.
-        </p>
-
-        {groupedBenefits.length === 0 && groupedExcl.length === 0 ? (
-          <p className="text-sm text-[#6b7280]">No benefit rules or exclusions on this version yet.</p>
-        ) : (
-          <div className="space-y-6">
-            {groupedBenefits.map(({ key, label, rows }) => (
-              <div key={key}>
-                <div className="text-xs font-semibold text-[#0b2b43] mb-2">{label}</div>
-                <ul className="space-y-2">
-                  {rows.map((r) => {
-                    const id = String(r.id ?? '');
-                    const hasOverride = id && overrideIds.has(id);
-                    const auto = r.auto_generated === true;
-                    return (
-                      <li
-                        key={id || formatBenefitRuleBusinessLine(r)}
-                        className="border border-[#e5e7eb] rounded-md p-3 text-sm bg-[#fafafa]"
-                      >
-                        <div className="flex flex-wrap gap-1.5 mb-1">
-                          {!versionLive && (
-                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">
-                              Draft only (not live)
-                            </span>
-                          )}
-                          {versionLive && (
-                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900">
-                              Publishable
-                            </span>
-                          )}
-                          {auto && (
-                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-800">
-                              From extraction
-                            </span>
-                          )}
-                          {hasOverride && (
-                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-900">
-                              Effective after your adjustment
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[#111827]">{formatBenefitRuleBusinessLine(r)}</div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-
-            {groupedExcl.length > 0 && (
-              <div>
-                <div className="text-xs font-semibold text-[#0b2b43] mb-2">Exclusions</div>
-                <ul className="space-y-2">
-                  {groupedExcl.flatMap((g) =>
-                    g.rows.map((r) => (
-                      <li
-                        key={String(r.id ?? formatExclusionBusinessLine(r))}
-                        className="border border-[#e5e7eb] rounded-md p-3 text-sm bg-[#fafafa]"
-                      >
-                        <div className="flex flex-wrap gap-1.5 mb-1">
-                          {!versionLive && (
-                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">
-                              Draft only (not live)
-                            </span>
-                          )}
-                          {versionLive && (
-                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900">
-                              Publishable
-                            </span>
-                          )}
-                          {r.auto_generated === true && (
-                            <span className="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-800">
-                              From extraction
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[#111827]">{formatExclusionBusinessLine(r)}</div>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
-
-      {/* 5 — Missing structure / blockers */}
-      <Card padding="lg">
-        <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">What to fix before going live</h3>
-        <p className="text-xs text-[#6b7280] mb-3">
-          Plain-language items from readiness checks. Use them together with the workspace banner above.
-        </p>
-        {missingStructure.length > 0 && (
-          <ul className="list-disc list-inside text-sm text-[#374151] space-y-1 mb-4">
-            {missingStructure.map((m, i) => (
-              <li key={i}>{String(m.issue || m.field || 'Structure gap')}</li>
-            ))}
-          </ul>
-        )}
-        {issues.length > 0 ? (
-          <ul className="space-y-2">
-            {issues.slice(0, 40).map((it, i) => (
-              <li key={i} className="text-sm border-l-2 border-amber-300 pl-3 py-0.5">
-                <span className="text-xs text-[#6b7280]">{formatIssueTierLabel(it.tier)}: </span>
-                <span className="text-[#111827]">{formatReadinessIssueForDisplay(it)}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          !missingStructure.length && (
-            <p className="text-sm text-[#6b7280]">No open checklist items for this version right now.</p>
-          )
-        )}
-      </Card>
-
-      {/* 6 — Employee visibility preview */}
-      <Card padding="lg" className="bg-[#f8fafc] border-[#e2e8f0]" id="hr-policy-employee-visibility-preview">
-        <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">Employee visibility preview</h3>
-        <div
-          className={`rounded-md border px-3 py-2 mb-4 text-sm ${bannerToneClasses(
-            !employeeSeesPublished
-              ? 'neutral'
-              : workspaceResolved.comparisonSummary === 'full' && comparisonReadyStrict === true
-                ? 'success'
-                : workspaceResolved.comparisonSummary === 'partial'
-                  ? 'warning'
-                  : 'neutral'
-          )}`}
-        >
-          <div className="font-medium">{visibility.headline}</div>
-          <p className="text-xs mt-1 opacity-90">{visibility.detail}</p>
+      )}
         </div>
+      </details>
+      )}
 
+      {/* Slice 3b removed the "Rules on this version" Card — it was a
+          read-only restatement of every benefit + exclusion row, while
+          the editable benefit table further down (the actual work
+          surface in HrPolicyReviewWorkspace) shows the same rows with
+          full per-row editing. Two cards for the same data was the
+          biggest source of repetition on this page. */}
+
+      {/* 5 — Employee visibility preview.
+          Slice 3b collapses this by default. The 24-row baseline-vs-
+          override-vs-effective grid is HR's per-employee audit; useful
+          but not part of the fast "check + fix + publish" path. The
+          headline banner stays visible so HR sees the visibility state
+          at a glance and only expands the grid if they need the detail. */}
+      <details
+        className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl"
+        id="hr-policy-employee-visibility-preview"
+      >
+        <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-[#0b2b43] mb-2">Employee visibility preview</h3>
+              <div
+                className={`rounded-md border px-3 py-2 text-sm ${bannerToneClasses(
+                  !employeeSeesPublished
+                    ? 'neutral'
+                    : workspaceResolved.comparisonSummary === 'full' && comparisonReadyStrict === true
+                      ? 'success'
+                      : workspaceResolved.comparisonSummary === 'partial'
+                        ? 'warning'
+                        : 'neutral'
+                )}`}
+              >
+                <div className="font-medium">{visibility.headline}</div>
+                <p className="text-xs mt-1 opacity-90">{visibility.detail}</p>
+              </div>
+            </div>
+            <span className="text-xs text-[#64748b] shrink-0 mt-1">
+              ▸ Show per-benefit detail
+            </span>
+          </div>
+        </summary>
+
+        <div className="px-5 pb-5">
         {entitlementPreview.length > 0 ? (
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {entitlementPreview.slice(0, 24).map((row, i) => {
@@ -570,7 +490,8 @@ export const HrPolicyDraftReviewPanel: React.FC<HrPolicyDraftReviewPanelProps> =
             No row-by-row preview yet. When you add HR adjustments, they will show here with before and after context.
           </p>
         )}
-      </Card>
+        </div>
+      </details>
     </div>
   );
 };

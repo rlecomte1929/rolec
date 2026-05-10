@@ -16,6 +16,11 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card } from '../../components/antigravity';
+import {
+  CollapsibleCategory,
+  groupByCategory,
+  shouldDefaultOpen,
+} from './diffCategoryGrouping';
 import { companyPolicyAPI } from '../../api/client';
 
 // --- Types -----------------------------------------------------------------
@@ -365,11 +370,18 @@ export const CanonicalPolicyDiffView: React.FC<Props> = ({
               <h4 className="text-sm font-semibold text-[#0b2b43] mb-2">
                 Changed rules ({rules.changed.length})
               </h4>
-              <ul className="space-y-2">
-                {rules.changed.map((entry, i) => (
-                  <ChangedRuleRow key={`rc-${i}`} entry={entry} />
+              <div className="space-y-2">
+                {groupByCategory(rules.changed, (e) => e.after.benefit_category).map((g) => (
+                  <CollapsibleCategory
+                    key={g.key}
+                    group={g}
+                    accentClassName="border-l-4 border-l-amber-400"
+                    defaultOpen={shouldDefaultOpen(rules.changed.length)}
+                    testId="canonical-diff-changed-group"
+                    renderRow={(entry, i) => <ChangedRuleRow key={`rc-${i}`} entry={entry} />}
+                  />
                 ))}
-              </ul>
+              </div>
             </section>
           )}
           {rules && rules.added.length > 0 && (
@@ -377,11 +389,18 @@ export const CanonicalPolicyDiffView: React.FC<Props> = ({
               <h4 className="text-sm font-semibold text-[#0b2b43] mb-2">
                 Added rules ({rules.added.length})
               </h4>
-              <ul className="space-y-2">
-                {rules.added.map((r, i) => (
-                  <AddedRule key={`ra-${i}`} r={r} />
+              <div className="space-y-2">
+                {groupByCategory(rules.added, (r) => r.benefit_category).map((g) => (
+                  <CollapsibleCategory
+                    key={g.key}
+                    group={g}
+                    accentClassName="border-l-4 border-l-emerald-400"
+                    defaultOpen={shouldDefaultOpen(rules.added.length)}
+                    testId="canonical-diff-added-group"
+                    renderRow={(r, i) => <AddedRule key={`ra-${i}`} r={r} />}
+                  />
                 ))}
-              </ul>
+              </div>
             </section>
           )}
           {rules && rules.removed.length > 0 && (
@@ -389,11 +408,18 @@ export const CanonicalPolicyDiffView: React.FC<Props> = ({
               <h4 className="text-sm font-semibold text-[#0b2b43] mb-2">
                 Removed rules ({rules.removed.length})
               </h4>
-              <ul className="space-y-2">
-                {rules.removed.map((r, i) => (
-                  <RemovedRule key={`rr-${i}`} r={r} />
+              <div className="space-y-2">
+                {groupByCategory(rules.removed, (r) => r.benefit_category).map((g) => (
+                  <CollapsibleCategory
+                    key={g.key}
+                    group={g}
+                    accentClassName="border-l-4 border-l-red-400"
+                    defaultOpen={shouldDefaultOpen(rules.removed.length)}
+                    testId="canonical-diff-removed-group"
+                    renderRow={(r, i) => <RemovedRule key={`rr-${i}`} r={r} />}
+                  />
                 ))}
-              </ul>
+              </div>
             </section>
           )}
           {exclusions && exclusions.changed.length > 0 && (

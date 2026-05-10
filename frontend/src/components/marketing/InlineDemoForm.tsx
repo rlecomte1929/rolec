@@ -3,7 +3,7 @@ import { submitDemoBooking } from '../../api/demoBooking';
 import { track } from '../../analytics';
 import { accessContent } from '../../pages/public/accessContent';
 
-const PERSONAL_EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
+const PERSONAL_EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'live.com'];
 const FALLBACK_CHALLENGE = 'Inline /access form: corridor not specified.';
 
 interface FormState {

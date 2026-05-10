@@ -509,19 +509,61 @@ def hr_notification_counts(
 ) -> Dict[str, Any]:
     """
     Lightweight summary HR uses to render nav badges:
-      - employees_waiting: rows of pending demand the company has
+      - employees_waiting: total demand_count across pending demand rows
       - destinations_with_demand: distinct (category, city) combos
       - pending_admin_tickets: tickets HR opened that are still pending admin
+
+    Computed via SQL aggregates in a single connection. The earlier version
+    materialised up to 500 demand rows and ran one vendor_curation lookup per
+    row (N+1) — under prod load that exhausted the SQLAlchemy pool and made
+    the dashboard time out (Render incident 2026-05-07).
     """
-    from ...services import employee_demand, scrape_safety
+    from sqlalchemy import text as _sql
     company_id = _caller_company_id(user)
-    demand_rows = employee_demand.list_demand_for_company(company_id, limit=500)
-    distinct = {(d.get("category"), d.get("destination_city")) for d in demand_rows}
-    pending_tickets = scrape_safety.list_destination_requests(
-        status="pending", company_id=company_id, limit=500,
+
+    # NOT EXISTS mirrors employee_demand._has_curation: hide demand rows where
+    # HR already has at least one curated vendor (master selected, or custom).
+    not_curated = (
+        " NOT EXISTS ("
+        "   SELECT 1 FROM company_vendor_selections cvs"
+        "   WHERE cvs.company_id = ed.company_id"
+        "     AND cvs.category = ed.category"
+        "     AND (cvs.destination_city = ed.destination_city"
+        "          OR cvs.destination_city IS NULL)"
+        "     AND (cvs.custom_item_json IS NOT NULL"
+        "          OR (cvs.master_item_id IS NOT NULL AND cvs.selected = TRUE))"
+        " )"
     )
+
+    with db.engine.connect() as conn:
+        sums = conn.execute(
+            _sql(
+                "SELECT COALESCE(SUM(ed.demand_count), 0) AS waiting "
+                "FROM catalog_employee_demand ed "
+                "WHERE ed.company_id = :co AND" + not_curated
+            ),
+            {"co": company_id},
+        ).mappings().first()
+        distinct_count = conn.execute(
+            _sql(
+                "SELECT COUNT(*) FROM ("
+                "  SELECT DISTINCT ed.category, ed.destination_city"
+                "  FROM catalog_employee_demand ed"
+                "  WHERE ed.company_id = :co AND" + not_curated +
+                ") sub"
+            ),
+            {"co": company_id},
+        ).scalar() or 0
+        pending = conn.execute(
+            _sql(
+                "SELECT COUNT(*) FROM catalog_destination_requests "
+                "WHERE status = 'pending' AND company_id = :co"
+            ),
+            {"co": company_id},
+        ).scalar() or 0
+
     return {
-        "employees_waiting": sum(int(d.get("demand_count") or 0) for d in demand_rows),
-        "destinations_with_demand": len(distinct),
-        "pending_admin_tickets": len(pending_tickets),
+        "employees_waiting": int((sums or {}).get("waiting") or 0),
+        "destinations_with_demand": int(distinct_count),
+        "pending_admin_tickets": int(pending),
     }

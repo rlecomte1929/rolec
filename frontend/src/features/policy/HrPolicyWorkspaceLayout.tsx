@@ -10,7 +10,7 @@ import {
   HrPolicyWorkspaceResolved,
   deriveHrPolicyPrimaryAction,
 } from './hrPolicyWorkspaceState';
-import { formatComparisonReadinessBadge, formatPublishReadinessBadge } from './policyWorkflowCopy';
+import { publishImpactSentence } from './policyWorkflowCopy';
 import { StarterPolicyOnboardingCard } from './StarterPolicyOnboardingCard';
 import type { StarterTemplateKey } from './starterPolicyCopy';
 import type { EmployeePreviewCompareModel } from './hrPolicyEmployeePreviewCompare';
@@ -67,16 +67,6 @@ function formatEntitlementRow(row: Record<string, unknown>): string {
   const cur = row.currency || 'USD';
   const parts = [label || sk, cap != null ? `${cur} ${cap}` : null].filter(Boolean);
   return parts.join(' · ') || String(sk || 'Benefit');
-}
-
-function AtAGlanceSkeleton() {
-  return (
-    <div className="grid sm:grid-cols-3 gap-4 animate-pulse" aria-hidden>
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="h-24 rounded-lg bg-slate-100 border border-slate-200" />
-      ))}
-    </div>
-  );
 }
 
 function EmployeeViewComparePanels({
@@ -182,73 +172,6 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
   const issueLimit = showAllIssues ? 50 : 3;
   const visibleIssues = resolved.highlightIssues.slice(0, issueLimit);
 
-  const liveSummary = (): { title: string; body: string } => {
-    if (resolved.phase === 'no_policy') {
-      return { title: 'Nothing live yet', body: 'Employees do not have a published policy to view.' };
-    }
-    if (resolved.phase === 'published' || resolved.publishedVersionNumber != null) {
-      return {
-        title: lifecycle.activeSource.title,
-        body: lifecycle.activeSource.subtitle,
-      };
-    }
-    return {
-      title: 'No live employee policy yet',
-      body: 'Publish a version to put benefits on employee assignments. This draft is HR-only until then.',
-    };
-  };
-
-  const underReviewSummary = (): { title: string; body: string } => {
-    if (resolved.phase === 'no_policy') {
-      return { title: '—', body: 'Create or upload a policy to start a draft.' };
-    }
-    if (resolved.hasUnpublishedDraftAhead) {
-      return {
-        title: 'Replacement draft in progress',
-        body: 'The yellow notice below states what is live vs draft—employees keep the published policy until you publish the replacement.',
-      };
-    }
-    if (resolved.phase === 'draft_not_publishable') {
-      return {
-        title: 'Draft needs review',
-        body:
-          'Your file was turned into an editable draft. Finish the checklist and benefit table before publishing—employees still see nothing from this draft until it goes live.',
-      };
-    }
-    if (resolved.phase === 'ready_to_publish') {
-      return {
-        title: 'Ready to go live',
-        body: 'Checks passed for publishing. Employees will see this version after you publish.',
-      };
-    }
-    return { title: 'No draft in progress', body: 'Upload a newer file or edit values; new work stays as a draft until published.' };
-  };
-
-  const employeeViewSummary = (): { title: string; body: string } => {
-    if (resolved.phase === 'no_policy') {
-      return { title: 'Employee view', body: 'Nothing to show until HR publishes a policy.' };
-    }
-    if (resolved.phase !== 'published') {
-      return {
-        title: 'Employee view',
-        body: 'Employees only see published versions. This draft is invisible to them until you publish.',
-      };
-    }
-    const tier =
-      resolved.comparisonSummary === 'full'
-        ? 'Full comparison'
-        : resolved.comparisonSummary === 'partial'
-          ? 'Partial comparison'
-          : 'Informational only';
-    return {
-      title: `Published policy — ${tier}`,
-      body: COMPARISON_SUMMARY_COPY[resolved.comparisonSummary],
-    };
-  };
-
-  const live = liveSummary();
-  const review = underReviewSummary();
-  const emp = employeeViewSummary();
 
   const renderPrimaryCta = () => {
     switch (primaryAction) {
@@ -294,13 +217,17 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
 
   return (
     <div className="space-y-6" data-hr-policy-workspace-layout>
-      {/* A — Policy status at a glance (live / under review / employee view + next step) */}
+      {/* A — Status + next step.
+          Slice 3c collapses the previous 5-in-1 into one tight module
+          that answers the only question HR opens this card to ask:
+          "if I publish right now, what changes for employees?"
+          The detail surfaces (per-employee compare, visibility rules)
+          stay one click away via <details>. */}
       <Card padding="lg" className="border-[#0b2b43]/12">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-[#0b2b43]">Policy status</h2>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-[#0b2b43]">What this means for employees</h2>
             <p className="text-sm text-[#4b5563] mt-1 max-w-3xl">{copy.headline}</p>
-            <p className="text-sm text-[#6b7280] mt-1 max-w-3xl">{copy.subline}</p>
           </div>
           {loading && (
             <span className="text-sm text-[#6b7280]" role="status" aria-live="polite">
@@ -309,18 +236,18 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-3">
-          {resolved.phase === 'published' && <Badge tone="success">Live for employees</Badge>}
-          {resolved.phase === 'ready_to_publish' && <Badge tone="warning">Ready to publish—not live yet</Badge>}
-          {resolved.phase === 'draft_not_publishable' && <Badge tone="warning">Draft—finish checklist</Badge>}
-          {resolved.phase === 'no_policy' && <Badge>No live policy</Badge>}
-          {resolved.publishReadiness?.status && (
-            <Badge tone="neutral">{formatPublishReadinessBadge(resolved.publishReadiness.status)}</Badge>
-          )}
-          {resolved.comparisonReadiness?.status && (
-            <Badge tone="neutral">{formatComparisonReadinessBadge(resolved.comparisonReadiness.status)}</Badge>
-          )}
-        </div>
+        {/* Phase-aware impact summary — derived from existing fields,
+            no new API call. The number-laden version
+            ("change 12 caps, add 1 benefit, no impact for DE/FR") needs
+            a per-jurisdiction breakdown from the backend; that's queued
+            as a follow-up. For now, lean on the existing copy + a
+            count-based hint from highlightIssues. */}
+        {!loading && (
+          <p className="text-sm text-[#374151] mt-3 leading-relaxed">
+            <strong className="text-[#0b2b43]">If you publish right now:</strong>{' '}
+            {publishImpactSentence(resolved, lifecycle)}
+          </p>
+        )}
 
         {resolved.phase === 'no_policy' && documentsCount > 0 && (
           <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mt-3">
@@ -336,45 +263,8 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
           </Alert>
         )}
 
-        {employeePreviewCompare && (
-          <div className="mt-4 border border-[#e5e7eb] rounded-lg p-4 bg-[#fafbfc]">
-            <h3 className="text-sm font-semibold text-[#0b2b43] mb-3">Employee view: today vs if you publish</h3>
-            <EmployeeViewComparePanels model={employeePreviewCompare} loading={loading} />
-          </div>
-        )}
-
-        {loading ? (
-          <div className="mt-4">
-            <AtAGlanceSkeleton />
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b] mb-1">
-                Live for employees today
-              </div>
-              <div className="text-sm font-medium text-[#0b2b43]">{live.title}</div>
-              <p className="text-xs text-[#4b5563] mt-1 leading-relaxed">{live.body}</p>
-            </div>
-            <div className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b] mb-1">
-                Under review (HR only)
-              </div>
-              <div className="text-sm font-medium text-[#0b2b43]">{review.title}</div>
-              <p className="text-xs text-[#4b5563] mt-1 leading-relaxed">{review.body}</p>
-            </div>
-            <div className="rounded-lg border border-[#e5e7eb] bg-[#fafafa] p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#64748b] mb-1">
-                Employee cost comparison
-              </div>
-              <div className="text-sm font-medium text-[#0b2b43]">{emp.title}</div>
-              <p className="text-xs text-[#4b5563] mt-1 leading-relaxed">{emp.body}</p>
-            </div>
-          </div>
-        )}
-
         {resolved.hasUnpublishedDraftAhead && lifecycle.draftReplacement && (
-          <div data-testid="hr-policy-replacement-warning" className="mt-4">
+          <div data-testid="hr-policy-replacement-warning" className="mt-3">
             <Alert variant="warning">
               <div className="space-y-1">
                 <strong className="text-[#92400e]">{lifecycle.draftReplacement.title}</strong>
@@ -421,15 +311,37 @@ export const HrPolicyWorkspaceLayout: React.FC<HrPolicyWorkspaceLayoutProps> = (
           )}
         </div>
 
-        <ul className="text-xs text-[#64748b] space-y-1 mt-4 list-disc list-inside border-t border-[#e5e7eb] pt-3">
-          {lifecycle.employeeVisibilityLines.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ul>
-        {lifecycle.templateUploadHint && (
-          <p className="text-xs text-[#4b5563] mt-2">{lifecycle.templateUploadHint}</p>
+        {/* Per-employee compare → audit case, hidden by default. */}
+        {employeePreviewCompare && (
+          <details className="mt-4 border border-[#e5e7eb] rounded-lg bg-[#fafbfc]">
+            <summary className="cursor-pointer list-none px-4 py-2.5 text-sm font-medium text-[#0b2b43] [&::-webkit-details-marker]:hidden">
+              ▸ Show what each employee would see (today vs if you publish)
+            </summary>
+            <div className="px-4 pb-4">
+              <EmployeeViewComparePanels model={employeePreviewCompare} loading={loading} />
+            </div>
+          </details>
         )}
-        <p className="text-xs text-[#9ca3af] mt-2">{lifecycle.versionHistoryHint}</p>
+
+        {/* Visibility rules + version-history hint → reference content,
+            hidden by default. The headline + impact sentence above
+            already tell HR what they need to act. */}
+        <details className="mt-3">
+          <summary className="cursor-pointer list-none text-xs text-[#64748b] hover:text-[#0b2b43] [&::-webkit-details-marker]:hidden">
+            ▸ How visibility works
+          </summary>
+          <div className="mt-2 border-t border-[#e5e7eb] pt-3">
+            <ul className="text-xs text-[#64748b] space-y-1 list-disc list-inside">
+              {lifecycle.employeeVisibilityLines.map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+            </ul>
+            {lifecycle.templateUploadHint && (
+              <p className="text-xs text-[#4b5563] mt-2">{lifecycle.templateUploadHint}</p>
+            )}
+            <p className="text-xs text-[#9ca3af] mt-2">{lifecycle.versionHistoryHint}</p>
+          </div>
+        </details>
       </Card>
 
       {/* Starter onboarding (no policy) — primary path */}

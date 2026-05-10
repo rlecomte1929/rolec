@@ -1,0 +1,39 @@
+{
+  "eval_id": 3,
+  "eval_name": "sales-one-pager",
+  "prompt": "Audit of post-demo sales leave-behind one-pager",
+  "assertions": [
+    {
+      "text": "Content type is correctly identified as 'one-pager' or 'leave-behind'",
+      "type": "content_type"
+    },
+    {
+      "text": "Output uses the structured format: CONTENT TYPE, OVERALL SCORE, SCORECARD, FINDINGS, NARRATIVE ARC, GAP MATRIX, TOP 3 PRIORITIES",
+      "type": "format"
+    },
+    {
+      "text": "'Relocation Made Easy' or equivalent tagline is flagged as wrong register (lifestyle/consumer)",
+      "type": "brand_check"
+    },
+    {
+      "text": "'all-in-one' is flagged as generic SaaS filler",
+      "type": "brand_check"
+    },
+    {
+      "text": "'seamless', 'best-in-class', and 'intuitive' are flagged as forbidden phrases",
+      "type": "brand_check"
+    },
+    {
+      "text": "'Real relocations, not demos' is identified as a defensive qualifier",
+      "type": "brand_check"
+    },
+    {
+      "text": "Missing problem statement / problem stakes section is called out as a structural gap",
+      "type": "arc_check"
+    },
+    {
+      "text": "The CTA (email address only) is flagged and a more specific CTA is recommended",
+      "type": "cta_check"
+    }
+  ]
+}

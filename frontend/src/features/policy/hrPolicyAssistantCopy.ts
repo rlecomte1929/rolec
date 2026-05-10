@@ -1,4 +1,4 @@
-export const HR_POLICY_ASSISTANT_TITLE = 'Policy Assistant';
+export const HR_POLICY_ASSISTANT_TITLE = 'Ask about this policy';
 
 export const HR_POLICY_ASSISTANT_SUBTITLE =
   'Ask about this policy version, employee-visible rules, and publish impact.';
@@ -8,10 +8,18 @@ export const HR_POLICY_ASSISTANT_PLACEHOLDER = 'Example: What do employees see f
 export const HR_POLICY_ASSISTANT_SCOPE_NOTE =
   'Answers use normalized policy data in this workspace (draft, published, rules). Not legal or immigration advice.';
 
-export const HR_POLICY_ASSISTANT_NO_POLICY =
-  'Select or create a company policy in the workspace to use policy Q&A.';
+/**
+ * Trust-signal pill replacing the SCOPE_NOTE paragraph in the panel.
+ * Visible above the response section. SCOPE_NOTE export kept for
+ * back-compat; the panel no longer renders it.
+ */
+export const HR_POLICY_ASSISTANT_TRUST_PILL =
+  "Verified from this workspace's policy data — not legal or immigration advice";
 
-export const HR_POLICY_ASSISTANT_SUBMIT = 'Get answer →';
+export const HR_POLICY_ASSISTANT_NO_POLICY =
+  'Q&A is currently available only for policies imported from a document. Upload a policy document to enable Q&A for this workspace.';
+
+export const HR_POLICY_ASSISTANT_SUBMIT = 'Ask';
 
 export const HR_POLICY_ASSISTANT_SUGGESTIONS: string[] = [
   'What do employees see for shipment?',

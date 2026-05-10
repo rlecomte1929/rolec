@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Alert, Badge, Button, Card, Input, LoadingButton } from '../components/antigravity';
 import { employeeAPI } from '../api/client';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
+import { useServicesFlow } from '../features/services/ServicesFlowContext';
+import { buildRoute } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import type { PostSignupReconciliation } from '../types';
 import type { EmployeeLinkedOverviewRow } from '../types/employeeAssignmentOverview';
@@ -13,14 +15,35 @@ import { logEmployeeEntry } from '../utils/employeeJourneyPerf';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
 import { getApiErrorCode } from '../utils/apiDetail';
 import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
+import { getLastVisited } from '../utils/employeeCaseProgress';
 
-const FLOW_STEPS = [
-  '1. Fill your case',
-  '2. Choose services',
-  '3. Review budget vs policy',
-  '4. (Soon) Request quotes',
-  '5. Exchange with HR',
-];
+/**
+ * Resolve where to send the user when they click "Open case" on the
+ * dashboard. Honor the last route they visited inside this assignment
+ * (so re-entering doesn't force them through the wizard again). Falls
+ * back to the case summary page when no last-visited is recorded.
+ *
+ * Both `assigned` (fresh assignment from HR, employee hasn't started
+ * intake yet) and `awaiting_intake` (employee started intake but hasn't
+ * submitted) are pre-intake states whose entry point is the wizard.
+ * Send both straight to step 1 rather than the summary (empty for a
+ * fresh case) or any stale last-visited URL.
+ */
+function openCaseHref(assignmentId: string, status?: string | null): string {
+  if (status === 'awaiting_intake' || status === 'assigned') {
+    return `/employee/case/${assignmentId}/wizard/1`;
+  }
+  return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
+}
+
+type FlowStep = {
+  label: string;
+  /** When set, the step renders as a Link to this path. */
+  href?: string;
+  /** When false, the step renders as a non-clickable muted pill with `mutedHint` as title. */
+  enabled?: boolean;
+  mutedHint?: string;
+};
 
 /** Basic UUID shape: used to catch swapped claim fields. */
 const ASSIGNMENT_ID_PATTERN =
@@ -339,18 +362,59 @@ export const EmployeeJourney: React.FC = () => {
     }
   };
 
+  const { recommendations: servicesRecommendations } = useServicesFlow();
+  const hasRecommendations = Boolean(
+    servicesRecommendations && Object.keys(servicesRecommendations).length > 0,
+  );
+  const flowSteps: FlowStep[] = useMemo(
+    () => [
+      // Step 1: handled by the per-row "Open case" button on the cases below.
+      { label: '1. Fill your case' },
+      { label: '2. Choose services', href: buildRoute('services') },
+      {
+        label: '3. Review budget vs policy',
+        href: hasRecommendations ? buildRoute('servicesEstimate') : undefined,
+        enabled: hasRecommendations,
+        mutedHint: hasRecommendations ? undefined : 'Complete step 2 first',
+      },
+      { label: '4. (Soon) Request quotes' },
+      { label: '5. Exchange with HR' },
+    ],
+    [hasRecommendations],
+  );
+
+  // Pill base style is shared so clickable + decorative steps line up visually.
+  // Clickable variants add the same hover/cursor/focus-visible affordance used
+  // on the HR cases-list rows for consistency with other interactive elements.
+  const PILL_BASE = 'rounded-full border border-[#cbd5f5] bg-[#eef4f8] px-3 py-1 font-medium';
+  const PILL_INTERACTIVE =
+    'cursor-pointer hover:bg-[#dbeafe] focus-visible:ring-2 focus-visible:ring-[#2563eb] focus-visible:outline-none transition-colors';
+  const PILL_MUTED = 'opacity-60 text-[#64748b]';
+
   const flowchart = useMemo(() => {
     return (
       <div className="flex flex-wrap items-center gap-2 text-sm text-[#0b2b43]">
-        {FLOW_STEPS.map((step, idx) => (
-          <div key={step} className="flex items-center gap-2">
-            <div className="rounded-full border border-[#cbd5f5] bg-[#eef4f8] px-3 py-1 font-medium">{step}</div>
-            {idx < FLOW_STEPS.length - 1 && <span className="text-[#94a3b8]">→</span>}
+        {flowSteps.map((step, idx) => (
+          <div key={step.label} className="flex items-center gap-2">
+            {step.href ? (
+              <Link to={step.href} className={`${PILL_BASE} ${PILL_INTERACTIVE}`}>
+                {step.label}
+              </Link>
+            ) : (
+              <div
+                className={`${PILL_BASE} ${step.enabled === false ? PILL_MUTED : ''}`}
+                title={step.mutedHint}
+                aria-disabled={step.enabled === false ? true : undefined}
+              >
+                {step.label}
+              </div>
+            )}
+            {idx < flowSteps.length - 1 && <span className="text-[#94a3b8]">→</span>}
           </div>
         ))}
       </div>
     );
-  }, []);
+  }, [flowSteps]);
 
 
   const linkAlerts = useMemo(() => {
@@ -531,7 +595,7 @@ export const EmployeeJourney: React.FC = () => {
                     <div className="text-xs font-mono text-[#94a3b8] pt-1">{row.assignment_id}</div>
                   </div>
                   <div className="flex sm:flex-col sm:justify-center shrink-0">
-                    <Button onClick={() => navigate(`/employee/case/${row.assignment_id}/summary`)}>Open case</Button>
+                    <Button onClick={() => navigate(openCaseHref(row.assignment_id, row.status))}>Open case</Button>
                   </div>
                 </li>
               ))}

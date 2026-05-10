@@ -1,0 +1,35 @@
+{
+  "eval_id": 1,
+  "eval_name": "homepage-hero-audit",
+  "prompt": "Audit of homepage hero copy including title, headline, subheadline, and CTAs",
+  "assertions": [
+    {
+      "text": "Output uses the exact structured format: CONTENT TYPE, OVERALL SCORE, SCORECARD, FINDINGS, NARRATIVE ARC, GAP MATRIX, TOP 3 PRIORITIES",
+      "type": "format"
+    },
+    {
+      "text": "Findings are sorted in severity order: 🔴 issues before 🟠 and 🟡",
+      "type": "ordering"
+    },
+    {
+      "text": "The word 'journey' is identified as forbidden lifestyle-relocation language and flagged",
+      "type": "brand_check"
+    },
+    {
+      "text": "'powerful' and 'seamless' are flagged as generic SaaS filler",
+      "type": "brand_check"
+    },
+    {
+      "text": "CTAs are flagged and replaced with 'Book a demo' and 'See the platform'",
+      "type": "cta_check"
+    },
+    {
+      "text": "A rewrite is provided for every flagged finding",
+      "type": "completeness"
+    },
+    {
+      "text": "Gap matrix is filled with at least 6 dimensions populated",
+      "type": "gap_matrix"
+    }
+  ]
+}

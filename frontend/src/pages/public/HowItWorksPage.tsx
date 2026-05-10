@@ -13,7 +13,7 @@ import { howItWorksContent } from './howItWorksContent';
 
 export const HowItWorksPage: React.FC = () => {
   usePageMeta({
-    title: 'How It Works — ReloPass',
+    title: 'How It Works · ReloPass',
     description: 'From case open to case closed. Four steps, one record. See how a relocation runs inside ReloPass.',
     ogUrl: 'https://www.relopass.com/how-it-works',
   });

@@ -2699,6 +2699,30 @@ export const resourcesAPI = {
     return response.data;
   },
 
+  /** HR-only preview: same payload shape as getPage, but driven by an explicit
+   *  destination + persona instead of a real assignment. */
+  getHrPreviewPage: async (
+    params: {
+      countryCode: string;
+      countryName?: string | null;
+      city?: string | null;
+      familyType?: 'single' | 'couple' | 'family';
+      relocationType?: 'short_term' | 'long_term' | 'permanent';
+      hasChildren?: boolean | null;
+    },
+    filters?: Record<string, string | number | boolean | null>
+  ): Promise<import('../types').ResourcesPagePayload> => {
+    const q: Record<string, string> = { country_code: params.countryCode };
+    if (params.countryName) q.country_name = params.countryName;
+    if (params.city) q.city = params.city;
+    if (params.familyType) q.family_type = params.familyType;
+    if (params.relocationType) q.relocation_type = params.relocationType;
+    if (params.hasChildren != null) q.has_children = String(params.hasChildren);
+    if (filters && Object.keys(filters).length) q.filters = JSON.stringify(filters);
+    const response = await api.get('/api/hr/resources/page', { params: q });
+    return response.data;
+  },
+
   getResources: async (
     assignmentOrCaseId: string,
     filters?: Record<string, string | number | boolean | null>,

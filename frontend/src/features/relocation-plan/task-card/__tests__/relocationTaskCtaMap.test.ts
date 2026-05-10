@@ -46,11 +46,17 @@ describe('resolveRelocationTaskCtaTarget', () => {
     });
   });
 
-  it('routes upload_document to employee wizard step 2 (document upload)', () => {
+  it('routes upload_document to employee wizard step 1 (auto-normalizes to first incomplete step)', () => {
+    // Was: routed straight to step 2 (where the upload UI lives) but
+    // the wizard blocks deep-links to later steps when previous steps
+    // are incomplete, leaving the user staring at "Complete the
+    // previous steps before continuing." Step 1 normalizes to the
+    // first incomplete step on landing — partway-through users get
+    // somewhere actionable, ready-to-upload users land on step 2.
     const cta: RelocationPlanCtaDTO = { type: 'upload_document', label: 'Upload' };
     expect(resolveRelocationTaskCtaTarget(employeeCtx, cta)).toEqual({
       kind: 'internal',
-      to: `/employee/case/${encodeURIComponent('assign-1')}/wizard/2`,
+      to: `/employee/case/${encodeURIComponent('assign-1')}/wizard/1`,
     });
   });
 

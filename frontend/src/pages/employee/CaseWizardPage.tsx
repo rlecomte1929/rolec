@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
+import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
+import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
 import { CaseContextBar } from '../../components/case/CaseContextBar';
 import { WizardSidebar } from '../../components/case/WizardSidebar';
 import { Card } from '../../components/antigravity';
@@ -17,6 +20,7 @@ import { Step2EmployeeProfile } from './wizard/Step2EmployeeProfile';
 import { Step3FamilyMembers } from './wizard/Step3FamilyMembers';
 import { Step4AssignmentContext } from './wizard/Step4AssignmentContext';
 import { Step5ReviewCreate } from './wizard/Step5ReviewCreate';
+import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
 
 function buildDefaultDraft(): CaseDraftDTO {
   const name = getAuthItem('relopass_name');
@@ -63,6 +67,8 @@ function caseToWizardDraft(caseData: CaseDTO | null, assignment?: { employee_ful
     employeeProfile: {
       ...seededEmployeeProfile,
       ...draftEmployeeProfile,
+      // Always fall back to the auth email if the draft has none
+      email: draftEmployeeProfile.email || seededEmployeeProfile.email || '',
     },
     familyMembers: {
       ...base.familyMembers,
@@ -224,6 +230,11 @@ export const CaseWizardPage: React.FC = () => {
   }, [draft]);
 
   const assignmentId = assignmentIdFromRoute;
+
+  // Persist current wizard step as the resume target — re-entering from
+  // the dashboard's "Open case" lands the user back on this step instead
+  // of forcing a restart from step 1.
+  useTrackLastVisited(assignmentId || null);
 
   // Enforce linear progression: cannot skip ahead.
   useEffect(() => {
@@ -472,8 +483,25 @@ export const CaseWizardPage: React.FC = () => {
 
   const completedSteps = stepCompletion.completed;
 
+  // Sprint 2: docked shell + trigger-only FAB.
+  const [assistantOpen, setAssistantOpen] = useState(false);
+
   return (
     <AppShell title="My case" subtitle="Relocation intake wizard.">
+      <PolicyAssistantDockedShell
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        title="Ask about your policy"
+        subtitle="Bounded Q&A on your published policy."
+        titleId="employee-wizard-assistant-shell-title"
+        assistant={() => (
+          <EmployeePolicyAssistantPanel
+            assignmentId={assignmentId}
+            assignmentLoading={false}
+            variant="embedded"
+          />
+        )}
+      >
       <div className="max-w-6xl mx-auto space-y-6">
         {assignmentStatus === 'awaiting_intake' && hrFeedback && (
           <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-sm text-[#92400e]">
@@ -627,6 +655,14 @@ export const CaseWizardPage: React.FC = () => {
           </div>
         </div>
       </div>
+      </PolicyAssistantDockedShell>
+      {/* FAB trigger — toggles the docked shell. Hides on lg+ when
+          open so it doesn't overlap the panel. */}
+      <PolicyAssistantFab
+        label="Ask about your policy"
+        isPanelOpen={assistantOpen}
+        onClick={() => setAssistantOpen((v) => !v)}
+      />
     </AppShell>
   );
 };

@@ -1,12 +1,25 @@
 /**
  * Bounded policy Q&A for employees: single-turn answers from published policy data.
- * HR Policy page: `sideSheet` — right anchored panel (desktop) / sheet (mobile), not a floating chat bubble.
+ * Mounted as `embedded` inside PolicyAssistantDockedShell — docked panel on lg+, bottom-sheet on mobile.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Link2,
+  Loader2,
+} from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
+import {
+  formatAnswerWithCitations,
+  isCitationDeepLinkAvailable,
+  scrollToPolicyReference,
+} from './policyAssistantCitations';
 import type { PolicyAssistantAnswer } from '../../types/policyAssistant';
 import { formatEvidenceAttribution } from './policyEvidenceFormatting';
 import {
@@ -19,13 +32,19 @@ import {
   supportStatusBadgeClass,
   supportStatusLabel,
 } from './employeePolicyAssistantModel';
-import { trackPolicyAssistantFollowUpClicked } from './policyAssistantAnalytics';
+import {
+  trackPolicyAssistantAnswerReceived,
+  trackPolicyAssistantDismissed,
+  trackPolicyAssistantFollowUpClicked,
+  trackPolicyAssistantOpened,
+  trackPolicyAssistantQuestionSubmitted,
+  type PolicyAssistantQuestionSource,
+  type PolicyAssistantSurface,
+} from './policyAssistantAnalytics';
 import {
   EMPLOYEE_POLICY_ASSISTANT_CLEAR_HISTORY,
   EMPLOYEE_POLICY_ASSISTANT_COPIED,
   EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER,
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER,
-  EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY,
   EMPLOYEE_POLICY_ASSISTANT_EMPTY_HINT,
   EMPLOYEE_POLICY_ASSISTANT_ERROR_DETAIL,
   EMPLOYEE_POLICY_ASSISTANT_ERROR_TITLE,
@@ -37,8 +56,8 @@ import {
   EMPLOYEE_POLICY_ASSISTANT_SUBTITLE,
   EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS,
   EMPLOYEE_POLICY_ASSISTANT_TITLE,
+  EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL,
 } from './employeePolicyAssistantCopy';
-import { PolicyAssistantSideSheet } from './PolicyAssistantSideSheet';
 
 const MAX_TURNS = 15;
 
@@ -104,11 +123,17 @@ function AnswerResultCard({
   question,
   answer,
   assistantTurnRequestId,
+  isMostRecent,
   onFollowUpSelect,
 }: {
   question: string;
   answer: PolicyAssistantAnswer;
   assistantTurnRequestId?: string | null;
+  /** Only the most recent turn renders the "Related policy questions"
+   *  chip block AND defaults to expanded — older cards default to
+   *  collapsed (header-only). After 10 turns, suppressing both chips
+   *  and full bodies saves ~30 buttons + 5 screens of visual noise. */
+  isMostRecent: boolean;
   onFollowUpSelect: (
     text: string,
     index: number,
@@ -125,6 +150,22 @@ function AnswerResultCard({
     answer.answer_text?.trim() ||
     (isClarification && answer.refusal ? answer.refusal.refusal_text : '') ||
     (isRefusal && answer.refusal ? answer.refusal.refusal_text : '');
+
+  // Collapsibility: most recent stays expanded; older cards collapse
+  // to header-only by default. When the parent submits a new question,
+  // the previous-most-recent card's `isMostRecent` flips to false and
+  // this useEffect resyncs the local state — which means a manually-
+  // expanded older card collapses on the next submit. That's
+  // acceptable per the Sprint 3 spec: the user has fresh focus on the
+  // new answer, and avoiding the more complex lifted-state model
+  // keeps this small.
+  const [collapsed, setCollapsed] = useState(!isMostRecent);
+  useEffect(() => {
+    setCollapsed(!isMostRecent);
+  }, [isMostRecent]);
+
+  const reactId = useId();
+  const bodyId = `pa-card-body-${reactId}`;
 
   const handleCopy = async () => {
     const text = turnToPlainText(question, answer);
@@ -145,51 +186,77 @@ function AnswerResultCard({
       role="article"
       aria-label="Policy Q&A"
     >
-      <div className="border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-[#f4f7fb] px-4 py-3.5">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Your question</div>
-        <p className="mt-1.5 text-[15px] font-medium leading-snug text-[#0b2b43]">{question}</p>
+      {/* Header row is the collapse toggle. Click anywhere on the
+          gradient bg flips collapsed state; the badge/topic/copy
+          children remain non-interactive (badge, chip) or stop
+          propagation (copy button). The chevron is the visual
+          affordance for keyboard + screen reader users. role=button
+          on the wrapping div + aria-expanded + Enter/Space handler
+          keeps a11y intact without needing nested <button>s. */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={!collapsed}
+        aria-controls={bodyId}
+        onClick={() => setCollapsed((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setCollapsed((v) => !v);
+          }
+        }}
+        className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-[#f4f7fb] px-4 py-3.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/30"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Your question</div>
+          <p className="mt-1.5 text-[15px] font-medium leading-snug text-[#0b2b43]">{question}</p>
+        </div>
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
+          <span
+            className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${
+              isRefusal && answer.refusal
+                ? supportStatusBadgeClass('refused')
+                : supportStatusBadgeClass(status)
+            }`}
+          >
+            {isRefusal && answer.refusal ? supportStatusLabel('refused') : supportStatusLabel(status)}
+          </span>
+          {!isRefusal && topic ? (
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium capitalize text-slate-700">
+              {topic}
+            </span>
+          ) : null}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleCopy();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-[#0b2b43]"
+            >
+              <Copy className="h-3.5 w-3.5 opacity-70" aria-hidden />
+              {copied ? EMPLOYEE_POLICY_ASSISTANT_COPIED : EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER}
+            </button>
+            <span
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-500"
+              aria-hidden
+            >
+              {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </span>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-4 px-4 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {isRefusal && answer.refusal ? (
-              <span
-                className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${supportStatusBadgeClass('refused')}`}
-              >
-                {supportStatusLabel('refused')}
-              </span>
-            ) : (
-              <>
-                <span
-                  className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${supportStatusBadgeClass(status)}`}
-                >
-                  {supportStatusLabel(status)}
-                </span>
-                {topic ? (
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-0.5 text-xs font-medium capitalize text-slate-700">
-                    {topic}
-                  </span>
-                ) : null}
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleCopy()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 hover:text-[#0b2b43]"
-          >
-            <Copy className="h-3.5 w-3.5 opacity-70" aria-hidden />
-            {copied ? EMPLOYEE_POLICY_ASSISTANT_COPIED : EMPLOYEE_POLICY_ASSISTANT_COPY_ANSWER}
-          </button>
-        </div>
+      {collapsed ? null : (
+      <div id={bodyId} className="space-y-4 px-4 py-4">
 
         {isRefusal && answer.refusal ? (
           <>
             <div className="rounded-lg border border-slate-100 bg-slate-50/60 px-4 py-3.5 text-[15px] leading-[1.65] text-slate-800">
               {formatRichMessage(answer.refusal.refusal_text)}
             </div>
-            {answer.refusal.supported_examples.length > 0 ? (
+            {isMostRecent && answer.refusal.supported_examples.length > 0 ? (
               <div className="rounded-lg border border-slate-100 bg-white px-3 py-3">
                 <div className="text-xs font-semibold text-slate-600 mb-2">Policy questions you can ask</div>
                 <ul className="text-sm text-slate-700 list-disc pl-5 space-y-1.5 leading-relaxed">
@@ -204,7 +271,7 @@ function AnswerResultCard({
           <>
             {primaryText ? (
               <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfd] px-4 py-3.5 text-[15px] leading-[1.65] text-slate-800">
-                {formatRichMessage(primaryText)}
+                {formatAnswerWithCitations(primaryText, answer.cited_chunks)}
               </div>
             ) : null}
 
@@ -218,15 +285,60 @@ function AnswerResultCard({
                     const headline = (ev.label || humanizeEvidenceKind(ev.kind)).trim();
                     const attribution = formatEvidenceAttribution(ev).trim();
                     const showExtraAttribution = attribution.length > 0 && attribution !== headline;
+                    const ref = (ev.reference || '').trim();
+                    const handleScroll = () => {
+                      if (!ref) return;
+                      // Mobile: docked panel falls back to a bottom-sheet
+                      // that covers the page. Scrolling the policy
+                      // underneath would do nothing visible — skip.
+                      if (!isCitationDeepLinkAvailable()) return;
+                      const ok = scrollToPolicyReference(ref);
+                      if (!ok && typeof console !== 'undefined') {
+                        // eslint-disable-next-line no-console
+                        console.warn(
+                          `[policy-assistant] no policy clause matched evidence reference "${ref}"`
+                        );
+                      }
+                    };
+                    const clickable = Boolean(ref);
+                    if (!clickable) {
+                      return (
+                        <li key={i} className="border-l-[3px] border-[#0b2b43]/25 pl-3">
+                          <div className="text-sm font-semibold text-[#0b2b43]">{headline}</div>
+                          {ev.excerpt ? (
+                            <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{ev.excerpt}</div>
+                          ) : null}
+                          {showExtraAttribution ? (
+                            <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
+                          ) : null}
+                        </li>
+                      );
+                    }
                     return (
-                      <li key={i} className="border-l-[3px] border-[#0b2b43]/25 pl-3">
-                        <div className="text-sm font-semibold text-[#0b2b43]">{headline}</div>
-                        {ev.excerpt ? (
-                          <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{ev.excerpt}</div>
-                        ) : null}
-                        {showExtraAttribution ? (
-                          <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
-                        ) : null}
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={handleScroll}
+                          aria-label={`Show ${headline} on the policy page`}
+                          data-testid="policy-evidence-citation"
+                          className="group block w-full rounded-md border-l-[3px] border-[#0b2b43]/25 bg-transparent pl-3 pr-2 py-1.5 text-left transition-colors hover:bg-slate-50 hover:border-[#0b2b43]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0b2b43]/35"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-sm font-semibold text-[#0b2b43] group-hover:text-[#08213a]">
+                              {headline}
+                            </div>
+                            <Link2
+                              className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400 group-hover:text-[#0b2b43]"
+                              aria-hidden
+                            />
+                          </div>
+                          {ev.excerpt ? (
+                            <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{ev.excerpt}</div>
+                          ) : null}
+                          {showExtraAttribution ? (
+                            <div className="mt-1.5 text-xs leading-relaxed text-slate-500">{attribution}</div>
+                          ) : null}
+                        </button>
                       </li>
                     );
                   })}
@@ -250,7 +362,7 @@ function AnswerResultCard({
               </div>
             )}
 
-            {answer.follow_up_options && answer.follow_up_options.length > 0 ? (
+            {isMostRecent && answer.follow_up_options && answer.follow_up_options.length > 0 ? (
               <div>
                 <div className="text-xs font-semibold text-slate-600 mb-2">Related policy questions</div>
                 <ul className="flex flex-wrap gap-2">
@@ -279,6 +391,7 @@ function AnswerResultCard({
           </>
         )}
       </div>
+      )}
     </article>
   );
 }
@@ -288,13 +401,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   /** When true, hide “no assignment” until parent finished loading. */
   assignmentLoading?: boolean;
   /**
-   * `card` — full-width panel (legacy in-page placement).
-   * `sideSheet` — HR Policy: triggers beside/near content; panel from the right (desktop) or sheet (mobile).
-   * @deprecated Use `sideSheet`. `fab` is treated as `sideSheet`.
+   * `card` — full-width panel rendered inline on a page (legacy /
+   *   tests). Includes its own header + Card wrapper.
+   * `embedded` — caller already provides the chrome (e.g. inside
+   *   PolicyAssistantDockedShell). Renders the form body only — no
+   *   inner header, no Card wrapper.
    */
-  variant?: 'card' | 'fab' | 'sideSheet';
+  variant?: 'card' | 'embedded';
 }> = ({ assignmentId, assignmentLoading = false, variant = 'card' }) => {
-  const layoutVariant = variant === 'fab' ? 'sideSheet' : variant;
+  const layoutVariant = variant;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const responseSectionRef = useRef<HTMLElement | null>(null);
   const scrollToResponseAfterAnswerRef = useRef(false);
@@ -302,8 +417,36 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   const [turns, setTurns] = useState<PolicyAssistantTurn[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [emptySubmitHint, setEmptySubmitHint] = useState(false);
+
+  // Analytics: surface label per mount, plus refs for state we need at
+  // dismissal time (closure-stable across the unmount cleanup).
+  const surface: PolicyAssistantSurface =
+    layoutVariant === 'card' ? 'employee_card' : 'employee_fab';
+  const submitSourceRef = useRef<PolicyAssistantQuestionSource>('free_text');
+  const hadQuestionRef = useRef(false);
+  const hadAnswerRef = useRef(false);
+
+  // Embedded variant: the panel mounts only when the docked shell opens
+  // and unmounts when it closes — so mount = "Opened" and unmount =
+  // "Dismissed". Card variant fires Opened once on mount; it has no
+  // explicit dismissal (lives inline on a page).
+  useEffect(() => {
+    trackPolicyAssistantOpened({ surface });
+    if (layoutVariant === 'embedded') {
+      return () => {
+        trackPolicyAssistantDismissed({
+          surface,
+          had_question: hadQuestionRef.current,
+          had_answer: hadAnswerRef.current,
+        });
+      };
+    }
+    return undefined;
+    // surface is stable for the lifetime of this component — depending on
+    // it would require a stable value anyway.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!assignmentId) {
@@ -340,10 +483,25 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     setSubmitting(true);
     setEmptySubmitHint(false);
     setError('');
+    // Analytics: capture the source for THIS submission, then reset to
+    // 'free_text' so the next plain-textarea submission is correctly
+    // labeled. shortcut/follow_up handlers below set the ref before
+    // calling submit().
+    const source = submitSourceRef.current;
+    submitSourceRef.current = 'free_text';
+    hadQuestionRef.current = true;
+    trackPolicyAssistantQuestionSubmitted({ surface, source });
     try {
       const res = await employeeAPI.postPolicyAssistantQuery(assignmentId, trimmed);
       const answer = res.answer;
       scrollToResponseAfterAnswerRef.current = true;
+      hadAnswerRef.current = true;
+      trackPolicyAssistantAnswerReceived({
+        surface,
+        answer_type: answer?.answer_type ?? null,
+        status: deriveSupportStatus(answer),
+        request_id: res.request_id ?? null,
+      });
       setTurns((prev) => {
         const next = [
           ...prev,
@@ -366,12 +524,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     } finally {
       setSubmitting(false);
     }
-  }, [assignmentId, trimmed]);
+  }, [assignmentId, trimmed, surface]);
 
   const applySuggestion = (q: string) => {
     setMessage(q);
     setError('');
     setEmptySubmitHint(false);
+    // Mark the next submit as originating from a shortcut chip so
+    // analytics can distinguish it from raw textarea input.
+    submitSourceRef.current = 'shortcut';
     focusQuestionInput();
   };
 
@@ -408,13 +569,20 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     setMessage(text);
     setError('');
     setEmptySubmitHint(false);
+    // Mark the next submission as originating from a follow-up chip
+    // so QuestionSubmitted carries source='follow_up'.
+    submitSourceRef.current = 'follow_up';
     focusQuestionInput();
   };
 
-  const questionId =
-    layoutVariant === 'sideSheet' ? 'policy-assistant-question-sheet' : 'policy-assistant-question';
-  const shortcutsSectionId =
-    layoutVariant === 'sideSheet' ? 'policy-assistant-shortcuts-sheet' : 'policy-assistant-shortcuts';
+  // Card mode keeps the legacy ids; embedded (docked shell) uses
+  // -sheet suffix so the same DOM tree doesn't collide if multiple
+  // instances render.
+  const inSheetLike = layoutVariant !== 'card';
+  const questionId = inSheetLike ? 'policy-assistant-question-sheet' : 'policy-assistant-question';
+  const shortcutsSectionId = inSheetLike
+    ? 'policy-assistant-shortcuts-sheet'
+    : 'policy-assistant-shortcuts';
 
   const shortcuts = EMPLOYEE_POLICY_ASSISTANT_SUGGESTIONS.slice(0, 4);
 
@@ -424,9 +592,18 @@ export const EmployeePolicyAssistantPanel: React.FC<{
 
   const errorParts = error ? policyAssistantUserFacingError(error) : null;
 
+  // Empty state: no typed message AND no saved Q&A. Drives the
+  // "sample questions as hero cards" layout below; once the user
+  // types or submits anything we revert to the textarea-hero layout.
+  const isEmptyState = !message.trim() && turns.length === 0;
+
   const mainForm = (
     <>
-      {layoutVariant !== 'sideSheet' ? (
+      {/* Inner header is the panel's own title/subtitle pair. Card mode
+          owns the only chrome around the panel and renders it. The
+          embedded variant relies on PolicyAssistantDockedShell's header
+          — duplicating it here would render the title twice. */}
+      {layoutVariant === 'card' ? (
         <header className="mb-8 space-y-1.5">
           <h2 className="text-lg font-semibold tracking-tight text-[#0b2b43]">
             {EMPLOYEE_POLICY_ASSISTANT_TITLE}
@@ -438,6 +615,37 @@ export const EmployeePolicyAssistantPanel: React.FC<{
       ) : null}
 
       <div className="flex flex-col gap-8">
+        {/* Empty state hero: when there are no saved turns AND the
+            user hasn't started typing, lead with sample questions as
+            full-width clickable cards. First-time users find "what to
+            ask" harder than "how to ask"; the cards put a starter set
+            front-and-center. Once the user types or has saved Q&A,
+            switch back to the textarea-hero layout below. */}
+        {isEmptyState ? (
+          <section
+            id={shortcutsSectionId}
+            className="flex flex-col gap-3"
+            aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
+          >
+            <h3 className="text-sm font-semibold text-[#0b2b43] mb-1">Try one of these:</h3>
+            <ul className="flex flex-col gap-2">
+              {shortcuts.map((s) => (
+                <li key={s}>
+                  <button
+                    type="button"
+                    onClick={() => applySuggestion(s)}
+                    disabled={submitting}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left text-sm font-medium text-slate-700 transition-colors hover:border-[#0b2b43]/25 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <span className="min-w-0 leading-snug">{s}</span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         {/* Input + primary action */}
         <div className="flex flex-col gap-2" aria-busy={submitting}>
           <label htmlFor={questionId} className="sr-only">
@@ -446,10 +654,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           <textarea
             ref={textareaRef}
             id={questionId}
-            rows={6}
+            rows={isEmptyState ? 3 : 6}
             maxLength={8000}
             placeholder={EMPLOYEE_POLICY_ASSISTANT_PLACEHOLDER}
-            className="w-full resize-y min-h-[10rem] rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 focus:shadow-[0_1px_2px_rgba(15,23,42,0.06)] disabled:opacity-60"
+            className={`w-full resize-y rounded-lg border border-slate-300/90 bg-white px-3.5 py-3.5 text-sm text-slate-800 leading-relaxed shadow-sm placeholder:text-slate-400 transition-[border-color,box-shadow] focus:outline-none focus:border-[#0b2b43]/50 focus:ring-2 focus:ring-[#0b2b43]/12 focus:shadow-[0_1px_2px_rgba(15,23,42,0.06)] disabled:opacity-60 ${
+              isEmptyState ? 'min-h-[5rem]' : 'min-h-[10rem]'
+            }`}
             value={message}
             onChange={(e) => {
               setMessage(e.target.value);
@@ -484,6 +694,11 @@ export const EmployeePolicyAssistantPanel: React.FC<{
               EMPLOYEE_POLICY_ASSISTANT_SUBMIT
             )}
           </Button>
+          {isEmptyState ? (
+            <p className="text-xs text-slate-500 mt-0.5">
+              Or type your own question above.
+            </p>
+          ) : null}
           {emptySubmitHint ? (
             <p
               id="policy-assistant-empty-hint"
@@ -502,30 +717,41 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           ) : null}
         </div>
 
-        <section
-          id={shortcutsSectionId}
-          className="flex flex-col gap-2.5"
-          aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
-        >
-          <h3 className="text-xs font-medium text-slate-600">{EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}</h3>
-          <div className="flex flex-wrap gap-2">
-            {shortcuts.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => applySuggestion(s)}
-                disabled={submitting}
-                className="inline-flex h-9 min-h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 py-0 text-left text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:max-w-[280px]"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </section>
+        {/* Compact shortcut chips below the textarea, shown only when
+            the user is past the empty state (typing or has Q&A
+            history). The hero block above is the empty-state version. */}
+        {isEmptyState ? null : (
+          <section
+            id={shortcutsSectionId}
+            className="flex flex-col gap-2.5"
+            aria-label={EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}
+          >
+            <h3 className="text-xs font-medium text-slate-600">{EMPLOYEE_POLICY_ASSISTANT_SHORTCUTS_TITLE}</h3>
+            <div className="flex flex-wrap gap-2">
+              {shortcuts.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => applySuggestion(s)}
+                  disabled={submitting}
+                  className="inline-flex h-9 min-h-9 max-w-full items-center rounded-md border border-slate-200 bg-white px-3 py-0 text-left text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:max-w-[280px]"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
-        <div className="pt-1 border-t border-slate-200/80 space-y-1">
-          <p className="text-[11px] leading-relaxed text-slate-400">{EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER}</p>
-          <p className="text-[11px] leading-relaxed text-slate-400">{EMPLOYEE_POLICY_ASSISTANT_DISCLAIMER_SECONDARY}</p>
+        {/* Trust-signal pill — replaces the previous two paragraphs of
+            light-gray disclaimer text. Reads as a positive signal
+            ("we checked the source") rather than a defensive
+            afterthought, while keeping the legal hedge inline. */}
+        <div className="pt-1">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-900">
+            <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+            {EMPLOYEE_POLICY_ASSISTANT_TRUST_PILL}
+          </span>
         </div>
 
         {/* POLICY RESPONSE AREA — grounded policy output (not chat UI) */}
@@ -557,12 +783,15 @@ export const EmployeePolicyAssistantPanel: React.FC<{
           </div>
           {turns.length > 0 ? (
             <div className="space-y-4">
-              {[...turns].reverse().map((t) => (
+              {[...turns].reverse().map((t, index) => (
+                // The list is reversed so index 0 is the most recent
+                // turn — only that card renders the follow-up chip block.
                 <AnswerResultCard
                   key={t.id}
                   question={t.question}
                   answer={t.answer}
                   assistantTurnRequestId={t.assistantRequestId}
+                  isMostRecent={index === 0}
                   onFollowUpSelect={handleFollowUpFromAnswer}
                 />
               ))}
@@ -584,7 +813,8 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   );
 
   if (assignmentLoading && !assignmentId) {
-    if (layoutVariant === 'sideSheet') {
+    // embedded returns null because the docked shell controls visibility.
+    if (layoutVariant === 'embedded') {
       return null;
     }
     return (
@@ -596,8 +826,12 @@ export const EmployeePolicyAssistantPanel: React.FC<{
   }
 
   if (!assignmentId) {
-    if (layoutVariant === 'sideSheet') {
-      return null;
+    if (layoutVariant === 'embedded') {
+      // Docked shell is open but no assignment in scope — show a minimal
+      // honest message inside the panel rather than a blank dialog.
+      return (
+        <p className="text-sm text-slate-500">{EMPLOYEE_POLICY_ASSISTANT_NO_ASSIGNMENT}</p>
+      );
     }
     return (
       <Card padding="md" className="mb-6 border-slate-200 bg-slate-50/50">
@@ -608,33 +842,10 @@ export const EmployeePolicyAssistantPanel: React.FC<{
     );
   }
 
-  if (layoutVariant === 'sideSheet') {
-    return (
-      <PolicyAssistantSideSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        title={EMPLOYEE_POLICY_ASSISTANT_TITLE}
-        subtitle={EMPLOYEE_POLICY_ASSISTANT_SUBTITLE}
-        titleId="policy-assistant-sheet-title"
-        trigger={
-          <div className="sticky top-0 z-10 -mx-1 mb-4 flex flex-col items-end gap-1 bg-gradient-to-b from-white from-80% to-transparent pb-1 pt-1 px-1 sm:-mx-0">
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0 border-slate-300 text-[#0b2b43] font-medium shadow-sm"
-              onClick={() => setSheetOpen(true)}
-            >
-              {EMPLOYEE_POLICY_ASSISTANT_TITLE}
-            </Button>
-            <p className="hidden max-w-[15rem] text-right text-xs leading-snug text-slate-500 md:block">
-              Opens as a side panel. This page stays open.
-            </p>
-          </div>
-        }
-      >
-        {mainForm}
-      </PolicyAssistantSideSheet>
-    );
+  // Embedded: parent (PolicyAssistantDockedShell) provides the header +
+  // close affordance. Render the body bare.
+  if (layoutVariant === 'embedded') {
+    return <>{mainForm}</>;
   }
 
   return <Card padding="md" className="mb-6 border-slate-200">{mainForm}</Card>;

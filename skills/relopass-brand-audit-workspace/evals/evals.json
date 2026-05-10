@@ -1,0 +1,20 @@
+{
+  "skill_name": "relopass-brand-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Can you audit this homepage hero copy for ReloPass?\n\nHeadline: 'Your Relocation Journey, Simplified'\nSubheadline: 'ReloPass helps HR teams manage the full relocation process — from paperwork to move-in day — in one powerful, seamless platform.'\nCTA 1: 'Get started'\nCTA 2: 'Learn more'\nPage title (browser tab): 'ReloPass - Your Relocation Journey'",
+      "expected_output": "Structured audit output with scorecard, findings sorted by severity (site-wide title issue flagged 🔴 first), all forbidden phrases flagged ('journey', 'simplified', 'powerful', 'seamless'), rewrites provided, gap matrix filled, and top 3 priorities listed."
+    },
+    {
+      "id": 2,
+      "prompt": "We're preparing a pitch deck for Series A investors. Here's the problem slide:\n\nSlide title: 'The Problem'\nBody: 'Global workforce mobility is complex and stressful. HR teams struggle with managing relocations across multiple vendors, documents, and timelines. Employees experience uncertainty and anxiety during what should be an exciting new chapter. The process is fragmented, inefficient, and costly — and existing solutions don't solve the whole problem.'\n\nPlease review this slide and tell me what needs to change.",
+      "expected_output": "Content type identified as pitch deck. Problem slide audited: lifestyle language ('exciting new chapter') flagged, employee-emotion framing flagged as wrong primary angle for investor deck (needs market-level problem framing), 'complex and stressful' is too soft, missing quantification of market failure. Rewrites provided. Severity correctly assigned."
+    },
+    {
+      "id": 3,
+      "prompt": "Here's a draft of a one-page sales leave-behind we're using after demos. Can you check if it works?\n\nHEADER: ReloPass — Relocation Made Easy\n\nWHAT WE DO\nReloPass is an all-in-one relocation management platform that helps HR teams coordinate relocations across vendors, employees, and documents. Our powerful tools make it easy to track cases, manage documents, and keep everyone in the loop.\n\nHOW IT WORKS\n1. Onboard your team\n2. Add your relocations\n3. Manage everything in one place\n\nWHY RELOPASS\n- Seamless coordination\n- Real relocations, not demos\n- Best-in-class vendor network\n- Intuitive and easy to use\n\nREADY TO START?\nContact us at hello@relopass.com",
+      "expected_output": "Content type: one-pager. Multiple 🟠-level issues: tagline 'Relocation Made Easy' and 'all-in-one' are both forbidden. 'Powerful tools', 'seamless', 'best-in-class', 'intuitive', 'real relocations' all flagged. How it works steps are vague (no operational specificity). No category claim. CTA is an email address rather than a specific action. Full rewrites provided for each section."
+    }
+  ]
+}

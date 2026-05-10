@@ -13,13 +13,21 @@ if _REPO_ROOT not in sys.path:
 from backend.services.policy_assistant_analytics import (
     EVENT_ASSISTANT_ANSWER_GENERATED,
     EVENT_ASSISTANT_ANSWER_READINESS,
+    EVENT_ASSISTANT_ANSWER_RECEIVED,
     EVENT_ASSISTANT_ANSWER_TOPIC,
+    EVENT_ASSISTANT_DISMISSED,
     EVENT_ASSISTANT_FOLLOW_UP_CLICKED,
+    EVENT_ASSISTANT_OPENED,
     EVENT_ASSISTANT_QUESTION_ASKED,
+    EVENT_ASSISTANT_QUESTION_SUBMITTED,
     EVENT_ASSISTANT_QUESTION_SUPPORTED,
     EVENT_ASSISTANT_QUESTION_UNSUPPORTED,
     EVENT_ASSISTANT_REFUSAL_SHOWN,
+    emit_assistant_answer_received,
+    emit_assistant_dismissed,
     emit_assistant_follow_up_clicked,
+    emit_assistant_opened,
+    emit_assistant_question_submitted,
     record_policy_assistant_turn,
 )
 from backend.services.policy_assistant_answer_engine import ResolvedPolicyContext
@@ -128,6 +136,87 @@ class PolicyAssistantAnalyticsTests(unittest.TestCase):
         self.assertEqual(mock_emit.call_args[0][0], EVENT_ASSISTANT_FOLLOW_UP_CLICKED)
         ex = (mock_emit.call_args[1].get("extra") or {})
         self.assertEqual(ex.get("assistant_turn_request_id"), "turn-uuid-1")
+
+
+class Sprint15BeaconEmittersTests(unittest.TestCase):
+    """Sprint 1.5: the four UI-driven beacon emitters added to back the
+    assistant_opened / question_submitted / answer_received / dismissed
+    events. Each one writes through the shared analytics_service emit
+    pathway with surface + small enums + booleans only — no PII."""
+
+    @patch("backend.services.policy_assistant_analytics.emit_event")
+    def test_opened_emits_with_surface(self, mock_emit) -> None:
+        emit_assistant_opened(
+            role=PolicyAssistantRoleScope.EMPLOYEE,
+            request_id="rid-1",
+            surface="employee_fab",
+        )
+        mock_emit.assert_called_once()
+        self.assertEqual(mock_emit.call_args[0][0], EVENT_ASSISTANT_OPENED)
+        kwargs = mock_emit.call_args[1]
+        self.assertEqual(kwargs.get("user_role"), "employee")
+        self.assertEqual(kwargs.get("request_id"), "rid-1")
+        self.assertEqual((kwargs.get("extra") or {}).get("surface"), "employee_fab")
+
+    @patch("backend.services.policy_assistant_analytics.emit_event")
+    def test_question_submitted_records_source(self, mock_emit) -> None:
+        emit_assistant_question_submitted(
+            role=PolicyAssistantRoleScope.HR,
+            request_id="rid-2",
+            surface="hr_sidesheet",
+            source="shortcut",
+        )
+        mock_emit.assert_called_once()
+        self.assertEqual(mock_emit.call_args[0][0], EVENT_ASSISTANT_QUESTION_SUBMITTED)
+        ex = mock_emit.call_args[1].get("extra") or {}
+        self.assertEqual(ex.get("surface"), "hr_sidesheet")
+        self.assertEqual(ex.get("source"), "shortcut")
+
+    @patch("backend.services.policy_assistant_analytics.emit_event")
+    def test_answer_received_carries_status_and_turn_id(self, mock_emit) -> None:
+        emit_assistant_answer_received(
+            role=PolicyAssistantRoleScope.EMPLOYEE,
+            request_id="rid-3",
+            surface="employee_fab",
+            answer_type="entitlement_summary",
+            status="answered",
+            assistant_turn_request_id="turn-id-3",
+        )
+        mock_emit.assert_called_once()
+        self.assertEqual(mock_emit.call_args[0][0], EVENT_ASSISTANT_ANSWER_RECEIVED)
+        ex = mock_emit.call_args[1].get("extra") or {}
+        self.assertEqual(ex.get("status"), "answered")
+        self.assertEqual(ex.get("answer_type"), "entitlement_summary")
+        self.assertEqual(ex.get("assistant_turn_request_id"), "turn-id-3")
+
+    @patch("backend.services.policy_assistant_analytics.emit_event")
+    def test_dismissed_carries_engagement_booleans(self, mock_emit) -> None:
+        emit_assistant_dismissed(
+            role=PolicyAssistantRoleScope.EMPLOYEE,
+            request_id="rid-4",
+            surface="employee_fab",
+            had_question=True,
+            had_answer=False,
+        )
+        mock_emit.assert_called_once()
+        self.assertEqual(mock_emit.call_args[0][0], EVENT_ASSISTANT_DISMISSED)
+        ex = mock_emit.call_args[1].get("extra") or {}
+        self.assertEqual(ex.get("had_question"), True)
+        self.assertEqual(ex.get("had_answer"), False)
+
+    @patch("backend.services.policy_assistant_analytics.emit_event")
+    def test_dismissed_with_no_engagement(self, mock_emit) -> None:
+        """User opened then closed without typing — both booleans False."""
+        emit_assistant_dismissed(
+            role=PolicyAssistantRoleScope.EMPLOYEE,
+            request_id="rid-5",
+            surface="employee_fab",
+            had_question=False,
+            had_answer=False,
+        )
+        ex = mock_emit.call_args[1].get("extra") or {}
+        self.assertEqual(ex.get("had_question"), False)
+        self.assertEqual(ex.get("had_answer"), False)
 
 
 if __name__ == "__main__":

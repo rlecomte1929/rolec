@@ -1079,6 +1079,14 @@ class Database:
             except Exception as e:
                 log.warning("readiness template seed skipped: %s", e)
             try:
+                self.ensure_missing_readiness_templates()
+            except Exception as e:
+                log.warning("readiness template top-up skipped: %s", e)
+            try:
+                self.seed_dossier_questions_if_missing()
+            except Exception as e:
+                log.warning("dossier questions seed skipped: %s", e)
+            try:
                 self._backfill_employee_contacts()
             except Exception as e:
                 log.warning("employee_contacts backfill skipped: %s", e)
@@ -2100,36 +2108,86 @@ class Database:
                 ON catalog_employee_demand (company_id, last_seen_at DESC)
             """))
 
-            # Exception requests (T1.3) — Postgres has these via supabase migration
-            # 20260427100000_exception_requests.sql; mirror on SQLite for local dev
-            # so the FastAPI router works against the local file DB without Supabase.
+            # Policy Assistant RAG chunks (Sprint A). Postgres has this via
+            # supabase migration 20260503100000_policy_assistant_chunks.sql
+            # with pgvector. SQLite has no pgvector so we store the
+            # embedding as a JSON-encoded TEXT array — services/
+            # policy_chunk_retriever.py falls back to in-Python cosine
+            # similarity when running on SQLite.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_assistant_chunks (
+                    id TEXT PRIMARY KEY,
+                    company_id TEXT NOT NULL,
+                    policy_version_id TEXT,
+                    source_type TEXT NOT NULL,
+                    source_ref TEXT NOT NULL,
+                    chunk_text TEXT NOT NULL,
+                    chunk_metadata TEXT NOT NULL DEFAULT '{}',
+                    embedding TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (company_id, source_type, source_ref)
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_pac_company_sqlite
+                ON policy_assistant_chunks (company_id)
+            """))
+
+            # Exception requests — P2/P3 immigration-flag schema (supersedes old
+            # budget-exception schema; Postgres uses migration 20260427100000_*.sql).
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS exception_requests (
                     id TEXT PRIMARY KEY,
                     case_id TEXT NOT NULL,
-                    organization_id TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    requested_amount REAL NOT NULL,
-                    cap_amount REAL NOT NULL,
-                    currency TEXT NOT NULL,
-                    reason TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    hr_note TEXT,
-                    requested_by_user_id TEXT NOT NULL,
-                    resolved_by_user_id TEXT,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    assignment_id TEXT,
+                    exception_type TEXT NOT NULL,
+                    reason TEXT,
+                    severity TEXT NOT NULL DEFAULT 'warning'
+                      CHECK (severity IN ('warning','blocker')),
+                    status TEXT NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending','approved','denied','escalated','withdrawn')),
+                    recommended_action TEXT,
                     resolved_at TEXT,
-                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    resolved_by TEXT,
+                    resolution_notes TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
             """))
-            conn.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_exception_requests_case
-                ON exception_requests (case_id, created_at DESC)
-            """))
-            conn.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_exception_requests_org_status
-                ON exception_requests (organization_id, status, created_at DESC)
-            """))
+            # Migrate any old budget-exception tables that are missing the new columns
+            for _col, _dflt in [
+                ("severity", "'warning'"),
+                ("exception_type", "''"),
+                ("assignment_id", "NULL"),
+                ("recommended_action", "NULL"),
+                ("resolved_by", "NULL"),
+                ("resolution_notes", "NULL"),
+            ]:
+                try:
+                    conn.execute(text(
+                        f"ALTER TABLE exception_requests ADD COLUMN {_col} TEXT NOT NULL DEFAULT {_dflt}"
+                        if _dflt not in ("NULL",) else
+                        f"ALTER TABLE exception_requests ADD COLUMN {_col} TEXT"
+                    ))
+                except Exception:
+                    pass
+            try:
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_exception_requests_case
+                    ON exception_requests (case_id, created_at DESC)
+                """))
+            except Exception:
+                pass
+            try:
+                # organization_id only exists in the older budget-exceptions schema;
+                # the P2/P3 immigration-flags schema does not have it — skip safely.
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_exception_requests_org_status
+                    ON exception_requests (organization_id, status, created_at DESC)
+                """))
+            except Exception:
+                pass
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS company_policy_assistant_bindings (
                     company_id TEXT PRIMARY KEY,
@@ -3248,6 +3306,32 @@ class Database:
                     self._ensure_case_milestones_tracker_sqlite(conn)
                 except Exception:
                     pass
+            # P2/P3: exception_requests (HR sign-off flags)
+            if _is_sqlite:
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS exception_requests (
+                            id TEXT PRIMARY KEY,
+                            case_id TEXT NOT NULL,
+                            assignment_id TEXT,
+                            exception_type TEXT NOT NULL,
+                            reason TEXT,
+                            severity TEXT NOT NULL DEFAULT 'warning'
+                              CHECK (severity IN ('warning','blocker')),
+                            status TEXT NOT NULL DEFAULT 'pending'
+                              CHECK (status IN ('pending','approved','denied','escalated','withdrawn')),
+                            recommended_action TEXT,
+                            resolved_at TEXT,
+                            resolved_by TEXT,
+                            resolution_notes TEXT,
+                            created_at TEXT NOT NULL,
+                            updated_at TEXT NOT NULL
+                        )
+                    """))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_exception_requests_case ON exception_requests(case_id)"))
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_exception_requests_status ON exception_requests(status) WHERE status IN ('pending','escalated')"))
+                except Exception:
+                    pass
             # Analytics: workflow events for observability
             try:
                 conn.execute(text("""
@@ -3344,6 +3428,16 @@ class Database:
             self.seed_readiness_templates_if_empty()
         except Exception as e:
             log.warning("readiness template seed skipped: %s", e)
+
+        try:
+            self.ensure_missing_readiness_templates()
+        except Exception as e:
+            log.warning("readiness template top-up skipped: %s", e)
+
+        try:
+            self.seed_dossier_questions_if_missing()
+        except Exception as e:
+            log.warning("dossier questions seed skipped: %s", e)
 
         try:
             self._backfill_employee_contacts()
@@ -4655,6 +4749,220 @@ class Database:
                 request_id=request_id,
             ).fetchall()
         return self._rows_to_list(rows)
+
+    # ------------------------------------------------------------------
+    # Exception requests (P2/P3 — HR sign-off flags)
+    # ------------------------------------------------------------------
+
+    def list_exception_requests(
+        self,
+        case_id: str,
+        assignment_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Return all exception_request rows for a case, ordered blockers first
+        then by created_at DESC.
+
+        If assignment_id is also supplied, returns only rows matching that
+        assignment (useful for assignment-scoped timeline endpoints).
+        """
+        cid = self.coalesce_case_lookup_id(case_id)
+        with self.engine.connect() as conn:
+            if assignment_id:
+                rows = self._exec(
+                    conn,
+                    """SELECT id, case_id, assignment_id, exception_type, reason, severity,
+                       status, recommended_action, resolved_at, resolved_by,
+                       resolution_notes, created_at, updated_at
+                       FROM exception_requests
+                       WHERE case_id = :cid AND assignment_id = :aid
+                       ORDER BY
+                         CASE severity WHEN 'blocker' THEN 0 ELSE 1 END ASC,
+                         created_at DESC""",
+                    {"cid": cid, "aid": assignment_id},
+                    op_name="list_exception_requests",
+                    request_id=request_id,
+                ).fetchall()
+            else:
+                rows = self._exec(
+                    conn,
+                    """SELECT id, case_id, assignment_id, exception_type, reason, severity,
+                       status, recommended_action, resolved_at, resolved_by,
+                       resolution_notes, created_at, updated_at
+                       FROM exception_requests
+                       WHERE case_id = :cid
+                       ORDER BY
+                         CASE severity WHEN 'blocker' THEN 0 ELSE 1 END ASC,
+                         created_at DESC""",
+                    {"cid": cid},
+                    op_name="list_exception_requests",
+                    request_id=request_id,
+                ).fetchall()
+        return self._rows_to_list(rows)
+
+    def upsert_exception_request(
+        self,
+        case_id: str,
+        exception_type: str,
+        reason: str,
+        severity: str,
+        *,
+        assignment_id: Optional[str] = None,
+        recommended_action: Optional[str] = None,
+        status: str = "pending",
+        request_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Insert a new exception_request row, or update the reason/severity/
+        recommended_action on an existing one if (case_id, exception_type)
+        already exists with status='pending'.
+
+        Rows that have been resolved (approved/denied/withdrawn) are left
+        untouched — a new pending row is inserted alongside them instead.
+        """
+        cid = self.coalesce_case_lookup_id(case_id)
+        now = datetime.utcnow().isoformat()
+
+        # Try to UPDATE an existing pending row first (idempotent re-run).
+        with self.engine.begin() as conn:
+            result = self._exec(
+                conn,
+                """UPDATE exception_requests
+                   SET reason = :reason, severity = :sev,
+                       recommended_action = :ra, updated_at = :now
+                   WHERE case_id = :cid
+                     AND exception_type = :et
+                     AND status = 'pending'""",
+                {
+                    "cid": cid,
+                    "et": exception_type,
+                    "reason": reason,
+                    "sev": severity,
+                    "ra": recommended_action,
+                    "now": now,
+                },
+                op_name="update_exception_request",
+                request_id=request_id,
+            )
+            updated = getattr(result, "rowcount", 0)
+
+        if updated and updated > 0:
+            # Fetch the row we just updated.
+            with self.engine.connect() as conn:
+                row = self._exec(
+                    conn,
+                    """SELECT * FROM exception_requests
+                       WHERE case_id = :cid AND exception_type = :et
+                         AND status = 'pending'
+                       ORDER BY updated_at DESC LIMIT 1""",
+                    {"cid": cid, "et": exception_type},
+                    op_name="get_exception_request",
+                    request_id=request_id,
+                ).fetchone()
+            return self._row_to_dict(row) or {}
+
+        # No existing pending row — insert a new one.
+        eid = str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            self._exec(
+                conn,
+                """INSERT INTO exception_requests
+                   (id, case_id, assignment_id, exception_type, reason, severity,
+                    status, recommended_action, created_at, updated_at)
+                   VALUES (:id, :cid, :aid, :et, :reason, :sev,
+                           :status, :ra, :now, :now)""",
+                {
+                    "id": eid,
+                    "cid": cid,
+                    "aid": assignment_id,
+                    "et": exception_type,
+                    "reason": reason,
+                    "sev": severity,
+                    "status": status,
+                    "ra": recommended_action,
+                    "now": now,
+                },
+                op_name="insert_exception_request",
+                request_id=request_id,
+            )
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM exception_requests WHERE id = :id",
+                {"id": eid},
+                op_name="get_exception_request",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row) or {}
+
+    def update_exception_request(
+        self,
+        case_id: str,
+        exception_id: str,
+        status: str,
+        *,
+        resolved_by: Optional[str] = None,
+        resolution_notes: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Update the status (and optional resolution fields) of an existing
+        exception_request row.
+
+        Rules:
+          • Verifies the row belongs to case_id before updating (prevents
+            cross-case tampering via the API).
+          • Sets resolved_at = UTC now when moving to approved / denied /
+            escalated / withdrawn.
+          • Returns the updated row as a dict, or None if the row was not
+            found or does not belong to the given case.
+
+        Valid target statuses: approved | denied | escalated | withdrawn.
+        (The 'pending' status is managed by upsert_exception_request only.)
+        """
+        cid = self.coalesce_case_lookup_id(case_id)
+        now = datetime.utcnow().isoformat()
+        resolved_statuses = {"approved", "denied", "escalated", "withdrawn"}
+        resolved_at = now if status in resolved_statuses else None
+
+        with self.engine.begin() as conn:
+            result = self._exec(
+                conn,
+                """UPDATE exception_requests
+                   SET status           = :status,
+                       resolved_by      = :resolved_by,
+                       resolution_notes = :resolution_notes,
+                       resolved_at      = :resolved_at,
+                       updated_at       = :now
+                   WHERE id = :eid
+                     AND case_id = :cid""",
+                {
+                    "status": status,
+                    "resolved_by": resolved_by,
+                    "resolution_notes": resolution_notes,
+                    "resolved_at": resolved_at,
+                    "now": now,
+                    "eid": exception_id,
+                    "cid": cid,
+                },
+                op_name="update_exception_request_status",
+                request_id=request_id,
+            )
+            updated = getattr(result, "rowcount", 0)
+
+        if not updated:
+            return None  # row not found or wrong case_id
+
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT * FROM exception_requests WHERE id = :eid",
+                {"eid": exception_id},
+                op_name="get_exception_request",
+                request_id=request_id,
+            ).fetchone()
+        return self._row_to_dict(row) or None
 
     # ------------------------------------------------------------------
     # Analytics events (observability)
@@ -6367,6 +6675,516 @@ class Database:
             return json.loads(value)
         except Exception:
             return None
+
+    def seed_dossier_questions_if_missing(self) -> None:
+        """
+        Idempotent: insert destination dossier_questions that are not yet in the
+        local DB.  Mirrors the Supabase migration seed so local dev works without
+        running migrations manually.  Safe to call every startup.
+        """
+        _SEED: list = [
+            # ── DE — Germany (EU Blue Card / Skilled Worker) ──────────────────
+            ("DE", "immigration", "de.visa_type_confirmed",
+             "Has the work visa type been confirmed by your employer? (EU Blue Card or Skilled Worker Visa)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 10),
+            ("DE", "immigration", "de.qualifications_recognized",
+             "Have your foreign professional qualifications been formally recognised by the relevant German authority?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 20),
+            ("DE", "immigration", "de.consulate_appointment",
+             "Has your appointment at the German consulate been booked for the visa application?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 30),
+            ("DE", "immigration", "de.visa_submitted",
+             "Has your visa application been submitted to the German consulate?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 40),
+            ("DE", "registration", "de.anmeldung_completed",
+             "Have you registered your address (Anmeldung) at the local Einwohnermeldeamt within 14 days of arrival?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 50),
+            ("DE", "immigration", "de.aufenthaltstitel_submitted",
+             "Has your residence permit (Aufenthaltstitel) application been submitted to the Ausländerbehörde?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 60),
+            ("DE", "insurance", "de.health_insurance",
+             "Do you have statutory or private health insurance in place? (Required for the residence permit application)",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 70),
+            ("DE", "immigration", "de.dependents",
+             "Will any dependents (spouse, children) accompany you and require German visas or residence permits?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 80),
+            ("DE", "immigration", "de.dependent_details",
+             "If yes, how many dependents will apply for German residence permits?",
+             "text", None, False,
+             '{"field":"relocationBasics.hasDependents","op":"==","value":true}', 90),
+            # ── FR — France (Salarié / Passeport Talent) ─────────────────────
+            ("FR", "immigration", "fr.work_permit_route",
+             "Has your employer confirmed the work permit route (Salarié or Passeport Talent)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["France","FR"]}', 10),
+            ("FR", "immigration", "fr.consulate_appointment",
+             "Has your consulate appointment been booked for the long-stay visa application?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["France","FR"]}', 20),
+            ("FR", "immigration", "fr.vls_ts_submitted",
+             "Has your long-stay visa (VLS-TS) application been submitted to the consulate?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["France","FR"]}', 30),
+            ("FR", "immigration", "fr.ofii_completed",
+             "Have you completed the OFII arrival declaration and medical visit after entering France?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["France","FR"]}', 40),
+            ("FR", "immigration", "fr.titre_sejour_scheduled",
+             "Has your titre de séjour (residence permit) prefecture appointment been scheduled?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["France","FR"]}', 50),
+            ("FR", "housing", "fr.housing_proof",
+             "Do you have proof of housing available (signed lease or employer-provided accommodation)?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["France","FR"]}', 60),
+            ("FR", "immigration", "fr.dependents",
+             "Will any dependents (spouse, children) accompany you and require French visas or residency?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["France","FR"]}', 70),
+            ("FR", "immigration", "fr.dependent_details",
+             "If yes, how many dependents will apply for French residency documents?",
+             "text", None, False,
+             '{"field":"relocationBasics.hasDependents","op":"==","value":true}', 80),
+            # ── GB — UK Skilled Worker ────────────────────────────────────────
+            ("GB", "immigration", "gb.sponsor_licence",
+             "Does your employer hold an active UK Sponsor Licence issued by the Home Office?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 10),
+            ("GB", "immigration", "gb.cos_confirmed",
+             "Has a Certificate of Sponsorship (CoS) been assigned to you by your employer?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 20),
+            ("GB", "immigration", "gb.salary_threshold",
+             "Does your salary meet the Skilled Worker visa general threshold (£38,700 or SOC going rate, whichever is higher)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 30),
+            ("GB", "immigration", "gb.points_eligibility",
+             "Have the mandatory 70 points under the UK points-based system been confirmed? (Job offer 20 pts + sponsor 20 pts + salary 20 pts + English 10 pts)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 40),
+            ("GB", "immigration", "gb.english_evidence",
+             "Is English language evidence available? (degree taught in English, or approved test such as IELTS/LanguageCert)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 50),
+            ("GB", "registration", "gb.move_date_confirm",
+             "Do you have a confirmed arrival date in the UK?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.targetMoveDate","op":"exists","value":false}', 60),
+            ("GB", "immigration", "gb.dependents",
+             "Will any dependents (spouse, children) accompany you and require a UK Dependant visa?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["United Kingdom","GB","UK"]}', 70),
+            ("GB", "immigration", "gb.dependent_details",
+             "If yes, how many dependents will apply for UK Dependant visas?",
+             "text", None, False,
+             '{"field":"relocationBasics.hasDependents","op":"==","value":true}', 80),
+            # ── NO — Norway (Skilled Worker Permit / EEA Registration) ───────
+            ("NO", "immigration", "no.permit_type_confirmed",
+             "Has the work authorisation type been confirmed? (Skilled Worker Permit for non-EU/EEA, or Registration Certificate for EU/EEA nationals)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Norway","NO","Oslo"]}', 10),
+            ("NO", "immigration", "no.udi_application_submitted",
+             "Has the Skilled Worker Permit application been submitted to UDI (Utlendingsdirektoratet)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Norway","NO","Oslo"]}', 20),
+            ("NO", "immigration", "no.permit_granted",
+             "Has the Norwegian work permit or EEA registration certificate been granted?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Norway","NO","Oslo"]}', 30),
+            ("NO", "registration", "no.d_number",
+             "Have you obtained a Norwegian D-number or national identity number (fødselsnummer) from Skatteetaten?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Norway","NO","Oslo"]}', 40),
+            ("NO", "registration", "no.skattekort",
+             "Have you obtained your tax card (Skattekort) from Skatteetaten? (Required before first payroll)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Norway","NO","Oslo"]}', 50),
+            ("NO", "registration", "no.folkeregisteret",
+             "Have you registered your Norwegian address with the National Population Register (Folkeregisteret)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Norway","NO","Oslo"]}', 60),
+            ("NO", "insurance", "no.health_coverage",
+             "Are you enrolled in the Norwegian National Insurance Scheme (Folketrygden) or do you have private coverage?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Norway","NO","Oslo"]}', 70),
+            ("NO", "immigration", "no.dependents",
+             "Will any dependents (spouse, children) accompany you and require Norwegian family immigration permits?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Norway","NO","Oslo"]}', 80),
+            ("NO", "immigration", "no.dependent_details",
+             "If yes, how many dependents will apply for Norwegian family immigration permits?",
+             "text", None, False,
+             '{"field":"relocationBasics.hasDependents","op":"==","value":true}', 90),
+            # ── BR — Brazil (VITEM V / CRNM) ──────────────────────────────────
+            ("BR", "immigration", "br.mte_authorization",
+             "Has the employer obtained work authorisation approval from the Ministry of Labour (SINFRE/MTE)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Brazil","BR","Rio de Janeiro"]}', 10),
+            ("BR", "immigration", "br.consulate_appointment",
+             "Has a consulate appointment been booked for the VITEM V (temporary worker) visa application?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Brazil","BR","Rio de Janeiro"]}', 20),
+            ("BR", "immigration", "br.vitem_v_submitted",
+             "Has the VITEM V work visa application been submitted at the Brazilian consulate?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Brazil","BR","Rio de Janeiro"]}', 30),
+            ("BR", "immigration", "br.vitem_v_granted",
+             "Has the VITEM V work visa been granted?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Brazil","BR","Rio de Janeiro"]}', 40),
+            ("BR", "immigration", "br.crnm_registered",
+             "Has the CRNM (Carteira de Registro Nacional Migratório) been registered at the Federal Police within 90 days of arrival?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Brazil","BR","Rio de Janeiro"]}', 50),
+            ("BR", "registration", "br.cpf_registered",
+             "Has your CPF (Cadastro de Pessoas Físicas) tax ID number been registered with Receita Federal?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Brazil","BR","Rio de Janeiro"]}', 60),
+            ("BR", "insurance", "br.health_insurance",
+             "Do you have Brazilian private health insurance (plano de saúde) in place?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Brazil","BR","Rio de Janeiro"]}', 70),
+            ("BR", "immigration", "br.dependents",
+             "Will any dependents accompany you and require Brazilian visas or residency documents?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Brazil","BR","Rio de Janeiro"]}', 80),
+            # ── IT — Italy (Nulla Osta / Permesso di Soggiorno) ───────────────
+            ("IT", "immigration", "it.nulla_osta",
+             "Has the Nulla Osta (work authorisation) been obtained from the Sportello Unico per l'Immigrazione?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Italy","IT","Rome","Roma"]}', 10),
+            ("IT", "immigration", "it.type_d_visa_submitted",
+             "Has the National (Type D) visa application been submitted at the Italian consulate?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Italy","IT","Rome","Roma"]}', 20),
+            ("IT", "immigration", "it.type_d_visa_granted",
+             "Has the Italian National (Type D) visa been granted?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Italy","IT","Rome","Roma"]}', 30),
+            ("IT", "immigration", "it.permesso_soggiorno",
+             "Has the Permesso di Soggiorno (residence permit) application been submitted to the Questura within 8 working days of arrival?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Italy","IT","Rome","Roma"]}', 40),
+            ("IT", "registration", "it.codice_fiscale",
+             "Have you obtained your Italian tax code (Codice Fiscale) from the Agenzia delle Entrate?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Italy","IT","Rome","Roma"]}', 50),
+            ("IT", "insurance", "it.asl_enrollment",
+             "Have you enrolled in the Italian national healthcare system (SSN/ASL)?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Italy","IT","Rome","Roma"]}', 60),
+            ("IT", "registration", "it.residenza",
+             "Have you registered your Italian address at the local municipality (Residenza anagrafica)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Italy","IT","Rome","Roma"]}', 70),
+            ("IT", "immigration", "it.dependents",
+             "Will any dependents accompany you and require Italian family visas or residence permits?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Italy","IT","Rome","Roma"]}', 80),
+            # ── ES — Spain (Work & Residence Authorization / NIE) ─────────────
+            ("ES", "immigration", "es.work_auth_submitted",
+             "Has the combined work and residence authorisation (autorización de residencia y trabajo) been applied for?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Spain","ES","Madrid"]}', 10),
+            ("ES", "immigration", "es.visa_granted",
+             "Has the Spanish work/residence visa been granted at the consulate?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Spain","ES","Madrid"]}', 20),
+            ("ES", "registration", "es.nie_obtained",
+             "Have you obtained your NIE (Número de Identidad de Extranjero) — the Spanish foreigner identification number?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Spain","ES","Madrid"]}', 30),
+            ("ES", "registration", "es.empadronamiento",
+             "Have you completed the Empadronamiento (municipal address registration) at your local town hall (Ayuntamiento)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Spain","ES","Madrid"]}', 40),
+            ("ES", "immigration", "es.tie_submitted",
+             "Has the TIE (Tarjeta de Identidad de Extranjero) residence card application been submitted to the Policía Nacional?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Spain","ES","Madrid"]}', 50),
+            ("ES", "registration", "es.social_security",
+             "Have you obtained your Spanish Social Security number (Número de Afiliación a la Seguridad Social)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Spain","ES","Madrid"]}', 60),
+            ("ES", "insurance", "es.health_coverage",
+             "Do you have access to Spanish public healthcare (via Social Security) or private health insurance?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Spain","ES","Madrid"]}', 70),
+            ("ES", "immigration", "es.dependents",
+             "Will any dependents accompany you and require Spanish family residence visas?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Spain","ES","Madrid"]}', 80),
+            # ── AU — Australia (TSS 482 / ENS 186) ───────────────────────────────
+            ("AU", "immigration", "au.visa_type_confirmed",
+             "Has the visa type been confirmed by your employer? (Temporary Skill Shortage subclass 482, or Employer Nomination subclass 186)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Australia","AU","Sydney","Melbourne","Brisbane","Perth","Adelaide"]}', 10),
+            ("AU", "immigration", "au.labour_market_testing",
+             "Has Labour Market Testing (LMT) been completed and documented by the employer?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Australia","AU","Sydney","Melbourne","Brisbane","Perth","Adelaide"]}', 20),
+            ("AU", "immigration", "au.skills_assessment",
+             "Has the skills assessment been submitted to the relevant Australian assessing authority (if required for your occupation)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Australia","AU","Sydney","Melbourne","Brisbane","Perth","Adelaide"]}', 30),
+            ("AU", "immigration", "au.visa_lodged",
+             "Has the visa application been lodged with the Australian Department of Home Affairs?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Australia","AU","Sydney","Melbourne","Brisbane","Perth","Adelaide"]}', 40),
+            ("AU", "registration", "au.tfn_applied",
+             "Have you applied for a Tax File Number (TFN) with the Australian Taxation Office (ATO)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Australia","AU","Sydney","Melbourne","Brisbane","Perth","Adelaide"]}', 50),
+            ("AU", "insurance", "au.medicare_health",
+             "Have you enrolled in Medicare (if eligible) or arranged private overseas health insurance?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Australia","AU","Sydney","Melbourne","Brisbane","Perth","Adelaide"]}', 60),
+            ("AU", "registration", "au.superannuation",
+             "Has your employer nominated or confirmed a superannuation fund for compulsory contributions?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Australia","AU","Sydney","Melbourne","Brisbane","Perth","Adelaide"]}', 70),
+            ("AU", "immigration", "au.dependents",
+             "Will any dependents accompany you and require Australian secondary applicant visas?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Australia","AU","Sydney","Melbourne","Brisbane","Perth","Adelaide"]}', 80),
+            # ── CA — Canada (Work Permit / LMIA) ─────────────────────────────────
+            ("CA", "immigration", "ca.permit_route_confirmed",
+             "Has the work permit route been confirmed? (LMIA-required, LMIA-exempt via CUSMA/USMCA, Intracompany Transfer, or Express Entry)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Canada","CA","Toronto","Vancouver","Montreal"]}', 10),
+            ("CA", "immigration", "ca.lmia_obtained",
+             "Has the employer obtained a positive Labour Market Impact Assessment (LMIA) from ESDC (if required for your work permit route)?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Canada","CA","Toronto","Vancouver","Montreal"]}', 20),
+            ("CA", "immigration", "ca.work_permit_submitted",
+             "Has the Canadian work permit application been submitted online or at a port of entry?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Canada","CA","Toronto","Vancouver","Montreal"]}', 30),
+            ("CA", "immigration", "ca.work_permit_granted",
+             "Has the Canadian work permit been granted?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Canada","CA","Toronto","Vancouver","Montreal"]}', 40),
+            ("CA", "registration", "ca.sin_obtained",
+             "Have you obtained a Social Insurance Number (SIN) from Service Canada?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Canada","CA","Toronto","Vancouver","Montreal"]}', 50),
+            ("CA", "insurance", "ca.provincial_health",
+             "Have you enrolled in the provincial health insurance plan? (Note: most provinces have a 3-month waiting period — interim private insurance is recommended)",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Canada","CA","Toronto","Vancouver","Montreal"]}', 60),
+            ("CA", "immigration", "ca.dependents",
+             "Will any dependents accompany you and require open or restricted Canadian work/study permits?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Canada","CA","Toronto","Vancouver","Montreal"]}', 70),
+            # ── CH — Switzerland (Permit B/L) ─────────────────────────────────────
+            ("CH", "immigration", "ch.permit_type_confirmed",
+             "Has the Swiss residence/work permit type been confirmed with the cantonal migration office? (Permit L for short stay, B for annual stay)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Switzerland","CH","Zurich","Geneva","Bern","Basel","Lausanne"]}', 10),
+            ("CH", "immigration", "ch.cantonal_permit_submitted",
+             "Has the cantonal migration office permit application been submitted by the employer?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Switzerland","CH","Zurich","Geneva","Bern","Basel","Lausanne"]}', 20),
+            ("CH", "immigration", "ch.permit_granted",
+             "Has the Swiss residence and work permit been granted?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Switzerland","CH","Zurich","Geneva","Bern","Basel","Lausanne"]}', 30),
+            ("CH", "registration", "ch.commune_registration",
+             "Have you registered your address at the local commune (Einwohnerkontrolle / contrôle des habitants) within 14 days of arrival?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Switzerland","CH","Zurich","Geneva","Bern","Basel","Lausanne"]}', 40),
+            ("CH", "insurance", "ch.health_insurance",
+             "Is mandatory Swiss health insurance (Krankenkasse / assurance maladie) in place? (Required within 3 months of arrival)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Switzerland","CH","Zurich","Geneva","Bern","Basel","Lausanne"]}', 50),
+            ("CH", "registration", "ch.ahv_number",
+             "Have you received your AHV/AVS social security number from the cantonal compensation office?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Switzerland","CH","Zurich","Geneva","Bern","Basel","Lausanne"]}', 60),
+            ("CH", "immigration", "ch.dependents",
+             "Will any dependents accompany you and require Swiss family reunion permits?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Switzerland","CH","Zurich","Geneva","Bern","Basel","Lausanne"]}', 70),
+            # ── HK — Hong Kong (Employment Visa) ─────────────────────────────────
+            ("HK", "immigration", "hk.employment_visa_submitted",
+             "Has the employment visa application been submitted to the Hong Kong Immigration Department?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Hong Kong","HK","Kowloon"]}', 10),
+            ("HK", "immigration", "hk.employment_visa_granted",
+             "Has the Hong Kong employment visa been granted?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Hong Kong","HK","Kowloon"]}', 20),
+            ("HK", "registration", "hk.hkid_obtained",
+             "Have you obtained your Hong Kong Identity Card (HKID) at an Immigration Services Centre within 30 days of arrival?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Hong Kong","HK","Kowloon"]}', 30),
+            ("HK", "registration", "hk.mpf_enrolled",
+             "Has your employer enrolled you in the Mandatory Provident Fund (MPF) scheme?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Hong Kong","HK","Kowloon"]}', 40),
+            ("HK", "registration", "hk.ird_tax",
+             "Have you noted your obligations with the Inland Revenue Department (IRD) for salaries tax?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Hong Kong","HK","Kowloon"]}', 50),
+            ("HK", "immigration", "hk.dependents",
+             "Will any dependents accompany you and require Hong Kong Dependant Visas?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Hong Kong","HK","Kowloon"]}', 60),
+            # ── JP — Japan (COE / Work Visa) ──────────────────────────────────────
+            ("JP", "immigration", "jp.coe_obtained",
+             "Has the Certificate of Eligibility (COE) been obtained from the Regional Immigration Services Bureau by the employer?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Japan","JP","Tokyo","Osaka","Fukuoka"]}', 10),
+            ("JP", "immigration", "jp.work_visa_submitted",
+             "Has the Japanese work visa application (Engineer/Specialist in Humanities or equivalent) been submitted at the consulate?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Japan","JP","Tokyo","Osaka","Fukuoka"]}', 20),
+            ("JP", "immigration", "jp.work_visa_granted",
+             "Has the Japanese work visa been granted?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Japan","JP","Tokyo","Osaka","Fukuoka"]}', 30),
+            ("JP", "registration", "jp.juminhyo_registered",
+             "Have you completed resident registration (Juminhyo) at the municipal office within 14 days of establishing residence?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Japan","JP","Tokyo","Osaka","Fukuoka"]}', 40),
+            ("JP", "registration", "jp.my_number",
+             "Have you received your My Number (Individual Number) notification card from the municipality?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Japan","JP","Tokyo","Osaka","Fukuoka"]}', 50),
+            ("JP", "insurance", "jp.health_insurance",
+             "Are you enrolled in Japanese health insurance via your employer (Shakai Hoken) or the National Health Insurance (Kokumin Kenko Hoken)?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Japan","JP","Tokyo","Osaka","Fukuoka"]}', 60),
+            ("JP", "immigration", "jp.dependents",
+             "Will any dependents accompany you and require Japanese Dependent (Kazoku Taizai) visas?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Japan","JP","Tokyo","Osaka","Fukuoka"]}', 70),
+            # ── NL — Netherlands (Highly Skilled Migrant / IND) ──────────────────
+            ("NL", "immigration", "nl.kennismigrant_confirmed",
+             "Has the Highly Skilled Migrant (Kennismigrant) permit route been confirmed with the IND by the recognised employer?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Netherlands","NL","Amsterdam","Rotterdam","Utrecht","The Hague"]}', 10),
+            ("NL", "immigration", "nl.ind_application_submitted",
+             "Has the IND (Immigratie en Naturalisatiedienst) permit application been submitted by the employer?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Netherlands","NL","Amsterdam","Rotterdam","Utrecht","The Hague"]}', 20),
+            ("NL", "immigration", "nl.residence_permit_granted",
+             "Has the Dutch residence permit (verblijfsvergunning) been granted?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Netherlands","NL","Amsterdam","Rotterdam","Utrecht","The Hague"]}', 30),
+            ("NL", "registration", "nl.bsn_obtained",
+             "Have you obtained a BSN (Burgerservicenummer — Dutch citizen service number) at the municipality?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Netherlands","NL","Amsterdam","Rotterdam","Utrecht","The Hague"]}', 40),
+            ("NL", "insurance", "nl.health_insurance",
+             "Is mandatory Dutch health insurance (basisverzekering) in place? (Required within 4 months of registering as resident)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Netherlands","NL","Amsterdam","Rotterdam","Utrecht","The Hague"]}', 50),
+            ("NL", "registration", "nl.digid_applied",
+             "Have you applied for a DigiD (Dutch digital identity) for access to online government services?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Netherlands","NL","Amsterdam","Rotterdam","Utrecht","The Hague"]}', 60),
+            ("NL", "immigration", "nl.dependents",
+             "Will any dependents accompany you and require Dutch family reunification permits?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["Netherlands","NL","Amsterdam","Rotterdam","Utrecht","The Hague"]}', 70),
+            # ── AE — UAE (Employment Entry Permit / Residence Visa) ───────────────
+            ("AE", "immigration", "ae.entry_permit_obtained",
+             "Has the Employment Entry Permit been obtained from MOHRE (Ministry of Human Resources and Emiratisation)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["UAE","AE","Dubai","Abu Dhabi","Sharjah"]}', 10),
+            ("AE", "immigration", "ae.medical_fitness",
+             "Has the mandatory medical fitness test (including blood test and chest X-ray) been completed in the UAE?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["UAE","AE","Dubai","Abu Dhabi","Sharjah"]}', 20),
+            ("AE", "immigration", "ae.residence_visa_stamped",
+             "Has the UAE residence visa been stamped in the passport by the General Directorate of Residency and Foreigners Affairs (GDRFA)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["UAE","AE","Dubai","Abu Dhabi","Sharjah"]}', 30),
+            ("AE", "registration", "ae.emirates_id",
+             "Has the Emirates ID application been submitted to the ICP (Federal Authority for Identity, Citizenship, Customs and Port Security)?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["UAE","AE","Dubai","Abu Dhabi","Sharjah"]}', 40),
+            ("AE", "registration", "ae.work_permit_issued",
+             "Has the MOHRE work permit / labour card been issued?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["UAE","AE","Dubai","Abu Dhabi","Sharjah"]}', 50),
+            ("AE", "insurance", "ae.health_insurance",
+             "Is UAE mandatory health insurance in place? (Required by law; employer must provide for employees in Dubai and Abu Dhabi)",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["UAE","AE","Dubai","Abu Dhabi","Sharjah"]}', 60),
+            ("AE", "immigration", "ae.dependents",
+             "Will any dependents accompany you and require UAE residence visas as your dependants?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["UAE","AE","Dubai","Abu Dhabi","Sharjah"]}', 70),
+            # ── ZA — South Africa (Critical Skills / Work Visa) ───────────────────
+            ("ZA", "immigration", "za.visa_type_confirmed",
+             "Has the visa type been confirmed? (Critical Skills Work Visa, General Work Visa, or Intra-Company Transfer Work Visa)",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["South Africa","ZA","Johannesburg","Cape Town","Durban","Pretoria"]}', 10),
+            ("ZA", "immigration", "za.saqa_evaluation",
+             "Has the SAQA (South African Qualifications Authority) foreign qualification evaluation been submitted (if required for your visa category)?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["South Africa","ZA","Johannesburg","Cape Town","Durban","Pretoria"]}', 20),
+            ("ZA", "immigration", "za.work_visa_submitted",
+             "Has the South African work visa application been submitted at the nearest VFS Global / SA mission?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["South Africa","ZA","Johannesburg","Cape Town","Durban","Pretoria"]}', 30),
+            ("ZA", "immigration", "za.work_visa_granted",
+             "Has the South African work visa been granted?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["South Africa","ZA","Johannesburg","Cape Town","Durban","Pretoria"]}', 40),
+            ("ZA", "registration", "za.sars_tax_number",
+             "Have you registered with SARS (South African Revenue Service) for a South African tax number?",
+             "boolean", None, True,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["South Africa","ZA","Johannesburg","Cape Town","Durban","Pretoria"]}', 50),
+            ("ZA", "insurance", "za.health_insurance",
+             "Do you have private health insurance (medical aid scheme) in South Africa? (Public healthcare has long wait times — private cover is strongly recommended)",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["South Africa","ZA","Johannesburg","Cape Town","Durban","Pretoria"]}', 60),
+            ("ZA", "immigration", "za.dependents",
+             "Will any dependents accompany you and require South African relative's visas?",
+             "boolean", None, False,
+             '{"field":"relocationBasics.destCountry","op":"in","value":["South Africa","ZA","Johannesburg","Cape Town","Durban","Pretoria"]}', 70),
+        ]
+        now = datetime.utcnow().isoformat()
+        for row in _SEED:
+            dest, domain, qkey, qtext, atype, opts, mandatory, applies, sort = row
+            try:
+                with self.engine.connect() as conn:
+                    existing = conn.execute(
+                        text("SELECT id FROM dossier_questions WHERE destination_country=:d AND question_key=:k"),
+                        {"d": dest, "k": qkey},
+                    ).fetchone()
+                if existing:
+                    continue
+                with self.engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "INSERT INTO dossier_questions "
+                            "(id, destination_country, domain, question_key, question_text, answer_type, "
+                            "options, is_mandatory, applies_if, sort_order, version, created_at) "
+                            "VALUES (:id,:dest,:domain,:key,:text,:atype,:opts,:mand,:app,:sort,1,:now)"
+                        ),
+                        {
+                            "id": str(uuid.uuid4()), "dest": dest, "domain": domain,
+                            "key": qkey, "text": qtext, "atype": atype,
+                            "opts": json.dumps(opts) if opts is not None else None,
+                            "mand": 1 if mandatory else 0,
+                            "app": applies, "sort": sort, "now": now,
+                        },
+                    )
+                log.info("dossier_question seeded: %s / %s", dest, qkey)
+            except Exception as e:
+                log.warning("dossier_question seed skipped (%s/%s): %s", dest, qkey, e)
 
     def list_dossier_questions(self, destination_country: str) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
@@ -13982,6 +14800,101 @@ class Database:
                         },
                     )
 
+    def ensure_missing_readiness_templates(self) -> None:
+        """
+        Idempotent top-up: insert any destination templates present in the JSON
+        seed file that are not yet in the database.  Safe to call every startup —
+        rows that already exist (matched on destination_key + route_key) are
+        skipped via INSERT OR IGNORE / ON CONFLICT DO NOTHING.
+        """
+        if not self._readiness_store_available():
+            return
+        seed_path = os.path.join(os.path.dirname(__file__), "seed_data", "readiness_templates.json")
+        if not os.path.isfile(seed_path):
+            return
+        with open(seed_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        templates = payload.get("templates") or []
+        _is_sqlite = str(self.engine.url).startswith("sqlite")
+        now = datetime.utcnow().isoformat()
+        for t in templates:
+            dest = (t.get("destination_key") or "").strip().upper()
+            route = (t.get("route_key") or DEFAULT_ROUTE_KEY).strip() or DEFAULT_ROUTE_KEY
+            if not dest:
+                continue
+            # Check if this destination+route already exists
+            with self.engine.connect() as conn:
+                existing = conn.execute(
+                    text("SELECT id FROM readiness_templates WHERE destination_key = :dk AND route_key = :rk"),
+                    {"dk": dest, "rk": route},
+                ).fetchone()
+            if existing:
+                continue  # already seeded
+            # Insert template + children
+            tid = str(uuid.uuid4())
+            watchouts = json.dumps(t.get("watchouts") or [])
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "INSERT INTO readiness_templates "
+                        "(id, destination_key, route_key, route_title, employee_summary, hr_summary, "
+                        "internal_notes_hr, watchouts_json, updated_at) "
+                        "VALUES (:id, :dk, :rk, :rt, :es, :hs, :inh, :wj, :ua)"
+                    ),
+                    {
+                        "id": tid,
+                        "dk": dest,
+                        "rk": route,
+                        "rt": t.get("route_title") or f"{dest} — {route}",
+                        "es": t.get("employee_summary") or "",
+                        "hs": t.get("hr_summary") or "",
+                        "inh": t.get("internal_notes_hr"),
+                        "wj": watchouts,
+                        "ua": now,
+                    },
+                )
+                for c in t.get("checklist") or []:
+                    conn.execute(
+                        text(
+                            "INSERT INTO readiness_template_checklist_items "
+                            "(id, template_id, sort_order, title, owner_role, required, depends_on_sort_order, "
+                            "notes_employee, notes_hr, stable_key) "
+                            "VALUES (:id, :tid, :so, :title, :own, :req, :dep, :ne, :nh, :sk)"
+                        ),
+                        {
+                            "id": str(uuid.uuid4()),
+                            "tid": tid,
+                            "so": int(c.get("sort_order") or 0),
+                            "title": c.get("title") or "Item",
+                            "own": (c.get("owner_role") or "employee").strip(),
+                            "req": 1 if c.get("required", True) else 0,
+                            "dep": c.get("depends_on_sort_order"),
+                            "ne": c.get("notes_employee"),
+                            "nh": c.get("notes_hr"),
+                            "sk": c.get("stable_key"),
+                        },
+                    )
+                for m in t.get("milestones") or []:
+                    conn.execute(
+                        text(
+                            "INSERT INTO readiness_template_milestones "
+                            "(id, template_id, sort_order, phase, title, body_employee, body_hr, owner_role, relative_timing) "
+                            "VALUES (:id, :tid, :so, :ph, :title, :be, :bh, :own, :rt)"
+                        ),
+                        {
+                            "id": str(uuid.uuid4()),
+                            "tid": tid,
+                            "so": int(m.get("sort_order") or 0),
+                            "ph": (m.get("phase") or "general").strip(),
+                            "title": m.get("title") or "Milestone",
+                            "be": m.get("body_employee"),
+                            "bh": m.get("body_hr"),
+                            "own": (m.get("owner_role") or "hr").strip(),
+                            "rt": m.get("relative_timing"),
+                        },
+                    )
+            log.info("readiness template seeded: %s / %s", dest, route)
+
     def get_readiness_template(self, destination_key: str, route_key: str) -> Optional[Dict[str, Any]]:
         if not self._readiness_store_available():
             return None
@@ -13996,7 +14909,21 @@ class Database:
 
     def resolve_readiness_destination_for_assignment(self, assignment_id: str) -> Tuple[Optional[str], Optional[str]]:
         """
-        Returns (destination_raw, destination_key) from employee profile, then relocation case.
+        Returns (destination_raw, destination_key) for the assignment.
+
+        Priority:
+          1. Employee profile (intake form) — most recent first-party answer
+          2. Canonical `relocation_cases.host_country` column — set by the
+             intake/admin flow and updated on reassignment
+          3. Case `profile_json.movePlan.destination` — historical blob,
+             may be stale (e.g. assignment was reassigned but the blob was
+             never re-saved)
+
+        The blob is the LAST fallback, not the first, because we have seen
+        cases where it disagrees with the canonical column (e.g. monica's
+        case had host_country="Japan" but profile_json said "Singapore",
+        causing the readiness summary to mislabel a Japan assignment with
+        a Singapore template).
         """
         prof = self.get_employee_profile(assignment_id)
         raw = extract_destination_from_profile(prof)
@@ -14006,10 +14933,11 @@ class Database:
                 cid = (asn.get("case_id") or "").strip()
                 case = self.get_case_by_id(cid) if cid else None
                 if case:
-                    pj = case.get("profile_json")
-                    raw = extract_destination_from_case_profile(pj)
-                    if not raw and case.get("host_country"):
-                        raw = str(case.get("host_country")).strip()
+                    if case.get("host_country"):
+                        raw = str(case.get("host_country")).strip() or None
+                    if not raw:
+                        # Last-resort fallback to the historical blob.
+                        raw = extract_destination_from_case_profile(case.get("profile_json"))
         key = normalize_destination_key(raw)
         return raw, key
 
