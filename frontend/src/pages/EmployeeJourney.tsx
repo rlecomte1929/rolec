@@ -23,13 +23,14 @@ import { getLastVisited } from '../utils/employeeCaseProgress';
  * (so re-entering doesn't force them through the wizard again). Falls
  * back to the case summary page when no last-visited is recorded.
  *
- * `awaiting_intake` is the entry condition for the intake wizard, so we
- * always send those cases straight to step 1 of the wizard rather than
- * the summary (which would otherwise be the empty-state of an unstarted
- * case) or any stale last-visited URL.
+ * Both `assigned` (fresh assignment from HR, employee hasn't started
+ * intake yet) and `awaiting_intake` (employee started intake but hasn't
+ * submitted) are pre-intake states whose entry point is the wizard.
+ * Send both straight to step 1 rather than the summary (empty for a
+ * fresh case) or any stale last-visited URL.
  */
 function openCaseHref(assignmentId: string, status?: string | null): string {
-  if (status === 'awaiting_intake') {
+  if (status === 'awaiting_intake' || status === 'assigned') {
     return `/employee/case/${assignmentId}/wizard/1`;
   }
   return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
