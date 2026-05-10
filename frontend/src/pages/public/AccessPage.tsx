@@ -15,7 +15,7 @@ import { accessContent } from './accessContent';
 
 export const AccessPage: React.FC = () => {
   usePageMeta({
-    title: 'Get Started — ReloPass',
+    title: 'Get Started · ReloPass',
     description: 'Book a demo, sign in, or create an account. 30-minute walkthrough. No commitment.',
     ogUrl: 'https://www.relopass.com/access',
   });

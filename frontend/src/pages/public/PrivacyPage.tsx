@@ -30,7 +30,7 @@ function renderBody(text: string): React.ReactNode {
 
 export const PrivacyPage: React.FC = () => {
   usePageMeta({
-    title: 'Privacy Policy — ReloPass',
+    title: 'Privacy Policy · ReloPass',
     description: 'How ReloPass collects, stores, and protects your data. Hosted in the EU.',
     ogUrl: 'https://www.relopass.com/privacy',
   });
