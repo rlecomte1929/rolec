@@ -1,5 +1,5 @@
 {
-  "name": "rolec",
+  "name": "rolecdeploy",
   "compatibility_date": "2026-02-12",
   "assets": {
     "directory": "./frontend/dist"
