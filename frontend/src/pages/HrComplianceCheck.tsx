@@ -292,7 +292,7 @@ export const HrComplianceCheck: React.FC = () => {
           <Card padding="lg">
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-center">
               <div>
-                <div className="text-xs uppercase tracking-wide text-[#6b7280]">Visa path</div>
+                <div className="text-xs uppercase tracking-wide text-[#6b7280]">Immigration path</div>
                 <div className="text-sm font-semibold text-[#0b2b43] mt-1">{report.meta.visaPath}</div>
               </div>
               <div>
