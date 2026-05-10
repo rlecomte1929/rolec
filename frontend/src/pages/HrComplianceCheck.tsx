@@ -225,6 +225,10 @@ export const HrComplianceCheck: React.FC = () => {
   }, [filteredChecks]);
 
   const criticalCount = report?.summary.criticalCount || 0;
+  // The risk score is driven by every WARN/FAIL check, not just CRITICAL-
+  // severity ones. Surface that broader count alongside the score so the
+  // user can reconcile e.g. "score 58 / High risk" with "0 critical issues".
+  const flaggedCount = report?.checks.filter((check) => check.status === 'WARN' || check.status === 'FAIL').length || 0;
   const gateBlocked = report?.checks.some((check) => check.blocking) || false;
 
   return (
@@ -314,7 +318,8 @@ export const HrComplianceCheck: React.FC = () => {
                   <div className="text-xs uppercase tracking-wide text-[#6b7280]">Risk score</div>
                   <div className="text-2xl font-semibold text-[#0b2b43]">{report.summary.riskScore}</div>
                   <div className="text-xs text-[#6b7280]">{report.summary.label} risk</div>
-                  <div className="text-xs text-[#b45309]">{criticalCount} critical issues to resolve</div>
+                  <div className="text-sm font-semibold text-[#b45309]">{flaggedCount} issues flagged</div>
+                  <div className="text-xs text-[#6b7280]">{criticalCount} critical-severity</div>
                 </div>
                 <div className="w-16">
                   <ProgressBar value={report.summary.riskScore} showLabel={false} />
@@ -445,7 +450,7 @@ export const HrComplianceCheck: React.FC = () => {
                   <Badge variant="warning">{report.consistencyConflicts.length} conflict</Badge>
                 </div>
                 {report.consistencyConflicts.length === 0 && (
-                  <div className="text-sm text-[#6b7280]">No conflicts detected.</div>
+                  <div className="text-sm text-[#6b7280]">No cross-field data conflicts detected.</div>
                 )}
                 {report.consistencyConflicts.map((conflict) => (
                   <div key={conflict.id} className="border border-[#fde2e2] rounded-lg p-3 text-sm text-[#7a2a2a] mb-2">
