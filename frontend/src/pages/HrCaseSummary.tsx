@@ -234,7 +234,7 @@ export const HrCaseSummary: React.FC = () => {
                   {isDecisionOpen ? 'Close decision' : 'Approve / Request changes'}
                 </Button>
                 {caseId && (
-                  <Link to={`/cases/${caseId}/resources`}>
+                  <Link to={buildRoute('hrResources')}>
                     <Button variant="outline">View resources</Button>
                   </Link>
                 )}
