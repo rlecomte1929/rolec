@@ -20,8 +20,16 @@ import { getLastVisited } from '../utils/employeeCaseProgress';
  * dashboard. Honor the last route they visited inside this assignment
  * (so re-entering doesn't force them through the wizard again). Falls
  * back to the case summary page when no last-visited is recorded.
+ *
+ * `awaiting_intake` is the entry condition for the intake wizard, so we
+ * always send those cases straight to step 1 of the wizard rather than
+ * the summary (which would otherwise be the empty-state of an unstarted
+ * case) or any stale last-visited URL.
  */
-function openCaseHref(assignmentId: string): string {
+function openCaseHref(assignmentId: string, status?: string | null): string {
+  if (status === 'awaiting_intake') {
+    return `/employee/case/${assignmentId}/wizard/1`;
+  }
   return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
 }
 
@@ -542,7 +550,7 @@ export const EmployeeJourney: React.FC = () => {
                     <div className="text-xs font-mono text-[#94a3b8] pt-1">{row.assignment_id}</div>
                   </div>
                   <div className="flex sm:flex-col sm:justify-center shrink-0">
-                    <Button onClick={() => navigate(openCaseHref(row.assignment_id))}>Open case</Button>
+                    <Button onClick={() => navigate(openCaseHref(row.assignment_id, row.status))}>Open case</Button>
                   </div>
                 </li>
               ))}
