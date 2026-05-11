@@ -56,10 +56,10 @@ export const accessContent = {
       },
     },
     submitLabel: 'Request a demo',
-    submitMicrocopy: 'Someone from our team will confirm a time within the next business days.',
+    submitMicrocopy: 'Someone from our team will confirm a time within 24 hours.',
     success: {
       title: 'Request received.',
-      body: 'We will be in touch within the next business days to confirm your walkthrough.',
+      body: 'We will be in touch within 24 hours to confirm your walkthrough.',
     },
     errorFallback: 'Something went wrong. Email us at contact@relopass.com.',
   },
