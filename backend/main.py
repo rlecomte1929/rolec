@@ -2096,9 +2096,13 @@ def admin_update_assignment_status(
         db.update_assignment_status(assignment_id, status, request_id=None)
     except Exception as e:
         log.exception("admin_update_assignment_status: update_assignment_status failed")
+        # Admin-only route — surface the underlying error class + message so the
+        # UI can show why the archive failed instead of a generic banner. Strip
+        # newlines so the detail stays readable in JSON.
+        reason = f"{type(e).__name__}: {str(e).splitlines()[0] if str(e) else ''}".strip(": ")
         raise HTTPException(
             status_code=500,
-            detail="Failed to update assignment status. Please try again or contact support.",
+            detail=f"Failed to update assignment status: {reason}",
         ) from e
     db.log_audit(user["id"], "UPDATE_STATUS", "assignment", assignment_id, None, {"status": status})
     return {"ok": True, "status": status}
@@ -4490,7 +4494,10 @@ def list_hr_assignments(
                 submitted_at_str = submitted_at.isoformat()
             else:
                 submitted_at_str = submitted_at
-            nk = db.coalesce_case_lookup_id(eff_case) if eff_case else ""
+            # deadline_by_case is keyed by the same trimmed case id used to
+            # build it (see db.next_open_milestone_deadlines_for_cases). Avoid
+            # the per-row wizard_cases roundtrip; .strip() is equivalent.
+            nk = eff_case.strip() if eff_case else ""
             next_deadline = deadline_by_case.get(nk) if nk else None
             summaries.append(AssignmentSummary(
                 id=assignment["id"],
