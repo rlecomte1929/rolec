@@ -2,6 +2,7 @@
 FastAPI main application for ReloPass backend.
 """
 import asyncio
+import concurrent.futures
 import logging
 import threading
 import time
@@ -3399,6 +3400,150 @@ def remove_hr_preferred_supplier(
     return {"ok": True, "removed": n}
 
 
+# /api/hr/cases/{case_id}/assign previously held the response open while running
+# ~15 sequential DB ops against the Supabase pooler — ensuring mobility/case
+# person/passport sync rows, writing a case event, drafting an invite message.
+# When pooler RTT spiked, the chain blew past the frontend's 15s axios cap and
+# users saw "timeout of 15000ms exceeded" even though the server eventually
+# finished the work. Side effects that don't gate the user-visible
+# {assignment_id, invite_token} response are now dispatched here.
+_hr_assign_side_effects_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=int(os.getenv("HR_ASSIGN_SIDE_EFFECTS_MAX_WORKERS", "4")),
+    thread_name_prefix="hr-assign-side-effects",
+)
+
+HR_ASSIGN_PERF_DEBUG = os.getenv("HR_ASSIGN_PERF_DEBUG", "").lower() in ("1", "true", "yes")
+
+
+def _log_hr_assign_perf(
+    request_id: Optional[str],
+    assignment_id: Optional[str],
+    total_duration_ms: float,
+    side_effects_dispatched: bool,
+) -> None:
+    """Structured JSON timing log for /api/hr/cases/{id}/assign (HR_ASSIGN_PERF_DEBUG=1)."""
+    if not HR_ASSIGN_PERF_DEBUG:
+        return
+    log.info(
+        "[hr-assign-perf] %s",
+        _json.dumps({
+            "endpoint": "/api/hr/cases/{case_id}/assign",
+            "request_id": request_id or "",
+            "assignment_id": (assignment_id or "")[:8] if assignment_id else "",
+            "total_duration_ms": round(total_duration_ms, 2),
+            "side_effects_dispatched": side_effects_dispatched,
+        }),
+    )
+
+
+def _dispatch_hr_assign_side_effects(
+    *,
+    assignment_id: str,
+    case_id: str,
+    hr_user_id: str,
+    stored_identifier: str,
+    invite_token: Optional[str],
+    employee_identifier_raw: str,
+    request_id: Optional[str],
+) -> None:
+    """Run the deferred ensure_*, case-participant, case-event and message draft
+    in a background thread. Each step is best-effort and logs its own warning
+    on failure — the user has already received the assignment_id/invite_token
+    response by the time this fires.
+    """
+    from .services.unified_assignment_creation import run_assignment_post_creation_hooks
+
+    def _run() -> None:
+        run_assignment_post_creation_hooks(db, assignment_id, request_id=request_id)
+
+        now_iso = datetime.utcnow().isoformat()
+        try:
+            db.ensure_case_participant(
+                case_id=case_id,
+                person_id=hr_user_id,
+                role="hr_owner",
+                joined_at=now_iso,
+                request_id=request_id,
+            )
+        except Exception as exc:
+            log.warning(
+                "ensure_case_participant skipped assignment_id=%s case_id=%s role=hr_owner error=%s",
+                assignment_id,
+                case_id,
+                exc,
+            )
+
+        try:
+            db.insert_case_event(
+                case_id=case_id,
+                assignment_id=assignment_id,
+                actor_principal_id=hr_user_id,
+                event_type="assignment.created",
+                payload={"employee_identifier": stored_identifier},
+                request_id=request_id,
+            )
+        except Exception as exc:
+            log.warning(
+                "insert_case_event skipped assignment_id=%s case_id=%s event_type=assignment.created error=%s",
+                assignment_id,
+                case_id,
+                exc,
+            )
+
+        invite_line = (
+            f"Invitation token: {invite_token}"
+            if invite_token
+            else "You can claim your assignment after signing in."
+        )
+        message_body = (
+            f"Hello,\n\n"
+            f"You have been assigned a relocation case on ReloPass.\n\n"
+            f"Assignment ID: {assignment_id}\n"
+            f"Employee identifier: {employee_identifier_raw}\n"
+            f"{invite_line}\n\n"
+            f"Sign up or log in at https://relopass.com/auth?mode=login\n"
+            f"Once logged in, go to My Case to start your intake.\n"
+        )
+        try:
+            db.create_message(
+                message_id=str(uuid.uuid4()),
+                assignment_id=assignment_id,
+                hr_user_id=hr_user_id,
+                employee_identifier=stored_identifier,
+                subject="Your relocation case is ready",
+                body=message_body,
+                status="draft",
+            )
+        except Exception as exc:
+            log.warning(
+                "create_message skipped assignment_id=%s case_id=%s error=%s",
+                assignment_id,
+                case_id,
+                exc,
+            )
+
+    try:
+        future = _hr_assign_side_effects_executor.submit(_run)
+    except RuntimeError as exc:
+        log.warning(
+            "hr_assign_side_effects dispatch failed assignment_id=%s error=%s",
+            assignment_id,
+            exc,
+        )
+        return
+
+    def _log_outcome(fut: "concurrent.futures.Future[None]") -> None:
+        exc = fut.exception()
+        if exc is not None:  # pragma: no cover - defensive
+            log.warning(
+                "hr_assign_side_effects background failure assignment_id=%s error=%s",
+                assignment_id,
+                exc,
+            )
+
+    future.add_done_callback(_log_outcome)
+
+
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
 def assign_case(
     case_id: str,
@@ -3406,7 +3551,9 @@ def assign_case(
     request_obj: Request,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
+    t0 = time.perf_counter()
     request_id = getattr(request_obj.state, "request_id", None) or str(uuid.uuid4())
+    side_effects_dispatched = False
     try:
         _deny_if_impersonating(user)
         effective = _effective_user(user, UserRole.HR)
@@ -3471,76 +3618,37 @@ def assign_case(
                     assignment_status=AssignmentStatus.ASSIGNED.value,
                     request_id=request_id,
                     observability_channel="hr",
+                    defer_post_creation_hooks=True,
                 )
         except ValueError as ve:
             raise HTTPException(status_code=400, detail=str(ve)) from ve
         assignment_id = uar.assignment_id
         invite_token = uar.invite_token
         stored_identifier = uar.stored_identifier
-        now_iso = datetime.utcnow().isoformat()
-        try:
-            db.ensure_case_participant(
-                case_id=case_id,
-                person_id=effective["id"],
-                role="hr_owner",
-                joined_at=now_iso,
-                request_id=request_id,
-            )
-        except Exception as exc:
-            log.warning(
-                "ensure_case_participant skipped assignment_id=%s case_id=%s role=hr_owner error=%s",
-                assignment_id, case_id, str(exc),
-            )
-        event_type = "assignment.created"
-        try:
-            db.insert_case_event(
-                case_id=case_id,
-                assignment_id=assignment_id,
-                actor_principal_id=effective["id"],
-                event_type=event_type,
-                payload={"employee_identifier": stored_identifier},
-                request_id=request_id,
-            )
-        except Exception as exc:
-            log.warning(
-                "insert_case_event skipped assignment_id=%s case_id=%s event_type=%s error=%s",
-                assignment_id,
-                case_id,
-                event_type,
-                str(exc),
-            )
 
-        # Prefill invitation message in Messages
-        invite_line = (
-            f"Invitation token: {invite_token}"
-            if invite_token
-            else "You can claim your assignment after signing in."
+        # Defer mobility/case-person/passport sync, case participant, case
+        # event, and the invitation-message draft to a background pool. All of
+        # these were already best-effort (try/except + "skipped" warnings);
+        # moving them out-of-band shrinks the synchronous response path from
+        # ~15 DB ops to ~9 and stops Supabase RTT spikes from bursting past
+        # the frontend's axios cap.
+        _dispatch_hr_assign_side_effects(
+            assignment_id=assignment_id,
+            case_id=case_id,
+            hr_user_id=effective["id"],
+            stored_identifier=stored_identifier,
+            invite_token=invite_token,
+            employee_identifier_raw=employee_identifier_raw,
+            request_id=request_id,
         )
-        message_body = (
-            f"Hello,\n\n"
-            f"You have been assigned a relocation case on ReloPass.\n\n"
-            f"Assignment ID: {assignment_id}\n"
-            f"Employee identifier: {employee_identifier_raw}\n"
-            f"{invite_line}\n\n"
-            f"Sign up or log in at https://relopass.com/auth?mode=login\n"
-            f"Once logged in, go to My Case to start your intake.\n"
-        )
-        try:
-            db.create_message(
-                message_id=str(uuid.uuid4()),
-                assignment_id=assignment_id,
-                hr_user_id=effective["id"],
-                employee_identifier=stored_identifier,
-                subject="Your relocation case is ready",
-                body=message_body,
-                status="draft",
-            )
-        except Exception as exc:
-            log.warning(
-                "create_message skipped assignment_id=%s case_id=%s error=%s",
-                assignment_id, case_id, str(exc),
-            )
+        side_effects_dispatched = True
 
+        _log_hr_assign_perf(
+            request_id,
+            assignment_id,
+            (time.perf_counter() - t0) * 1000,
+            side_effects_dispatched,
+        )
         return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
     except HTTPException:
         # Let explicit 4xx/404 propagate as-is.

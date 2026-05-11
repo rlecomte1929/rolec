@@ -334,9 +334,17 @@ export const dashboardAPI = {
   },
 };
 
+// HR case creation + assignment run a ~15-step DB chain (contact resolve,
+// invite tokens, mobility/case-person/passport sync, message draft). The 15s
+// default axios timeout was too tight when Supabase pooler RTT spiked,
+// surfacing as "timeout of 15000ms exceeded" in the HR dashboard. Backend
+// now dispatches the non-essential side effects to a background pool, but
+// keep a 45s ceiling here as a safety net for the synchronous portion.
+const HR_CASE_TIMEOUT = 45_000;
+
 export const hrAPI = {
   createCase: async (): Promise<{ caseId: string }> => {
-    const response = await api.post('/api/hr/cases');
+    const response = await api.post('/api/hr/cases', undefined, { timeout: HR_CASE_TIMEOUT });
     return response.data;
   },
   assignCase: async (
@@ -344,11 +352,15 @@ export const hrAPI = {
     employeeIdentifier: string,
     options?: { firstName?: string; lastName?: string }
   ): Promise<AssignCaseResponse> => {
-    const response = await api.post(`/api/hr/cases/${caseId}/assign`, {
-      employeeIdentifier,
-      employeeFirstName: options?.firstName?.trim() || undefined,
-      employeeLastName: options?.lastName?.trim() || undefined,
-    });
+    const response = await api.post(
+      `/api/hr/cases/${caseId}/assign`,
+      {
+        employeeIdentifier,
+        employeeFirstName: options?.firstName?.trim() || undefined,
+        employeeLastName: options?.lastName?.trim() || undefined,
+      },
+      { timeout: HR_CASE_TIMEOUT },
+    );
     return response.data;
   },
   listAssignments: async (params?: {

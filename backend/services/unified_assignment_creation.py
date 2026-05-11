@@ -32,6 +32,46 @@ class UnifiedAssignmentCreationResult:
     employee_user_id: Optional[str]
 
 
+def run_assignment_post_creation_hooks(
+    db: "Database",
+    assignment_id: str,
+    *,
+    request_id: Optional[str] = None,
+) -> None:
+    """Run the three idempotent ensure_* hooks that previously ran inline.
+
+    Each is wrapped in try/except so a slow or failing hook never blocks the
+    next one. Callers that defer the hooks (via
+    create_assignment_with_contact_and_invites(..., defer_post_creation_hooks=True))
+    should dispatch this to a background thread so the assignment response
+    isn't held by Supabase RTT for the mobility/case-person/passport sync.
+    """
+    try:
+        ensure_mobility_case_link_for_assignment(db, assignment_id, request_id=request_id)
+    except Exception as exc:
+        log.warning(
+            "ensure_mobility_case_link_for_assignment failed assignment_id=%s: %s",
+            assignment_id,
+            exc,
+        )
+    try:
+        ensure_employee_case_person_for_assignment(db, assignment_id, request_id=request_id)
+    except Exception as exc:
+        log.warning(
+            "ensure_employee_case_person_for_assignment failed assignment_id=%s: %s",
+            assignment_id,
+            exc,
+        )
+    try:
+        ensure_passport_case_document_for_assignment(db, assignment_id, request_id=request_id)
+    except Exception as exc:
+        log.warning(
+            "ensure_passport_case_document_for_assignment failed assignment_id=%s: %s",
+            assignment_id,
+            exc,
+        )
+
+
 def create_assignment_with_contact_and_invites(
     db: "Database",
     *,
@@ -46,6 +86,7 @@ def create_assignment_with_contact_and_invites(
     request_id: Optional[str],
     assignment_id: Optional[str] = None,
     observability_channel: Optional[str] = None,
+    defer_post_creation_hooks: bool = False,
 ) -> UnifiedAssignmentCreationResult:
     """
     Canonical steps:
@@ -87,18 +128,8 @@ def create_assignment_with_contact_and_invites(
             assignment_id=aid,
             pre_linked_auth_user=bool(employee_user_id),
         )
-        try:
-            ensure_mobility_case_link_for_assignment(db, aid, request_id=request_id)
-        except Exception as exc:
-            log.warning("ensure_mobility_case_link_for_assignment failed assignment_id=%s: %s", aid, exc)
-        try:
-            ensure_employee_case_person_for_assignment(db, aid, request_id=request_id)
-        except Exception as exc:
-            log.warning("ensure_employee_case_person_for_assignment failed assignment_id=%s: %s", aid, exc)
-        try:
-            ensure_passport_case_document_for_assignment(db, aid, request_id=request_id)
-        except Exception as exc:
-            log.warning("ensure_passport_case_document_for_assignment failed assignment_id=%s: %s", aid, exc)
+        if not defer_post_creation_hooks:
+            run_assignment_post_creation_hooks(db, aid, request_id=request_id)
         return UnifiedAssignmentCreationResult(
             assignment_id=aid,
             case_id=case_id,
@@ -171,18 +202,8 @@ def create_assignment_with_contact_and_invites(
         pre_linked_auth_user=bool(employee_user_id),
     )
 
-    try:
-        ensure_mobility_case_link_for_assignment(db, aid, request_id=request_id)
-    except Exception as exc:
-        log.warning("ensure_mobility_case_link_for_assignment failed assignment_id=%s: %s", aid, exc)
-    try:
-        ensure_employee_case_person_for_assignment(db, aid, request_id=request_id)
-    except Exception as exc:
-        log.warning("ensure_employee_case_person_for_assignment failed assignment_id=%s: %s", aid, exc)
-    try:
-        ensure_passport_case_document_for_assignment(db, aid, request_id=request_id)
-    except Exception as exc:
-        log.warning("ensure_passport_case_document_for_assignment failed assignment_id=%s: %s", aid, exc)
+    if not defer_post_creation_hooks:
+        run_assignment_post_creation_hooks(db, aid, request_id=request_id)
 
     return UnifiedAssignmentCreationResult(
         assignment_id=aid,
