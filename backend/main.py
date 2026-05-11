@@ -4490,7 +4490,10 @@ def list_hr_assignments(
                 submitted_at_str = submitted_at.isoformat()
             else:
                 submitted_at_str = submitted_at
-            nk = db.coalesce_case_lookup_id(eff_case) if eff_case else ""
+            # deadline_by_case is keyed by the same trimmed case id used to
+            # build it (see db.next_open_milestone_deadlines_for_cases). Avoid
+            # the per-row wizard_cases roundtrip; .strip() is equivalent.
+            nk = eff_case.strip() if eff_case else ""
             next_deadline = deadline_by_case.get(nk) if nk else None
             summaries.append(AssignmentSummary(
                 id=assignment["id"],

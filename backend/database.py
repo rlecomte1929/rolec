@@ -6506,13 +6506,13 @@ class Database:
         """Map normalized case id -> human-readable next open milestone date (earliest target_date)."""
         if not relocation_case_ids:
             return {}
+        # Note: coalesce_case_lookup_id ran a wizard_cases SELECT per id but
+        # always returned the input string unchanged. .strip() is equivalent
+        # and avoids N synchronous round-trips on the HR dashboard hot path.
         normalized: List[str] = []
         seen: Set[str] = set()
         for raw in relocation_case_ids:
-            r = (raw or "").strip()
-            if not r:
-                continue
-            nid = self.coalesce_case_lookup_id(r)
+            nid = (raw or "").strip()
             if nid and nid not in seen:
                 seen.add(nid)
                 normalized.append(nid)
@@ -6546,7 +6546,7 @@ class Database:
                 continue
             c1 = (m.get("canonical_case_id") or "").strip()
             c0 = (m.get("case_id") or "").strip()
-            key = self.coalesce_case_lookup_id(c1 or c0)
+            key = (c1 or c0)
             if key not in best:
                 continue
             ts = str(td).strip()
