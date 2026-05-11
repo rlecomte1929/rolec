@@ -4417,10 +4417,13 @@ def list_hr_assignments(
         unique_ids = list({cid for cid in case_ids if cid})
         if unique_ids:
             placeholders = ", ".join(f":id{i}" for i in range(len(unique_ids)))
+            # CAST both sides to text: relocation_cases.id is uuid on Postgres while
+            # case_assignments.case_id / canonical_case_id are text. Without the cast
+            # Postgres raises "operator does not exist: uuid = text". SQLite is no-op.
             sql = (
-                "SELECT id, status, stage, home_country, host_country, "
+                "SELECT CAST(id AS TEXT) AS id, status, stage, home_country, host_country, "
                 "employee_id, company_id, profile_json "
-                "FROM relocation_cases WHERE id IN (" + placeholders + ")"
+                "FROM relocation_cases WHERE CAST(id AS TEXT) IN (" + placeholders + ")"
             )
             params = {f"id{i}": cid for i, cid in enumerate(unique_ids)}
             with db.engine.connect() as conn, timed("db.load_relocation_cases_bulk", request_id):
