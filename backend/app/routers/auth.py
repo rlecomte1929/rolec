@@ -14,6 +14,7 @@ resolution breaks on PEP 563 string-annotated body params unless every name is
 in the router module's __globals__ at registration time.
 """
 
+import concurrent.futures
 import json as _json
 import logging
 import os
@@ -54,6 +55,17 @@ router = APIRouter(tags=["auth"])
 _pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 AUTH_PERF_DEBUG = os.getenv("AUTH_PERF_DEBUG", "").lower() in ("1", "true", "yes")
+
+# Login must not block on the EMPLOYEE post-signin reconcile path. A slow or
+# wedged query in reconcile previously held the request open until Cloudflare's
+# 100s edge timeout. Cap reconcile to a strict budget; if it overruns, the
+# login response still goes out and reconcile completes (or is abandoned) in
+# the background thread.
+_RECONCILE_TIMEOUT_SECONDS = float(os.getenv("AUTH_RECONCILE_TIMEOUT_SECONDS", "5"))
+_reconcile_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=int(os.getenv("AUTH_RECONCILE_MAX_WORKERS", "4")),
+    thread_name_prefix="auth-reconcile",
+)
 
 
 def _log_auth_perf(
@@ -331,16 +343,18 @@ def login(body: LoginRequest, request: Request):
 
     reconciliation_payload = None
     if effective_role == UserRole.EMPLOYEE:
+        future = _reconcile_executor.submit(
+            reconcile_pending_assignment_claims,
+            db,
+            user_id=user["id"],
+            email=user.get("email"),
+            username=user.get("username"),
+            role=user.get("role") or UserRole.EMPLOYEE.value,
+            request_id=request_id or None,
+            emit_side_effects=True,
+        )
         try:
-            claim_res = reconcile_pending_assignment_claims(
-                db,
-                user_id=user["id"],
-                email=user.get("email"),
-                username=user.get("username"),
-                role=user.get("role") or UserRole.EMPLOYEE.value,
-                request_id=request_id or None,
-                emit_side_effects=True,
-            )
+            claim_res = future.result(timeout=_RECONCILE_TIMEOUT_SECONDS)
             identity_event(
                 "identity.auth.signin.reconcile",
                 request_id=request_id or None,
@@ -367,6 +381,19 @@ def login(body: LoginRequest, request: Request):
                     headline=rec.get("headline"),
                     message=rec.get("message"),
                 )
+        except concurrent.futures.TimeoutError:
+            log.warning(
+                "login claim_link timed_out user_id=%s timeout_s=%s",
+                user["id"][:8],
+                _RECONCILE_TIMEOUT_SECONDS,
+            )
+            identity_event(
+                "identity.auth.signin.reconcile",
+                request_id=request_id or None,
+                auth_user_id=user["id"],
+                outcome="timeout",
+                timeout_seconds=_RECONCILE_TIMEOUT_SECONDS,
+            )
         except Exception as rec_exc:
             log.warning("login claim_link skipped user_id=%s error=%s", user["id"][:8], rec_exc)
             identity_event(
