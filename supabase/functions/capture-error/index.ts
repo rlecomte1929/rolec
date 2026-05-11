@@ -90,18 +90,33 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  // Insert raw event
-  const { error: logError } = await supabase.from("error_logs").insert({
+  // Insert raw event. user_id may point at a stale/test auth user that no
+  // longer exists (e.g. seed accounts wiped from auth.users); retry with
+  // user_id null so we still capture the error rather than dropping it.
+  const baseRow = {
     fingerprint: body.fingerprint,
     message:     body.message.slice(0, 1000),
     stack:       body.stack?.slice(0, 5000) ?? null,
     url:         body.url.slice(0, 500),
-    user_id:     body.user_id ?? null,
     component_name: body.component_name ?? null,
     browser:     body.browser.slice(0, 300),
     breadcrumbs: body.breadcrumbs.slice(0, 10),
     severity:    body.severity ?? "error",
+  };
+  let { error: logError } = await supabase.from("error_logs").insert({
+    ...baseRow,
+    user_id: body.user_id ?? null,
   });
+  // Postgres FK violation = 23503; capture-error supports anonymous logging.
+  if (logError && logError.code === "23503" && body.user_id) {
+    console.warn(
+      "[capture-error] user_id FK violation, retrying anonymous:",
+      body.user_id
+    );
+    ({ error: logError } = await supabase
+      .from("error_logs")
+      .insert({ ...baseRow, user_id: null }));
+  }
 
   if (logError) {
     console.error("[capture-error] Insert error_logs failed:", logError);
