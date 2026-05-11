@@ -67,6 +67,61 @@ _reconcile_executor = concurrent.futures.ThreadPoolExecutor(
     thread_name_prefix="auth-reconcile",
 )
 
+# Supabase Auth provisioning runs out-of-band: a slow or unreachable Supabase
+# Auth admin API must never block the response on /api/auth/login or
+# /api/auth/register. The sync is idempotent and best-effort — if it fails or
+# is dropped, the next login retries it. The pool is intentionally small so a
+# wedged Supabase cannot consume unbounded threads.
+_supabase_sync_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=int(os.getenv("AUTH_SUPABASE_SYNC_MAX_WORKERS", "4")),
+    thread_name_prefix="auth-supabase-sync",
+)
+
+
+def _dispatch_supabase_sync(
+    email: str,
+    password: str,
+    *,
+    relopass_user_id: str,
+    full_name: Optional[str],
+) -> None:
+    """Fire-and-forget Supabase auth-user provisioning.
+
+    Replaces the previous in-request blocking call that could hold the login
+    response past Cloudflare's 100s edge timeout and the frontend's 45s axios
+    cap, surfacing as "Request timed out" to users.
+    """
+    from ...services.supabase_auth_sync import sync_relopass_user_to_supabase_auth
+
+    try:
+        future = _supabase_sync_executor.submit(
+            sync_relopass_user_to_supabase_auth,
+            email,
+            password,
+            relopass_user_id=relopass_user_id,
+            full_name=full_name,
+        )
+    except RuntimeError as ex:
+        log.warning("supabase_auth_sync dispatch failed user_id=%s error=%s", relopass_user_id[:8], ex)
+        return
+
+    def _log_outcome(fut: "concurrent.futures.Future[bool]") -> None:
+        try:
+            ok = fut.result()
+            if not ok:
+                log.warning(
+                    "supabase_auth_sync background user_id=%s outcome=failed",
+                    relopass_user_id[:8],
+                )
+        except Exception as exc:  # pragma: no cover - defensive
+            log.warning(
+                "supabase_auth_sync background user_id=%s exception=%s",
+                relopass_user_id[:8],
+                exc,
+            )
+
+    future.add_done_callback(_log_outcome)
+
 
 def _log_auth_perf(
     endpoint: str,
@@ -237,9 +292,7 @@ def register(body: RegisterRequest, request: Request):
         )
         log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
         if email:
-            from ...services.supabase_auth_sync import sync_relopass_user_to_supabase_auth
-
-            sync_relopass_user_to_supabase_auth(
+            _dispatch_supabase_sync(
                 email,
                 body.password,
                 relopass_user_id=user_id,
@@ -413,9 +466,7 @@ def login(body: LoginRequest, request: Request):
     )
     log.info("auth_login success user_id=%s", user["id"][:8])
     if user.get("email"):
-        from ...services.supabase_auth_sync import sync_relopass_user_to_supabase_auth
-
-        sync_relopass_user_to_supabase_auth(
+        _dispatch_supabase_sync(
             user["email"],
             body.password,
             relopass_user_id=user["id"],
@@ -471,7 +522,18 @@ def logout(
         # Imported lazily to avoid a hard dependency on the Supabase SDK at
         # module import time in environments without Supabase configured.
         from ...services.supabase_auth_sync import revoke_supabase_session
-        revoked = revoke_supabase_session(supabase_access_token)
-        log.info("auth_logout supabase_token_revoked=%s", revoked)
+
+        def _revoke_outcome(fut: "concurrent.futures.Future[bool]") -> None:
+            try:
+                log.info("auth_logout supabase_token_revoked=%s", fut.result())
+            except Exception as exc:  # pragma: no cover - defensive
+                log.warning("auth_logout supabase revoke exception=%s", exc)
+
+        try:
+            _supabase_sync_executor.submit(
+                revoke_supabase_session, supabase_access_token
+            ).add_done_callback(_revoke_outcome)
+        except RuntimeError as ex:
+            log.warning("auth_logout supabase revoke dispatch failed: %s", ex)
 
     return {"success": True}

@@ -1,0 +1,51 @@
+name: Render keepalive
+
+# Render's free plan spins workers down after ~15 minutes of inactivity. The
+# next request after sleep eats a 10-30s cold start, which the frontend's
+# 45s axios cap on /api/auth/login already covers — but only if nothing else
+# slow stacks on top. Pinging /health every 10 minutes keeps the worker warm
+# so real user logins stay fast.
+#
+# Override the target by setting the `BACKEND_HEALTH_URL` repo variable
+# (Settings -> Secrets and variables -> Actions -> Variables).
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping backend /health
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Resolve target URL
+        id: target
+        run: |
+          url="${{ vars.BACKEND_HEALTH_URL }}"
+          if [ -z "$url" ]; then
+            url="https://api.relopass.com/health"
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: GET ${{ steps.target.outputs.url }}
+        run: |
+          set -euo pipefail
+          # Allow up to 60s for cold start to finish; we just want to wake it.
+          status=$(curl -sS -o /tmp/body.txt -w "%{http_code}" \
+            --max-time 60 --retry 2 --retry-delay 5 \
+            "${{ steps.target.outputs.url }}") || status="000"
+          echo "HTTP $status"
+          head -c 400 /tmp/body.txt || true
+          echo
+          # Treat any 2xx as success; anything else fails the job so we get a
+          # GitHub notification rather than silently masking an outage.
+          case "$status" in
+            2*) exit 0 ;;
+            *) exit 1 ;;
+          esac
