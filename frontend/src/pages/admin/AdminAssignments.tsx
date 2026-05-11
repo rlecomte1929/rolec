@@ -86,6 +86,7 @@ export const AdminAssignments: React.FC = () => {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteFeedback, setDeleteFeedback] = useState<'idle' | 'deleting' | 'done' | 'error'>('idle');
+  const [deleteErrorDetail, setDeleteErrorDetail] = useState<string | null>(null);
 
   const loadAssignments = useCallback(async () => {
     setLoading(true);
@@ -297,7 +298,11 @@ export const AdminAssignments: React.FC = () => {
                       <span className="text-sm text-green-600">Deleted. List updated.</span>
                     )}
                     {deleteFeedback === 'error' && (
-                      <span className="text-sm text-red-600">Delete failed or list could not refresh.</span>
+                      <span className="text-sm text-red-600">
+                        {deleteErrorDetail
+                          ? `Delete failed: ${deleteErrorDetail}`
+                          : 'Delete failed or list could not refresh.'}
+                      </span>
                     )}
                     <Button
                       size="sm"
@@ -320,25 +325,40 @@ export const AdminAssignments: React.FC = () => {
                         if (!window.confirm('Are you sure? This action cannot be undone.')) return;
                         const ids = Array.from(selectedIds);
                         setDeleteFeedback('deleting');
+                        setDeleteErrorDetail(null);
                         setSelectedIds(new Set());
                         try {
                           const results = await Promise.allSettled(
                             ids.map((id) => adminAPI.updateAssignmentStatus(id, { status: 'archived' })),
                           );
-                          const failed = results.filter((r) => r.status === 'rejected').length;
+                          const rejected = results.filter(
+                            (r): r is PromiseRejectedResult => r.status === 'rejected',
+                          );
+                          const failed = rejected.length;
                           await loadAssignments();
                           setDeleteFeedback(failed > 0 ? 'error' : 'done');
                           if (failed === 0) {
+                            setDeleteErrorDetail(null);
                             setSelectionMode(false);
                             setTimeout(() => setDeleteFeedback('idle'), 3000);
                           } else {
-                            setTimeout(() => setDeleteFeedback('idle'), 5000);
+                            const firstReason = rejected[0]?.reason;
+                            const detail =
+                              firstReason?.response?.data?.detail ||
+                              firstReason?.message ||
+                              'unknown error';
+                            const suffix = failed > 1 ? ` (${failed} failed; first: ${detail})` : ` ${detail}`;
+                            setDeleteErrorDetail(suffix.trim());
+                            setTimeout(() => setDeleteFeedback('idle'), 8000);
                           }
-                        } catch (e) {
+                        } catch (e: any) {
                           console.error(e);
                           await loadAssignments();
+                          setDeleteErrorDetail(
+                            e?.response?.data?.detail || e?.message || 'unknown error',
+                          );
                           setDeleteFeedback('error');
-                          setTimeout(() => setDeleteFeedback('idle'), 5000);
+                          setTimeout(() => setDeleteFeedback('idle'), 8000);
                         }
                       }}
                     >
