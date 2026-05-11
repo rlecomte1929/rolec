@@ -251,12 +251,45 @@ def _run_startup_step_with_timeout(step_name: str, fn, timeout_s: int) -> bool:
     return True
 
 
+def _validate_supabase_auth_config() -> None:
+    """Fail fast on missing Supabase Auth config at startup.
+
+    The login path dispatches a Supabase Auth sync in the background. If the
+    config is absent, the sync would attempt and silently fail forever, eating
+    a worker slot every login. Set DISABLE_SUPABASE_AUTH_SYNC up front so the
+    sync short-circuits at the first env check instead.
+    """
+    if os.getenv("DISABLE_SUPABASE_AUTH_SYNC", "").lower() in ("1", "true", "yes"):
+        log.info("supabase_auth_sync explicitly disabled via DISABLE_SUPABASE_AUTH_SYNC")
+        return
+    supabase_url = os.getenv("SUPABASE_URL", "").strip()
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    missing = []
+    if not supabase_url:
+        missing.append("SUPABASE_URL")
+    if not service_key:
+        missing.append("SUPABASE_SERVICE_ROLE_KEY")
+    if missing:
+        log.warning(
+            "Supabase Auth sync config missing (%s) — auto-disabling background sync "
+            "to keep /api/auth/login fast. Set DISABLE_SUPABASE_AUTH_SYNC=1 explicitly "
+            "to silence this warning, or provide the missing env vars to enable sync.",
+            ", ".join(missing),
+        )
+        os.environ["DISABLE_SUPABASE_AUTH_SYNC"] = "1"
+        return
+    log.info("Supabase Auth sync config present (URL + service-role key).")
+
+
 def _run_runtime_startup_initialization() -> None:
     log.info("Initializing database schemas...")
     _run_startup_step_with_timeout("init_db", init_db, timeout_s=60)
     _run_startup_step_with_timeout("ensure_initialized", db.ensure_initialized, timeout_s=60)
     _run_startup_step_with_timeout(
         "log_expected_tables_status", db.log_expected_tables_status, timeout_s=30
+    )
+    _run_startup_step_with_timeout(
+        "validate_supabase_auth_config", _validate_supabase_auth_config, timeout_s=5
     )
 
     def _storage_diag() -> None:
@@ -551,6 +584,62 @@ def health_check():
         "version": "1.0.0",
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
+
+
+@app.get("/api/health/supabase")
+def supabase_health(probe: int = 0):
+    """Supabase Auth config + reachability probe.
+
+    Always returns 200; inspect the body to see degraded state. Use ?probe=1
+    to additionally attempt a cheap admin call (bounded by
+    SUPABASE_AUTH_SYNC_TIMEOUT_SECONDS). Useful for confirming whether
+    "Request timed out" login errors are caused by Supabase being unreachable.
+    """
+    out: Dict[str, Any] = {
+        "status": "ok",
+        "config_present": False,
+        "sync_disabled": os.getenv("DISABLE_SUPABASE_AUTH_SYNC", "").lower() in ("1", "true", "yes"),
+        "supabase_url_set": bool(os.getenv("SUPABASE_URL", "").strip()),
+        "service_role_key_set": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()),
+        "anon_key_set": bool(os.getenv("SUPABASE_ANON_KEY", "").strip()),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+    out["config_present"] = out["supabase_url_set"] and out["service_role_key_set"]
+    if not out["config_present"]:
+        out["status"] = "degraded"
+        out["reason"] = "missing_config"
+        return out
+    if not probe:
+        return out
+
+    # Live probe — bounded by the same timeout as the auth sync path.
+    import concurrent.futures
+    from .services.supabase_auth_sync import _SUPABASE_CALL_TIMEOUT_S, _call_with_timeout
+    from .services.supabase_client import get_supabase_admin_client
+
+    try:
+        client = get_supabase_admin_client()
+    except Exception as ex:
+        out["status"] = "degraded"
+        out["reason"] = "admin_client_init_failed"
+        out["error"] = type(ex).__name__
+        return out
+
+    started = time.perf_counter()
+    try:
+        _call_with_timeout(client.auth.admin.list_users)
+        out["probe_ok"] = True
+        out["probe_ms"] = round((time.perf_counter() - started) * 1000, 2)
+    except concurrent.futures.TimeoutError:
+        out["status"] = "degraded"
+        out["reason"] = "probe_timeout"
+        out["probe_timeout_s"] = _SUPABASE_CALL_TIMEOUT_S
+    except Exception as ex:
+        out["status"] = "degraded"
+        out["reason"] = "probe_error"
+        out["error"] = type(ex).__name__
+        out["error_message"] = str(ex)[:200]
+    return out
 
 
 # ---------------------------------------------------------------------------

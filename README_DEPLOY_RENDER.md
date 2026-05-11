@@ -18,8 +18,13 @@
 | `DATABASE_URL` | Yes      | `postgresql://user:pass@host:5432/dbname`            |
 | `CORS_ORIGINS` | Optional | `https://relopass.com,https://www.relopass.com`      |
 | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Recommended | Same as policy storage; also used to **mirror ReloPass users into Supabase Auth** on login/register (so the frontend can refresh Supabase tokens). |
-| `DISABLE_SUPABASE_AUTH_SYNC` | Optional | Set to `1` only if you must disable that mirroring. |
+| `DISABLE_SUPABASE_AUTH_SYNC` | Optional | Set to `1` only if you must disable that mirroring. Auto-enabled when `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` are absent. |
+| `SUPABASE_AUTH_SYNC_TIMEOUT_SECONDS` | Optional | Wallclock cap per Supabase admin call from the background sync (default `5`). Lower if Supabase is consistently slow and you'd rather drop syncs than queue them. |
+| `AUTH_SUPABASE_SYNC_MAX_WORKERS` | Optional | Background pool size for the post-login Supabase sync (default `4`). |
+| `AUTH_PERF_DEBUG` | Optional | Set to `1` to emit structured JSON timing logs for `/api/auth/login` and `/api/auth/register` — useful when diagnosing "Request timed out" on login. |
 | `DISABLE_STARTUP_SEED` | Optional | Set to `1` to skip wizard demo cases and supplier JSON seeding entirely. |
+
+> **Diagnosing slow logins.** Hit `GET /api/health/supabase` (add `?probe=1` to issue a live admin call bounded by `SUPABASE_AUTH_SYNC_TIMEOUT_SECONDS`). The response indicates whether the Supabase Auth admin API is reachable from the Render worker; degraded status with `reason: probe_timeout` points at network/keys before the request even reaches login.
 
 - If `DATABASE_URL` is not set, the backend falls back to local SQLite (`relopass.db`).
 - **Supabase Session Pooler** (required): Use the pooler connection string, not the direct connection.

@@ -7,6 +7,7 @@ with 400 after backend login/register.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import os
 from typing import Any, Optional
@@ -17,6 +18,28 @@ try:
     from .supabase_client import get_supabase_admin_client
 except Exception:  # pragma: no cover - shadowed supabase package / missing deps
     get_supabase_admin_client = None  # type: ignore[misc, assignment]
+
+
+# Per-call wallclock cap for Supabase admin API requests. supabase-py 2.5 does
+# not expose a portable socket timeout for the gotrue admin client, so the call
+# is dispatched to a worker thread and abandoned (logged) if it overruns. This
+# stops a wedged Supabase from holding any caller past the configured budget.
+_SUPABASE_CALL_TIMEOUT_S = float(os.getenv("SUPABASE_AUTH_SYNC_TIMEOUT_SECONDS", "5"))
+_call_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=int(os.getenv("SUPABASE_AUTH_SYNC_MAX_WORKERS", "8")),
+    thread_name_prefix="supabase-call",
+)
+
+
+def _call_with_timeout(fn, *args, **kwargs):
+    """Run a blocking Supabase admin call with a hard wallclock timeout.
+
+    Raises concurrent.futures.TimeoutError if the call exceeds the budget;
+    the worker thread is intentionally left running so a deadlocked socket
+    does not stall caller threads.
+    """
+    fut = _call_executor.submit(fn, *args, **kwargs)
+    return fut.result(timeout=_SUPABASE_CALL_TIMEOUT_S)
 
 
 def _duplicate_user_error(exc: BaseException) -> bool:
@@ -83,9 +106,17 @@ def sync_relopass_user_to_supabase_auth(
     }
 
     try:
-        client.auth.admin.create_user(attrs)  # type: ignore[union-attr]
+        _call_with_timeout(client.auth.admin.create_user, attrs)  # type: ignore[union-attr]
         log.info("supabase_auth_sync created auth user email=%s relopass_id=%s", e[:3] + "***", relopass_user_id[:8])
         return True
+    except concurrent.futures.TimeoutError:
+        log.warning(
+            "supabase_auth_sync timed_out email=%s relopass_id=%s timeout_s=%s",
+            e[:3] + "***",
+            relopass_user_id[:8],
+            _SUPABASE_CALL_TIMEOUT_S,
+        )
+        return False
     except Exception as ex:
         if _duplicate_user_error(ex):
             log.debug("supabase_auth_sync user already present email=%s", e[:3] + "***")
@@ -131,9 +162,16 @@ def revoke_supabase_session(access_token: str) -> bool:
         fn = getattr(admin, method_name, None)
         if callable(fn):
             try:
-                fn(access_token)
+                _call_with_timeout(fn, access_token)
                 log.info("revoke_supabase_session ok via admin.%s", method_name)
                 return True
+            except concurrent.futures.TimeoutError:
+                log.warning(
+                    "revoke_supabase_session timed_out via admin.%s timeout_s=%s",
+                    method_name,
+                    _SUPABASE_CALL_TIMEOUT_S,
+                )
+                return False
             except Exception as ex:
                 log.warning("revoke_supabase_session via admin.%s failed: %s", method_name, ex)
                 return False
