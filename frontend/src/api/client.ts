@@ -60,8 +60,8 @@ export { API_BASE_URL };
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  /** Fast-fail so users see a real error instead of a spinner when the API is slow. Long-running calls (uploads, policy extraction) override per-request. */
-  timeout: 15_000,
+  /** 60s default covers slow HR queries (assignments list, company profile) while still failing on truly stuck requests. Long-running calls (uploads, policy extraction) override per-request with 120s. */
+  timeout: 60_000,
   headers: {
     'Content-Type': 'application/json',
   },
