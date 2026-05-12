@@ -9500,15 +9500,21 @@ class Database:
         with self.engine.begin() as conn:
             # Production Postgres may not yet have the newer columns (status, plan_tier, hr_seat_limit, employee_seat_limit).
             # Build the INSERT/UPSERT dynamically based on actual columns to avoid UndefinedColumn errors.
-            company_cols = {
-                row._mapping["column_name"]
-                for row in conn.execute(
-                    text(
-                        "SELECT column_name FROM information_schema.columns "
-                        "WHERE table_name = 'companies'"
-                    )
-                ).fetchall()
-            }
+            if _is_sqlite:
+                company_cols = {
+                    row[1]
+                    for row in conn.execute(text("PRAGMA table_info(companies)")).fetchall()
+                }
+            else:
+                company_cols = {
+                    row._mapping["column_name"]
+                    for row in conn.execute(
+                        text(
+                            "SELECT column_name FROM information_schema.columns "
+                            "WHERE table_name = 'companies'"
+                        )
+                    ).fetchall()
+                }
 
             base_cols = [
                 "id",
