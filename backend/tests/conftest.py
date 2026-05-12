@@ -8,6 +8,13 @@ import shutil
 # run don't flake. Must be set before backend.main is imported.
 os.environ.setdefault("RELOPASS_DISABLE_RATE_LIMITS", "1")
 
+# Use in-memory SQLite for tests so no file I/O is required.
+# Must be set before backend.database is imported (engine is created at module level).
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+
+# Disable Supabase auth sync in tests — no real Supabase credentials available.
+os.environ.setdefault("DISABLE_SUPABASE_AUTH_SYNC", "1")
+
 # Make ~/homebrew/bin and the LibreOffice MacOS dir available to subprocess
 # calls started from tests (fixture builder shells out to soffice / qpdf).
 # No-ops when the paths don't exist; safe to always prepend.

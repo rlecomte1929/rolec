@@ -55,9 +55,19 @@ def sqlalchemy_engine_kwargs(database_url: str) -> Dict[str, Any]:
     """
     SQLAlchemy create_engine kwargs: SQLite uses thread check; Postgres uses a small pool
     with pre-ping and recycle to survive Supabase/managed-DB idle disconnects.
+
+    For in-memory SQLite (``sqlite:///:memory:``), we use ``StaticPool`` so that
+    every engine checkout returns the *same* underlying connection.  Without this,
+    the default QueuePool can open multiple physical connections to ``:memory:``,
+    each of which sees an empty database — tables created during ``ensure_initialized``
+    are invisible to connections checked out by later HTTP requests.
     """
     if database_url.startswith("sqlite"):
-        return {"connect_args": {"check_same_thread": False}}
+        kwargs: Dict[str, Any] = {"connect_args": {"check_same_thread": False}}
+        if ":memory:" in database_url:
+            from sqlalchemy.pool import StaticPool
+            kwargs["poolclass"] = StaticPool
+        return kwargs
     return {
         "pool_pre_ping": True,
         "pool_size": int(os.getenv("SQLALCHEMY_POOL_SIZE", "10")),

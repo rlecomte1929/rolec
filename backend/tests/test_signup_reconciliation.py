@@ -36,6 +36,9 @@ class SignupReconciliationTests(unittest.TestCase):
         dbmod._engine = eng
         dbmod._is_sqlite = True
         self.db = Database()
+        # Force schema creation so _seed_company's direct engine.begin() calls
+        # work correctly — the DB initializes lazily via _exec otherwise.
+        self.db.ensure_initialized()
 
     def tearDown(self):
         dbmod._engine = self._prev_engine

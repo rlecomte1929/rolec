@@ -17,43 +17,43 @@ from backend.app.routers import auth as auth_router  # noqa: E402
 from backend.main import app  # noqa: E402
 from backend.services.assignment_claim_link_service import ClaimLinkResult  # noqa: E402
 
-client = TestClient(app)
-
-
 def test_employee_login_returns_when_reconcile_hangs(monkeypatch):
     """If reconcile blocks past the timeout, login still returns 200 promptly."""
-    # Register a fresh EMPLOYEE so the test is self-contained and doesn't
-    # depend on seed data.
-    email = f"emp-{uuid.uuid4().hex[:10]}@example.test"
-    password = "Passw0rd!"
-    reg = client.post(
-        "/api/auth/register",
-        json={"email": email, "password": password, "role": "EMPLOYEE", "name": "T"},
-    )
-    assert reg.status_code == 200, reg.text
+    # Use TestClient as a context manager so the app lifespan (which calls
+    # db.ensure_initialized()) runs before any requests are made.
+    with TestClient(app) as client:
+        # Register a fresh EMPLOYEE so the test is self-contained and doesn't
+        # depend on seed data.
+        email = f"emp-{uuid.uuid4().hex[:10]}@example.test"
+        password = "Passw0rd!"
+        reg = client.post(
+            "/api/auth/register",
+            json={"email": email, "password": password, "role": "EMPLOYEE", "name": "T"},
+        )
+        assert reg.status_code == 200, reg.text
 
-    started = threading.Event()
-    release = threading.Event()
+        started = threading.Event()
+        release = threading.Event()
 
-    def _blocking_reconcile(*_args, **_kwargs):
-        started.set()
-        # Block well past the timeout; released after the assertions so the
-        # executor thread can exit without leaking past the test.
-        release.wait(timeout=30)
-        return ClaimLinkResult()
+        def _blocking_reconcile(*_args, **_kwargs):
+            started.set()
+            # Block well past the timeout; released after the assertions so the
+            # executor thread can exit without leaking past the test.
+            release.wait(timeout=30)
+            return ClaimLinkResult()
 
-    monkeypatch.setattr(
-        auth_router, "reconcile_pending_assignment_claims", _blocking_reconcile
-    )
-    monkeypatch.setattr(auth_router, "_RECONCILE_TIMEOUT_SECONDS", 0.5)
+        monkeypatch.setattr(
+            auth_router, "reconcile_pending_assignment_claims", _blocking_reconcile
+        )
+        monkeypatch.setattr(auth_router, "_RECONCILE_TIMEOUT_SECONDS", 0.5)
 
-    t0 = time.perf_counter()
-    res = client.post(
-        "/api/auth/login",
-        json={"identifier": email, "password": password},
-    )
-    elapsed = time.perf_counter() - t0
-    release.set()
+        t0 = time.perf_counter()
+        res = client.post(
+            "/api/auth/login",
+            json={"identifier": email, "password": password},
+        )
+        elapsed = time.perf_counter() - t0
+        release.set()
 
     assert started.is_set(), "reconcile was never invoked"
     assert res.status_code == 200, res.text
