@@ -3604,9 +3604,9 @@ class Database:
                 u.email,
                 u.role,
                 u.username,
-                u.full_name,
+                p.full_name,
                 p.company_id,
-                p.is_admin
+                (u.role = 'admin') AS is_admin
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             LEFT JOIN profiles p ON p.id = u.id
