@@ -3606,7 +3606,7 @@ class Database:
                 u.username,
                 p.full_name,
                 p.company_id,
-                (u.role = 'admin') AS is_admin
+                (LOWER(u.role) = 'admin') AS is_admin
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             LEFT JOIN profiles p ON p.id = u.id
