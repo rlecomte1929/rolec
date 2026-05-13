@@ -147,6 +147,7 @@ from .app.routers import services_state as services_state_router
 from .app.routers import admin_catalog as admin_catalog_router
 from .app.routers import hr_catalog as hr_catalog_router
 from .app.routers import providers as providers_router
+from .app.routers import employee_quotes as employee_quotes_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -534,6 +535,7 @@ app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
 app.include_router(hr_catalog_router.router)
 app.include_router(providers_router.router)
+app.include_router(employee_quotes_router.router)
 app.include_router(mobility_context_router.router)
 app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)

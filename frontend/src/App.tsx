@@ -42,6 +42,7 @@ const EmployeePolicyPage = lazy(() => import('./pages/employee/EmployeePolicyPag
 const CaseWizardPage = lazy(() => import('./pages/employee/CaseWizardPage').then((module) => ({ default: module.CaseWizardPage })));
 const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
 const EmployeeRelocationPlanPage = lazy(() => import('./pages/employee/EmployeeRelocationPlanPage').then((module) => ({ default: module.EmployeeRelocationPlanPage })));
+const QuoteRequestPage = lazy(() => import('./pages/employee/QuoteRequestPage').then((module) => ({ default: module.QuoteRequestPage })));
 const ProvidersPage = lazy(() => import('./pages/ProvidersPage').then((module) => ({ default: module.ProvidersPage })));
 const Messages = lazy(() => import('./pages/Messages').then((module) => ({ default: module.Messages })));
 const Resources = lazy(() => import('./pages/Resources').then((module) => ({ default: module.Resources })));
@@ -177,6 +178,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path={ROUTE_DEFS.employeeJourney.path} element={<Navigate to={ROUTE_DEFS.employeeDashboard.path} replace />} />
         <Route path={ROUTE_DEFS.employeeDashboard.path} element={<EmployeeJourney />} />
+        <Route path={ROUTE_DEFS.employeeQuoteRequest.path} element={<QuoteRequestPage />} />
         <Route path={WIZARD_ROUTES.EMP_DASH} element={<Navigate to={ROUTE_DEFS.employeeDashboard.path} replace />} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
         <Route path={ROUTE_DEFS.hrCommandCenter.path} element={<HrCommandCenter />} />

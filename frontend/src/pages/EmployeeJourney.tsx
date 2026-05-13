@@ -377,7 +377,11 @@ export const EmployeeJourney: React.FC = () => {
         enabled: hasRecommendations,
         mutedHint: hasRecommendations ? undefined : 'Complete step 2 first',
       },
-      { label: '4. (Soon) Request quotes' },
+      {
+        label: '4. Request quotes',
+        href: buildRoute('employeeQuoteRequest'),
+        enabled: true,
+      },
       { label: '5. Exchange with HR' },
     ],
     [hasRecommendations],
