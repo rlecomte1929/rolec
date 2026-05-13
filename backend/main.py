@@ -13345,9 +13345,7 @@ app.include_router(admin_policy_config_router)
 app.include_router(employee_policy_config_router)
 app.include_router(public_policy_config_router)
 
-# AIQ-37-B: Policy Builder wizard CRUD
-from .app.routers import hr_policies as hr_policies_router  # noqa: E402
-app.include_router(hr_policies_router.router)
+# AIQ-37-B: Policy Builder wizard CRUD — hr_policies router not yet implemented
 
 
 if __name__ == "__main__":
