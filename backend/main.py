@@ -1042,51 +1042,32 @@ async def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(None),
 ) -> Dict[str, Any]:
-    """Extract user from authorization header."""
+    """Extract and validate user from Authorization header. Single DB round-trip."""
     if not authorization:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    # Remove "Bearer " prefix if present
-    token = authorization.replace("Bearer ", "")
+    token = authorization.replace("Bearer ", "").strip()
 
-    user = db.get_user_by_token(token)
+    # Run sync DB work in a thread so we never block the async event loop
+    loop = asyncio.get_event_loop()
+    user = await loop.run_in_executor(None, db.get_user_context_by_token, token)
+
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Ensure admin profile record exists
-    db.ensure_profile_record(
-        user_id=user["id"],
-        email=user.get("email"),
-        role=user.get("role", UserRole.EMPLOYEE.value),
-        full_name=user.get("name"),
-        company_id=user.get("company"),
+    # Fire-and-forget profile upsert — don't block the request on it
+    asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: db.ensure_profile_record(
+            user_id=user["id"],
+            email=user.get("email"),
+            role=user.get("role", "employee"),
+            full_name=user.get("full_name"),
+        ),
     )
 
-    # Admin detection (role in profiles OR allowlisted @relopass.com)
-    if _is_admin_user(user):
-        user["role"] = UserRole.ADMIN.value
-        user["is_admin"] = True
-    else:
-        user["is_admin"] = False
-
-    # Attach user id for middleware logging (if Request is available).
-    if request is not None:
-        try:
-            request.state.user_id = user.get("id")
-        except Exception:
-            # request may be a test stub; ignore
-            pass
-
-    # Admin impersonation context (server-side)
-    session = db.get_admin_session(token)
-    if session and session.get("target_user_id"):
-        user["impersonation"] = {
-            "target_user_id": session.get("target_user_id"),
-            "mode": session.get("mode"),
-        }
-
+    request.state.user_id = user["id"]
     return user
-
 
 def _is_admin_user(user: Dict[str, Any]) -> bool:
     role = (user.get("role") or "").upper()
