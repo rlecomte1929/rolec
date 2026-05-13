@@ -9,7 +9,7 @@ import time
 import os
 import json as _json
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO
 
 # Configure observability (Sentry + structured logging) before anything else
 # logs, so early startup lines land in the right format. All of it is no-op
@@ -11991,17 +11991,18 @@ def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_rol
     assignment = db.get_assignment_by_case_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    assignment_id = assignment.get("id")
     profile = db.get_employee_profile(case_id)
     if not profile:
         profile = RelocationProfile(userId=case_id).model_dump()
 
-    cached = db.get_latest_compliance_run(case_id)
+    cached = db.get_latest_compliance_run(assignment_id)
     if cached:
         return cached
 
     def _build_report():
         policy = policy_engine.load_policy()
-        exceptions = db.list_policy_exceptions(case_id)
+        exceptions = db.list_policy_exceptions(assignment_id)
         spend = policy_engine.compute_spend(case_id, profile, policy)
         return policy_engine.build_compliance_report(case_id, profile, policy, spend, exceptions, assignment.get("status"))
 
@@ -12010,6 +12011,10 @@ def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_rol
         report = _fut.result(timeout=25)
     except concurrent.futures.TimeoutError:
         raise HTTPException(status_code=503, detail="Compliance report generation timed out. Please retry.")
+    try:
+        db.save_compliance_run(str(uuid.uuid4()), assignment_id, report)
+    except Exception as _cache_err:
+        log.warning("Failed to cache compliance run: %s", _cache_err)
     return report
 
 
