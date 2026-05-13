@@ -32,20 +32,71 @@ class UnifiedAssignmentCreationResult:
     employee_user_id: Optional[str]
 
 
+def _link_contact_post_create(
+    db: "Database",
+    assignment_id: str,
+    *,
+    request_id: Optional[str] = None,
+) -> None:
+    """Deferred: link employee_contact → auth user after the assignment row exists.
+
+    B3-fix: this call was previously inline in create_assignment_with_contact_and_invites
+    and could hang (waiting for a DB lock or a slow pooler connection) inside the
+    20-second synchronous window, causing 503 timeouts.  Running it here — after the
+    assignment row is committed and control has returned to the caller — keeps it
+    safely out of the critical path.
+    """
+    try:
+        from sqlalchemy import text as _text  # local import to avoid circular at module level
+
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                _text(
+                    "SELECT employee_contact_id, employee_user_id "
+                    "FROM case_assignments WHERE id = :aid LIMIT 1"
+                ),
+                {"aid": assignment_id},
+            ).fetchone()
+        if not row:
+            return
+        m = row._mapping if hasattr(row, "_mapping") else dict(row)
+        ecid = (str(m.get("employee_contact_id") or "")).strip()
+        euid = (str(m.get("employee_user_id") or "")).strip()
+        if ecid and euid:
+            db.link_employee_contact_to_auth_user(ecid, euid, request_id=request_id)
+            log.info(
+                "link_contact_post_create done assignment_id=%s ecid=%s request_id=%s",
+                assignment_id,
+                ecid[:8],
+                request_id,
+            )
+    except Exception as exc:
+        log.warning(
+            "link_contact_post_create failed assignment_id=%s: %s",
+            assignment_id,
+            exc,
+        )
+
+
 def run_assignment_post_creation_hooks(
     db: "Database",
     assignment_id: str,
     *,
     request_id: Optional[str] = None,
 ) -> None:
-    """Run the three idempotent ensure_* hooks that previously ran inline.
+    """Run the idempotent ensure_* hooks that previously ran inline.
 
     Each is wrapped in try/except so a slow or failing hook never blocks the
     next one. Callers that defer the hooks (via
     create_assignment_with_contact_and_invites(..., defer_post_creation_hooks=True))
     should dispatch this to a background thread so the assignment response
     isn't held by Supabase RTT for the mobility/case-person/passport sync.
+
+    Also runs _link_contact_post_create (B3-fix) which was previously inline
+    and could cause 20-second hangs when a DB lock delayed the pooler connection.
     """
+    # B3-fix: link employee_contact → auth user in background, not on critical path
+    _link_contact_post_create(db, assignment_id, request_id=request_id)
     try:
         ensure_mobility_case_link_for_assignment(db, assignment_id, request_id=request_id)
     except Exception as exc:
@@ -153,7 +204,10 @@ def create_assignment_with_contact_and_invites(
         last_name=employee_last_name,
         request_id=request_id,
     )
-    if employee_user_id:
+    # B3-fix: skip the inline link when defer_post_creation_hooks=True so this
+    # potentially-slow DB write doesn't block the critical-path 20 s window.
+    # _link_contact_post_create() in run_assignment_post_creation_hooks handles it.
+    if employee_user_id and not defer_post_creation_hooks:
         db.link_employee_contact_to_auth_user(
             employee_contact_id, employee_user_id, request_id=request_id
         )
