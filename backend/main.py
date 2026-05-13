@@ -3074,6 +3074,19 @@ def get_dashboard(request: Request, user: Dict[str, Any] = Depends(get_current_u
     )
 
 
+@app.get("/api/hr/cases")
+def list_cases(
+    status: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile.")
+    items = db.list_relocation_cases(company_id=company_id, status=status)
+    return {"cases": items}
+
+
 @app.post("/api/hr/cases", response_model=CreateCaseResponse)
 def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
