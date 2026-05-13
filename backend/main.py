@@ -11982,7 +11982,7 @@ def create_policy_exception(
 
 @app.get("/api/hr/cases/{case_id}/compliance")
 def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    assignment = db.get_assignment_by_id(case_id)
+    assignment = db.get_assignment_by_case_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     profile = db.get_employee_profile(case_id)
@@ -11993,10 +11993,17 @@ def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_rol
     if cached:
         return cached
 
-    policy = policy_engine.load_policy()
-    exceptions = db.list_policy_exceptions(case_id)
-    spend = policy_engine.compute_spend(case_id, profile, policy)
-    report = policy_engine.build_compliance_report(case_id, profile, policy, spend, exceptions, assignment.get("status"))
+    def _build_report():
+        policy = policy_engine.load_policy()
+        exceptions = db.list_policy_exceptions(case_id)
+        spend = policy_engine.compute_spend(case_id, profile, policy)
+        return policy_engine.build_compliance_report(case_id, profile, policy, spend, exceptions, assignment.get("status"))
+
+    try:
+        _fut = _hr_assign_side_effects_executor.submit(_build_report)
+        report = _fut.result(timeout=25)
+    except concurrent.futures.TimeoutError:
+        raise HTTPException(status_code=503, detail="Compliance report generation timed out. Please retry.")
     return report
 
 
