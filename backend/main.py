@@ -1044,51 +1044,32 @@ async def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(None),
 ) -> Dict[str, Any]:
-    """Extract user from authorization header."""
+    """Extract and validate user from Authorization header. Single DB round-trip."""
     if not authorization:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    # Remove "Bearer " prefix if present
-    token = authorization.replace("Bearer ", "")
+    token = authorization.replace("Bearer ", "").strip()
 
-    user = db.get_user_by_token(token)
+    # Run sync DB work in a thread so we never block the async event loop
+    loop = asyncio.get_event_loop()
+    user = await loop.run_in_executor(None, db.get_user_context_by_token, token)
+
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Ensure admin profile record exists
-    db.ensure_profile_record(
-        user_id=user["id"],
-        email=user.get("email"),
-        role=user.get("role", UserRole.EMPLOYEE.value),
-        full_name=user.get("name"),
-        company_id=user.get("company"),
+    # Fire-and-forget profile upsert — don't block the request on it
+    asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: db.ensure_profile_record(
+            user_id=user["id"],
+            email=user.get("email"),
+            role=user.get("role", "employee"),
+            full_name=user.get("full_name"),
+        ),
     )
 
-    # Admin detection (role in profiles OR allowlisted @relopass.com)
-    if _is_admin_user(user):
-        user["role"] = UserRole.ADMIN.value
-        user["is_admin"] = True
-    else:
-        user["is_admin"] = False
-
-    # Attach user id for middleware logging (if Request is available).
-    if request is not None:
-        try:
-            request.state.user_id = user.get("id")
-        except Exception:
-            # request may be a test stub; ignore
-            pass
-
-    # Admin impersonation context (server-side)
-    session = db.get_admin_session(token)
-    if session and session.get("target_user_id"):
-        user["impersonation"] = {
-            "target_user_id": session.get("target_user_id"),
-            "mode": session.get("mode"),
-        }
-
+    request.state.user_id = user["id"]
     return user
-
 
 def _is_admin_user(user: Dict[str, Any]) -> bool:
     role = (user.get("role") or "").upper()
@@ -3095,6 +3076,19 @@ def get_dashboard(request: Request, user: Dict[str, Any] = Depends(get_current_u
     )
 
 
+@app.get("/api/hr/cases")
+def list_cases(
+    status: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile.")
+    items = db.list_relocation_cases(company_id=company_id, status=status)
+    return {"cases": items}
+
+
 @app.post("/api/hr/cases", response_model=CreateCaseResponse)
 def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
@@ -3548,6 +3542,21 @@ def _dispatch_hr_assign_side_effects(
     future.add_done_callback(_log_outcome)
 
 
+@app.get("/api/hr/cases/{case_id}")
+def get_case(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile.")
+    case = db.get_case_by_id(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
 def assign_case(
     case_id: str,
@@ -3610,7 +3619,8 @@ def assign_case(
         assert_canonical_status(AssignmentStatus.ASSIGNED.value)
         try:
             with timed("unified_assignment_creation", request_id):
-                uar = create_assignment_with_contact_and_invites(
+                _create_fut = _hr_assign_side_effects_executor.submit(
+                    create_assignment_with_contact_and_invites,
                     db,
                     company_id=hr_company_id,
                     hr_user_id=effective["id"],
@@ -3624,6 +3634,13 @@ def assign_case(
                     observability_channel="hr",
                     defer_post_creation_hooks=True,
                 )
+                try:
+                    uar = _create_fut.result(timeout=20)
+                except concurrent.futures.TimeoutError:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Assignment creation timed out. Please retry in a moment.",
+                    )
         except ValueError as ve:
             raise HTTPException(status_code=400, detail=str(ve)) from ve
         assignment_id = uar.assignment_id
@@ -6608,6 +6625,22 @@ def _run_policy_document_ingest_background(
         num_clauses,
         final_doc.get("processing_status"),
     )
+
+
+@app.get("/api/resources")
+def list_resources(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    filters: Optional[str] = Query(None, description="JSON filters: city, family_type, budget, category, etc."),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Alias for /api/resources/country — backward-compatible resources endpoint."""
+    def _fetch():
+        return get_country_resources(assignment_id=assignment_id, filters=filters, user=user)
+    try:
+        _fut = _hr_assign_side_effects_executor.submit(_fetch)
+        return _fut.result(timeout=25)
+    except concurrent.futures.TimeoutError:
+        raise HTTPException(status_code=503, detail="Resources loading timed out. Please retry in a moment.")
 
 
 @app.get("/api/employee/assignments/{assignment_id}/services")
@@ -12186,7 +12219,7 @@ def create_policy_exception(
 ):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
-    assignment = db.get_assignment_by_id(case_id)
+    assignment = db.get_assignment_by_case_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     if not request.category:
@@ -12218,10 +12251,21 @@ def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_rol
     if cached:
         return cached
 
-    policy = policy_engine.load_policy()
-    exceptions = db.list_policy_exceptions(assignment_id)
-    spend = policy_engine.compute_spend(case_id, profile, policy)
-    report = policy_engine.build_compliance_report(case_id, profile, policy, spend, exceptions, assignment.get("status"))
+    def _build_report():
+        policy = policy_engine.load_policy()
+        exceptions = db.list_policy_exceptions(assignment_id)
+        spend = policy_engine.compute_spend(case_id, profile, policy)
+        return policy_engine.build_compliance_report(case_id, profile, policy, spend, exceptions, assignment.get("status"))
+
+    try:
+        _fut = _hr_assign_side_effects_executor.submit(_build_report)
+        report = _fut.result(timeout=25)
+    except concurrent.futures.TimeoutError:
+        raise HTTPException(status_code=503, detail="Compliance report generation timed out. Please retry.")
+    try:
+        db.save_compliance_run(str(uuid.uuid4()), assignment_id, report)
+    except Exception as _cache_err:
+        log.warning("Failed to cache compliance run: %s", _cache_err)
     return report
 
 

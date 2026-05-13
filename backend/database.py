@@ -3592,6 +3592,42 @@ class Database:
     # ==================================================================
     # Profile operations (legacy)
     # ==================================================================
+    def get_user_context_by_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """
+        Single-query replacement for the 4-call chain:
+            get_user_by_token -> get_user_by_id -> get_admin_session -> get_profile_record
+        Returns None if the session token is unknown.
+        """
+        sql = text("""
+            SELECT
+                u.id,
+                u.email,
+                u.role,
+                u.username,
+                p.full_name,
+                p.company_id,
+                (u.role = 'admin') AS is_admin
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            LEFT JOIN profiles p ON p.id = u.id
+            WHERE s.token = :token
+            LIMIT 1
+        """)
+        with self.engine.connect() as conn:
+            row = conn.execute(sql, {"token": token}).fetchone()
+        if not row:
+            return None
+        m = row._mapping
+        return {
+            "id":          m["id"],
+            "email":       m["email"],
+            "role":        m["role"],
+            "username":    m.get("username"),
+            "full_name":   m.get("full_name"),
+            "company_id":  m.get("company_id"),
+            "is_admin":    bool(m.get("is_admin")),
+        }
+
     def save_profile(self, user_id: str, profile: Dict[str, Any]) -> bool:
         now = datetime.utcnow().isoformat()
         pj = json.dumps(profile)
