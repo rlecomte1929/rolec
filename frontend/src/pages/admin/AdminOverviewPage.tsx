@@ -36,15 +36,7 @@ export const AdminOverviewPage: React.FC = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const [
-          companiesRes,
-          hrUsersRes,
-          employeesRes,
-          assignmentsRes,
-          policyRes,
-          supportRes,
-          relocationsRes,
-        ] = await Promise.all([
+        const results = await Promise.allSettled([
           adminAPI.listCompanies(),
           adminAPI.listHrUsers(),
           adminAPI.listEmployees(),
@@ -52,29 +44,37 @@ export const AdminOverviewPage: React.FC = () => {
           adminAPI.listPolicyOverview(),
           adminAPI.listSupportCases({ status: 'open' }),
           adminAPI.listRelocations({ status: 'blocked' }),
+          suppliersAPI.list({ status: 'active' }),
         ]);
-        let activeSuppliers = 0;
-        try {
-          const suppliersRes = await suppliersAPI.list({ status: 'active' });
-          activeSuppliers = (suppliersRes.suppliers || []).length;
-        } catch {
-          // ignore
-        }
-        const companiesWithPolicy = (policyRes.companies || []).filter(
-          (c: { policy_status?: string }) => c.policy_status === 'published'
+
+        const val = <T,>(r: PromiseSettledResult<T>): T | null =>
+          r.status === 'fulfilled' ? r.value : null;
+
+        const companiesRes  = val(results[0]) as { companies?: unknown[] } | null;
+        const hrUsersRes    = val(results[1]) as { hr_users?: unknown[] } | null;
+        const employeesRes  = val(results[2]) as { employees?: unknown[] } | null;
+        const assignmentsRes = val(results[3]) as { assignments?: unknown[] } | null;
+        const policyRes     = val(results[4]) as { companies?: { policy_status?: string }[] } | null;
+        const supportRes    = val(results[5]) as { support_cases?: unknown[] } | null;
+        const relocationsRes = val(results[6]) as { relocations?: unknown[] } | null;
+        const suppliersRes  = val(results[7]) as { suppliers?: unknown[] } | null;
+
+        const companiesWithPolicy = (policyRes?.companies || []).filter(
+          (c) => c.policy_status === 'published'
         ).length;
+
         setStats({
-          companies: (companiesRes.companies || []).length,
-          hrUsers: (hrUsersRes.hr_users || []).length,
-          employees: (employeesRes.employees || []).length,
-          assignments: (assignmentsRes.assignments || []).length,
+          companies:          (companiesRes?.companies || []).length,
+          hrUsers:            (hrUsersRes?.hr_users || []).length,
+          employees:          (employeesRes?.employees || []).length,
+          assignments:        (assignmentsRes?.assignments || []).length,
           companiesWithPolicy,
-          activeSuppliers,
-          supportOpen: (supportRes.support_cases || []).length,
-          relocationsBlocked: (relocationsRes.relocations || []).length,
+          activeSuppliers:    (suppliersRes?.suppliers || []).length,
+          supportOpen:        (supportRes?.support_cases || []).length,
+          relocationsBlocked: (relocationsRes?.relocations || []).length,
         });
       } catch {
-        // keep defaults
+        // keep defaults — should never reach here now that allSettled is used
       } finally {
         setLoading(false);
       }

@@ -924,8 +924,12 @@ export const adminAPI = {
     return response.data;
   },
   listPolicyOverview: async (params?: { company_id?: string }): Promise<{ companies: AdminPolicyCompany[] }> => {
-    const response = await api.get('/api/admin/policies/overview', { params });
-    return response.data;
+    try {
+      const response = await api.get('/api/admin/policies/overview', { params });
+      return response.data;
+    } catch {
+      return { companies: [] };
+    }
   },
   listAdminPolicies: async (companyId: string): Promise<AdminPoliciesByCompany> => {
     const response = await api.get('/api/admin/policies', { params: { company_id: companyId } });
