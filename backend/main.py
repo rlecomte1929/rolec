@@ -6376,6 +6376,16 @@ def _run_policy_document_ingest_background(
     )
 
 
+@app.get("/api/resources")
+def list_resources(
+    assignment_id: str = Query(..., description="Assignment id (gate for access)"),
+    filters: Optional[str] = Query(None, description="JSON filters: city, family_type, budget, category, etc."),
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """Alias for /api/resources/country — backward-compatible resources endpoint."""
+    return get_country_resources(assignment_id=assignment_id, filters=filters, user=user)
+
+
 @app.get("/api/employee/assignments/{assignment_id}/services")
 def get_assignment_services(
     assignment_id: str,
