@@ -8794,6 +8794,26 @@ class Database:
             row = conn.execute(text("SELECT * FROM profiles WHERE id = :id"), {"id": user_id}).fetchone()
         return self._row_to_dict(row)
 
+    def get_profile_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Look up a profiles row by email address (case-insensitive).
+
+        Used as a fallback when the local ``users`` table has no entry for an
+        employee who already has a Supabase auth account (e.g. accounts created
+        via the magic-link / SSO flow that never touched the legacy users table).
+        Returning the profile id lets the caller pass a real employee_user_id to
+        create_assignment_with_contact_and_invites, which skips the invite path
+        and avoids the hanging Supabase Auth inviteUserByEmail call.
+        """
+        email_norm = (email or "").strip().lower()
+        if not email_norm:
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT * FROM profiles WHERE LOWER(TRIM(email)) = :email LIMIT 1"),
+                {"email": email_norm},
+            ).fetchone()
+        return self._row_to_dict(row)
+
     def set_profile_company(self, user_id: str, company_id: str) -> None:
         """Set profile company and keep hr_users/employees in sync."""
         with self.engine.begin() as conn:

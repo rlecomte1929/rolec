@@ -3601,6 +3601,27 @@ def assign_case(
         employee_last_name = (ln or "").strip() or None
 
         employee_user = db.get_user_by_identifier(employee_identifier_raw)
+        # Fix A (B3): If no legacy-users row exists for this email, fall back to
+        # the profiles table.  Employees who signed up via magic-link or SSO
+        # never get a row in the local `users` table, so get_user_by_identifier
+        # returns None and the downstream code passes employee_user_id=None to
+        # create_assignment_with_contact_and_invites.  That triggers the
+        # ensure_pending_assignment_invites path which calls Supabase Auth
+        # inviteUserByEmail — a blocking HTTP call that hangs when the email
+        # service is unavailable, causing the 20 s 503 timeout (B3).
+        # Resolving the user_id here skips that path entirely.
+        if not employee_user and "@" in employee_identifier_raw:
+            _profile_fb = db.get_profile_by_email(employee_identifier_raw)
+            if _profile_fb and _profile_fb.get("status") in ("active", None):
+                employee_user = {
+                    "id": _profile_fb["id"],
+                    "email": _profile_fb.get("email") or employee_identifier_raw,
+                }
+                log.info(
+                    "assign_case: resolved employee_user_id=%s from profiles fallback for identifier=%s",
+                    _profile_fb["id"],
+                    employee_identifier_raw,
+                )
         if employee_user and hr_company_id:
             emp_profile = db.get_profile_record(employee_user["id"])
             if emp_profile and not emp_profile.get("company_id"):
