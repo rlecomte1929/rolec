@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { getAuthItem } from '../utils/demo';
@@ -8,6 +8,20 @@ import { hrAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
+import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
+
+type QuoteRequest = {
+  id: string;
+  case_id: string;
+  employee_id: string;
+  company_id: string;
+  service_categories: string[];
+  notes: string | null;
+  budget_range: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
 
 export const HrCommandCenterCaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,6 +49,37 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
     events: Array<{ event_type: string; description?: string; created_at: string }>;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Quote requests for this case
+  const [quoteRequests, setQuoteRequests] = useState<QuoteRequest[]>([]);
+  const [updatingQrId, setUpdatingQrId] = useState<string | null>(null);
+
+  const loadQuoteRequests = useCallback(() => {
+    if (!id) return;
+    hrAPI
+      .getQuoteRequests({ case_id: id })
+      .then((res) => setQuoteRequests(res.quote_requests))
+      .catch(() => setQuoteRequests([]));
+  }, [id]);
+
+  useEffect(() => {
+    loadQuoteRequests();
+  }, [loadQuoteRequests]);
+
+  const handleQuoteStatusUpdate = async (
+    qrId: string,
+    status: 'acknowledged' | 'fulfilled'
+  ) => {
+    setUpdatingQrId(qrId);
+    try {
+      await hrAPI.updateQuoteRequestStatus(qrId, status);
+      loadQuoteRequests();
+    } catch {
+      // silently fail — HR can retry
+    } finally {
+      setUpdatingQrId(null);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -175,6 +220,90 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             )}
           </Card>
         </div>
+
+        {/* ── Employee Tasks (AIQ-34-C) — polls every 8s ── */}
+        <HrCaseTasksPanel caseId={detail.id} />
+
+        {/* ── Quote Requests from employee (Step 4) ── */}
+        <Card padding="lg" className="border border-[#e2e8f0]">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-[#0b2b43]">
+              Quote requests
+              {quoteRequests.filter((q) => q.status === 'pending').length > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center rounded-full bg-[#fef3c7] border border-[#fbbf24] px-2 py-0.5 text-xs font-medium text-[#92400e]">
+                  {quoteRequests.filter((q) => q.status === 'pending').length} pending
+                </span>
+              )}
+            </div>
+          </div>
+          {quoteRequests.length === 0 ? (
+            <p className="text-sm text-[#94a3b8]">No quote requests from the employee yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {quoteRequests.map((qr) => (
+                <li
+                  key={qr.id}
+                  className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 text-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {qr.service_categories.map((cat) => (
+                          <span
+                            key={cat}
+                            className="rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-xs text-[#1d4ed8]"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                      {qr.notes && (
+                        <p className="text-[#374151] text-xs mt-1 leading-relaxed">{qr.notes}</p>
+                      )}
+                      {qr.budget_range && (
+                        <p className="text-[#64748b] text-xs mt-1">Budget: {qr.budget_range}</p>
+                      )}
+                      <p className="text-[#94a3b8] text-xs mt-1">
+                        {new Date(qr.created_at).toLocaleDateString()} ·{' '}
+                        <span
+                          className={
+                            qr.status === 'fulfilled'
+                              ? 'text-[#16a34a]'
+                              : qr.status === 'acknowledged'
+                              ? 'text-[#2563eb]'
+                              : 'text-[#d97706]'
+                          }
+                        >
+                          {qr.status}
+                        </span>
+                      </p>
+                    </div>
+                    {qr.status === 'pending' && (
+                      <button
+                        type="button"
+                        disabled={updatingQrId === qr.id}
+                        onClick={() => handleQuoteStatusUpdate(qr.id, 'acknowledged')}
+                        className="shrink-0 rounded-lg border border-[#2563eb] bg-white px-3 py-1.5 text-xs font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50 transition-colors"
+                      >
+                        {updatingQrId === qr.id ? '…' : 'Acknowledge'}
+                      </button>
+                    )}
+                    {qr.status === 'acknowledged' && (
+                      <button
+                        type="button"
+                        disabled={updatingQrId === qr.id}
+                        onClick={() => handleQuoteStatusUpdate(qr.id, 'fulfilled')}
+                        className="shrink-0 rounded-lg border border-[#16a34a] bg-white px-3 py-1.5 text-xs font-medium text-[#16a34a] hover:bg-[#f0fdf4] disabled:opacity-50 transition-colors"
+                      >
+                        {updatingQrId === qr.id ? '…' : 'Mark fulfilled'}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
         <Button variant="outline" onClick={() => navigate(buildRoute('hrCommandCenter'))}>
           Back to Command Center

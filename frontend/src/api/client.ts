@@ -342,6 +342,41 @@ export const dashboardAPI = {
 // keep a 45s ceiling here as a safety net for the synchronous portion.
 const HR_CASE_TIMEOUT = 45_000;
 
+// ── AIQ-34-C shared types ────────────────────────────────────────────────────
+export type TaskType =
+  | 'document_upload'
+  | 'address_confirmation'
+  | 'acknowledgment'
+  | 'selection'
+  | 'custom';
+
+export interface EmployeeTask {
+  id: string;
+  case_id: string;
+  employee_id: string;
+  org_id: string;
+  task_type: TaskType;
+  title: string;
+  description: string | null;
+  status: 'pending' | 'submitted' | 'revision_requested' | 'approved';
+  due_date: string | null;
+  required_file_upload: boolean;
+  file_url: string | null;
+  submission_data: Record<string, unknown> | null;
+  review_note: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmployeeTaskListResponse {
+  case_id: string;
+  tasks: EmployeeTask[];
+  stats: { total: number; completed: number; pct: number };
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const hrAPI = {
   createCase: async (): Promise<{ caseId: string }> => {
     const response = await api.post('/api/hr/cases', undefined, { timeout: HR_CASE_TIMEOUT });
@@ -673,6 +708,78 @@ export const hrAPI = {
     const d = documentId?.trim();
     if (d) body.document_id = d;
     const response = await api.post('/api/hr/policy-assistant/query', body, { timeout: 120_000 });
+    return response.data;
+  },
+
+  // ── Quote requests (AIQ-65) ──────────────────────────────────────────────
+
+  getServiceCategories: async (): Promise<{ service_categories: string[] }> => {
+    const response = await api.get('/api/hr/service-categories');
+    return response.data;
+  },
+
+  getQuoteRequests: async (params?: {
+    status?: string;
+    case_id?: string;
+  }): Promise<{
+    quote_requests: Array<{
+      id: string;
+      case_id: string;
+      employee_id: string;
+      company_id: string;
+      service_categories: string[];
+      notes: string | null;
+      budget_range: string | null;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+  }> => {
+    const response = await api.get('/api/hr/quote-requests', { params });
+    // backend returns a list directly; normalise to named key
+    const data = response.data;
+    return { quote_requests: Array.isArray(data) ? data : (data.quote_requests ?? []) };
+  },
+
+  updateQuoteRequestStatus: async (
+    requestId: string,
+    status: 'acknowledged' | 'fulfilled'
+  ): Promise<{ id: string; status: string }> => {
+    const response = await api.patch(`/api/hr/quote-requests/${requestId}`, { status });
+    return response.data;
+  },
+
+  // ── AIQ-34-C: Employee task management (HR side) ──────────────────────────
+
+  /** GET /api/hr/cases/{caseId}/tasks — full task list + completion stats */
+  getCaseTasks: async (caseId: string): Promise<EmployeeTaskListResponse> => {
+    const response = await api.get(`/api/hr/cases/${caseId}/tasks`);
+    return response.data;
+  },
+
+  /** PATCH /api/hr/cases/{caseId}/tasks/{taskId} — approve or request revision */
+  reviewTask: async (
+    caseId: string,
+    taskId: string,
+    body: { action: 'approved' | 'revision_requested'; review_note?: string }
+  ): Promise<EmployeeTask> => {
+    const response = await api.patch(`/api/hr/cases/${caseId}/tasks/${taskId}`, body);
+    return response.data;
+  },
+
+  /** POST /api/hr/cases/{caseId}/tasks — HR creates a task for the employee */
+  addCaseTask: async (
+    caseId: string,
+    body: {
+      employee_id: string;
+      task_type: TaskType;
+      title: string;
+      description?: string;
+      due_date?: string;
+      required_file_upload?: boolean;
+    }
+  ): Promise<EmployeeTask> => {
+    const response = await api.post(`/api/hr/cases/${caseId}/tasks`, body);
     return response.data;
   },
 };
@@ -1929,6 +2036,36 @@ export const employeeAPI = {
       message,
     }, { timeout: 120_000 });
     return response.data;
+  },
+
+  // ── Quote requests (AIQ-65) ──────────────────────────────────────────────
+
+  createQuoteRequest: async (payload: {
+    case_id: string;
+    service_categories: string[];
+    notes?: string;
+    budget_range?: string;
+  }): Promise<{
+    id: string;
+    case_id: string;
+    status: string;
+    created_at: string;
+  }> => {
+    const response = await api.post('/api/employee/quote-requests', payload);
+    return response.data;
+  },
+
+  listMyQuoteRequests: async (): Promise<Array<{
+    id: string;
+    case_id: string;
+    service_categories: string[];
+    notes: string | null;
+    budget_range: string | null;
+    status: string;
+    created_at: string;
+  }>> => {
+    const response = await api.get('/api/employee/quote-requests');
+    return Array.isArray(response.data) ? response.data : [];
   },
 };
 
