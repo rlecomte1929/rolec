@@ -6383,7 +6383,13 @@ def list_resources(
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ):
     """Alias for /api/resources/country — backward-compatible resources endpoint."""
-    return get_country_resources(assignment_id=assignment_id, filters=filters, user=user)
+    def _fetch():
+        return get_country_resources(assignment_id=assignment_id, filters=filters, user=user)
+    try:
+        _fut = _hr_assign_side_effects_executor.submit(_fetch)
+        return _fut.result(timeout=25)
+    except concurrent.futures.TimeoutError:
+        raise HTTPException(status_code=503, detail="Resources loading timed out. Please retry in a moment.")
 
 
 @app.get("/api/employee/assignments/{assignment_id}/services")
