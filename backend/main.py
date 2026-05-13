@@ -3540,6 +3540,21 @@ def _dispatch_hr_assign_side_effects(
     future.add_done_callback(_log_outcome)
 
 
+@app.get("/api/hr/cases/{case_id}")
+def get_case(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile.")
+    case = db.get_case_by_id(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+
 @app.post("/api/hr/cases/{case_id}/assign", response_model=AssignCaseResponse)
 def assign_case(
     case_id: str,
@@ -3602,7 +3617,8 @@ def assign_case(
         assert_canonical_status(AssignmentStatus.ASSIGNED.value)
         try:
             with timed("unified_assignment_creation", request_id):
-                uar = create_assignment_with_contact_and_invites(
+                _create_fut = _hr_assign_side_effects_executor.submit(
+                    create_assignment_with_contact_and_invites,
                     db,
                     company_id=hr_company_id,
                     hr_user_id=effective["id"],
@@ -3616,6 +3632,13 @@ def assign_case(
                     observability_channel="hr",
                     defer_post_creation_hooks=True,
                 )
+                try:
+                    uar = _create_fut.result(timeout=20)
+                except concurrent.futures.TimeoutError:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Assignment creation timed out. Please retry in a moment.",
+                    )
         except ValueError as ve:
             raise HTTPException(status_code=400, detail=str(ve)) from ve
         assignment_id = uar.assignment_id
@@ -11929,7 +11952,7 @@ def create_policy_exception(
 ):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
-    assignment = db.get_assignment_by_id(case_id)
+    assignment = db.get_assignment_by_case_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     if not request.category:
