@@ -9,7 +9,7 @@ import time
 import os
 import json as _json
 
-logging.basicConfig(level=logging.INFO
+logging.basicConfig(level=logging.INFO)
 
 # Configure observability (Sentry + structured logging) before anything else
 # logs, so early startup lines land in the right format. All of it is no-op
