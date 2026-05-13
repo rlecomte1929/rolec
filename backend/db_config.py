@@ -60,9 +60,14 @@ def sqlalchemy_engine_kwargs(database_url: str) -> Dict[str, Any]:
         return {"connect_args": {"check_same_thread": False}}
     return {
         "pool_pre_ping": True,
-        "pool_size": int(os.getenv("SQLALCHEMY_POOL_SIZE", "10")),
-        "max_overflow": int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "20")),
+        "pool_size": int(os.getenv("SQLALCHEMY_POOL_SIZE", "5")),
+        "max_overflow": int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "10")),
         "pool_recycle": int(os.getenv("SQLALCHEMY_POOL_RECYCLE", "280")),
+        "pool_timeout": int(os.getenv("SQLALCHEMY_POOL_TIMEOUT", "10")),
+        "connect_args": {
+            "connect_timeout": 10,
+            "options": "-c statement_timeout=20000 -c lock_timeout=8000",
+        },
     }
 
 
