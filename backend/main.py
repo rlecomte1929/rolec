@@ -147,6 +147,7 @@ from .app.routers import services_state as services_state_router
 from .app.routers import admin_catalog as admin_catalog_router
 from .app.routers import hr_catalog as hr_catalog_router
 from .app.routers import providers as providers_router
+from .app.routers import provider_portal as provider_portal_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -534,6 +535,7 @@ app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
 app.include_router(hr_catalog_router.router)
 app.include_router(providers_router.router)
+app.include_router(provider_portal_router.router)
 app.include_router(mobility_context_router.router)
 app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
@@ -4464,6 +4466,255 @@ def update_profile_photo(
     profile["primaryApplicant"]["photoUrl"] = request.photoUrl
     db.save_employee_profile(assignment_id, profile)
     return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# Employee Task Portal  (AIQ-34-B)
+# ---------------------------------------------------------------------------
+
+class TaskSubmitRequest(BaseModel):
+    """
+    Payload for PATCH /api/employee/tasks/{task_id}
+
+    submission_data  — structured form data (address fields, selection value, etc.)
+    file_url         — pre-uploaded file URL (client uploads directly to Supabase Storage
+                       and sends back the public/signed URL)
+    """
+    submission_data: Optional[Dict[str, Any]] = None
+    file_url: Optional[str] = None
+
+
+def _resolve_employee_case_id(user_id: str, case_id_override: Optional[str] = None) -> Optional[str]:
+    """
+    Resolve the relocation case_id for the authenticated employee.
+
+    Priority:
+      1. Explicit `case_id` query parameter (magic-link sessions pass this)
+      2. Primary linked assignment for the user
+    """
+    if case_id_override and case_id_override.strip():
+        return case_id_override.strip()
+    linked = db.list_linked_assignments_for_employee(user_id)
+    if not linked:
+        return None
+    primary = linked[0]
+    return _effective_relocation_case_id(primary) or None
+
+
+@app.get("/api/employee/tasks")
+def list_employee_tasks(
+    case_id: Optional[str] = Query(None, description="Override case ID (used by magic-link sessions)"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    List all tasks for the authenticated employee.
+
+    - Resolves the active relocation case automatically from the employee's linked assignment.
+    - Pass `?case_id=<uuid>` for magic-link sessions where the case is explicit.
+    - Returns tasks ordered by due_date ASC NULLS LAST.
+    """
+    uid = user["id"]
+    resolved_case_id = _resolve_employee_case_id(uid, case_id)
+    if not resolved_case_id:
+        return {"tasks": [], "case_id": None}
+    tasks = db.list_employee_tasks(employee_id=uid, case_id=resolved_case_id)
+    total = len(tasks)
+    completed = sum(1 for t in tasks if t.get("status") in ("submitted", "approved"))
+    return {
+        "case_id": resolved_case_id,
+        "tasks": tasks,
+        "stats": {
+            "total": total,
+            "completed": completed,
+            "pct": round(completed / total * 100) if total else 0,
+        },
+    }
+
+
+@app.get("/api/employee/tasks/{task_id}")
+def get_employee_task(
+    task_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Fetch a single task by ID. Only returns the task if it belongs to the
+    authenticated employee.
+    """
+    task = db.get_employee_task(task_id=task_id, employee_id=user["id"])
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+
+@app.patch("/api/employee/tasks/{task_id}")
+def submit_employee_task(
+    task_id: str,
+    body: TaskSubmitRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Submit a task with form data and/or file URL.
+
+    - Sets status → 'submitted' (from 'pending' or 'revision_requested').
+    - Idempotent: re-submitting an already-submitted task returns current state.
+    - file_url: client uploads the file directly to Supabase Storage and passes
+      back the resulting URL here; no binary upload through this endpoint.
+    """
+    task = db.get_employee_task(task_id=task_id, employee_id=user["id"])
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    updated = db.submit_employee_task(
+        task_id=task_id,
+        employee_id=user["id"],
+        submission_data=body.submission_data,
+        file_url=body.file_url,
+    )
+    if updated is None:
+        raise HTTPException(status_code=500, detail="Failed to submit task")
+    return updated
+
+
+@app.get("/api/hr/cases/{case_id}")
+def get_hr_draft_case(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    Return minimal info for a draft relocation case (no assignment yet).
+
+    Used by /hr/cases/:caseId when getAssignment() returns 404 — the case
+    exists in relocation_cases but has not been assigned to an employee yet.
+    Returns { id, status: 'draft', company_id, created_at } or 404.
+    """
+    effective = _effective_user(user, UserRole.HR)
+    case_row = db.get_case_by_id(case_id)
+    if not case_row:
+        raise HTTPException(status_code=404, detail="Case not found")
+    # HR access check: admin sees all; otherwise check company or owner
+    if not effective.get("is_admin"):
+        hr_company = _get_hr_company_id(effective)
+        case_company = case_row.get("company_id")
+        case_owner = case_row.get("hr_user_id")
+        uid = effective.get("id")
+        if not (
+            (hr_company and hr_company == case_company)
+            or (uid and uid == case_owner)
+        ):
+            raise HTTPException(status_code=404, detail="Case not found")
+    return {
+        "id": case_row.get("id") or case_id,
+        "status": "draft",
+        "company_id": case_row.get("company_id"),
+        "created_at": case_row.get("created_at"),
+        "hr_user_id": case_row.get("hr_user_id"),
+    }
+
+
+@app.get("/api/hr/cases/{case_id}/tasks")
+def list_case_tasks_for_hr(
+    case_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    HR view: all tasks for a given case, ordered by status (pending first).
+    Used by AIQ-34-C task completion badge in the command center.
+    """
+    tasks = db.list_employee_tasks_for_case_hr(case_id=case_id)
+    total = len(tasks)
+    completed = sum(1 for t in tasks if t.get("status") in ("submitted", "approved"))
+    return {
+        "case_id": case_id,
+        "tasks": tasks,
+        "stats": {
+            "total": total,
+            "completed": completed,
+            "pct": round(completed / total * 100) if total else 0,
+        },
+    }
+
+
+class HrTaskReviewRequest(BaseModel):
+    """Payload for PATCH /api/hr/cases/{case_id}/tasks/{task_id}"""
+    action: str          # 'approved' | 'revision_requested'
+    review_note: Optional[str] = None
+
+
+@app.patch("/api/hr/cases/{case_id}/tasks/{task_id}")
+def review_employee_task(
+    case_id: str,
+    task_id: str,
+    body: HrTaskReviewRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    HR approves or requests revision on a submitted employee task.
+
+    - action: 'approved' or 'revision_requested'
+    - Only acts on tasks in status 'submitted'; idempotent otherwise.
+    """
+    if body.action not in ("approved", "revision_requested"):
+        raise HTTPException(status_code=400, detail="action must be 'approved' or 'revision_requested'")
+
+    updated = db.review_employee_task(
+        task_id=task_id,
+        case_id=case_id,
+        hr_user_id=user["id"],
+        action=body.action,
+        review_note=body.review_note,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Task not found for this case")
+    return updated
+
+
+class HrCreateTaskRequest(BaseModel):
+    """Payload for POST /api/hr/cases/{case_id}/tasks"""
+    employee_id: str
+    task_type: str          # document_upload | address_confirmation | acknowledgment | selection | custom
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[str] = None      # ISO date YYYY-MM-DD
+    required_file_upload: bool = False
+
+
+@app.post("/api/hr/cases/{case_id}/tasks", status_code=201)
+def create_case_task_for_hr(
+    case_id: str,
+    body: HrCreateTaskRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """
+    HR assigns a new task to an employee on an open case.
+
+    - employee_id: the employee's auth user ID (must be linked to this case)
+    - Starts in status 'pending'
+    """
+    VALID_TYPES = {"document_upload", "address_confirmation", "acknowledgment", "selection", "custom"}
+    if body.task_type not in VALID_TYPES:
+        raise HTTPException(status_code=400, detail=f"task_type must be one of {sorted(VALID_TYPES)}")
+
+    # Resolve org_id from the HR user's company via direct lookup
+    with db.engine.connect() as _conn:
+        _row = _conn.execute(
+            text("SELECT company_id FROM hr_users WHERE profile_id = :pid LIMIT 1"),
+            {"pid": user["id"]},
+        ).fetchone()
+    org_id = str(_row._mapping["company_id"]) if _row else ""
+
+    created = db.create_employee_task_for_case(
+        case_id=case_id,
+        employee_id=body.employee_id,
+        org_id=org_id,
+        task_type=body.task_type,
+        title=body.title,
+        description=body.description,
+        due_date=body.due_date,
+        required_file_upload=body.required_file_upload,
+    )
+    if created is None:
+        raise HTTPException(status_code=500, detail="Failed to create task")
+    return created
 
 
 def _effective_relocation_case_id(assignment: Dict[str, Any]) -> str:
@@ -11955,19 +12206,20 @@ def create_policy_exception(
 
 @app.get("/api/hr/cases/{case_id}/compliance")
 def get_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
-    assignment = db.get_assignment_by_id(case_id)
+    assignment = db.get_assignment_by_case_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    assignment_id = assignment.get("id")
     profile = db.get_employee_profile(case_id)
     if not profile:
         profile = RelocationProfile(userId=case_id).model_dump()
 
-    cached = db.get_latest_compliance_run(case_id)
+    cached = db.get_latest_compliance_run(assignment_id)
     if cached:
         return cached
 
     policy = policy_engine.load_policy()
-    exceptions = db.list_policy_exceptions(case_id)
+    exceptions = db.list_policy_exceptions(assignment_id)
     spend = policy_engine.compute_spend(case_id, profile, policy)
     report = policy_engine.build_compliance_report(case_id, profile, policy, spend, exceptions, assignment.get("status"))
     return report
@@ -13050,6 +13302,10 @@ app.include_router(hr_policy_config_router)
 app.include_router(admin_policy_config_router)
 app.include_router(employee_policy_config_router)
 app.include_router(public_policy_config_router)
+
+# AIQ-37-B: Policy Builder wizard CRUD
+from .app.routers import hr_policies as hr_policies_router  # noqa: E402
+app.include_router(hr_policies_router.router)
 
 
 if __name__ == "__main__":
