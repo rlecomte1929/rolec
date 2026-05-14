@@ -5,7 +5,7 @@ Uses published views only. Never exposes internal governance fields.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
 
@@ -165,3 +165,12 @@ def get_resources_page(
         except json.JSONDecodeError:
             pass
     return get_resources_page_data(case_id, draft, filter_dict)
+
+
+@router.get("/destinations")
+def list_supported_destinations(
+    user: Dict[str, Any] = Depends(_require_hr_or_employee),
+) -> List[Dict[str, Any]]:
+    """List all destinations supported by the platform (from catalog allowlist)."""
+    from ..services import scrape_safety
+    return scrape_safety.list_allowlist()

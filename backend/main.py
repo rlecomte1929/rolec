@@ -3101,6 +3101,11 @@ def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
         )
     case_id = str(uuid.uuid4())
     profile = RelocationProfile(userId=effective["id"]).model_dump()
+    # Resolve company name from DB so employer.name is never hardcoded or null
+    company = db.get_company(company_id)
+    company_name = (company or {}).get("name")
+    if company_name:
+        profile["primaryApplicant"]["employer"]["name"] = company_name
     db.create_case(case_id, effective["id"], profile, company_id=company_id)
     return CreateCaseResponse(caseId=case_id)
 

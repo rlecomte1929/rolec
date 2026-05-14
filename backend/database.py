@@ -3734,7 +3734,8 @@ class Database:
 
     def get_case_by_id(self, case_id: str) -> Optional[Dict[str, Any]]:
         with self.engine.connect() as conn:
-            row = conn.execute(text("SELECT * FROM relocation_cases WHERE id = :id"), {"id": case_id}).fetchone()
+            # relocation_cases.id is UUID; cast to text so string comparison works
+            row = conn.execute(text("SELECT * FROM relocation_cases WHERE id::text = :id"), {"id": case_id}).fetchone()
         return self._row_to_dict(row)
 
     def redact_case_identity_data(

@@ -74,7 +74,7 @@ class Passport(BaseModel):
 
 # Employer model
 class Employer(BaseModel):
-    name: str = "Norwegian Investment"
+    name: Optional[str] = None
     roleTitle: Optional[str] = None
     jobLevel: Optional[str] = None
     contractType: Optional[ContractType] = None
