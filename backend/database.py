@@ -389,9 +389,34 @@ class Database:
     ):
         """
         Execute a SQL statement with basic timing and optional request correlation.
+
+        B3-fix-v4: initialization check uses non-blocking lock acquisition.
+        Calling ensure_initialized() with blocking=True while holding an open
+        engine.begin() connection causes a deadlock when the startup daemon thread
+        already holds _init_lock: the connection stays in "idle in transaction"
+        until idle_in_transaction_session_timeout kills it (15s).  Using
+        acquire(blocking=False) means we skip init if another thread is initializing
+        and proceed with the SQL directly — tables always exist in prod
+        (DISABLE_RUNTIME_DDL=true / Supabase migrations).
         """
         if not self._initialized:
-            self.ensure_initialized()
+            acquired = self._init_lock.acquire(blocking=False)
+            if acquired:
+                try:
+                    if not self._initialized:  # double-checked locking
+                        self.init_db()
+                        self._initialized = True
+                except Exception as _init_exc:
+                    log.warning("_exec: init_db skipped due to error: %s", _init_exc)
+                finally:
+                    self._init_lock.release()
+            else:
+                log.warning(
+                    "_exec: _init_lock held by another thread (startup race?) — "
+                    "proceeding without init for op=%s request_id=%s",
+                    op_name,
+                    request_id,
+                )
         start = time.perf_counter()
         result = conn.execute(text(sql), params)
         dur_ms = (time.perf_counter() - start) * 1000
@@ -3823,6 +3848,11 @@ class Database:
         # 20-second hang.  Callers are responsible for passing a valid ID.
         ecid_check = (employee_contact_id or "").strip() if employee_contact_id else None
         elm = (employee_link_mode or "").strip() or None
+        # B3-fix-v4: ensure DB init is complete BEFORE opening the transaction.
+        # If _initialized=False here (startup race), we block before holding any
+        # connection — no zombie is created.  If _initialized=True (normal case),
+        # this is a single boolean read and is effectively free.
+        self.ensure_initialized()
         with self.engine.begin() as conn:
             # B3-fix-v3: SET LOCAL applies for the duration of this explicit transaction.
             # PgBouncer transaction mode assigns the SAME backend server for BEGIN…COMMIT,
@@ -5944,6 +5974,8 @@ class Database:
         request_id: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Core query for company assignments with optional filters and pagination."""
+        # B3-fix-v4: ensure init before opening the transaction (same pattern as create_assignment).
+        self.ensure_initialized()
         if _is_sqlite:
             join_on_cases = "rc.id = COALESCE(NULLIF(TRIM(a.canonical_case_id), ''), a.case_id)"
         else:
