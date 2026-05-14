@@ -42,7 +42,9 @@ def get_case(case_id: str):
 @router.patch("/{case_id}", response_model=schemas.CaseDTO)
 def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
     with SessionLocal() as db:
-        incoming = patch.model_dump(mode="json")
+        # Filter out None sections so partial payloads (e.g. from E2E runner) don't
+        # overwrite existing draft sections with null.
+        incoming = {k: v for k, v in patch.model_dump(mode="json").items() if v is not None}
         case = crud.get_case(db, case_id)
         if not case:
             case = crud.create_case(db, case_id, incoming)

@@ -53,10 +53,11 @@ class AssignmentContextDTO(BaseModel):
 
 
 class CaseDraftDTO(BaseModel):
-    relocationBasics: RelocationBasicsDTO
-    employeeProfile: EmployeeProfileDTO
-    familyMembers: FamilyMembersDTO
-    assignmentContext: AssignmentContextDTO
+    model_config = ConfigDict(extra="ignore")
+    relocationBasics: Optional[RelocationBasicsDTO] = None
+    employeeProfile: Optional[EmployeeProfileDTO] = None
+    familyMembers: Optional[FamilyMembersDTO] = None
+    assignmentContext: Optional[AssignmentContextDTO] = None
 
 
 class CaseDTO(BaseModel):
