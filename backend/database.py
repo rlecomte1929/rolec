@@ -3824,6 +3824,16 @@ class Database:
         ecid_check = (employee_contact_id or "").strip() if employee_contact_id else None
         elm = (employee_link_mode or "").strip() or None
         with self.engine.begin() as conn:
+            # B3-fix-v3: SET LOCAL applies for the duration of this explicit transaction.
+            # PgBouncer transaction mode assigns the SAME backend server for BEGIN…COMMIT,
+            # so SET LOCAL is guaranteed to be honoured (unlike SET outside a transaction
+            # which PgBouncer may route to a different backend on the next round-trip).
+            if not _is_sqlite:
+                try:
+                    conn.execute(text("SET LOCAL statement_timeout = '7500ms'"))
+                    conn.execute(text("SET LOCAL lock_timeout = '5000ms'"))
+                except Exception:
+                    pass  # never block the insert for a non-critical SET
             self._exec(
                 conn,
                 "INSERT INTO case_assignments "
@@ -5982,7 +5992,15 @@ class Database:
             ORDER BY a.created_at DESC
             {limit_clause}{offset_clause}
         """
-        with self.engine.connect() as conn:
+        # B3-fix-v3: use engine.begin() so SET LOCAL applies to both queries
+        # (PgBouncer transaction mode routes entire BEGIN…COMMIT to same backend).
+        with self.engine.begin() as conn:
+            if not _is_sqlite:
+                try:
+                    conn.execute(text("SET LOCAL statement_timeout = '7500ms'"))
+                    conn.execute(text("SET LOCAL lock_timeout = '5000ms'"))
+                except Exception:
+                    pass
             total_row = self._exec(
                 conn, count_sql, params, op_name="list_assignments_for_company_count", request_id=request_id
             ).fetchone()
