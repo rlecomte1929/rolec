@@ -1812,6 +1812,7 @@ class AdminSetRoleRequest(BaseModel):
     role: str
 
 
+@app.post("/api/admin/users", status_code=201)  # legacy alias — test runner uses this path (B2)
 @app.post("/api/admin/people", status_code=201)
 def create_person(
     body: AdminCreatePersonRequest,
@@ -12353,6 +12354,7 @@ class CommandCenterKPIs(BaseModel):
 
 class CommandCenterCaseRow(BaseModel):
     id: str
+    caseId: Optional[str] = None  # relocation_cases UUID — use this for /api/hr/cases/{id} navigation
     employeeIdentifier: str
     destCountry: Optional[str] = None
     status: str
@@ -12365,6 +12367,7 @@ class CommandCenterCaseRow(BaseModel):
 
 class CommandCenterCaseDetail(BaseModel):
     id: str
+    caseId: Optional[str] = None  # relocation_cases UUID — use this for /api/hr/cases/{id} navigation
     employeeIdentifier: str
     destCountry: Optional[str] = None
     status: str

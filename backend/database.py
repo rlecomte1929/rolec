@@ -8171,7 +8171,7 @@ class Database:
                     where = "WHERE " + self._command_center_company_where()
                     params["cid"] = company_id
                     sql = f"""
-                        SELECT ca.id, ca.employee_identifier, ca.status,
+                        SELECT ca.id, ca.case_id, ca.employee_identifier, ca.status,
                                COALESCE(ca.risk_status, 'green') as risk_status,
                                ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
                                {dest_sql} as dest_country,
@@ -8195,7 +8195,7 @@ class Database:
                     )
                     params["hr"] = hr_user_id
                     sql = f"""
-                        SELECT ca.id, ca.employee_identifier, ca.status,
+                        SELECT ca.id, ca.case_id, ca.employee_identifier, ca.status,
                                COALESCE(ca.risk_status, 'green') as risk_status,
                                ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
                                {dest_sql} as dest_country,
@@ -8209,7 +8209,7 @@ class Database:
                     """
                 else:
                     sql = f"""
-                        SELECT ca.id, ca.employee_identifier, ca.status,
+                        SELECT ca.id, ca.case_id, ca.employee_identifier, ca.status,
                                COALESCE(ca.risk_status, 'green') as risk_status,
                                ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
                                {dest_sql} as dest_country,
@@ -8273,6 +8273,7 @@ class Database:
                     dest = None
                 result.append({
                     "id": a_id,
+                    "caseId": m.get("case_id") or None,
                     "employeeIdentifier": m.get("employee_identifier") or "",
                     "destCountry": dest,
                     "status": display_status,
@@ -8385,6 +8386,7 @@ class Database:
                 exp_start = m.get("expected_start_date") or m.get("wizard_target_move_date")
                 return {
                     "id": assignment_id,
+                    "caseId": m.get("case_id") or None,
                     "employeeIdentifier": m.get("employee_identifier") or "",
                     "destCountry": dest_val,
                     "status": display_status,

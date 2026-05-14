@@ -423,7 +423,8 @@ class CreateCaseResponse(BaseModel):
 
 
 class AssignCaseRequest(BaseModel):
-    employeeIdentifier: str
+    # Accept both camelCase (current) and snake_case (legacy test runner / old clients)
+    employeeIdentifier: str = Field(validation_alias=AliasChoices("employeeIdentifier", "employee_email"))
     employeeFirstName: Optional[str] = None
     employeeLastName: Optional[str] = None
 
