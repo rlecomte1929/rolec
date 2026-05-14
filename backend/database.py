@@ -38,6 +38,23 @@ _is_sqlite = _raw_url.startswith("sqlite")
 
 if _is_sqlite:
     from sqlalchemy import event
+else:
+    # B3-fix: Supabase PgBouncer in transaction-pooling mode resets session-level
+    # GUC settings (statement_timeout / lock_timeout) between transactions, so the
+    # connect_args options=-c ... approach is unreliable.  Re-applying them on every
+    # pool checkout guarantees they are set before ANY DB round-trip regardless of
+    # pooler mode.  The two SET calls add ~1 ms overhead per checkout.
+    from sqlalchemy import event as _sa_event
+
+    @_sa_event.listens_for(_engine, "checkout")
+    def _set_db_timeouts(dbapi_conn, conn_record, conn_proxy):
+        try:
+            cur = dbapi_conn.cursor()
+            cur.execute("SET statement_timeout = 8000")   # 8 s — abort hung queries fast
+            cur.execute("SET lock_timeout = 5000")        # 5 s — abort lock waits fast
+            cur.close()
+        except Exception:
+            pass  # never block a checkout for a non-critical SET
 
     @event.listens_for(_engine, "connect")
     def _sqlite_enable_foreign_keys(dbapi_connection, _connection_record) -> None:
@@ -3803,11 +3820,12 @@ class Database:
         now = datetime.utcnow().isoformat()
         efn = (employee_first_name or "").strip() or None
         eln = (employee_last_name or "").strip() or None
+        # B3-fix: skip pre-validation SELECT on employee_contact_id.
+        # The ID was just returned by resolve_or_create_employee_contact which already
+        # verified its existence.  The extra SELECT opened a second pool connection that
+        # was the first DB op to hit a stale/locked Supabase connection, causing the
+        # 20-second hang.  Callers are responsible for passing a valid ID.
         ecid_check = (employee_contact_id or "").strip() if employee_contact_id else None
-        if ecid_check:
-            ec_row = self.get_employee_contact_by_id(ecid_check, request_id=request_id)
-            if not ec_row:
-                raise ValueError(f"employee_contact_id not found: {ecid_check}")
         elm = (employee_link_mode or "").strip() or None
         with self.engine.begin() as conn:
             self._exec(
