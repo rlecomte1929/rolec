@@ -8,7 +8,7 @@ payload shape as /api/resources/page.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
 
@@ -32,6 +32,15 @@ def _require_hr_or_admin(authorization: Optional[str] = Header(None)) -> Dict[st
     if profile and (profile.get("role") or "").upper() in ("ADMIN", "HR"):
         return user
     raise HTTPException(status_code=403, detail="HR or Admin required")
+
+
+@router.get("/destinations")
+def list_hr_resources_destinations(
+    user: Dict[str, Any] = Depends(_require_hr_or_admin),
+) -> List[Dict[str, Any]]:
+    """List all supported destinations (HR view). Alias for /api/resources/destinations."""
+    from ..services import scrape_safety
+    return scrape_safety.list_allowlist()
 
 
 @router.get("/page")

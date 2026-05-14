@@ -114,6 +114,9 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
             return _ensure_wizard_case(case_id)
     profile = _safe_parse_profile(row.get("profile_json"))
     missing_fields = compute_missing_fields(profile)
+    # Convenience shortcut: expose employer at top level so clients don't need
+    # to traverse primaryApplicant.employer — also returned inside profile_json.
+    employer_obj = (profile.get("primaryApplicant") or {}).get("employer") or {}
 
     return {
         "id": row.get("id", case_id),
@@ -121,7 +124,10 @@ def compat_get_case(case_id: str, authorization: Optional[str] = Header(None)):
         "stage": row.get("stage") or "incomplete",
         "home_country": row.get("home_country"),
         "host_country": row.get("host_country"),
-        "profile_json": row.get("profile_json") or "",
+        # Return profile_json as parsed dict (not raw string) so callers can
+        # traverse .employer.name etc. without double-parsing.
+        "profile_json": profile,
+        "employer": employer_obj,
         "profile": profile,
         "missing_fields": missing_fields,
     }

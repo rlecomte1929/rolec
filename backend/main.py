@@ -3791,6 +3791,47 @@ def get_employee_assignment(
     }
 
 
+@app.get("/api/employee/dashboard")
+def get_employee_dashboard(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Employee dashboard bootstrap. Returns the same payload as /api/employee/assignments/overview.
+    Also enforces EMPLOYEE-only guard — HR/Admin tokens receive 403 (B15 fix).
+    """
+    return get_employee_assignments_overview(request=request, user=user)
+
+
+@app.get("/api/employee/cases")
+def get_employee_cases(
+    request: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Returns the employee's assigned cases as a list.
+    Delegates to the assignments/current endpoint and normalises to a cases array.
+    """
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    rid = getattr(request.state, "request_id", None)
+    try:
+        linked = db.list_linked_assignments_for_employee(effective["id"], request_id=rid)
+    except Exception:
+        linked = []
+    cases = []
+    for row in linked:
+        d = dict(row)
+        case_id = d.get("case_id") or d.get("id")
+        cases.append({
+            "id": case_id,
+            "caseId": case_id,
+            "assignmentId": d.get("id"),
+            "status": normalize_status(d.get("status")),
+            "employeeIdentifier": d.get("employee_identifier"),
+        })
+    return {"cases": cases}
+
+
 @app.get("/api/employee/assignments/overview")
 def get_employee_assignments_overview(
     request: Request,
