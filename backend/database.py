@@ -12,7 +12,7 @@ from threading import Lock
 from typing import Optional, Dict, Any, List, Tuple, Set, Callable
 from datetime import datetime
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
 from .db_config import DATABASE_URL as _raw_url, sqlalchemy_engine_kwargs
@@ -37,16 +37,19 @@ _engine = create_engine(_raw_url, **sqlalchemy_engine_kwargs(_raw_url))
 _is_sqlite = _raw_url.startswith("sqlite")
 
 if _is_sqlite:
-    from sqlalchemy import event
+    @event.listens_for(_engine, "connect")
+    def _sqlite_enable_foreign_keys(dbapi_connection, _connection_record) -> None:
+        """Enforce REFERENCES clauses on SQLite (off by default)."""
+        cur = dbapi_connection.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
 else:
     # B3-fix: Supabase PgBouncer in transaction-pooling mode resets session-level
     # GUC settings (statement_timeout / lock_timeout) between transactions, so the
     # connect_args options=-c ... approach is unreliable.  Re-applying them on every
     # pool checkout guarantees they are set before ANY DB round-trip regardless of
     # pooler mode.  The two SET calls add ~1 ms overhead per checkout.
-    from sqlalchemy import event as _sa_event
-
-    @_sa_event.listens_for(_engine, "checkout")
+    @event.listens_for(_engine, "checkout")
     def _set_db_timeouts(dbapi_conn, conn_record, conn_proxy):
         try:
             cur = dbapi_conn.cursor()
@@ -55,13 +58,6 @@ else:
             cur.close()
         except Exception:
             pass  # never block a checkout for a non-critical SET
-
-    @event.listens_for(_engine, "connect")
-    def _sqlite_enable_foreign_keys(dbapi_connection, _connection_record) -> None:
-        """Enforce REFERENCES clauses on SQLite (off by default)."""
-        cur = dbapi_connection.cursor()
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.close()
 
 
 def _relocation_cases_join_on(table_alias: str = "a", style: str = "standard") -> str:
