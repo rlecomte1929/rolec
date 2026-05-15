@@ -20,6 +20,7 @@ import { SecurityPage } from './pages/public/SecurityPage';
 import { PrivacyPage } from './pages/public/PrivacyPage';
 import { Auth } from './pages/Auth';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
+import { RequireEmployeeRoute } from './features/employee/RequireEmployeeRoute';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
@@ -176,10 +177,10 @@ function App() {
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         <Route path="/journey" element={<Journey />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path={ROUTE_DEFS.employeeJourney.path} element={<Navigate to={ROUTE_DEFS.employeeDashboard.path} replace />} />
-        <Route path={ROUTE_DEFS.employeeDashboard.path} element={<EmployeeJourney />} />
-        <Route path={ROUTE_DEFS.employeeQuoteRequest.path} element={<QuoteRequestPage />} />
-        <Route path={WIZARD_ROUTES.EMP_DASH} element={<Navigate to={ROUTE_DEFS.employeeDashboard.path} replace />} />
+        <Route path={ROUTE_DEFS.employeeJourney.path} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeDashboard.path} element={<RequireEmployeeRoute><EmployeeJourney /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeQuoteRequest.path} element={<RequireEmployeeRoute><QuoteRequestPage /></RequireEmployeeRoute>} />
+        <Route path={WIZARD_ROUTES.EMP_DASH} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
         <Route path={ROUTE_DEFS.hrCommandCenter.path} element={<HrCommandCenter />} />
         <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<HrCommandCenterCaseDetail />} />
@@ -214,14 +215,14 @@ function App() {
         <Route path={ROUTE_DEFS.hrPreferredSuppliers.path} element={<HrPreferredSuppliers />} />
         <Route path={ROUTE_DEFS.hrVendorCuration.path} element={<HrVendorCuration />} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
-        <Route path={ROUTE_DEFS.employeePolicy.path} element={<EmployeePolicyPage />} />
+        <Route path={ROUTE_DEFS.employeePolicy.path} element={<RequireEmployeeRoute><EmployeePolicyPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeHrPolicy.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
         <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
-        <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<CaseWizardPage />} />
-        <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<CaseWizardPage />} />
-        <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<CaseWizardPage />} />
-        <Route path={WIZARD_ROUTES.CASE_SUMMARY} element={<EmployeeCaseSummary />} />
-        <Route path={WIZARD_ROUTES.CASE_PLAN} element={<EmployeeRelocationPlanPage />} />
+        <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
+        <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
+        <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
+        <Route path={WIZARD_ROUTES.CASE_SUMMARY} element={<RequireEmployeeRoute><EmployeeCaseSummary /></RequireEmployeeRoute>} />
+        <Route path={WIZARD_ROUTES.CASE_PLAN} element={<RequireEmployeeRoute><EmployeeRelocationPlanPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />

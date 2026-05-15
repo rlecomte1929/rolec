@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
 import { Card, Alert } from '../components/antigravity';
@@ -15,16 +15,14 @@ type FamilyType = 'single' | 'couple' | 'family';
 type RelocationType = 'short_term' | 'long_term' | 'permanent';
 
 /**
- * Pilot destinations supported by the platform today. Mirrors the country
- * codes recognised in backend/services/resources/context_service.py
- * (_country_code_from_name) plus the most common European pilot countries
- * HR teams ask about. Edit here when we extend pilot coverage.
+ * Fallback destinations used while the API call is in flight, or if it fails.
+ * The live dropdown is populated dynamically from /api/hr/resources/destinations.
  */
-const DESTINATION_OPTIONS: ReadonlyArray<{ code: string; name: string }> = [
+const FALLBACK_DESTINATIONS: ReadonlyArray<{ code: string; name: string }> = [
   { code: 'NO', name: 'Norway' },
   { code: 'SG', name: 'Singapore' },
   { code: 'DE', name: 'Germany' },
-  { code: 'UK', name: 'United Kingdom' },
+  { code: 'GB', name: 'United Kingdom' },
   { code: 'US', name: 'United States' },
   { code: 'FR', name: 'France' },
   { code: 'NL', name: 'Netherlands' },
@@ -35,22 +33,121 @@ const DESTINATION_OPTIONS: ReadonlyArray<{ code: string; name: string }> = [
   { code: 'IT', name: 'Italy' },
 ];
 
-function pickInitialCountry(companyDefault: string | null | undefined): string {
-  if (!companyDefault) return 'NO';
+/**
+ * Maps country names (as stored in the catalog_destination_allowlist) to
+ * ISO 3166-1 alpha-2 codes. Extend this as new destinations are allowlisted.
+ */
+const COUNTRY_NAME_TO_CODE: Record<string, string> = {
+  'Norway': 'NO',
+  'Singapore': 'SG',
+  'Germany': 'DE',
+  'United Kingdom': 'GB',
+  'UK': 'GB',
+  'United States': 'US',
+  'USA': 'US',
+  'France': 'FR',
+  'Netherlands': 'NL',
+  'Switzerland': 'CH',
+  'Belgium': 'BE',
+  'Ireland': 'IE',
+  'Spain': 'ES',
+  'Italy': 'IT',
+  'Sweden': 'SE',
+  'Denmark': 'DK',
+  'Finland': 'FI',
+  'Portugal': 'PT',
+  'Austria': 'AT',
+  'Luxembourg': 'LU',
+  'Poland': 'PL',
+  'Czech Republic': 'CZ',
+  'Czechia': 'CZ',
+  'Hungary': 'HU',
+  'Romania': 'RO',
+  'Bulgaria': 'BG',
+  'Croatia': 'HR',
+  'Slovakia': 'SK',
+  'Slovenia': 'SI',
+  'Estonia': 'EE',
+  'Latvia': 'LV',
+  'Lithuania': 'LT',
+  'Greece': 'GR',
+  'Japan': 'JP',
+  'South Korea': 'KR',
+  'China': 'CN',
+  'Hong Kong': 'HK',
+  'Australia': 'AU',
+  'New Zealand': 'NZ',
+  'Canada': 'CA',
+  'Brazil': 'BR',
+  'Mexico': 'MX',
+  'South Africa': 'ZA',
+  'United Arab Emirates': 'AE',
+  'UAE': 'AE',
+  'India': 'IN',
+  'Thailand': 'TH',
+  'Malaysia': 'MY',
+  'Indonesia': 'ID',
+  'Philippines': 'PH',
+  'Israel': 'IL',
+  'Turkey': 'TR',
+  'Saudi Arabia': 'SA',
+};
+
+function countryNameToCode(name: string): string {
+  const trimmed = name.trim();
+  return COUNTRY_NAME_TO_CODE[trimmed] ?? trimmed.toUpperCase().slice(0, 2);
+}
+
+function pickInitialCountry(
+  companyDefault: string | null | undefined,
+  options: ReadonlyArray<{ code: string; name: string }>
+): string {
+  const opts = options.length ? options : FALLBACK_DESTINATIONS;
+  if (!companyDefault) return opts[0]?.code ?? 'NO';
   const trimmed = companyDefault.trim();
-  if (!trimmed) return 'NO';
+  if (!trimmed) return opts[0]?.code ?? 'NO';
   // Try direct code match first (e.g. company stored "DE")
-  const byCode = DESTINATION_OPTIONS.find((d) => d.code.toLowerCase() === trimmed.toLowerCase());
+  const byCode = opts.find((d) => d.code.toLowerCase() === trimmed.toLowerCase());
   if (byCode) return byCode.code;
   // Then try by name (e.g. "Germany")
-  const byName = DESTINATION_OPTIONS.find((d) => d.name.toLowerCase() === trimmed.toLowerCase());
+  const byName = opts.find((d) => d.name.toLowerCase() === trimmed.toLowerCase());
   if (byName) return byName.code;
-  return 'NO';
+  return opts[0]?.code ?? 'NO';
 }
 
 export const HrResourcesPreview: React.FC = () => {
   const { company } = useHrCompanyContext();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Dynamic destination list — fetched from /api/hr/resources/destinations so
+  // the dropdown reflects the live catalog allowlist (B14 fix).
+  const [destinationOptions, setDestinationOptions] = useState<Array<{ code: string; name: string }>>(
+    [...FALLBACK_DESTINATIONS]
+  );
+  const destinationsFetched = useRef(false);
+
+  useEffect(() => {
+    if (destinationsFetched.current) return;
+    destinationsFetched.current = true;
+    resourcesAPI
+      .getDestinations()
+      .then((raw) => {
+        // Deduplicate by country name, build {code, name} pairs, sort alphabetically.
+        const seen = new Set<string>();
+        const opts: Array<{ code: string; name: string }> = [];
+        for (const entry of raw) {
+          const name = (entry.country || '').trim();
+          if (!name || seen.has(name)) continue;
+          seen.add(name);
+          opts.push({ code: countryNameToCode(name), name });
+        }
+        opts.sort((a, b) => a.name.localeCompare(b.name));
+        if (opts.length > 0) setDestinationOptions(opts);
+      })
+      .catch(() => {
+        // Keep FALLBACK_DESTINATIONS on error — no-op.
+      });
+  }, []);
 
   const companyDefault = useMemo(() => {
     if (!company) return null;
@@ -62,7 +159,13 @@ export const HrResourcesPreview: React.FC = () => {
     );
   }, [company]);
 
-  const initialCountry = useMemo(() => pickInitialCountry(companyDefault), [companyDefault]);
+  const initialCountry = useMemo(
+    () => pickInitialCountry(companyDefault, destinationOptions),
+    // Intentionally omit destinationOptions from deps — only recalculate when
+    // company changes, not every time the list loads, to avoid re-selecting.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [companyDefault]
+  );
 
   const country = (searchParams.get('country') || initialCountry).toUpperCase();
   const city = searchParams.get('city') || '';
@@ -134,7 +237,7 @@ export const HrResourcesPreview: React.FC = () => {
     if (raw.eventType) filterObj.eventType = raw.eventType;
     if (raw.search) filterObj.search = raw.search;
 
-    const countryName = DESTINATION_OPTIONS.find((d) => d.code === country)?.name ?? null;
+    const countryName = destinationOptions.find((d) => d.code === country)?.name ?? null;
     resourcesAPI
       .getHrPreviewPage(
         {
@@ -176,7 +279,7 @@ export const HrResourcesPreview: React.FC = () => {
               onChange={(e) => updateDestination({ country: e.target.value })}
               className="border border-[#e2e8f0] rounded-lg px-3 py-2 text-sm bg-white"
             >
-              {DESTINATION_OPTIONS.map((d) => (
+              {destinationOptions.map((d) => (
                 <option key={d.code} value={d.code}>
                   {d.name} ({d.code})
                 </option>

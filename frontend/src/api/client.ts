@@ -2852,6 +2852,16 @@ export const resourcesAPI = {
     return response.data;
   },
 
+  /**
+   * Returns the catalog destination allowlist — every (city, country) pair the
+   * platform supports for AI scraping. Used by HrResourcesPreview to build a
+   * live dropdown instead of a hardcoded 12-country list (B14 fix).
+   */
+  getDestinations: async (): Promise<Array<{ city: string; country: string }>> => {
+    const response = await api.get('/api/hr/resources/destinations');
+    return Array.isArray(response.data) ? response.data : [];
+  },
+
   /** HR-only preview: same payload shape as getPage, but driven by an explicit
    *  destination + persona instead of a real assignment. */
   getHrPreviewPage: async (
