@@ -27,8 +27,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from ..auth_deps import require_hr_or_employee
-from ...database import db
+from ..auth_deps import require_hr_or_employee, require_case_access
+from ...database import db, _jb
 from ...services.audit_log_service import (
     ACTION_INSERT,
     ACTION_UPDATE,
@@ -98,6 +98,8 @@ def get_services_state(
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ) -> Dict[str, Any]:
     organization_id = _caller_company_id(user)
+    # B21 fix: employees must own this case; HR is scoped to their company.
+    require_case_access(case_id, user)
     with db.engine.begin() as conn:
         row = conn.execute(
             text(
@@ -136,6 +138,8 @@ def put_services_state(
     user: Dict[str, Any] = Depends(require_hr_or_employee),
 ) -> Dict[str, Any]:
     organization_id = _caller_company_id(user)
+    # B21 fix: employees must own this case; HR is scoped to their company.
+    require_case_access(case_id, user)
     actor_id = user["id"]
     blob = json.dumps(body.state, default=str)
     if len(blob.encode("utf-8")) > MAX_STATE_BYTES:
@@ -160,9 +164,9 @@ def put_services_state(
         if existing:
             conn.execute(
                 text(
-                    "UPDATE services_state "
-                    "SET state_json = :blob, updated_at = :now, updated_by_user_id = :actor "
-                    "WHERE case_id = :id"
+                    f"UPDATE services_state "
+                    f"SET state_json = :blob{_jb}, updated_at = :now, updated_by_user_id = :actor "
+                    f"WHERE case_id = :id"
                 ),
                 {"blob": blob, "now": now, "actor": actor_id, "id": case_id},
             )
@@ -170,9 +174,9 @@ def put_services_state(
         else:
             conn.execute(
                 text(
-                    "INSERT INTO services_state "
-                    "(case_id, organization_id, state_json, updated_at, updated_by_user_id) "
-                    "VALUES (:id, :org, :blob, :now, :actor)"
+                    f"INSERT INTO services_state "
+                    f"(case_id, organization_id, state_json, updated_at, updated_by_user_id) "
+                    f"VALUES (:id, :org, :blob{_jb}, :now, :actor)"
                 ),
                 {
                     "id": case_id,

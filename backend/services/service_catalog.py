@@ -81,7 +81,7 @@ def list_items(
         where.append("source = :source")
         params["source"] = source
     if active_only:
-        where.append("active = 1")
+        where.append("active = true")
     sql = "SELECT * FROM service_catalog_items"
     if where:
         sql += " WHERE " + " AND ".join(where)
@@ -127,7 +127,7 @@ def upsert_item(
                     "UPDATE service_catalog_items SET "
                     "city = :city, country = :country, name = :name, "
                     "attributes_json = :attr, source = :source, "
-                    "active = 1, updated_at = :now "
+                    "active = true, updated_at = :now "
                     "WHERE id = :id"
                 ),
                 {
@@ -185,7 +185,7 @@ def find_master_by_external_id(category: str, external_id: str) -> Optional[Dict
         row = conn.execute(
             text(
                 "SELECT * FROM service_catalog_items "
-                "WHERE category = :cat AND external_id = :eid AND active = 1"
+                "WHERE category = :cat AND external_id = :eid AND active = true"
             ),
             {"cat": category, "eid": external_id},
         ).mappings().first()
@@ -194,7 +194,7 @@ def find_master_by_external_id(category: str, external_id: str) -> Optional[Dict
 
 def count_by_category_city(category: str, city: Optional[str] = None) -> int:
     """Coverage count helper used by Phase 1's catalog_coverage."""
-    sql = "SELECT COUNT(*) FROM service_catalog_items WHERE category = :cat AND active = 1"
+    sql = "SELECT COUNT(*) FROM service_catalog_items WHERE category = :cat AND active = true"
     params: Dict[str, Any] = {"cat": category}
     if city is not None:
         sql += " AND city = :city"

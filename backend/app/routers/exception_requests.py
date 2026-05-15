@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from ..auth_deps import get_current_user, require_hr_or_employee
+from ..auth_deps import get_current_user, require_hr_or_employee, require_case_access
 from ...database import db
 from ...services.audit_log_service import (
     ACTION_INSERT,
@@ -155,6 +155,8 @@ def create_exception_request(
     Postgres FK + RLS); local SQLite tier is permissive.
     """
     organization_id = _caller_company_id(user)
+    # B21 fix: employees must own this case; HR is scoped to their company.
+    require_case_access(case_id, user)
     actor_id = user["id"]
     new_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
@@ -163,7 +165,7 @@ def create_exception_request(
         conn.execute(
             text(
                 """
-                INSERT INTO exception_requests (
+                INSERT INTO policy_cap_requests (
                     id, case_id, organization_id, category,
                     requested_amount, cap_amount, currency, reason,
                     status, requested_by_user_id, created_at, updated_at
@@ -188,7 +190,7 @@ def create_exception_request(
             },
         )
         row = conn.execute(
-            text("SELECT * FROM exception_requests WHERE id = :id"),
+            text("SELECT * FROM policy_cap_requests WHERE id = :id"),
             {"id": new_id},
         ).mappings().first()
 
@@ -219,11 +221,13 @@ def list_exception_requests_for_case(
 ) -> List[Dict[str, Any]]:
     """List all exception requests on a case, scoped to the caller's company."""
     organization_id = _caller_company_id(user)
+    # B21 fix: employees must own this case; HR is scoped to their company.
+    require_case_access(case_id, user)
     with db.engine.begin() as conn:
         rows = conn.execute(
             text(
                 """
-                SELECT * FROM exception_requests
+                SELECT * FROM policy_cap_requests
                 WHERE case_id = :case_id AND organization_id = :org
                 ORDER BY created_at DESC
                 """
@@ -256,7 +260,7 @@ def list_exception_requests_for_company(
         if status:
             rows = conn.execute(
                 text(
-                    "SELECT * FROM exception_requests "
+                    "SELECT * FROM policy_cap_requests "
                     "WHERE organization_id = :org AND status = :status "
                     "ORDER BY created_at DESC"
                 ),
@@ -265,7 +269,7 @@ def list_exception_requests_for_company(
         else:
             rows = conn.execute(
                 text(
-                    "SELECT * FROM exception_requests "
+                    "SELECT * FROM policy_cap_requests "
                     "WHERE organization_id = :org "
                     "ORDER BY created_at DESC"
                 ),
@@ -295,7 +299,7 @@ def resolve_exception_request(
     with db.engine.begin() as conn:
         existing = conn.execute(
             text(
-                "SELECT * FROM exception_requests WHERE id = :id AND organization_id = :org"
+                "SELECT * FROM policy_cap_requests WHERE id = :id AND organization_id = :org"
             ),
             {"id": request_id, "org": organization_id},
         ).mappings().first()
@@ -310,7 +314,7 @@ def resolve_exception_request(
         conn.execute(
             text(
                 """
-                UPDATE exception_requests
+                UPDATE policy_cap_requests
                 SET status = :status,
                     hr_note = :note,
                     resolved_by_user_id = :actor,
@@ -328,7 +332,7 @@ def resolve_exception_request(
             },
         )
         row = conn.execute(
-            text("SELECT * FROM exception_requests WHERE id = :id"),
+            text("SELECT * FROM policy_cap_requests WHERE id = :id"),
             {"id": request_id},
         ).mappings().first()
 

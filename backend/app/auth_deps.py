@@ -132,3 +132,27 @@ def require_assignment_visibility(assignment_id: str, user: Dict[str, Any]) -> D
     if not visible:
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
     return assignment
+
+
+def require_case_access(case_id: str, user: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate user can access a case by its case_id; return the assignment row.
+
+    Employees: must own the case (assignment.employee_user_id == caller.id).
+    HR / Admin: sufficient to belong to the same company as the case.
+
+    Raises 404 if the case has no assignment, 403 if the caller lacks access.
+    Used by case-scoped routers (services_state, exception_requests) that
+    previously only checked organization_id — insufficient for employees.
+    """
+    assignment = db.get_assignment_by_case_id(case_id)
+    if not assignment:
+        # Case might exist without an assignment for HR-wizard flows; in that
+        # case employee access is implicitly denied (no assignment to verify).
+        # HR can still proceed if the case belongs to their company.
+        role = UserRole.HR if user.get("role") in (UserRole.HR.value, UserRole.ADMIN.value) else UserRole.EMPLOYEE
+        effective = _effective_user(user, role)
+        is_hr = effective.get("role") == UserRole.HR.value or effective.get("is_admin")
+        if not is_hr:
+            raise HTTPException(status_code=404, detail="Case not found")
+        return {}  # No assignment row — HR path with no assignment yet
+    return require_assignment_visibility(assignment["id"], user)

@@ -35,6 +35,8 @@ log = logging.getLogger(__name__)
 _engine = create_engine(_raw_url, **sqlalchemy_engine_kwargs(_raw_url))
 
 _is_sqlite = _raw_url.startswith("sqlite")
+# Postgres-only jsonb cast suffix; empty string on SQLite (TEXT columns used there).
+_jb = "" if _is_sqlite else "::jsonb"
 
 if _is_sqlite:
     @event.listens_for(_engine, "connect")
@@ -2226,6 +2228,40 @@ class Database:
                 """))
             except Exception:
                 pass
+            # policy_cap_requests: employee-initiated cost override requests (B18 fix).
+            # Separate from exception_requests (immigration/compliance flags).
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_cap_requests (
+                    id TEXT PRIMARY KEY,
+                    case_id TEXT NOT NULL,
+                    organization_id TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    requested_amount REAL NOT NULL,
+                    cap_amount REAL NOT NULL,
+                    currency TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending','approved','rejected')),
+                    hr_note TEXT,
+                    requested_by_user_id TEXT NOT NULL,
+                    resolved_by_user_id TEXT,
+                    created_at TEXT NOT NULL,
+                    resolved_at TEXT,
+                    updated_at TEXT NOT NULL
+                )
+            """))
+            try:
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_policy_cap_requests_case
+                    ON policy_cap_requests (case_id, created_at DESC)
+                """))
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_policy_cap_requests_org_status
+                    ON policy_cap_requests (organization_id, status, created_at DESC)
+                """))
+            except Exception:
+                pass
+
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS company_policy_assistant_bindings (
                     company_id TEXT PRIMARY KEY,
@@ -14754,11 +14790,11 @@ class Database:
         rid = str(uuid.uuid4()) if not existing else existing._mapping["id"]
         with self.engine.begin() as conn:
             if existing:
-                conn.execute(text("""
+                conn.execute(text(f"""
                     UPDATE resolved_assignment_policies SET
                     case_id = :cid, company_id = :coid, policy_id = :pid, policy_version_id = :vid,
                     canonical_case_id = :ccid, resolution_status = :status, resolved_at = :now,
-                    resolution_context_json = :ctx, updated_at = :now
+                    resolution_context_json = :ctx{_jb}, updated_at = :now
                     WHERE assignment_id = :aid
                 """), {
                     "aid": assignment_id, "cid": case_id, "coid": company_id, "pid": policy_id,
@@ -14768,11 +14804,11 @@ class Database:
                 conn.execute(text("DELETE FROM resolved_assignment_policy_benefits WHERE resolved_policy_id = :rid"), {"rid": rid})
                 conn.execute(text("DELETE FROM resolved_assignment_policy_exclusions WHERE resolved_policy_id = :rid"), {"rid": rid})
             else:
-                conn.execute(text("""
+                conn.execute(text(f"""
                     INSERT INTO resolved_assignment_policies
                     (id, assignment_id, case_id, company_id, policy_id, policy_version_id, canonical_case_id,
                      resolution_status, resolved_at, resolution_context_json, created_at, updated_at)
-                    VALUES (:id, :aid, :cid, :coid, :pid, :vid, :ccid, :status, :now, :ctx, :now, :now)
+                    VALUES (:id, :aid, :cid, :coid, :pid, :vid, :ccid, :status, :now, :ctx{_jb}, :now, :now)
                 """), {
                     "id": rid, "aid": assignment_id, "cid": case_id, "coid": company_id, "pid": policy_id,
                     "vid": policy_version_id, "ccid": canonical_case_id, "status": resolution_status,
@@ -14786,12 +14822,13 @@ class Database:
                     inc = bool(inc)
                 if not isinstance(apr, bool):
                     apr = bool(apr)
-                conn.execute(text("""
+                conn.execute(text(f"""
                     INSERT INTO resolved_assignment_policy_benefits
                     (id, resolved_policy_id, benefit_key, included, min_value, standard_value, max_value,
                      currency, amount_unit, frequency, approval_required, evidence_required_json,
                      exclusions_json, condition_summary, source_rule_ids_json, created_at, updated_at)
-                    VALUES (:id, :rid, :bk, :inc, :minv, :stdv, :maxv, :cur, :au, :freq, :apr, :evj, :exj, :cs, :srj, :now, :now)
+                    VALUES (:id, :rid, :bk, :inc, :minv, :stdv, :maxv, :cur, :au, :freq, :apr,
+                            :evj{_jb}, :exj{_jb}, :cs, :srj{_jb}, :now, :now)
                 """), {
                     "id": bid, "rid": rid, "bk": b["benefit_key"], "inc": inc,
                     "minv": b.get("min_value"), "stdv": b.get("standard_value"), "maxv": b.get("max_value"),
@@ -14804,10 +14841,10 @@ class Database:
                 })
             for e in exclusions:
                 eid = str(uuid.uuid4())
-                conn.execute(text("""
+                conn.execute(text(f"""
                     INSERT INTO resolved_assignment_policy_exclusions
                     (id, resolved_policy_id, benefit_key, domain, description, source_rule_ids_json)
-                    VALUES (:id, :rid, :bk, :dom, :desc, :srj)
+                    VALUES (:id, :rid, :bk, :dom, :desc, :srj{_jb})
                 """), {
                     "id": eid, "rid": rid, "bk": e.get("benefit_key"), "dom": e["domain"],
                     "desc": e.get("description"), "srj": json.dumps(e.get("source_rule_ids_json") or []),
