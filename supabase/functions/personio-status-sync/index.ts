@@ -7,23 +7,22 @@
  * Flow:
  *   1. Parse incoming payload (case_id, new_status, employee_id, company_id)
  *   2. Look up the employee's email from public.profiles
- *   3. Fetch the Personio OAuth token from public.hris_connections
- *   4. Search Personio by email → get Personio employee ID
- *   5. PUT custom attributes to Personio
- *   6. Log the result (success/skip/warn/error) to public.personio_sync_log
+ *   3. Fetch the Personio connection from public.hris_connections (by org_id = company_id)
+ *   4. Fetch field mappings from public.hris_field_mappings
+ *   5. Search Personio by email → get Personio employee ID
+ *   6. PUT custom attributes to Personio
+ *   7. Log the result to public.personio_sync_log
  *
- * Env vars required:
- *   SUPABASE_URL              — set automatically by Supabase runtime
- *   SUPABASE_SERVICE_ROLE_KEY — set automatically by Supabase runtime
- *   HRIS_TOKEN_ENCRYPTION_KEY — 32-byte hex key, set in Edge Function secrets
+ * Env vars (set automatically by Supabase runtime):
+ *   SUPABASE_URL
+ *   SUPABASE_SERVICE_ROLE_KEY
+ *   RELOPASS_APP_URL  (optional, defaults to https://app.relopass.com)
  *
- * The function is idempotent: calling it twice with the same payload writes
- * the same data to Personio (PUT is idempotent) and appends a new log row.
- *
- * Rate limit: Personio allows 200 req/min. This function makes ≤2 Personio API
- * calls per invocation (GET employees + PUT custom-attributes). At 200 case
- * updates/min this would saturate the limit — in practice status changes are
- * far less frequent. Add a queue if volume exceeds ~80 updates/min.
+ * Schema notes (from AIQ-33-B):
+ *   hris_connections.org_id       = relocation_cases.company_id
+ *   hris_connections.access_token = plain-text OAuth token (managed by AIQ-33-B)
+ *   hris_connections.api_base_url = Personio API base (e.g. https://api.personio.de)
+ *   hris_field_mappings           = per-connection field mapping overrides
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -44,19 +43,24 @@ interface TriggerPayload {
 
 interface HrisConnection {
   id: string;
-  company_id: string;
+  org_id: string;
   provider: string;
-  access_token_enc: string | null;
-  refresh_token_enc: string | null;
-  token_expiry: string | null;
-  base_url: string;
-  field_mappings: Record<string, string>;
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expires_at: string | null;
+  api_base_url: string;
+  subdomain: string | null;
   status: string;
+}
+
+interface FieldMapping {
+  hris_field: string;
+  relopass_field: string;
 }
 
 interface SyncLogEntry {
   case_id: string;
-  company_id: string | null;
+  org_id: string | null;
   employee_email: string | null;
   personio_employee_id: number | null;
   direction: "relopass_to_personio";
@@ -68,47 +72,31 @@ interface SyncLogEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Default Personio custom field names (can be overridden per org via field_mappings)
+// Default Personio custom field IDs
+// Can be overridden per connection via hris_field_mappings rows where
+// relopass_field matches one of these keys.
 // ---------------------------------------------------------------------------
-const DEFAULT_FIELD_MAPPINGS = {
+const DEFAULT_PERSONIO_FIELDS: Record<string, string> = {
   relocation_status: "relocation_status",
   relocation_case_url: "relocation_case_url",
   estimated_completion_date: "estimated_completion_date",
 };
 
 // ---------------------------------------------------------------------------
-// Token decryption
-// AES-256-GCM, hex-encoded ciphertext format: <12-byte-iv-hex><ciphertext-hex>
+// Map ReloPass status → human-readable Personio value
 // ---------------------------------------------------------------------------
-async function decryptToken(encHex: string, keyHex: string): Promise<string> {
-  const keyBytes = hexToBytes(keyHex);
-  const encBytes = hexToBytes(encHex);
-  const iv = encBytes.slice(0, 12);
-  const ciphertext = encBytes.slice(12);
-
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    keyBytes,
-    { name: "AES-GCM" },
-    false,
-    ["decrypt"]
-  );
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
-    cryptoKey,
-    ciphertext
-  );
-
-  return new TextDecoder().decode(decrypted);
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-  }
-  return bytes;
+function mapStatus(status: string): string {
+  const map: Record<string, string> = {
+    draft: "Draft",
+    created: "Draft",
+    active: "In Progress",
+    in_progress: "In Progress",
+    on_hold: "On Hold",
+    completed: "Completed",
+    closed: "Completed",
+    archived: "Completed",
+  };
+  return map[status.toLowerCase()] ?? status;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +138,6 @@ async function personioUpdateCustomAttributes(
 ): Promise<Record<string, unknown>> {
   const url = `${baseUrl}/api/v2/company/employees/${employeeId}/custom-attributes`;
 
-  // Personio PUT body: { data: { <field_id>: { value: <v> } } }
   const body: Record<string, { value: string | number | null }> = {};
   for (const [key, val] of Object.entries(attributes)) {
     body[key] = { value: val };
@@ -184,23 +171,6 @@ async function personioUpdateCustomAttributes(
 }
 
 // ---------------------------------------------------------------------------
-// Map ReloPass status to Personio-friendly string
-// ---------------------------------------------------------------------------
-function mapStatus(status: string): string {
-  const map: Record<string, string> = {
-    draft: "Draft",
-    created: "Draft",
-    active: "In Progress",
-    in_progress: "In Progress",
-    on_hold: "On Hold",
-    completed: "Completed",
-    closed: "Completed",
-    archived: "Completed",
-  };
-  return map[status.toLowerCase()] ?? status;
-}
-
-// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -210,7 +180,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const encryptionKey = Deno.env.get("HRIS_TOKEN_ENCRYPTION_KEY") ?? "";
+  const appUrl = Deno.env.get("RELOPASS_APP_URL") ?? "https://app.relopass.com";
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
@@ -229,64 +199,49 @@ Deno.serve(async (req: Request): Promise<Response> => {
     `[personio-sync] case_id=${case_id} status=${payload.old_status}→${new_status} company=${company_id}`
   );
 
-  const logBase: Omit<SyncLogEntry, "sync_status" | "error_message" | "fields_updated" | "personio_response"> = {
+  const logBase = {
     case_id,
-    company_id: company_id ?? null,
-    employee_email: null,
-    personio_employee_id: null,
-    direction: "relopass_to_personio",
+    org_id: company_id ?? null,
+    employee_email: null as string | null,
+    personio_employee_id: null as number | null,
+    direction: "relopass_to_personio" as const,
     new_case_status: new_status,
   };
 
   const writeLog = async (entry: SyncLogEntry) => {
     const { error } = await supabase.from("personio_sync_log").insert(entry);
-    if (error) {
-      console.error("[personio-sync] Failed to write sync log:", error.message);
-    }
+    if (error) console.error("[personio-sync] Failed to write sync log:", error.message);
   };
 
   // --- Guard: skip if no company ---
   if (!company_id) {
-    console.warn("[personio-sync] No company_id on case — skipping.");
-    await writeLog({ ...logBase, sync_status: "skip", error_message: "no company_id on case", fields_updated: null, personio_response: null });
+    await writeLog({ ...logBase, sync_status: "skip", error_message: "no_company_id", fields_updated: null, personio_response: null });
     return Response.json({ ok: true, status: "skip", reason: "no_company_id" });
   }
 
-  // --- Step 1: Fetch Personio connection ---
+  // --- Step 1: Fetch Personio connection (org_id matches company_id) ---
   const { data: conn, error: connErr } = await supabase
     .from("hris_connections")
-    .select("*")
-    .eq("company_id", company_id)
+    .select("id, org_id, provider, access_token, api_base_url, subdomain, status, token_expires_at")
+    .eq("org_id", company_id)
     .eq("provider", "personio")
     .eq("status", "active")
     .single();
 
   if (connErr || !conn) {
-    console.log(`[personio-sync] No active Personio connection for company ${company_id} — skipping.`);
+    console.log(`[personio-sync] No active Personio connection for org ${company_id} — skipping.`);
     await writeLog({ ...logBase, sync_status: "skip", error_message: "no_active_personio_connection", fields_updated: null, personio_response: null });
     return Response.json({ ok: true, status: "skip", reason: "no_active_personio_connection" });
   }
 
   const connection = conn as HrisConnection;
 
-  // --- Step 2: Decrypt access token ---
-  if (!connection.access_token_enc || !encryptionKey) {
-    console.warn("[personio-sync] No token or encryption key — skipping.");
-    await writeLog({ ...logBase, sync_status: "skip", error_message: "missing_token_or_encryption_key", fields_updated: null, personio_response: null });
-    return Response.json({ ok: true, status: "skip", reason: "missing_token" });
+  if (!connection.access_token) {
+    await writeLog({ ...logBase, sync_status: "skip", error_message: "no_access_token", fields_updated: null, personio_response: null });
+    return Response.json({ ok: true, status: "skip", reason: "no_access_token" });
   }
 
-  let accessToken: string;
-  try {
-    accessToken = await decryptToken(connection.access_token_enc, encryptionKey);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[personio-sync] Token decryption failed:", msg);
-    await writeLog({ ...logBase, sync_status: "error", error_message: `token_decryption_failed: ${msg}`, fields_updated: null, personio_response: null });
-    return Response.json({ ok: false, status: "error", reason: "token_decryption_failed" }, { status: 500 });
-  }
-
-  // --- Step 3: Resolve employee email from profiles ---
+  // --- Step 2: Resolve employee email from profiles ---
   let employeeEmail: string | null = null;
   if (employee_id) {
     const { data: profile } = await supabase
@@ -305,12 +260,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   logBase.employee_email = employeeEmail;
 
+  // --- Step 3: Fetch field mappings for this connection ---
+  const { data: mappingRows } = await supabase
+    .from("hris_field_mappings")
+    .select("hris_field, relopass_field")
+    .eq("connection_id", connection.id);
+
+  const fieldMappings: Record<string, string> = { ...DEFAULT_PERSONIO_FIELDS };
+  for (const row of (mappingRows ?? []) as FieldMapping[]) {
+    // relopass_field is our key (e.g. "relocation_status"),
+    // hris_field is the Personio custom attribute ID to write to.
+    if (row.relopass_field in fieldMappings) {
+      fieldMappings[row.relopass_field] = row.hris_field;
+    }
+  }
+
   // --- Step 4: Lookup Personio employee by email ---
   let personioEmployee: PersonioEmployee | null;
   try {
     personioEmployee = await personioGetEmployeeByEmail(
-      connection.base_url,
-      accessToken,
+      connection.api_base_url,
+      connection.access_token,
       employeeEmail
     );
   } catch (e) {
@@ -321,22 +291,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   if (!personioEmployee) {
-    console.warn(`[personio-sync] No Personio employee found for email ${employeeEmail}`);
-    await writeLog({ ...logBase, sync_status: "warn", error_message: `no_personio_employee_for_email:${employeeEmail}`, fields_updated: null, personio_response: null });
+    console.warn(`[personio-sync] No Personio employee found for ${employeeEmail}`);
+    await writeLog({ ...logBase, sync_status: "warn", error_message: `no_personio_employee: ${employeeEmail}`, fields_updated: null, personio_response: null });
     return Response.json({ ok: true, status: "warn", reason: "personio_employee_not_found" });
   }
 
   logBase.personio_employee_id = personioEmployee.id;
 
-  // --- Step 5: Build the custom attribute payload ---
-  const fieldMappings = { ...DEFAULT_FIELD_MAPPINGS, ...connection.field_mappings };
-  const caseUrl = `${Deno.env.get("RELOPASS_APP_URL") ?? "https://app.relopass.com"}/hr/cases/${case_id}`;
-
+  // --- Step 5: Build custom attribute payload ---
+  const caseUrl = `${appUrl}/hr/cases/${case_id}`;
   const attributesToWrite: Record<string, string | null> = {
     [fieldMappings.relocation_status]: mapStatus(new_status),
     [fieldMappings.relocation_case_url]: caseUrl,
-    // estimated_completion_date: not available in trigger payload; leave as null unless
-    // extended in the future to include projected_end_date from relocation_cases.
     [fieldMappings.estimated_completion_date]: updated_at?.slice(0, 10) ?? null,
   };
 
@@ -344,42 +310,35 @@ Deno.serve(async (req: Request): Promise<Response> => {
   let personioResponse: Record<string, unknown>;
   try {
     personioResponse = await personioUpdateCustomAttributes(
-      connection.base_url,
-      accessToken,
+      connection.api_base_url,
+      connection.access_token,
       personioEmployee.id,
       attributesToWrite
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[personio-sync] Personio PUT failed:", msg);
-    await writeLog({
-      ...logBase,
-      sync_status: "error",
-      error_message: msg,
-      fields_updated: attributesToWrite,
-      personio_response: null,
-    });
+    await writeLog({ ...logBase, sync_status: "error", error_message: msg, fields_updated: attributesToWrite, personio_response: null });
     return Response.json({ ok: false, status: "error", reason: "personio_put_failed" }, { status: 502 });
   }
 
-  // --- Update connection last_sync_at ---
+  // Update connection last_sync_at
   await supabase
     .from("hris_connections")
     .update({ last_sync_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  // --- Log success ---
+  // Log success
   await writeLog({
     ...logBase,
     sync_status: "success",
     error_message: null,
     fields_updated: attributesToWrite,
-    // Truncate personio response to avoid storing huge payloads
     personio_response: JSON.parse(JSON.stringify(personioResponse).slice(0, 2000)),
   });
 
   console.log(
-    `[personio-sync] ✓ case ${case_id} → Personio employee ${personioEmployee.id} updated (status: ${new_status})`
+    `[personio-sync] ✓ case ${case_id} → Personio employee ${personioEmployee.id} (status: ${new_status})`
   );
 
   return Response.json({
