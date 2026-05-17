@@ -67,27 +67,14 @@ CREATE OR REPLACE FUNCTION public.fn_notify_personio_status_sync()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, extensions AS $$
 DECLARE
-  v_url         text;
-  v_anon_key    text;
-  v_payload     jsonb;
-  v_project_ref text;
+  v_url     text := 'https://nsvefcvpvwwwhuqyuqmp.supabase.co/functions/v1/personio-status-sync';
+  v_key     text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zdmVmY3Zwdnd3d2h1cXl1cW1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMjgwNzIsImV4cCI6MjA4NjgwNDA3Mn0.TFDDThoEm9Q8zLEkmgVKiseolUbzN2GyFo0BMnv8qMQ';
+  v_payload jsonb;
 BEGIN
   -- Skip if status didn't actually change
   IF OLD.status IS NOT DISTINCT FROM NEW.status THEN
     RETURN NEW;
   END IF;
-
-  v_project_ref := current_setting('app.supabase_project_ref', true);
-  v_anon_key    := current_setting('app.supabase_anon_key', true);
-
-  IF v_project_ref IS NULL OR v_anon_key IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  v_url := format(
-    'https://%s.supabase.co/functions/v1/personio-status-sync',
-    v_project_ref
-  );
 
   v_payload := jsonb_build_object(
     'case_id',      NEW.id,
@@ -104,7 +91,7 @@ BEGIN
     body    := v_payload::text,
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
-      'Authorization', 'Bearer ' || v_anon_key
+      'Authorization', 'Bearer ' || v_key
     )
   );
 
