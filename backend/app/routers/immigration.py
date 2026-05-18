@@ -32,12 +32,34 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
+from ..services.immigration_interview_engine import (
+    AddressGap,
+    QuestionNode,
+    compute_completion_pct,
+    compute_section_progress,
+    detect_address_gaps,
+    get_next_question,
+    get_section_summary,
+    get_vault_updates,
+    load_questions,
+    validate_answer,
+)
+from ..services.ocr_passport_extractor import (
+    ConflictRecord,
+    MrzValidationResult,
+    PassportExtractionResult,
+    detect_conflicts,
+    extract_passport,
+    save_ocr_to_vault,
+    validate_mrz,
+    _upload_passport_image,
+)
 from ..services.immigration_requirement_service import (
     RequirementResult,
     RiskFlag,
@@ -103,6 +125,12 @@ class EmployeeProfileUpdate(BaseModel):
     institution: Optional[str] = None
     graduation_year: Optional[int] = None
     degree_anabin_status: Optional[str] = None
+
+
+class InterviewAnswerBody(BaseModel):
+    question_id: str
+    answer_value: Any            # str | bool | dict | list — depends on question type
+    skip: Optional[bool] = False  # if True, record as explicitly skipped
 
 
 class MilestoneCreate(BaseModel):
@@ -490,6 +518,85 @@ def update_profile_hr_fields(
 # Employee: GET /api/employee/cases/{case_id}/profile
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Employee: POST /api/employee/cases/{case_id}/consent
+# ---------------------------------------------------------------------------
+
+@router.post("/employee/cases/{case_id}/consent", status_code=status.HTTP_201_CREATED)
+def record_consent_employee(
+    case_id: str,
+    body: ConsentBody,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Employee self-records GDPR consent for their own immigration case.
+    Creates a row in consent_records for each purpose in body.purposes.
+    Returns the consent_record_id for the immigration_processing purpose.
+
+    The employee_id in the body must match the authenticated user to prevent
+    one employee recording consent on behalf of another.
+    """
+    employee_id = current_user["id"]
+
+    # Verify the employee_id in the body matches the authenticated user
+    if body.employee_id != employee_id:
+        raise HTTPException(
+            status_code=403,
+            detail="employee_id in request body must match the authenticated user.",
+        )
+
+    if not body.purposes:
+        raise HTTPException(status_code=422, detail="At least one purpose required.")
+
+    now = _now_iso()
+    primary_id = None
+
+    for purpose in body.purposes:
+        record_id = str(uuid.uuid4())
+        text_hash = body.consent_text_hash or hashlib.sha256(
+            f"{CONSENT_TEXT_VERSION}:{purpose}".encode()
+        ).hexdigest()
+
+        with db.engine.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO public.consent_records
+                        (id, employee_id, case_id, purpose, consented,
+                         consent_version, consent_text_hash, consented_at)
+                    VALUES
+                        (:id, :employee_id, :case_id, :purpose, TRUE,
+                         :version, :hash, :now)
+                """),
+                {
+                    "id": record_id,
+                    "employee_id": employee_id,
+                    "case_id": case_id,
+                    "purpose": purpose,
+                    "version": CONSENT_TEXT_VERSION,
+                    "hash": text_hash,
+                    "now": now,
+                },
+            )
+        if purpose == "immigration_processing":
+            primary_id = record_id
+
+    _log_access(
+        case_id=case_id,
+        profile_id=None,
+        user_id=employee_id,
+        role="employee",
+        action="consent_record",
+        fields=body.purposes,
+    )
+
+    return {
+        "consent_record_id": primary_id,
+        "purposes_recorded": body.purposes,
+        "consent_version": CONSENT_TEXT_VERSION,
+        "recorded_at": now,
+    }
+
+
 @router.get("/employee/cases/{case_id}/profile")
 def get_profile_employee(
     case_id: str,
@@ -753,27 +860,427 @@ def update_milestone(
 
 
 # ---------------------------------------------------------------------------
+# HR: GET /api/hr/cases/{case_id}/immigration/interview-status  (IMM-13)
+# ---------------------------------------------------------------------------
+
+@router.get("/hr/cases/{case_id}/immigration/interview-status")
+def get_interview_status_hr(
+    case_id: str,
+    hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """
+    HR-facing view of the employee's immigration interview progress.
+    Returns the stored completion_pct and session metadata without exposing
+    any individual question answers (those stay employee-private).
+    """
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT completion_pct, completed_at, started_at, last_active_at
+                FROM public.interview_sessions
+                WHERE case_id = :case_id
+                ORDER BY started_at DESC
+                LIMIT 1
+            """),
+            {"case_id": case_id},
+        ).mappings().first()
+
+    if not row:
+        return {
+            "has_session": False,
+            "completion_pct": 0,
+            "is_complete": False,
+            "started_at": None,
+            "last_active_at": None,
+            "completed_at": None,
+        }
+
+    return {
+        "has_session": True,
+        "completion_pct": float(row["completion_pct"] or 0),
+        "is_complete": row["completed_at"] is not None,
+        "started_at": _ts(row["started_at"]),
+        "last_active_at": _ts(row["last_active_at"]),
+        "completed_at": _ts(row["completed_at"]),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Stubs for future tasks (return 501 with helpful message)
 # ---------------------------------------------------------------------------
 
 @router.post("/employee/cases/{case_id}/profile/ocr-passport")
-def ocr_passport_stub(case_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
-    raise HTTPException(status_code=501, detail="OCR passport extraction (IMM-05) not yet implemented.")
+async def ocr_passport(
+    case_id: str,
+    passport_image: UploadFile = File(..., description="Passport photo — JPEG, PNG, or WebP, max 10 MB"),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    IMM-05 — Passport OCR upload, extract, validate MRZ, detect conflicts,
+    and auto-save extracted fields to imm_employee_profiles.
+
+    Returns extracted fields with per-field confidence, MRZ validation result,
+    conflict records, and the updated profile_id.
+    Does NOT require the employee to confirm — fields are saved immediately
+    with source='ocr' (can be overridden by a subsequent self_entered PUT).
+    """
+    employee_id = current_user["id"]
+
+    # --- Consent gate ---
+    if not _check_consent(case_id, employee_id):
+        raise HTTPException(
+            status_code=403,
+            detail="No valid immigration consent on record for this case. "
+                   "Please complete the consent step first.",
+        )
+
+    # --- Validate file type and size ---
+    ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
+    MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+
+    content_type = (passport_image.content_type or "").lower()
+    if content_type not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported file type '{content_type}'. Accepted: JPEG, PNG, WebP.",
+        )
+
+    image_bytes = await passport_image.read()
+    if len(image_bytes) > MAX_BYTES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"File too large ({len(image_bytes) // 1024} KB). Maximum is 10 MB.",
+        )
+
+    # --- Upload to Supabase Storage (non-blocking — failure is logged but not surfaced) ---
+    storage_path = _upload_passport_image(case_id, image_bytes, content_type)
+
+    # --- OCR extraction via GPT-4o ---
+    try:
+        extraction: PassportExtractionResult = await extract_passport(image_bytes, content_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except RuntimeError as exc:
+        log.error("OCR runtime error for case %s: %s", case_id, exc)
+        raise HTTPException(status_code=503, detail="OCR service temporarily unavailable.")
+
+    # --- MRZ validation ---
+    mrz_result: Optional[MrzValidationResult] = None
+    if extraction.mrz_line1 and extraction.mrz_line2:
+        mrz_result = validate_mrz(extraction.mrz_line1, extraction.mrz_line2)
+
+    # --- Load existing vault for conflict detection ---
+    existing_profile = _load_profile_for_case_employee(case_id, employee_id)
+    conflicts: List[ConflictRecord] = []
+    if existing_profile:
+        conflicts = detect_conflicts(
+            extraction,
+            existing_profile,
+            field_sources=existing_profile.get("field_sources") or {},
+        )
+
+    # --- Auto-save to vault ---
+    org_id = current_user.get("org_id", "")
+    profile_id = save_ocr_to_vault(case_id, employee_id, extraction, org_id)
+
+    # --- Log access ---
+    saved_fields = [
+        f for f in [
+            "legal_first_name", "legal_last_name", "date_of_birth", "gender",
+            "place_of_birth", "nationality", "passport_country", "passport_expiry",
+            "passport_issue_date", "passport_number", "passport_mrz_line1", "passport_mrz_line2",
+        ]
+        if getattr(extraction, {
+            "legal_first_name": "given_names", "legal_last_name": "surname",
+            "passport_country": "issuing_country", "passport_expiry": "expiry_date",
+            "passport_issue_date": "issue_date", "passport_mrz_line1": "mrz_line1",
+            "passport_mrz_line2": "mrz_line2",
+        }.get(f, f), None) is not None
+    ]
+    _log_access(
+        case_id=case_id,
+        profile_id=profile_id or (existing_profile.get("id") if existing_profile else None),
+        user_id=employee_id,
+        role="employee",
+        action="ocr_extract",
+        fields=saved_fields,
+        purpose="immigration_processing",
+    )
+
+    return {
+        "profile_id": profile_id,
+        "storage_path": storage_path,
+        "extracted_fields": {
+            "surname": extraction.surname,
+            "given_names": extraction.given_names,
+            "date_of_birth": extraction.date_of_birth,
+            "gender": extraction.gender,
+            "place_of_birth": extraction.place_of_birth,
+            "nationality": extraction.nationality,
+            "issuing_country": extraction.issuing_country,
+            "passport_number": extraction.passport_number,
+            "issue_date": extraction.issue_date,
+            "expiry_date": extraction.expiry_date,
+            "mrz_line1": extraction.mrz_line1,
+            "mrz_line2": extraction.mrz_line2,
+        },
+        "confidence": extraction.confidence,
+        "mrz_validation": {
+            "is_valid": mrz_result.is_valid if mrz_result else None,
+            "error_fields": mrz_result.error_fields if mrz_result else [],
+            "details": mrz_result.details if mrz_result else {},
+        } if mrz_result else None,
+        "conflicts": [
+            {
+                "field_name": c.field_name,
+                "ocr_value": c.ocr_value,
+                "vault_value": c.vault_value,
+                "vault_source": c.vault_source,
+            }
+            for c in conflicts
+        ],
+        "fields_saved": saved_fields,
+    }
 
 
 @router.get("/employee/cases/{case_id}/interview/next")
-def interview_next_stub(case_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
-    raise HTTPException(status_code=501, detail="Interview engine (IMM-06) not yet implemented.")
+def interview_next(
+    case_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    IMM-06 — Return the next unanswered interview question.
+
+    Creates a new interview session if none exists for this case+employee.
+    Returns None as `next_question` when the interview is complete.
+    """
+    employee_id = current_user["id"]
+
+    if not _check_consent(case_id, employee_id):
+        raise HTTPException(status_code=403, detail="Consent required before starting interview.")
+
+    session = _load_or_create_session(case_id, employee_id, current_user.get("org_id", ""))
+    vault = _load_profile_for_case_employee(case_id, employee_id) or {}
+
+    confirmed = list(session.get("prefilled_fields") or [])
+    answers = dict(session.get("answers") or {})
+
+    questions = load_questions()
+    next_q = get_next_question(answers, vault, confirmed, questions)
+
+    progress = compute_section_progress(answers, questions)
+    completion = compute_completion_pct(answers, questions)
+
+    return {
+        "session_id": session["id"],
+        "next_question": next_q,
+        "completion_pct": completion,
+        "section_progress": {
+            sid: {
+                "total_applicable": sp.total_applicable,
+                "answered": sp.answered,
+                "required_answered": sp.required_answered,
+                "required_total": sp.required_total,
+                "is_complete": sp.is_complete,
+            }
+            for sid, sp in progress.items()
+        },
+        "is_complete": next_q is None,
+    }
 
 
 @router.post("/employee/cases/{case_id}/interview/answer")
-def interview_answer_stub(case_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
-    raise HTTPException(status_code=501, detail="Interview engine (IMM-06) not yet implemented.")
+def interview_answer(
+    case_id: str,
+    body: InterviewAnswerBody,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    IMM-06 — Submit an answer to an interview question.
+
+    Validates the answer, saves to vault if the question maps to a vault field,
+    updates session state, checks for address gaps, and returns the next question.
+
+    Uses SELECT … FOR UPDATE to prevent concurrent corruption of session state.
+    """
+    employee_id = current_user["id"]
+
+    if not _check_consent(case_id, employee_id):
+        raise HTTPException(status_code=403, detail="Consent required before answering.")
+
+    questions = load_questions()
+    q_map = {q.id: q for q in questions}
+    question = q_map.get(body.question_id)
+    if not question:
+        raise HTTPException(status_code=422, detail=f"Unknown question_id '{body.question_id}'.")
+
+    # Validate answer (unless explicitly skipping)
+    if not body.skip:
+        validation = validate_answer(question, body.answer_value)
+        if not validation.is_valid:
+            raise HTTPException(status_code=422, detail=validation.error)
+
+    answer_value = None if body.skip else body.answer_value
+
+    # Load session with row-level lock to prevent concurrent updates
+    session = _load_session_for_update(case_id, employee_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="No active interview session found. Call /next first.")
+
+    answers: Dict[str, Any] = dict(session.get("answers") or {})
+    confirmed_prefills: List[str] = list(session.get("prefilled_fields") or [])
+    skipped: List[str] = list(session.get("skipped_fields") or [])
+
+    # Record answer or skip
+    if body.skip:
+        if question.id not in skipped:
+            skipped.append(question.id)
+    else:
+        answers[question.id] = answer_value
+        # If this was a pre-filled question being confirmed, add to confirmed_prefills
+        if question.vault_field and question.vault_field not in confirmed_prefills:
+            vault_check = _load_profile_for_case_employee(case_id, employee_id) or {}
+            if vault_check.get(question.vault_field):
+                confirmed_prefills.append(question.vault_field)
+
+    # Vault updates
+    vault_updated: List[str] = []
+    if not body.skip and question.vault_field:
+        vault_updates = get_vault_updates(question, answer_value)
+        if vault_updates:
+            _apply_vault_updates(case_id, employee_id, vault_updates, current_user.get("org_id", ""))
+            vault_updated = list(vault_updates.keys())
+
+    # Address gap detection
+    gap_warnings: List[Dict[str, Any]] = []
+    if question.vault_field == "address_history" and not body.skip:
+        try:
+            addr_list = answer_value if isinstance(answer_value, list) else []
+            gaps = detect_address_gaps(addr_list)
+            gap_warnings = [
+                {
+                    "gap_days": g.gap_days,
+                    "message": f"There is a {g.gap_days}-day gap in your address history between "
+                               f"{g.from_address.get('to_date', '?')} and "
+                               f"{g.to_address.get('from_date', '?')}. "
+                               "Please add any addresses you lived at during this period.",
+                }
+                for g in gaps
+            ]
+        except Exception:
+            pass
+
+    # Recompute progress
+    vault = _load_profile_for_case_employee(case_id, employee_id) or {}
+    completion = compute_completion_pct(answers, questions)
+    progress = compute_section_progress(answers, questions)
+    next_q = get_next_question(answers, vault, confirmed_prefills, questions)
+
+    # Determine completed sections
+    completed_sections = [sid for sid, sp in progress.items() if sp.is_complete]
+    completed_at_ts = _now_iso() if next_q is None else None
+
+    # Persist session
+    _save_session(
+        session_id=session["id"],
+        answers=answers,
+        skipped_fields=skipped,
+        prefilled_fields=confirmed_prefills,
+        current_section=next_q["section"] if next_q else None,
+        current_question_id=next_q["question_id"] if next_q else None,
+        completed_sections=completed_sections,
+        completion_pct=completion,
+        completed_at=completed_at_ts,
+    )
+
+    # Log access
+    logged_fields = vault_updated or [question.id]
+    _log_access(
+        case_id=case_id,
+        profile_id=None,
+        user_id=employee_id,
+        role="employee",
+        action="interview_answer",
+        fields=logged_fields,
+    )
+
+    return {
+        "session_id": session["id"],
+        "question_answered": body.question_id,
+        "vault_updated": vault_updated,
+        "next_question": next_q,
+        "completion_pct": completion,
+        "section_progress": {
+            sid: {
+                "total_applicable": sp.total_applicable,
+                "answered": sp.answered,
+                "required_answered": sp.required_answered,
+                "required_total": sp.required_total,
+                "is_complete": sp.is_complete,
+            }
+            for sid, sp in progress.items()
+        },
+        "gap_warnings": gap_warnings,
+        "is_complete": next_q is None,
+    }
 
 
 @router.get("/employee/cases/{case_id}/interview/status")
-def interview_status_stub(case_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
-    raise HTTPException(status_code=501, detail="Interview engine (IMM-06) not yet implemented.")
+def interview_status(
+    case_id: str,
+    section_id: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    IMM-06 — Overall interview progress.
+
+    If `section_id` query param is provided, returns detailed per-question
+    breakdown for that section.
+    """
+    employee_id = current_user["id"]
+
+    if not _check_consent(case_id, employee_id):
+        raise HTTPException(status_code=403, detail="Consent required.")
+
+    session = _load_session(case_id, employee_id)
+    if not session:
+        return {
+            "has_session": False,
+            "completion_pct": 0,
+            "is_complete": False,
+            "section_progress": {},
+        }
+
+    answers = dict(session.get("answers") or {})
+    questions = load_questions()
+    progress = compute_section_progress(answers, questions)
+    completion = compute_completion_pct(answers, questions)
+
+    result: Dict[str, Any] = {
+        "has_session": True,
+        "session_id": session["id"],
+        "completion_pct": completion,
+        "is_complete": session.get("completed_at") is not None,
+        "started_at": _ts(session.get("started_at")),
+        "last_active_at": _ts(session.get("last_active_at")),
+        "completed_at": _ts(session.get("completed_at")),
+        "section_progress": {
+            sid: {
+                "total_applicable": sp.total_applicable,
+                "answered": sp.answered,
+                "required_answered": sp.required_answered,
+                "required_total": sp.required_total,
+                "is_complete": sp.is_complete,
+            }
+            for sid, sp in progress.items()
+        },
+    }
+
+    if section_id:
+        result["section_detail"] = get_section_summary(section_id, answers, questions)
+
+    return result
 
 
 @router.get("/employee/cases/{case_id}/my-data/export")
@@ -831,6 +1338,194 @@ def _load_profile_for_case_employee(case_id: str, employee_id: str) -> Optional[
         if hasattr(v, "isoformat"):
             result[col] = v.isoformat()
     return result
+
+
+def _ts(v: Any) -> Optional[str]:
+    """Coerce a datetime/string to ISO string, or None."""
+    if v is None:
+        return None
+    if hasattr(v, "isoformat"):
+        return v.isoformat()
+    return str(v)
+
+
+# ---------------------------------------------------------------------------
+# Interview session DB helpers
+# ---------------------------------------------------------------------------
+
+def _load_session(case_id: str, employee_id: str) -> Optional[Dict[str, Any]]:
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT id, answers, skipped_fields, prefilled_fields,
+                       completed_sections, completion_pct, current_section,
+                       current_question_id, consent_record_id,
+                       started_at, last_active_at, completed_at
+                FROM public.interview_sessions
+                WHERE case_id = :case_id AND employee_id = :employee_id
+                ORDER BY started_at DESC
+                LIMIT 1
+            """),
+            {"case_id": case_id, "employee_id": employee_id},
+        ).mappings().first()
+    return dict(row) if row else None
+
+
+def _load_session_for_update(case_id: str, employee_id: str) -> Optional[Dict[str, Any]]:
+    """Load session with row-level lock (FOR UPDATE) to prevent concurrent corruption."""
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT id, answers, skipped_fields, prefilled_fields,
+                       completed_sections, completion_pct, current_section,
+                       current_question_id, started_at, last_active_at, completed_at
+                FROM public.interview_sessions
+                WHERE case_id = :case_id AND employee_id = :employee_id
+                ORDER BY started_at DESC
+                LIMIT 1
+                FOR UPDATE
+            """),
+            {"case_id": case_id, "employee_id": employee_id},
+        ).mappings().first()
+    return dict(row) if row else None
+
+
+def _load_or_create_session(case_id: str, employee_id: str, org_id: str) -> Dict[str, Any]:
+    """Load existing session or create a fresh one."""
+    session = _load_session(case_id, employee_id)
+    if session:
+        return session
+
+    session_id = str(uuid.uuid4())
+    now = _now_iso()
+    with db.engine.begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO public.interview_sessions
+                    (id, case_id, employee_id, org_id,
+                     answers, skipped_fields, prefilled_fields, completed_sections,
+                     completion_pct, started_at, last_active_at, created_at, updated_at)
+                VALUES
+                    (:id, :case_id, :employee_id, :org_id,
+                     '{}', '{}', '{}', '{}',
+                     0, :now, :now, :now, :now)
+            """),
+            {
+                "id": session_id,
+                "case_id": case_id,
+                "employee_id": employee_id,
+                "org_id": org_id,
+                "now": now,
+            },
+        )
+    return _load_session(case_id, employee_id) or {}
+
+
+def _save_session(
+    session_id: str,
+    answers: Dict[str, Any],
+    skipped_fields: List[str],
+    prefilled_fields: List[str],
+    current_section: Optional[str],
+    current_question_id: Optional[str],
+    completed_sections: List[str],
+    completion_pct: int,
+    completed_at: Optional[str],
+) -> None:
+    import json as _json
+    now = _now_iso()
+    with db.engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE public.interview_sessions
+                SET answers              = :answers,
+                    skipped_fields       = :skipped,
+                    prefilled_fields     = :prefilled,
+                    current_section      = :section,
+                    current_question_id  = :question_id,
+                    completed_sections   = :completed,
+                    completion_pct       = :pct,
+                    completed_at         = :completed_at,
+                    last_active_at       = :now,
+                    updated_at           = :now
+                WHERE id = :session_id
+            """),
+            {
+                "session_id": session_id,
+                "answers": _json.dumps(answers),
+                "skipped": skipped_fields,
+                "prefilled": prefilled_fields,
+                "section": current_section,
+                "question_id": current_question_id,
+                "completed": completed_sections,
+                "pct": completion_pct,
+                "completed_at": completed_at,
+                "now": now,
+            },
+        )
+
+
+def _apply_vault_updates(
+    case_id: str,
+    employee_id: str,
+    vault_updates: Dict[str, Any],
+    org_id: str = "",
+) -> None:
+    """
+    Apply a dict of vault column → value updates to imm_employee_profiles.
+    Creates the profile row if it doesn't exist.
+    Fields already marked 'hr_provided' in field_sources are never overwritten.
+    """
+    now = _now_iso()
+    profile = _load_profile_for_case_employee(case_id, employee_id)
+
+    if profile:
+        existing_sources: Dict[str, str] = dict(profile.get("field_sources") or {})
+        set_clauses = []
+        params: Dict[str, Any] = {"case_id": case_id, "employee_id": employee_id, "now": now}
+        for col, val in vault_updates.items():
+            if existing_sources.get(col) == "hr_provided":
+                continue
+            set_clauses.append(f"{col} = :{col}")
+            params[col] = val
+            existing_sources[col] = "interview"
+
+        if not set_clauses:
+            return
+
+        params["field_sources"] = existing_sources
+        set_clauses += ["field_sources = :field_sources", "updated_at = :now"]
+        with db.engine.begin() as conn:
+            conn.execute(
+                text(
+                    f"UPDATE public.imm_employee_profiles "
+                    f"SET {', '.join(set_clauses)} "
+                    f"WHERE case_id = :case_id AND employee_id = :employee_id"
+                ),
+                params,
+            )
+    else:
+        profile_id = str(uuid.uuid4())
+        field_sources = {col: "interview" for col in vault_updates}
+        params = {
+            "id": profile_id,
+            "case_id": case_id,
+            "employee_id": employee_id,
+            "org_id": org_id,
+            "field_sources": field_sources,
+            "created_at": now,
+            "updated_at": now,
+            **vault_updates,
+        }
+        cols = list(params.keys())
+        with db.engine.begin() as conn:
+            conn.execute(
+                text(
+                    f"INSERT INTO public.imm_employee_profiles ({', '.join(cols)}) "
+                    f"VALUES ({', '.join(f':{c}' for c in cols)})"
+                ),
+                params,
+            )
 
 
 def _get_encryption_key() -> str:

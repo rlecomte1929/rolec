@@ -43,6 +43,7 @@ const EmployeePolicyPage = lazy(() => import('./pages/employee/EmployeePolicyPag
 const CaseWizardPage = lazy(() => import('./pages/employee/CaseWizardPage').then((module) => ({ default: module.CaseWizardPage })));
 const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
 const EmployeeRelocationPlanPage = lazy(() => import('./pages/employee/EmployeeRelocationPlanPage').then((module) => ({ default: module.EmployeeRelocationPlanPage })));
+const ImmigrationPage = lazy(() => import('./pages/employee/ImmigrationPage').then((module) => ({ default: module.ImmigrationPage })));
 const QuoteRequestPage = lazy(() => import('./pages/employee/QuoteRequestPage').then((module) => ({ default: module.QuoteRequestPage })));
 const ProvidersPage = lazy(() => import('./pages/ProvidersPage').then((module) => ({ default: module.ProvidersPage })));
 const Messages = lazy(() => import('./pages/Messages').then((module) => ({ default: module.Messages })));
@@ -223,6 +224,7 @@ function App() {
         <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.CASE_SUMMARY} element={<RequireEmployeeRoute><EmployeeCaseSummary /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.CASE_PLAN} element={<RequireEmployeeRoute><EmployeeRelocationPlanPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeCaseImmigration.path} element={<RequireEmployeeRoute><ImmigrationPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />

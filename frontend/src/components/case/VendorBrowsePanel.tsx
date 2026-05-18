@@ -5,10 +5,11 @@
  * service category and corridor without leaving the case record.
  *
  * Props:
- *  - isOpen        : controls visibility
- *  - onClose       : close handler
- *  - destCountry   : pre-fills the destination part of the corridor filter
- *  - onRequestQuote: called when HR clicks "Request Quote" on a vendor card
+ *  - isOpen          : controls visibility
+ *  - onClose         : close handler
+ *  - destCountry     : pre-fills the destination part of the corridor filter
+ *  - initialCategory : pre-selects a service category filter (e.g. "Immigration/visa")
+ *  - onRequestQuote  : called when HR clicks "Request Quote" on a vendor card
  */
 
 import React, { useEffect, useState } from 'react';
@@ -37,6 +38,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   destCountry?: string;
+  initialCategory?: string;
   onRequestQuote: (vendor: Vendor) => void;
 }
 
@@ -44,6 +46,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
   isOpen,
   onClose,
   destCountry,
+  initialCategory,
   onRequestQuote,
 }) => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -51,8 +54,8 @@ export const VendorBrowsePanel: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Filters
-  const [selectedCategory, setSelectedCategory] = useState('');
+  // Filters — initialCategory pre-selects service category (e.g. from immigration panel)
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory ?? '');
   const [selectedCorridor, setSelectedCorridor] = useState('');
 
   // Load corridors once on open

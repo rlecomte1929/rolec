@@ -12,6 +12,7 @@ import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
 import { RfqModal } from '../components/case/RfqModal';
 import { PendingRfqsPanel } from '../components/case/PendingRfqsPanel';
+import { ImmigrationStatusPanel } from '../components/case/ImmigrationStatusPanel';
 
 type QuoteRequest = {
   id: string;
@@ -59,6 +60,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
 
   // Vendor browse panel + RFQ modal
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
+  const [vendorPanelInitialCategory, setVendorPanelInitialCategory] = useState('');
   const [rfqVendor, setRfqVendor] = useState<{ id: string; name: string; service_categories: string[]; contact_email: string } | null>(null);
   const [rfqSuccessMsg, setRfqSuccessMsg] = useState('');
   const [rfqListKey, setRfqListKey] = useState(0);
@@ -233,6 +235,26 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         {/* ── Employee Tasks (AIQ-34-C) — polls every 8s ── */}
         <HrCaseTasksPanel caseId={detail.id} />
 
+        {/* ── IMM-13: Immigration status panel ── */}
+        <Card padding="lg" className="border border-[#e2e8f0]">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-sm font-semibold text-[#0b2b43]">Immigration status</div>
+              <p className="text-xs text-[#94a3b8] mt-0.5">Documents, risk flags and employee interview progress</p>
+            </div>
+          </div>
+          <ImmigrationStatusPanel
+            caseId={detail.id}
+            onFindVendor={() => {
+              setVendorPanelInitialCategory('Immigration/visa');
+              setVendorPanelOpen(true);
+            }}
+            onViewProfile={() => {
+              navigate(buildRoute('hrAssignmentReview', { id: detail.id }));
+            }}
+          />
+        </Card>
+
         {/* ── AIQ-40-D: Vendor RFQs (sent by HR, tracked here) ── */}
         <Card padding="lg" className="border border-[#e2e8f0]">
           <div className="flex items-center justify-between mb-4">
@@ -242,7 +264,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => setVendorPanelOpen(true)}
+              onClick={() => { setVendorPanelInitialCategory(''); setVendorPanelOpen(true); }}
               className="flex items-center gap-1.5 rounded-lg border border-[#0b2b43] bg-white px-3 py-1.5 text-xs font-medium text-[#0b2b43] hover:bg-[#f8fafc] transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -343,10 +365,12 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       {/* ── AIQ-40-B: Vendor browse slide-over ── */}
       <VendorBrowsePanel
         isOpen={vendorPanelOpen}
-        onClose={() => setVendorPanelOpen(false)}
+        onClose={() => { setVendorPanelOpen(false); setVendorPanelInitialCategory(''); }}
         destCountry={detail.destCountry}
+        initialCategory={vendorPanelInitialCategory}
         onRequestQuote={(vendor) => {
           setVendorPanelOpen(false);
+          setVendorPanelInitialCategory('');
           setRfqVendor(vendor);
         }}
       />

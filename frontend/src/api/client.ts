@@ -785,6 +785,55 @@ export const hrAPI = {
     return response.data;
   },
 
+  // ── IMM-13: Immigration status panel ─────────────────────────────────────
+
+  /** GET /api/hr/cases/{caseId}/immigration-requirements */
+  getImmigrationRequirements: async (caseId: string): Promise<{
+    corridor_from: string;
+    corridor_to: string;
+    visa_type: string;
+    document_count: number;
+    estimated_timeline_days: number;
+    requirements: Array<{
+      document_type: string;
+      document_name: string;
+      is_required: boolean;
+      freshness_days: number | null;
+      requires_apostille: boolean;
+      apostille_countries: string[];
+      requires_translation: boolean;
+      translation_languages: string[];
+      typical_processing_days: number | null;
+      book_early_flag: boolean;
+      book_early_reason: string | null;
+      form_url: string | null;
+    }>;
+    risk_flags: Array<{
+      flag_type: string;
+      severity: 'critical' | 'warning' | 'info';
+      title: string;
+      description: string;
+      recommended_action: string;
+      deadline: string | null;
+    }>;
+  }> => {
+    const response = await api.get(`/api/hr/cases/${caseId}/immigration-requirements`);
+    return response.data;
+  },
+
+  /** GET /api/hr/cases/{caseId}/immigration/interview-status (IMM-13) */
+  getImmigrationInterviewStatus: async (caseId: string): Promise<{
+    has_session: boolean;
+    completion_pct: number;
+    is_complete: boolean;
+    started_at: string | null;
+    last_active_at: string | null;
+    completed_at: string | null;
+  }> => {
+    const response = await api.get(`/api/hr/cases/${caseId}/immigration/interview-status`);
+    return response.data;
+  },
+
   // ── AIQ-40-C: RFQ flow ────────────────────────────────────────────────────
 
   /** POST /api/hr/rfq-requests */

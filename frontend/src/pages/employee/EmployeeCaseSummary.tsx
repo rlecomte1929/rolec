@@ -129,6 +129,7 @@ export const EmployeeCaseSummary: React.FC = () => {
     (ac.employerName || ac.jobTitle || ac.contractStartDate);
 
   const planHref = assignmentId ? buildRoute('employeeCasePlan', { caseId: assignmentId }) : buildRoute('employeeDashboard');
+  const immigrationHref = assignmentId ? buildRoute('employeeCaseImmigration', { caseId: assignmentId }) : null;
 
   return (
     <AppShell title="My case" subtitle="Intake summary — what you’ve shared so far.">
@@ -190,7 +191,46 @@ export const EmployeeCaseSummary: React.FC = () => {
               </Link>{' '}
               tab.
             </li>
+            {immigrationHref && (
+              <li>
+                <strong>Immigration intake</strong> — complete your visa profile (passport scan,
+                personal details, address history) on the{' '}
+                <Link to={immigrationHref} className="font-medium text-[#0b2b43] underline">
+                  Immigration intake
+                </Link>{' '}
+                page.
+              </li>
+            )}
           </ul>
+        </Card>
+      )}
+
+      {/* Immigration intake card */}
+      {immigrationHref && !isLoading && (
+        <Card padding="md" className="mb-6 border-[#e0f2fe] bg-[#f0f9ff]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex-shrink-0 rounded-full bg-[#bae6fd] p-2">
+                <svg className="h-4 w-4 text-[#0369a1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-[#0b2b43]">Immigration intake</div>
+                <p className="text-xs text-[#475569] mt-0.5">
+                  Provide your passport details, address history, and family information to start
+                  your visa application. Takes about 10–15 minutes.
+                </p>
+              </div>
+            </div>
+            <Link
+              to={immigrationHref}
+              className="shrink-0 rounded-lg bg-[#0b2b43] px-4 py-2 text-xs font-semibold text-white hover:bg-[#1a3f5e] transition-colors"
+            >
+              Start →
+            </Link>
+          </div>
         </Card>
       )}
 

@@ -1,0 +1,433 @@
+{
+  "_comment": "Immigration interview question DAG — IMM-06. Edit this file to add/remove questions without code changes.",
+  "sections": [
+    {
+      "id": "identity",
+      "title": "Personal Identity",
+      "description": "Basic personal details as they appear on your travel documents.",
+      "order": 1
+    },
+    {
+      "id": "travel_docs",
+      "title": "Travel Documents",
+      "description": "Passport and existing visa information.",
+      "order": 2
+    },
+    {
+      "id": "address_history",
+      "title": "Address History",
+      "description": "Your current and previous addresses over the last 5 years.",
+      "order": 3
+    },
+    {
+      "id": "family",
+      "title": "Family & Dependents",
+      "description": "Spouse, partner, and any dependents joining you.",
+      "order": 4
+    }
+  ],
+  "questions": [
+    {
+      "id": "q_legal_first_name",
+      "section": "identity",
+      "order": 10,
+      "label": "What is your legal first name?",
+      "help_text": "As it appears on your passport — no nicknames.",
+      "type": "text",
+      "required": true,
+      "skippable": false,
+      "vault_field": "legal_first_name",
+      "condition": null
+    },
+    {
+      "id": "q_legal_last_name",
+      "section": "identity",
+      "order": 20,
+      "label": "What is your legal last name (surname)?",
+      "help_text": "As it appears on your passport.",
+      "type": "text",
+      "required": true,
+      "skippable": false,
+      "vault_field": "legal_last_name",
+      "condition": null
+    },
+    {
+      "id": "q_middle_names",
+      "section": "identity",
+      "order": 30,
+      "label": "Do you have any middle names?",
+      "help_text": "Leave blank if none. Include all middle names as they appear on your passport.",
+      "type": "text",
+      "required": false,
+      "skippable": true,
+      "vault_field": "middle_names",
+      "condition": null
+    },
+    {
+      "id": "q_date_of_birth",
+      "section": "identity",
+      "order": 40,
+      "label": "What is your date of birth?",
+      "help_text": "Format: DD/MM/YYYY",
+      "type": "date",
+      "required": true,
+      "skippable": false,
+      "vault_field": "date_of_birth",
+      "condition": null
+    },
+    {
+      "id": "q_place_of_birth",
+      "section": "identity",
+      "order": 50,
+      "label": "What is your place of birth?",
+      "help_text": "City and country, e.g. 'Paris, France'",
+      "type": "text",
+      "required": true,
+      "skippable": false,
+      "vault_field": "place_of_birth",
+      "condition": null
+    },
+    {
+      "id": "q_gender",
+      "section": "identity",
+      "order": 60,
+      "label": "What gender is listed on your passport?",
+      "help_text": "Select the gender marker as it appears on your travel document.",
+      "type": "select",
+      "options": ["M", "F", "X"],
+      "option_labels": {"M": "Male (M)", "F": "Female (F)", "X": "Unspecified / Non-binary (X)"},
+      "required": true,
+      "skippable": false,
+      "vault_field": "gender",
+      "condition": null
+    },
+    {
+      "id": "q_nationality",
+      "section": "identity",
+      "order": 70,
+      "label": "What is your nationality?",
+      "help_text": "Your primary nationality as shown on your passport (e.g. French, German, British).",
+      "type": "text",
+      "required": true,
+      "skippable": false,
+      "vault_field": "nationality",
+      "condition": null
+    },
+    {
+      "id": "q_has_second_nationality",
+      "section": "identity",
+      "order": 80,
+      "label": "Do you hold a second nationality?",
+      "help_text": "This affects which documents you may use to enter certain countries.",
+      "type": "boolean",
+      "required": true,
+      "skippable": false,
+      "vault_field": null,
+      "condition": null
+    },
+    {
+      "id": "q_second_nationality",
+      "section": "identity",
+      "order": 90,
+      "label": "What is your second nationality?",
+      "help_text": "As shown on your second passport or ID document.",
+      "type": "text",
+      "required": true,
+      "skippable": false,
+      "vault_field": "second_nationality",
+      "condition": {
+        "question_id": "q_has_second_nationality",
+        "operator": "eq",
+        "value": "true"
+      }
+    },
+    {
+      "id": "q_marital_status",
+      "section": "identity",
+      "order": 100,
+      "label": "What is your marital status?",
+      "help_text": "This determines which family documents may be required.",
+      "type": "select",
+      "options": ["single", "married", "civil_partnership", "divorced", "widowed", "separated"],
+      "option_labels": {
+        "single": "Single",
+        "married": "Married",
+        "civil_partnership": "Civil Partnership",
+        "divorced": "Divorced",
+        "widowed": "Widowed",
+        "separated": "Separated"
+      },
+      "required": true,
+      "skippable": false,
+      "vault_field": "marital_status",
+      "condition": null
+    },
+    {
+      "id": "q_prior_visa_refusals",
+      "section": "identity",
+      "order": 110,
+      "label": "Have you had any visa or entry permit refusals in the last 10 years?",
+      "help_text": "Including tourist, work, or study visas for any country. This must be disclosed — omissions may cause visa rejection.",
+      "type": "boolean",
+      "required": true,
+      "skippable": false,
+      "vault_field": "prior_visa_refusals",
+      "condition": null
+    },
+    {
+      "id": "q_highest_qualification",
+      "section": "identity",
+      "order": 120,
+      "label": "What is your highest educational qualification?",
+      "help_text": "Required for most skilled worker and Blue Card visa applications.",
+      "type": "select",
+      "options": ["none", "secondary", "vocational", "bachelors", "masters", "doctorate", "professional"],
+      "option_labels": {
+        "none": "No formal qualification",
+        "secondary": "Secondary / High School",
+        "vocational": "Vocational / Apprenticeship",
+        "bachelors": "Bachelor's Degree",
+        "masters": "Master's Degree",
+        "doctorate": "Doctorate / PhD",
+        "professional": "Professional Qualification (e.g. CPA, Bar, MD)"
+      },
+      "required": true,
+      "skippable": false,
+      "vault_field": "highest_qualification",
+      "condition": null
+    },
+    {
+      "id": "q_passport_upload",
+      "section": "travel_docs",
+      "order": 10,
+      "label": "Upload a photo of your passport data page",
+      "help_text": "The page with your photo, name, and MRZ lines. JPEG, PNG, or WebP, max 10 MB. We will auto-fill fields from the image.",
+      "type": "upload",
+      "upload_endpoint": "/api/employee/cases/{case_id}/profile/ocr-passport",
+      "required": false,
+      "skippable": true,
+      "vault_field": null,
+      "condition": null
+    },
+    {
+      "id": "q_passport_number",
+      "section": "travel_docs",
+      "order": 20,
+      "label": "What is your passport number?",
+      "help_text": "Exactly as printed on the data page — no spaces.",
+      "type": "text",
+      "required": true,
+      "skippable": false,
+      "vault_field": "passport_number",
+      "condition": null
+    },
+    {
+      "id": "q_passport_expiry",
+      "section": "travel_docs",
+      "order": 30,
+      "label": "What is your passport expiry date?",
+      "help_text": "Your passport must be valid for at least 6 months beyond your visa end date.",
+      "type": "date",
+      "required": true,
+      "skippable": false,
+      "vault_field": "passport_expiry",
+      "condition": null
+    },
+    {
+      "id": "q_passport_issue_date",
+      "section": "travel_docs",
+      "order": 40,
+      "label": "When was your passport issued?",
+      "help_text": "The 'Date of Issue' or 'Date of Delivery' on the data page.",
+      "type": "date",
+      "required": true,
+      "skippable": false,
+      "vault_field": "passport_issue_date",
+      "condition": null
+    },
+    {
+      "id": "q_passport_country",
+      "section": "travel_docs",
+      "order": 50,
+      "label": "Which country issued your passport?",
+      "help_text": "ISO 3-letter code or full country name (e.g. FRA, GBR, DEU).",
+      "type": "text",
+      "required": true,
+      "skippable": false,
+      "vault_field": "passport_country",
+      "condition": null
+    },
+    {
+      "id": "q_existing_visa_type",
+      "section": "travel_docs",
+      "order": 60,
+      "label": "Do you currently hold a visa or residence permit for the destination country?",
+      "help_text": "Enter the visa type if applicable (e.g. 'Tourist Schengen', 'Blue Card', 'Skilled Worker') or leave blank.",
+      "type": "text",
+      "required": false,
+      "skippable": true,
+      "vault_field": "existing_visa_type",
+      "condition": null
+    },
+    {
+      "id": "q_existing_visa_expiry",
+      "section": "travel_docs",
+      "order": 70,
+      "label": "When does your current visa or permit expire?",
+      "help_text": "Required so your relocation can be timed before expiry.",
+      "type": "date",
+      "required": true,
+      "skippable": false,
+      "vault_field": "existing_visa_expiry",
+      "condition": {
+        "question_id": "q_existing_visa_type",
+        "operator": "answered",
+        "value": null
+      }
+    },
+    {
+      "id": "q_degree_institution",
+      "section": "travel_docs",
+      "order": 80,
+      "label": "Where did you obtain your highest qualification?",
+      "help_text": "Name of the university or institution, and country.",
+      "type": "text",
+      "required": false,
+      "skippable": true,
+      "vault_field": "institution",
+      "condition": {
+        "question_id": "q_highest_qualification",
+        "operator": "not_in",
+        "value": ["none", "secondary"]
+      }
+    },
+    {
+      "id": "q_current_address",
+      "section": "address_history",
+      "order": 10,
+      "label": "What is your current home address?",
+      "help_text": "Your permanent residential address. This is used to determine consulate jurisdiction.",
+      "type": "address",
+      "required": true,
+      "skippable": false,
+      "vault_field": "current_address",
+      "condition": null
+    },
+    {
+      "id": "q_has_previous_addresses",
+      "section": "address_history",
+      "order": 20,
+      "label": "Have you lived at any other address in the past 5 years?",
+      "help_text": "Most visa applications require a complete 5-year address history.",
+      "type": "boolean",
+      "required": true,
+      "skippable": false,
+      "vault_field": null,
+      "condition": null
+    },
+    {
+      "id": "q_address_history",
+      "section": "address_history",
+      "order": 30,
+      "label": "Please list all addresses you have lived at in the past 5 years",
+      "help_text": "Include start and end dates for each address. We will flag any gaps over 30 days.",
+      "type": "address_list",
+      "required": true,
+      "skippable": false,
+      "vault_field": "address_history",
+      "condition": {
+        "question_id": "q_has_previous_addresses",
+        "operator": "eq",
+        "value": "true"
+      }
+    },
+    {
+      "id": "q_has_dependents_moving",
+      "section": "family",
+      "order": 10,
+      "label": "Will any family members or dependents be relocating with you?",
+      "help_text": "Includes spouse, civil partner, and children.",
+      "type": "boolean",
+      "required": true,
+      "skippable": false,
+      "vault_field": null,
+      "condition": null
+    },
+    {
+      "id": "q_spouse_name",
+      "section": "family",
+      "order": 20,
+      "label": "What is your spouse or partner's full legal name?",
+      "help_text": "As it appears on their passport.",
+      "type": "text",
+      "required": true,
+      "skippable": false,
+      "vault_field": "spouse_name",
+      "condition": {
+        "question_id": "q_marital_status",
+        "operator": "in",
+        "value": ["married", "civil_partnership"]
+      }
+    },
+    {
+      "id": "q_spouse_nationality",
+      "section": "family",
+      "order": 30,
+      "label": "What is your spouse or partner's nationality?",
+      "help_text": "Different nationality may require separate visa applications.",
+      "type": "text",
+      "required": true,
+      "skippable": false,
+      "vault_field": "spouse_nationality",
+      "condition": {
+        "question_id": "q_marital_status",
+        "operator": "in",
+        "value": ["married", "civil_partnership"]
+      }
+    },
+    {
+      "id": "q_spouse_dob",
+      "section": "family",
+      "order": 40,
+      "label": "What is your spouse or partner's date of birth?",
+      "help_text": "Required for dependent visa applications.",
+      "type": "date",
+      "required": true,
+      "skippable": false,
+      "vault_field": "spouse_dob",
+      "condition": {
+        "question_id": "q_marital_status",
+        "operator": "in",
+        "value": ["married", "civil_partnership"]
+      }
+    },
+    {
+      "id": "q_dependents",
+      "section": "family",
+      "order": 50,
+      "label": "Please provide details for each dependent joining you",
+      "help_text": "For each child or dependent: full name, date of birth, nationality, and relationship.",
+      "type": "dependent_list",
+      "required": true,
+      "skippable": false,
+      "vault_field": "dependents",
+      "condition": {
+        "question_id": "q_has_dependents_moving",
+        "operator": "eq",
+        "value": "true"
+      }
+    },
+    {
+      "id": "q_emergency_contact",
+      "section": "family",
+      "order": 60,
+      "label": "Emergency contact details",
+      "help_text": "Name, relationship, and phone number of someone to contact in an emergency.",
+      "type": "text",
+      "required": false,
+      "skippable": true,
+      "vault_field": null,
+      "condition": null
+    }
+  ]
+}
