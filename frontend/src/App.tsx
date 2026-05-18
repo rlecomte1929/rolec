@@ -63,6 +63,7 @@ const HrEmployees = lazy(() => import('./pages/HrEmployees').then((module) => ({
 const HrEmployeeDetail = lazy(() => import('./pages/HrEmployeeDetail').then((module) => ({ default: module.HrEmployeeDetail })));
 const HrCommandCenter = lazy(() => import('./pages/HrCommandCenter').then((module) => ({ default: module.HrCommandCenter })));
 const HrCommandCenterCaseDetail = lazy(() => import('./pages/HrCommandCenterCaseDetail').then((module) => ({ default: module.HrCommandCenterCaseDetail })));
+const HrAnalytics = lazy(() => import('./pages/HrAnalytics').then((module) => ({ default: module.HrAnalytics })));
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings').then((module) => ({ default: module.NotificationSettings })));
 
 const CountriesPage = lazy(() => import('./pages/admin/CountriesPage').then((module) => ({ default: module.CountriesPage })));
@@ -183,6 +184,7 @@ function App() {
         <Route path={ROUTE_DEFS.employeeQuoteRequest.path} element={<RequireEmployeeRoute><QuoteRequestPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.EMP_DASH} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
+        <Route path={ROUTE_DEFS.hrAnalytics.path} element={<HrAnalytics />} />
         <Route path={ROUTE_DEFS.hrCommandCenter.path} element={<HrCommandCenter />} />
         <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<HrCommandCenterCaseDetail />} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />

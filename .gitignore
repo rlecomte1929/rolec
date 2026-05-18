@@ -54,3 +54,5 @@ ci_test*.db
 DISCOVERY_REPORT.md
 INGESTION_SUMMARY.md
 
+venv_new/
+venv/

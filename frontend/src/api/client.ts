@@ -920,6 +920,31 @@ export const hrAPI = {
     const response = await api.post(`/api/hr/cases/${caseId}/tasks`, body);
     return response.data;
   },
+
+  /** AIQ-39-B: Workspace benchmarking stats + industry comparison. */
+  getAnalytics: async (): Promise<{
+    workspace: {
+      avg_completion_days: number | null;
+      compliance_incident_rate: number | null;
+      total_cases_in_window: number;
+      closed_cases_in_window: number;
+      top_delay_causes: Array<{ cause: string; count: number }>;
+      corridor_breakdown: Array<{ corridor: string; avg_days: number; case_count: number }>;
+      computed_at: string | null;
+    };
+    industry: {
+      median_completion_days: number | null;
+      median_compliance_rate: number | null;
+      case_count: number;
+      workspace_count: number;
+      is_valid: boolean;
+      computed_at: string | null;
+    } | null;
+    trend: Array<{ month: string; avg_completion_days: number | null }>;
+  }> => {
+    const response = await api.get('/api/hr/analytics');
+    return response.data;
+  },
 };
 
 // Company API (for header branding: HR and Employee)

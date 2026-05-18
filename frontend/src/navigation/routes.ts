@@ -19,6 +19,7 @@ export const ROUTE_DEFS = {
   /** Immigration intake flow (consent → OCR → interview). */
   employeeCaseImmigration: { path: '/employee/case/:caseId/immigration', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrDashboard: { path: '/hr/dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  hrAnalytics: { path: '/hr/analytics', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCommandCenter: { path: '/hr/command-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCommandCenterCase: { path: '/hr/command-center/cases/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrEmployeeDashboard: { path: '/hr/employee-dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },

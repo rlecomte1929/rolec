@@ -156,6 +156,7 @@ from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import hr_vendors as hr_vendors_router
 from .app.routers import hr_rfq as hr_rfq_router
 from .app.routers import immigration as immigration_router
+from .app.routers import analytics as analytics_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -547,6 +548,7 @@ app.include_router(employee_quotes_router.router)
 app.include_router(hr_vendors_router.router)
 app.include_router(hr_rfq_router.router)
 app.include_router(immigration_router.router)
+app.include_router(analytics_router.router)
 app.include_router(mobility_context_router.router)
 app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
