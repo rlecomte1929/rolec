@@ -114,6 +114,7 @@ export const HrVendorCuration: React.FC = () => {
   // Phase 2 notifications: employee demand backlog (what employees are waiting on).
   const [demand, setDemand] = useState<EmployeeDemandRow[]>([]);
   const [demandLoading, setDemandLoading] = useState(false);
+  const [demandError, setDemandError] = useState(false);
   // Curate-jump target: when HR clicks "Curate" on a demand row, we scroll the
   // master-vendors card into view and flash a ring so the action is visible
   // even when (category, destination) didn't change.
@@ -169,12 +170,13 @@ export const HrVendorCuration: React.FC = () => {
 
   const reloadDemand = useCallback(async () => {
     setDemandLoading(true);
+    setDemandError(false);
     try {
       const list = await listEmployeeDemand();
       setDemand(list);
     } catch {
-      // Non-fatal — widget is informational; absence shouldn't block the page.
-      setDemand([]);
+      // Non-fatal — keep the widget visible but show an error state.
+      setDemandError(true);
     } finally {
       setDemandLoading(false);
     }
@@ -416,8 +418,7 @@ export const HrVendorCuration: React.FC = () => {
       title="Vendor curation"
       subtitle="Choose which providers your employees see, per service and destination."
     >
-      {(demandLoading || demand.length > 0) && (
-        <Card padding="lg" className="mb-6 border border-[#fde68a] bg-[#fffbeb]">
+      <Card padding="lg" className="mb-6 border border-[#fde68a] bg-[#fffbeb]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold text-[#92400e]">
@@ -426,6 +427,10 @@ export const HrVendorCuration: React.FC = () => {
               <p className="text-sm text-[#92400e]/90 mt-1">
                 {demandLoading ? (
                   'Checking…'
+                ) : demandError ? (
+                  'Could not load — check your connection and retry.'
+                ) : demand.length === 0 ? (
+                  'No employees are currently waiting on vendor selections.'
                 ) : (
                   <>
                     <strong>{totalEmployeesWaiting}</strong> employee view
@@ -468,7 +473,6 @@ export const HrVendorCuration: React.FC = () => {
             </ul>
           )}
         </Card>
-      )}
 
       <Card padding="lg" className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

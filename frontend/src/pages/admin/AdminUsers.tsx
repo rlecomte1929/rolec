@@ -378,13 +378,19 @@ const AddPersonModal: React.FC<AddPersonModalProps> = ({ companies, onClose, onC
     setSuccess(null);
     setSubmitting(true);
     try {
-      await adminAPI.createPerson({
+      const result = await adminAPI.createPerson({
         email: trimmed,
         full_name: full_name.trim() || undefined,
         role,
         company_id: company_id || undefined,
       });
-      setSuccess('Person created.');
+      // B2 fix: surface whether the invite email was dispatched.
+      const inviteSent = result?.invite_sent !== false;
+      setSuccess(
+        inviteSent
+          ? 'Person created. An invite email has been sent so they can set their password.'
+          : 'Person created. No invite email sent — check Supabase email configuration.'
+      );
       onCreated();
     } catch (err: any) {
       const detail = err?.response?.data;

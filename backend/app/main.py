@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import init_db
-from .routers import cases, admin
+from .routers import cases, admin, employee_quotes
 from .seed import seed_demo_cases
 
 
@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
 
     app.include_router(cases.router)
     app.include_router(admin.router)
+    app.include_router(employee_quotes.router)
     return app
 
 

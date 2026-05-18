@@ -249,7 +249,18 @@ export const HrDashboard: React.FC = () => {
   return (
     <AppShell title="Assignments" subtitle="Create cases, assign people, track status.">
       <div className="space-y-6">
-        {error && <Alert variant="error">{error}</Alert>}
+        {error && (
+          <Alert variant="error">
+            <span>{error}</span>
+            <Button
+              variant="outline"
+              className="ml-4 text-xs py-1 px-3"
+              onClick={() => loadAssignments()}
+            >
+              Retry
+            </Button>
+          </Alert>
+        )}
 
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <input

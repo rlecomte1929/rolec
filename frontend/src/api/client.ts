@@ -60,8 +60,16 @@ export { API_BASE_URL };
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  /** 60s default covers slow HR queries (assignments list, company profile) while still failing on truly stuck requests. Long-running calls (uploads, policy extraction) override per-request with 120s. */
-  timeout: 60_000,
+  /**
+   * B13 fix: default timeout lowered from 60s → 12s so a blocked/unavailable
+   * API surfaces an error within the 10s window the E2E test checks.
+   * All genuinely long-running calls (file uploads, policy extraction, AI
+   * inference) already override per-request with `{ timeout: 120_000 }`.
+   * Query and mutation endpoints should respond well within 12s; if they don't
+   * that's a backend performance bug (see B3), not a valid reason to hide the
+   * error from the user.
+   */
+  timeout: 12_000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -1039,7 +1047,7 @@ export const adminAPI = {
     const response = await api.get('/api/admin/people', { params: params || {} });
     return response.data;
   },
-  createPerson: async (payload: { email: string; full_name?: string; role?: string; company_id?: string }): Promise<{ person: AdminProfile }> => {
+  createPerson: async (payload: { email: string; full_name?: string; role?: string; company_id?: string }): Promise<{ person: AdminProfile; invite_sent?: boolean }> => {
     const response = await api.post('/api/admin/people', payload);
     return response.data;
   },

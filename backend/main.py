@@ -155,6 +155,7 @@ from .app.routers import providers as providers_router
 from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import hr_vendors as hr_vendors_router
 from .app.routers import hr_rfq as hr_rfq_router
+from .app.routers import immigration as immigration_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -545,6 +546,7 @@ app.include_router(providers_router.router)
 app.include_router(employee_quotes_router.router)
 app.include_router(hr_vendors_router.router)
 app.include_router(hr_rfq_router.router)
+app.include_router(immigration_router.router)
 app.include_router(mobility_context_router.router)
 app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
@@ -1883,7 +1885,27 @@ def create_person(
         user.get("id"),
     )
     db.log_audit(user["id"], "CREATE", "profile", person_id, None, {"email": email})
-    return {"person": profile}
+
+    # B2 fix: send Supabase Auth invite email so the created user can log in.
+    # Previously the profile was created silently with no way to set a password.
+    # invite_admin_created_user is best-effort and never raises.
+    from .services.supabase_auth_sync import invite_admin_created_user as _invite
+    _app_url = os.environ.get("APP_URL", "https://relopass.com")
+    invite_sent = _invite(
+        email,
+        full_name=body.full_name,
+        role=role,
+        redirect_to=f"{_app_url}/auth?mode=login",
+    )
+    if not invite_sent:
+        log.warning(
+            "admin_create_person invite_not_sent request_id=%s email=%s "
+            "(Supabase not configured or invite_user_by_email unavailable)",
+            request_id,
+            email,
+        )
+
+    return {"person": profile, "invite_sent": invite_sent}
 
 
 @app.patch("/api/admin/people/{person_id}")
@@ -3458,6 +3480,12 @@ def _dispatch_hr_assign_side_effects(
     invite_token: Optional[str],
     employee_identifier_raw: str,
     request_id: Optional[str],
+    # B3-perf: profile + employee-row sync deferred from the critical path.
+    # These were previously sequential DB round-trips before the assignment
+    # response was returned.  Both are best-effort (HR Employees tab display),
+    # so running them here is safe.
+    employee_user_id: Optional[str] = None,
+    hr_company_id: Optional[str] = None,
 ) -> None:
     """Run the deferred ensure_*, case-participant, case-event and message draft
     in a background thread. Each step is best-effort and logs its own warning
@@ -3468,6 +3496,33 @@ def _dispatch_hr_assign_side_effects(
 
     def _run() -> None:
         run_assignment_post_creation_hooks(db, assignment_id, request_id=request_id)
+
+        # B3-perf: ensure employee profile company_id and employees row (deferred).
+        if employee_user_id and hr_company_id:
+            try:
+                emp_profile = db.get_profile_record(employee_user_id)
+                if emp_profile and not emp_profile.get("company_id"):
+                    db.ensure_profile_record(
+                        employee_user_id,
+                        emp_profile.get("email") or employee_identifier_raw,
+                        emp_profile.get("role") or UserRole.EMPLOYEE.value,
+                        emp_profile.get("full_name") or employee_identifier_raw.split("@")[0],
+                        hr_company_id,
+                    )
+            except Exception as exc:
+                log.warning(
+                    "deferred ensure_profile_record skipped employee_user_id=%s error=%s",
+                    employee_user_id,
+                    exc,
+                )
+            try:
+                db.ensure_employee_for_profile(employee_user_id, hr_company_id)
+            except Exception as exc:
+                log.warning(
+                    "deferred ensure_employee_for_profile skipped employee_user_id=%s error=%s",
+                    employee_user_id,
+                    exc,
+                )
 
         now_iso = datetime.utcnow().isoformat()
         try:
@@ -3585,9 +3640,26 @@ def assign_case(
     try:
         _deny_if_impersonating(user)
         effective = _effective_user(user, UserRole.HR)
-        case = db.get_case_by_id(case_id)
-        if not case:
-            raise HTTPException(status_code=404, detail="Case not found")
+
+        # B3-perf: parse the identifier early (no I/O) so we can start both
+        # DB lookups in parallel before fetching the company_id.
+        employee_identifier_raw = request.employeeIdentifier.strip()
+        if not employee_identifier_raw:
+            raise HTTPException(status_code=400, detail="Employee identifier required")
+
+        fn = getattr(request, "employeeFirstName", None) or getattr(request, "employee_first_name", None)
+        ln = getattr(request, "employeeLastName", None) or getattr(request, "employee_last_name", None)
+        employee_first_name = (fn or "").strip() or None
+        employee_last_name = (ln or "").strip() or None
+
+        # B3-perf: kick off case + user lookups in parallel; each is an
+        # independent SELECT.  We fetch the HR company_id (1-2 SELECTs) while
+        # both futures are in-flight, then gather results — eliminating one
+        # full Supabase pooler round-trip from the critical path.
+        _case_fut = _hr_assign_side_effects_executor.submit(db.get_case_by_id, case_id)
+        _user_fut = _hr_assign_side_effects_executor.submit(
+            db.get_user_by_identifier, employee_identifier_raw
+        )
 
         hr_company_id = _get_hr_company_id(effective)
         if not hr_company_id:
@@ -3595,6 +3667,14 @@ def assign_case(
                 status_code=400,
                 detail="No company linked to your profile. Please complete your company profile first.",
             )
+
+        try:
+            case = _case_fut.result(timeout=8)
+        except concurrent.futures.TimeoutError:
+            raise HTTPException(status_code=503, detail="Case lookup timed out. Please retry.")
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+
         if not case.get("company_id"):
             db.upsert_relocation_case(
                 case_id=case_id,
@@ -3606,16 +3686,12 @@ def assign_case(
                 home_country=case.get("home_country"),
             )
 
-        employee_identifier_raw = request.employeeIdentifier.strip()
-        if not employee_identifier_raw:
-            raise HTTPException(status_code=400, detail="Employee identifier required")
+        try:
+            employee_user = _user_fut.result(timeout=8)
+        except concurrent.futures.TimeoutError:
+            employee_user = None
+            log.warning("assign_case: get_user_by_identifier timed out for identifier=%s", employee_identifier_raw)
 
-        fn = getattr(request, "employeeFirstName", None) or getattr(request, "employee_first_name", None)
-        ln = getattr(request, "employeeLastName", None) or getattr(request, "employee_last_name", None)
-        employee_first_name = (fn or "").strip() or None
-        employee_last_name = (ln or "").strip() or None
-
-        employee_user = db.get_user_by_identifier(employee_identifier_raw)
         # Fix A (B3): If no legacy-users row exists for this email, fall back to
         # the profiles table.  Employees who signed up via magic-link or SSO
         # never get a row in the local `users` table, so get_user_by_identifier
@@ -3637,19 +3713,10 @@ def assign_case(
                     _profile_fb["id"],
                     employee_identifier_raw,
                 )
-        if employee_user and hr_company_id:
-            emp_profile = db.get_profile_record(employee_user["id"])
-            if emp_profile and not emp_profile.get("company_id"):
-                db.ensure_profile_record(
-                    employee_user["id"],
-                    emp_profile.get("email") or employee_identifier_raw,
-                    emp_profile.get("role") or UserRole.EMPLOYEE.value,
-                    emp_profile.get("full_name") or employee_identifier_raw.split("@")[0],
-                    hr_company_id,
-                )
-        # Ensure employees row exists so HR Employees tab shows this employee (real auth accounts only)
-        if employee_user and hr_company_id:
-            db.ensure_employee_for_profile(employee_user["id"], hr_company_id)
+        # B3-perf: ensure_profile_record + ensure_employee_for_profile are
+        # best-effort (they only affect the HR Employees tab display) and each
+        # requires 1-2 DB round-trips.  Defer them to _dispatch_hr_assign_side_effects
+        # so they run after the assignment_id/invite_token response is returned.
 
         # New assignments created by HR are immediately in the 'assigned' state.
         assert_canonical_status(AssignmentStatus.ASSIGNED.value)
@@ -3684,11 +3751,11 @@ def assign_case(
         stored_identifier = uar.stored_identifier
 
         # Defer mobility/case-person/passport sync, case participant, case
-        # event, and the invitation-message draft to a background pool. All of
-        # these were already best-effort (try/except + "skipped" warnings);
-        # moving them out-of-band shrinks the synchronous response path from
-        # ~15 DB ops to ~9 and stops Supabase RTT spikes from bursting past
-        # the frontend's axios cap.
+        # event, the invitation-message draft, and (B3-perf) the employee
+        # profile + employees-row sync to a background pool. All of these were
+        # already best-effort (try/except + "skipped" warnings); moving them
+        # out-of-band shrinks the synchronous response path and stops Supabase
+        # RTT spikes from bursting past the frontend's axios cap.
         _dispatch_hr_assign_side_effects(
             assignment_id=assignment_id,
             case_id=case_id,
@@ -3697,6 +3764,8 @@ def assign_case(
             invite_token=invite_token,
             employee_identifier_raw=employee_identifier_raw,
             request_id=request_id,
+            employee_user_id=employee_user["id"] if employee_user else None,
+            hr_company_id=hr_company_id,
         )
         side_effects_dispatched = True
 
