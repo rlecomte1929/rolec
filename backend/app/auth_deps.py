@@ -98,6 +98,13 @@ def _effective_user(user: Dict[str, Any], expected_role: Optional[UserRole] = No
     return target
 
 
+def get_org_id_for_hr_user(user: Dict[str, Any] = Depends(require_admin_or_hr)) -> str:
+    """Return the company_id for the current HR / Admin user."""
+    profile = db.get_profile_record(user.get("id"))
+    company_id = (profile or {}).get("company_id") or user.get("company") or ""
+    return company_id
+
+
 def require_vendor(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Require user to be a vendor. Returns user dict with vendor_id added. 403 if not a vendor."""
     vendor_id = db.get_vendor_for_user(user.get("id"))
