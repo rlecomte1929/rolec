@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { hrAPI } from '../../api/client';
 import type { EmployeeTask, EmployeeTaskListResponse, TaskType } from '../../api/client';
 import { Alert, Button, Card, LoadingButton, ProgressBar } from '../antigravity';
+import { ProviderCoordinationPanel } from '../ProviderCoordinationPanel';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -452,6 +453,9 @@ export const HrCaseTasksPanel: React.FC<HrCaseTasksPanelProps> = ({ caseId }) =>
             ))}
         </div>
       )}
+
+      {/* Provider coordination — housing, immigration, shipping tasks */}
+      <ProviderCoordinationPanel caseId={caseId} />
     </Card>
   );
 };

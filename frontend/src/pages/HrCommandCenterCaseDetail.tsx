@@ -9,6 +9,9 @@ import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
+import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
+import { RfqModal } from '../components/case/RfqModal';
+import { PendingRfqsPanel } from '../components/case/PendingRfqsPanel';
 
 type QuoteRequest = {
   id: string;
@@ -53,6 +56,12 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   // Quote requests for this case
   const [quoteRequests, setQuoteRequests] = useState<QuoteRequest[]>([]);
   const [updatingQrId, setUpdatingQrId] = useState<string | null>(null);
+
+  // Vendor browse panel + RFQ modal
+  const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
+  const [rfqVendor, setRfqVendor] = useState<{ id: string; name: string; service_categories: string[]; contact_email: string } | null>(null);
+  const [rfqSuccessMsg, setRfqSuccessMsg] = useState('');
+  const [rfqListKey, setRfqListKey] = useState(0);
 
   const loadQuoteRequests = useCallback(() => {
     if (!id) return;
@@ -224,11 +233,32 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         {/* ── Employee Tasks (AIQ-34-C) — polls every 8s ── */}
         <HrCaseTasksPanel caseId={detail.id} />
 
+        {/* ── AIQ-40-D: Vendor RFQs (sent by HR, tracked here) ── */}
+        <Card padding="lg" className="border border-[#e2e8f0]">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-sm font-semibold text-[#0b2b43]">Vendor quote requests</div>
+              <p className="text-xs text-[#94a3b8] mt-0.5">RFQs you've sent to vendors for this case</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setVendorPanelOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-[#0b2b43] bg-white px-3 py-1.5 text-xs font-medium text-[#0b2b43] hover:bg-[#f8fafc] transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Find a vendor
+            </button>
+          </div>
+          <PendingRfqsPanel key={rfqListKey} caseId={detail.id} />
+        </Card>
+
         {/* ── Quote Requests from employee (Step 4) ── */}
         <Card padding="lg" className="border border-[#e2e8f0]">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-[#0b2b43]">
-              Quote requests
+              Employee quote requests
               {quoteRequests.filter((q) => q.status === 'pending').length > 0 && (
                 <span className="ml-2 inline-flex items-center justify-center rounded-full bg-[#fef3c7] border border-[#fbbf24] px-2 py-0.5 text-xs font-medium text-[#92400e]">
                   {quoteRequests.filter((q) => q.status === 'pending').length} pending
@@ -309,6 +339,35 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
           Back to Command Center
         </Button>
       </div>
+
+      {/* ── AIQ-40-B: Vendor browse slide-over ── */}
+      <VendorBrowsePanel
+        isOpen={vendorPanelOpen}
+        onClose={() => setVendorPanelOpen(false)}
+        destCountry={detail.destCountry}
+        onRequestQuote={(vendor) => {
+          setVendorPanelOpen(false);
+          setRfqVendor(vendor);
+        }}
+      />
+
+      {/* ── AIQ-40-C: RFQ modal ── */}
+      {rfqSuccessMsg && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-5 py-3 shadow-lg text-sm text-[#166534] font-medium">
+          ✓ {rfqSuccessMsg}
+          <button type="button" onClick={() => setRfqSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</button>
+        </div>
+      )}
+      <RfqModal
+        vendor={rfqVendor}
+        caseId={detail.id}
+        onClose={() => setRfqVendor(null)}
+        onSent={(vendorName) => {
+          setRfqVendor(null);
+          setRfqSuccessMsg(`Quote request sent to ${vendorName}`);
+          setRfqListKey((k) => k + 1);
+        }}
+      />
     </AppShell>
   );
 };

@@ -749,6 +749,87 @@ export const hrAPI = {
     return response.data;
   },
 
+  // ── AIQ-40-A/B: Vendor directory ─────────────────────────────────────────
+
+  /** GET /api/hr/vendors?corridor=X&category=Y */
+  getVendors: async (params?: {
+    corridor?: string;
+    category?: string;
+  }): Promise<{
+    vendors: Array<{
+      id: string;
+      name: string;
+      service_categories: string[];
+      corridors: string[];
+      contact_email: string;
+      description?: string;
+      is_approved: boolean;
+    }>;
+  }> => {
+    const response = await api.get('/api/hr/vendors', { params });
+    const data = response.data;
+    return { vendors: Array.isArray(data) ? data : (data.vendors ?? []) };
+  },
+
+  /** GET /api/hr/vendors/corridors */
+  getVendorCorridors: async (): Promise<{ corridors: string[] }> => {
+    const response = await api.get('/api/hr/vendors/corridors');
+    return response.data;
+  },
+
+  // ── AIQ-40-C: RFQ flow ────────────────────────────────────────────────────
+
+  /** POST /api/hr/rfq-requests */
+  createRfqRequest: async (payload: {
+    case_id: string;
+    vendor_id: string;
+    service_category: string;
+    move_date?: string;
+    budget_range?: string;
+    special_requirements?: string;
+  }): Promise<{ ok: boolean; rfq_id: string; vendor_name: string; status: string; message: string }> => {
+    const response = await api.post('/api/hr/rfq-requests', payload);
+    return response.data;
+  },
+
+  /** GET /api/hr/rfq-requests?case_id=X */
+  getRfqRequests: async (params?: { case_id?: string }): Promise<{
+    rfqs: Array<{
+      id: string;
+      case_id: string;
+      vendor_id: string;
+      vendor_name: string;
+      vendor_email: string;
+      service_category: string;
+      move_date: string | null;
+      budget_range: string | null;
+      special_requirements: string | null;
+      hr_email: string;
+      hr_name: string;
+      status: string;
+      created_at: string;
+    }>;
+    total: number;
+  }> => {
+    const response = await api.get('/api/hr/rfq-requests', { params });
+    return response.data;
+  },
+
+  /** PATCH /api/hr/rfq-requests/{id} */
+  updateRfqStatus: async (
+    rfqId: string,
+    status: 'quote_received' | 'accepted' | 'cancelled',
+    quoteDetails?: {
+      quote_amount?: number;
+      quote_currency?: string;
+      quote_deadline?: string;
+      quote_deliverable?: string;
+    }
+  ): Promise<{ ok: boolean; rfq_id: string; status: string }> => {
+    const response = await api.patch(`/api/hr/rfq-requests/${rfqId}`, { status, ...quoteDetails });
+    return response.data;
+  },
+
   // ── AIQ-34-C: Employee task management (HR side) ──────────────────────────
 
   /** GET /api/hr/cases/{caseId}/tasks — full task list + completion stats */

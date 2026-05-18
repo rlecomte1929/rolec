@@ -37,22 +37,27 @@ async function sendEmailResend(
   to: string,
   subject: string,
   body: string,
-  _payload: Record<string, unknown>,
+  payload: Record<string, unknown>,
   apiKey: string,
   from: string
 ): Promise<SendResult> {
+  const emailPayload: Record<string, unknown> = {
+    from,
+    to: [to],
+    subject,
+    text: body,
+  };
+  // Support HTML body if provided in the outbox payload
+  if (payload.html_body && typeof payload.html_body === "string") {
+    emailPayload.html = payload.html_body;
+  }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject,
-      text: body,
-    }),
+    body: JSON.stringify(emailPayload),
   });
   if (!res.ok) {
     const err = await res.text();
