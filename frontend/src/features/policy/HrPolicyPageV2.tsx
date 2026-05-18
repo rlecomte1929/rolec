@@ -135,30 +135,29 @@ const StatusStrip: React.FC<StatusStripProps> = ({
   })();
 
   return (
-    <div
-      className="sticky top-0 z-30 -mx-6 px-6 py-3 bg-white/95 backdrop-blur border-b border-slate-200"
-      data-testid="hr-policy-status-strip"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={liveVariant} size="sm">
-          {liveLabel}
-        </Badge>
-        <Badge variant="neutral" size="sm">{draftDelta}</Badge>
-        <Badge variant="neutral" size="sm">{publishedAt}</Badge>
-        <Badge variant="neutral" size="sm">{sourceLabel}</Badge>
-        <div className="ml-auto flex gap-2">
-          <Button size="sm" variant="outline" onClick={onPreviewEmployeeView}>
-            Preview employee view
-          </Button>
-          <Button
-            size="sm"
-            onClick={onPublish}
-            disabled={!publishEnabled || publishBusy}
-          >
-            {publishBusy ? 'Publishing…' : 'Publish draft'}
-          </Button>
+    <div className="sticky top-0 z-30" data-testid="hr-policy-status-strip">
+      <Card padding="md">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={liveVariant} size="sm">
+            {liveLabel}
+          </Badge>
+          <Badge variant="neutral" size="sm">{draftDelta}</Badge>
+          <Badge variant="neutral" size="sm">{publishedAt}</Badge>
+          <Badge variant="neutral" size="sm">{sourceLabel}</Badge>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" variant="outline" onClick={onPreviewEmployeeView}>
+              Preview employee view
+            </Button>
+            <Button
+              size="sm"
+              onClick={onPublish}
+              disabled={!publishEnabled || publishBusy}
+            >
+              {publishBusy ? 'Publishing…' : 'Publish draft'}
+            </Button>
+          </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };
