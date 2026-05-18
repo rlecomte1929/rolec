@@ -134,6 +134,11 @@ from .app.routers import admin_prospects as admin_prospects_router
 from .app.routers import mobility_context as mobility_context_router
 from .app.routers import admin_mobility as admin_mobility_router
 from .app.routers import policy_canonical as policy_canonical_router
+from .app.routers import hr_coordination as hr_coordination_router
+from .app.routers import prescreening as prescreening_router
+from .app.routers import integrations_personio_webhook as personio_webhook_router
+from .app.routers import integrations_personio_settings as personio_settings_router
+from .app.routers import integrations_bamboohr as bamboohr_router
 from .routes import relocation as relocation_router
 from .routes import compat as compat_router
 from .routes import relocation_classify as relocation_classify_router
@@ -148,6 +153,8 @@ from .app.routers import admin_catalog as admin_catalog_router
 from .app.routers import hr_catalog as hr_catalog_router
 from .app.routers import providers as providers_router
 from .app.routers import employee_quotes as employee_quotes_router
+from .app.routers import hr_vendors as hr_vendors_router
+from .app.routers import hr_rfq as hr_rfq_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -536,6 +543,8 @@ app.include_router(admin_catalog_router.router)
 app.include_router(hr_catalog_router.router)
 app.include_router(providers_router.router)
 app.include_router(employee_quotes_router.router)
+app.include_router(hr_vendors_router.router)
+app.include_router(hr_rfq_router.router)
 app.include_router(mobility_context_router.router)
 app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
@@ -13416,6 +13425,11 @@ app.include_router(hr_policy_config_router)
 app.include_router(admin_policy_config_router)
 app.include_router(employee_policy_config_router)
 app.include_router(public_policy_config_router)
+app.include_router(hr_coordination_router.router)
+app.include_router(prescreening_router.router)
+app.include_router(personio_webhook_router.router)
+app.include_router(personio_settings_router.router)
+app.include_router(bamboohr_router.router)
 
 # AIQ-37-B: Policy Builder wizard CRUD — hr_policies router not yet implemented
 
