@@ -223,7 +223,7 @@ def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
                        mc.destination_country AS dest_country,
                        mc.origin_country
                 FROM public.case_assignments ca
-                LEFT JOIN public.mobility_cases mc ON mc.id = ca.case_id
+                LEFT JOIN public.mobility_cases mc ON mc.id::text = ca.case_id
                 WHERE ca.id = :case_id OR ca.case_id = :case_id
                 LIMIT 1
             """),
