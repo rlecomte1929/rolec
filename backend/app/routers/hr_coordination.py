@@ -292,7 +292,7 @@ def update_task(
 # DELETE /api/hr/tasks/{task_id}
 # ---------------------------------------------------------------------------
 
-@router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def cancel_task(
     task_id: str,
     hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
