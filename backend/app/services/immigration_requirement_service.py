@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-from ....database import db
+from ...database import db
 
 log = logging.getLogger(__name__)
 
