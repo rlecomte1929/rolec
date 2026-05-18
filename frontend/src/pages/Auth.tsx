@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
 import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
+import { supabase } from '../api/supabase';
 
 export const Auth: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -23,6 +24,55 @@ export const Auth: React.FC = () => {
   /** Blocks double-submit before React re-renders (e.g. double-click + Enter). */
   const authInFlight = useRef(false);
 
+  // Invite flow state
+  const [inviteMode, setInviteMode] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitePassword, setInvitePassword] = useState('');
+  const [inviteConfirm, setInviteConfirm] = useState('');
+  const [inviteDone, setInviteDone] = useState(false);
+
+  // Detect Supabase invite token in URL hash on mount
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash) return;
+    const params = new URLSearchParams(hash.slice(1));
+    if (params.get('type') !== 'invite') return;
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (!accessToken) return;
+
+    setInviteMode(true);
+    // Establish Supabase session from the invite tokens
+    supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken ?? '' })
+      .then(({ data }) => {
+        if (data.user?.email) setInviteEmail(data.user.email);
+      })
+      .catch(() => {/* session may be expired — user will see the form and get an error on submit */});
+    // Clean hash from URL without triggering a re-render
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }, []);
+
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authInFlight.current || isLoading) return;
+    if (invitePassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (invitePassword !== inviteConfirm) { setError('Passwords do not match.'); return; }
+    setError('');
+    authInFlight.current = true;
+    setIsLoading(true);
+    try {
+      const { error: supaErr } = await supabase.auth.updateUser({ password: invitePassword });
+      if (supaErr) throw new Error(supaErr.message);
+      // Now log in to ReloPass with the new password so we get the ReloPass session token
+      await login({ identifier: inviteEmail, password: invitePassword });
+      setInviteDone(true);
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to set password. The invite link may have expired — ask your admin to resend it.');
+    } finally {
+      authInFlight.current = false;
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const nextMode = searchParams.get('mode');
@@ -143,6 +193,63 @@ export const Auth: React.FC = () => {
       return <Navigate to={buildRoute(key)} replace />;
     }
   }
+
+  // ── Invite flow ────────────────────────────────────────────────────────────
+  if (inviteMode) {
+    return (
+      <PublicLayout>
+        <div className="max-w-md mx-auto">
+          <Card padding="lg">
+            {inviteDone ? (
+              <div className="text-center space-y-3">
+                <p className="text-2xl">✓</p>
+                <p className="font-semibold text-[#0b2b43]">Password set — you're in!</p>
+                <p className="text-sm text-[#6b7280]">Redirecting you to your dashboard…</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSetPassword} className="space-y-5">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#0b2b43]">Set your password</h2>
+                  <p className="text-sm text-[#6b7280] mt-1">
+                    Welcome to ReloPass{inviteEmail ? ` — ${inviteEmail}` : ''}. Choose a password to activate your account.
+                  </p>
+                </div>
+                {error && <Alert variant="error">{error}</Alert>}
+                <Input
+                  type="password"
+                  value={invitePassword}
+                  onChange={setInvitePassword}
+                  label="New password"
+                  placeholder="At least 6 characters"
+                  autoComplete="new-password"
+                  fullWidth
+                />
+                <Input
+                  type="password"
+                  value={inviteConfirm}
+                  onChange={setInviteConfirm}
+                  label="Confirm password"
+                  placeholder="Repeat your password"
+                  autoComplete="new-password"
+                  fullWidth
+                />
+                <LoadingButton
+                  type="submit"
+                  fullWidth
+                  loading={isLoading}
+                  loadingLabel="Setting password…"
+                  disabled={!invitePassword || !inviteConfirm}
+                >
+                  Activate account
+                </LoadingButton>
+              </form>
+            )}
+          </Card>
+        </div>
+      </PublicLayout>
+    );
+  }
+  // ── End invite flow ────────────────────────────────────────────────────────
 
   return (
     <PublicLayout>
