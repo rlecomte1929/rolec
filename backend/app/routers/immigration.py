@@ -211,15 +211,20 @@ def _log_access(
 
 
 def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
-    """Fetch basic case details (corridor, visa_type, move_date) scoped to org."""
+    """Fetch basic case details (corridor) from the assignment record.
+
+    The route parameter is the case_assignments.id (PK), not case_id (FK).
+    We try by PK first, then fall back to FK so the helper works in both call sites.
+    """
     with db.engine.begin() as conn:
         row = conn.execute(
             text("""
-                SELECT ca.case_id, ca.employee_user_id,
-                       c.dest_country, c.origin_country
+                SELECT ca.id, ca.case_id, ca.employee_user_id,
+                       mc.destination_country AS dest_country,
+                       mc.origin_country
                 FROM public.case_assignments ca
-                LEFT JOIN public.cases c ON c.id = ca.case_id
-                WHERE ca.case_id = :case_id
+                LEFT JOIN public.mobility_cases mc ON mc.id = ca.case_id
+                WHERE ca.id = :case_id OR ca.case_id = :case_id
                 LIMIT 1
             """),
             {"case_id": case_id},
@@ -250,8 +255,8 @@ def get_immigration_requirements(
     if not corridor_from or not corridor_to:
         case = _get_case_details(case_id, org_id)
         if case:
-            corridor_from = corridor_from or case.get("origin_country", "FR")
-            corridor_to = corridor_to or case.get("dest_country", "DE")
+            corridor_from = corridor_from or case.get("origin_country") or "FR"
+            corridor_to = corridor_to or case.get("dest_country") or "DE"
         else:
             corridor_from = corridor_from or "FR"
             corridor_to = corridor_to or "DE"
