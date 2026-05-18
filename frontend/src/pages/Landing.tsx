@@ -34,6 +34,13 @@ export const Landing: React.FC = () => {
   const c = landingContent;
 
   if (getAuthItem('relopass_token')) {
+    // If the SPA loaded via the 404.html → /?__redirect=<path> fallback,
+    // honour that redirect rather than sending the user to their home route.
+    const params = new URLSearchParams(window.location.search);
+    const deepRedirect = params.get('__redirect');
+    if (deepRedirect && deepRedirect.startsWith('/') && deepRedirect !== '/') {
+      return <Navigate to={deepRedirect} replace />;
+    }
     const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
     if (key !== 'landing') {
       return <Navigate to={buildRoute(key)} replace />;
