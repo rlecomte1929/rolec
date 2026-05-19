@@ -225,13 +225,13 @@ export const Messages: React.FC = () => {
         title: 'Employer & HR',
         conversations: hr,
         emptyHint:
-          'No HR messages yet. When your employer contacts you about an assignment, it appears here—one thread per assignment.',
+          'No HR messages yet. Once HR links your account to an assignment, they can open a thread here to share updates, ask questions, or send documents. You\'ll get an email notification when the first message arrives.',
       },
       {
         title: 'Service providers',
         conversations: sup,
         emptyHint:
-          'No provider conversations yet. When you request quotes, messages with vendors appear here in the same layout as HR threads.',
+          'No provider conversations yet. Once you\'re linked to a case and have chosen services, requesting quotes opens a thread with each vendor here—you can exchange details and documents directly.',
       },
     ];
   }, [conversations, isHrLike]);

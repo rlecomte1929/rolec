@@ -215,22 +215,31 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 >
                   Dashboard
                 </Link>
-                <Link
-                  to={myCaseHref}
-                  title={
-                    linkedCount > 1
-                      ? 'Choose a case from your dashboard when you have multiple assignments'
-                      : undefined
-                  }
-                  className={`px-3 py-1 rounded-full border ${
-                    (location.pathname.includes('/wizard') || location.pathname.includes('/summary')) &&
-                    location.pathname.startsWith('/employee/case/')
-                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-                      : 'border-transparent hover:text-[#0b2b43]'
-                  }`}
-                >
-                  {myCaseNavLabel}
-                </Link>
+                {linkedCount === 0 && !employeeAssignmentLoading ? (
+                  <span
+                    title="Link a case from your dashboard first"
+                    className="px-3 py-1 rounded-full border border-transparent text-[#94a3b8] cursor-default select-none"
+                  >
+                    {myCaseNavLabel}
+                  </span>
+                ) : (
+                  <Link
+                    to={myCaseHref}
+                    title={
+                      linkedCount > 1
+                        ? 'Choose a case from your dashboard when you have multiple assignments'
+                        : undefined
+                    }
+                    className={`px-3 py-1 rounded-full border ${
+                      (location.pathname.includes('/wizard') || location.pathname.includes('/summary')) &&
+                      location.pathname.startsWith('/employee/case/')
+                        ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    {myCaseNavLabel}
+                  </Link>
+                )}
                 {/* Order matches the user flow: intake → services → plan.
                     Relocation plan moved AFTER Services so the nav reads
                     left-to-right as a journey. The plan is the aggregator
@@ -247,21 +256,30 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
                 >
                   Services
                 </Link>
-                <Link
-                  to={relocationPlanHref}
-                  title={
-                    linkedCount > 1
-                      ? 'Choose an assignment on your dashboard to open your relocation plan'
-                      : undefined
-                  }
-                  className={`px-3 py-1 rounded-full border ${
-                    isRelocationPlanRoute
-                      ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
-                      : 'border-transparent hover:text-[#0b2b43]'
-                  }`}
-                >
-                  Relocation plan
-                </Link>
+                {linkedCount === 0 && !employeeAssignmentLoading ? (
+                  <span
+                    title="Available once your case is linked"
+                    className="px-3 py-1 rounded-full border border-transparent text-[#94a3b8] cursor-default select-none"
+                  >
+                    Relocation plan
+                  </span>
+                ) : (
+                  <Link
+                    to={relocationPlanHref}
+                    title={
+                      linkedCount > 1
+                        ? 'Choose an assignment on your dashboard to open your relocation plan'
+                        : undefined
+                    }
+                    className={`px-3 py-1 rounded-full border ${
+                      isRelocationPlanRoute
+                        ? 'border-[#0b2b43] text-[#0b2b43] bg-[#eef4f8]'
+                        : 'border-transparent hover:text-[#0b2b43]'
+                    }`}
+                  >
+                    Relocation plan
+                  </Link>
+                )}
                 <Link
                   to={buildRoute('hrPolicy')}
                   className={`px-3 py-1 rounded-full border ${
@@ -441,6 +459,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
           </div>
         )}
       </header>
+      {showEmployeeNav && !employeeAssignmentLoading && linkedCount === 0 && (
+        <div className="bg-[#fffbeb] border-b border-[#fde68a]">
+          <Container maxWidth="xl" className="py-2 flex items-center gap-2 text-sm text-[#78350f]">
+            <span>⏳</span>
+            <span>
+              Your account isn't linked to a company assignment yet — most features are on hold.
+              Use the <strong>Dashboard</strong> to claim your case, or wait for HR to match your email.
+            </span>
+          </Container>
+        </div>
+      )}
       {adminContext?.impersonation && (
         <div className="bg-amber-50 border-b border-amber-200">
           <Container maxWidth="xl" className="py-2 flex items-center justify-between text-sm text-amber-900">

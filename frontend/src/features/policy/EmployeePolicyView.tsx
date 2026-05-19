@@ -128,12 +128,27 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
   assignmentIdOverride,
 }) => {
   const [searchParams] = useSearchParams();
-  const { assignmentId: contextAssignmentId } = useEmployeeAssignment();
+  const { assignmentId: contextAssignmentId, linkedCount, isLoading: assignmentLoading } = useEmployeeAssignment();
   const assignmentId =
     assignmentIdOverride ??
     searchParams.get('assignmentId') ??
     contextAssignmentId ??
     undefined;
+
+  // Show a friendly holding state while the assignment context is still loading,
+  // or if the employee isn't yet linked to a company/assignment.
+  if (!assignmentLoading && !assignmentId && linkedCount === 0) {
+    return (
+      <Card padding="lg" className="border-[#e2e8f0]">
+        <p className="text-sm font-medium text-[#0b2b43] mb-1">No company linked yet</p>
+        <p className="text-sm text-[#64748b]">
+          Your company's relocation policy will appear here automatically once HR links your account to an assignment.
+          No action is needed on your part — you'll be able to view your full benefit entitlements as soon as they've set it up.
+        </p>
+      </Card>
+    );
+  }
+
   const caseId = searchParams.get('caseId') || undefined;
   const assignmentTypeRaw = searchParams.get('assignmentType');
   const familyStatusRaw = searchParams.get('familyStatus');
@@ -146,6 +161,12 @@ export const EmployeePolicyView: React.FC<EmployeePolicyViewProps> = ({
   const [servicesPolicyCtx, setServicesPolicyCtx] = useState<ServicesPolicyContext | null>(null);
 
   const load = useCallback(async () => {
+    // Don't attempt a network call if there's nothing to load against — the
+    // early-return above already handles the no-assignment UI state.
+    if (!assignmentId && !caseId && !assignmentType && !familyStatus) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {

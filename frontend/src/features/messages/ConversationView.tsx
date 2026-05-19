@@ -51,7 +51,8 @@ export const ConversationView: React.FC<ConversationViewProps> = ({
         className="flex-1 flex flex-col items-center justify-center bg-[#f8fafc] text-[#6b7280] p-8"
         aria-live="polite"
       >
-        <p className="text-sm">Select a conversation or start a new one.</p>
+        <p className="text-sm text-center">Select a conversation to read it.</p>
+        <p className="text-xs text-[#94a3b8] mt-1 text-center max-w-xs">HR opens the first thread once your case is linked. You'll reply from here.</p>
       </div>
     );
   }

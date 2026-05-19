@@ -374,8 +374,6 @@ export const EmployeeJourney: React.FC = () => {
       {
         label: '3. Review budget vs policy',
         href: hasRecommendations ? buildRoute('servicesEstimate') : undefined,
-        enabled: hasRecommendations,
-        mutedHint: hasRecommendations ? undefined : 'Complete step 2 first',
       },
       {
         label: '4. Request quotes',
