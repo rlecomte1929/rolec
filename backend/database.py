@@ -10265,6 +10265,15 @@ class Database:
             )
         return result.rowcount > 0 if hasattr(result, "rowcount") else True
 
+    def delete_employee_for_company(self, employee_id: str, company_id: str) -> bool:
+        """Remove an employee from the company roster. Returns False if not found/wrong company."""
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text("DELETE FROM employees WHERE id = :eid AND company_id = :cid"),
+                {"eid": employee_id, "cid": company_id},
+            )
+        return result.rowcount > 0 if hasattr(result, "rowcount") else True
+
     def list_hr_users(self, company_id: Optional[str] = None) -> List[Dict[str, Any]]:
         with self.engine.connect() as conn:
             if company_id:

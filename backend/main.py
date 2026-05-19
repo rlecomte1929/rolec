@@ -3306,6 +3306,23 @@ def update_hr_company_employee(
     return {"employee": employee or db.get_employee_by_profile_for_company(employee_id, company_id)}
 
 
+@app.delete("/api/hr/employees/{employee_id}", status_code=204)
+def delete_hr_company_employee(
+    employee_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """Remove an employee from the company roster. Company-scoped; 404 if not found."""
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company linked to your profile")
+    deleted = db.delete_employee_for_company(employee_id, company_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    db.log_audit(effective["id"], "DELETE", "employee", employee_id, "HR delete", {"company_id": company_id})
+
+
 ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "svg"}
 ALLOWED_LOGO_CONTENT_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/svg+xml"}
 MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024  # 2MB

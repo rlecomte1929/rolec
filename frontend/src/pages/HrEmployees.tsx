@@ -72,7 +72,7 @@ export const HrEmployees: React.FC = () => {
             </div>
           </div>
         ) : (
-          <HrTeamList employees={employees} isLoading={isLoading} />
+          <HrTeamList employees={employees} isLoading={isLoading} onReload={loadEmployees} />
         )}
       </div>
     </AppShell>

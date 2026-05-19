@@ -1,20 +1,28 @@
-import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Badge, Button } from '../../components/antigravity';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Button } from '../../components/antigravity';
+import { hrAPI } from '../../api/client';
 import type { HrCompanyEmployee } from '../../types';
 import { buildRoute } from '../../navigation/routes';
+import {
+  POLICY_EMPLOYEE_LEVEL_OPTIONS,
+  normalizeEmployeeLevel,
+} from '../policy-config/policyTargeting';
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// ─── constants ───────────────────────────────────────────────────────────────
 
-function initials(name?: string): string {
-  if (!name) return '?';
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
+const ASSIGNMENT_TYPE_OPTIONS = [
+  { value: 'Long-Term', label: 'Long-term' },
+  { value: 'Short-Term', label: 'Short-term' },
+  { value: 'Permanent', label: 'Permanent' },
+  { value: 'international', label: 'International' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'on_assignment', label: 'On assignment' },
+  { value: 'inactive', label: 'Inactive' },
+];
 
 const AVATAR_PALETTE = [
   { bg: '#E1F5EE', color: '#0F6E56' },
@@ -25,91 +33,153 @@ const AVATAR_PALETTE = [
   { bg: '#FBEAF0', color: '#72243E' },
 ];
 
-function avatarColor(index: number) {
-  return AVATAR_PALETTE[index % AVATAR_PALETTE.length];
+// Default column widths in px
+const DEFAULT_COL_WIDTHS = [40, 260, 180, 150, 120, 130, 80];
+const COL_MIN = 60;
+const PAGE_SIZE = 12;
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 }
 
-function statusVariant(status?: string): 'success' | 'warning' | 'neutral' | 'error' {
-  switch ((status || '').toLowerCase()) {
-    case 'active':
-      return 'success';
-    case 'pending':
-    case 'in_progress':
-      return 'warning';
-    case 'completed':
-      return 'neutral';
-    case 'cancelled':
-      return 'error';
-    default:
-      return 'neutral';
+function avatarColor(idx: number) {
+  return AVATAR_PALETTE[idx % AVATAR_PALETTE.length];
+}
+
+/** Display name: full_name → email → null (show placeholder) */
+function displayName(emp: HrCompanyEmployee): string | null {
+  return emp.full_name || emp.email || null;
+}
+
+
+// ─── column resize hook ───────────────────────────────────────────────────────
+
+function useColumnResize(initial: number[]) {
+  const [widths, setWidths] = useState<number[]>(initial);
+  const dragging = useRef<{ colIdx: number; startX: number; startW: number } | null>(null);
+
+  const onMouseDown = useCallback(
+    (colIdx: number) => (e: React.MouseEvent) => {
+      e.preventDefault();
+      dragging.current = { colIdx, startX: e.clientX, startW: widths[colIdx] };
+
+      const onMove = (mv: MouseEvent) => {
+        if (!dragging.current) return;
+        const delta = mv.clientX - dragging.current.startX;
+        const newW = Math.max(COL_MIN, dragging.current.startW + delta);
+        setWidths((prev) => {
+          const next = [...prev];
+          next[dragging.current!.colIdx] = newW;
+          return next;
+        });
+      };
+
+      const onUp = () => {
+        dragging.current = null;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [widths]
+  );
+
+  return { widths, onMouseDown };
+}
+
+// ─── inline edit cell ────────────────────────────────────────────────────────
+
+interface InlineSelectProps {
+  value: string;
+  options: { value: string; label: string }[];
+  onSave: (val: string) => Promise<void>;
+  placeholder?: string;
+}
+
+const InlineSelect: React.FC<InlineSelectProps> = ({ value, options, onSave, placeholder }) => {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const label = options.find((o) => o.value.toLowerCase() === value?.toLowerCase())?.label ?? value;
+
+  if (!editing) {
+    return (
+      <span
+        className="group flex items-center gap-1 cursor-pointer"
+        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      >
+        <span className={value ? 'text-[#374151]' : 'text-[#9ca3af]'}>
+          {value ? label : (placeholder ?? '—')}
+        </span>
+        <svg className="opacity-0 group-hover:opacity-100 text-[#9ca3af] flex-shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </span>
+    );
   }
-}
 
-function statusLabel(status?: string): string {
-  if (!status) return 'Unknown';
-  return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
+  return (
+    <select
+      autoFocus
+      className="text-xs border border-[#1D9E75] rounded px-1 py-0.5 bg-white text-[#0b2b43] outline-none"
+      defaultValue={value || ''}
+      disabled={saving}
+      onClick={(e) => e.stopPropagation()}
+      onChange={async (e) => {
+        setSaving(true);
+        try { await onSave(e.target.value); } finally { setSaving(false); setEditing(false); }
+      }}
+      onBlur={() => setEditing(false)}
+    >
+      <option value="">— clear —</option>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+};
 
-const PAGE_SIZE = 10;
+// ─── expand row ───────────────────────────────────────────────────────────────
 
-// ─── metric cards ────────────────────────────────────────────────────────────
-
-interface MetricCardProps {
-  label: string;
-  value: number;
-  sub?: string;
-}
-
-const MetricCard: React.FC<MetricCardProps> = ({ label, value, sub }) => (
-  <div className="bg-[#f9fafb] rounded-xl px-4 py-3 border border-[#e5e7eb]">
-    <div className="text-xs text-[#6b7280] mb-1">{label}</div>
-    <div className="text-2xl font-medium text-[#0b2b43]">{value}</div>
-    {sub && <div className="text-xs text-[#9ca3af] mt-1">{sub}</div>}
-  </div>
-);
-
-// ─── expand row ──────────────────────────────────────────────────────────────
-
-interface ExpandRowProps {
-  emp: HrCompanyEmployee;
-}
-
-const ExpandRow: React.FC<ExpandRowProps> = ({ emp }) => (
-  <tr className="bg-[#f9fafb] border-b border-[#e5e7eb]">
+const ExpandRow: React.FC<{ emp: HrCompanyEmployee; colSpan: number }> = ({ emp, colSpan }) => (
+  <tr className="bg-[#fafafa] border-b border-[#e5e7eb]">
     <td />
-    <td colSpan={6} className="px-4 py-4">
-      <div className="grid grid-cols-4 gap-4 text-sm">
+    <td colSpan={colSpan - 1} className="px-4 py-4">
+      <div className="grid grid-cols-4 gap-x-8 gap-y-3 text-sm">
         <div>
-          <div className="text-xs text-[#9ca3af] mb-1">Employee ID</div>
-          <div className="font-mono text-xs text-[#374151] truncate">{emp.profile_id}</div>
+          <p className="text-xs text-[#9ca3af] mb-1">Employee ID</p>
+          <p className="font-mono text-xs text-[#6b7280] truncate">{emp.profile_id}</p>
         </div>
         <div>
-          <div className="text-xs text-[#9ca3af] mb-1">Band / level</div>
-          <div className="text-[#374151]">{emp.band || '—'}</div>
+          <p className="text-xs text-[#9ca3af] mb-1">Email</p>
+          <p className="text-[#374151] truncate">{emp.email || '—'}</p>
         </div>
         <div>
-          <div className="text-xs text-[#9ca3af] mb-1">Assignment type</div>
-          <div className="text-[#374151]">{emp.assignment_type || '—'}</div>
+          <p className="text-xs text-[#9ca3af] mb-1">Member since</p>
+          <p className="text-[#374151]">
+            {new Date(emp.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
         </div>
         <div>
-          <div className="text-xs text-[#9ca3af] mb-1">Member since</div>
-          <div className="text-[#374151]">
-            {new Date(emp.created_at).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
-          </div>
-          {emp.relocation_case_id && (
+          {emp.relocation_case_id ? (
             <>
-              <div className="text-xs text-[#9ca3af] mb-1 mt-3">Active case</div>
+              <p className="text-xs text-[#9ca3af] mb-1">Active case</p>
               <Link
                 to={buildRoute('hrCaseSummary', { caseId: emp.relocation_case_id })}
-                className="text-xs text-[#185FA5] hover:underline truncate block"
+                className="text-xs text-[#185FA5] hover:underline"
                 onClick={(e) => e.stopPropagation()}
               >
-                View case →
+                Open case →
               </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-[#9ca3af] mb-1">Relocation case</p>
+              <p className="text-xs text-[#9ca3af]">No active case</p>
             </>
           )}
         </div>
@@ -118,41 +188,95 @@ const ExpandRow: React.FC<ExpandRowProps> = ({ emp }) => (
   </tr>
 );
 
-// ─── main component ──────────────────────────────────────────────────────────
+// ─── confirm delete modal ──────────────────────────────────────────────────────
+
+const ConfirmModal: React.FC<{
+  count: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}> = ({ count, onConfirm, onCancel }) => (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    onClick={onCancel}
+  >
+    <div
+      className="bg-white rounded-xl border border-[#e5e7eb] p-6 w-80 shadow-sm"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p className="font-medium text-[#0b2b43] mb-2">Remove {count === 1 ? 'employee' : `${count} employees`}?</p>
+      <p className="text-sm text-[#6b7280] mb-5">
+        This removes {count === 1 ? 'them' : 'them'} from your company roster. It does not delete their ReloPass account or active cases.
+      </p>
+      <div className="flex gap-2 justify-end">
+        <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
+        <button
+          className="px-3 py-1.5 text-sm rounded-lg bg-[#E24B4A] text-white font-medium hover:bg-[#A32D2D] transition-colors"
+          onClick={onConfirm}
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── main component ───────────────────────────────────────────────────────────
 
 interface HrTeamListProps {
   employees: HrCompanyEmployee[];
   isLoading?: boolean;
+  onReload: () => void;
 }
 
-export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading }) => {
+export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading, onReload }) => {
+  const navigate = useNavigate();
+
+  // ── filters ───────────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterBand, setFilterBand] = useState('');
+  const [filterAssignment, setFilterAssignment] = useState('');
+  const [filterHasCase, setFilterHasCase] = useState('');
+
+  // ── table state ───────────────────────────────────────────────────────────
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
 
+  // ── delete state ──────────────────────────────────────────────────────────
+  const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // ── column resize ─────────────────────────────────────────────────────────
+  const { widths, onMouseDown } = useColumnResize(DEFAULT_COL_WIDTHS);
+
   // ── metrics ───────────────────────────────────────────────────────────────
-  const activeCount = employees.filter(
-    (e) => (e.status || '').toLowerCase() === 'active'
-  ).length;
+  const activeCount = employees.filter((e) => (e.status || '').toLowerCase() === 'active').length;
+  const onAssignmentCount = employees.filter((e) => (e.status || '').toLowerCase() === 'on_assignment').length;
   const withCaseCount = employees.filter((e) => !!e.relocation_case_id).length;
-  const internationalCount = employees.filter(
-    (e) => (e.assignment_type || '').toLowerCase().includes('international')
-  ).length;
+  const missingProfileCount = employees.filter((e) => !e.full_name && !e.email).length;
 
   // ── filter ────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    if (!q) return employees;
-    return employees.filter(
-      (e) =>
-        (e.full_name || '').toLowerCase().includes(q) ||
-        (e.email || '').toLowerCase().includes(q) ||
-        (e.band || '').toLowerCase().includes(q) ||
-        (e.assignment_type || '').toLowerCase().includes(q) ||
-        (e.role || '').toLowerCase().includes(q)
-    );
-  }, [employees, search]);
+    return employees.filter((e) => {
+      if (q) {
+        const name = displayName(e)?.toLowerCase() ?? '';
+        const email = (e.email || '').toLowerCase();
+        const band = (e.band || '').toLowerCase();
+        const at = (e.assignment_type || '').toLowerCase();
+        if (!name.includes(q) && !email.includes(q) && !band.includes(q) && !at.includes(q)) return false;
+      }
+      if (filterStatus && (e.status || '').toLowerCase() !== filterStatus.toLowerCase()) return false;
+      if (filterBand && normalizeEmployeeLevel(e.band || '') !== filterBand) return false;
+      if (filterAssignment && (e.assignment_type || '').toLowerCase() !== filterAssignment.toLowerCase()) return false;
+      if (filterHasCase === 'yes' && !e.relocation_case_id) return false;
+      if (filterHasCase === 'no' && !!e.relocation_case_id) return false;
+      return true;
+    });
+  }, [employees, search, filterStatus, filterBand, filterAssignment, filterHasCase]);
+
+  const activeFilters = [filterStatus, filterBand, filterAssignment, filterHasCase].filter(Boolean).length;
 
   // ── pagination ────────────────────────────────────────────────────────────
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -160,17 +284,13 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading }) 
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   // ── selection ─────────────────────────────────────────────────────────────
-  const allPageSelected =
-    pageRows.length > 0 && pageRows.every((e) => selected.has(e.id));
+  const allPageSelected = pageRows.length > 0 && pageRows.every((e) => selected.has(e.id));
 
   function toggleAll() {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allPageSelected) {
-        pageRows.forEach((e) => next.delete(e.id));
-      } else {
-        pageRows.forEach((e) => next.add(e.id));
-      }
+      if (allPageSelected) { pageRows.forEach((e) => next.delete(e.id)); }
+      else { pageRows.forEach((e) => next.add(e.id)); }
       return next;
     });
   }
@@ -178,261 +298,352 @@ export const HrTeamList: React.FC<HrTeamListProps> = ({ employees, isLoading }) 
   function toggleRow(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
 
-  if (isLoading) {
-    return (
-      <div className="border border-[#e5e7eb] rounded-xl p-6 text-sm text-[#9ca3af]">
-        Loading employees…
-      </div>
-    );
+  // ── inline update ─────────────────────────────────────────────────────────
+  const handleUpdate = useCallback(
+    (empId: string, field: 'band' | 'assignment_type' | 'status') =>
+      async (value: string) => {
+        await hrAPI.updateEmployee(empId, { [field]: value || undefined });
+        onReload();
+      },
+    [onReload]
+  );
+
+  // ── delete ────────────────────────────────────────────────────────────────
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await Promise.all(pendingDelete.map((id) => hrAPI.deleteEmployee(id)));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        pendingDelete.forEach((id) => next.delete(id));
+        return next;
+      });
+      onReload();
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
+    }
   }
 
+  function clearFilters() {
+    setFilterStatus(''); setFilterBand(''); setFilterAssignment(''); setFilterHasCase('');
+  }
+
+  if (isLoading) {
+    return <div className="text-sm text-[#9ca3af] p-4">Loading team…</div>;
+  }
+
+  const COLS = ['', 'Employee', 'Assignment', 'Level', 'Status', 'Case', ''];
+
   return (
-    <div>
-      {/* metric cards */}
-      <div className="grid grid-cols-4 gap-3 mb-5">
-        <MetricCard label="Total employees" value={employees.length} />
-        <MetricCard
-          label="Active"
-          value={activeCount}
-          sub={`${Math.round((activeCount / Math.max(employees.length, 1)) * 100)}% of team`}
+    <>
+      {pendingDelete && (
+        <ConfirmModal
+          count={pendingDelete.length}
+          onConfirm={confirmDelete}
+          onCancel={() => !deleting && setPendingDelete(null)}
         />
-        <MetricCard label="With active case" value={withCaseCount} />
-        <MetricCard label="International" value={internationalCount} />
+      )}
+
+      {/* metric strip */}
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        {[
+          { label: 'Total employees', value: employees.length, sub: null },
+          { label: 'Active', value: activeCount, sub: `${Math.round((activeCount / Math.max(employees.length, 1)) * 100)}% of team` },
+          { label: 'On assignment', value: onAssignmentCount, sub: withCaseCount > 0 ? `${withCaseCount} active case${withCaseCount !== 1 ? 's' : ''}` : null },
+          { label: 'Profile pending', value: missingProfileCount, sub: missingProfileCount > 0 ? 'Missing name & email' : 'All profiles complete' },
+        ].map((m) => (
+          <div key={m.label} className="bg-[#f9fafb] border border-[#e5e7eb] rounded-xl px-4 py-3">
+            <p className="text-xs text-[#6b7280] mb-1">{m.label}</p>
+            <p className="text-2xl font-medium text-[#0b2b43]">{m.value}</p>
+            {m.sub && <p className="text-xs text-[#9ca3af] mt-1">{m.sub}</p>}
+          </div>
+        ))}
       </div>
 
       {/* toolbar */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative flex-1">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]"
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        {/* search */}
+        <div className="relative flex-1 min-w-[180px]">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input
             type="text"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search by name, email, band…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-[#e5e7eb] rounded-lg bg-white placeholder:text-[#9ca3af] text-[#0b2b43] focus:outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Search by name, email, level…"
+            className="w-full pl-8 pr-3 py-2 text-sm border border-[#e5e7eb] rounded-lg bg-white placeholder:text-[#9ca3af] text-[#0b2b43] focus:outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75]"
           />
         </div>
-        {selected.size > 0 && (
-          <span className="text-sm text-[#6b7280]">
-            {selected.size} selected
-          </span>
+
+        {/* filter dropdowns */}
+        {([
+          {
+            value: filterStatus, setter: setFilterStatus,
+            placeholder: 'Status', options: STATUS_OPTIONS,
+          },
+          {
+            value: filterBand, setter: setFilterBand,
+            placeholder: 'Level', options: POLICY_EMPLOYEE_LEVEL_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+          },
+          {
+            value: filterAssignment, setter: setFilterAssignment,
+            placeholder: 'Assignment', options: ASSIGNMENT_TYPE_OPTIONS,
+          },
+          {
+            value: filterHasCase, setter: setFilterHasCase,
+            placeholder: 'Case', options: [{ value: 'yes', label: 'Has case' }, { value: 'no', label: 'No case' }],
+          },
+        ] as { value: string; setter: (v: string) => void; placeholder: string; options: { value: string; label: string }[] }[]).map((f) => (
+          <select
+            key={f.placeholder}
+            value={f.value}
+            onChange={(e) => { f.setter(e.target.value); setPage(1); }}
+            className={`text-sm border rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-[#1D9E75] focus:ring-1 focus:ring-[#1D9E75] ${f.value ? 'border-[#1D9E75] text-[#0F6E56] font-medium' : 'border-[#e5e7eb] text-[#6b7280]'}`}
+          >
+            <option value="">{f.placeholder}</option>
+            {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        ))}
+
+        {activeFilters > 0 && (
+          <button onClick={clearFilters} className="text-xs text-[#9ca3af] hover:text-[#374151] underline-offset-2 hover:underline transition-colors">
+            Clear {activeFilters} filter{activeFilters > 1 ? 's' : ''}
+          </button>
         )}
+
+        <div className="ml-auto flex items-center gap-2">
+          {selected.size > 0 && (
+            <button
+              onClick={() => setPendingDelete(Array.from(selected))}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-[#F09595] text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              Remove {selected.size}
+            </button>
+          )}
+          <button
+            onClick={() => navigate(buildRoute('hrCommandCenter'))}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-[#1D9E75] text-white font-medium hover:bg-[#0F6E56] transition-colors"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Assign employee
+          </button>
+        </div>
       </div>
 
+      {/* results count */}
+      {(search || activeFilters > 0) && (
+        <p className="text-xs text-[#9ca3af] mb-2">
+          {filtered.length} result{filtered.length !== 1 ? 's' : ''} · {employees.length} total
+        </p>
+      )}
+
       {/* table */}
-      <div className="border border-[#e5e7eb] rounded-xl overflow-hidden">
-        <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
-          <colgroup>
-            <col style={{ width: '36px' }} />
-            <col style={{ width: '200px' }} />
-            <col style={{ width: '160px' }} />
-            <col style={{ width: '160px' }} />
-            <col style={{ width: '100px' }} />
-            <col style={{ width: '100px' }} />
-            <col style={{ width: '60px' }} />
-          </colgroup>
-          <thead>
-            <tr className="bg-[#f3f4f6] border-b border-[#e5e7eb]">
-              <th className="px-3 py-2 text-left">
-                <input
-                  type="checkbox"
-                  checked={allPageSelected}
-                  onChange={toggleAll}
-                  className="w-3.5 h-3.5 accent-[#1D9E75] cursor-pointer"
-                />
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-[#6b7280] uppercase tracking-wide">
-                Name
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-[#6b7280] uppercase tracking-wide">
-                Email
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-[#6b7280] uppercase tracking-wide">
-                Assignment
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-[#6b7280] uppercase tracking-wide">
-                Band
-              </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-[#6b7280] uppercase tracking-wide">
-                Status
-              </th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {pageRows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-8 text-center text-sm text-[#9ca3af]"
-                >
-                  {search ? 'No employees match your search.' : 'No employees yet.'}
-                </td>
+      <div className="border border-[#e5e7eb] rounded-xl overflow-hidden select-none">
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ tableLayout: 'fixed', width: widths.reduce((a, b) => a + b, 0), minWidth: '100%', borderCollapse: 'collapse' }}>
+            <colgroup>
+              {widths.map((w, i) => <col key={i} style={{ width: w }} />)}
+            </colgroup>
+            <thead>
+              <tr className="bg-[#f3f4f6] border-b border-[#e5e7eb]">
+                {COLS.map((col, i) => (
+                  <th
+                    key={i}
+                    className="relative px-3 py-2.5 text-left text-xs font-medium text-[#6b7280] uppercase tracking-wide"
+                    style={{ userSelect: 'none' }}
+                  >
+                    {i === 0 ? (
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        onChange={toggleAll}
+                        className="w-3.5 h-3.5 accent-[#1D9E75] cursor-pointer"
+                      />
+                    ) : col}
+                    {/* resize handle — not on last col */}
+                    {i < COLS.length - 1 && (
+                      <div
+                        onMouseDown={onMouseDown(i)}
+                        className="absolute right-0 top-0 h-full w-3 cursor-col-resize flex items-center justify-center group"
+                        style={{ zIndex: 1 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="w-px h-3/5 bg-[#d1d5db] group-hover:bg-[#1D9E75] transition-colors" />
+                      </div>
+                    )}
+                  </th>
+                ))}
               </tr>
-            ) : (
-              pageRows.map((emp, idx) => {
-                const isExpanded = expanded === emp.id;
-                const isSelected = selected.has(emp.id);
-                const av = avatarColor(idx);
-                const displayName = emp.full_name || emp.email || emp.profile_id || '—';
+            </thead>
+            <tbody>
+              {pageRows.length === 0 ? (
+                <tr>
+                  <td colSpan={COLS.length} className="px-4 py-10 text-center text-sm text-[#9ca3af]">
+                    {search || activeFilters > 0 ? 'No employees match your filters.' : 'No employees yet.'}
+                  </td>
+                </tr>
+              ) : (
+                pageRows.map((emp, idx) => {
+                  const isExpanded = expanded === emp.id;
+                  const isSelected = selected.has(emp.id);
+                  const name = displayName(emp);
+                  const hasProfile = !!name;
+                  const av = avatarColor(idx);
 
-                return (
-                  <React.Fragment key={emp.id}>
-                    <tr
-                      className={`border-b border-[#e5e7eb] cursor-pointer transition-colors ${
-                        isSelected
-                          ? 'bg-[#E1F5EE]'
-                          : 'hover:bg-[#f9fafb]'
-                      }`}
-                      onClick={() =>
-                        setExpanded((prev) => (prev === emp.id ? null : emp.id))
-                      }
-                    >
-                      <td
-                        className="px-3 py-2.5"
-                        onClick={(e) => e.stopPropagation()}
+                  return (
+                    <React.Fragment key={emp.id}>
+                      <tr
+                        className={`border-b border-[#e5e7eb] cursor-pointer transition-colors ${isSelected ? 'bg-[#E1F5EE]' : 'hover:bg-[#f9fafb]'}`}
+                        onClick={() => setExpanded((p) => (p === emp.id ? null : emp.id))}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleRow(emp.id)}
-                          className="w-3.5 h-3.5 accent-[#1D9E75] cursor-pointer"
-                        />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <svg
-                            className={`flex-shrink-0 text-[#9ca3af] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                            width="12"
-                            height="12"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <polyline points="6 9 12 15 18 9" />
-                          </svg>
-                          <div
-                            className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium"
-                            style={{ background: av.bg, color: av.color }}
-                          >
-                            {initials(emp.full_name)}
+                        {/* checkbox */}
+                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleRow(emp.id)}
+                            className="w-3.5 h-3.5 accent-[#1D9E75] cursor-pointer"
+                          />
+                        </td>
+
+                        {/* name */}
+                        <td className="px-3 py-2.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <svg className={`flex-shrink-0 text-[#9ca3af] transition-transform ${isExpanded ? 'rotate-180' : ''}`} width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                            <div
+                              className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium"
+                              style={hasProfile ? { background: av.bg, color: av.color } : { background: '#f3f4f6', color: '#9ca3af' }}
+                            >
+                              {hasProfile ? initials(name!) : '?'}
+                            </div>
+                            <div className="min-w-0">
+                              {hasProfile ? (
+                                <>
+                                  <p className="text-sm font-medium text-[#0b2b43] truncate">{name}</p>
+                                  {emp.email && emp.full_name && (
+                                    <p className="text-xs text-[#9ca3af] truncate">{emp.email}</p>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-xs font-mono text-[#9ca3af] truncate">{emp.profile_id.slice(0, 20)}…</p>
+                                  <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] rounded bg-[#FAEEDA] text-[#854F0B]">Profile pending</span>
+                                </>
+                              )}
+                            </div>
                           </div>
-                          <span className="truncate font-medium text-[#0b2b43]">
-                            {displayName}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-[#6b7280] truncate">
-                        {emp.email || '—'}
-                      </td>
-                      <td className="px-3 py-2.5 text-[#374151] truncate">
-                        {emp.assignment_type || '—'}
-                      </td>
-                      <td className="px-3 py-2.5 text-[#374151]">
-                        {emp.band || '—'}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <Badge variant={statusVariant(emp.status)} size="sm">
-                          {statusLabel(emp.status)}
-                        </Badge>
-                      </td>
-                      <td
-                        className="px-3 py-2.5 text-right"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Link
-                          to={buildRoute('hrEmployeeDetail', { id: emp.id })}
-                          className="text-[#9ca3af] hover:text-[#0b2b43] transition-colors text-xs"
-                          title="View employee"
-                        >
-                          →
-                        </Link>
-                      </td>
-                    </tr>
-                    {isExpanded && <ExpandRow emp={emp} />}
-                  </React.Fragment>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                        </td>
 
-        {/* pagination */}
-        {pageCount > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-[#e5e7eb] bg-white">
-            <span className="text-xs text-[#9ca3af]">
-              {(safePage - 1) * PAGE_SIZE + 1}–
-              {Math.min(safePage * PAGE_SIZE, filtered.length)} of{' '}
-              {filtered.length} employees
-            </span>
+                        {/* assignment type — inline editable */}
+                        <td className="px-3 py-2.5 text-sm" onClick={(e) => e.stopPropagation()}>
+                          <InlineSelect
+                            value={emp.assignment_type || ''}
+                            options={ASSIGNMENT_TYPE_OPTIONS}
+                            onSave={handleUpdate(emp.id, 'assignment_type')}
+                            placeholder="—"
+                          />
+                        </td>
+
+                        {/* band — inline editable */}
+                        <td className="px-3 py-2.5 text-sm" onClick={(e) => e.stopPropagation()}>
+                          <InlineSelect
+                            value={normalizeEmployeeLevel(emp.band || '') ?? ''}
+                            options={POLICY_EMPLOYEE_LEVEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                            onSave={handleUpdate(emp.id, 'band')}
+                            placeholder="—"
+                          />
+                        </td>
+
+                        {/* status — inline editable */}
+                        <td className="px-3 py-2.5 text-sm" onClick={(e) => e.stopPropagation()}>
+                          <InlineSelect
+                            value={emp.status || ''}
+                            options={STATUS_OPTIONS}
+                            onSave={handleUpdate(emp.id, 'status')}
+                            placeholder="Unknown"
+                          />
+                        </td>
+
+                        {/* case indicator */}
+                        <td className="px-3 py-2.5">
+                          {emp.relocation_case_id ? (
+                            <Link
+                              to={buildRoute('hrCaseSummary', { caseId: emp.relocation_case_id })}
+                              className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[#E6F1FB] text-[#185FA5] hover:bg-[#B5D4F4] transition-colors font-medium"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                              Active
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-[#9ca3af]">—</span>
+                          )}
+                        </td>
+
+                        {/* actions */}
+                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1 justify-end">
+                            <Link
+                              to={buildRoute('hrEmployeeDetail', { id: emp.id })}
+                              className="p-1 rounded text-[#9ca3af] hover:text-[#185FA5] hover:bg-[#E6F1FB] transition-colors"
+                              title="Edit employee"
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </Link>
+                            <button
+                              onClick={() => setPendingDelete([emp.id])}
+                              className="p-1 rounded text-[#9ca3af] hover:text-[#A32D2D] hover:bg-[#FCEBEB] transition-colors"
+                              title="Remove employee"
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isExpanded && <ExpandRow emp={emp} colSpan={COLS.length} />}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* pagination footer */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-[#e5e7eb] bg-white">
+          <span className="text-xs text-[#9ca3af]">
+            {filtered.length === 0
+              ? '0 employees'
+              : `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+            {selected.size > 0 && (
+              <span className="ml-2 text-[#0F6E56] font-medium">· {selected.size} selected</span>
+            )}
+          </span>
+          {pageCount > 1 && (
             <div className="flex gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-              >
-                ←
-              </Button>
-              {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => (
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="w-7 h-7 rounded-md border border-[#e5e7eb] text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40 text-xs">←</button>
+              {Array.from({ length: Math.min(pageCount, 7) }, (_, i) => i + 1).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPage(p)}
-                  className={`w-7 h-7 rounded-md text-xs border transition-colors ${
-                    p === safePage
-                      ? 'bg-[#1D9E75] border-[#1D9E75] text-white font-medium'
-                      : 'border-[#e5e7eb] text-[#374151] hover:bg-[#f3f4f6]'
-                  }`}
+                  className={`w-7 h-7 rounded-md text-xs border transition-colors ${p === safePage ? 'bg-[#1D9E75] border-[#1D9E75] text-white font-medium' : 'border-[#e5e7eb] text-[#374151] hover:bg-[#f3f4f6]'}`}
                 >
                   {p}
                 </button>
               ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                disabled={safePage === pageCount}
-              >
-                →
-              </Button>
+              <button onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={safePage === pageCount} className="w-7 h-7 rounded-md border border-[#e5e7eb] text-[#374151] hover:bg-[#f3f4f6] disabled:opacity-40 text-xs">→</button>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* empty / total count footer */}
-      {pageCount <= 1 && filtered.length > 0 && (
-        <div className="text-xs text-[#9ca3af] mt-3 text-right">
-          {filtered.length} employee{filtered.length !== 1 ? 's' : ''}
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 };

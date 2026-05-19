@@ -564,6 +564,9 @@ export const hrAPI = {
     const response = await api.patch(`/api/hr/employees/${employeeId}`, payload);
     return response.data;
   },
+  deleteEmployee: async (employeeId: string): Promise<void> => {
+    await api.delete(`/api/hr/employees/${employeeId}`);
+  },
   saveCompanyProfile: async (payload: CompanyProfilePayload): Promise<any> => {
     const response = await api.post('/api/hr/company-profile', payload);
     invalidateApiCache('hr:company-profile');
