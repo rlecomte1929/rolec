@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { adminAPI } from '../../../api/client';
 import type {
   CompanyV2,
   CompanyV2PlanTier,
@@ -6,6 +7,7 @@ import type {
   CompanyV2Tone,
 } from './adapter';
 import { CompanyFormModal } from './CompanyFormModal';
+import { RowActionMenu } from './RowActionMenu';
 
 // ── Visual helpers ──────────────────────────────────────────────────────────
 
@@ -313,6 +315,32 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<CompanyV2 | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function handleArchive(c: CompanyV2) {
+    if (!window.confirm(`Archive "${c.name}"? It will be hidden from active lists. Reversible.`)) return;
+    setBusyId(c.id);
+    setActionError(null);
+    try {
+      await adminAPI.archiveCompany(c.id);
+      onRefresh?.();
+    } catch (e) {
+      const detail =
+        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        (e as Error)?.message ??
+        'Failed to archive company';
+      setActionError(detail);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function handleDelete(_c: CompanyV2) {
+    // Delete with type-name confirmation lands in C3 of this work block.
+    setActionError('Delete is not wired up yet — coming in C3.');
+  }
 
   const countries = useMemo(
     () =>
@@ -512,6 +540,18 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
           {error}
         </div>
       )}
+      {actionError && (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="text-amber-700 hover:underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -528,20 +568,21 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                 <Th>Employee seats</Th>
                 <Th className="text-right">Cases</Th>
                 <Th>Contact</Th>
-                <Th className="pr-4">Created</Th>
+                <Th>Created</Th>
+                <Th className="pr-4 w-12 text-right" aria-label="Actions"><span className="sr-only">Actions</span></Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400">
                     Loading companies…
                   </td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400">
                     {anyFilter ? 'No companies match your filters.' : 'No companies yet.'}
                   </td>
                 </tr>
@@ -592,8 +633,21 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                         <div className="text-xs text-slate-500 truncate max-w-[14rem]">{c.hr_contact}</div>
                       )}
                     </td>
-                    <td className="pr-4 py-2.5 text-xs text-slate-500">
+                    <td className="py-2.5 text-xs text-slate-500">
                       {relativeDate(c.created_at)}
+                    </td>
+                    <td className="pr-4 py-2.5 text-right">
+                      {busyId === c.id ? (
+                        <span className="text-[11px] text-slate-400">…</span>
+                      ) : (
+                        <RowActionMenu
+                          onEdit={() => setEditTarget(c)}
+                          onArchive={() => void handleArchive(c)}
+                          onDelete={() => handleDelete(c)}
+                          disableArchive={c.status === 'archived'}
+                          ariaLabel={`Open actions for ${c.name}`}
+                        />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -610,6 +664,18 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
           onClose={() => setShowAddModal(false)}
           onSaved={() => {
             setShowAddModal(false);
+            onRefresh?.();
+          }}
+        />
+      )}
+
+      {editTarget && (
+        <CompanyFormModal
+          mode="edit"
+          initial={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => {
+            setEditTarget(null);
             onRefresh?.();
           }}
         />
