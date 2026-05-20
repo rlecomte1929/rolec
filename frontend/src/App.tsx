@@ -14,6 +14,7 @@ import { ROUTE_DEFS } from './navigation/routes';
 import { Landing } from './pages/Landing';
 import { PlatformPage } from './pages/public/PlatformPage';
 import { HowItWorksPage } from './pages/public/HowItWorksPage';
+import { GetStartedPage } from './pages/public/GetStartedPage';
 import { WhyReloPassPage } from './pages/public/WhyReloPassPage';
 import { AccessPage } from './pages/public/AccessPage';
 import { SecurityPage } from './pages/public/SecurityPage';
@@ -75,6 +76,7 @@ const HrProviderGridV2 = lazy(() => import('./features/platform-v2/provider-grid
 const HrBacklogPage = lazy(() => import('./features/platform-v2/hr-backlog/HrBacklogPage').then((module) => ({ default: module.HrBacklogPage })));
 const MobilityControlCenterV2Page = lazy(() => import('./features/platform-v2/mobility-control/MobilityControlCenterV2Page').then((module) => ({ default: module.MobilityControlCenterV2Page })));
 const HrPolicyBuilder = lazy(() => import('./pages/HrPolicyBuilder').then((module) => ({ default: module.HrPolicyBuilder })));
+const HrExceptionsPage = lazy(() => import('./features/platform-v2/exceptions/HrExceptionsPage').then((module) => ({ default: module.HrExceptionsPage })));
 const ProviderPortal = lazy(() => import('./pages/ProviderPortal').then((module) => ({ default: module.ProviderPortal })));
 const EmployeeTaskPage = lazy(() => import('./pages/employee/EmployeeTaskPage').then((module) => ({ default: module.EmployeeTaskPage })));
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings').then((module) => ({ default: module.NotificationSettings })));
@@ -195,6 +197,7 @@ function App() {
         <Route path={ROUTE_DEFS.platform.path} element={<PlatformPage />} />
         <Route path={ROUTE_DEFS.why.path} element={<WhyReloPassPage />} />
         <Route path={ROUTE_DEFS.howItWorks.path} element={<HowItWorksPage />} />
+        <Route path={ROUTE_DEFS.getStarted.path} element={<GetStartedPage />} />
         <Route path={ROUTE_DEFS.security.path} element={<SecurityPage />} />
         <Route path={ROUTE_DEFS.privacy.path} element={<PrivacyPage />} />
         <Route path={ROUTE_DEFS.access.path} element={<AccessPage />} />
@@ -240,6 +243,7 @@ function App() {
             HR + ADMIN access — server-side filtering by company_id. */}
         <Route path="/hr/backlog" element={<HrBacklogPage />} />
         <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<HrPolicyBuilder />} />
+        <Route path={ROUTE_DEFS.hrExceptions.path} element={<HrExceptionsPage />} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<HrCaseSummary />} />
         <Route path={ROUTE_DEFS.hrReview.path} element={<Navigate to={ROUTE_DEFS.hrEmployeeDashboard.path} replace />} />

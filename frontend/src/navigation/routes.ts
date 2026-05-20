@@ -7,6 +7,7 @@ export const ROUTE_DEFS = {
   platform: { path: '/platform', roles: ['PUBLIC'] as RouteRole[] },
   why: { path: '/why', roles: ['PUBLIC'] as RouteRole[] },
   howItWorks: { path: '/how-it-works', roles: ['PUBLIC'] as RouteRole[] },
+  getStarted: { path: '/get-started', roles: ['PUBLIC'] as RouteRole[] },
   security: { path: '/security', roles: ['PUBLIC'] as RouteRole[] },
   privacy: { path: '/privacy', roles: ['PUBLIC'] as RouteRole[] },
   access: { path: '/access', roles: ['PUBLIC'] as RouteRole[] },
@@ -57,6 +58,8 @@ export const ROUTE_DEFS = {
   hrPolicyManagement: { path: '/hr/policy-management', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy Builder wizard (AIQ-37-B/C). */
   hrPolicyBuilder: { path: '/hr/settings/policy', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** Policy exceptions inbox — HR review + approve/reject flow. */
+  hrExceptions: { path: '/hr/exceptions', roles: ['HR', 'ADMIN'] as RouteRole[] },
   employeePolicy: { path: '/employee/policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   submissionCenter: { path: '/submission-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompanyProfile: { path: '/hr/company-profile', roles: ['HR', 'ADMIN'] as RouteRole[] },
