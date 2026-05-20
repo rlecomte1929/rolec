@@ -125,6 +125,7 @@ const AdminReviewQueueV2Page = lazy(() => import('./features/platform-v2/review-
 const AdminReviewQueueDetailPage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueueDetailPage').then((module) => ({ default: module.AdminReviewQueueDetailPage })));
 const AdminReviewQueueWorkloadPage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueueWorkloadPage').then((module) => ({ default: module.AdminReviewQueueWorkloadPage })));
 const AdminOpsSlaPage = lazy(() => import('./pages/admin/ops/AdminOpsSlaPage').then((module) => ({ default: module.AdminOpsSlaPage })));
+const OpsAnalyticsV2Page = lazy(() => import('./features/platform-v2/ops-analytics/OpsAnalyticsV2Page').then((module) => ({ default: module.OpsAnalyticsV2Page })));
 const AdminOpsQueuePage = lazy(() => import('./pages/admin/ops/AdminOpsQueuePage').then((module) => ({ default: module.AdminOpsQueuePage })));
 const AdminOpsReviewersPage = lazy(() => import('./pages/admin/ops/AdminOpsReviewersPage').then((module) => ({ default: module.AdminOpsReviewersPage })));
 const AdminOpsDestinationsPage = lazy(() => import('./pages/admin/ops/AdminOpsDestinationsPage').then((module) => ({ default: module.AdminOpsDestinationsPage })));
@@ -337,7 +338,20 @@ function App() {
         <Route path="/admin/review-queue-v2" element={<RequireAdminRoute><AdminReviewQueueV2Page /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueWorkload.path} element={<RequireAdminRoute><AdminReviewQueueWorkloadPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueDetail.path} element={<RequireAdminRoute><AdminReviewQueueDetailPage /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminOpsSla.path} element={<RequireAdminRoute><AdminOpsSlaPage /></RequireAdminRoute>} />
+        {/* platform-v2: flag-gated. Default OFF → legacy AdminOpsSlaPage (pill-tab SLA view).
+            Enable: localStorage.setItem('platform_v2_ops_analytics', 'on'). */}
+        <Route
+          path={ROUTE_DEFS.adminOpsSla.path}
+          element={
+            <RequireAdminRoute>
+              <V2Gate flag="ops_analytics" fallback={<AdminOpsSlaPage />}>
+                <OpsAnalyticsV2Page />
+              </V2Gate>
+            </RequireAdminRoute>
+          }
+        />
+        {/* Sibling always-V2 route for side-by-side QA. */}
+        <Route path="/admin/ops-v2" element={<RequireAdminRoute><OpsAnalyticsV2Page /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsQueue.path} element={<RequireAdminRoute><AdminOpsQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsReviewers.path} element={<RequireAdminRoute><AdminOpsReviewersPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsDestinations.path} element={<RequireAdminRoute><AdminOpsDestinationsPage /></RequireAdminRoute>} />
@@ -368,16 +382,10 @@ function App() {
           path={ROUTE_DEFS.hrResources.path}
           element={<HrResourcesPreview />}
         />
-        {/* platform-v2: flag-gated. Default OFF → legacy HrCompanyProfile renders.
-            Enable per-session: localStorage.setItem('platform_v2_company_profile', 'on'). */}
-        <Route
-          path={ROUTE_DEFS.hrCompanyProfile.path}
-          element={
-            <V2Gate flag="company_profile" fallback={<HrCompanyProfile />}>
-              <HrCompanyProfileV2 />
-            </V2Gate>
-          }
-        />
+        {/* platform-v2: V2 is now the default. Legacy HrCompanyProfile remains
+            mounted at /hr/company-profile-legacy for emergency rollback. */}
+        <Route path={ROUTE_DEFS.hrCompanyProfile.path} element={<HrCompanyProfileV2 />} />
+        <Route path="/hr/company-profile-legacy" element={<HrCompanyProfile />} />
         <Route path="/hr/company-profile-v2" element={<HrCompanyProfileV2 />} />
         <Route path={ROUTE_DEFS.hrEmployees.path} element={<HrEmployees />} />
         <Route path={ROUTE_DEFS.hrEmployeeDetail.path} element={<HrEmployeeDetail />} />

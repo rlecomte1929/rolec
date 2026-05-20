@@ -72,6 +72,8 @@ export function AdminCompanyProfilePage() {
         title={tenantName}
         subtitle="Admin view of this tenant's profile. Changes save against the tenant. To see what this tenant's HR sees, use the impersonation flow (not yet wired)."
         badge="tenant"
+        backTo={`/admin/companies/${companyId}`}
+        backLabel="Back to tenant"
         topSlot={
           <nav className="mb-3 flex items-center gap-2 text-[12px] text-slate-500">
             <Link to="/admin/companies-v2" className="text-indigo-600 hover:underline">

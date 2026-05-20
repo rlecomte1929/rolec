@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { CompanyProfilePayload } from '../../../types';
 
 // ── Option lists (mirror the prototype's static lists) ──────────────────────
@@ -44,10 +45,18 @@ const INDUSTRIES = [
 
 const SIZE_BANDS = ['1–10', '11–50', '51–200', '201–500', '501–1000', '1001–5000', '5000+'] as const;
 
-const WORKING_LOCATIONS = ['Remote', 'Hybrid', 'On-site', 'Office-first', 'Distributed'] as const;
+const WORKING_LOCATIONS: ReadonlyArray<{ value: string; icon: string }> = [
+  { value: 'Remote', icon: '🌍' },
+  { value: 'Hybrid', icon: '🏢' },
+  { value: 'On-site', icon: '🏬' },
+  { value: 'Office-first', icon: '🏛️' },
+  { value: 'Distributed', icon: '🌐' },
+];
 
 const LOGO_ACCEPT = 'image/png,image/jpeg,image/jpg,image/svg+xml';
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
+const AUTOSAVE_DEBOUNCE_MS = 1500;
 
 // ── Form state shape (matches CompanyProfilePayload) ────────────────────────
 
@@ -66,6 +75,8 @@ type FormState = {
   default_destination_country: string;
   default_working_location: string;
 };
+
+type SectionKey = 'identity' | 'location' | 'hr' | 'branding';
 
 function emptyForm(): FormState {
   return {
@@ -136,33 +147,24 @@ export interface CompanyProfileFormProps {
   onUploadLogo?: (file: File) => Promise<void>;
   /** Optional logo remove handler. If absent, the remove button is hidden. */
   onRemoveLogo?: () => Promise<void>;
-  /** Eyebrow path shown above the h1 (e.g. "ReloPass · /hr/company-profile"). */
+  /** Eyebrow path shown above the h1. */
   eyebrow: string;
   /** Main heading. */
   title: string;
   /** One-line description shown below the h1. */
   subtitle: string;
-  /** Optional badge text shown next to the h1 (e.g. "v2 preview" or "admin"). */
+  /** Optional badge text shown next to the h1. */
   badge?: string;
-  /** Optional content rendered at the very top, before the page header (e.g. breadcrumb). */
+  /** Optional content rendered at the very top, before the page header. */
   topSlot?: React.ReactNode;
+  /** Path the "Back" button navigates to. Defaults to /hr/provider-grid (mobility control). */
+  backTo?: string;
+  /** Label for the back button. Defaults to "Back to mobility control". */
+  backLabel?: string;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-/**
- * Presentational 4-section company-profile form with sticky save bar.
- *
- * Manages its own form state, dirty tracking, and save flow. Data + persistence
- * is delegated to the caller via `company`, `onSave`, `onUploadLogo`,
- * `onRemoveLogo` props — this lets the same form drive both HR ("my company")
- * and admin tenant ("a specific company's") profile pages.
- *
- * Visual surface mirrors the prototype's s7p design (sections A/B/C/D with
- * per-section completion %). Sticky save bar slides in only when the form is
- * dirty; "Discard" reverts to pristine; "Save changes" calls onSave + 2.5s
- * "✓ Saved" flash.
- */
 export function CompanyProfileForm({
   company,
   loading = false,
@@ -175,27 +177,39 @@ export function CompanyProfileForm({
   subtitle,
   badge,
   topSlot,
+  backTo = '/hr/provider-grid',
+  backLabel = 'Back to mobility control',
 }: CompanyProfileFormProps) {
+  const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(() => formFromCompany(company));
   const [pristine, setPristine] = useState<FormState>(() => formFromCompany(company));
+  const [savedSnapshot, setSavedSnapshot] = useState<FormState>(() => formFromCompany(company));
   const [saving, setSaving] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [sectionFlash, setSectionFlash] = useState<Record<SectionKey, boolean>>({
+    identity: false, location: false, hr: false, branding: false,
+  });
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimers = useRef<Record<SectionKey, ReturnType<typeof setTimeout> | null>>({
+    identity: null, location: null, hr: null, branding: null,
+  });
 
-  // Re-seed form when the source company changes (initial load, after save refresh,
-  // or when the URL :companyId switches in the admin view).
+  // Re-seed when source company changes
   useEffect(() => {
     const next = formFromCompany(company);
     setForm(next);
     setPristine(next);
+    setSavedSnapshot(next);
   }, [company]);
 
+  // Cleanup timers on unmount
   useEffect(() => () => {
-    if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    Object.values(flashTimers.current).forEach((t) => t && clearTimeout(t));
   }, []);
 
   const logoUrl = useMemo(() => {
@@ -210,35 +224,76 @@ export function CompanyProfileForm({
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  async function handleSave() {
-    if (!form.name.trim()) {
-      setSaveError('Name is required.');
-      return;
-    }
-    setSaveError(null);
-    setSaving(true);
-    try {
-      await onSave(formToPayload(form));
-      setSavedFlash(true);
-      if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
-      savedFlashTimer.current = setTimeout(() => setSavedFlash(false), 2500);
-    } catch (e) {
-      const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
-      const status = err?.response?.status;
-      const detail = err?.response?.data?.detail;
-      if (detail) setSaveError(detail);
-      else if (status === 500) setSaveError('Server crashed — check the uvicorn terminal for the Python traceback.');
-      else if (status === 403) setSaveError('Permission denied — your HR/admin session may have expired.');
-      else if (status === 422) setSaveError('The form data was rejected by the server (validation error).');
-      else setSaveError(err?.message ?? 'Failed to save profile.');
-    } finally {
-      setSaving(false);
-    }
+  // Which sections changed since the last successful save
+  const sectionDirty = useMemo<Record<SectionKey, boolean>>(() => {
+    const diff = (k: keyof FormState) => form[k] !== savedSnapshot[k];
+    return {
+      identity: diff('name') || diff('legal_name') || diff('industry') || diff('size_band') || diff('website'),
+      location: diff('country') || diff('hq_city') || diff('address') || diff('phone'),
+      hr: diff('hr_contact') || diff('support_email') || diff('default_destination_country') || diff('default_working_location'),
+      branding: false,
+    };
+  }, [form, savedSnapshot]);
+
+  function flashSection(key: SectionKey) {
+    setSectionFlash((s) => ({ ...s, [key]: true }));
+    if (flashTimers.current[key]) clearTimeout(flashTimers.current[key]!);
+    flashTimers.current[key] = setTimeout(() => {
+      setSectionFlash((s) => ({ ...s, [key]: false }));
+    }, 2200);
   }
 
-  function handleDiscard() {
-    setForm(pristine);
-    setSaveError(null);
+  const persist = useCallback(
+    async (snapshot: FormState, sourceSections: SectionKey[]) => {
+      if (!snapshot.name.trim()) {
+        setSaveError('Company name is required.');
+        return false;
+      }
+      setSaveError(null);
+      setSaving(true);
+      try {
+        await onSave(formToPayload(snapshot));
+        setSavedSnapshot(snapshot);
+        setPristine(snapshot);
+        setLastSavedAt(Date.now());
+        sourceSections.forEach((k) => flashSection(k));
+        return true;
+      } catch (e) {
+        const err = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+        const status = err?.response?.status;
+        const detail = err?.response?.data?.detail;
+        if (detail) setSaveError(detail);
+        else if (status === 500) setSaveError('Server error — check the uvicorn terminal for the Python traceback.');
+        else if (status === 403) setSaveError('Permission denied — your session may have expired.');
+        else if (status === 422) setSaveError('The form data was rejected by the server (validation error).');
+        else setSaveError(err?.message ?? 'Failed to save profile.');
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [onSave],
+  );
+
+  // Debounced auto-save: schedule a save 1.5s after the last edit (when dirty)
+  useEffect(() => {
+    if (!isDirty) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    const snapshot = form;
+    const sections = (Object.keys(sectionDirty) as SectionKey[]).filter((k) => sectionDirty[k]);
+    autosaveTimer.current = setTimeout(() => {
+      void persist(snapshot, sections);
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, isDirty]);
+
+  async function handleManualSave() {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    const sections = (Object.keys(sectionDirty) as SectionKey[]).filter((k) => sectionDirty[k]);
+    await persist(form, sections.length ? sections : ['identity', 'location', 'hr']);
   }
 
   const handleLogoFile = useCallback(
@@ -256,6 +311,8 @@ export function CompanyProfileForm({
       setLogoUploading(true);
       try {
         await onUploadLogo(file);
+        flashSection('branding');
+        setLastSavedAt(Date.now());
       } catch (e) {
         const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
         setLogoError(detail ?? 'Upload failed.');
@@ -273,6 +330,8 @@ export function CompanyProfileForm({
     setLogoUploading(true);
     try {
       await onRemoveLogo();
+      flashSection('branding');
+      setLastSavedAt(Date.now());
     } catch (e) {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setLogoError(detail ?? 'Remove failed.');
@@ -281,19 +340,10 @@ export function CompanyProfileForm({
     }
   }
 
-  const completion = useMemo(() => {
-    const filled = (...vs: string[]) => vs.filter((v) => v.trim()).length;
-    const pct = (n: number, total: number) => (total === 0 ? 0 : Math.round((n / total) * 100));
-    return {
-      A: pct(filled(form.name, form.legal_name, form.industry, form.size_band, form.website), 5),
-      B: pct(filled(form.country, form.hq_city, form.address, form.phone), 4),
-      C: pct(filled(form.hr_contact, form.support_email, form.default_destination_country, form.default_working_location), 4),
-      D: logoUrl ? 100 : 0,
-    };
-  }, [form, logoUrl]);
+  const savedAgo = useRelativeTime(lastSavedAt);
 
   return (
-    <div className="mx-auto max-w-[1100px] px-6 py-6 pb-24">
+    <div className="mx-auto max-w-[1400px] px-6 py-6 pb-28">
       {topSlot}
 
       <div className="mb-5">
@@ -319,277 +369,362 @@ export function CompanyProfileForm({
         <div className="mb-4 text-sm text-slate-500">Loading profile…</div>
       )}
 
-      <Section letter="A" title="Identity" subtitle="The name and category this tenant uses across the platform." completion={completion.A}>
-        <Field label="Company name" required>
-          <input
-            value={form.name}
-            onChange={(e) => setField('name', e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="e.g. Aurora Energy"
-          />
-        </Field>
-        <Field label="Legal name">
-          <input
-            value={form.legal_name}
-            onChange={(e) => setField('legal_name', e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="e.g. Aurora Energy AS"
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Industry">
-            <select
-              value={form.industry}
-              onChange={(e) => setField('industry', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        {/* ── Company identity ──────────────────────────────────────────── */}
+        <SectionCard
+          title="Company identity"
+          subtitle="How your company is identified across ReloPass."
+          savedFlash={sectionFlash.identity}
+          dirty={sectionDirty.identity}
+        >
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Field
+              label="Company name"
+              required
+              helper="Pre-fills as the employer name in every new relocation case."
             >
-              <option value="">—</option>
-              {INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
-            </select>
-          </Field>
-          <Field label="Size band">
-            <select
-              value={form.size_band}
-              onChange={(e) => setField('size_band', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <input
+                value={form.name}
+                onChange={(e) => setField('name', e.target.value)}
+                className={inputCx}
+                placeholder="e.g. Aurora Energy"
+              />
+            </Field>
+            <Field
+              label="Legal name"
+              helper="Used on official case documents and contracts."
             >
-              <option value="">—</option>
-              {SIZE_BANDS.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </Field>
-        </div>
-        <Field label="Website">
-          <input
-            value={form.website}
-            onChange={(e) => setField('website', e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="aurora-energy.com"
-          />
-        </Field>
-      </Section>
+              <input
+                value={form.legal_name}
+                onChange={(e) => setField('legal_name', e.target.value)}
+                className={inputCx}
+                placeholder="e.g. Aurora Energy AS"
+              />
+            </Field>
+            <Field label="Industry">
+              <select
+                value={form.industry}
+                onChange={(e) => setField('industry', e.target.value)}
+                className={selectCx}
+              >
+                <option value="">—</option>
+                {INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
+              </select>
+            </Field>
+            <Field
+              label="Company size band"
+              helper="Used for filtering & may affect policy tier eligibility."
+            >
+              <select
+                value={form.size_band}
+                onChange={(e) => setField('size_band', e.target.value)}
+                className={selectCx}
+              >
+                <option value="">—</option>
+                {SIZE_BANDS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Website" full>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[12.5px] text-slate-400">
+                  https://
+                </span>
+                <input
+                  value={form.website}
+                  onChange={(e) => setField('website', e.target.value.replace(/^https?:\/\//, ''))}
+                  className={`${inputCx} pl-[60px]`}
+                  placeholder="aurora-energy.com"
+                />
+              </div>
+            </Field>
+          </div>
+        </SectionCard>
 
-      <Section letter="B" title="Location & contact" subtitle="Where this tenant is headquartered and how mobility teams can reach them." completion={completion.B}>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="HQ country">
-            <select
-              value={form.country}
-              onChange={(e) => setField('country', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        {/* ── Location & contact ────────────────────────────────────────── */}
+        <SectionCard
+          title="Location & contact"
+          subtitle="Where your company is based and how to reach you."
+          savedFlash={sectionFlash.location}
+          dirty={sectionDirty.location}
+        >
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Field
+              label="Country of incorporation"
+              helper="Pre-filled as employer country in every new relocation case."
             >
-              <option value="">—</option>
-              {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="HQ city">
-            <input
-              value={form.hq_city}
-              onChange={(e) => setField('hq_city', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g. Paris"
-            />
-          </Field>
-        </div>
-        <Field label="Address">
-          <input
-            value={form.address}
-            onChange={(e) => setField('address', e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Street, postcode, city"
-          />
-        </Field>
-        <Field label="Phone">
-          <input
-            value={form.phone}
-            onChange={(e) => setField('phone', e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="+33 …"
-          />
-        </Field>
-      </Section>
+              <CountrySelect
+                value={form.country}
+                onChange={(v) => setField('country', v)}
+              />
+            </Field>
+            <Field label="HQ city">
+              <input
+                value={form.hq_city}
+                onChange={(e) => setField('hq_city', e.target.value)}
+                className={inputCx}
+                placeholder="Paris"
+              />
+            </Field>
+            <Field label="Address" full>
+              <input
+                value={form.address}
+                onChange={(e) => setField('address', e.target.value)}
+                className={inputCx}
+                placeholder="12 Avenue de Friedland, 75008 Paris, France"
+              />
+            </Field>
+            <Field
+              label="Phone"
+              full
+              helper="International format with country code."
+            >
+              <input
+                value={form.phone}
+                onChange={(e) => setField('phone', e.target.value)}
+                className={inputCx}
+                placeholder="+33 1 4502 8821"
+              />
+            </Field>
+          </div>
+        </SectionCard>
 
-      <Section letter="C" title="HR & mobility defaults" subtitle="Default routing for new relocation cases + the contacts ReloPass surfaces to providers." completion={completion.C}>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="HR contact email">
-            <input
-              value={form.hr_contact}
-              onChange={(e) => setField('hr_contact', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="hr@company.com"
-            />
-          </Field>
-          <Field label="Support email">
-            <input
-              value={form.support_email}
-              onChange={(e) => setField('support_email', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="mobility@company.com"
-            />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Default destination country">
-            <select
-              value={form.default_destination_country}
-              onChange={(e) => setField('default_destination_country', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        {/* ── HR & mobility defaults ────────────────────────────────────── */}
+        <SectionCard
+          title="HR & mobility defaults"
+          subtitle="These defaults power your relocation cases and policy engine."
+          savedFlash={sectionFlash.hr}
+          dirty={sectionDirty.hr}
+        >
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Field
+              label="HR contact"
+              helper="Internal — used in audit logs and admin views."
             >
-              <option value="">—</option>
-              {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Default working location">
-            <select
-              value={form.default_working_location}
-              onChange={(e) => setField('default_working_location', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">—</option>
-              {WORKING_LOCATIONS.map((w) => <option key={w} value={w}>{w}</option>)}
-            </select>
-          </Field>
-        </div>
-      </Section>
+              <input
+                value={form.hr_contact}
+                onChange={(e) => setField('hr_contact', e.target.value)}
+                className={inputCx}
+                placeholder="helena.muller@aurora-energy.com"
+              />
+            </Field>
+            <Field label="Support email">
+              <input
+                value={form.support_email}
+                onChange={(e) => setField('support_email', e.target.value)}
+                className={inputCx}
+                placeholder="mobility@aurora-energy.com"
+              />
+              <InfoBanner>
+                <span className="font-medium">Employees see this</span> as their HR contact in the relocation portal.
+              </InfoBanner>
+            </Field>
+            <Field label="Default destination country">
+              <CountrySelect
+                value={form.default_destination_country}
+                onChange={(v) => setField('default_destination_country', v)}
+              />
+              <InfoBanner>
+                Seeds the destination picker in <span className="font-medium">every new case</span> and drives supplier &amp; resource recommendations.
+              </InfoBanner>
+            </Field>
+            <Field label="Default working location">
+              <select
+                value={form.default_working_location}
+                onChange={(e) => setField('default_working_location', e.target.value)}
+                className={selectCx}
+              >
+                <option value="">—</option>
+                {WORKING_LOCATIONS.map((w) => (
+                  <option key={w.value} value={w.value}>{w.icon}  {w.value}</option>
+                ))}
+              </select>
+              <InfoBanner>
+                Injected into the <span className="font-medium">policy evaluation engine</span> — affects which policies are triggered for each case.
+              </InfoBanner>
+            </Field>
+          </div>
+        </SectionCard>
 
-      <Section letter="D" title="Branding" subtitle="Logo employees and providers see across the platform." completion={completion.D}>
-        <div className="flex items-center gap-4">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-            {logoUrl ? (
-              <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain" />
+        {/* ── Branding ──────────────────────────────────────────────────── */}
+        <SectionCard
+          title="Branding"
+          subtitle="Your logo and colours appear across the entire platform."
+          savedFlash={sectionFlash.branding}
+          dirty={false}
+        >
+          <div className="flex items-start gap-4">
+            <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain" />
+              ) : (
+                <span className="text-[11px] text-slate-400">No logo</span>
+              )}
+            </div>
+            <div className="flex-1 space-y-3">
+              <div>
+                <div className="text-[13.5px] font-semibold text-slate-900">Company logo</div>
+                <p className="mt-0.5 text-[12px] text-slate-500">
+                  PNG, JPG or SVG · max 2 MB · square 512×512 recommended for best quality.
+                </p>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={LOGO_ACCEPT}
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleLogoFile(f);
+                  e.target.value = '';
+                }}
+              />
+              <div className="flex flex-wrap gap-2">
+                {onUploadLogo ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={logoUploading}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-[12.5px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <UploadIcon className="h-3.5 w-3.5" />
+                    {logoUploading ? 'Uploading…' : logoUrl ? 'Replace' : 'Upload logo'}
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-slate-400">
+                    Logo upload is only available to HR for their own company.
+                  </span>
+                )}
+                {onRemoveLogo && logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => void handleRemoveLogo()}
+                    disabled={logoUploading}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-[12.5px] font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    <span aria-hidden>×</span> Remove
+                  </button>
+                )}
+              </div>
+              {logoError && <p className="text-[11px] text-rose-600">{logoError}</p>}
+              <InfoBanner>
+                <span className="font-medium">Your logo appears in the header</span> on every page of the platform, visible to both HR managers and employees.
+              </InfoBanner>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* Sticky bottom bar */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-6 py-3">
+          <div className="flex items-center gap-3 text-[13px]">
+            {saveError ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-rose-700 ring-1 ring-inset ring-rose-200">
+                <span aria-hidden>⚠</span> {saveError}
+              </span>
+            ) : saving ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">
+                <Spinner className="h-3 w-3" /> Saving…
+              </span>
+            ) : isDirty ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-amber-800 ring-1 ring-inset ring-amber-200">
+                Unsaved changes
+              </span>
             ) : (
-              <span className="text-[11px] text-slate-400">No logo</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800 ring-1 ring-inset ring-emerald-200">
+                <CheckIcon className="h-3 w-3" /> All changes saved
+              </span>
+            )}
+            {lastSavedAt && !isDirty && !saving && (
+              <span className="text-slate-500">Auto-saved {savedAgo}</span>
             )}
           </div>
-          <div className="space-y-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={LOGO_ACCEPT}
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleLogoFile(f);
-                e.target.value = '';
-              }}
-            />
-            <div className="flex gap-2">
-              {onUploadLogo ? (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={logoUploading}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {logoUploading ? 'Uploading…' : logoUrl ? 'Replace logo' : 'Upload logo'}
-                </button>
-              ) : (
-                <span className="text-[11px] text-slate-400">
-                  Logo upload is only available to HR for their own company.
-                </span>
-              )}
-              {onRemoveLogo && logoUrl && (
-                <button
-                  type="button"
-                  onClick={() => void handleRemoveLogo()}
-                  disabled={logoUploading}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-            {onUploadLogo && <p className="text-[11px] text-slate-500">PNG, JPG, or SVG. Max 2 MB.</p>}
-            {logoError && <p className="text-[11px] text-rose-600">{logoError}</p>}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(backTo)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <span aria-hidden>←</span> {backLabel}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleManualSave()}
+              disabled={saving || !form.name.trim()}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[13px] font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
+            >
+              <CheckIcon className="h-3.5 w-3.5" /> Save profile
+            </button>
           </div>
         </div>
-      </Section>
-
-      {/* Sticky save bar — appears when the form is dirty */}
-      {isDirty && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-md">
-          <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-6 py-3">
-            <div className="text-[13px] text-slate-600">
-              {savedFlash ? (
-                <span className="text-emerald-700">✓ Saved.</span>
-              ) : saveError ? (
-                <span className="text-rose-700">{saveError}</span>
-              ) : (
-                <span>You have unsaved changes.</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleDiscard}
-                disabled={saving}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={saving}
-                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save changes'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!isDirty && savedFlash && (
-        <div className="fixed bottom-6 right-6 z-30 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-lg">
-          ✓ Saved
-        </div>
-      )}
+      </div>
     </div>
   );
 }
 
 // ── Visual primitives ──────────────────────────────────────────────────────
 
-function Section({
-  letter,
+const inputCx =
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100';
+
+const selectCx =
+  'w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13.5px] text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100';
+
+function SectionCard({
   title,
   subtitle,
-  completion,
+  savedFlash,
+  dirty,
   children,
 }: {
-  letter: string;
   title: string;
   subtitle: string;
-  completion: number;
+  savedFlash: boolean;
+  dirty: boolean;
   children: React.ReactNode;
 }) {
+  // Show pill: green "Saved" by default; emerald flash when section just saved; amber "Editing" if dirty.
+  let pill: React.ReactNode;
+  if (savedFlash) {
+    pill = (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200">
+        <CheckIcon className="h-3 w-3" /> Saved
+      </span>
+    );
+  } else if (dirty) {
+    pill = (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+        Editing
+      </span>
+    );
+  } else {
+    pill = (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+        <CheckIcon className="h-3 w-3" /> Saved
+      </span>
+    );
+  }
+
   return (
-    <section className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded bg-slate-900 text-[11px] font-semibold text-white">
-              {letter}
-            </span>
+        <div className="flex items-start gap-2.5">
+          <span
+            className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-full ${
+              dirty ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+            }`}
+            aria-hidden
+          >
+            <CheckIcon className="h-3 w-3" />
+          </span>
+          <div>
             <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
-          </div>
-          <p className="mt-1 text-[12.5px] text-slate-500">{subtitle}</p>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Section</div>
-          <div className="mt-0.5 text-[13px] font-semibold tabular-nums text-slate-700">{completion}%</div>
-          <div className="mt-1 h-1 w-20 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className={`h-full ${completion === 100 ? 'bg-emerald-500' : completion >= 50 ? 'bg-indigo-500' : 'bg-slate-300'}`}
-              style={{ width: `${completion}%` }}
-            />
+            <p className="mt-0.5 text-[12.5px] text-slate-500">{subtitle}</p>
           </div>
         </div>
+        <div className="shrink-0">{pill}</div>
       </div>
-      <div className="space-y-3">{children}</div>
+      <div>{children}</div>
     </section>
   );
 }
@@ -597,20 +732,111 @@ function Section({
 function Field({
   label,
   required = false,
+  helper,
+  full = false,
   children,
 }: {
   label: string;
   required?: boolean;
+  helper?: string;
+  full?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <label className="block">
-      <div className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+    <label className={`block ${full ? 'md:col-span-2' : ''}`}>
+      <div className="mb-1 text-[12px] font-medium text-slate-700">
         {label} {required && <span className="text-rose-600">*</span>}
       </div>
       {children}
+      {helper && <p className="mt-1 text-[11.5px] text-slate-500">{helper}</p>}
     </label>
   );
+}
+
+function InfoBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-2 inline-flex w-full items-start gap-1.5 rounded-md bg-indigo-50/70 px-2.5 py-1.5 text-[11.5px] text-indigo-900 ring-1 ring-inset ring-indigo-100">
+      <InfoIcon className="mt-0.5 h-3 w-3 shrink-0 text-indigo-500" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function CountrySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const selected = COUNTRIES.find((c) => c.code === value);
+  return (
+    <div className="relative">
+      {selected && (
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px]">
+          {selected.flag}
+        </span>
+      )}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${selectCx} ${selected ? 'pl-9' : ''}`}
+      >
+        <option value="">—</option>
+        {COUNTRIES.map((c) => (
+          <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// ── Icons (tiny inline SVGs to avoid a new dependency) ─────────────────────
+
+function CheckIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M2 6.5l2.5 2.5L10 3.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function InfoIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
+      <circle cx="6" cy="6" r="5" />
+      <path d="M6 5.5v3M6 3.5v.01" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function UploadIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
+      <path d="M7 9V2M4 5l3-3 3 3M2 11h10" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function Spinner({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`animate-spin ${className}`} fill="none">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="4" />
+      <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// ── Hooks ──────────────────────────────────────────────────────────────────
+
+function useRelativeTime(ts: number | null): string {
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!ts) return;
+    const id = setInterval(() => force((n) => n + 1), 5000);
+    return () => clearInterval(id);
+  }, [ts]);
+  if (!ts) return '';
+  const seconds = Math.max(1, Math.round((Date.now() - ts) / 1000));
+  if (seconds < 60) return `${seconds} second${seconds === 1 ? '' : 's'} ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.round(minutes / 60);
+  return `${hours} hour${hours === 1 ? '' : 's'} ago`;
 }
 
 export default CompanyProfileForm;
