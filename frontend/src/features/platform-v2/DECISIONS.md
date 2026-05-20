@@ -250,7 +250,14 @@ Run with both tabs open side by side: `localhost:3000/admin/companies` (legacy) 
 
 (Add a dated entry below with anything that surprised you. Format: `- 2026-MM-DD · <finding> · <action: fix / accept / defer>`.)
 
-> _no findings yet — pending first solo-mode QA pass_
+- 2026-05-20 · `/admin/companies-v2` rendered but visual fidelity vs prototype was low (flat Badge/Card primitives, default density) · **fix** in `2d670ff` — replaced antigravity primitives with Tailwind utilities + custom Pill component; KPI tone system, gradient logo chips, sticky+blurred filter bar, denser table.
+- 2026-05-20 · One-click demo buttons in `/auth?mode=login` returned "Invalid username or email" — defaults were `demo-admin / demo123` which don't exist · **fix** in `bb7a7c8` — defaults now match `backend/scripts/seed_testingapril_accounts.py` (admin@relopass.com / hr@testingapril.com / employee@testingapril.com). Requires the seed script to have been run.
+
+### Recipe lessons (carry forward to screen 2..N)
+
+1. **Antigravity primitives are form-shaped, not table-shaped.** `Badge`, `Card`, `Input`, `Select`, `ProgressBar` have opinionated APIs (closed string callbacks, options arrays, fixed paddings). They work great in HrPolicy and the policy assistant. For prototype-style data screens (table headers, sticky filters, compact KPIs, dense pills) plain HTML + Tailwind utilities give better control. **Recipe addition:** for any ported screen, the first sub-decision is "form-style or data-style"; data-style screens skip antigravity in favour of Tailwind utilities.
+2. **Visual fidelity needs an explicit pass.** First cut "works" but doesn't feel like the prototype. Bake a "polish pass" into step 8 (Solo-mode QA) — not as a separate phase but as expected work during QA.
+3. **Defaults that fail silently are worse than defaults that fail loudly.** The `demo-admin / demo123` defaults looked plausible but referenced accounts that don't exist. Future env-var defaults should either match real seeds or surface a clear "configure VITE_DEMO_* first" message.
 
 ---
 
