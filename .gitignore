@@ -56,3 +56,11 @@ INGESTION_SUMMARY.md
 
 venv_new/
 venv/
+
+# Merge / patch cruft. Three-way-merge backups (.orig), reject hunks (.rej),
+# and editor lock/temp files. Re-emerge whenever a merge conflict is touched;
+# never useful to track.
+*.orig
+*.rej
+.fuse_hidden*
+*.ooNMPsk
