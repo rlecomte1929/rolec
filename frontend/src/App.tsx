@@ -59,6 +59,7 @@ const QuoteRfqDetail = lazy(() => import('./pages/services/QuoteRfqDetail').then
 const VendorInbox = lazy(() => import('./pages/vendor/VendorInbox').then((module) => ({ default: module.VendorInbox })));
 const VendorRfq = lazy(() => import('./pages/vendor/VendorRfq').then((module) => ({ default: module.VendorRfq })));
 const HrCompanyProfile = lazy(() => import('./pages/HrCompanyProfile').then((module) => ({ default: module.HrCompanyProfile })));
+const HrCompanyProfileV2 = lazy(() => import('./features/platform-v2/company-profile/CompanyProfileV2Page').then((module) => ({ default: module.CompanyProfileV2Page })));
 const HrResourcesPreview = lazy(() => import('./pages/HrResourcesPreview').then((module) => ({ default: module.HrResourcesPreview })));
 const HrEmployees = lazy(() => import('./pages/HrEmployees').then((module) => ({ default: module.HrEmployees })));
 const HrEmployeeDetail = lazy(() => import('./pages/HrEmployeeDetail').then((module) => ({ default: module.HrEmployeeDetail })));
@@ -345,7 +346,17 @@ function App() {
           path={ROUTE_DEFS.hrResources.path}
           element={<HrResourcesPreview />}
         />
-        <Route path={ROUTE_DEFS.hrCompanyProfile.path} element={<HrCompanyProfile />} />
+        {/* platform-v2: flag-gated. Default OFF → legacy HrCompanyProfile renders.
+            Enable per-session: localStorage.setItem('platform_v2_company_profile', 'on'). */}
+        <Route
+          path={ROUTE_DEFS.hrCompanyProfile.path}
+          element={
+            <V2Gate flag="company_profile" fallback={<HrCompanyProfile />}>
+              <HrCompanyProfileV2 />
+            </V2Gate>
+          }
+        />
+        <Route path="/hr/company-profile-v2" element={<HrCompanyProfileV2 />} />
         <Route path={ROUTE_DEFS.hrEmployees.path} element={<HrEmployees />} />
         <Route path={ROUTE_DEFS.hrEmployeeDetail.path} element={<HrEmployeeDetail />} />
         <Route path={ROUTE_DEFS.notificationSettings.path} element={<NotificationSettings />} />
