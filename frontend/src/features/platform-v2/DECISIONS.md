@@ -213,6 +213,45 @@ This is **Phase 0 — recipe proof**. The goal is to land a working V2 screen, e
 
 None. Legacy `AdminCompanies.tsx` is untouched. V2 mounts at `/admin/companies-v2` (sibling route) until promotion. After promotion, the legacy route gates by `useV2Flag('companies')`; flag-off renders legacy, flag-on renders V2.
 
+### Step 8 — Solo-mode QA checklist
+
+Run with both tabs open side by side: `localhost:3000/admin/companies` (legacy) and `localhost:3000/admin/companies-v2` (V2).
+
+**Smoke (must all pass before flipping the flag):**
+
+- [ ] V2 route loads without console errors / red warnings
+- [ ] Page shows the same number of company rows as legacy
+- [ ] Each row shows the company name + the same plan, status, country, size as legacy
+- [ ] Company logos render with stable colours (refresh → same colour for the same company)
+- [ ] HR seat + Employee seat progress bars render and the % shape matches what you'd expect from the count/limit
+- [ ] Clicking a row opens the slide-out detail panel
+- [ ] Detail panel close button + backdrop click both dismiss
+- [ ] Detail panel re-opens for a different company without ghost state
+- [ ] Search filter shrinks the row count live
+- [ ] Each select (status, plan, country, size) filters as expected
+- [ ] "Issues only" checkbox filters to companies with `missing_from_registry` or orphan rows (if you have any in your dev DB; otherwise the list goes empty)
+- [ ] "Clear filters" button resets all selects + search + checkbox
+- [ ] Refresh link triggers a re-fetch (Network tab shows new request)
+- [ ] Empty state ("No companies match your filters") shows when filters drop the list to zero
+- [ ] Auth: log out → both routes redirect away. Log in as non-admin → 403 / redirect. Log in as admin → both routes render.
+
+**Accepted scope differences vs legacy (already decided, no action):**
+
+| Legacy has | V2 deliberately doesn't (yet) | Why |
+|---|---|---|
+| Per-column search inputs (HR-min, employees-min, cases-min, contact) | Single search bar + 4 selects | Prototype design; matrix-style column filtering deferred |
+| Inline row editing | Read-only | Phase 0 = read-only proof |
+| Add Company modal | "Add tenant" button is absent | Editing surface deferred |
+| Bulk archive / delete | No bulk-select | Editing surface deferred |
+| `<Link>` to `/admin/companies/:id` detail page | Slide-out detail panel only (no sub-tabs) | Sub-tabs deferred to v1.1 (require `/api/admin/companies/{id}` detail call) |
+| Sortable column headers | No sort UI in V2 | Prototype's drag-to-reorder + sort deferred; default order is API order |
+
+**Findings to log here when you run the QA:**
+
+(Add a dated entry below with anything that surprised you. Format: `- 2026-MM-DD · <finding> · <action: fix / accept / defer>`.)
+
+> _no findings yet — pending first solo-mode QA pass_
+
 ---
 
 ## Validation gates (canonical)
