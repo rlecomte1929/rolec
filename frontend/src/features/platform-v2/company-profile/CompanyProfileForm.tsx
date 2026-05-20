@@ -614,8 +614,9 @@ export function CompanyProfileForm({
         </SectionCard>
       </div>
 
-      {/* Sticky bottom bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-md">
+      {/* Sticky bottom bar — sits within the main scroll column so the
+          PlatformSidebar isn't covered when it's expanded. */}
+      <div className="sticky bottom-0 left-0 right-0 z-20 -mx-6 mt-6 border-t border-slate-200 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-6 py-3">
           <div className="flex items-center gap-3 text-[13px]">
             {saveError ? (
