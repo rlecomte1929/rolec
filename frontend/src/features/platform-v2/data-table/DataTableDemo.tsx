@@ -145,7 +145,7 @@ export function DataTableDemo() {
   ], []);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-6 py-8">
+    <div className="px-6 py-8">
       <div className="mb-6">
         <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
           ReloPass · /dev/data-table-demo

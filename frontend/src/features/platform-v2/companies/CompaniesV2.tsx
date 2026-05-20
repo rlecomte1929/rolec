@@ -408,7 +408,12 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
   const activeCompany = activeId ? companies.find((c) => c.id === activeId) ?? null : null;
 
   return (
-    <div className="px-6 py-6 mx-auto max-w-[1400px]">
+    // No max-width cap on this page — list-style screens benefit from filling
+    // the viewport so the table has room for all columns without horizontal
+    // scroll. Page header still uses its own max-w-3xl for paragraph
+    // readability. (Form-style screens like /hr/company-profile-v2 keep their
+    // narrower max — different shape, different need.)
+    <div className="px-6 py-6">
       {/* Header */}
       <div className="mb-5">
         <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">

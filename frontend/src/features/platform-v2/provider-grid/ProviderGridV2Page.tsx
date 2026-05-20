@@ -60,7 +60,9 @@ export function ProviderGridV2Page() {
 
   return (
     <AppShell>
-      <div className="px-6 py-6 mx-auto max-w-[1400px]">
+      {/* No max-width cap — list pages fill the viewport so wide tables fit
+          without horizontal scroll on larger monitors. */}
+      <div className="px-6 py-6">
         {/* Header */}
         <div className="mb-5">
           <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
