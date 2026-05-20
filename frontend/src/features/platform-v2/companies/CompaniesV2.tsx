@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Badge, Card, ProgressBar } from '../../../components/antigravity';
 import type {
   CompanyV2,
   CompanyV2PlanTier,
@@ -9,26 +8,43 @@ import type {
 
 // ── Visual helpers ──────────────────────────────────────────────────────────
 
-const TONE_BG: Record<CompanyV2Tone, string> = {
-  a: 'bg-indigo-100 text-indigo-700',
-  b: 'bg-emerald-100 text-emerald-700',
-  c: 'bg-amber-100 text-amber-700',
-  d: 'bg-sky-100 text-sky-700',
-  e: 'bg-rose-100 text-rose-700',
-  f: 'bg-violet-100 text-violet-700',
+// Gradient + ring tones for the company logo chip — richer than flat bg.
+const TONE_LOGO: Record<CompanyV2Tone, string> = {
+  a: 'bg-gradient-to-br from-indigo-500 to-indigo-700 text-white',
+  b: 'bg-gradient-to-br from-emerald-500 to-emerald-700 text-white',
+  c: 'bg-gradient-to-br from-amber-500 to-amber-700 text-white',
+  d: 'bg-gradient-to-br from-sky-500 to-sky-700 text-white',
+  e: 'bg-gradient-to-br from-rose-500 to-rose-700 text-white',
+  f: 'bg-gradient-to-br from-violet-500 to-violet-700 text-white',
 };
 
-const PLAN_VARIANT: Record<CompanyV2PlanTier, 'success' | 'warning' | 'neutral'> = {
-  premium: 'success',
-  medium: 'warning',
-  low: 'neutral',
+const PLAN_PILL: Record<CompanyV2PlanTier, string> = {
+  premium: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  medium:  'bg-amber-50  text-amber-700  ring-amber-200',
+  low:     'bg-slate-100 text-slate-600  ring-slate-200',
 };
 
-const STATUS_VARIANT: Record<CompanyV2Status, 'success' | 'warning' | 'neutral'> = {
-  active: 'success',
-  inactive: 'warning',
-  archived: 'neutral',
+const STATUS_PILL: Record<CompanyV2Status, string> = {
+  active:   'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  inactive: 'bg-amber-50  text-amber-700  ring-amber-200',
+  archived: 'bg-slate-100 text-slate-500  ring-slate-200',
 };
+
+const STATUS_DOT: Record<CompanyV2Status, string> = {
+  active:   'bg-emerald-500',
+  inactive: 'bg-amber-500',
+  archived: 'bg-slate-400',
+};
+
+function Pill({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${className}`}
+    >
+      {children}
+    </span>
+  );
+}
 
 function logoInitials(name: string): string {
   return name
@@ -57,21 +73,41 @@ interface KpiProps {
   label: string;
   value: string | number;
   sub: string;
-  tone?: 'default' | 'success' | 'warning' | 'accent';
+  tone?: 'default' | 'success' | 'warning' | 'accent' | 'teal';
 }
 
 function Kpi({ label, value, sub, tone = 'default' }: KpiProps) {
-  const toneClass: Record<NonNullable<KpiProps['tone']>, string> = {
+  const card: Record<NonNullable<KpiProps['tone']>, string> = {
     default: 'border-slate-200 bg-white',
-    success: 'border-emerald-200 bg-emerald-50',
-    warning: 'border-amber-200 bg-amber-50',
-    accent: 'border-indigo-200 bg-indigo-50',
+    success: 'border-slate-200 bg-white',
+    warning: 'border-slate-200 bg-white',
+    accent: 'border-slate-200 bg-white',
+    teal: 'border-slate-200 bg-white',
+  };
+  const valueClass: Record<NonNullable<KpiProps['tone']>, string> = {
+    default: 'text-slate-900',
+    success: 'text-emerald-700',
+    warning: 'text-amber-700',
+    accent: 'text-indigo-700',
+    teal: 'text-teal-700',
+  };
+  const dot: Record<NonNullable<KpiProps['tone']>, string> = {
+    default: 'bg-slate-200',
+    success: 'bg-emerald-500',
+    warning: 'bg-amber-500',
+    accent: 'bg-indigo-500',
+    teal: 'bg-teal-500',
   };
   return (
-    <div className={`rounded-lg border ${toneClass[tone]} px-4 py-3`}>
-      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-0.5 text-2xl font-semibold text-slate-900">{value}</div>
-      <div className="text-[11px] text-slate-500">{sub}</div>
+    <div className={`relative rounded-lg border ${card[tone]} px-3 py-2.5 transition-colors hover:border-slate-300`}>
+      <span className={`absolute right-2.5 top-2.5 block h-1.5 w-1.5 rounded-full ${dot[tone]}`} aria-hidden />
+      <div className="truncate text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        {label}
+      </div>
+      <div className={`mt-1 text-[22px] font-semibold leading-none tracking-tight tabular-nums ${valueClass[tone]}`}>
+        {value}
+      </div>
+      <div className="mt-1 truncate text-[10.5px] text-slate-500">{sub}</div>
     </div>
   );
 }
@@ -83,10 +119,10 @@ interface CompanyLogoProps {
 }
 
 function CompanyLogo({ name, tone, size = 'sm' }: CompanyLogoProps) {
-  const sizeClass = size === 'lg' ? 'h-10 w-10 text-sm' : 'h-7 w-7 text-[11px]';
+  const sizeClass = size === 'lg' ? 'h-11 w-11 text-[13px]' : 'h-7 w-7 text-[10.5px]';
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded font-semibold ${TONE_BG[tone]} ${sizeClass}`}
+      className={`flex shrink-0 items-center justify-center rounded-md font-semibold shadow-sm ${TONE_LOGO[tone]} ${sizeClass}`}
       aria-hidden
     >
       {logoInitials(name)}
@@ -102,20 +138,22 @@ interface SeatCellProps {
 function SeatCell({ count, limit }: SeatCellProps) {
   if (limit == null) {
     return (
-      <div className="text-sm tabular-nums text-slate-700">
+      <div className="text-[12.5px] tabular-nums text-slate-700">
         {count} <span className="text-slate-400">/ —</span>
       </div>
     );
   }
   const pct = limit > 0 ? Math.min(100, Math.round((count / limit) * 100)) : 0;
-  const color: 'green' | 'yellow' | 'red' =
-    pct > 90 ? 'red' : pct > 75 ? 'yellow' : 'green';
+  const barColor =
+    pct > 90 ? 'bg-rose-500' : pct > 75 ? 'bg-amber-500' : 'bg-emerald-500';
   return (
-    <div className="space-y-1 min-w-[6rem]">
-      <div className="text-sm tabular-nums text-slate-700">
+    <div className="min-w-[6rem] space-y-1">
+      <div className="text-[12.5px] tabular-nums text-slate-700">
         {count} <span className="text-slate-400">/ {limit}</span>
       </div>
-      <ProgressBar value={pct} color={color} />
+      <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
@@ -160,9 +198,12 @@ function DetailPanel({ company, onClose }: DetailPanelProps) {
 
         <div className="space-y-4 px-6 py-5 text-sm">
           <Section label="Status">
-            <Badge variant={STATUS_VARIANT[company.status]}>{company.status}</Badge>
+            <Pill className={STATUS_PILL[company.status]}>
+              <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[company.status]}`} />
+              {company.status}
+            </Pill>
             <span className="ml-2 inline-block">
-              <Badge variant={PLAN_VARIANT[company.plan_tier]}>{company.plan_tier} plan</Badge>
+              <Pill className={PLAN_PILL[company.plan_tier]}>{company.plan_tier} plan</Pill>
             </span>
           </Section>
 
@@ -331,25 +372,25 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
     <div className="px-6 py-6 mx-auto max-w-[1400px]">
       {/* Header */}
       <div className="mb-5">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
-          ReloPass · /admin/companies (v2)
+        <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
+          ReloPass · /admin/companies/overview
         </div>
-        <div className="mt-1 flex items-baseline gap-3">
-          <h1 className="text-2xl font-semibold text-slate-900">Companies</h1>
-          <Badge variant="neutral">v2 preview</Badge>
+        <div className="mt-1.5 flex items-baseline gap-3">
+          <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Companies</h1>
+          <Pill className="bg-indigo-50 text-indigo-700 ring-indigo-200">v2 preview</Pill>
           {onRefresh && (
             <button
               type="button"
               onClick={onRefresh}
-              className="ml-auto text-xs text-indigo-600 underline-offset-2 hover:underline"
+              className="ml-auto text-xs font-medium text-indigo-600 underline-offset-2 hover:underline"
               disabled={loading}
             >
               {loading ? 'Refreshing…' : 'Refresh'}
             </button>
           )}
         </div>
-        <p className="mt-1 text-sm text-slate-500">
-          Every tenant on the platform — people, activity, policy health and data quality in one view. Click any row to inspect.
+        <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
+          Every tenant on the platform — people, activity, policy health and data quality, in one view. Click any row to inspect.
         </p>
       </div>
 
@@ -372,7 +413,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
       </div>
 
       {/* Filter bar */}
-      <Card padding="md" className="mb-4">
+      <div className="sticky top-2 z-10 mb-4 rounded-xl border border-slate-200 bg-white/70 px-3 py-2.5 backdrop-blur-md backdrop-saturate-150">
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="search"
@@ -448,11 +489,11 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
               Clear filters
             </button>
           )}
-          <div className="ml-auto text-xs text-slate-500 tabular-nums">
+          <div className="ml-auto text-[11.5px] font-medium text-slate-500 tabular-nums">
             {filtered.length} of {companies.length}
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Error */}
       {error && (
@@ -462,10 +503,10 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
       )}
 
       {/* Table */}
-      <Card padding="none" className="overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <table className="min-w-full text-[13px]">
+            <thead className="bg-slate-50/80 text-left text-[10.5px] font-semibold uppercase tracking-widest text-slate-500">
               <tr>
                 <Th className="pl-4">Company</Th>
                 <Th>Plan</Th>
@@ -515,10 +556,13 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                       </div>
                     </td>
                     <td className="py-2.5">
-                      <Badge variant={PLAN_VARIANT[c.plan_tier]}>{c.plan_tier}</Badge>
+                      <Pill className={PLAN_PILL[c.plan_tier]}>{c.plan_tier}</Pill>
                     </td>
                     <td className="py-2.5">
-                      <Badge variant={STATUS_VARIANT[c.status]}>{c.status}</Badge>
+                      <Pill className={STATUS_PILL[c.status]}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[c.status]}`} />
+                        {c.status}
+                      </Pill>
                     </td>
                     <td className="py-2.5 text-slate-700">{c.country ?? '—'}</td>
                     <td className="py-2.5 text-slate-700">{c.size_band ?? '—'}</td>
@@ -545,7 +589,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
       {activeCompany && <DetailPanel company={activeCompany} onClose={() => setActiveId(null)} />}
     </div>
@@ -553,7 +597,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
 }
 
 function Th({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <th className={`py-2 ${className ?? 'px-2'} font-semibold`}>{children}</th>;
+  return <th className={`py-2.5 ${className ?? 'px-2'} font-semibold`}>{children}</th>;
 }
 
 export default CompaniesV2;
