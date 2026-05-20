@@ -67,19 +67,79 @@ export interface CompanyV2 {
   orphan_row_count: number;
 }
 
-// ── Adapter (stub) ──────────────────────────────────────────────────────────
+// ── Adapter ─────────────────────────────────────────────────────────────────
+
+const VALID_STATUS = new Set<CompanyV2Status>(['active', 'inactive', 'archived']);
+const VALID_PLAN = new Set<CompanyV2PlanTier>(['low', 'medium', 'premium']);
+const TONES: readonly CompanyV2Tone[] = ['a', 'b', 'c', 'd', 'e', 'f'];
+
+/**
+ * Deterministic 6-bucket hash of a string id. Same id always maps to the same
+ * tone, so the logo chip colour stays stable across re-renders and across
+ * different users viewing the same row. Uses djb2-style accumulation.
+ */
+function toneForId(id: string): CompanyV2Tone {
+  let hash = 5381;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) + hash + id.charCodeAt(i)) | 0;
+  }
+  // Bring into [0, TONES.length)
+  const bucket = Math.abs(hash) % TONES.length;
+  return TONES[bucket]!;
+}
+
+function narrowStatus(raw: AdminCompany['status']): CompanyV2Status {
+  const s = (raw ?? 'active').toString().toLowerCase();
+  return VALID_STATUS.has(s as CompanyV2Status) ? (s as CompanyV2Status) : 'active';
+}
+
+function narrowPlan(raw: AdminCompany['plan_tier']): CompanyV2PlanTier {
+  const p = (raw ?? 'low').toString().toLowerCase();
+  return VALID_PLAN.has(p as CompanyV2PlanTier) ? (p as CompanyV2PlanTier) : 'low';
+}
 
 /**
  * Convert one real-backend `AdminCompany` into the V2 shape.
  * Pure function — no side effects, no network, no React.
- *
- * Implementation lands in step 3 of the recipe.
  */
-export function toV2Shape(_real: AdminCompany): CompanyV2 {
-  throw new Error('toV2Shape: not implemented yet (step 3 of per-screen recipe)');
+export function toV2Shape(real: AdminCompany): CompanyV2 {
+  return {
+    id: real.id,
+    name: real.name,
+    legal_name: real.name, // backend has no separate legal_name yet
+    industry: null,
+    website: null,
+    hq_city: null,
+
+    country: real.country ?? null,
+    size_band: real.size_band ?? null,
+    address: real.address ?? null,
+    phone: real.phone ?? null,
+
+    status: narrowStatus(real.status),
+    plan_tier: narrowPlan(real.plan_tier),
+
+    hr_users_count: real.hr_users_count ?? 0,
+    hr_seat_limit: real.hr_seat_limit ?? null,
+    employee_count: real.employee_count ?? 0,
+    employee_seat_limit: real.employee_seat_limit ?? null,
+    assignments_count: real.assignments_count ?? 0,
+
+    primary_contact_name: real.primary_contact_name ?? null,
+    hr_contact: real.hr_contact ?? null,
+    support_email: real.support_email ?? null,
+
+    created_at: real.created_at,
+    updated_at: real.updated_at ?? null,
+
+    tone: toneForId(real.id),
+
+    has_registry_issue: Boolean(real.missing_from_registry),
+    orphan_row_count: real.missing_from_companies_table ?? 0,
+  };
 }
 
 /** Convert the whole list response in one call. */
-export function listToV2Shape(_companies: AdminCompany[]): CompanyV2[] {
-  throw new Error('listToV2Shape: not implemented yet (step 3 of per-screen recipe)');
+export function listToV2Shape(companies: AdminCompany[]): CompanyV2[] {
+  return companies.map(toV2Shape);
 }
