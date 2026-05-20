@@ -1959,6 +1959,13 @@ export const employeeAPI = {
     invalidateApiCache('employee:assignments-overview');
     return response.data;
   },
+  /** Magic-link token claim: employee arrived via invite URL with ?token=<uuid>. */
+  claimByToken: async (token: string): Promise<{ success: boolean; assignmentId?: string }> => {
+    const response = await api.post('/api/employee/assignments/claim-by-token', { token });
+    invalidateApiCache('employee:current-assignment');
+    invalidateApiCache('employee:assignments-overview');
+    return response.data;
+  },
   /** Hub pending rows only: strict eligibility (pending_claim + contact linked + company + invites). */
   linkPendingAssignment: async (
     assignmentId: string,

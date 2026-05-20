@@ -442,6 +442,10 @@ class ClaimAssignmentRequest(BaseModel):
     email: str
 
 
+class ClaimByTokenRequest(BaseModel):
+    token: str
+
+
 class EmployeeJourneyRequest(BaseModel):
     assignmentId: str
     questionId: str

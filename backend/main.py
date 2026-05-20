@@ -40,7 +40,7 @@ from .schemas import (
     PostSignupReconciliation,
     IntakeChecklistItem, CaseReadinessUi,
     EmployeeJourneyRequest, EmployeeJourneyNextQuestion, HRAssignmentDecision,
-    UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest,
+    UpdateAssignmentIdentifierRequest, ClaimAssignmentRequest, ClaimByTokenRequest,
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest,
     AddEvidenceRequest, AddEvidenceResponse,
 )
@@ -4309,6 +4309,122 @@ def claim_assignment(
         principal_email=effective.get("email"),
         principal_username=effective.get("username"),
         case_event_payload={},
+    )
+    return {"success": True, "assignmentId": assignment_id}
+
+
+@app.post("/api/employee/assignments/claim-by-token")
+@limiter.limit("10/hour;50/day")
+def claim_assignment_by_token(
+    request: Request,
+    body: ClaimByTokenRequest,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Magic-link token claim: employee arrives via invite link containing a token
+    (?token=<uuid>), already authenticated. Looks up assignment_claim_invites by
+    token, validates status, then attaches the employee to the assignment.
+
+    Returns { success: true, assignmentId: str } on success.
+    """
+    _deny_if_impersonating(user)
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    claim_req_id = getattr(request.state, "request_id", None) or ""
+
+    token = (body.token or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Token is required")
+
+    invite = db.get_claim_invite_by_token(token)
+    if not invite:
+        identity_event(
+            "identity.claim.token.failed",
+            failure_code="TOKEN_NOT_FOUND",
+            request_id=claim_req_id or None,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(status_code=404, detail="Invalid or expired invite token")
+
+    invite_status = (invite.get("status") or "").strip().lower()
+    assignment_id = str(invite.get("assignment_id") or "").strip()
+    if not assignment_id:
+        raise HTTPException(status_code=400, detail="Invite has no associated assignment")
+
+    if invite_status == "revoked":
+        identity_event(
+            "identity.claim.token.failed",
+            failure_code="CLAIM_INVITE_REVOKED",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_INVITE_REVOKED,
+                "This invitation was cancelled by HR. Contact HR if you still need access to this case.",
+            ),
+        )
+
+    # Already claimed — treat as idempotent success (user may refresh on the case page)
+    if invite_status == "claimed":
+        identity_event(
+            "identity.claim.token",
+            outcome="idempotent_already_claimed",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective.get("id"),
+        )
+        return {"success": True, "assignmentId": assignment_id}
+
+    assignment = db.get_assignment_by_id(assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    effective_id = str(effective["id"]).strip()
+    emp_uid = assignment.get("employee_user_id")
+    emp_uid_str = str(emp_uid).strip() if emp_uid else ""
+
+    # Already linked to this user — idempotent
+    if emp_uid_str and emp_uid_str == effective_id:
+        identity_event(
+            "identity.claim.token",
+            outcome="idempotent_already_linked",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective_id,
+        )
+        return {"success": True, "assignmentId": assignment_id}
+
+    # Claimed by a different user
+    if emp_uid_str and emp_uid_str != effective_id:
+        identity_event(
+            "identity.claim.token.failed",
+            failure_code="CLAIM_ASSIGNMENT_ALREADY_CLAIMED",
+            request_id=claim_req_id or None,
+            assignment_id=assignment_id,
+            auth_user_id=effective_id,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=err_detail(
+                IdentityErrorCode.CLAIM_ASSIGNMENT_ALREADY_CLAIMED,
+                "Assignment already claimed by another account.",
+            ),
+        )
+
+    finalize_assignment_claim_attach(
+        db,
+        assignment_id=assignment_id,
+        employee_user_id=effective["id"],
+        assignment=assignment,
+        request_id=None,
+        identity_event_name="identity.claim.token",
+        identity_outcome="attached",
+        claim_req_id=claim_req_id,
+        principal_email=effective.get("email"),
+        principal_username=effective.get("username"),
+        case_event_payload={"method": "magic_link"},
     )
     return {"success": True, "assignmentId": assignment_id}
 

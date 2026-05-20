@@ -13,6 +13,8 @@ import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
 import { RfqModal } from '../components/case/RfqModal';
 import { PendingRfqsPanel } from '../components/case/PendingRfqsPanel';
 import { ImmigrationStatusPanel } from '../components/case/ImmigrationStatusPanel';
+import { AdvisorsPanel } from '../components/case/AdvisorsPanel';
+import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptionsPanel';
 
 type QuoteRequest = {
   id: string;
@@ -254,6 +256,14 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
             }}
           />
         </Card>
+
+        {/* ── GAP 4: Immigration advisors matched to corridor ── */}
+        <AdvisorsPanel
+          destinationCountry={detail.destCountry}
+        />
+
+        {/* ── GAP 7: Assignment-level policy exception requests ── */}
+        <AssignmentExceptionsPanel assignmentId={detail.id} />
 
         {/* ── AIQ-40-D: Vendor RFQs (sent by HR, tracked here) ── */}
         <Card padding="lg" className="border border-[#e2e8f0]">

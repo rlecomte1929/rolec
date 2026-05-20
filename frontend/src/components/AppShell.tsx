@@ -3,6 +3,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Container } from './antigravity';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
+import { useBrandingConfig } from '../hooks/useBrandingConfig';
 import { getNavigationError } from '../navigation/safeNavigate';
 import { buildRoute, homeRouteKeyForRole, ROUTE_DEFS } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
@@ -59,6 +60,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
   const isOnAdminRoute = location.pathname.startsWith('/admin');
   const isAdminPolicyWorkspace = location.pathname.startsWith('/hr/policy') && searchParams.get('adminCompanyId') != null;
   const showAdminContextOnly = isOnAdminRoute || isAdminPolicyWorkspace;
+
+  // GAP 10: Apply company branding CSS vars (primary_colour etc.) to :root
+  useBrandingConfig();
   const showEmployeeNav = (isEmployeeRole && !isHrRole) || (role === 'ADMIN' && isOnEmployeeRoute);
   const showHrNav = isHrRole && !(role === 'ADMIN' && isOnEmployeeRoute) && !showAdminContextOnly;
   const { selectedCaseId } = useSelectedCase();

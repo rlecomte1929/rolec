@@ -21,6 +21,7 @@ import { ReadinessAndActionsBlock } from '../features/cases/ReadinessAndActionsB
 import { CaseOperationalSection } from '../features/cases/CaseOperationalSection';
 import { deriveCaseEssentials } from '../features/cases/caseEssentials';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
+import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptionsPanel';
 
 const statusBadge = (status?: AssignmentStatus) => {
   if (!status) return <Badge variant="neutral">Unknown</Badge>;
@@ -246,6 +247,9 @@ export const HrCaseSummary: React.FC = () => {
           {assignment.caseId && (
             <ExceptionFlagsPanel caseId={assignment.caseId} />
           )}
+
+          {/* ── GAP 7: Assignment-level benefit exception requests ── */}
+          <AssignmentExceptionsPanel assignmentId={assignment.id} />
 
           <CaseOperationalSection
             step={1}

@@ -4132,6 +4132,29 @@ class Database:
             return False
         return all(x == "revoked" for x in st)
 
+    def get_claim_invite_by_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """
+        Look up a single assignment_claim_invites row by its unique token.
+        Returns the row as a dict, or None if not found or on DB error.
+        """
+        token = (token or "").strip()
+        if not token:
+            return None
+        try:
+            with self.engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        "SELECT * FROM assignment_claim_invites WHERE token = :tok LIMIT 1"
+                    ),
+                    {"tok": token},
+                ).fetchone()
+            if row is None:
+                return None
+            m = row._mapping if hasattr(row, "_mapping") else dict(row)
+            return dict(m)
+        except (OperationalError, ProgrammingError):
+            return None
+
     def list_unassigned_assignments_legacy_for_identifiers(
         self, identifiers: List[str], request_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
