@@ -25,6 +25,9 @@
 export type V2FlagKey =
   // Phase 0 proof — read-only admin screen
   | 'companies'
+  // Resizable + drag-reorder columns on Companies V2 table (additive — see
+  // features/platform-v2/data-table/ for the primitive)
+  | 'companies_resizable'
   // Phase 1 — HR command center surface
   | 'mobility_control'
   | 'company_profile'
@@ -83,6 +86,7 @@ export function setV2FlagOverride(key: V2FlagKey, value: boolean | null): void {
 
 export const V2_FLAGS: ReadonlyArray<V2FlagKey> = [
   'companies',
+  'companies_resizable',
   'mobility_control',
   'company_profile',
   'inbox',

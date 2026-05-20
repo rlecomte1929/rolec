@@ -9,6 +9,8 @@ import type {
 import { CompanyFormModal } from './CompanyFormModal';
 import { RowActionMenu } from './RowActionMenu';
 import { DeleteCompanyDialog } from './DeleteCompanyDialog';
+import { useV2Flag } from '../useV2Flag';
+import { CompaniesV2Table } from './CompaniesV2Table';
 
 // ── Visual helpers ──────────────────────────────────────────────────────────
 
@@ -22,25 +24,25 @@ const TONE_LOGO: Record<CompanyV2Tone, string> = {
   f: 'bg-gradient-to-br from-violet-500 to-violet-700 text-white',
 };
 
-const PLAN_PILL: Record<CompanyV2PlanTier, string> = {
+export const PLAN_PILL: Record<CompanyV2PlanTier, string> = {
   premium: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   medium:  'bg-amber-50  text-amber-700  ring-amber-200',
   low:     'bg-slate-100 text-slate-600  ring-slate-200',
 };
 
-const STATUS_PILL: Record<CompanyV2Status, string> = {
+export const STATUS_PILL: Record<CompanyV2Status, string> = {
   active:   'bg-emerald-50 text-emerald-700 ring-emerald-200',
   inactive: 'bg-amber-50  text-amber-700  ring-amber-200',
   archived: 'bg-slate-100 text-slate-500  ring-slate-200',
 };
 
-const STATUS_DOT: Record<CompanyV2Status, string> = {
+export const STATUS_DOT: Record<CompanyV2Status, string> = {
   active:   'bg-emerald-500',
   inactive: 'bg-amber-500',
   archived: 'bg-slate-400',
 };
 
-function Pill({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function Pill({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${className}`}
@@ -60,7 +62,7 @@ function logoInitials(name: string): string {
     .toUpperCase();
 }
 
-function relativeDate(iso: string | null): string {
+export function relativeDate(iso: string | null): string {
   if (!iso) return '—';
   const diff = Date.now() - new Date(iso).getTime();
   const days = Math.floor(diff / 86_400_000);
@@ -122,7 +124,7 @@ interface CompanyLogoProps {
   size?: 'sm' | 'lg';
 }
 
-function CompanyLogo({ name, tone, size = 'sm' }: CompanyLogoProps) {
+export function CompanyLogo({ name, tone, size = 'sm' }: CompanyLogoProps) {
   const sizeClass = size === 'lg' ? 'h-11 w-11 text-[13px]' : 'h-7 w-7 text-[10.5px]';
   return (
     <div
@@ -139,7 +141,7 @@ interface SeatCellProps {
   limit: number | null;
 }
 
-function SeatCell({ count, limit }: SeatCellProps) {
+export function SeatCell({ count, limit }: SeatCellProps) {
   if (limit == null) {
     return (
       <div className="text-[12.5px] tabular-nums text-slate-700">
@@ -313,6 +315,11 @@ export interface CompaniesV2Props {
 }
 
 export function CompaniesV2({ companies, loading = false, error = null, onRefresh }: CompaniesV2Props) {
+  // Flag-gated resizable + drag-reorder table. Default off → renders the
+  // existing hand-written <table> block unchanged. Set
+  // localStorage.platform_v2_companies_resizable='on' to opt in per-session.
+  const { on: resizableOn } = useV2Flag('companies_resizable');
+
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -555,10 +562,27 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
         </div>
       )}
 
-      {/* Table — outer wrapper deliberately uses isolation+rounded without
-          overflow-hidden so absolute/portal children (row action menus) are
-          not clipped. The inner div keeps overflow-x-auto for wide-table
-          horizontal scroll. */}
+      {/* Table — flag-gated. Default: hand-written <table>. Flag on:
+          <CompaniesV2Table> backed by <DataTable> (resizable + drag-reorder
+          columns, layout persisted in localStorage). */}
+      {resizableOn ? (
+        <CompaniesV2Table
+          rows={filtered}
+          activeId={activeId}
+          busyId={busyId}
+          onRowClick={(c) => setActiveId(c.id)}
+          onEdit={(c) => setEditTarget(c)}
+          onArchive={(c) => void handleArchive(c)}
+          onDelete={(c) => handleDelete(c)}
+          emptyState={
+            loading
+              ? 'Loading companies…'
+              : anyFilter
+                ? 'No companies match your filters.'
+                : 'No companies yet.'
+          }
+        />
+      ) : (
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto rounded-xl">
           <table className="min-w-full text-[13px]">
@@ -660,6 +684,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
           </table>
         </div>
       </div>
+      )}
 
       {activeCompany && <DetailPanel company={activeCompany} onClose={() => setActiveId(null)} />}
 
