@@ -25,8 +25,13 @@
 export type V2FlagKey =
   // Phase 0 proof — read-only admin screen
   | 'companies'
+  // Resizable + drag-reorder columns on Companies V2 table (additive — see
+  // features/platform-v2/data-table/ for the primitive)
+  | 'companies_resizable'
   // Phase 1 — HR command center surface
   | 'mobility_control'
+  // Resizable + drag-reorder columns on Provider Grid V2
+  | 'provider_grid_resizable'
   | 'company_profile'
   | 'inbox'
   | 'employee_policy'
@@ -83,7 +88,9 @@ export function setV2FlagOverride(key: V2FlagKey, value: boolean | null): void {
 
 export const V2_FLAGS: ReadonlyArray<V2FlagKey> = [
   'companies',
+  'companies_resizable',
   'mobility_control',
+  'provider_grid_resizable',
   'company_profile',
   'inbox',
   'employee_policy',

@@ -3,6 +3,8 @@ import { AppShell } from '../../../components/AppShell';
 import { ProviderStatusGrid } from '../../../components/providers/ProviderStatusGrid';
 import { hrAPI } from '../../../api/client';
 import type { ProviderGridRow } from '../../../api/client';
+import { useV2Flag } from '../useV2Flag';
+import { ProviderGridV2Table } from './ProviderGridV2Table';
 
 /**
  * Provider Grid V2 — prototype-styled wrapper around the existing
@@ -16,6 +18,11 @@ import type { ProviderGridRow } from '../../../api/client';
  * Mounted at sibling /hr/provider-grid-v2 + via V2Gate on /hr/provider-grid.
  */
 export function ProviderGridV2Page() {
+  // Flag-gated resizable + drag-reorder table. Defaults off → renders the
+  // existing ProviderStatusGrid unchanged. Set
+  // localStorage.platform_v2_provider_grid_resizable='on' to opt in.
+  const { on: resizableOn } = useV2Flag('provider_grid_resizable');
+
   const [rows, setRows] = useState<ProviderGridRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -60,7 +67,9 @@ export function ProviderGridV2Page() {
 
   return (
     <AppShell>
-      <div className="px-6 py-6 mx-auto max-w-[1400px]">
+      {/* No max-width cap — list pages fill the viewport so wide tables fit
+          without horizontal scroll on larger monitors. */}
+      <div className="px-6 py-6">
         {/* Header */}
         <div className="mb-5">
           <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
@@ -99,12 +108,23 @@ export function ProviderGridV2Page() {
           </div>
         )}
 
-        <ProviderStatusGrid
-          rows={rows}
-          loading={loading}
-          lastRefreshed={lastRefreshed}
-          onRefresh={fetchGrid}
-        />
+        {/* Flag-gated table. Default: legacy ProviderStatusGrid (which has
+            its own toolbar with row count + refresh button). Flag on:
+            ProviderGridV2Table backed by <DataTable> for resize + drag-
+            reorder + per-table layout persistence. */}
+        {resizableOn ? (
+          <ProviderGridV2Table
+            rows={rows}
+            emptyState={loading ? 'Loading provider grid…' : 'No provider assignments yet.'}
+          />
+        ) : (
+          <ProviderStatusGrid
+            rows={rows}
+            loading={loading}
+            lastRefreshed={lastRefreshed}
+            onRefresh={fetchGrid}
+          />
+        )}
       </div>
     </AppShell>
   );

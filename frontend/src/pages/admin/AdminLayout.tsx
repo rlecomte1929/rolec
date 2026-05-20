@@ -153,11 +153,11 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
 
           {/* HR OPERATIONS */}
           <SectionHeading label="HR Operations" count={5} />
-          <NavItem to={buildRoute('hrCommandCenter')} label="Company profile" active={isActive(ROUTE_DEFS.hrCommandCenter.path, true)} />
-          <NavItem to={buildRoute('hrCommandCenter')} label="Mobility control" active={false} badge={12} />
+          <NavItem to={buildRoute('hrCompanyProfile')} label="Company profile" active={isActive(ROUTE_DEFS.hrCompanyProfile.path, true)} />
+          <NavItem to={buildRoute('hrCommandCenter')} label="Mobility control" active={isActive(ROUTE_DEFS.hrCommandCenter.path, true)} badge={12} />
           <NavItem to={buildRoute('hrPolicyBuilder')} label="Policy Builder" active={isActive(ROUTE_DEFS.hrPolicyBuilder.path)} badgeVariant="new" />
           <NavItem to={buildRoute('hrPolicy')} label="Policy & benefits" active={isActive(ROUTE_DEFS.hrPolicy.path)} />
-          <NavItem to={buildRoute('hrProviderGrid')} label="Policy vs. Reality" active={isActive(ROUTE_DEFS.hrProviderGrid.path)} badgeVariant="new" />
+          <NavItem to={buildRoute('hrProviderGrid')} label="Provider status" active={isActive(ROUTE_DEFS.hrProviderGrid.path)} badgeVariant="new" />
           <NavItem to={buildRoute('hrCommandCenter')} label="Exceptions" active={false} />
 
           {/* ADMIN · RELOPASS */}
