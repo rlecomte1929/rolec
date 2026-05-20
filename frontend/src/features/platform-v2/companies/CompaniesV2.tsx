@@ -555,9 +555,12 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+      {/* Table — outer wrapper deliberately uses isolation+rounded without
+          overflow-hidden so absolute/portal children (row action menus) are
+          not clipped. The inner div keeps overflow-x-auto for wide-table
+          horizontal scroll. */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-xl">
           <table className="min-w-full text-[13px]">
             <thead className="bg-slate-50/80 text-left text-[10.5px] font-semibold uppercase tracking-widest text-slate-500">
               <tr>
