@@ -31,6 +31,26 @@ URL-as-scope dodges all of the above. `/admin/companies/abc123/profile` is unamb
 
 **Trigger to revisit:** if a workflow emerges that genuinely needs "act as a tenant globally" — most likely "view exactly what this tenant's HR sees" — wire the existing impersonation endpoint with a clear "Impersonating: X · Exit" banner. Don't reach for global scope state.
 
+### First tenant-scoped sub-route shipped (2026-05-20)
+
+`/admin/companies/:companyId/profile` is live (`AdminCompanyProfilePage`, commit `e6094fd`).
+
+Architecture validated end-to-end:
+  - Sidebar switcher pick → `navigate('/admin/companies/:id')` (existing `AdminCompanyDetail`)
+  - That page has a "View profile →" button → `/admin/companies/:id/profile`
+  - `AdminCompanyProfilePage` reads `:companyId` from URL, loads via `adminAPI.getCompanyDetail`, saves via `adminAPI.updateCompany`
+  - The shared `CompanyProfileForm` is the same component used by HR's `/hr/company-profile-v2` — different data source, same UI
+  - Sidebar chip auto-syncs to the URL via existing `useMatch` logic
+
+Logo upload is hidden on the admin route (no admin-side endpoint exists yet; would need a `POST /api/admin/companies/{id}/logo` to bypass HR session scope). Form gracefully reflects this by hiding the upload button and showing a small notice.
+
+Pattern proven. To add more tenant-scoped sub-routes in future:
+1. Decide what scoped view to add (e.g. `/admin/companies/:companyId/policies`, `…/cases`, `…/exceptions`).
+2. Create a new page that reads `:companyId` from URL params + calls the right admin endpoint.
+3. Mount under existing `<RequireAdminRoute>` at the new URL.
+4. Add a link from `AdminCompanyDetail` (or `AdminCompanyProfilePage`) to the new sub-route.
+5. No global state changes required — URL is the scope.
+
 ---
 
 ## 2026-05-20 · Solo, pre-customer operating mode
