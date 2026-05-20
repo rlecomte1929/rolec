@@ -131,10 +131,30 @@ export function CompanyFormModal({ mode, initial, onClose, onSaved }: CompanyFor
       }
       onSaved();
     } catch (e) {
-      const detail =
-        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-        (e as Error)?.message ??
-        `Failed to ${mode === 'create' ? 'create' : 'update'} company`;
+      const err = e as {
+        response?: { status?: number; data?: { detail?: string } };
+        message?: string;
+      };
+      const status = err?.response?.status;
+      const serverDetail = err?.response?.data?.detail;
+      const action = mode === 'create' ? 'create' : 'update';
+      // Server-supplied detail wins; otherwise infer from HTTP status; finally
+      // fall back to the raw axios message. 500 gets a hint about backend logs
+      // since the modal can't surface a meaningful reason without it.
+      let detail: string;
+      if (serverDetail) {
+        detail = serverDetail;
+      } else if (status === 500) {
+        detail = `Server crashed while trying to ${action} the company. Check the uvicorn terminal for the Python traceback.`;
+      } else if (status === 403) {
+        detail = `Permission denied — your admin session may have expired.`;
+      } else if (status === 422) {
+        detail = `The form data was rejected by the server (validation error).`;
+      } else if (status) {
+        detail = `Server returned ${status} — could not ${action} company.`;
+      } else {
+        detail = err?.message ?? `Failed to ${action} company`;
+      }
       setError(detail);
     } finally {
       setSubmitting(false);
