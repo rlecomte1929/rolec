@@ -344,6 +344,61 @@ All four go through the same `adminAPI.invalidateApiCachePrefix('admin:companies
 - [ ] Delete escape paths: ESC key dismisses; outside-click dismisses (unless submitting).
 - [ ] Error surfacing: kill the backend mid-action → `actionError` banner shows above the table with a Dismiss button.
 
+---
+
+## Phase 1 · Screen 3 — s7p Company Profile (HR) — port (2026-05-20)
+
+Single-record edit page (different shape from s9g's list+modal). HR uses this to maintain their own company's profile.
+
+### Prototype side
+`frontend/public/design-preview/platform-s7p-profile.jsx` — 870 LOC. Four sections:
+  - **A · Identity** — name, legal_name, industry, size_band, website
+  - **B · Location & Contact** — country, hq_city, address, phone
+  - **C · HR & Mobility Defaults** — hr_contact, support_email, default_destination_country, default_working_location
+  - **D · Branding** — logo upload + brand_color picker
+
+Variants: `filled` (canonical), `empty` (welcome), `wizard` (3-step).
+
+### Legacy side
+`frontend/src/pages/HrCompanyProfile.tsx` — 287 LOC. Flat single-column form (no section grouping). Same field set as prototype.
+
+Data layer (reused as-is in V2):
+  - `useHrCompanyContext()` → `{ company, loading, error, refresh }`
+  - `hrAPI.getCompanyProfile()` → `GET /api/hr/company-profile`
+  - `hrAPI.saveCompanyProfile(payload)` → `POST /api/hr/company-profile`
+  - `hrAPI.uploadCompanyLogo(file)` → `POST /api/hr/company-profile/logo`
+  - `hrAPI.removeCompanyLogo()` → `POST /api/hr/company-profile/remove-logo`
+
+### Field shape: identical
+
+Both sides consume `CompanyProfilePayload` (types.ts:86). **No adapter needed** — V2 component reads/writes the same fields the legacy already supports. One exception: `brand_color` is in the prototype + the DB schema (`database.py:9669`) but is NOT in `CompanyProfilePayload`. Deferred to follow-up.
+
+### V2 scope (this port)
+
+**In:**
+  - Section-grouped layout matching the prototype (A / B / C / D)
+  - Same field set as legacy (no new schema)
+  - Sticky save bar at the bottom with "saved ✓" flash
+  - Logo upload (reuse `hrAPI.uploadCompanyLogo` + `removeCompanyLogo`)
+  - Country picker with flags (prototype-style)
+  - Reuses `useHrCompanyContext` for the data path
+
+**Out (deferred):**
+  - Brand color picker (needs `brand_color` added to `CompanyProfilePayload` + API contract)
+  - Empty + wizard variants (canonical filled only)
+  - Completion scoring (`FIELD_WEIGHTS` strip in prototype)
+  - Zoom-into-section UX (prototype's `profileZoom` tweak)
+
+### Recipe profile
+
+Closer to REWORK than ADOPT (visual layer redone, data layer untouched). About **3-4 commits**, not 10:
+  1. Comparison + scope (this entry)
+  2. CompanyProfileV2 component (visual + form state)
+  3. Sibling route + V2Gate
+  4. QA notes + tag
+
+No `adapter.ts` because the input and output types are already aligned.
+
 ### Recipe lessons (carry forward to screen 2..N)
 
 1. **Antigravity primitives are form-shaped, not table-shaped.** `Badge`, `Card`, `Input`, `Select`, `ProgressBar` have opinionated APIs (closed string callbacks, options arrays, fixed paddings). They work great in HrPolicy and the policy assistant. For prototype-style data screens (table headers, sticky filters, compact KPIs, dense pills) plain HTML + Tailwind utilities give better control. **Recipe addition:** for any ported screen, the first sub-decision is "form-style or data-style"; data-style screens skip antigravity in favour of Tailwind utilities.
