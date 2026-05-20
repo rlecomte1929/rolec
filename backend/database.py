@@ -265,6 +265,32 @@ def _get_company_policies_columns(conn: Any) -> set:
     return {r._mapping["column_name"] for r in rows}
 
 
+def _table_columns(conn: Any, table_name: str) -> set:
+    """Dialect-aware column-name introspection.
+
+    Returns the set of column names for `table_name`. Uses SQLite's
+    PRAGMA table_info on SQLite engines and Postgres's information_schema
+    on everything else. Existing call sites that hard-code the Postgres
+    query break on SQLite dev — this helper is the safe replacement.
+    """
+    if _is_sqlite:
+        rows = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+        return {r[1] for r in rows}
+    rows = conn.execute(
+        text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND table_name = :t"
+        ),
+        {"t": table_name},
+    ).fetchall()
+    return {r._mapping["column_name"] for r in rows}
+
+
+def _table_has_column(conn: Any, table_name: str, column_name: str) -> bool:
+    """Convenience wrapper over `_table_columns` for the common existence check."""
+    return column_name in _table_columns(conn, table_name)
+
+
 def _seed_default_policy_template_sqlite(conn: Any) -> None:
     """Insert one platform default policy template for SQLite when none exists."""
     from sqlalchemy import text
@@ -9682,15 +9708,7 @@ class Database:
         with self.engine.begin() as conn:
             # Production Postgres may not yet have the newer columns (status, plan_tier, hr_seat_limit, employee_seat_limit).
             # Build the INSERT/UPSERT dynamically based on actual columns to avoid UndefinedColumn errors.
-            company_cols = {
-                row._mapping["column_name"]
-                for row in conn.execute(
-                    text(
-                        "SELECT column_name FROM information_schema.columns "
-                        "WHERE table_name = 'companies'"
-                    )
-                ).fetchall()
-            }
+            company_cols = _table_columns(conn, "companies")
 
             base_cols = [
                 "id",
@@ -9841,13 +9859,8 @@ class Database:
             # We only include this update when the column exists.
             try:
                 with self.engine.connect() as conn:
-                    row = conn.execute(
-                        text(
-                            "SELECT 1 FROM information_schema.columns "
-                            "WHERE table_name = 'companies' AND column_name = 'status'"
-                        )
-                    ).fetchone()
-                if row:
+                    has_status = _table_has_column(conn, "companies", "status")
+                if has_status:
                     updates.append("status = :status")
                     params["status"] = (status or "active").lower()
             except Exception:
@@ -9883,13 +9896,8 @@ class Database:
         """
         try:
             with self.engine.connect() as conn:
-                row = conn.execute(
-                    text(
-                        "SELECT 1 FROM information_schema.columns "
-                        "WHERE table_name = 'companies' AND column_name = 'status'"
-                    )
-                ).fetchone()
-            if row:
+                has_status = _table_has_column(conn, "companies", "status")
+            if has_status:
                 return self.update_company(company_id, status="inactive")
         except Exception:
             pass
