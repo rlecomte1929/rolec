@@ -75,7 +75,7 @@ const HrProviderGrid = lazy(() => import('./pages/HrProviderGrid').then((module)
 const HrProviderGridV2 = lazy(() => import('./features/platform-v2/provider-grid/ProviderGridV2Page').then((module) => ({ default: module.ProviderGridV2Page })));
 const HrBacklogPage = lazy(() => import('./features/platform-v2/hr-backlog/HrBacklogPage').then((module) => ({ default: module.HrBacklogPage })));
 const MobilityControlCenterV2Page = lazy(() => import('./features/platform-v2/mobility-control/MobilityControlCenterV2Page').then((module) => ({ default: module.MobilityControlCenterV2Page })));
-const HrPolicyBuilder = lazy(() => import('./pages/HrPolicyBuilder').then((module) => ({ default: module.HrPolicyBuilder })));
+const HrPolicyBuilder = lazy(() => import('./features/platform-v2/policy-builder/HrPolicyBuilderV2Page').then((module) => ({ default: module.HrPolicyBuilderV2Page })));
 const HrExceptionsPage = lazy(() => import('./features/platform-v2/exceptions/HrExceptionsPage').then((module) => ({ default: module.HrExceptionsPage })));
 const HrPolicyRealityPage = lazy(() => import('./features/platform-v2/policy-reality/HrPolicyRealityPage').then((module) => ({ default: module.HrPolicyRealityPage })));
 const HrDiscoveryPage = lazy(() => import('./features/platform-v2/discovery/HrDiscoveryPage').then((module) => ({ default: module.HrDiscoveryPage })));
