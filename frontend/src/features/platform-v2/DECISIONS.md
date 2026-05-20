@@ -253,6 +253,50 @@ Run with both tabs open side by side: `localhost:3000/admin/companies` (legacy) 
 - 2026-05-20 · `/admin/companies-v2` rendered but visual fidelity vs prototype was low (flat Badge/Card primitives, default density) · **fix** in `2d670ff` — replaced antigravity primitives with Tailwind utilities + custom Pill component; KPI tone system, gradient logo chips, sticky+blurred filter bar, denser table.
 - 2026-05-20 · One-click demo buttons in `/auth?mode=login` returned "Invalid username or email" — defaults were `demo-admin / demo123` which don't exist · **fix** in `bb7a7c8` — defaults now match `backend/scripts/seed_testingapril_accounts.py` (admin@relopass.com / hr@testingapril.com / employee@testingapril.com). Requires the seed script to have been run.
 
+---
+
+## Phase 1 · Screen 2 — Provider Grid (s7) — port complete (2026-05-20)
+
+**Verdict applied: ADOPT** (per the classification table).
+
+The existing `pages/HrProviderGrid.tsx` + `components/providers/ProviderStatusGrid.tsx` are already prototype-aligned in concept (Provider × Case matrix). No data-shape translation needed → **no adapter, no Vitest unit test for shape translation** — the existing typed `ProviderGridRow` IS the V2 shape.
+
+### What landed (single commit, not 10)
+
+`features/platform-v2/provider-grid/ProviderGridV2Page.tsx` — thin wrapper that:
+  - Reuses `hrAPI.getProviderStatusGrid()` (existing endpoint, no API change)
+  - Reuses the existing `<ProviderStatusGrid>` component as-is for the matrix
+  - Adds prototype-style page header (eyebrow `RELOPASS · /hr/provider-grid` + h1 "Provider status" + `v2 preview` pill + Refresh + sub-line)
+  - Adds a 6-card KPI strip computed locally from the same `rows` array (total / not-started / in-progress / at-risk / complete / blocked cells)
+  - Reuses the `Pill` + `Kpi` idiom established in s9g Companies (gradient logos absent — N/A here since the matrix shows status cells, not company chips)
+
+Mounted at sibling `/hr/provider-grid-v2` (always V2) and gated on legacy `/hr/provider-grid` via `V2Gate flag="mobility_control"` (default OFF).
+
+### What this proves about the recipe
+
+**ADOPT screens are roughly 3× faster than REWORK / new screens.** s9g Companies needed 10 commits (read-only port from scratch). s7 Provider Grid needed 1 — because the table component, the API call, the types, and the data already lived in real code. The recipe collapses to:
+  1. Wrap existing component in prototype-styled page shell (header + KPIs).
+  2. Sibling route + V2Gate the legacy.
+  3. Validate.
+
+For future ADOPT screens, skip steps 2-4 of the standard recipe (stub adapter, implement adapter, write adapter tests). Keep step 1 (comparison), step 5 (V2 component wrapper), step 7 (route + gate), step 8 (QA notes).
+
+### Step 8 — Solo-mode QA checklist (Provider Grid)
+
+Run with both tabs open: `localhost:3000/hr/provider-grid` (legacy, default) and `localhost:3000/hr/provider-grid-v2` (V2 always).
+
+- [ ] V2 route loads without console errors specific to it
+- [ ] Header eyebrow + h1 + v2 pill + Refresh button render
+- [ ] KPI strip shows 6 cards; values match what you'd get summing the row list
+- [ ] Existing ProviderStatusGrid renders below the strip (sortable headers, cell statuses, employee names)
+- [ ] Refresh link triggers re-fetch (matches the inner grid's own Refresh button)
+- [ ] Empty state still works when no rows
+- [ ] Auth: HR or ADMIN access works; other roles blocked (same boundary as legacy route)
+
+### Recipe lesson (carry forward)
+
+**ADOPT verdict means single-commit port.** Don't fake the 10-step ritual when the underlying component is already correct — it's overhead with no protection added. The discipline that matters (tsc + build green, V2Gate, sibling route, written QA notes) still applies; the ceremony (multiple step commits, adapter + fixture + test trio) does not.
+
 ### Recipe lessons (carry forward to screen 2..N)
 
 1. **Antigravity primitives are form-shaped, not table-shaped.** `Badge`, `Card`, `Input`, `Select`, `ProgressBar` have opinionated APIs (closed string callbacks, options arrays, fixed paddings). They work great in HrPolicy and the policy assistant. For prototype-style data screens (table headers, sticky filters, compact KPIs, dense pills) plain HTML + Tailwind utilities give better control. **Recipe addition:** for any ported screen, the first sub-decision is "form-style or data-style"; data-style screens skip antigravity in favour of Tailwind utilities.

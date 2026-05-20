@@ -66,6 +66,7 @@ const HrCommandCenter = lazy(() => import('./pages/HrCommandCenter').then((modul
 const HrCommandCenterCaseDetail = lazy(() => import('./pages/HrCommandCenterCaseDetail').then((module) => ({ default: module.HrCommandCenterCaseDetail })));
 const HrAnalytics = lazy(() => import('./pages/HrAnalytics').then((module) => ({ default: module.HrAnalytics })));
 const HrProviderGrid = lazy(() => import('./pages/HrProviderGrid').then((module) => ({ default: module.HrProviderGrid })));
+const HrProviderGridV2 = lazy(() => import('./features/platform-v2/provider-grid/ProviderGridV2Page').then((module) => ({ default: module.ProviderGridV2Page })));
 const HrPolicyBuilder = lazy(() => import('./pages/HrPolicyBuilder').then((module) => ({ default: module.HrPolicyBuilder })));
 const ProviderPortal = lazy(() => import('./pages/ProviderPortal').then((module) => ({ default: module.ProviderPortal })));
 const EmployeeTaskPage = lazy(() => import('./pages/employee/EmployeeTaskPage').then((module) => ({ default: module.EmployeeTaskPage })));
@@ -199,7 +200,18 @@ function App() {
         <Route path={ROUTE_DEFS.hrAnalytics.path} element={<HrAnalytics />} />
         <Route path={ROUTE_DEFS.hrCommandCenter.path} element={<HrCommandCenter />} />
         <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<HrCommandCenterCaseDetail />} />
-        <Route path={ROUTE_DEFS.hrProviderGrid.path} element={<HrProviderGrid />} />
+        {/* platform-v2: flag-gated. Default OFF → legacy HrProviderGrid renders.
+            Enable per-session: localStorage.setItem('platform_v2_mobility_control', 'on').
+            Sibling /hr/provider-grid-v2 always renders V2 for side-by-side comparison. */}
+        <Route
+          path={ROUTE_DEFS.hrProviderGrid.path}
+          element={
+            <V2Gate flag="mobility_control" fallback={<HrProviderGrid />}>
+              <HrProviderGridV2 />
+            </V2Gate>
+          }
+        />
+        <Route path="/hr/provider-grid-v2" element={<HrProviderGridV2 />} />
         <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<HrPolicyBuilder />} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<HrCaseSummary />} />
