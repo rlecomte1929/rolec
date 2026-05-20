@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useMatch, useNavigate } from 'react-router-dom';
-import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
-import { getAdminNotificationCounts, type AdminNotificationCounts } from '../../api/adminCatalog';
+import { useMatch, useNavigate } from 'react-router-dom';
 import { getAuthItem } from '../../utils/demo';
 import { useAdminViewingCompany } from '../../features/admin/AdminViewingCompanyContext';
 import type { AdminCompany } from '../../types';
+import { PlatformShellSidebar } from '../../components/PlatformShellSidebar';
 
 interface Props {
   title?: string;
@@ -14,192 +13,30 @@ interface Props {
   headerRight?: React.ReactNode;
 }
 
-// ── Sidebar badge ─────────────────────────────────────────────────────────────
-
-const Badge: React.FC<{ count?: number; label?: string; variant?: 'count' | 'new' | 'live' }> = ({
-  count,
-  label,
-  variant = 'count',
-}) => {
-  if (variant === 'new') return (
-    <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-500 border border-indigo-100">
-      NEW
-    </span>
-  );
-  if (variant === 'live') return (
-    <span className="ml-auto px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-      LIVE
-    </span>
-  );
-  if (label) return (
-    <span className="ml-auto text-[10px] font-semibold text-slate-400">{label}</span>
-  );
-  if (!count || count <= 0) return null;
-  return (
-    <span className="ml-auto min-w-[1.25rem] px-1 text-center rounded-full bg-slate-200 text-slate-700 text-[10px] font-semibold leading-5">
-      {count > 99 ? '99+' : count}
-    </span>
-  );
-};
-
-// ── Nav item ──────────────────────────────────────────────────────────────────
-
-interface NavItemProps {
-  to: string;
-  label: string;
-  active: boolean;
-  badge?: number;
-  badgeVariant?: 'count' | 'new' | 'live';
-  badgeLabel?: string;
-}
-
-const NavItem: React.FC<NavItemProps> = ({ to, label, active, badge, badgeVariant, badgeLabel }) => (
-  <Link
-    to={to}
-    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-      active
-        ? 'bg-[#0b2b43]/8 text-[#0b2b43] font-medium'
-        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-    }`}
-  >
-    <span className="flex-1 truncate">{label}</span>
-    <Badge count={badge} label={badgeLabel} variant={badgeVariant} />
-  </Link>
-);
-
-// ── Section heading ───────────────────────────────────────────────────────────
-
-const SectionHeading: React.FC<{ label: string; count?: number }> = ({ label, count }) => (
-  <div className="flex items-center gap-1.5 px-3 pt-5 pb-1">
-    <span className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">{label}</span>
-    {count !== undefined && (
-      <span className="text-[10px] text-slate-300 font-medium">{count}</span>
-    )}
-  </div>
-);
-
 // ── Main layout ───────────────────────────────────────────────────────────────
 
+function deriveInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'RP';
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+}
+
 export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, headerRight }) => {
-  const location = useLocation();
   const userName = getAuthItem('relopass_name') ?? 'Romain';
-
-  const isActive = (path: string, exact?: boolean) =>
-    exact
-      ? location.pathname === path
-      : location.pathname === path || location.pathname.startsWith(`${path}/`);
-
-  const [adminNotif, setAdminNotif] = useState<AdminNotificationCounts | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const fetchOnce = () => {
-      void getAdminNotificationCounts()
-        .then((c) => { if (!cancelled) setAdminNotif(c); })
-        .catch(() => {});
-    };
-    fetchOnce();
-    const id = window.setInterval(fetchOnce, 60_000);
-    return () => { cancelled = true; window.clearInterval(id); };
-  }, []);
-
-  const pendingTickets = adminNotif?.pending_tickets ?? 0;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
 
-      {/* ── Sidebar ── */}
-      <aside className="w-[200px] shrink-0 flex flex-col bg-white border-r border-slate-200 overflow-y-auto">
-
-        {/* Logo */}
-        <div className="flex items-center gap-2 px-4 py-4 border-b border-slate-100">
-          <img src="/logo.svg" alt="ReloPass" className="h-6 w-auto"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          <span className="text-sm font-semibold text-slate-900">ReloPass</span>
-          <span className="text-slate-400 text-sm">/ Platform</span>
-        </div>
-
-        {/* Company switcher */}
-        <div className="px-3 py-2 border-b border-slate-100">
-          <CompanySwitcher />
-        </div>
-
-        {/* Search */}
-        <div className="px-3 py-2 border-b border-slate-100">
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
-            <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span className="text-xs text-slate-400 flex-1">Search cases, vendors…</span>
-            <kbd className="text-[10px] text-slate-300 border border-slate-200 rounded px-1">⌘K</kbd>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-2 pb-4">
-
-          {/* EMPLOYEE */}
-          <SectionHeading label="Employee" count={5} />
-          <NavItem to={buildRoute('employeeDashboard')} label="Intake" active={isActive(ROUTE_DEFS.employeeDashboard.path, true)} />
-          <NavItem to={buildRoute('employeeDashboard')} label="Detailed intake" active={false} badgeVariant="new" />
-          <NavItem to={buildRoute('employeeDashboard')} label="Roadmap" active={false} badge={3} />
-          <NavItem to={buildRoute('employeeDashboard')} label="Documents" active={false} />
-          <NavItem to={buildRoute('employeeDashboard')} label="Dossier & forms" active={false} />
-          <NavItem to={buildRoute('employeeDashboard')} label="Service providers" active={false} />
-          <NavItem to={buildRoute('employeeTaskPage')} label="Inbox" active={isActive(ROUTE_DEFS.employeeTaskPage.path)} badge={3} />
-
-          {/* AI ENGINE */}
-          <SectionHeading label="AI Engine" />
-          <NavItem to={buildRoute('employeeDashboard')} label="Requirements discovery" active={false} badgeVariant="live" />
-
-          {/* HR OPERATIONS */}
-          <SectionHeading label="HR Operations" count={5} />
-          <NavItem to={buildRoute('hrCompanyProfile')} label="Company profile" active={isActive(ROUTE_DEFS.hrCompanyProfile.path, true)} />
-          <NavItem to={buildRoute('hrCommandCenter')} label="Mobility control" active={isActive(ROUTE_DEFS.hrCommandCenter.path, true)} badge={12} />
-          <NavItem to={buildRoute('hrPolicyBuilder')} label="Policy Builder" active={isActive(ROUTE_DEFS.hrPolicyBuilder.path)} badgeVariant="new" />
-          <NavItem to={buildRoute('hrPolicy')} label="Policy & benefits" active={isActive(ROUTE_DEFS.hrPolicy.path)} />
-          <NavItem to={buildRoute('hrProviderGrid')} label="Provider status" active={isActive(ROUTE_DEFS.hrProviderGrid.path)} badgeVariant="new" />
-          <NavItem to={buildRoute('hrCommandCenter')} label="Exceptions" active={false} />
-
-          {/* ADMIN · RELOPASS */}
-          <SectionHeading label="Admin · ReloPass" count={5} />
-          <NavItem to={buildRoute('adminOverview')} label="Admin overview"
-            active={isActive(ROUTE_DEFS.adminOverview.path, true)} />
-          <NavItem to={buildRoute('adminCompanies')} label="Companies"
-            active={isActive(ROUTE_DEFS.adminCompanies.path)} />
-          <NavItem to={buildRoute('adminReviewQueue')} label="Review queue"
-            active={isActive(ROUTE_DEFS.adminReviewQueue.path)}
-            badge={pendingTickets || 24} />
-          <NavItem to={buildRoute('adminOpsSla')} label="Ops analytics"
-            active={isActive(ROUTE_DEFS.adminOpsSla.path)} />
-          <NavItem to={buildRoute('adminOpsQueue')} label="Workflow analytics"
-            active={isActive(ROUTE_DEFS.adminOpsQueue.path)} />
-          <NavItem to={buildRoute('adminResources')} label="Resources CMS"
-            active={isActive(ROUTE_DEFS.adminResources.path)} />
-          <NavItem to={buildRoute('adminProspects')} label="Prospects"
-            active={isActive(ROUTE_DEFS.adminProspects.path)} />
-          <NavItem to={buildRoute('adminCatalogQueue')} label="Integrations"
-            active={isActive(ROUTE_DEFS.adminCatalogQueue.path)}
-            badge={pendingTickets} />
-        </nav>
-
-        {/* User footer */}
-        <div className="px-3 py-3 border-t border-slate-100">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600 shrink-0">
-              {(userName.slice(0, 1) + (userName.includes(' ') ? userName.split(' ')[1]?.[0] ?? '' : '')).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-slate-900 truncate">{userName} · ReloPass</p>
-              <p className="text-[10px] text-slate-400">Admin · superuser</p>
-            </div>
-            <button className="text-slate-400 hover:text-slate-600">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </aside>
+      <PlatformShellSidebar
+        role="ADMIN"
+        companySlot={<CompanySwitcher />}
+        user={{
+          initials: deriveInitials(userName),
+          name: `${userName} · ReloPass`,
+          role: 'Admin · superuser',
+        }}
+      />
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col overflow-hidden">

@@ -1,0 +1,81 @@
+import React from 'react';
+import {
+  Sparkles,
+  UserRound,
+  Activity,
+  Upload,
+  Files,
+  Briefcase,
+  MessageSquare,
+  Share2,
+  Globe2,
+  PenSquare,
+  ShieldCheck,
+  TriangleAlert,
+  Home,
+  Building2,
+  CheckCircle2,
+  BarChart3,
+  Workflow,
+  BookOpen,
+  Users,
+  Layers,
+  type LucideIcon,
+} from 'lucide-react';
+
+/**
+ * Single source of truth for platform sidebar icons.
+ *
+ * Both `AdminLayout` (production admin shell) and `PlatformSidebar` (new
+ * platform-v2 nav) read from this map. Add a new nav item: add it here once,
+ * reference its id from both sidebars. Keys mirror the prototype IDs at
+ * `frontend/public/design-preview/platform-shell.jsx`.
+ */
+export const NAV_ICONS: Record<string, LucideIcon> = {
+  // Employee
+  intake: Sparkles,
+  'detailed-intake': UserRound,
+  roadmap: Activity,
+  documents: Upload,
+  dossier: Files,
+  'service-providers': Briefcase,
+  inbox: MessageSquare,
+
+  // AI Engine
+  'requirements-discovery': Share2,
+
+  // HR Operations
+  'company-profile': Briefcase,
+  'mobility-control': Globe2,
+  'policy-builder': PenSquare,
+  'policy-benefits': ShieldCheck,
+  'policy-reality': Activity,
+  'provider-status': Activity,
+  exceptions: TriangleAlert,
+
+  // Admin · ReloPass
+  'admin-overview': Home,
+  'admin-companies': Building2,
+  'review-queue': CheckCircle2,
+  'ops-analytics': BarChart3,
+  'workflow-analytics': Workflow,
+  'resources-cms': BookOpen,
+  prospects: Users,
+  integrations: Layers,
+};
+
+export type NavIconId = keyof typeof NAV_ICONS;
+
+interface NavIconProps {
+  id: string;
+  size?: number;
+  className?: string;
+  strokeWidth?: number;
+}
+
+/** Render the icon for a nav item by id. Renders nothing if the id is unknown. */
+export const NavIcon: React.FC<NavIconProps> = ({ id, size = 16, className, strokeWidth = 1.75 }) => {
+  const Icon = NAV_ICONS[id];
+  if (!Icon) return null;
+  return <Icon size={size} strokeWidth={strokeWidth} className={className} aria-hidden="true" />;
+};
