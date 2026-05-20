@@ -157,9 +157,9 @@ export interface CompanyProfileFormProps {
   badge?: string;
   /** Optional content rendered at the very top, before the page header. */
   topSlot?: React.ReactNode;
-  /** Path the "Back" button navigates to. Defaults to /hr/provider-grid (mobility control). */
+  /** Path the "Back" button navigates to. Defaults to /hr/dashboard. */
   backTo?: string;
-  /** Label for the back button. Defaults to "Back to mobility control". */
+  /** Label for the back button. Defaults to "Back to Dashboard". */
   backLabel?: string;
 }
 
@@ -177,8 +177,8 @@ export function CompanyProfileForm({
   subtitle,
   badge,
   topSlot,
-  backTo = '/hr/provider-grid',
-  backLabel = 'Back to mobility control',
+  backTo = '/hr/dashboard',
+  backLabel = 'Back to Dashboard',
 }: CompanyProfileFormProps) {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(() => formFromCompany(company));
@@ -615,36 +615,38 @@ export function CompanyProfileForm({
       </div>
 
       {/* Sticky bottom bar — sits within the main scroll column so the
-          PlatformSidebar isn't covered when it's expanded. */}
-      <div className="sticky bottom-0 left-0 right-0 z-20 -mx-6 mt-6 border-t border-slate-200 bg-white/95 backdrop-blur-md">
+          PlatformSidebar isn't covered when it's expanded. Uses brand
+          navy (#0b2b43) + teal (#1f8e8b) to match the antigravity Button
+          primary/secondary variants used across the rest of the platform. */}
+      <div className="sticky bottom-0 left-0 right-0 z-20 -mx-6 mt-6 border-t border-[#e2e8f0] bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-6 py-3">
           <div className="flex items-center gap-3 text-[13px]">
             {saveError ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-rose-700 ring-1 ring-inset ring-rose-200">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-rose-700 ring-1 ring-inset ring-rose-200">
                 <span aria-hidden>⚠</span> {saveError}
               </span>
             ) : saving ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e6f2f4] px-3 py-1 text-[#0b2b43] ring-1 ring-inset ring-[#cfe3e6]">
                 <Spinner className="h-3 w-3" /> Saving…
               </span>
             ) : isDirty ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-amber-800 ring-1 ring-inset ring-amber-200">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-amber-800 ring-1 ring-inset ring-amber-200">
                 Unsaved changes
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800 ring-1 ring-inset ring-emerald-200">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-emerald-800 ring-1 ring-inset ring-emerald-200">
                 <CheckIcon className="h-3 w-3" /> All changes saved
               </span>
             )}
             {lastSavedAt && !isDirty && !saving && (
-              <span className="text-slate-500">Auto-saved {savedAgo}</span>
+              <span className="text-[#64748b]">Auto-saved {savedAgo}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => navigate(backTo)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border-2 border-[#0b2b43] bg-white px-4 py-2 text-[13px] font-medium text-[#0b2b43] transition-colors hover:bg-[#e6f2f4] focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-2"
             >
               <span aria-hidden>←</span> {backLabel}
             </button>
@@ -652,7 +654,7 @@ export function CompanyProfileForm({
               type="button"
               onClick={() => void handleManualSave()}
               disabled={saving || !form.name.trim()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-[13px] font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#0b2b43] px-4 py-2 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-[#123651] focus:outline-none focus:ring-2 focus:ring-[#0b2b43] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckIcon className="h-3.5 w-3.5" /> Save profile
             </button>
