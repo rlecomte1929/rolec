@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ReloPass — Design Preview</title>
+  <style>
+    :root { color-scheme: light dark; font-family: -apple-system, system-ui, sans-serif; }
+    body { margin: 0; padding: 48px 32px; max-width: 880px; margin-inline: auto; line-height: 1.5; }
+    h1 { font-size: 28px; margin: 0 0 4px; }
+    .sub { color: #6b7280; margin: 0 0 32px; font-size: 14px; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    a.card {
+      display: block; text-decoration: none; color: inherit;
+      border: 1px solid #e5e7eb; border-radius: 12px;
+      padding: 16px 18px; transition: border-color 0.15s, transform 0.15s;
+      background: white;
+    }
+    a.card:hover { border-color: #6366f1; transform: translateY(-2px); }
+    a.card.primary { border-color: #6366f1; background: #eef2ff; }
+    a.card h3 { margin: 0 0 4px; font-size: 16px; }
+    a.card p  { margin: 0; font-size: 13px; color: #6b7280; }
+    .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+            background: #6366f1; color: white; margin-left: 6px; vertical-align: middle; }
+    .warn { background: #fef3c7; border: 1px solid #fde68a; border-radius: 10px;
+            padding: 14px 18px; font-size: 13px; color: #78350f; margin-bottom: 28px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #0a0a0a; color: #e5e5e5; }
+      a.card { background: #171717; border-color: #262626; }
+      a.card.primary { background: #1e1b4b; border-color: #6366f1; }
+      a.card p { color: #a3a3a3; }
+      .warn { background: #422006; border-color: #78350f; color: #fde68a; }
+    }
+  </style>
+</head>
+<body>
+  <h1>ReloPass — Design Preview</h1>
+  <p class="sub">Claude Design handoff bundle. Static prototypes — no real backend, mock data only.</p>
+
+  <div class="warn">
+    <strong>Sandbox.</strong> These files live in <code>frontend/public/design-preview/</code> and run in isolation.
+    The real ReloPass app is unaffected by anything you do here.
+    To remove the entire preview, delete that directory.
+  </div>
+
+  <div class="grid">
+    <a class="card primary" href="./ReloPass%20Platform.html">
+      <h3>ReloPass Platform <span class="pill">primary</span></h3>
+      <p>Full platform shell — auth, intake, HR, admin, policy builder, exceptions. 25+ screens with built-in screen picker.</p>
+    </a>
+    <a class="card" href="./Pathway%20Final.html">
+      <h3>Pathway — Final</h3>
+      <p>Latest single-page intake/journey design.</p>
+    </a>
+    <a class="card" href="./Pathway%20v2.html">
+      <h3>Pathway — v2</h3>
+      <p>Iteration with separated timeline / intake / header atoms.</p>
+    </a>
+    <a class="card" href="./Pathway%20Simple.html">
+      <h3>Pathway — Simple</h3>
+      <p>Original simpler pathway prototype.</p>
+    </a>
+    <a class="card" href="./pathway-original.html">
+      <h3>Pathway — Original index</h3>
+      <p>The bundle's original auto-boot index (Pathway Simple wizard).</p>
+    </a>
+    <a class="card" href="./_HANDOFF_README.md">
+      <h3>Handoff README</h3>
+      <p>The notes shipped by Claude Design with the bundle.</p>
+    </a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReloPass — Sign in</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    body { display: flex; height: 100vh; }
+
+    /* ── GLOBE PANEL (left) ─────────────────────────────────────────── */
+    .globe-panel {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #0d1f3a;  /* ← lighter navy: clearly blue, not near-black */
+    }
+    #globe-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Globe panel — ReloPass wordmark overlay (top-left) */
+    .globe-logo {
+      position: absolute;
+      top: 36px;
+      left: 44px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      z-index: 2;
+    }
+    .globe-logo .wordmark {
+      font-size: 15px;
+      font-weight: 500;
+      color: rgba(232,241,255,0.88);
+      letter-spacing: -0.01em;
+    }
+    .globe-logo .product-label {
+      font-size: 13px;
+      font-weight: 400;
+      color: rgba(165,192,228,0.40);
+    }
+
+    /* Live badge bottom-left */
+    .globe-badge {
+      position: absolute;
+      bottom: 40px;
+      left: 44px;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .live-tag {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      color: rgba(29,191,162,0.85);
+    }
+    .case-card {
+      background: rgba(10,22,55,0.82);
+      border: 0.5px solid rgba(255,255,255,0.10);
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .case-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(29,191,162,0.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1DBFA2;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .case-info { display: flex; flex-direction: column; gap: 3px; }
+    .case-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(232,241,255,0.90);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .case-live {
+      font-size: 8px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #1DBFA2;
+      background: rgba(29,191,162,0.12);
+      border: 0.5px solid rgba(29,191,162,0.25);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+    .case-meta {
+      font-size: 11px;
+      color: rgba(165,192,228,0.50);
+    }
+
+    /* ── FORM PANEL (right) — white ─────────────────────────────────── */
+    .form-panel {
+      width: 440px;
+      min-width: 400px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      border-left: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .form-inner {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 48px 48px 32px;
+    }
+
+    /* Tab switcher */
+    .tab-switcher {
+      display: flex;
+      background: #f1f5f9;
+      border-radius: 10px;
+      padding: 3px;
+      margin-bottom: 36px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 8px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+      background: transparent;
+      color: #64748b;
+    }
+    .tab-btn.active {
+      background: #ffffff;
+      color: #0d1f3a;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.10), 0 0 0 0.5px rgba(0,0,0,0.05);
+    }
+
+    /* Form heading */
+    .form-heading {
+      font-size: 22px;
+      font-weight: 500;
+      color: #0d1f3a;
+      letter-spacing: -0.02em;
+      margin-bottom: 5px;
+    }
+    .form-subhead {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    /* Error */
+    .form-error {
+      font-size: 13px;
+      color: #b91c1c;
+      background: #fef2f2;
+      border: 0.5px solid #fca5a5;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      display: none;
+      line-height: 1.4;
+    }
+    .form-error.visible { display: block; }
+
+    /* Fields */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 16px;
+    }
+    .field label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #374151;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .field-wrap { position: relative; }
+    .field input {
+      width: 100%;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #0d1f3a;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+    .field input::placeholder { color: #94a3b8; }
+    .field input:focus {
+      background: #ffffff;
+      border-color: #1DBFA2;
+      box-shadow: 0 0 0 3px rgba(29,191,162,0.10);
+    }
+    .field input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Password toggle */
+    .pw-toggle {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #94a3b8;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      transition: color 0.15s;
+    }
+    .pw-toggle:hover { color: #475569; }
+
+    .forgot-link {
+      font-size: 12px;
+      font-weight: 400;
+      color: #64748b;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .forgot-link:hover { color: #1DBFA2; }
+
+    /* Primary button */
+    .btn-primary {
+      width: 100%;
+      padding: 11px 0;
+      background: #0d1f3a;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      color: #ffffff;
+      cursor: pointer;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s, transform 0.1s, opacity 0.15s;
+    }
+    .btn-primary:hover:not(:disabled) { background: #162d52; }
+    .btn-primary:active:not(:disabled) { transform: scale(0.99); }
+    .btn-primary:disabled { opacity: 0.50; cursor: not-allowed; }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.25);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+      flex-shrink: 0;
+    }
+    .btn-primary.loading .spinner { display: block; }
+    .btn-primary.loading .btn-label { opacity: 0.75; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: #94a3b8;
+      font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+
+    /* SSO buttons */
+    .sso-row { display: flex; gap: 10px; }
+    .btn-sso {
+      flex: 1;
+      padding: 9px 0;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 400;
+      font-family: inherit;
+      color: #374151;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn-sso:hover { border-color: #cbd5e1; background: #f8fafc; }
+
+    /* Sign up / new account link */
+    .switch-link {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 24px;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .switch-link a {
+      color: #1DBFA2;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+    .switch-link a:hover { color: #18a38a; }
+
+    /* Demo panel */
+    .demo-panel {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid #f1f5f9;
+    }
+    .demo-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .demo-label span {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+    }
+    .demo-label .proto-badge {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #d97706;
+      background: #fffbeb;
+      border: 0.5px solid #fcd34d;
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+    .demo-cards { display: flex; gap: 8px; }
+    .demo-card {
+      flex: 1;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      text-decoration: none;
+    }
+    .demo-card:hover { border-color: #1DBFA2; background: #f0fdf9; }
+    .demo-card-role {
+      font-size: 12px;
+      font-weight: 500;
+      color: #0d1f3a;
+      margin-bottom: 3px;
+    }
+    .demo-card-name {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+    .demo-card-link {
+      font-size: 10px;
+      font-weight: 500;
+      color: #1DBFA2;
+      font-family: 'Menlo', 'Consolas', monospace;
+    }
+
+    /* Form panel footer */
+    .form-footer {
+      padding: 20px 48px;
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      border-top: 1px solid #f1f5f9;
+    }
+    .form-footer a,
+    .form-footer span {
+      font-size: 11px;
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.12s;
+    }
+    .form-footer a:hover { color: #64748b; }
+
+    /* View toggle for sign-in vs create-account */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── RESPONSIVE ─────────────────────────────────────────────────── */
+    @media (max-width: 960px) {
+      body { flex-direction: column; overflow-y: auto; height: auto; }
+      .globe-panel { height: 260px; flex: none; }
+      .form-panel  { width: 100%; min-width: 0; }
+      .form-inner  { padding: 32px 28px 24px; }
+      .form-footer { padding: 16px 28px; }
+      .demo-cards  { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── GLOBE PANEL ─────────────────────────────────────────────────── -->
+  <div class="globe-panel">
+    <canvas id="globe-canvas" aria-hidden="true"></canvas>
+
+    <!-- Logo overlay -->
+    <div class="globe-logo">
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <circle cx="14" cy="14" r="12.5" stroke="rgba(29,191,162,0.55)" stroke-width="1"/>
+        <ellipse cx="14" cy="14" rx="5.5" ry="12.5" stroke="rgba(29,191,162,0.35)" stroke-width="0.75"/>
+        <line x1="1.5" y1="14" x2="26.5" y2="14" stroke="rgba(29,191,162,0.35)" stroke-width="0.75"/>
+        <circle cx="14" cy="14" r="2.2" fill="#1DBFA2"/>
+      </svg>
+      <span class="wordmark">ReloPass</span>
+      <span class="product-label">· Platform</span>
+    </div>
+
+    <!-- Live case badge -->
+    <div class="globe-badge">
+      <span class="live-tag">• LIVE ACROSS 47 CORRIDORS</span>
+      <div class="case-card">
+        <div class="case-icon">↝</div>
+        <div class="case-info">
+          <div class="case-name">
+            Marc B. · FR → NO
+            <span class="case-live">LIVE</span>
+          </div>
+          <div class="case-meta">visa approved · 2,882 active relocations across 47 corridors</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── FORM PANEL ──────────────────────────────────────────────────── -->
+  <div class="form-panel">
+    <div class="form-inner">
+
+      <!-- Tab switcher -->
+      <div class="tab-switcher" role="tablist">
+        <button class="tab-btn active" id="tab-signin"
+          role="tab" aria-selected="true" aria-controls="view-signin">
+          Sign in
+        </button>
+        <button class="tab-btn" id="tab-create"
+          role="tab" aria-selected="false" aria-controls="view-create">
+          Create account
+        </button>
+      </div>
+
+      <!-- ── SIGN IN VIEW ─────────────────────────────────────────── -->
+      <div class="view active" id="view-signin" role="tabpanel">
+
+        <h1 class="form-heading">Sign in to ReloPass</h1>
+        <p class="form-subhead">Welcome back. Pick up where you left off.</p>
+
+        <p class="form-error" id="signin-error" role="alert"></p>
+
+        <form id="signin-form" novalidate>
+          <div class="field">
+            <label for="signin-email">Email or username</label>
+            <input id="signin-email" name="email" type="email"
+              placeholder="you@company.com"
+              autocomplete="email" required />
+          </div>
+
+          <div class="field">
+            <label for="signin-password">
+              Password
+              <a href="/auth/forgot" class="forgot-link">Forgot?</a>
+            </label>
+            <div class="field-wrap">
+              <input id="signin-password" name="password" type="password"
+                placeholder="••••••••"
+                autocomplete="current-password" required />
+              <button type="button" class="pw-toggle" aria-label="Show password"
+                onclick="togglePw('signin-password', this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary" id="signin-btn">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="btn-label">Sign in</span>
+          </button>
+        </form>
+
+        <div class="divider"><span>or</span></div>
+
+        <div class="sso-row">
+          <button class="btn-sso" onclick="handleSSO('google')">
+            <!-- Google icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Google
+          </button>
+          <button class="btn-sso" onclick="handleSSO('microsoft')">
+            <!-- Microsoft icon -->
+            <svg width="16" height="16" viewBox="0 0 23 23" aria-hidden="true">
+              <rect x="1"  y="1"  width="10" height="10" fill="#f35325"/>
+              <rect x="12" y="1"  width="10" height="10" fill="#81bc06"/>
+              <rect x="1"  y="12" width="10" height="10" fill="#05a6f0"/>
+              <rect x="12" y="12" width="10" height="10" fill="#ffba08"/>
+            </svg>
+            Microsoft SSO
+          </button>
+        </div>
+
+        <p class="switch-link">
+          New to ReloPass?
+          <a href="#" onclick="switchTab('create'); return false;">Create an account →</a>
+        </p>
+
+        <!-- Demo quick-access (remove in production) -->
+        <div class="demo-panel">
+          <div class="demo-label">
+            <span>ONE-CLICK DEMO</span>
+            <span class="proto-badge">PROTOTYPE</span>
+          </div>
+          <div class="demo-cards">
+            <a class="demo-card" href="/admin" onclick="demoLogin('admin'); return false;">
+              <div class="demo-card-role">Admin</div>
+              <div class="demo-card-name">ReloPass team</div>
+              <div class="demo-card-link">→ /ADMIN</div>
+            </a>
+            <a class="demo-card" href="/hr/dashboard" onclick="demoLogin('hr'); return false;">
+              <div class="demo-card-role">HR</div>
+              <div class="demo-card-name">Helena · Aurora</div>
+              <div class="demo-card-link">→ /HR/DASHBOARD</div>
+            </a>
+            <a class="demo-card" href="/employee/dashboard" onclick="demoLogin('employee'); return false;">
+              <div class="demo-card-role">Employee</div>
+              <div class="demo-card-name">Marc · FR→NO</div>
+              <div class="demo-card-link">→ /EMPLOYEE/DASHBOARD</div>
+            </a>
+          </div>
+        </div>
+
+      </div><!-- /view-signin -->
+
+
+      <!-- ── CREATE ACCOUNT VIEW ──────────────────────────────────── -->
+      <div class="view" id="view-create" role="tabpanel">
+
+        <h1 class="form-heading">Create your account</h1>
+        <p class="form-subhead">Set up your ReloPass workspace in minutes.</p>
+
+        <p class="form-error" id="create-error" role="alert"></p>
+
+        <form id="create-form" novalidate>
+          <div class="field">
+            <label for="create-name">Full name</label>
+            <input id="create-name" name="name" type="text"
+              placeholder="Jane Smith"
+              autocomplete="name" required />
+          </div>
+
+          <div class="field">
+            <label for="create-email">Work email</label>
+            <input id="create-email" name="email" type="email"
+              placeholder="you@company.com"
+              autocomplete="email" required />
+          </div>
+
+          <div class="field">
+            <label for="create-company">Company</label>
+            <input id="create-company" name="company" type="text"
+              placeholder="Acme Corp"
+              autocomplete="organization" />
+          </div>
+
+          <div class="field">
+            <label for="create-password">Password</label>
+            <div class="field-wrap">
+              <input id="create-password" name="password" type="password"
+                placeholder="Min. 8 characters"
+                autocomplete="new-password" required />
+              <button type="button" class="pw-toggle" aria-label="Show password"
+                onclick="togglePw('create-password', this)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary" id="create-btn">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="btn-label">Create account</span>
+          </button>
+        </form>
+
+        <p class="switch-link" style="margin-top:20px;">
+          Already have an account?
+          <a href="#" onclick="switchTab('signin'); return false;">Sign in →</a>
+        </p>
+
+        <p style="font-size:11px;color:#94a3b8;margin-top:16px;text-align:center;line-height:1.6;">
+          By creating an account you agree to the
+          <a href="/terms" style="color:#64748b;text-decoration:none;">Terms of Service</a>
+          and
+          <a href="/privacy" style="color:#64748b;text-decoration:none;">Privacy Policy</a>.
+        </p>
+
+      </div><!-- /view-create -->
+
+    </div><!-- /form-inner -->
+
+    <footer class="form-footer">
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <a href="mailto:support@relopass.com">Support</a>
+      <span>© 2026 ReloPass</span>
+    </footer>
+  </div><!-- /form-panel -->
+
+
+  <script>
+    /* ═══════════════════════════════════════════════════════════════════
+       UI INTERACTIONS
+    ═══════════════════════════════════════════════════════════════════ */
+
+    /* Tab switching */
+    function switchTab(which) {
+      const isSignin = which === 'signin';
+      document.getElementById('tab-signin').classList.toggle('active', isSignin);
+      document.getElementById('tab-create').classList.toggle('active', !isSignin);
+      document.getElementById('tab-signin').setAttribute('aria-selected', isSignin);
+      document.getElementById('tab-create').setAttribute('aria-selected', !isSignin);
+      document.getElementById('view-signin').classList.toggle('active', isSignin);
+      document.getElementById('view-create').classList.toggle('active', !isSignin);
+    }
+
+    document.getElementById('tab-signin').addEventListener('click', () => switchTab('signin'));
+    document.getElementById('tab-create').addEventListener('click', () => switchTab('create'));
+
+    /* Password show/hide */
+    function togglePw(inputId, btn) {
+      const input = document.getElementById(inputId);
+      const isText = input.type === 'text';
+      input.type = isText ? 'password' : 'text';
+      btn.style.color = isText ? '' : '#1DBFA2';
+    }
+
+    /* Form error helpers */
+    function showError(boxId, msg) {
+      const el = document.getElementById(boxId);
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+    function clearError(boxId) {
+      document.getElementById(boxId).classList.remove('visible');
+    }
+
+    function setLoading(formId, btnId, on) {
+      const btn = document.getElementById(btnId);
+      btn.disabled = on;
+      btn.classList.toggle('loading', on);
+      document.getElementById(formId)
+        .querySelectorAll('input')
+        .forEach(el => el.disabled = on);
+    }
+
+    /* ── Sign in form ─────────────────────────────────────────────── */
+    document.getElementById('signin-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      clearError('signin-error');
+      const email    = this.email.value.trim();
+      const password = this.password.value;
+      if (!email || !password) { showError('signin-error', 'Please fill in both fields.'); return; }
+      setLoading('signin-form', 'signin-btn', true);
+      try {
+        /* ── TODO: replace with your auth call ──────────────────────
+           Supabase:
+             const { error } = await supabase.auth.signInWithPassword({ email, password });
+             if (error) throw error;
+             window.location.href = '/dashboard';
+        ─────────────────────────────────────────────────────────── */
+        await new Promise(r => setTimeout(r, 1200));
+        showError('signin-error', 'Backend not connected — wire up the TODO block.');
+      } catch (err) {
+        showError('signin-error', err.message || 'Sign in failed. Please try again.');
+      } finally {
+        setLoading('signin-form', 'signin-btn', false);
+      }
+    });
+
+    /* ── Create account form ──────────────────────────────────────── */
+    document.getElementById('create-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      clearError('create-error');
+      const email    = this.email.value.trim();
+      const password = this.password.value;
+      const name     = this.name.value.trim();
+      if (!name || !email || !password) { showError('create-error', 'Please fill in all required fields.'); return; }
+      if (password.length < 8) { showError('create-error', 'Password must be at least 8 characters.'); return; }
+      setLoading('create-form', 'create-btn', true);
+      try {
+        /* ── TODO: replace with your sign-up call ───────────────────
+           Supabase:
+             const { error } = await supabase.auth.signUp({ email, password,
+               options: { data: { full_name: name, company: this.company.value } }
+             });
+             if (error) throw error;
+             window.location.href = '/onboarding';
+        ─────────────────────────────────────────────────────────── */
+        await new Promise(r => setTimeout(r, 1200));
+        showError('create-error', 'Backend not connected — wire up the TODO block.');
+      } catch (err) {
+        showError('create-error', err.message || 'Account creation failed. Please try again.');
+      } finally {
+        setLoading('create-form', 'create-btn', false);
+      }
+    });
+
+    /* ── SSO ─────────────────────────────────────────────────────── */
+    function handleSSO(provider) {
+      /* ── TODO: trigger your OAuth flow ─────────────────────────────
+         Supabase: await supabase.auth.signInWithOAuth({ provider });
+      ─────────────────────────────────────────────────────────── */
+      alert(`SSO (${provider}): wire up your identity provider here.`);
+    }
+
+    /* ── Demo quick-login ────────────────────────────────────────── */
+    function demoLogin(role) {
+      /* ── TODO: set a demo session cookie or mock auth token ──────── */
+      alert(`Demo login as ${role} — connect to your prototype auth here.`);
+    }
+
+
+    /* ═══════════════════════════════════════════════════════════════════
+       GLOBE CANVAS ANIMATION
+       Background: #0d1f3a (lighter navy — clearly blue, not near-black)
+       Tune constants marked with ← TUNE
+    ═══════════════════════════════════════════════════════════════════ */
+    (function () {
+      const cv  = document.getElementById('globe-canvas');
+      const ctx = cv.getContext('2d');
+
+      function resize() {
+        cv.width  = cv.clientWidth  || 900;
+        cv.height = cv.clientHeight || 900;
+      }
+      resize();
+      const ro = new ResizeObserver(resize);
+      ro.observe(cv.parentElement);
+
+      function G() {
+        const W = cv.width, H = cv.height;
+        const R = Math.min(W * 0.44, H * 0.42);   /* ← TUNE: globe size */
+        return { W, H, X: W * 0.52, Y: H * 0.50, RX: R, RY: R * 1.02 };
+      }
+
+      function proj(lat, lon, g) {
+        return [
+          g.X + g.RX * (lon / 90),
+          g.Y - g.RY * ((lat - 15) / 72),
+        ];
+      }
+
+      const CITIES = [
+        { key: 'paris',     lat:  48.9, lon:   2.3, code: 'FR' },
+        { key: 'oslo',      lat:  59.9, lon:  10.7, code: 'NO' },
+        { key: 'london',    lat:  51.5, lon:  -0.1, code: 'GB' },
+        { key: 'dubai',     lat:  25.2, lon:  55.3, code: 'AE' },
+        { key: 'singapore', lat:   1.3, lon: 103.8, code: 'SG' },
+        { key: 'newyork',   lat:  40.7, lon: -74.0, code: 'US' },
+        { key: 'toronto',   lat:  43.7, lon: -79.4, code: 'CA' },
+        { key: 'saopaulo',  lat: -23.5, lon: -46.6, code: 'BR' },
+        { key: 'berlin',    lat:  52.5, lon:  13.4, code: 'DE' },
+        { key: 'sydney',    lat: -33.9, lon: 151.2, code: 'AU' },
+      ];
+      const cityMap = Object.fromEntries(CITIES.map(c => [c.key, c]));
+
+      const CORR_DEF = [
+        { f: 'paris',    t: 'oslo',      col: '#1DBFA2', lbl: 'FR → NO', delay:   0 },
+        { f: 'london',   t: 'dubai',     col: '#4A9AE8', lbl: 'GB → AE', delay:  55 },
+        { f: 'newyork',  t: 'london',    col: '#EFA827', lbl: 'US → GB', delay: 110 },
+        { f: 'toronto',  t: 'berlin',    col: '#1DBFA2', lbl: 'CA → DE', delay:  25 },
+        { f: 'dubai',    t: 'singapore', col: '#4A9AE8', lbl: 'AE → SG', delay: 148 },
+        { f: 'saopaulo', t: 'london',    col: '#EFA827', lbl: 'BR → GB', delay:  80 },
+        { f: 'berlin',   t: 'dubai',     col: '#1DBFA2', lbl: 'DE → AE', delay: 170 },
+      ];
+      const corrs = CORR_DEF.map(d => ({
+        ...d, phase: 'idle', prog: 0, opa: 0, timer: d.delay, lblAmt: 0,
+      }));
+      const pulses = [];
+
+      const CONTS = [
+        [[70,20],[65,-5],[55,-10],[46,-8],[36,10],[38,36],[56,40],[70,28]],
+        [[37,-5],[37,50],[15,50],[-2,42],[-35,26],[-22,-17],[14,-18],[37,-5]],
+        [[70,37],[70,142],[55,142],[24,121],[10,104],[5,100],[10,44],[40,37],[70,37]],
+        [[70,-142],[70,-56],[50,-57],[30,-82],[20,-90],[20,-118],[50,-130],[70,-142]],
+        [[10,-80],[8,-62],[-5,-35],[-33,-52],[-55,-68],[-40,-73],[0,-80],[10,-80]],
+        [[-12,114],[-12,154],[-42,148],[-40,114],[-12,114]],
+      ];
+
+      function cpOf(fx, fy, tx, ty) {
+        const d = Math.hypot(tx - fx, ty - fy);
+        return [(fx + tx) / 2, (fy + ty) / 2 - d * 0.32];
+      }
+      function bez(fx, fy, cx, cy, tx, ty, t) {
+        const u = 1 - t;
+        return [u*u*fx + 2*u*t*cx + t*t*tx, u*u*fy + 2*u*t*cy + t*t*ty];
+      }
+      function h2(v) {
+        return Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).padStart(2, '0');
+      }
+
+      function drawBg(g) {
+        /* Slightly lighter navy: #0d1f3a — clearly blue, not near-black */
+        ctx.fillStyle = '#0d1f3a';
+        ctx.fillRect(0, 0, g.W, g.H);
+        const gr = ctx.createRadialGradient(g.X, g.Y * 0.7, 0, g.X, g.Y, g.RX * 1.4);
+        gr.addColorStop(0, 'rgba(20,60,150,0.18)');
+        gr.addColorStop(1, 'rgba(13,31,58,0)');
+        ctx.fillStyle = gr;
+        ctx.fillRect(0, 0, g.W, g.H);
+      }
+
+      function drawContinents(g) {
+        CONTS.forEach(pts => {
+          ctx.beginPath();
+          pts.forEach(([lat, lon], i) => {
+            const [x, y] = proj(lat, lon, g);
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+          });
+          ctx.closePath();
+          ctx.fillStyle   = 'rgba(30,70,170,0.065)'; ctx.fill();
+          ctx.strokeStyle = 'rgba(40,90,200,0.12)';
+          ctx.lineWidth   = 0.5; ctx.stroke();
+        });
+      }
+
+      function drawGlobe(g) {
+        for (let lat = -60; lat <= 70; lat += 20) {
+          const [, py] = proj(lat, 0, g);
+          const cosL = Math.abs(Math.cos(lat * Math.PI / 180));
+          const rx   = g.RX * cosL * 0.86;
+          if (rx < 6) continue;
+          ctx.beginPath();
+          ctx.ellipse(g.X, py, rx, g.RY * 0.10, 0, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(50,100,220,0.13)'; ctx.lineWidth = 0.65; ctx.stroke();
+        }
+        for (let lon = -150; lon <= 150; lon += 30) {
+          const angle = (lon / 90) * (Math.PI / 2.9);
+          ctx.save();
+          ctx.translate(g.X, g.Y); ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, g.RX * 0.28, g.RY, 0, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(50,100,220,0.13)'; ctx.lineWidth = 0.65; ctx.stroke();
+          ctx.restore();
+        }
+        ctx.beginPath();
+        ctx.ellipse(g.X, g.Y, g.RX, g.RY, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(50,100,220,0.26)'; ctx.lineWidth = 1; ctx.stroke();
+      }
+
+      function updateCorrs(g) {
+        const DF = 115, HF = 95, FF = 58;   /* ← TUNE: draw / hold / fade frames */
+        corrs.forEach(c => {
+          if (c.phase === 'idle') {
+            if (--c.timer <= 0) { c.phase = 'drawing'; c.prog = 0; c.opa = 0; }
+          } else if (c.phase === 'drawing') {
+            c.prog = Math.min(1, c.prog + 1 / DF);
+            c.opa  = Math.min(1, c.opa  + 2.8 / DF);
+            if (c.prog >= 1) {
+              c.phase = 'visible'; c.timer = HF; c.lblAmt = 0;
+              const tc = cityMap[c.t];
+              if (tc) {
+                const [px, py] = proj(tc.lat, tc.lon, g);
+                pulses.push({ x: px, y: py, r: 5, opa: 1, col: c.col });
+              }
+            }
+          } else if (c.phase === 'visible') {
+            c.timer--;
+            c.lblAmt = Math.min(HF, (HF - c.timer) * 2.8);
+            if (c.timer <= 0) c.phase = 'fading';
+          } else if (c.phase === 'fading') {
+            c.opa = Math.max(0, c.opa - 1 / FF);
+            if (c.opa <= 0) {
+              c.phase = 'idle';
+              c.timer = 35 + (Math.random() * 85 | 0);  /* ← TUNE: gap between routes */
+              c.prog  = 0; c.lblAmt = 0;
+            }
+          }
+        });
+      }
+
+      function drawCorrs(g) {
+        corrs.forEach(c => {
+          if (c.phase === 'idle' || c.opa <= 0) return;
+          const fc = cityMap[c.f], tc = cityMap[c.t];
+          if (!fc || !tc) return;
+          const [fx, fy] = proj(fc.lat, fc.lon, g);
+          const [tx, ty] = proj(tc.lat, tc.lon, g);
+          const [cpx, cpy] = cpOf(fx, fy, tx, ty);
+
+          const steps = 50, maxS = Math.floor(c.prog * steps);
+          ctx.beginPath();
+          for (let i = 0; i <= maxS; i++) {
+            const [px, py] = bez(fx, fy, cpx, cpy, tx, ty, i / steps);
+            i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+          }
+          ctx.strokeStyle = c.col + h2(c.opa * 0.82);
+          ctx.lineWidth   = 1.5; ctx.stroke();
+
+          if (c.phase === 'drawing') {
+            const [px, py] = bez(fx, fy, cpx, cpy, tx, ty, c.prog);
+            const gr = ctx.createRadialGradient(px, py, 0, px, py, 14);
+            gr.addColorStop(0,    c.col + 'FF');
+            gr.addColorStop(0.45, c.col + '66');
+            gr.addColorStop(1,    c.col + '00');
+            ctx.fillStyle = gr;
+            ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI * 2); ctx.fill();
+          }
+
+          if (c.lblAmt > 0 && c.opa > 0.28) {
+            const la = Math.min(1, c.lblAmt / 65) * c.opa;
+            const [mx, my] = bez(fx, fy, cpx, cpy, tx, ty, 0.5);
+            ctx.save();
+            ctx.font      = '500 10px system-ui, sans-serif';
+            ctx.fillStyle = c.col + h2(la * 0.88);
+            ctx.textAlign = 'center';
+            ctx.fillText(c.lbl, mx, my - 11);
+            ctx.restore();
+          }
+        });
+      }
+
+      function drawPulses() {
+        for (let i = pulses.length - 1; i >= 0; i--) {
+          const p = pulses[i];
+          p.r   += 2.0; p.opa -= 0.026;
+          if (p.opa <= 0) { pulses.splice(i, 1); continue; }
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.strokeStyle = p.col + h2(p.opa * 0.68);
+          ctx.lineWidth   = 1; ctx.stroke();
+        }
+      }
+
+      function drawCities(g) {
+        CITIES.forEach(c => {
+          const [x, y] = proj(c.lat, c.lon, g);
+          ctx.beginPath(); ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1; ctx.stroke();
+          ctx.beginPath(); ctx.arc(x, y, 2.8, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.86)'; ctx.fill();
+          ctx.font      = '400 9px system-ui, sans-serif';
+          ctx.fillStyle = 'rgba(185,210,250,0.50)';
+          ctx.textAlign = 'center';
+          ctx.fillText(c.code, x, y - 12);
+        });
+      }
+
+      function drawVignette(g) {
+        /* Right-edge fade into the white form panel */
+        const gr = ctx.createLinearGradient(g.W - 60, 0, g.W, 0);
+        gr.addColorStop(0, 'rgba(13,31,58,0)');
+        gr.addColorStop(1, 'rgba(13,31,58,0.70)');
+        ctx.fillStyle = gr; ctx.fillRect(g.W - 60, 0, 60, g.H);
+        const gb = ctx.createLinearGradient(0, g.H - 60, 0, g.H);
+        gb.addColorStop(0, 'rgba(13,31,58,0)');
+        gb.addColorStop(1, 'rgba(13,31,58,0.55)');
+        ctx.fillStyle = gb; ctx.fillRect(0, g.H - 60, g.W, 60);
+      }
+
+      function frame() {
+        const g = G();
+        ctx.clearRect(0, 0, g.W, g.H);
+        drawBg(g);
+        drawContinents(g);
+        drawGlobe(g);
+        updateCorrs(g);
+        drawCorrs(g);
+        drawPulses();
+        drawCities(g);
+        drawVignette(g);
+        requestAnimationFrame(frame);
+      }
+      frame();
+    })();
+  </script>
+
+</body>
+</html>
