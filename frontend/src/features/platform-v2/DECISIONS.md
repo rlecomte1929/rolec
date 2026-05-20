@@ -1,5 +1,8 @@
 # platform-v2 decisions log
 
+> **Vite dev-cache gotcha (recipe-level).** When introducing a NEW package import that Vite hadn't seen before (e.g. `createPortal` from `react-dom` for `RowActionMenu`), the running dev server may serve a stale prebundle and surface `504 (Outdated Optimize Dep)` + cascading "Failed to fetch dynamically imported module" errors. Fix: stop and restart `npm run dev`. If that's not enough, `rm -rf node_modules/.vite && npm run dev`. Production builds are unaffected. Reproduces only after adding the FIRST consumer of a new sub-import path within a session.
+
+
 Append-only log of architectural and product decisions made during the platform-v2 port. Newest entries on top. Each entry: date, what, why, alternative considered.
 
 ---
