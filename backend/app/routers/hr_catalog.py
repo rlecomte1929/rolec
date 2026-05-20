@@ -39,6 +39,17 @@ def _caller_company_id(user: Dict[str, Any]) -> str:
     return company_id
 
 
+def _caller_company_id_optional(user: Dict[str, Any]) -> Optional[str]:
+    """Same lookup as _caller_company_id but returns None instead of 403.
+
+    Used by read-only "dashboard widget" endpoints (notification badges,
+    summary counts) that should render gracefully for admins / unlinked
+    users rather than 403-ing every HR page load."""
+    profile = db.get_profile_record(user.get("id"))
+    company_id = (profile or {}).get("company_id") or user.get("company")
+    return str(company_id) if company_id else None
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -519,7 +530,15 @@ def hr_notification_counts(
     the dashboard time out (Render incident 2026-05-07).
     """
     from sqlalchemy import text as _sql
-    company_id = _caller_company_id(user)
+    company_id = _caller_company_id_optional(user)
+    if not company_id:
+        # Admin / unlinked user: zeroed badges instead of 403 noise in
+        # every HR page console.
+        return {
+            "employees_waiting": 0,
+            "destinations_with_demand": 0,
+            "pending_admin_tickets": 0,
+        }
 
     # NOT EXISTS mirrors employee_demand._has_curation: hide demand rows where
     # HR already has at least one curated vendor (master selected, or custom).

@@ -46,7 +46,10 @@ class BrandingConfig(BaseModel):
 
 
 class BrandingConfigResponse(BaseModel):
-    company_id: str
+    # company_id is None when the caller has no company linked (admin users
+    # browsing cross-tenant). The GET endpoint returns default branding in
+    # that case rather than 403'ing every HR page that boots.
+    company_id: Optional[str] = None
     company_name: Optional[str] = None
     branding: BrandingConfig
 
@@ -79,22 +82,22 @@ def _get_company_branding(company_id: str) -> tuple[Optional[str], Optional[Dict
 
 
 def _resolve_company_id(user: Dict[str, Any]) -> str:
-    """Extract company_id from the authenticated user's token / profile."""
+    """Extract company_id from the authenticated user's token / profile.
+
+    Returns None when the user has no company linked. The caller decides
+    whether that's a 403 (e.g. for PUT-style mutations that require a
+    tenant) or a 200-with-defaults (for GETs — admin users with no tenant
+    membership should see the page render with default branding instead
+    of 403 noise in every HR page console)."""
     company_id = user.get("company") or user.get("company_id")
     if not company_id:
-        # Try profile lookup
         try:
             from ...database import db
             profile = db.get_profile_record(user.get("id"))
             company_id = (profile or {}).get("company_id")
         except Exception:
             pass
-    if not company_id:
-        raise HTTPException(
-            status_code=403,
-            detail="No company linked to your profile.",
-        )
-    return str(company_id)
+    return str(company_id) if company_id else None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,10 +112,19 @@ def get_branding_config(
     GAP 10: Return the company's portal branding config.
 
     Available to all authenticated users (employees and HR).
-    Always returns 200 — if no branding_config is set, fields are null
-    (frontend falls back to default ReloPass theme).
+    Always returns 200 — if the user has no company linked (e.g. admin
+    cross-tenant browse) OR if no branding_config is set, fields are
+    null and the frontend falls back to the default ReloPass theme.
     """
     company_id = _resolve_company_id(user)
+    if not company_id:
+        # Admin / unlinked user: return empty defaults instead of 403'ing
+        # every HR page that boots.
+        return BrandingConfigResponse(
+            company_id=None,
+            company_name=None,
+            branding=BrandingConfig(),
+        )
     company_name, branding_dict = _get_company_branding(company_id)
 
     # Parse JSONB into typed model, ignoring unknown keys
@@ -148,6 +160,13 @@ def update_branding_config(
         raise HTTPException(status_code=403, detail="HR or admin role required.")
 
     company_id = _resolve_company_id(user)
+    if not company_id:
+        # PUTs still require a real company — can't save branding without
+        # somewhere to save it.
+        raise HTTPException(
+            status_code=403,
+            detail="No company linked to your profile — cannot save branding.",
+        )
 
     try:
         from ...services.supabase_client import get_supabase_admin_client
