@@ -141,6 +141,40 @@ interface SeatCellProps {
   limit: number | null;
 }
 
+/**
+ * Contact cell: primary contact name on the first line + the best-available
+ * email under it (hr_contact wins, support_email is the fallback). Email is
+ * rendered as a mailto link with a subtle hover.
+ */
+export function ContactCell({
+  primaryName,
+  hrContact,
+  supportEmail,
+  maxWidthClass = 'max-w-[14rem]',
+}: {
+  primaryName: string | null;
+  hrContact: string | null;
+  supportEmail: string | null;
+  maxWidthClass?: string;
+}) {
+  const email = hrContact?.trim() || supportEmail?.trim() || null;
+  return (
+    <>
+      <div className="text-slate-700">{primaryName ?? '—'}</div>
+      {email && (
+        <a
+          href={`mailto:${email}`}
+          onClick={(e) => e.stopPropagation()}
+          className={`block truncate text-xs text-slate-500 hover:text-indigo-600 hover:underline ${maxWidthClass}`}
+          title={email}
+        >
+          {email}
+        </a>
+      )}
+    </>
+  );
+}
+
 export function SeatCell({ count, limit }: SeatCellProps) {
   if (limit == null) {
     return (
@@ -662,10 +696,11 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
                       {c.assignments_count}
                     </td>
                     <td className="py-2.5">
-                      <div className="text-slate-700">{c.primary_contact_name ?? '—'}</div>
-                      {c.hr_contact && (
-                        <div className="text-xs text-slate-500 truncate max-w-[14rem]">{c.hr_contact}</div>
-                      )}
+                      <ContactCell
+                        primaryName={c.primary_contact_name}
+                        hrContact={c.hr_contact}
+                        supportEmail={c.support_email}
+                      />
                     </td>
                     <td className="py-2.5 text-xs text-slate-500">
                       {relativeDate(c.created_at)}

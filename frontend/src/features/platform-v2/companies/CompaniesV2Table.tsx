@@ -4,6 +4,7 @@ import type { CompanyV2 } from './adapter';
 import { RowActionMenu } from './RowActionMenu';
 import {
   CompanyLogo,
+  ContactCell,
   PLAN_PILL,
   Pill,
   SeatCell,
@@ -126,14 +127,14 @@ export function CompaniesV2Table({
       {
         id: 'contact',
         header: 'Contact',
-        defaultWidth: 170,
+        defaultWidth: 200,
+        minWidth: 140,
         cell: (c) => (
-          <>
-            <div className="text-slate-700">{c.primary_contact_name ?? '—'}</div>
-            {c.hr_contact && (
-              <div className="text-xs text-slate-500 truncate max-w-[14rem]">{c.hr_contact}</div>
-            )}
-          </>
+          <ContactCell
+            primaryName={c.primary_contact_name}
+            hrContact={c.hr_contact}
+            supportEmail={c.support_email}
+          />
         ),
       },
       {
