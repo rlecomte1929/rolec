@@ -64,6 +64,8 @@ export const ROUTE_DEFS = {
   hrPolicyReality: { path: '/hr/policy-vs-reality', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** AI Requirements Discovery Engine — corridor requirement graph + timeline + source audit. */
   hrDiscovery: { path: '/hr/discovery', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** Employee rich profile & preferences editor — housing, spouse, children, pets, financial. */
+  employeeRichProfile: { path: '/employee/profile', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeePolicy: { path: '/employee/policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   submissionCenter: { path: '/submission-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompanyProfile: { path: '/hr/company-profile', roles: ['HR', 'ADMIN'] as RouteRole[] },

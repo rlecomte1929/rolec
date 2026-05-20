@@ -79,6 +79,7 @@ const HrPolicyBuilder = lazy(() => import('./pages/HrPolicyBuilder').then((modul
 const HrExceptionsPage = lazy(() => import('./features/platform-v2/exceptions/HrExceptionsPage').then((module) => ({ default: module.HrExceptionsPage })));
 const HrPolicyRealityPage = lazy(() => import('./features/platform-v2/policy-reality/HrPolicyRealityPage').then((module) => ({ default: module.HrPolicyRealityPage })));
 const HrDiscoveryPage = lazy(() => import('./features/platform-v2/discovery/HrDiscoveryPage').then((module) => ({ default: module.HrDiscoveryPage })));
+const EmployeeRichProfilePage = lazy(() => import('./features/platform-v2/employee-profile/EmployeeRichProfilePage').then((module) => ({ default: module.EmployeeRichProfilePage })));
 const ProviderPortal = lazy(() => import('./pages/ProviderPortal').then((module) => ({ default: module.ProviderPortal })));
 const EmployeeTaskPage = lazy(() => import('./pages/employee/EmployeeTaskPage').then((module) => ({ default: module.EmployeeTaskPage })));
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings').then((module) => ({ default: module.NotificationSettings })));
@@ -214,6 +215,7 @@ function App() {
         <Route path={ROUTE_DEFS.employeeDashboard.path} element={<RequireEmployeeRoute><EmployeeJourney /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeQuoteRequest.path} element={<RequireEmployeeRoute><QuoteRequestPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeTaskPage.path} element={<RequireEmployeeRoute><EmployeeTaskPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeRichProfile.path} element={<RequireEmployeeRoute><EmployeeRichProfilePage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.EMP_DASH} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
         <Route path={ROUTE_DEFS.hrAnalytics.path} element={<HrAnalytics />} />
