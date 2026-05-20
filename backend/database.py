@@ -8252,6 +8252,21 @@ class Database:
             dest_sql = self._command_center_dest_country_sql()
             with self.engine.connect() as conn:
                 params: Dict[str, Any] = {"limit": limit, "offset": (page - 1) * limit}
+                # Shared additional projections: origin country, owner full name,
+                # employee role/band. All LEFT joins so missing rows just yield NULLs.
+                extra_select = (
+                    "wc.origin_country as wizard_origin_country, "
+                    "wc.dest_country as wizard_dest_country, "
+                    "wc.target_move_date as wizard_target_move_date, "
+                    "hp.full_name as hr_owner_name, "
+                    "hp.email as hr_owner_email, "
+                    "emp.band as employee_band, "
+                    "emp.assignment_type as employee_assignment_type"
+                )
+                extra_joins = (
+                    "LEFT JOIN profiles hp ON hp.id = ca.hr_user_id "
+                    "LEFT JOIN employees emp ON emp.profile_id = ca.employee_user_id"
+                )
                 if company_id:
                     where = "WHERE " + self._command_center_company_where()
                     params["cid"] = company_id
@@ -8259,14 +8274,14 @@ class Database:
                         SELECT ca.id, ca.case_id, ca.employee_identifier, ca.status,
                                COALESCE(ca.risk_status, 'green') as risk_status,
                                ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
+                               ca.updated_at,
                                {dest_sql} as dest_country,
-                               wc.origin_country as wizard_origin_country,
-                               wc.dest_country as wizard_dest_country,
-                               wc.target_move_date as wizard_target_move_date
+                               {extra_select}
                         FROM case_assignments ca
                         LEFT JOIN relocation_cases rc ON {rc_join}
                         LEFT JOIN wizard_cases wc ON {wc_join}
                         LEFT JOIN hr_users hu ON hu.profile_id = ca.hr_user_id
+                        {extra_joins}
                         {where}
                     """
                 elif hr_user_id:
@@ -8283,13 +8298,13 @@ class Database:
                         SELECT ca.id, ca.case_id, ca.employee_identifier, ca.status,
                                COALESCE(ca.risk_status, 'green') as risk_status,
                                ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
+                               ca.updated_at,
                                {dest_sql} as dest_country,
-                               wc.origin_country as wizard_origin_country,
-                               wc.dest_country as wizard_dest_country,
-                               wc.target_move_date as wizard_target_move_date
+                               {extra_select}
                         FROM case_assignments ca
                         LEFT JOIN relocation_cases rc ON {rc_join}
                         LEFT JOIN wizard_cases wc ON {wc_join}
+                        {extra_joins}
                         {where}
                     """
                 else:
@@ -8297,13 +8312,13 @@ class Database:
                         SELECT ca.id, ca.case_id, ca.employee_identifier, ca.status,
                                COALESCE(ca.risk_status, 'green') as risk_status,
                                ca.budget_limit, ca.budget_estimated, ca.expected_start_date,
+                               ca.updated_at,
                                {dest_sql} as dest_country,
-                               wc.origin_country as wizard_origin_country,
-                               wc.dest_country as wizard_dest_country,
-                               wc.target_move_date as wizard_target_move_date
+                               {extra_select}
                         FROM case_assignments ca
                         LEFT JOIN relocation_cases rc ON {rc_join}
                         LEFT JOIN wizard_cases wc ON {wc_join}
+                        {extra_joins}
                         WHERE 1=1
                     """
                 if risk_filter:
@@ -8356,10 +8371,27 @@ class Database:
                 dest = m.get("dest_country")
                 if dest is not None and isinstance(dest, str) and not dest.strip():
                     dest = None
+                origin = m.get("wizard_origin_country")
+                if origin is not None and isinstance(origin, str) and not origin.strip():
+                    origin = None
+                owner_name = m.get("hr_owner_name") or None
+                if isinstance(owner_name, str) and not owner_name.strip():
+                    owner_name = None
+                if not owner_name:
+                    # Fallback to email local-part so the column never reads "Unassigned"
+                    # for HR users whose profile.full_name hasn't been backfilled.
+                    email = m.get("hr_owner_email") or ""
+                    if isinstance(email, str) and "@" in email:
+                        owner_name = email.split("@", 1)[0]
+                employee_role = m.get("employee_band") or m.get("employee_assignment_type") or None
+                if isinstance(employee_role, str) and not employee_role.strip():
+                    employee_role = None
                 result.append({
                     "id": a_id,
                     "caseId": m.get("case_id") or None,
                     "employeeIdentifier": m.get("employee_identifier") or "",
+                    "employeeRole": employee_role,
+                    "originCountry": origin,
                     "destCountry": dest,
                     "status": display_status,
                     "riskStatus": m.get("risk_status") or "green",
@@ -8367,6 +8399,9 @@ class Database:
                     "budgetLimit": m.get("budget_limit"),
                     "budgetEstimated": m.get("budget_estimated"),
                     "nextDeadline": str(next_d) if next_d else None,
+                    "targetMoveDate": str(m.get("wizard_target_move_date")) if m.get("wizard_target_move_date") else None,
+                    "ownerName": owner_name,
+                    "updatedAt": str(m.get("updated_at")) if m.get("updated_at") else None,
                 })
             return result
         except Exception as e:

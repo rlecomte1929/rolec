@@ -70,6 +70,7 @@ const HrAnalytics = lazy(() => import('./pages/HrAnalytics').then((module) => ({
 const HrProviderGrid = lazy(() => import('./pages/HrProviderGrid').then((module) => ({ default: module.HrProviderGrid })));
 const HrProviderGridV2 = lazy(() => import('./features/platform-v2/provider-grid/ProviderGridV2Page').then((module) => ({ default: module.ProviderGridV2Page })));
 const HrBacklogPage = lazy(() => import('./features/platform-v2/hr-backlog/HrBacklogPage').then((module) => ({ default: module.HrBacklogPage })));
+const MobilityControlCenterV2Page = lazy(() => import('./features/platform-v2/mobility-control/MobilityControlCenterV2Page').then((module) => ({ default: module.MobilityControlCenterV2Page })));
 const HrPolicyBuilder = lazy(() => import('./pages/HrPolicyBuilder').then((module) => ({ default: module.HrPolicyBuilder })));
 const ProviderPortal = lazy(() => import('./pages/ProviderPortal').then((module) => ({ default: module.ProviderPortal })));
 const EmployeeTaskPage = lazy(() => import('./pages/employee/EmployeeTaskPage').then((module) => ({ default: module.EmployeeTaskPage })));
@@ -100,6 +101,7 @@ const AdminSupplierDetail = lazy(() => import('./pages/admin/AdminSupplierDetail
 const AdminCompanyDetail = lazy(() => import('./pages/admin/AdminCompanyDetail').then((module) => ({ default: module.AdminCompanyDetail })));
 const AdminCompanyProfilePage = lazy(() => import('./features/platform-v2/admin-company-profile/AdminCompanyProfilePage').then((module) => ({ default: module.AdminCompanyProfilePage })));
 const DataTableDemo = lazy(() => import('./features/platform-v2/data-table/DataTableDemo').then((module) => ({ default: module.DataTableDemo })));
+const PlatformSidebarPreview = lazy(() => import('./features/platform-v2/sidebar/PlatformSidebarPreview').then((module) => ({ default: module.PlatformSidebarPreview })));
 const AdminResources = lazy(() => import('./pages/admin/AdminResources').then((module) => ({ default: module.AdminResources })));
 const AdminResourceEditor = lazy(() => import('./pages/admin/AdminResourceEditor').then((module) => ({ default: module.AdminResourceEditor })));
 const AdminEvents = lazy(() => import('./pages/admin/AdminEvents').then((module) => ({ default: module.AdminEvents })));
@@ -195,6 +197,7 @@ function App() {
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         {/* Design preview — sandboxed Claude Design handoff bundle in iframe. Static, no auth, mock data only. */}
         <Route path="/design-preview" element={<DesignPreview />} />
+        <Route path="/platform-v2/sidebar" element={<PlatformSidebarPreview />} />
         {/* Provider portal — public, magic-link JWT auth */}
         <Route path={ROUTE_DEFS.providerPortal.path} element={<ProviderPortal />} />
         <Route path="/journey" element={<Journey />} />
@@ -206,7 +209,19 @@ function App() {
         <Route path={WIZARD_ROUTES.EMP_DASH} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
         <Route path={ROUTE_DEFS.hrAnalytics.path} element={<HrAnalytics />} />
-        <Route path={ROUTE_DEFS.hrCommandCenter.path} element={<HrCommandCenter />} />
+        {/* /hr/command-center: gated by mobility_control flag. ON → new
+            MobilityControlCenterV2Page (mock-aligned). OFF → legacy
+            HrCommandCenter "Dashboard". Sibling /hr/command-center-v2
+            always renders V2 for side-by-side comparison. */}
+        <Route
+          path={ROUTE_DEFS.hrCommandCenter.path}
+          element={
+            <V2Gate flag="mobility_control" fallback={<HrCommandCenter />}>
+              <MobilityControlCenterV2Page />
+            </V2Gate>
+          }
+        />
+        <Route path="/hr/command-center-v2" element={<MobilityControlCenterV2Page />} />
         <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<HrCommandCenterCaseDetail />} />
         {/* platform-v2: flag-gated. Default OFF → legacy HrProviderGrid renders.
             Enable per-session: localStorage.setItem('platform_v2_mobility_control', 'on').

@@ -730,7 +730,7 @@ export const hrAPI = {
     const response = await api.get('/api/hr/command-center/kpis');
     return response.data;
   },
-  listCommandCenterCases: async (params?: { page?: number; limit?: number; risk_filter?: string }): Promise<Array<{ id: string; employeeIdentifier: string; destCountry?: string; status: string; riskStatus: string; tasksDonePercent: number; budgetLimit?: number; budgetEstimated?: number; nextDeadline?: string }>> => {
+  listCommandCenterCases: async (params?: { page?: number; limit?: number; risk_filter?: string }): Promise<CommandCenterCaseRow[]> => {
     const response = await api.get('/api/hr/command-center/cases', { params });
     return response.data;
   },
@@ -2537,6 +2537,24 @@ export interface ProviderGridRow {
 export interface ProviderGridResponse {
   rows: ProviderGridRow[];
   total: number;
+}
+
+export interface CommandCenterCaseRow {
+  id: string;
+  caseId?: string | null;
+  employeeIdentifier: string;
+  employeeRole?: string | null;
+  originCountry?: string | null;
+  destCountry?: string | null;
+  status: string;
+  riskStatus: 'green' | 'yellow' | 'red' | string;
+  tasksDonePercent: number;
+  budgetLimit?: number | null;
+  budgetEstimated?: number | null;
+  nextDeadline?: string | null;
+  targetMoveDate?: string | null;
+  ownerName?: string | null;
+  updatedAt?: string | null;
 }
 
 export type TaskOwner = 'hr' | 'employee' | 'provider' | 'joint';

@@ -12637,6 +12637,8 @@ class CommandCenterCaseRow(BaseModel):
     id: str
     caseId: Optional[str] = None  # relocation_cases UUID — use this for /api/hr/cases/{id} navigation
     employeeIdentifier: str
+    employeeRole: Optional[str] = None
+    originCountry: Optional[str] = None
     destCountry: Optional[str] = None
     status: str
     riskStatus: str
@@ -12644,6 +12646,9 @@ class CommandCenterCaseRow(BaseModel):
     budgetLimit: Optional[float] = None
     budgetEstimated: Optional[float] = None
     nextDeadline: Optional[str] = None
+    targetMoveDate: Optional[str] = None
+    ownerName: Optional[str] = None
+    updatedAt: Optional[str] = None
 
 
 class CommandCenterCaseDetail(BaseModel):

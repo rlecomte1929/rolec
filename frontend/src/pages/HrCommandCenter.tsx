@@ -12,13 +12,13 @@ import { HrExceptionsQueueCard } from '../features/exceptions/HrExceptionsQueueC
 type CaseRow = {
   id: string;
   employeeIdentifier: string;
-  destCountry?: string;
+  destCountry?: string | null;
   status: string;
   riskStatus: string;
   tasksDonePercent: number;
-  budgetLimit?: number;
-  budgetEstimated?: number;
-  nextDeadline?: string;
+  budgetLimit?: number | null;
+  budgetEstimated?: number | null;
+  nextDeadline?: string | null;
 };
 
 export const HrCommandCenter: React.FC = () => {
