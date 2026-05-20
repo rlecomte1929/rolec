@@ -134,6 +134,12 @@ export const AdminCompanyDetail: React.FC = () => {
             <Button variant="outline" size="sm" onClick={() => void loadDetail()} disabled={loading}>
               {loading ? 'Refreshing…' : 'Refresh'}
             </Button>
+            <Link
+              to={`/admin/companies/${companyId}/profile`}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              View profile →
+            </Link>
             <Link to={buildRoute('adminCompanies')} className="text-sm text-[#0b2b43] underline">
               ← Companies
             </Link>

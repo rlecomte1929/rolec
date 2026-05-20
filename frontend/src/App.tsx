@@ -97,6 +97,7 @@ const AdminProspects = lazy(() => import('./pages/admin/AdminProspects').then((m
 const AdminSupplierNew = lazy(() => import('./pages/admin/AdminSupplierNew').then((module) => ({ default: module.AdminSupplierNew })));
 const AdminSupplierDetail = lazy(() => import('./pages/admin/AdminSupplierDetail').then((module) => ({ default: module.AdminSupplierDetail })));
 const AdminCompanyDetail = lazy(() => import('./pages/admin/AdminCompanyDetail').then((module) => ({ default: module.AdminCompanyDetail })));
+const AdminCompanyProfilePage = lazy(() => import('./features/platform-v2/admin-company-profile/AdminCompanyProfilePage').then((module) => ({ default: module.AdminCompanyProfilePage })));
 const AdminResources = lazy(() => import('./pages/admin/AdminResources').then((module) => ({ default: module.AdminResources })));
 const AdminResourceEditor = lazy(() => import('./pages/admin/AdminResourceEditor').then((module) => ({ default: module.AdminResourceEditor })));
 const AdminEvents = lazy(() => import('./pages/admin/AdminEvents').then((module) => ({ default: module.AdminEvents })));
@@ -283,6 +284,8 @@ function App() {
         <Route path={ROUTE_DEFS.adminMessages.path} element={<RequireAdminRoute><AdminMessages /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResearch.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminOverview.path} replace /></RequireAdminRoute>} />
         <Route path="/admin/companies/:companyId" element={<RequireAdminRoute><AdminCompanyDetail /></RequireAdminRoute>} />
+        {/* Tenant-scoped sub-route: URL param is the scope, no global state. */}
+        <Route path="/admin/companies/:companyId/profile" element={<RequireAdminRoute><AdminCompanyProfilePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminUsers.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminPeople.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminRelocations.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminAssignments.path} replace /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSupport.path} element={<RequireAdminRoute><Navigate to={ROUTE_DEFS.adminMessages.path} replace /></RequireAdminRoute>} />
