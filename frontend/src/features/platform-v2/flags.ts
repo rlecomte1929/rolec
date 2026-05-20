@@ -47,7 +47,10 @@ export type V2FlagKey =
   | 'roadmap_tracks'
   // Phase 5 — admin polish
   | 'admin_overview'
-  | 'review_queue';
+  | 'review_queue'
+  | 'ops_analytics'
+  // HR-side backlog of pending employee tasks (own company only)
+  | 'hr_backlog';
 
 const LS_PREFIX = 'platform_v2_';
 const ENV_PREFIX = 'VITE_PLATFORM_V2_';
@@ -104,4 +107,6 @@ export const V2_FLAGS: ReadonlyArray<V2FlagKey> = [
   'roadmap_tracks',
   'admin_overview',
   'review_queue',
+  'ops_analytics',
+  'hr_backlog',
 ];

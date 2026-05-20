@@ -16692,6 +16692,82 @@ class Database:
             log.warning("list_employee_tasks_for_case_hr case_id=%s: %s", case_id, e)
             return []
 
+    def list_hr_backlog(self, org_id: str) -> List[Dict[str, Any]]:
+        """HR-side backlog: every employee_task for the org that is still
+        pending (status='pending' or 'revision_requested'). Used by the
+        /api/hr/backlog endpoint to give HR a single-page view of "what my
+        employees still owe us" across all their cases.
+
+        Joins to profiles for employee_name/email when available; falls back
+        to a no-join query if the profiles join fails (some local schemas
+        don't have all the columns yet)."""
+        # Try the joined query first — gives us employee names directly.
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(text(
+                    """
+                    SELECT t.id, t.case_id, t.employee_id, t.org_id, t.type, t.title,
+                           t.description, t.due_date, t.status, t.required_file_upload,
+                           t.submitted_at, t.reviewed_at, t.created_at, t.updated_at,
+                           p.full_name AS employee_name, p.email AS employee_email
+                    FROM employee_tasks t
+                    LEFT JOIN profiles p ON p.id = t.employee_id
+                    WHERE t.org_id = :org
+                      AND t.status IN ('pending', 'revision_requested')
+                    ORDER BY
+                        CASE t.status
+                            WHEN 'revision_requested' THEN 1
+                            WHEN 'pending'            THEN 2
+                            ELSE 3
+                        END,
+                        t.due_date ASC NULLS LAST,
+                        t.created_at ASC
+                    """
+                ), {"org": org_id}).fetchall()
+                result = []
+                for row in rows:
+                    d = dict(row._mapping)
+                    for k in ("due_date", "submitted_at", "reviewed_at", "created_at", "updated_at"):
+                        if d.get(k) is not None:
+                            d[k] = str(d[k])
+                    result.append(d)
+                return result
+        except Exception as e:
+            log.warning("list_hr_backlog joined query failed (will retry without join): %s", e)
+
+        # Fallback: no join. Frontend will show employee_id (uuid prefix) only.
+        try:
+            with self.engine.connect() as conn:
+                rows = conn.execute(text(
+                    """
+                    SELECT id, case_id, employee_id, org_id, type, title, description,
+                           due_date, status, required_file_upload, submitted_at,
+                           reviewed_at, created_at, updated_at
+                    FROM employee_tasks
+                    WHERE org_id = :org
+                      AND status IN ('pending', 'revision_requested')
+                    ORDER BY
+                        CASE status
+                            WHEN 'revision_requested' THEN 1
+                            WHEN 'pending'            THEN 2
+                            ELSE 3
+                        END,
+                        due_date ASC NULLS LAST,
+                        created_at ASC
+                    """
+                ), {"org": org_id}).fetchall()
+                result = []
+                for row in rows:
+                    d = dict(row._mapping)
+                    for k in ("due_date", "submitted_at", "reviewed_at", "created_at", "updated_at"):
+                        if d.get(k) is not None:
+                            d[k] = str(d[k])
+                    result.append(d)
+                return result
+        except Exception as e:
+            log.warning("list_hr_backlog fallback query failed org_id=%s: %s", org_id, e)
+            return []
+
 
 # Global database instance
 db = Database()

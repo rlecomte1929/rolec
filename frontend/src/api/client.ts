@@ -385,7 +385,39 @@ export interface EmployeeTaskListResponse {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── HR-side backlog: pending employee tasks across the HR's company ────────
+
+export interface HrBacklogTask {
+  id: string;
+  case_id?: string | null;
+  employee_id?: string | null;
+  org_id?: string | null;
+  type?: string | null;
+  title: string;
+  description?: string | null;
+  due_date?: string | null;
+  status: 'pending' | 'revision_requested' | string;
+  required_file_upload?: boolean;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  /** Joined columns — may be missing if profiles join failed. */
+  employee_name?: string | null;
+  employee_email?: string | null;
+}
+
+export interface HrBacklogResponse {
+  items: HrBacklogTask[];
+  total: number;
+  has_company: boolean;
+}
+
 export const hrAPI = {
+  getBacklog: async (): Promise<HrBacklogResponse> => {
+    const response = await api.get('/api/hr/backlog');
+    return response.data;
+  },
   createCase: async (): Promise<{ caseId: string }> => {
     const response = await api.post('/api/hr/cases', undefined, { timeout: HR_CASE_TIMEOUT });
     return response.data;
@@ -1902,6 +1934,9 @@ export const adminOpsAnalyticsAPI = {
     api.get('/api/admin/ops/queue/breaches', { params }).then((r) => r.data),
   getReviewerWorkload: () => api.get('/api/admin/ops/reviewers/workload').then((r) => r.data),
   getDestinations: () => api.get('/api/admin/ops/destinations').then((r) => r.data),
+  /** Top destinations selected by users across all relocation cases (request-driven, not ops backlog). */
+  getTopDestinationsByRequest: (params?: { limit?: number }) =>
+    api.get('/api/admin/ops/destinations/requests', { params }).then((r) => r.data),
   getNotificationMetrics: (params?: { days?: number }) =>
     api.get('/api/admin/ops/notifications', { params }).then((r) => r.data),
   getBottlenecks: () => api.get('/api/admin/ops/bottlenecks').then((r) => r.data),

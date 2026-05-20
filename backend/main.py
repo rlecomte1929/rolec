@@ -3243,6 +3243,26 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
 # ---------------------------------------------------------------------------
 
 
+@app.get("/api/hr/backlog")
+def list_hr_backlog(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    """HR-side backlog of pending employee tasks for the HR user's company.
+
+    Scoped strictly to the caller's company_id — HR can't see other tenants'
+    backlogs from this endpoint. Returns tasks in status 'pending' or
+    'revision_requested' (the two states where employees still owe action).
+
+    Returns {items, total, has_company}. has_company=false when the user has
+    no company linked yet — keeps the page renderable instead of 400ing.
+    """
+    effective = _effective_user(user, UserRole.HR)
+    company_id = _get_hr_company_id(effective)
+    if not company_id:
+        return {"items": [], "total": 0, "has_company": False}
+    items = db.list_hr_backlog(company_id)
+    db.log_audit(effective["id"], "READ", "hr_backlog", None, None, {"company_id": company_id, "count": len(items)})
+    return {"items": items, "total": len(items), "has_company": True}
+
+
 @app.get("/api/hr/employees")
 def list_hr_company_employees(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     """List employees for the HR user's company. Company-scoped only."""

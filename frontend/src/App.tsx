@@ -69,6 +69,7 @@ const HrCommandCenterCaseDetail = lazy(() => import('./pages/HrCommandCenterCase
 const HrAnalytics = lazy(() => import('./pages/HrAnalytics').then((module) => ({ default: module.HrAnalytics })));
 const HrProviderGrid = lazy(() => import('./pages/HrProviderGrid').then((module) => ({ default: module.HrProviderGrid })));
 const HrProviderGridV2 = lazy(() => import('./features/platform-v2/provider-grid/ProviderGridV2Page').then((module) => ({ default: module.ProviderGridV2Page })));
+const HrBacklogPage = lazy(() => import('./features/platform-v2/hr-backlog/HrBacklogPage').then((module) => ({ default: module.HrBacklogPage })));
 const HrPolicyBuilder = lazy(() => import('./pages/HrPolicyBuilder').then((module) => ({ default: module.HrPolicyBuilder })));
 const ProviderPortal = lazy(() => import('./pages/ProviderPortal').then((module) => ({ default: module.ProviderPortal })));
 const EmployeeTaskPage = lazy(() => import('./pages/employee/EmployeeTaskPage').then((module) => ({ default: module.EmployeeTaskPage })));
@@ -219,6 +220,9 @@ function App() {
           }
         />
         <Route path="/hr/provider-grid-v2" element={<HrProviderGridV2 />} />
+        {/* HR Backlog (V2): pending employee tasks across the HR's company.
+            HR + ADMIN access — server-side filtering by company_id. */}
+        <Route path="/hr/backlog" element={<HrBacklogPage />} />
         <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<HrPolicyBuilder />} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<HrCaseSummary />} />
