@@ -66,6 +66,8 @@ export const ROUTE_DEFS = {
   hrDiscovery: { path: '/hr/discovery', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Employee rich profile & preferences editor — housing, spouse, children, pets, financial. */
   employeeRichProfile: { path: '/employee/profile', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  /** Employee detailed intake wizard — 6-step move context, household builder, commute map. */
+  employeeIntake: { path: '/employee/intake', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeePolicy: { path: '/employee/policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   submissionCenter: { path: '/submission-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompanyProfile: { path: '/hr/company-profile', roles: ['HR', 'ADMIN'] as RouteRole[] },

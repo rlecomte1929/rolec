@@ -1,0 +1,1081 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { AppShell } from '../../../components/AppShell';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type MemberKind = 'self' | 'partner' | 'child' | 'pet' | 'adult';
+
+interface Member {
+  id: string;
+  kind: MemberKind;
+  // partner
+  name?: string;
+  employment?: string;
+  needs_work_permit?: string;
+  lang_level?: string;
+  // child
+  dob?: string;
+  school?: string;
+  // pet
+  pet_type?: string;
+  breed?: string;
+  count?: number;
+  rabies?: string;
+  microchipped?: string;
+  notes?: string;
+  // adult
+  full_name?: string;
+  relationship?: string;
+  care_level?: string;
+}
+
+interface HousingPrefs {
+  intent?: string;
+  bedrooms?: number | '';
+  budget?: number | '';
+  school_type?: string;
+  special_needs?: string;
+  school_start?: string;
+}
+
+interface IntakeData {
+  origin_country: string;
+  origin_city: string;
+  dest_country: string;
+  dest_city: string;
+  target_date: string;
+  purpose: string;
+  full_name: string;
+  email: string;
+  nationality: string;
+  passport_country: string;
+  passport_expiry: string;
+  members: Member[];
+  job_title: string;
+  contract_type: string;
+  contract_start: string;
+  salary_band: string;
+  office_address: string;
+  work_pattern: string;
+  commute_mins: number;
+  commute_mode: string[];
+  services: string[];
+  service_notes: Record<string, string>;
+  housing_prefs: HousingPrefs;
+  consent: boolean;
+}
+
+// ─── Static data ──────────────────────────────────────────────────────────────
+
+const COUNTRIES = [
+  { code: 'FR', name: 'France',         flag: '🇫🇷' },
+  { code: 'DE', name: 'Germany',        flag: '🇩🇪' },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'NO', name: 'Norway',         flag: '🇳🇴' },
+  { code: 'SE', name: 'Sweden',         flag: '🇸🇪' },
+  { code: 'NL', name: 'Netherlands',    flag: '🇳🇱' },
+  { code: 'BE', name: 'Belgium',        flag: '🇧🇪' },
+  { code: 'IE', name: 'Ireland',        flag: '🇮🇪' },
+  { code: 'CH', name: 'Switzerland',    flag: '🇨🇭' },
+  { code: 'IT', name: 'Italy',          flag: '🇮🇹' },
+  { code: 'ES', name: 'Spain',          flag: '🇪🇸' },
+  { code: 'PT', name: 'Portugal',       flag: '🇵🇹' },
+  { code: 'US', name: 'United States',  flag: '🇺🇸' },
+  { code: 'CA', name: 'Canada',         flag: '🇨🇦' },
+  { code: 'JP', name: 'Japan',          flag: '🇯🇵' },
+  { code: 'KR', name: 'South Korea',    flag: '🇰🇷' },
+  { code: 'IN', name: 'India',          flag: '🇮🇳' },
+  { code: 'SG', name: 'Singapore',      flag: '🇸🇬' },
+  { code: 'AE', name: 'United Arab Emirates', flag: '🇦🇪' },
+  { code: 'AU', name: 'Australia',      flag: '🇦🇺' },
+  { code: 'BR', name: 'Brazil',         flag: '🇧🇷' },
+];
+
+const CITIES_BY_COUNTRY: Record<string, string[]> = {
+  FR: ['Paris', 'Lyon', 'Marseille', 'Toulouse', 'Nice', 'Bordeaux'],
+  DE: ['Berlin', 'Munich', 'Hamburg', 'Frankfurt', 'Cologne'],
+  GB: ['London', 'Manchester', 'Birmingham', 'Edinburgh'],
+  NO: ['Oslo', 'Bergen', 'Stavanger', 'Trondheim'],
+  US: ['New York', 'San Francisco', 'Los Angeles', 'Chicago', 'Austin'],
+  CA: ['Toronto', 'Vancouver', 'Montreal'],
+  JP: ['Tokyo', 'Osaka', 'Kyoto'],
+  IN: ['Mumbai', 'Bangalore', 'Delhi'],
+  SG: ['Singapore'],
+  AE: ['Dubai', 'Abu Dhabi'],
+  NL: ['Amsterdam', 'Rotterdam', 'The Hague'],
+  CH: ['Zurich', 'Geneva', 'Basel'],
+  AU: ['Sydney', 'Melbourne', 'Brisbane'],
+};
+
+const QUARANTINE_COUNTRIES = new Set(['GB', 'AU', 'JP', 'NZ', 'SG']);
+const RESTRICTED_BREEDS = ['pit bull', 'pitbull', 'american staffordshire', 'amstaff', 'rottweiler', 'doberman', 'dogo argentino'];
+
+const SERVICES = [
+  { id: 'housing',     ico: '🏠', t: 'Housing search',       s: 'Apartment or house search at destination' },
+  { id: 'immigration', ico: '🛂', t: 'Immigration',          s: 'Visas, permits, residence registration' },
+  { id: 'schools',     ico: '🏫', t: 'Schools',              s: 'School search and enrollment for kids' },
+  { id: 'movers',      ico: '📦', t: 'International movers', s: 'Household goods shipping' },
+  { id: 'banking',     ico: '🏦', t: 'Banking',              s: 'Local bank account, FX transfer' },
+  { id: 'tax',         ico: '🧾', t: 'Tax advisor',          s: 'Cross-border tax, equalization' },
+  { id: 'language',    ico: '🗣️', t: 'Language tuition',     s: 'Lessons for you or your family' },
+  { id: 'pets',        ico: '🐾', t: 'Pet relocation',       s: 'Quarantine, health certs, transport' },
+  { id: 'temp',        ico: '🏨', t: 'Temporary housing',    s: 'Where you stay on arrival' },
+  { id: 'spouse',      ico: '💼', t: 'Spouse career',        s: 'Job search, coaching, credentials' },
+  { id: 'healthcare',  ico: '🏥', t: 'Healthcare',           s: 'Insurance, doctor finding', soon: true },
+  { id: 'culture',     ico: '🎭', t: 'Culture & community',  s: 'Expat groups, orientation', soon: true },
+];
+
+const INITIAL_DATA: IntakeData = {
+  origin_country: 'FR',
+  origin_city: 'Paris',
+  dest_country: 'NO',
+  dest_city: 'Stavanger',
+  target_date: '2026-09-01',
+  purpose: 'Employment',
+  full_name: 'Marc Bouchard',
+  email: 'marc.bouchard@aurora-energy.com',
+  nationality: 'FR',
+  passport_country: 'FR',
+  passport_expiry: '2030-04-12',
+  members: [
+    { id: 'self', kind: 'self' },
+    { id: 'p1', kind: 'partner', name: 'Camille Bouchard', employment: 'Working', needs_work_permit: 'Yes', lang_level: 'Beginner' },
+    { id: 'c1', kind: 'child', name: 'Léo', dob: '2017-04-12', school: 'International' },
+    { id: 'c2', kind: 'child', name: 'Élise', dob: '2019-09-30', school: 'International' },
+  ],
+  job_title: 'Senior Engineer',
+  contract_type: 'Permanent',
+  contract_start: '2026-09-15',
+  salary_band: '100–150k€',
+  office_address: 'Forusparken 2, 4031 Stavanger, Norway',
+  work_pattern: 'Hybrid',
+  commute_mins: 30,
+  commute_mode: ['public_transit', 'walking'],
+  services: ['housing', 'immigration', 'schools', 'spouse'],
+  service_notes: {},
+  housing_prefs: {},
+  consent: false,
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function computeAge(dob?: string): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+}
+
+function isRestrictedBreed(breed?: string) {
+  if (!breed) return false;
+  const lower = breed.toLowerCase();
+  return RESTRICTED_BREEDS.some((b) => lower.includes(b));
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function FieldWrap({
+  label,
+  required,
+  optional,
+  hint,
+  prefill,
+  onUnlock,
+  why,
+  className = '',
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  optional?: boolean;
+  hint?: string;
+  prefill?: boolean;
+  onUnlock?: () => void;
+  why?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const [whyOpen, setWhyOpen] = useState(false);
+  return (
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 flex-wrap">
+        {label}
+        {required && <span className="text-red-500" title="Required">*</span>}
+        {optional && <span className="text-gray-400 font-normal">(optional)</span>}
+        {prefill && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-medium">
+            🔒 HR pre-filled
+            {onUnlock && (
+              <button type="button" onClick={onUnlock} className="underline text-violet-500 hover:text-violet-700 ml-0.5">
+                Edit
+              </button>
+            )}
+          </span>
+        )}
+        {why && (
+          <button type="button" onClick={() => setWhyOpen((o) => !o)} className="text-violet-500 text-[10px] font-medium hover:text-violet-700">
+            Why?
+          </button>
+        )}
+      </label>
+      {children}
+      {whyOpen && why && (
+        <div className="text-xs text-gray-500 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">{why}</div>
+      )}
+      {hint && <div className="text-xs text-gray-400">{hint}</div>}
+    </div>
+  );
+}
+
+const inputCls = (locked?: boolean) =>
+  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 ${
+    locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
+  }`;
+
+const selectCls = (locked?: boolean) =>
+  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 ${
+    locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
+  }`;
+
+function Grid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
+}
+
+function CountryCombo({ value, onChange, placeholder = 'Select a country', disabled }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = COUNTRIES.find((c) => c.code === value);
+  const filtered = query
+    ? COUNTRIES.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || c.code.toLowerCase().includes(query.toLowerCase()))
+    : COUNTRIES;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <div className={`flex items-center border rounded-lg overflow-hidden ${disabled ? 'bg-gray-50 border-gray-100' : 'border-gray-200 bg-white'}`}>
+        <span className="px-3 text-base">{selected ? selected.flag : '🔍'}</span>
+        <input
+          type="text"
+          className="flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent"
+          value={open ? query : selected ? selected.name : ''}
+          placeholder={placeholder}
+          disabled={disabled}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => { if (!disabled) { setQuery(''); setOpen(true); } }}
+          autoComplete="off"
+        />
+        <span className="px-2 text-gray-400 text-xs">▾</span>
+      </div>
+      {open && !disabled && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
+          {filtered.length === 0
+            ? <div className="px-4 py-3 text-xs text-gray-400">No match</div>
+            : filtered.map((c) => (
+              <div key={c.code} onClick={() => { onChange(c.code); setOpen(false); setQuery(''); }}
+                className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-violet-50 text-violet-700' : ''}`}>
+                <span className="text-base">{c.flag}</span>
+                <span className="flex-1">{c.name}</span>
+                <span className="text-xs text-gray-400">{c.code}</span>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CityCombo({ country, value, onChange }: { country: string; value: string; onChange: (v: string) => void }) {
+  const opts = CITIES_BY_COUNTRY[country] ?? [];
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
+        <span className="px-3 text-gray-400 text-sm">📍</span>
+        <input type="text" value={value} placeholder="Select or type a city" autoComplete="off"
+          className="flex-1 py-2 pr-3 text-sm focus:outline-none bg-transparent"
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setOpen(true)} />
+        <span className="px-2 text-gray-400 text-xs">▾</span>
+      </div>
+      {open && opts.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg">
+          {opts.map((c) => (
+            <div key={c} onClick={() => { onChange(c); setOpen(false); }}
+              className="px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50">{c}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MultiChip({ value, onChange, options }: {
+  value: string[]; onChange: (v: string[]) => void;
+  options: Array<string | { value: string; label: string }>;
+}) {
+  const toggle = (v: string) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v]);
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1">
+      {options.map((o) => {
+        const val = typeof o === 'string' ? o : o.value;
+        const lbl = typeof o === 'string' ? o : o.label;
+        return (
+          <button key={val} type="button" onClick={() => toggle(val)}
+            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+              value.includes(val) ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+            }`}>{lbl}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Commute map (SVG) ────────────────────────────────────────────────────────
+
+const NEIGHBORHOODS = [
+  { id: 'n1', x: 50, y: 28, t_min: 8,  name: 'Vika' },
+  { id: 'n2', x: 28, y: 35, t_min: 14, name: 'Frogner' },
+  { id: 'n3', x: 70, y: 38, t_min: 16, name: 'Grünerløkka' },
+  { id: 'n4', x: 38, y: 56, t_min: 22, name: 'Bygdøy' },
+  { id: 'n5', x: 64, y: 60, t_min: 26, name: 'Tøyen' },
+  { id: 'n6', x: 22, y: 70, t_min: 34, name: 'Bærum' },
+  { id: 'n7', x: 78, y: 73, t_min: 42, name: 'Furuset' },
+  { id: 'n8', x: 50, y: 82, t_min: 52, name: 'Sandvika' },
+];
+
+function CommuteMap({ maxMins, mode }: { maxMins: number; mode: string[] }) {
+  const radius = Math.min(50, (maxMins / 60) * 50 + 5);
+  const cx = 50, cy = 48;
+  const inCount = NEIGHBORHOODS.filter((n) => n.t_min <= maxMins).length;
+  return (
+    <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-950">
+      <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-medium">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" /> live
+      </span>
+      <svg viewBox="0 0 100 100" className="w-full h-48" preserveAspectRatio="xMidYMid meet" aria-hidden>
+        {[20, 40, 60, 80].map((v) => (
+          <g key={`g${v}`}>
+            <line x1={v} y1={0} x2={v} y2={100} stroke="#1f2937" strokeWidth="0.3" />
+            <line x1={0} y1={v} x2={100} y2={v} stroke="#1f2937" strokeWidth="0.3" />
+          </g>
+        ))}
+        <circle cx={cx} cy={cy} r={radius} fill="rgba(124,58,237,0.12)" stroke="rgba(124,58,237,0.4)" strokeWidth="0.6" />
+        {NEIGHBORHOODS.map((n) => {
+          const inside = n.t_min <= maxMins;
+          return (
+            <g key={n.id}>
+              <circle cx={n.x} cy={n.y} r="3.5" fill={inside ? '#7c3aed' : '#374151'} />
+              <text x={n.x} y={n.y + 7} textAnchor="middle" fontSize="3.5"
+                fill={inside ? '#a78bfa' : '#6b7280'}>{n.name}</text>
+            </g>
+          );
+        })}
+        <circle cx={cx} cy={cy} r="8" fill="rgba(124,58,237,0.2)" stroke="#7c3aed" strokeWidth="1" />
+        <circle cx={cx} cy={cy} r="2.5" fill="#7c3aed" />
+        <text x={cx} y={cy - 5} textAnchor="middle" fontSize="3" fill="#a78bfa">Office</text>
+      </svg>
+      <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-gray-400">
+        <strong className="text-violet-400">{inCount} neighborhoods</strong> within {maxMins}min
+        {mode.length > 0 ? ` by ${mode.slice(0, 2).map((m) => m === 'public_transit' ? 'transit' : m).join('/')}` : ''}
+      </div>
+    </div>
+  );
+}
+
+// ─── Household member cards ───────────────────────────────────────────────────
+
+function CardShell({ ico, title, sub, status, expanded, onToggle, onRemove, urgent, children }: {
+  ico: string; title: string; sub: string;
+  status: 'complete' | 'partial' | 'empty';
+  expanded: boolean; onToggle: () => void; onRemove?: () => void;
+  urgent?: boolean; children: React.ReactNode;
+}) {
+  const statusCls = { complete: 'text-green-600 bg-green-50', partial: 'text-amber-600 bg-amber-50', empty: 'text-gray-400 bg-gray-50' };
+  const statusLbl = { complete: '✓ Complete', partial: 'In progress', empty: 'Not started' };
+  return (
+    <div className={`border rounded-xl overflow-hidden ${urgent ? 'border-amber-200' : 'border-gray-100'} bg-white`}>
+      <button type="button" onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+        <span className="text-xl flex-shrink-0">{ico}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-gray-900 truncate">{title}</div>
+          <div className="text-xs text-gray-400 truncate">{sub}</div>
+        </div>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusCls[status]}`}>{statusLbl[status]}</span>
+        <span className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>▾</span>
+        {onRemove && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="ml-1 text-gray-300 hover:text-red-400 transition-colors text-sm font-bold">✕</button>
+        )}
+      </button>
+      {expanded && <div className="px-4 pb-4 border-t border-gray-100">{children}</div>}
+    </div>
+  );
+}
+
+function PartnerCard({ m, onChange, onRemove, international, expanded, onToggle }: {
+  m: Member; onChange: (m: Member) => void; onRemove: () => void;
+  international: boolean; expanded: boolean; onToggle: () => void;
+}) {
+  const status: 'complete' | 'partial' | 'empty' = m.name && m.employment ? 'complete' : m.name || m.employment ? 'partial' : 'empty';
+  return (
+    <CardShell ico="👤" title={`Partner / Spouse${m.name ? ` · ${m.name}` : ''}`}
+      sub={m.employment || 'Tell us about your partner'} status={status}
+      expanded={expanded} onToggle={onToggle} onRemove={onRemove}>
+      <Grid>
+        <FieldWrap label="Full name" required>
+          <input className={inputCls()} value={m.name ?? ''} placeholder="e.g. Camille Bouchard"
+            onChange={(e) => onChange({ ...m, name: e.target.value })} />
+        </FieldWrap>
+        <FieldWrap label="Employment status">
+          <select className={selectCls()} value={m.employment ?? ''} onChange={(e) => onChange({ ...m, employment: e.target.value })}>
+            <option value="">Select…</option>
+            <option>Working</option><option>Not working</option><option>Student</option>
+          </select>
+        </FieldWrap>
+        {international && m.employment === 'Working' && (
+          <FieldWrap label="Need a work permit at destination?" why="If yes, we'll add the dependent work-permit track and surface partner career services.">
+            <select className={selectCls()} value={m.needs_work_permit ?? ''} onChange={(e) => onChange({ ...m, needs_work_permit: e.target.value })}>
+              <option value="">Select…</option><option>Yes</option><option>No</option><option>Not sure</option>
+            </select>
+          </FieldWrap>
+        )}
+        <FieldWrap label="Language level at destination">
+          <select className={selectCls()} value={m.lang_level ?? ''} onChange={(e) => onChange({ ...m, lang_level: e.target.value })}>
+            <option value="">Select…</option>
+            <option>Fluent</option><option>Conversational</option><option>Beginner</option><option>None</option>
+          </select>
+        </FieldWrap>
+      </Grid>
+    </CardShell>
+  );
+}
+
+function ChildCard({ m, onChange, onRemove, index, expanded, onToggle }: {
+  m: Member; onChange: (m: Member) => void; onRemove: () => void;
+  index: number; expanded: boolean; onToggle: () => void;
+}) {
+  const age = computeAge(m.dob);
+  const schoolLvl = age == null ? '' : age < 6 ? 'pre-school' : age < 11 ? 'primary' : age < 15 ? 'middle' : 'secondary';
+  const status: 'complete' | 'partial' | 'empty' = m.name && m.dob && m.school ? 'complete' : m.name || m.dob ? 'partial' : 'empty';
+  return (
+    <CardShell ico="🧒"
+      title={`Child ${index + 1}${m.name ? ` · ${m.name}` : ''}${age != null ? ` · ${age}y` : ''}`}
+      sub={m.school ? `${m.school} school` : 'Date of birth + school preference'}
+      status={status} expanded={expanded} onToggle={onToggle} onRemove={onRemove}>
+      <Grid>
+        <FieldWrap label="First name" required>
+          <input className={inputCls()} value={m.name ?? ''} placeholder="e.g. Léo"
+            onChange={(e) => onChange({ ...m, name: e.target.value })} />
+        </FieldWrap>
+        <FieldWrap label="Date of birth" required why="We compute age automatically for school search and enrollment timing.">
+          <input type="date" className={inputCls()} value={m.dob ?? ''}
+            onChange={(e) => onChange({ ...m, dob: e.target.value })} />
+          {age != null && (
+            <div className="text-[10px] text-violet-600 mt-0.5">✦ {age} years old · {schoolLvl}</div>
+          )}
+        </FieldWrap>
+        <FieldWrap label="School type preference" className="sm:col-span-2">
+          <MultiChip value={m.school ? [m.school] : []} onChange={([v]) => onChange({ ...m, school: v })}
+            options={['Public', 'Private', 'International', 'Bilingual', 'Not sure yet']} />
+        </FieldWrap>
+      </Grid>
+    </CardShell>
+  );
+}
+
+function PetCard({ m, onChange, onRemove, index, expanded, onToggle, international, destCountry }: {
+  m: Member; onChange: (m: Member) => void; onRemove: () => void;
+  index: number; expanded: boolean; onToggle: () => void;
+  international: boolean; destCountry: string;
+}) {
+  const restricted = isRestrictedBreed(m.breed);
+  const quarantine = QUARANTINE_COUNTRIES.has(destCountry);
+  const destName = COUNTRIES.find((c) => c.code === destCountry)?.name ?? 'destination';
+  const status: 'complete' | 'partial' | 'empty' = m.pet_type && m.count ? 'complete' : m.pet_type ? 'partial' : 'empty';
+  return (
+    <CardShell ico={m.pet_type === 'Cat' ? '🐱' : m.pet_type === 'Bird' ? '🐦' : '🐕'}
+      title={`${m.pet_type || 'Pet'} ${m.breed ? `· ${m.breed}` : ''}${(m.count ?? 1) > 1 ? ` × ${m.count}` : ''}`}
+      sub={international ? 'Vaccination, microchip, breed' : 'Type & count'}
+      status={status} expanded={expanded} onToggle={onToggle} onRemove={onRemove} urgent={restricted}>
+      <Grid>
+        <FieldWrap label="Type" required>
+          <select className={selectCls()} value={m.pet_type ?? ''} onChange={(e) => onChange({ ...m, pet_type: e.target.value })}>
+            <option value="">Select…</option>
+            <option>Dog</option><option>Cat</option><option>Bird</option><option>Exotic</option><option>Other</option>
+          </select>
+        </FieldWrap>
+        <FieldWrap label="Count" required>
+          <input type="number" min={1} max={10} className={inputCls()} value={m.count ?? 1}
+            onChange={(e) => onChange({ ...m, count: Number(e.target.value) })} />
+        </FieldWrap>
+        {(m.pet_type === 'Dog' || m.pet_type === 'Cat') && (
+          <FieldWrap label="Breed" required={m.pet_type === 'Dog'} className="sm:col-span-2"
+            why="Some breeds face housing restrictions or import limits. Flagging early saves problems later.">
+            <input className={inputCls()} value={m.breed ?? ''}
+              placeholder={m.pet_type === 'Dog' ? 'e.g. Labrador, Pit Bull' : 'e.g. Maine Coon'}
+              onChange={(e) => onChange({ ...m, breed: e.target.value })} />
+            {restricted && (
+              <div className="flex items-start gap-2 mt-1 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                ⚠ <span><strong>This breed may face housing restrictions</strong> in {destName}. We'll flag this on housing options.</span>
+              </div>
+            )}
+          </FieldWrap>
+        )}
+        {international && (
+          <>
+            <FieldWrap label="Rabies vaccination">
+              <select className={selectCls()} value={m.rabies ?? ''} onChange={(e) => onChange({ ...m, rabies: e.target.value })}>
+                <option value="">Select…</option><option>Yes</option><option>No</option>
+              </select>
+            </FieldWrap>
+            <FieldWrap label="Microchipped">
+              <select className={selectCls()} value={m.microchipped ?? ''} onChange={(e) => onChange({ ...m, microchipped: e.target.value })}>
+                <option value="">Select…</option><option>Yes</option><option>No</option>
+              </select>
+            </FieldWrap>
+          </>
+        )}
+        <FieldWrap label="Notes for relocation" optional className="sm:col-span-2"
+          hint="e.g. vaccination details, special handling, size…">
+          <textarea rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-violet-300"
+            value={m.notes ?? ''} placeholder="Any special needs or requirements…"
+            onChange={(e) => onChange({ ...m, notes: e.target.value })} />
+        </FieldWrap>
+        {international && quarantine && (
+          <div className="sm:col-span-2 flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
+            ℹ <span><strong>{destName} requires pet quarantine.</strong> Your roadmap will include a dedicated track — import permits, health certs, arrival inspection. Typical timeline: 6–12 months pre-arrival.</span>
+          </div>
+        )}
+      </Grid>
+    </CardShell>
+  );
+}
+
+// ─── Step components ──────────────────────────────────────────────────────────
+
+function StepHd({ title, sub, required }: { title: string; sub: string; required?: boolean }) {
+  return (
+    <div className="mb-5">
+      <div className="text-base font-bold text-gray-900">{title}</div>
+      <div className="text-sm text-gray-500 mt-0.5">{sub}</div>
+      {required && <div className="text-xs text-gray-400 mt-1"><span className="text-red-400">*</span> required field</div>}
+    </div>
+  );
+}
+
+// ─── Review summary ───────────────────────────────────────────────────────────
+
+function ReviewSummary({ data, goTo }: { data: IntakeData; goTo: (s: number) => void }) {
+  const partner = data.members.find((m) => m.kind === 'partner');
+  const children = data.members.filter((m) => m.kind === 'child');
+  const pets = data.members.filter((m) => m.kind === 'pet');
+  const oC = COUNTRIES.find((c) => c.code === data.origin_country);
+  const dC = COUNTRIES.find((c) => c.code === data.dest_country);
+
+  const Card = ({ label, step, rows }: { label: string; step: number; rows: [string, React.ReactNode][] }) => (
+    <div className="border border-gray-100 rounded-xl p-4 bg-white">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{label}</span>
+        <button type="button" onClick={() => goTo(step)} className="text-xs text-violet-600 font-medium hover:text-violet-800">Edit →</button>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex gap-3 text-xs">
+            <span className="text-gray-400 w-24 flex-shrink-0">{k}</span>
+            <span className="text-gray-700 font-medium">{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+      <Card label="Move" step={1} rows={[
+        ['Route', `${oC?.flag ?? ''} ${data.origin_city} → ${dC?.flag ?? ''} ${data.dest_city}`],
+        ['Target date', data.target_date || '—'],
+        ['Purpose', data.purpose],
+      ]} />
+      <Card label="About you" step={2} rows={[
+        ['Name', data.full_name || <em className="text-red-400">missing</em>],
+        ['Passport', `${data.passport_country || '—'} · expires ${data.passport_expiry || '—'}`],
+        ['Email', data.email || '—'],
+      ]} />
+      <Card label={`Household (${data.members.length})`} step={3} rows={[
+        ['Self', data.full_name || 'You'],
+        ...(partner ? [['Partner', `${partner.name ?? '—'} · ${partner.employment ?? '—'}`] as [string, React.ReactNode]] : []),
+        ...(children.length ? [['Children', children.map((c) => `${c.name ?? '?'} (${computeAge(c.dob) ?? '?'}y)`).join(', ')] as [string, React.ReactNode]] : []),
+        ...(pets.length ? [['Pets', pets.map((p) => `${p.pet_type ?? '?'}${p.breed ? ` (${p.breed})` : ''}`).join(', ')] as [string, React.ReactNode]] : []),
+      ]} />
+      <Card label="Work & commute" step={4} rows={[
+        ['Job', `${data.job_title || '—'} · ${data.contract_type}`],
+        ['Office', data.office_address || <em className="text-red-400">missing</em>],
+        ['Pattern', `${data.work_pattern}${data.work_pattern !== 'Fully remote' ? ` · ≤${data.commute_mins}min` : ''}`],
+        ['Salary', data.salary_band || '—'],
+      ]} />
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export function EmployeeIntakePage() {
+  const [data, setData] = useState<IntakeData>(INITIAL_DATA);
+  const [step, setStep] = useState(1);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [locks, setLocks] = useState({ dest: true, destCity: true, email: true, job: true, contractType: true, contractStart: true, salary: true, office: true });
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [savedAt, setSavedAt] = useState(Date.now());
+
+  const setField = useCallback(<K extends keyof IntakeData>(k: K, v: IntakeData[K]) => {
+    setData((d) => ({ ...d, [k]: v }));
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => setSavedAt(Date.now()), 700);
+  }, []);
+
+  const unlock = (key: keyof typeof locks) => setLocks((l) => ({ ...l, [key]: false }));
+
+  const international = !!(data.origin_country && data.dest_country && data.origin_country !== data.dest_country);
+
+  const partner = data.members.find((m) => m.kind === 'partner');
+  const children = data.members.filter((m) => m.kind === 'child');
+  const pets = data.members.filter((m) => m.kind === 'pet');
+
+  const addMember = (kind: MemberKind, extra?: Partial<Member>) => {
+    const id = kind + Date.now();
+    setField('members', [...data.members, { id, kind, count: 1, ...extra }]);
+    setExpanded((e) => ({ ...e, [id]: true }));
+  };
+  const updateMember = (id: string, next: Member) => setField('members', data.members.map((m) => m.id === id ? next : m));
+  const removeMember = (id: string) => setField('members', data.members.filter((m) => m.id !== id));
+  const toggleMember = (id: string) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
+
+  // Auto-select services on household change
+  useEffect(() => {
+    const auto = new Set(data.services);
+    auto.add('housing'); auto.add('immigration');
+    if (children.length) auto.add('schools');
+    if (pets.length) auto.add('pets');
+    if (partner) auto.add('spouse');
+    const next = [...auto];
+    if (next.length !== data.services.length || next.some((s) => !data.services.includes(s))) {
+      setField('services', next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.members.length]);
+
+  const stepValid = (s: number) => {
+    if (s === 1) return !!(data.origin_country && data.origin_city && data.dest_country && data.dest_city && data.target_date && data.purpose);
+    if (s === 2) return !!(data.full_name && data.nationality && data.passport_country && data.passport_expiry);
+    if (s === 3) return data.members.length >= 1;
+    if (s === 4) return !!(data.job_title && data.contract_start && data.contract_type && data.office_address && data.work_pattern && data.salary_band);
+    if (s === 5) return data.services.length >= 1;
+    return true;
+  };
+
+  const goTo = (s: number) => {
+    setStep(s);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const STEP_LABELS = ['Journey', 'About You', 'My People', 'Work & Place', 'My Needs', 'Review'];
+  const STEP_ICONS = ['🛫', '👤', '👪', '🗺️', '✅', '📋'];
+
+  const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
+  const savedLabel = elapsedSecs < 60 ? 'just now' : 'a moment ago';
+
+  return (
+    <AppShell>
+      <div className="mx-auto max-w-2xl px-4 py-8">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-1">Employee · Intake Wizard</div>
+          <h1 className="text-2xl font-bold text-gray-900">Detailed intake</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Tell us about your relocation so we can prepare the right recommendations. Each step takes a couple of minutes.
+          </p>
+        </div>
+
+        {/* Pre-fill banner */}
+        <div className="flex items-start gap-3 p-3 mb-5 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+          <span className="flex-shrink-0">ℹ</span>
+          <div><strong>Some fields are pre-filled by your HR team</strong> (destination, office address, contract details, salary band). Click "Edit" on any pre-filled field if anything looks wrong.</div>
+        </div>
+
+        {/* Wizard frame */}
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+
+          {/* Progress stepper */}
+          <div className="border-b border-gray-100 px-5 pt-4 pb-3">
+            <div className="flex items-center justify-between mb-2 text-xs text-gray-400">
+              <span className="font-semibold text-gray-600">Detailed Intake</span>
+              <span>Auto-saved {savedLabel}</span>
+              <span>Step {step} / 6</span>
+            </div>
+            <div className="flex items-center gap-1 overflow-x-auto">
+              {STEP_LABELS.map((lbl, i) => {
+                const n = i + 1;
+                const isDone = stepValid(n) && n < step;
+                const isActive = n === step;
+                return (
+                  <button key={lbl} type="button"
+                    onClick={() => n < step && goTo(n)}
+                    disabled={n > step}
+                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-semibold flex-shrink-0 transition-colors ${
+                      isActive ? 'bg-violet-100 text-violet-700' :
+                      isDone ? 'text-green-600 cursor-pointer hover:bg-green-50' :
+                      'text-gray-300'
+                    }`}>
+                    <span className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center flex-shrink-0 ${
+                      isActive ? 'bg-violet-600 text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
+                    }`}>{isDone ? '✓' : n}</span>
+                    <span className="hidden sm:inline">{STEP_ICONS[i]} {lbl}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Step body */}
+          <div className="p-5">
+
+            {/* ── Step 1 — Journey ── */}
+            {step === 1 && (
+              <>
+                <StepHd title="Where are you moving from and to?" sub="Just the basics — we'll use this to start drafting your roadmap." required />
+                <Grid>
+                  <FieldWrap label="Origin country" required>
+                    <CountryCombo value={data.origin_country} onChange={(v) => setField('origin_country', v)} />
+                  </FieldWrap>
+                  <FieldWrap label="Origin city" required>
+                    <CityCombo country={data.origin_country} value={data.origin_city} onChange={(v) => setField('origin_city', v)} />
+                  </FieldWrap>
+                  <FieldWrap label="Destination country" required prefill={locks.dest} onUnlock={() => unlock('dest')}>
+                    <CountryCombo value={data.dest_country} onChange={(v) => setField('dest_country', v)} disabled={locks.dest} />
+                  </FieldWrap>
+                  <FieldWrap label="Destination city" required prefill={locks.destCity} onUnlock={() => unlock('destCity')}>
+                    <CityCombo country={data.dest_country} value={data.dest_city} onChange={(v) => setField('dest_city', v)} />
+                  </FieldWrap>
+                  <FieldWrap label="Target move date" required>
+                    <input type="date" className={inputCls()} value={data.target_date}
+                      onChange={(e) => setField('target_date', e.target.value)} />
+                  </FieldWrap>
+                  <FieldWrap label="Purpose of relocation" required>
+                    <select className={selectCls()} value={data.purpose} onChange={(e) => setField('purpose', e.target.value)}>
+                      <option>Employment</option><option>Study</option><option>Family</option><option>Other</option>
+                    </select>
+                  </FieldWrap>
+                </Grid>
+                {international && (
+                  <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+                    🌍 <span><strong>International move detected.</strong> We'll automatically include visa, customs, international movers, and pet import (if relevant) in your roadmap.</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Step 2 — About You ── */}
+            {step === 2 && (
+              <>
+                <StepHd title="A bit about you" sub="Your passport details kick off the immigration track." />
+                <Grid>
+                  <FieldWrap label="Full name" required>
+                    <input className={inputCls()} value={data.full_name} placeholder="As shown on your passport"
+                      onChange={(e) => setField('full_name', e.target.value)} />
+                  </FieldWrap>
+                  <FieldWrap label="Email" required prefill={locks.email} onUnlock={() => unlock('email')}>
+                    <input type="email" className={inputCls(locks.email)} value={data.email} disabled={locks.email}
+                      onChange={(e) => setField('email', e.target.value)} />
+                  </FieldWrap>
+                  <FieldWrap label="Nationality" required>
+                    <CountryCombo value={data.nationality} onChange={(v) => setField('nationality', v)} />
+                  </FieldWrap>
+                  <FieldWrap label="Passport country" required>
+                    <CountryCombo value={data.passport_country} onChange={(v) => setField('passport_country', v)} />
+                  </FieldWrap>
+                  <FieldWrap label="Passport expiry" required>
+                    <input type="date" className={inputCls()} value={data.passport_expiry}
+                      onChange={(e) => setField('passport_expiry', e.target.value)} />
+                  </FieldWrap>
+                  <FieldWrap label="Passport upload" optional hint="Drop a PDF or photo — we'll OCR name, country, and expiry." className="sm:col-span-2">
+                    <div className="flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-5 text-sm text-gray-400 cursor-pointer hover:border-violet-300 hover:text-violet-500 transition-colors">
+                      ↑ Drop your passport or click to browse
+                    </div>
+                  </FieldWrap>
+                </Grid>
+              </>
+            )}
+
+            {/* ── Step 3 — My People ── */}
+            {step === 3 && (
+              <>
+                <StepHd title="Who's relocating with you?" sub="Add anyone joining the move. Cards expand for details and scale gracefully." />
+                <div className="flex flex-col gap-2 mb-3">
+                  {/* Self (immutable) */}
+                  <div className="flex items-center gap-3 px-4 py-3 border border-green-100 bg-green-50/50 rounded-xl">
+                    <span className="text-xl">🙋</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900">{data.full_name || 'You'}</div>
+                      <div className="text-xs text-gray-400">Primary relocator</div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-green-600 bg-green-100">✓ From Step 2</span>
+                  </div>
+
+                  {partner && (
+                    <PartnerCard m={partner} onChange={(n) => updateMember(partner.id, n)} onRemove={() => removeMember(partner.id)}
+                      international={international} expanded={!!expanded[partner.id]} onToggle={() => toggleMember(partner.id)} />
+                  )}
+                  {children.map((c, i) => (
+                    <ChildCard key={c.id} m={c} index={i} onChange={(n) => updateMember(c.id, n)} onRemove={() => removeMember(c.id)}
+                      expanded={!!expanded[c.id]} onToggle={() => toggleMember(c.id)} />
+                  ))}
+                  {pets.map((p, i) => (
+                    <PetCard key={p.id} m={p} index={i} onChange={(n) => updateMember(p.id, n)} onRemove={() => removeMember(p.id)}
+                      expanded={!!expanded[p.id]} onToggle={() => toggleMember(p.id)}
+                      international={international} destCountry={data.dest_country} />
+                  ))}
+                </div>
+                {/* Add buttons */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {!partner && <button type="button" onClick={() => addMember('partner')} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add partner</button>}
+                  <button type="button" onClick={() => addMember('child')} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add a child</button>
+                  <button type="button" onClick={() => addMember('pet', { count: 1 })} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add a pet</button>
+                </div>
+                {data.members.length === 1 && (
+                  <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+                    ℹ <span><strong>Moving solo?</strong> That's fine — just continue. You can add household members later from your profile.</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Step 4 — Work & Place ── */}
+            {step === 4 && (
+              <>
+                <StepHd title="Your work & commute" sub="Most of this is pre-filled by your HR team — confirm or update. Commute settings drive your housing pre-filter." required />
+                <Grid>
+                  <FieldWrap label="Job title" required prefill={locks.job} onUnlock={() => unlock('job')}>
+                    <input className={inputCls(locks.job)} value={data.job_title} disabled={locks.job} placeholder="e.g. Senior Engineer"
+                      onChange={(e) => setField('job_title', e.target.value)} />
+                  </FieldWrap>
+                  <FieldWrap label="Contract type" required prefill={locks.contractType} onUnlock={() => unlock('contractType')}>
+                    <select className={selectCls(locks.contractType)} value={data.contract_type} disabled={locks.contractType}
+                      onChange={(e) => setField('contract_type', e.target.value)}>
+                      <option>Permanent</option><option>Fixed-term</option><option>Secondment</option>
+                    </select>
+                  </FieldWrap>
+                  <FieldWrap label="Contract start date" required prefill={locks.contractStart} onUnlock={() => unlock('contractStart')}>
+                    <input type="date" className={inputCls(locks.contractStart)} value={data.contract_start} disabled={locks.contractStart}
+                      onChange={(e) => setField('contract_start', e.target.value)} />
+                  </FieldWrap>
+                  <FieldWrap label="Salary band" required prefill={locks.salary} onUnlock={() => unlock('salary')} hint="Used to confirm visa salary thresholds.">
+                    <select className={selectCls(locks.salary)} value={data.salary_band} disabled={locks.salary}
+                      onChange={(e) => setField('salary_band', e.target.value)}>
+                      <option value="">Select…</option>
+                      <option>50–100k€</option><option>100–150k€</option><option>150–200k€</option><option>200–300k€</option><option>300k€+</option>
+                    </select>
+                  </FieldWrap>
+                  <FieldWrap label="Office address at destination" required className="sm:col-span-2" prefill={locks.office} onUnlock={() => unlock('office')}
+                    why="Anchors commute analysis. We'll show neighborhoods within your time radius.">
+                    <input className={inputCls(locks.office)} value={data.office_address} disabled={locks.office}
+                      placeholder="Start typing…" onChange={(e) => setField('office_address', e.target.value)} />
+                    {data.office_address && (
+                      <div className="flex items-center gap-2 mt-1 px-2.5 py-1.5 bg-gray-50 rounded-lg text-xs text-gray-500">
+                        📍 <span className="flex-1">{data.office_address}</span>
+                        <span className="text-green-600 font-medium">Verified</span>
+                      </div>
+                    )}
+                  </FieldWrap>
+                  <FieldWrap label="Work pattern" required className="sm:col-span-2">
+                    <MultiChip value={[data.work_pattern]} onChange={([v]) => setField('work_pattern', v)}
+                      options={['Full in-office', 'Hybrid', 'Fully remote']} />
+                  </FieldWrap>
+                </Grid>
+
+                {data.work_pattern !== 'Fully remote' && (
+                  <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="flex flex-col gap-4">
+                      <FieldWrap label="Maximum commute you'd accept">
+                        <div className="flex items-center gap-3">
+                          <input type="range" min={15} max={75} step={5} value={data.commute_mins}
+                            onChange={(e) => setField('commute_mins', Number(e.target.value))}
+                            className="flex-1 accent-violet-600" />
+                          <span className="text-sm font-bold text-violet-700 w-12 text-right">{data.commute_mins}min</span>
+                        </div>
+                        <div className="text-xs text-gray-400">Shorter = fewer neighborhoods but better matches.</div>
+                      </FieldWrap>
+                      <FieldWrap label="Preferred way to commute">
+                        <MultiChip value={data.commute_mode} onChange={(v) => setField('commute_mode', v)}
+                          options={[
+                            { value: 'car', label: '🚗 Car' },
+                            { value: 'public_transit', label: '🚇 Transit' },
+                            { value: 'bike', label: '🚴 Bike' },
+                            { value: 'walking', label: '🚶 Walking' },
+                            { value: 'no_pref', label: 'No preference' },
+                          ]} />
+                      </FieldWrap>
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-700 mb-1.5">Commute map · live preview</div>
+                      <CommuteMap maxMins={data.commute_mins} mode={data.commute_mode} />
+                    </div>
+                  </div>
+                )}
+                {data.work_pattern === 'Fully remote' && (
+                  <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+                    ℹ <span><strong>Working fully remote.</strong> We'll skip commute filtering and lead housing search with neighborhood quality and lifestyle priorities instead.</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Step 5 — My Needs ── */}
+            {step === 5 && (
+              <>
+                <StepHd title="What do you need help with?" sub="We've pre-selected services most relevant to your household. Adjust freely." />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
+                  {SERVICES.map((svc) => (
+                    <button key={svc.id} type="button" disabled={svc.soon}
+                      onClick={() => !svc.soon && setField('services', data.services.includes(svc.id)
+                        ? data.services.filter((s) => s !== svc.id)
+                        : [...data.services, svc.id])}
+                      className={`flex flex-col gap-1 p-3 rounded-xl border text-left transition-all ${
+                        svc.soon ? 'opacity-40 cursor-not-allowed border-gray-100 bg-gray-50' :
+                        data.services.includes(svc.id) ? 'border-violet-300 bg-violet-50 ring-1 ring-violet-300' :
+                        'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50'
+                      }`}>
+                      <span className="text-lg">{svc.ico}</span>
+                      <span className="text-xs font-semibold text-gray-900">{svc.t}{svc.soon && <span className="ml-1 text-[9px] text-gray-400">soon</span>}</span>
+                      <span className="text-[10px] text-gray-400 leading-tight">{svc.s}</span>
+                      {data.services.includes(svc.id) && <span className="text-[9px] font-bold text-violet-600 mt-0.5">✓ Selected</span>}
+                    </button>
+                  ))}
+                </div>
+                {data.services.length === 0 && (
+                  <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
+                    ⚠ <span>Select at least one service to continue. You can always add more later.</span>
+                  </div>
+                )}
+                {data.services.includes('housing') && (
+                  <div className="border border-gray-100 rounded-xl p-4 mb-3 bg-white">
+                    <div className="text-xs font-bold text-gray-700 mb-3">🏠 Housing preferences</div>
+                    <Grid>
+                      <FieldWrap label="Rent or buy?">
+                        <select className={selectCls()} value={data.housing_prefs.intent ?? ''}
+                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, intent: e.target.value })}>
+                          <option value="">Select…</option><option>Rent</option><option>Buy</option><option>Not sure yet</option>
+                        </select>
+                      </FieldWrap>
+                      <FieldWrap label="Bedrooms needed">
+                        <input type="number" min={1} max={6} className={inputCls()} placeholder="e.g. 2"
+                          value={data.housing_prefs.bedrooms ?? ''}
+                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, bedrooms: e.target.value === '' ? '' : Number(e.target.value) })} />
+                      </FieldWrap>
+                      <FieldWrap label="Monthly budget (€)" className="sm:col-span-2">
+                        <input type="number" className={inputCls()} placeholder="e.g. 2500"
+                          value={data.housing_prefs.budget ?? ''}
+                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, budget: e.target.value === '' ? '' : Number(e.target.value) })} />
+                      </FieldWrap>
+                    </Grid>
+                  </div>
+                )}
+                {data.services.includes('schools') && children.length > 0 && (
+                  <div className="border border-gray-100 rounded-xl p-4 mb-3 bg-white">
+                    <div className="text-xs font-bold text-gray-700 mb-3">🏫 Schools · {children.length} child{children.length > 1 ? 'ren' : ''}</div>
+                    <Grid>
+                      <FieldWrap label="School type">
+                        <select className={selectCls()} value={data.housing_prefs.school_type ?? ''}
+                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, school_type: e.target.value })}>
+                          <option value="">Select…</option>
+                          <option>International</option><option>Public</option><option>Private</option><option>Bilingual</option>
+                        </select>
+                      </FieldWrap>
+                      <FieldWrap label="Any special needs support?">
+                        <select className={selectCls()} value={data.housing_prefs.special_needs ?? ''}
+                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, special_needs: e.target.value })}>
+                          <option value="">Select…</option><option>Yes</option><option>No</option>
+                        </select>
+                      </FieldWrap>
+                      <FieldWrap label="Expected school start date" className="sm:col-span-2" hint="Defaults to your move date; adjust if kids start later.">
+                        <input type="date" className={inputCls()} value={data.housing_prefs.school_start ?? data.target_date}
+                          onChange={(e) => setField('housing_prefs', { ...data.housing_prefs, school_start: e.target.value })} />
+                      </FieldWrap>
+                    </Grid>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Step 6 — Review ── */}
+            {step === 6 && (
+              <>
+                <StepHd title="Review & submit" sub="A quick check before we generate your roadmap. You can edit any section later." />
+                <ReviewSummary data={data} goTo={goTo} />
+                <div className="flex items-start gap-3 mt-5 p-4 border border-gray-100 rounded-xl bg-gray-50">
+                  <input type="checkbox" checked={data.consent} id="consent-cb"
+                    onChange={(e) => setField('consent', e.target.checked)}
+                    className="mt-0.5 accent-violet-600" />
+                  <label htmlFor="consent-cb" className="cursor-pointer">
+                    <div className="text-sm font-semibold text-gray-900">I agree to ReloPass storing this information to generate my relocation roadmap.</div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      Your personal data is processed in accordance with our Privacy policy and Terms of service. You can request export or deletion any time from your profile.
+                    </div>
+                  </label>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Footer nav */}
+          <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
+            {step > 1 ? (
+              <button type="button" onClick={() => goTo(step - 1)}
+                className="px-4 py-2 text-sm font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                ← Back
+              </button>
+            ) : <div />}
+            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+              🔒 Encrypted · only you and your HR team see this
+            </div>
+            {step < 6 ? (
+              <button type="button" onClick={() => goTo(step + 1)} disabled={!stepValid(step)}
+                className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  stepValid(step) ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                }`}>
+                Continue →
+              </button>
+            ) : (
+              <button type="button" disabled={!data.consent}
+                onClick={() => {
+                  /* TODO: submit to API */
+                  alert('Roadmap generation queued — navigating to /employee/dashboard');
+                }}
+                className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  data.consent ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                }`}>
+                ✦ Generate my roadmap
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </AppShell>
+  );
+  // TODO: on submit: await employeeAPI.submitIntake(data); navigate(ROUTE_DEFS.employeeDashboard.path);
+}
