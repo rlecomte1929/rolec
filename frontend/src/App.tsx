@@ -20,6 +20,7 @@ import { SecurityPage } from './pages/public/SecurityPage';
 import { PrivacyPage } from './pages/public/PrivacyPage';
 import { Auth } from './pages/Auth';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
+import { V2Gate } from './features/platform-v2';
 import { RequireEmployeeRoute } from './features/employee/RequireEmployeeRoute';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
@@ -244,8 +245,20 @@ function App() {
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminCompanies.path} element={<RequireAdminRoute><AdminCompanies /></RequireAdminRoute>} />
-        {/* platform-v2 sibling route. Mounts the V2 implementation directly (no flag gate yet) so we can compare side-by-side during QA (step 8). Promoted in step 9. */}
+        {/* platform-v2: flag-gated. Default OFF → legacy AdminCompanies renders.
+            Enable per-session: localStorage.setItem('platform_v2_companies', 'on').
+            Enable globally: VITE_PLATFORM_V2_COMPANIES=true in env. */}
+        <Route
+          path={ROUTE_DEFS.adminCompanies.path}
+          element={
+            <RequireAdminRoute>
+              <V2Gate flag="companies" fallback={<AdminCompanies />}>
+                <AdminCompaniesV2 />
+              </V2Gate>
+            </RequireAdminRoute>
+          }
+        />
+        {/* Sibling route — kept so V2 stays reachable for side-by-side QA even while the flag is OFF on the legacy URL. */}
         <Route path="/admin/companies-v2" element={<RequireAdminRoute><AdminCompaniesV2 /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPeople.path} element={<RequireAdminRoute><AdminUsers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAssignments.path} element={<RequireAdminRoute><AdminAssignments /></RequireAdminRoute>} />
