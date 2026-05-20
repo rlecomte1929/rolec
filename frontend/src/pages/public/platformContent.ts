@@ -7,60 +7,79 @@
 
 export const platformContent = {
   hero: {
-    eyebrow: 'For HR and mobility teams',
-    headline: 'Every relocation on one system of record.',
+    eyebrow: 'The platform',
+    headline: 'Every part of the relocation workflow. One connected system.',
     subheadline:
-      'Cases, documents, providers, and progress on one record. No inboxes, no spreadsheets, no vendor portals.',
+      'Cases, timelines, documents, providers, and policy controls — structured into a single operating layer.',
     primaryCta: 'Book a demo',
-    secondaryCta: 'How it works',
+    secondaryCta: 'Sign in',
     trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
 
   productDefinition: {
-    title: 'Case-based relocation system',
-    body: 'Each move is its own case. Stops updates living only in email, sheets, and vendor threads.',
+    title: 'Built around the case.',
+    body: 'The case is the unit of work. Everything else — policy, tasks, documents, providers — connects to it.',
   },
 
   insideProduct: {
     blocks: [
       {
-        title: 'Case overview',
-        body: 'Status, dates, and open work in one place.',
+        title: 'Cases',
+        body: 'Every relocation case in one place, from open to close. The case holds the policy, the timeline, the documents, the providers, and the evidence.',
         image: '/screenshot-service-package.png',
-        imageAlt: 'Service package estimate showing three selected providers with costs',
+        imageAlt: 'ReloPass case detail view showing status, timeline, documents, and provider activity',
       },
       {
-        title: 'Corridor resources',
-        body: 'Visa steps, housing options, and school guides. Matched to the corridor.',
+        title: 'Timelines',
+        body: 'Structured task sequences, policy-applied at creation. Nothing is manually assembled. Nothing is forgotten.',
+        image: '/screenshot-employee-plan.png',
+        imageAlt: 'Timeline view showing task states: complete, in progress, blocked, upcoming',
+      },
+      {
+        title: 'Documents',
+        body: 'Required documents tracked to the case. Uploads are matched to the case. Nothing lives in email. Nothing is chased manually.',
         image: '/screenshot-destination-intelligence.png',
-        imageAlt: 'Destination intelligence for Singapore: visa, housing, and school resources',
+        imageAlt: 'Document tracker panel within a case showing completion status per document type',
       },
       {
-        title: 'Service providers',
-        body: 'Vendor steps stay linked to the same case.',
+        title: 'Providers',
+        body: 'Vendor tasks inside the case, not outside it. Their actions are logged. Their status is visible. No separate inboxes.',
         image: '/screenshot-provider-recommendations.png',
-        imageAlt: 'Provider recommendations ranked by match score and policy alignment',
+        imageAlt: 'Provider task view within the case showing multiple providers and status per task',
+      },
+      {
+        title: 'Policy controls',
+        body: 'Your relocation policy becomes the system\'s operating rules. Define what is required for each relocation type and corridor.',
+        image: '/screenshot-hr-assignments.png',
+        imageAlt: 'Policy configuration view showing corridor, tier, and required steps',
+      },
+      {
+        title: 'Visibility',
+        body: 'Live case status across every open case. Open items, upcoming milestones, exceptions, and overdue tasks — surfaced automatically.',
+        image: '/screenshot-service-package.png',
+        imageAlt: 'Portfolio dashboard showing multiple cases in different states',
       },
     ],
   },
 
   splitSection: {
-    title: 'One record. Two views.',
-    subtitle: 'HR sees every case. Employees see their own.',
+    title: 'Same case. Two structured views.',
+    subtitle: 'HR sees the full portfolio. Employees see their own case.',
     hrView: {
-      label: 'HR view',
+      label: 'What HR sees',
       image: '/screenshot-hr-assignments.png',
-      caption: 'All cases, corridors, and status across the team.',
+      caption: 'Case portfolio, policy adherence, exception flags, compliance status, provider progress.',
     },
     employeeView: {
-      label: 'Employee view',
+      label: 'What the employee sees',
       image: '/screenshot-employee-plan.png',
-      caption: 'Each step, sequenced. The next action is always clear.',
+      caption: 'Their own case timeline, document requirements, next steps, provider contacts.',
     },
   },
 
   cta: {
-    headline: 'See how it works with your cases',
+    headline: 'See the platform in a 30-minute walkthrough.',
+    subtext: 'We\'ll walk through your specific relocation types and show you how ReloPass structures them.',
     options: {
       demo: 'Book a demo',
       howItWorks: 'How it works',

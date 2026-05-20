@@ -7,10 +7,10 @@
 
 export const landingContent = {
   hero: {
-    eyebrow: 'For HR and mobility teams',
-    headline: 'The operating layer for cross-border relocation.',
+    eyebrow: 'Global mobility infrastructure',
+    headline: 'The operating layer for global mobility.',
     subheadline:
-      'Cases, documents, providers, and status on one record. No chased threads, no parallel spreadsheets.',
+      'Replace email threads, spreadsheets, and fragmented vendors with one policy-driven system of record.',
     brandPromise: 'Every relocation case is visible, compliant, on-time.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
@@ -18,42 +18,54 @@ export const landingContent = {
   },
 
   problem: {
-    title: 'Relocation still runs on emails and spreadsheets.',
+    title: 'Relocation still runs on email and spreadsheets.',
     cards: [
       {
-        title: 'Scattered coordination',
-        body: 'Email, spreadsheets, and vendor threads do not share one case view.',
+        title: 'HR is accountable for outcomes they cannot see.',
+        body: 'Status lives in inboxes, not in systems.',
       },
       {
-        title: 'No single view',
-        body: 'Hard to see what moved, what is blocked, and who owns the next step.',
+        title: 'Vendors operate outside the case, not inside it.',
+        body: 'Provider progress is invisible until something goes wrong.',
       },
       {
-        title: 'Follow-up becomes the work',
-        body: 'Too much time on documents, pings, and status checks.',
+        title: 'Every delay is a compliance, cost, or employee risk.',
+        body: 'Handoffs are untracked. Deadlines are missed before anyone notices.',
+      },
+      {
+        title: 'Status lives in inboxes, not in systems.',
+        body: 'Nothing is auditable. Nothing is proactive.',
       },
     ],
   },
 
   solution: {
-    sectionHeader: 'Global mobility. Structured.',
-    title: 'One structured way to run it',
+    sectionHeader: 'One system for cases, timelines, documents, providers, and status.',
+    title: 'One system for cases, timelines, documents, providers, and status.',
     blocks: [
       {
-        title: 'Case-based workflow',
-        body: 'Each move is one trackable case.',
+        title: 'Cases',
+        body: 'Every relocation case in one place, from open to close.',
       },
       {
-        title: 'Guided steps',
-        body: 'Employees see what to do next.',
+        title: 'Timelines',
+        body: 'Structured task sequences, policy-applied at creation.',
       },
       {
-        title: 'Policy alignment',
-        body: 'Work follows company rules and caps.',
+        title: 'Documents',
+        body: 'Required documents tracked to the case, not to inboxes.',
       },
       {
-        title: 'Provider work in context',
-        body: 'Vendor tasks stay tied to the case, not lost in inboxes.',
+        title: 'Providers',
+        body: 'Vendor tasks assigned and monitored inside the case.',
+      },
+      {
+        title: 'Policy controls',
+        body: 'Your relocation policy becomes the system\'s operating rules.',
+      },
+      {
+        title: 'Visibility',
+        body: 'Live case status across every open case and provider.',
       },
     ],
   },
@@ -86,11 +98,11 @@ export const landingContent = {
   },
 
   finalCta: {
-    headline: 'Three ways in.',
-    microCopy: 'Book a demo, sign in, or create an account.',
+    headline: 'Ready to run relocation as a system?',
+    microCopy: 'Tell us how your relocations run today. We\'ll show you what changes.',
     options: {
       demo: 'Book a demo',
-      platform: 'See the platform',
+      platform: 'See the platform walkthrough',
       signIn: 'Sign in',
     },
   },
