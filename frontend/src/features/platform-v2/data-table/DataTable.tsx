@@ -273,23 +273,38 @@ function DraggableHeaderCell<T>({ header, unmovable }: DraggableHeaderCellProps<
     transform: CSS.Translate.toString(transform),
     transition,
     width: header.getSize(),
-    opacity: isDragging ? 0.6 : 1,
+    opacity: isDragging ? 0.7 : 1,
     position: 'relative',
-    cursor: unmovable ? 'default' : 'grab',
+    // Cursor: 'grabbing' during an active drag, 'grab' otherwise, 'default'
+    // for unmovable columns. Communicates the affordance + the live state.
+    cursor: unmovable ? 'default' : isDragging ? 'grabbing' : 'grab',
+    background: isDragging ? '#eef2ff' : undefined,
   };
 
   const canSort = header.column.getCanSort();
   const sortDir = header.column.getIsSorted();
+  const isResizing = header.column.getIsResizing();
 
   return (
     <th
       ref={setNodeRef}
       style={style}
-      className="select-none whitespace-nowrap py-2.5 px-3 font-semibold"
+      // `group` so the grip + resize handle can react to header hover.
+      className="group select-none whitespace-nowrap py-2.5 px-3 font-semibold"
       {...(unmovable ? {} : attributes)}
       {...(unmovable ? {} : listeners)}
     >
       <span className="inline-flex items-center gap-1.5">
+        {/* Drag grip — visible on hover, fully opaque while dragging. */}
+        {!unmovable && (
+          <GripDots
+            className={`shrink-0 transition-opacity ${
+              isDragging
+                ? 'text-indigo-500 opacity-100'
+                : 'text-slate-300 opacity-0 group-hover:opacity-100'
+            }`}
+          />
+        )}
         <span
           className={canSort ? 'cursor-pointer' : ''}
           onClick={(e) => {
@@ -309,16 +324,48 @@ function DraggableHeaderCell<T>({ header, unmovable }: DraggableHeaderCellProps<
         )}
       </span>
 
-      {/* Resize handle */}
+      {/* Resize handle.
+          - Wide invisible hit-zone (w-2) for easy grabbing.
+          - Inside it, a thin always-visible line (w-px) at the right edge
+            that thickens + recolors on hover/resize so the affordance is
+            discoverable but not noisy.
+          - stopPropagation on pointerdown prevents drag from hijacking. */}
       <span
         onMouseDown={header.getResizeHandler()}
         onTouchStart={header.getResizeHandler()}
-        // Stop drag from hijacking the resize handle.
         onPointerDown={(e) => e.stopPropagation()}
-        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none touch-none hover:bg-indigo-300/70 active:bg-indigo-500"
+        className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none group/resize"
         aria-hidden
-      />
+      >
+        <span
+          className={`pointer-events-none absolute right-0 top-1/4 h-1/2 transition-all ${
+            isResizing
+              ? 'w-[3px] bg-indigo-500'
+              : 'w-px bg-slate-300 group-hover/resize:w-[3px] group-hover/resize:bg-indigo-400'
+          }`}
+        />
+      </span>
     </th>
+  );
+}
+
+/** 6-dot grip icon (matches the standard drag-handle convention). */
+function GripDots({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      width="6"
+      height="10"
+      viewBox="0 0 6 10"
+      className={className}
+      aria-hidden
+    >
+      <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+      <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+      <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+      <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+      <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+      <circle cx="4.5" cy="8.5" r="1" fill="currentColor" />
+    </svg>
   );
 }
 
