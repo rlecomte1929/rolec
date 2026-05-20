@@ -127,8 +127,8 @@ const AdminReviewQueuePage = lazy(() => import('./pages/admin/review-queue/Admin
 const AdminReviewQueueV2Page = lazy(() => import('./features/platform-v2/review-queue/AdminReviewQueueV2Page').then((module) => ({ default: module.AdminReviewQueueV2Page })));
 const AdminReviewQueueDetailPage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueueDetailPage').then((module) => ({ default: module.AdminReviewQueueDetailPage })));
 const AdminReviewQueueWorkloadPage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueueWorkloadPage').then((module) => ({ default: module.AdminReviewQueueWorkloadPage })));
-const AdminOpsSlaPage = lazy(() => import('./pages/admin/ops/AdminOpsSlaPage').then((module) => ({ default: module.AdminOpsSlaPage })));
 const OpsAnalyticsV2Page = lazy(() => import('./features/platform-v2/ops-analytics/OpsAnalyticsV2Page').then((module) => ({ default: module.OpsAnalyticsV2Page })));
+const AdminOpsSlaPage = lazy(() => import('./pages/admin/ops/AdminOpsSlaPage').then((module) => ({ default: module.AdminOpsSlaPage })));
 const AdminOpsQueuePage = lazy(() => import('./pages/admin/ops/AdminOpsQueuePage').then((module) => ({ default: module.AdminOpsQueuePage })));
 const AdminOpsReviewersPage = lazy(() => import('./pages/admin/ops/AdminOpsReviewersPage').then((module) => ({ default: module.AdminOpsReviewersPage })));
 const AdminOpsDestinationsPage = lazy(() => import('./pages/admin/ops/AdminOpsDestinationsPage').then((module) => ({ default: module.AdminOpsDestinationsPage })));
@@ -357,20 +357,11 @@ function App() {
         <Route path="/admin/review-queue-v2" element={<RequireAdminRoute><AdminReviewQueueV2Page /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueWorkload.path} element={<RequireAdminRoute><AdminReviewQueueWorkloadPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueDetail.path} element={<RequireAdminRoute><AdminReviewQueueDetailPage /></RequireAdminRoute>} />
-        {/* platform-v2: flag-gated. Default OFF → legacy AdminOpsSlaPage (pill-tab SLA view).
-            Enable: localStorage.setItem('platform_v2_ops_analytics', 'on'). */}
-        <Route
-          path={ROUTE_DEFS.adminOpsSla.path}
-          element={
-            <RequireAdminRoute>
-              <V2Gate flag="ops_analytics" fallback={<AdminOpsSlaPage />}>
-                <OpsAnalyticsV2Page />
-              </V2Gate>
-            </RequireAdminRoute>
-          }
-        />
-        {/* Sibling always-V2 route for side-by-side QA. */}
-        <Route path="/admin/ops-v2" element={<RequireAdminRoute><OpsAnalyticsV2Page /></RequireAdminRoute>} />
+        {/* Ops analytics — Dashboard is the default landing; SLA / Queue /
+            Reviewers / Destinations / Alerts are sibling tabs rendered by
+            AdminOpsLayout. All six pages share the same tab strip. */}
+        <Route path={ROUTE_DEFS.adminOps.path} element={<RequireAdminRoute><OpsAnalyticsV2Page /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminOpsSla.path} element={<RequireAdminRoute><AdminOpsSlaPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsQueue.path} element={<RequireAdminRoute><AdminOpsQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsReviewers.path} element={<RequireAdminRoute><AdminOpsReviewersPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsDestinations.path} element={<RequireAdminRoute><AdminOpsDestinationsPage /></RequireAdminRoute>} />

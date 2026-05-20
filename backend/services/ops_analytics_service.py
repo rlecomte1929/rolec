@@ -269,3 +269,134 @@ def get_ops_bottlenecks() -> Dict[str, Any]:
         "total_backlog": backlog.get("total", 0),
         "unassigned_count": backlog.get("by_status", {}).get("new", 0) + backlog.get("by_status", {}).get("triaged", 0),
     }
+
+
+# Common country-name → ISO 3166-1 alpha-2 mapping. Covers the names we see
+# in Supabase `case_assignments.destination_country` (full names like
+# "Germany") so the API always returns a canonical 2-letter code the frontend
+# can pass to flagcdn.com.
+_COUNTRY_NAME_TO_ISO2: Dict[str, str] = {
+    # Europe
+    "norway": "NO", "germany": "DE", "france": "FR", "spain": "ES", "italy": "IT",
+    "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+    "united kingdom": "GB", "uk": "GB", "great britain": "GB", "britain": "GB", "england": "GB",
+    "ireland": "IE", "belgium": "BE", "luxembourg": "LU",
+    "switzerland": "CH", "austria": "AT", "denmark": "DK", "sweden": "SE", "finland": "FI",
+    "iceland": "IS", "poland": "PL", "portugal": "PT", "greece": "GR", "czech republic": "CZ",
+    "czechia": "CZ", "slovakia": "SK", "hungary": "HU", "romania": "RO", "bulgaria": "BG",
+    "croatia": "HR", "slovenia": "SI", "estonia": "EE", "latvia": "LV", "lithuania": "LT",
+    "ukraine": "UA", "turkey": "TR", "türkiye": "TR", "russia": "RU", "cyprus": "CY",
+    "malta": "MT", "serbia": "RS",
+    # Americas
+    "united states": "US", "united states of america": "US", "usa": "US", "u.s.": "US", "u.s.a.": "US",
+    "america": "US",
+    "canada": "CA", "mexico": "MX", "brazil": "BR", "argentina": "AR", "chile": "CL",
+    "colombia": "CO", "peru": "PE", "uruguay": "UY", "costa rica": "CR", "panama": "PA",
+    # Asia / Pacific
+    "japan": "JP", "china": "CN", "south korea": "KR", "korea": "KR", "republic of korea": "KR",
+    "north korea": "KP", "india": "IN", "pakistan": "PK", "bangladesh": "BD", "sri lanka": "LK",
+    "singapore": "SG", "malaysia": "MY", "indonesia": "ID", "thailand": "TH", "vietnam": "VN",
+    "philippines": "PH", "hong kong": "HK", "taiwan": "TW", "australia": "AU", "new zealand": "NZ",
+    "israel": "IL", "saudi arabia": "SA", "uae": "AE", "united arab emirates": "AE",
+    "qatar": "QA", "kuwait": "KW", "bahrain": "BH", "oman": "OM", "jordan": "JO",
+    "lebanon": "LB", "egypt": "EG",
+    # Africa
+    "south africa": "ZA", "morocco": "MA", "tunisia": "TN", "kenya": "KE", "nigeria": "NG",
+    "ghana": "GH", "ethiopia": "ET",
+}
+
+
+def _normalize_country_to_iso2(raw: Optional[str]) -> Optional[str]:
+    """Normalize a country string to an ISO 3166-1 alpha-2 code.
+
+    Accepts already-canonical codes ("DE", "de"), full names ("Germany",
+    "United States"), or 3-letter codes (best-effort by stripping the trailing
+    char). Returns None when input is empty/unmappable so the caller can
+    decide whether to drop the row or keep the raw value.
+    """
+    if not raw:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    # Already 2-letter code (case-insensitive).
+    if len(s) == 2 and s.isalpha():
+        return s.upper()
+    lower = s.lower()
+    if lower in _COUNTRY_NAME_TO_ISO2:
+        return _COUNTRY_NAME_TO_ISO2[lower]
+    # 3-letter (alpha-3) — not standard ISO mapping, but a few common cases.
+    alpha3 = {
+        "deu": "DE", "fra": "FR", "esp": "ES", "ita": "IT", "gbr": "GB",
+        "usa": "US", "can": "CA", "mex": "MX", "bra": "BR", "nor": "NO",
+        "swe": "SE", "fin": "FI", "dnk": "DK", "nld": "NL", "che": "CH",
+        "aut": "AT", "bel": "BE", "irl": "IE", "prt": "PT", "pol": "PL",
+        "jpn": "JP", "chn": "CN", "kor": "KR", "ind": "IN", "sgp": "SG",
+        "aus": "AU", "nzl": "NZ", "are": "AE", "sau": "SA", "zaf": "ZA",
+    }
+    if len(s) == 3 and lower in alpha3:
+        return alpha3[lower]
+    return None
+
+
+def get_top_destinations_by_request(limit: int = 5) -> Dict[str, Any]:
+    """Top destination countries selected by users across all relocation requests.
+
+    Sources `destination_country` from Supabase `case_assignments` — the
+    canonical store for relocation requests. Falls back to the local
+    `relocation_cases.host_country` for environments where Supabase isn't
+    populated (dev), so the card still has data when running off SQLite.
+
+    All raw values are normalized to ISO 3166-1 alpha-2 codes so the frontend
+    can render a flag without worrying about whether the row stored "Germany"
+    or "DE". Unrecognized values are kept as an uppercased raw string so they
+    still appear in the list (the frontend falls back to a generic globe).
+
+    Returns the top `limit` countries ordered by request volume.
+    """
+    counts: Dict[str, int] = {}
+
+    def _add(raw: Optional[str]) -> None:
+        iso = _normalize_country_to_iso2(raw)
+        if iso:
+            counts[iso] = counts.get(iso, 0) + 1
+            return
+        # Keep unmappable rows so the card isn't silently lossy — just label
+        # them with the raw value (uppercased) and let the UI render a globe.
+        key = (raw or "").strip().upper()
+        if key:
+            counts[key] = counts.get(key, 0) + 1
+
+    # Primary source: Supabase case_assignments.
+    try:
+        supabase = _get_supabase()
+        page = (
+            supabase.table("case_assignments")
+            .select("destination_country")
+            .neq("status", "archived")
+            .limit(10000)
+            .execute()
+        )
+        for row in (page.data or []):
+            _add(row.get("destination_country"))
+    except Exception:
+        # Swallow — fall back to local DB below.
+        pass
+
+    # Fallback: local relocation_cases (dev environments without Supabase data).
+    if not counts:
+        try:
+            from ..database import db  # type: ignore
+            assignments = db.list_admin_assignments(status=None) or []
+            for a in assignments:
+                _add(a.get("destination_country") or a.get("host_country"))
+        except Exception:
+            pass
+
+    ranked = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+    items = [{"country_code": code, "total": cnt} for code, cnt in ranked[:limit]]
+    return {
+        "items": items,
+        "total_requests": sum(counts.values()),
+        "unique_countries": len(counts),
+    }

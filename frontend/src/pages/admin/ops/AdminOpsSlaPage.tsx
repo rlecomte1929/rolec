@@ -3,136 +3,134 @@ import { Link } from 'react-router-dom';
 import { AdminOpsLayout } from './AdminOpsLayout';
 import { adminOpsAnalyticsAPI } from '../../../api/client';
 import { buildRoute } from '../../../navigation/routes';
+import {
+  ConnectedPill,
+  OnHoldPill,
+  MiniStat,
+  SectionHeading,
+  OpsPageActions,
+  fmtNum,
+  fmtPct,
+} from './opsShared';
+
+/**
+ * SLA tab — drill-down into open / overdue / breached counts, on-time
+ * resolution rate, average assign/resolve times, and a list of the most
+ * recent SLA breaches. Sibling of the Ops dashboard.
+ */
+
+interface SlaOverview {
+  open_count?: number;
+  overdue_count?: number;
+  breached_count?: number;
+  resolved_count?: number;
+  on_time_resolution_rate_pct?: number;
+  avg_time_to_assign_hours?: number;
+  avg_time_to_resolve_hours?: number;
+}
+
+interface BreachItem {
+  id: string;
+  title?: string;
+  priority_band?: string;
+}
 
 export const AdminOpsSlaPage: React.FC = () => {
-  const [sla, setSla] = useState<Record<string, unknown> | null>(null);
-  const [breaches, setBreaches] = useState<Array<Record<string, unknown>>>([]);
-  const [bottlenecks, setBottlenecks] = useState<Record<string, unknown> | null>(null);
+  const [sla, setSla] = useState<SlaOverview | null>(null);
+  const [breaches, setBreaches] = useState<BreachItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [days, setDays] = useState(30);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const [slaRes, breachesRes, botRes] = await Promise.all([
-        adminOpsAnalyticsAPI.getSlaOverview({ days }),
-        adminOpsAnalyticsAPI.getQueueBreaches({ limit: 20 }),
-        adminOpsAnalyticsAPI.getBottlenecks(),
-      ]);
-      setSla(slaRes);
-      setBreaches(breachesRes.items ?? []);
-      setBottlenecks(botRes);
-    } catch (e) {
-      setError((e as Error)?.message || 'Failed to load');
-    } finally {
-      setLoading(false);
+    const results = await Promise.allSettled([
+      adminOpsAnalyticsAPI.getSlaOverview({ days }),
+      adminOpsAnalyticsAPI.getQueueBreaches({ limit: 20 }),
+    ]);
+    if (results[0].status === 'fulfilled') setSla(results[0].value as SlaOverview);
+    if (results[1].status === 'fulfilled') {
+      const v = results[1].value as { items?: BreachItem[] };
+      setBreaches(v.items ?? []);
     }
+    if (results[0].status === 'rejected' && results[1].status === 'rejected') {
+      setError('Backend unavailable — SLA endpoints are not returning data in this environment.');
+    }
+    setLoading(false);
   }, [days]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   return (
     <AdminOpsLayout
-      title="SLA & Operations Dashboard"
-      subtitle="SLA and queue health"
+      title="Ops analytics"
+      subtitle="SLA — open / overdue / breached counts and recent SLA breaches."
+      headerRight={<OpsPageActions days={days} onDaysChange={setDays} />}
     >
-      <div className="space-y-6">
-        <div className="flex justify-between">
-          <select
-            className="rounded border border-slate-300 px-2 py-1 text-sm"
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-          >
-            <option value={7}>Last 7 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
-          </select>
+      {error && (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>{error}</span>
+          <button type="button" onClick={() => void load()} className="text-amber-700 hover:underline">
+            Retry
+          </button>
         </div>
+      )}
 
-        {error && <div className="rounded-lg bg-red-50 p-3 text-red-700">{error}</div>}
-
-        {loading ? (
-          <div className="py-12 text-center text-slate-500">Loading...</div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-              <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="text-2xl font-semibold text-[#0b2b43]">{Number(sla?.open_count ?? 0)}</div>
-                <div className="text-sm text-slate-600">Open items</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="text-2xl font-semibold text-red-600">{Number(sla?.overdue_count ?? 0)}</div>
-                <div className="text-sm text-slate-600">Overdue</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="text-2xl font-semibold text-amber-600">{Number(sla?.breached_count ?? 0)}</div>
-                <div className="text-sm text-slate-600">SLA breaches</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="text-2xl font-semibold text-green-600">{Number(sla?.on_time_resolution_rate_pct ?? 0)}%</div>
-                <div className="text-sm text-slate-600">On-time rate</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="text-2xl font-semibold text-slate-700">{Number(sla?.avg_time_to_resolve_hours ?? 0)}h</div>
-                <div className="text-sm text-slate-600">Avg resolve time</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="text-2xl font-semibold text-slate-700">{Number(sla?.resolved_count ?? 0)}</div>
-                <div className="text-sm text-slate-600">Resolved</div>
-              </div>
+      {loading ? (
+        <div className="py-12 text-center text-slate-500">Loading…</div>
+      ) : (
+        <div className="space-y-5">
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-baseline justify-between">
+              <SectionHeading label="SLA snapshot" />
+              {sla ? <ConnectedPill /> : <OnHoldPill />}
             </div>
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              <MiniStat label="Open" value={fmtNum(sla?.open_count)} />
+              <MiniStat label="Overdue" value={fmtNum(sla?.overdue_count)} tone="warning" />
+              <MiniStat label="Breached" value={fmtNum(sla?.breached_count)} tone="danger" />
+              <MiniStat label="On-time" value={fmtPct(sla?.on_time_resolution_rate_pct)} tone="success" />
+              <MiniStat
+                label="Avg resolve"
+                value={typeof sla?.avg_time_to_resolve_hours === 'number' ? `${sla.avg_time_to_resolve_hours}h` : '—'}
+              />
+              <MiniStat label="Resolved" value={fmtNum(sla?.resolved_count)} />
+            </div>
+          </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <h3 className="mb-3 font-semibold text-slate-700">Bottlenecks</h3>
-                <div className="space-y-2 text-sm">
-                  <div>Total backlog: {Number(bottlenecks?.total_backlog ?? 0)}</div>
-                  <div>Unassigned: {Number(bottlenecks?.unassigned_count ?? 0)}</div>
-                  {(bottlenecks?.top_backlog_destination as Record<string, unknown> | null) && (
-                    <div>
-                      Top destination:{' '}
-                      {String((bottlenecks?.top_backlog_destination as Record<string, unknown>)?.country_code ?? '')} /{' '}
-                      {String((bottlenecks?.top_backlog_destination as Record<string, unknown>)?.city_name ?? '')} (
-                      {Number((bottlenecks?.top_backlog_destination as Record<string, unknown>)?.total ?? 0)} items)
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                <h3 className="mb-3 font-semibold text-slate-700">Recent SLA breaches</h3>
-                <div className="space-y-2">
-                  {breaches.length === 0 ? (
-                    <p className="text-sm text-slate-500">No breaches in current open items</p>
-                  ) : (
-                    breaches.slice(0, 10).map((b) => (
-                      <Link
-                        key={String(b.id)}
-                        to={buildRoute('adminReviewQueueDetail', { id: String(b.id) })}
-                        className="block rounded bg-slate-50 px-2 py-1 text-sm hover:bg-slate-100"
-                      >
-                        {String((b.title as string)?.slice(0, 50) || 'Queue item')} · {String(b.priority_band ?? '')}
-                      </Link>
-                    ))
-                  )}
-                  {breaches.length > 0 && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-baseline justify-between">
+              <SectionHeading label="Recent SLA breaches" />
+              {breaches.length > 0 ? <ConnectedPill /> : <OnHoldPill />}
+            </div>
+            {breaches.length === 0 ? (
+              <p className="text-[12.5px] text-slate-500">No breaches in current open items.</p>
+            ) : (
+              <ul className="space-y-1">
+                {breaches.slice(0, 10).map((b) => (
+                  <li key={b.id}>
                     <Link
-                      to={buildRoute('adminReviewQueue') + '?overdue=1'}
-                      className="text-sm text-[#0b2b43] underline"
+                      to={buildRoute('adminReviewQueueDetail', { id: b.id })}
+                      className="block rounded bg-slate-50 px-3 py-1.5 text-[12.5px] hover:bg-slate-100"
                     >
-                      View all overdue →
+                      <span className="font-medium text-slate-800">{(b.title ?? 'Queue item').slice(0, 80)}</span>
+                      <span className="ml-2 text-[11px] text-slate-500">· {b.priority_band ?? 'unknown'}</span>
                     </Link>
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {breaches.length > 0 && (
+              <Link to={`${buildRoute('adminReviewQueue')}?overdue=1`} className="mt-2 inline-block text-[12px] text-indigo-700 underline">
+                View all overdue →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
     </AdminOpsLayout>
   );
 };

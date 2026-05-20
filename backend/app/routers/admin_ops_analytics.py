@@ -17,6 +17,7 @@ from ...services.ops_analytics_service import (
     get_queue_breaches,
     get_reviewer_workload,
     get_sla_overview,
+    get_top_destinations_by_request,
 )
 
 
@@ -76,6 +77,15 @@ def reviewer_workload(user: Dict[str, Any] = Depends(_require_admin)):
 @router.get("/destinations")
 def destinations(user: Dict[str, Any] = Depends(_require_admin)):
     return get_destination_ops_metrics()
+
+
+@router.get("/destinations/requests")
+def destinations_by_request(
+    limit: int = Query(5, ge=1, le=20),
+    user: Dict[str, Any] = Depends(_require_admin),
+):
+    """Top destination countries selected by users across all relocation cases."""
+    return get_top_destinations_by_request(limit=limit)
 
 
 @router.get("/notifications")

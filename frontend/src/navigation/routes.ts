@@ -106,6 +106,7 @@ export const ROUTE_DEFS = {
   adminReviewQueue: { path: '/admin/review-queue', roles: ['ADMIN'] as RouteRole[] },
   adminReviewQueueDetail: { path: '/admin/review-queue/:id', roles: ['ADMIN'] as RouteRole[] },
   adminReviewQueueWorkload: { path: '/admin/review-queue/workload', roles: ['ADMIN'] as RouteRole[] },
+  adminOps: { path: '/admin/ops', roles: ['ADMIN'] as RouteRole[] },
   adminOpsSla: { path: '/admin/ops/sla', roles: ['ADMIN'] as RouteRole[] },
   adminOpsQueue: { path: '/admin/ops/queue', roles: ['ADMIN'] as RouteRole[] },
   adminOpsReviewers: { path: '/admin/ops/reviewers', roles: ['ADMIN'] as RouteRole[] },
