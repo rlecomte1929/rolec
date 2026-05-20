@@ -444,6 +444,129 @@ def create_queue_item_from_stale_live_event(event: Dict[str, Any]) -> Optional[D
     return created
 
 
+# ── Aggregation: synthetic queue items from peer tables ─────────────────────
+# These produce QueueItem-shaped dicts from pending rows in tables OTHER than
+# review_queue_items. Lets the admin Review Queue surface things like pending
+# policy exceptions and pending provider invites without needing a separate
+# table / backfill / sync.
+#
+# Each function is wrapped in try/except by the caller so a missing table or
+# Supabase outage degrades to "no rows from that source" — the canonical
+# review_queue_items list still returns.
+
+def _synthesize_queue_item(
+    *,
+    item_id: str,
+    queue_item_type: str,
+    title: str,
+    created_at: Optional[str],
+    org_id: Optional[str] = None,
+    priority_band: str = "medium",
+    priority_score: int = 50,
+    assigned_to_user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Shape a row from a peer table into the QueueItem dict the frontend
+    already consumes. Marked `synthetic: True` so callers (e.g. detail page)
+    can route to the source table instead of review_queue_items."""
+    return {
+        "id": item_id,
+        "queue_item_type": queue_item_type,
+        "status": "open",
+        "priority_score": priority_score,
+        "priority_band": priority_band,
+        "title": title,
+        "country_code": None,
+        "city_name": None,
+        "content_domain": None,
+        "source_name": None,
+        "trust_tier": None,
+        "assigned_to_user_id": assigned_to_user_id,
+        "due_at": None,
+        "created_at": created_at,
+        "priority_reasons": [],
+        # Meta: tells frontend "this isn't in review_queue_items; don't try to
+        # PATCH /api/admin/review-queue/<id> on it." Detail navigation will
+        # need a separate router branch — out of scope for this commit.
+        "synthetic": True,
+        "source_table": queue_item_type,  # 'policy_exception' or 'vendor_approval'
+        "org_id": org_id,
+    }
+
+
+def _pending_exception_requests(limit: int = 200) -> List[Dict[str, Any]]:
+    """Pull pending policy exception requests, shape as QueueItem rows."""
+    try:
+        supabase = _get_supabase()
+        rows = (
+            supabase.table("exception_requests")
+            .select("id, assignment_id, benefit_key, type_label, reason, status, created_at, requested_by_user_id")
+            .eq("status", "pending")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        ).data or []
+    except Exception as exc:
+        log.warning("Aggregation: exception_requests query failed: %s", exc)
+        return []
+
+    items: List[Dict[str, Any]] = []
+    for r in rows:
+        label = (r.get("type_label") or r.get("benefit_key") or "Exception").strip()
+        # Title format: "Exception · {benefit_key} (assignment ${short})"
+        assign_short = (r.get("assignment_id") or "")[:6]
+        title = f"Exception · {label}" + (f"  ({assign_short})" if assign_short else "")
+        items.append(_synthesize_queue_item(
+            item_id=str(r.get("id")),
+            queue_item_type="policy_exception",
+            title=title,
+            created_at=r.get("created_at"),
+            assigned_to_user_id=r.get("requested_by_user_id"),
+            priority_band="medium",
+            priority_score=60,
+        ))
+    return items
+
+
+def _pending_provider_invites(limit: int = 200) -> List[Dict[str, Any]]:
+    """Pull provider invites that are issued but not yet accepted / revoked /
+    expired. Each row represents a "pending provider approval" awaiting either
+    provider redemption or admin sign-off (per product direction: HR invites,
+    admin approves)."""
+    try:
+        from datetime import timezone as _tz
+        now_iso = datetime.now(_tz.utc).isoformat()
+        supabase = _get_supabase()
+        rows = (
+            supabase.table("provider_invites")
+            .select("id, provider_id, org_id, email, expires_at, created_at, first_used_at, revoked_at, case_id")
+            .is_("first_used_at", "null")
+            .is_("revoked_at", "null")
+            .gt("expires_at", now_iso)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        ).data or []
+    except Exception as exc:
+        log.warning("Aggregation: provider_invites query failed: %s", exc)
+        return []
+
+    items: List[Dict[str, Any]] = []
+    for r in rows:
+        email = r.get("email") or "(no email)"
+        provider_short = (r.get("provider_id") or "")[:6]
+        title = f"Vendor invite · {email}" + (f"  (prov {provider_short})" if provider_short else "")
+        items.append(_synthesize_queue_item(
+            item_id=str(r.get("id")),
+            queue_item_type="vendor_approval",
+            title=title,
+            created_at=r.get("created_at"),
+            org_id=r.get("org_id"),
+            priority_band="medium",
+            priority_score=55,
+        ))
+    return items
+
+
 def list_review_queue_items(
     status: Optional[str] = None,
     statuses: Optional[List[str]] = None,
@@ -459,49 +582,62 @@ def list_review_queue_items(
     offset: int = 0,
     sort: str = "priority",
 ) -> Dict[str, Any]:
-    """List queue items with filters."""
-    supabase = _get_supabase()
-    q = supabase.table("review_queue_items").select("*", count="exact")
+    """List queue items with filters.
 
-    if status:
-        q = q.eq("status", status)
-    elif statuses:
-        q = q.in_("status", statuses)
+    Three independent sources are merged: the canonical review_queue_items
+    table, pending exception_requests (synthetic), and pending
+    provider_invites (synthetic). Each source is try/except'd so the
+    endpoint stays useful even when Supabase / one table is unavailable.
+    """
+    items: List[Dict[str, Any]] = []
+    total: Optional[int] = None
+    try:
+        supabase = _get_supabase()
+        q = supabase.table("review_queue_items").select("*", count="exact")
 
-    if priority_band:
-        q = q.eq("priority_band", priority_band)
-    if assignee_id:
-        q = q.eq("assigned_to_user_id", assignee_id)
-    if unassigned_only:
-        q = q.is_("assigned_to_user_id", "null")
-    if country_code:
-        q = q.eq("country_code", country_code)
-    if city_name:
-        q = q.eq("city_name", city_name)
-    if queue_item_type:
-        q = q.eq("queue_item_type", queue_item_type)
-    if search:
-        q = q.ilike("title", f"%{search}%")
+        if status:
+            q = q.eq("status", status)
+        elif statuses:
+            q = q.in_("status", statuses)
 
-    if overdue_only:
-        now = datetime.now(timezone.utc).isoformat()
-        q = q.lt("due_at", now).not_.in_("status", ["resolved", "rejected", "deferred"])
+        if priority_band:
+            q = q.eq("priority_band", priority_band)
+        if assignee_id:
+            q = q.eq("assigned_to_user_id", assignee_id)
+        if unassigned_only:
+            q = q.is_("assigned_to_user_id", "null")
+        if country_code:
+            q = q.eq("country_code", country_code)
+        if city_name:
+            q = q.eq("city_name", city_name)
+        if queue_item_type:
+            q = q.eq("queue_item_type", queue_item_type)
+        if search:
+            q = q.ilike("title", f"%{search}%")
 
-    order_col = "priority_score"
-    order_asc = False
-    if sort == "created":
-        order_col = "created_at"
-    elif sort == "due":
-        order_col = "due_at"
-        order_asc = True
-    elif sort == "age":
-        order_col = "created_at"
-        order_asc = True
+        if overdue_only:
+            now = datetime.now(timezone.utc).isoformat()
+            q = q.lt("due_at", now).not_.in_("status", ["resolved", "rejected", "deferred"])
 
-    q = q.order(order_col, desc=not order_asc).range(offset, offset + limit - 1)
-    r = q.execute()
-    items = r.data or []
-    total = r.count if hasattr(r, "count") and r.count is not None else len(items)
+        order_col = "priority_score"
+        order_asc = False
+        if sort == "created":
+            order_col = "created_at"
+        elif sort == "due":
+            order_col = "due_at"
+            order_asc = True
+        elif sort == "age":
+            order_col = "created_at"
+            order_asc = True
+
+        q = q.order(order_col, desc=not order_asc).range(offset, offset + limit - 1)
+        r = q.execute()
+        items = r.data or []
+        total = r.count if hasattr(r, "count") and r.count is not None else len(items)
+    except Exception as exc:
+        log.warning("List: review_queue_items query failed: %s", exc)
+        items = []
+        total = 0
 
     for it in items:
         pr = it.get("priority_reasons_json")
@@ -512,6 +648,48 @@ def list_review_queue_items(
                 it["priority_reasons"] = []
         else:
             it["priority_reasons"] = pr or []
+
+    # ── Aggregate synthetic items from peer tables ─────────────────────────
+    # Skip if the caller is filtering to a queue_item_type that isn't one of
+    # our synthetic sources — keeps the canonical-only path lean. Skip if
+    # the caller specified a non-open status (synthetic items are always
+    # treated as open until they're resolved in their source table).
+    treat_as_open = status in (None, "open", "in_progress") and not statuses
+    want_exceptions = treat_as_open and queue_item_type in (None, "policy_exception")
+    want_invites = treat_as_open and queue_item_type in (None, "vendor_approval")
+
+    synthetic: List[Dict[str, Any]] = []
+    # Cap each source generously (limit + offset is the upper bound we'd ever
+    # need post-merge). 200 is also a comfortable hard cap.
+    fetch_cap = max(limit + offset, 50)
+    if want_exceptions:
+        synthetic.extend(_pending_exception_requests(limit=fetch_cap))
+    if want_invites:
+        synthetic.extend(_pending_provider_invites(limit=fetch_cap))
+
+    # Apply unassigned_only / search to synthetic too (so filters are
+    # consistent with the canonical list).
+    if unassigned_only:
+        synthetic = [it for it in synthetic if not it.get("assigned_to_user_id")]
+    if priority_band:
+        synthetic = [it for it in synthetic if it.get("priority_band") == priority_band]
+    if search:
+        s = search.lower()
+        synthetic = [it for it in synthetic if s in (it.get("title", "").lower())]
+
+    if synthetic:
+        merged = items + synthetic
+        # Re-sort the merged list using the requested sort key.
+        if sort == "created" or sort == "age":
+            merged.sort(key=lambda it: it.get("created_at") or "", reverse=(sort == "created"))
+        elif sort == "due":
+            merged.sort(key=lambda it: it.get("due_at") or "9999-12-31")
+        else:  # 'priority' (default)
+            merged.sort(key=lambda it: (-(it.get("priority_score") or 0), it.get("created_at") or ""), reverse=False)
+        items = merged
+        total = (total or 0) + len(synthetic)
+        # Apply the pagination window to the merged list.
+        items = items[offset:offset + limit]
 
     return {"items": items, "total": total}
 
@@ -761,15 +939,25 @@ def update_queue_item_notes(item_id: str, notes: str, actor_user_id: str) -> Opt
 
 def get_review_queue_stats() -> Dict[str, Any]:
     """Get queue statistics for dashboard."""
-    supabase = _get_supabase()
     open_statuses = list(_OPEN_STATUSES)
 
-    items = (
-        supabase.table("review_queue_items")
-        .select("id, status, priority_band, queue_item_type, assigned_to_user_id, due_at")
-        .in_("status", open_statuses)
-        .execute()
-    ).data or []
+    try:
+        supabase = _get_supabase()
+        items = (
+            supabase.table("review_queue_items")
+            .select("id, status, priority_band, queue_item_type, assigned_to_user_id, due_at")
+            .in_("status", open_statuses)
+            .execute()
+        ).data or []
+    except Exception as exc:
+        log.warning("Stats: review_queue_items query failed: %s", exc)
+        items = []
+
+    # Aggregate synthetic items the same way list_review_queue_items does so
+    # the KPI strip and the row count stay consistent. Each source is
+    # try/except'd inside its own helper.
+    synthetic = _pending_exception_requests(limit=500) + _pending_provider_invites(limit=500)
+    items = items + synthetic
 
     now = datetime.now(timezone.utc)
     overdue_count = sum(
