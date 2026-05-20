@@ -1,0 +1,67 @@
+{
+  "_note": "Synthetic fixture mirroring the AdminCompany shape in types.ts:767. Replace with a real captured response from GET /api/admin/companies when you have a populated dev DB. To capture: open DevTools → Network → /api/admin/companies → copy response → paste the `companies` array here.",
+  "companies": [
+    {
+      "id": "co_real_active",
+      "name": "Aurora Energy",
+      "country": "France",
+      "size_band": "200–1000",
+      "address": "12 Avenue de Friedland, 75008 Paris",
+      "phone": "+33 1 4502 8821",
+      "hr_contact": "helena.muller@aurora-energy.com",
+      "support_email": "mobility@aurora-energy.com",
+      "created_at": "2024-09-12T08:23:11Z",
+      "updated_at": "2026-05-14T10:42:00Z",
+      "status": "active",
+      "plan_tier": "premium",
+      "hr_seat_limit": 8,
+      "employee_seat_limit": 500,
+      "hr_users_count": 5,
+      "employee_count": 142,
+      "assignments_count": 12,
+      "primary_contact_name": "Helena Müller"
+    },
+    {
+      "id": "co_real_sparse",
+      "name": "Quill & Co",
+      "country": "France",
+      "size_band": "10–50",
+      "created_at": "2025-09-08T14:00:00Z",
+      "status": "active",
+      "plan_tier": "low",
+      "hr_users_count": 1,
+      "employee_count": 8,
+      "assignments_count": 0,
+      "primary_contact_name": "Margaux Lefèvre",
+      "hr_contact": "margaux@quill.fr",
+      "missing_from_registry": true
+    },
+    {
+      "id": "co_real_archived",
+      "name": "Sable Maritime",
+      "country": "Norway",
+      "size_band": "200–1000",
+      "created_at": "2023-06-19T00:00:00Z",
+      "updated_at": "2025-09-04T00:00:00Z",
+      "status": "archived",
+      "plan_tier": "low",
+      "hr_seat_limit": 3,
+      "employee_seat_limit": 100,
+      "hr_users_count": 0,
+      "employee_count": 0,
+      "assignments_count": 0,
+      "primary_contact_name": "Magnus Berg",
+      "missing_from_companies_table": 2
+    },
+    {
+      "id": "co_real_unknown_enum",
+      "name": "Edge Case Co",
+      "created_at": "2026-01-01T00:00:00Z",
+      "status": "SuspendedByBilling",
+      "plan_tier": "enterprise_v2",
+      "hr_users_count": 3,
+      "employee_count": 20,
+      "assignments_count": 1
+    }
+  ]
+}
