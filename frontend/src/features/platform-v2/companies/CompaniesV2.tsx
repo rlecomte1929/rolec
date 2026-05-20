@@ -8,6 +8,7 @@ import type {
 } from './adapter';
 import { CompanyFormModal } from './CompanyFormModal';
 import { RowActionMenu } from './RowActionMenu';
+import { DeleteCompanyDialog } from './DeleteCompanyDialog';
 
 // ── Visual helpers ──────────────────────────────────────────────────────────
 
@@ -316,6 +317,7 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editTarget, setEditTarget] = useState<CompanyV2 | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CompanyV2 | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -337,9 +339,9 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
     }
   }
 
-  function handleDelete(_c: CompanyV2) {
-    // Delete with type-name confirmation lands in C3 of this work block.
-    setActionError('Delete is not wired up yet — coming in C3.');
+  function handleDelete(c: CompanyV2) {
+    setActionError(null);
+    setDeleteTarget(c);
   }
 
   const countries = useMemo(
@@ -676,6 +678,17 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
           onClose={() => setEditTarget(null)}
           onSaved={() => {
             setEditTarget(null);
+            onRefresh?.();
+          }}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteCompanyDialog
+          company={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={() => {
+            setDeleteTarget(null);
             onRefresh?.();
           }}
         />
