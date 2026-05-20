@@ -144,6 +144,77 @@ The KEEP files (provider portal, EmployeeTaskPage, RequireEmployeeRoute, useProv
 
 ---
 
+## Phase 0 · s9g Companies — port comparison (2026-05-20)
+
+Step 1 of the per-screen recipe. Read both sides; capture the diff.
+
+### Prototype side
+`frontend/public/design-preview/platform-s9g-companies.jsx` — 1116 LOC.
+
+Layout (top → bottom):
+- Page header: eyebrow path + h1 + admin pill + Export CSV + Add tenant buttons + sub-line
+- **KPI strip** (9 cards): Total / Active / Inactive / Archived / Premium / HR users / Employees / Open cases / Data issues
+- **Filter bar**: search + 4 selects (status, plan, country, size) + "Issues only" toggle + "Clear" link
+- **Table** with drag-reorderable columns: name (with logo + legal_name), plan, status, country, size, hr (with seat ratio + bar), emp (with seat ratio + bar), cases, contact (primary + sub-line), created (relative date), row actions menu
+- **Bulk-select** with header checkbox (indeterminate state) + row checkboxes
+- **Slide-out detail panel** triggered by row click — tabs: overview / hr_users / employees / assignments / policies — with fade-in placeholder while loading
+
+### Legacy side
+`frontend/src/pages/admin/AdminCompanies.tsx` — 841 LOC. Fed by `adminAPI.listCompanies(query)` → `AdminCompany[]` (typed in `frontend/src/types.ts:767`).
+
+Layout:
+- Top filter row (search + status + plan + country + size + HR-min + employees-min + cases-min + contact)
+- Table with sortable headers
+- **Inline row editing** (click edit → fields become inputs → save / cancel)
+- **Add Company modal**
+- **Bulk archive / delete** with feedback states
+- Drill-in via `<Link to={/admin/companies/${id}}>` (separate `CountryDetailPage` / detail route)
+
+### Field-by-field shape diff
+
+`AdminCompany` (real) vs prototype's shape — the diff is small:
+
+| Field | Real `AdminCompany` | Prototype | Action |
+|---|---|---|---|
+| `id`, `name`, `country`, `size_band`, `address`, `phone`, `hr_contact`, `support_email`, `created_at`, `updated_at`, `status`, `plan_tier`, `hr_seat_limit`, `employee_seat_limit`, `hr_users_count`, `employee_count`, `assignments_count`, `primary_contact_name`, `missing_from_registry`, `missing_from_companies_table` | ✓ | ✓ | Pass through |
+| `legal_name` | — | "Aurora Energy AS" | Adapter substitutes `name` when missing |
+| `industry` | — | "Energy" | Adapter returns `null`; column hidden for now |
+| `website` | — | "aurora-energy.com" | Adapter returns `null`; not shown in v1 |
+| `hq_city` | — | "Paris" | Adapter returns `null`; not shown in v1 |
+| `tone` | — | 'a'..'f' | Adapter derives deterministically from `id` (hash → 6 buckets) |
+
+**Endpoint mapping:**
+- List → `GET /api/admin/companies` (existing — used by `adminAPI.listCompanies`)
+- Detail → `GET /api/admin/companies/{company_id}` (existing — backs `AdminCompanyDetail*` types already in `types.ts`)
+
+### What the V2 port WILL include (scope of Phase 0)
+
+- KPI strip (9 cards, computed client-side from the list response)
+- Filter bar — search + 4 selects + "issues only"
+- Table — name/plan/status/country/size/hr-seat-progress/emp-seat-progress/cases/contact/created
+- Slide-out detail panel — overview tab only for now (skipping hr_users / employees / assignments / policies sub-tabs in v1)
+- Empty / loading / error states
+- Read-only
+
+### What the V2 port WILL NOT include (deferred)
+
+- Drag-reorderable columns (cosmetic; deferred unless requested)
+- Bulk-select + bulk actions (legacy has them; not in scope for read-only proof)
+- Inline row editing (legacy has it; V2 detail panel becomes the edit surface later)
+- Add Tenant modal (legacy has it; revisit when V2 takes over fully)
+- Export CSV button (stub button, no handler in v1)
+- HR Users / Employees / Assignments / Policies sub-tabs in detail panel (requires `/api/admin/companies/{id}` detail call; defer to v1.1)
+
+### V1 sub-scope reasoning
+
+This is **Phase 0 — recipe proof**. The goal is to land a working V2 screen, exercise the adapter pattern end-to-end, validate the flag gate, and produce a side-by-side comparison. Editing surfaces are deferred so the proof stays read-only (no data integrity risk). Once the read-only pattern is proven, editing and bulk actions get added in follow-up commits — same recipe, same flag.
+
+### Side effects on the existing legacy page
+
+None. Legacy `AdminCompanies.tsx` is untouched. V2 mounts at `/admin/companies-v2` (sibling route) until promotion. After promotion, the legacy route gates by `useV2Flag('companies')`; flag-off renders legacy, flag-on renders V2.
+
+---
+
 ## Validation gates (canonical)
 
 ### Tier A — every commit (kept in both modes)
