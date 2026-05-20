@@ -82,6 +82,7 @@ const AdminCatalogQueuePage = lazy(() => import('./pages/admin/AdminCatalogQueue
 // baseline" bulk editor). Per product direction one editor is the source of
 // truth — the Policy Workspace row drawers. Route + page removed accordingly.
 const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies').then((module) => ({ default: module.AdminCompanies })));
+const AdminCompaniesV2 = lazy(() => import('./features/platform-v2/companies/CompaniesV2Page').then((module) => ({ default: module.CompaniesV2Page })));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((module) => ({ default: module.AdminUsers })));
 const AdminAssignments = lazy(() => import('./pages/admin/AdminAssignments').then((module) => ({ default: module.AdminAssignments })));
 const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((module) => ({ default: module.AdminMessages })));
@@ -244,6 +245,8 @@ function App() {
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCompanies.path} element={<RequireAdminRoute><AdminCompanies /></RequireAdminRoute>} />
+        {/* platform-v2 sibling route. Mounts the V2 implementation directly (no flag gate yet) so we can compare side-by-side during QA (step 8). Promoted in step 9. */}
+        <Route path="/admin/companies-v2" element={<RequireAdminRoute><AdminCompaniesV2 /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPeople.path} element={<RequireAdminRoute><AdminUsers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAssignments.path} element={<RequireAdminRoute><AdminAssignments /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminMobilityCases.path} element={<RequireAdminRoute><AdminMobilityCaseInspectPage /></RequireAdminRoute>} />
