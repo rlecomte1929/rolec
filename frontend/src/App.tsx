@@ -121,6 +121,7 @@ const AdminCrawlSchedules = lazy(() => import('./pages/admin/freshness/AdminCraw
 const AdminCrawlJobRuns = lazy(() => import('./pages/admin/freshness/AdminCrawlJobRuns').then((module) => ({ default: module.AdminCrawlJobRuns })));
 const AdminCrawlJobRunDetail = lazy(() => import('./pages/admin/freshness/AdminCrawlJobRunDetail').then((module) => ({ default: module.AdminCrawlJobRunDetail })));
 const AdminReviewQueuePage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueuePage').then((module) => ({ default: module.AdminReviewQueuePage })));
+const AdminReviewQueueV2Page = lazy(() => import('./features/platform-v2/review-queue/AdminReviewQueueV2Page').then((module) => ({ default: module.AdminReviewQueueV2Page })));
 const AdminReviewQueueDetailPage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueueDetailPage').then((module) => ({ default: module.AdminReviewQueueDetailPage })));
 const AdminReviewQueueWorkloadPage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueueWorkloadPage').then((module) => ({ default: module.AdminReviewQueueWorkloadPage })));
 const AdminOpsSlaPage = lazy(() => import('./pages/admin/ops/AdminOpsSlaPage').then((module) => ({ default: module.AdminOpsSlaPage })));
@@ -320,7 +321,20 @@ function App() {
         <Route path={ROUTE_DEFS.adminCrawlSchedules.path} element={<RequireAdminRoute><AdminCrawlSchedules /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCrawlJobRuns.path} element={<RequireAdminRoute><AdminCrawlJobRuns /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCrawlJobRunDetail.path} element={<RequireAdminRoute><AdminCrawlJobRunDetail /></RequireAdminRoute>} />
-        <Route path={ROUTE_DEFS.adminReviewQueue.path} element={<RequireAdminRoute><AdminReviewQueuePage /></RequireAdminRoute>} />
+        {/* platform-v2: flag-gated. Default OFF → legacy AdminReviewQueuePage.
+            Enable: localStorage.setItem('platform_v2_review_queue', 'on'). */}
+        <Route
+          path={ROUTE_DEFS.adminReviewQueue.path}
+          element={
+            <RequireAdminRoute>
+              <V2Gate flag="review_queue" fallback={<AdminReviewQueuePage />}>
+                <AdminReviewQueueV2Page />
+              </V2Gate>
+            </RequireAdminRoute>
+          }
+        />
+        {/* Sibling always-V2 route for side-by-side QA. */}
+        <Route path="/admin/review-queue-v2" element={<RequireAdminRoute><AdminReviewQueueV2Page /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueWorkload.path} element={<RequireAdminRoute><AdminReviewQueueWorkloadPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueDetail.path} element={<RequireAdminRoute><AdminReviewQueueDetailPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsSla.path} element={<RequireAdminRoute><AdminOpsSlaPage /></RequireAdminRoute>} />

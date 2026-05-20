@@ -46,7 +46,8 @@ export type V2FlagKey =
   | 'requirements_discovery'
   | 'roadmap_tracks'
   // Phase 5 — admin polish
-  | 'admin_overview';
+  | 'admin_overview'
+  | 'review_queue';
 
 const LS_PREFIX = 'platform_v2_';
 const ENV_PREFIX = 'VITE_PLATFORM_V2_';
@@ -102,4 +103,5 @@ export const V2_FLAGS: ReadonlyArray<V2FlagKey> = [
   'requirements_discovery',
   'roadmap_tracks',
   'admin_overview',
+  'review_queue',
 ];
