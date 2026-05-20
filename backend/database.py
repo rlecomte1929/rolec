@@ -8253,11 +8253,19 @@ class Database:
             with self.engine.connect() as conn:
                 params: Dict[str, Any] = {"limit": limit, "offset": (page - 1) * limit}
                 # Shared additional projections: origin country, owner full name,
-                # employee role/band. All LEFT joins so missing rows just yield NULLs.
+                # employee role/band, household composition + visa-surrogate. All
+                # LEFT joins so missing rows just yield NULLs. Household fields
+                # land on wizard_cases via 20260502110000_s4_family_details;
+                # move_type / contract_type via 20260502100000_s3_contract_move_type.
                 extra_select = (
                     "wc.origin_country as wizard_origin_country, "
                     "wc.dest_country as wizard_dest_country, "
                     "wc.target_move_date as wizard_target_move_date, "
+                    "wc.move_type as wizard_move_type, "
+                    "wc.contract_type as wizard_contract_type, "
+                    "wc.has_spouse as wizard_has_spouse, "
+                    "wc.child_count as wizard_child_count, "
+                    "wc.partner_requires_visa as wizard_partner_requires_visa, "
                     "hp.full_name as hr_owner_name, "
                     "hp.email as hr_owner_email, "
                     "emp.band as employee_band, "
@@ -8386,6 +8394,42 @@ class Database:
                 employee_role = m.get("employee_band") or m.get("employee_assignment_type") or None
                 if isinstance(employee_role, str) and not employee_role.strip():
                     employee_role = None
+
+                # Visa label — best-effort surrogate. move_type / contract_type
+                # come from the wizard; assignment_type is the employees-table
+                # band. None of these is a real visa-program enum (the prototype
+                # mock showed "Skilled Worker", "EU Blue Card", "L-1A", etc.),
+                # but they're the closest first-class fields we have today.
+                visa_label = (
+                    m.get("wizard_move_type")
+                    or m.get("wizard_contract_type")
+                    or m.get("employee_assignment_type")
+                    or None
+                )
+                if isinstance(visa_label, str) and not visa_label.strip():
+                    visa_label = None
+
+                # Household composition from wizard family fields.
+                #   None  → not asked yet
+                #   "Solo"        → no spouse, no kids
+                #   "Partner"     → spouse only
+                #   "N kids"      → no spouse, kids only
+                #   "Partner + N kids" → both
+                has_spouse = bool(m.get("wizard_has_spouse"))
+                try:
+                    child_count = int(m.get("wizard_child_count") or 0)
+                except (TypeError, ValueError):
+                    child_count = 0
+                household_label: Optional[str]
+                if not has_spouse and child_count == 0:
+                    household_label = None  # Treat zeros as "unanswered" to avoid claiming "Solo" prematurely
+                elif has_spouse and child_count == 0:
+                    household_label = "Partner"
+                elif not has_spouse and child_count > 0:
+                    household_label = f"{child_count} kid{'s' if child_count != 1 else ''}"
+                else:
+                    household_label = f"Partner + {child_count} kid{'s' if child_count != 1 else ''}"
+
                 result.append({
                     "id": a_id,
                     "caseId": m.get("case_id") or None,
@@ -8402,6 +8446,11 @@ class Database:
                     "targetMoveDate": str(m.get("wizard_target_move_date")) if m.get("wizard_target_move_date") else None,
                     "ownerName": owner_name,
                     "updatedAt": str(m.get("updated_at")) if m.get("updated_at") else None,
+                    # New: visa surrogate + household composition (both may be None).
+                    "visaLabel": visa_label,
+                    "household": household_label,
+                    "hasSpouse": has_spouse,
+                    "childCount": child_count,
                 })
             return result
         except Exception as e:

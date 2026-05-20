@@ -35,16 +35,65 @@ type ApprovalRow = {
   currency?: string;
 };
 
-// ── Country → flag (very small map, falls back to ISO code) ─────────────────
-const FLAGS: Record<string, string> = {
-  FR: '🇫🇷', NO: '🇳🇴', DE: '🇩🇪', IN: '🇮🇳', MX: '🇲🇽', US: '🇺🇸',
-  GB: '🇬🇧', ES: '🇪🇸', CA: '🇨🇦', BR: '🇧🇷', NL: '🇳🇱', SG: '🇸🇬',
-  JP: '🇯🇵', AE: '🇦🇪', IT: '🇮🇹', AU: '🇦🇺', HK: '🇭🇰', CH: '🇨🇭',
-  IE: '🇮🇪', PT: '🇵🇹', BE: '🇧🇪', AT: '🇦🇹', SE: '🇸🇪', DK: '🇩🇰',
+// ── Country resolver: accepts ISO-2, ISO-3, or full name in any case ────────
+// Source values on wizard_cases.{origin,dest}_country / relocation_cases.host_country
+// are inconsistent in practice — sometimes "FR", sometimes "France", sometimes
+// "FRA". This maps any of those to a canonical ISO-2 code so flags render
+// consistently. Add to this map as new corridors come online.
+const ISO2_TO_NAME: Record<string, string> = {
+  FR: 'France', NO: 'Norway', DE: 'Germany', IN: 'India', MX: 'Mexico', US: 'United States',
+  GB: 'United Kingdom', UK: 'United Kingdom', ES: 'Spain', CA: 'Canada', BR: 'Brazil',
+  NL: 'Netherlands', SG: 'Singapore', JP: 'Japan', AE: 'United Arab Emirates',
+  IT: 'Italy', AU: 'Australia', HK: 'Hong Kong', CH: 'Switzerland', IE: 'Ireland',
+  PT: 'Portugal', BE: 'Belgium', AT: 'Austria', SE: 'Sweden', DK: 'Denmark',
+  FI: 'Finland', PL: 'Poland', CZ: 'Czechia', LU: 'Luxembourg', IL: 'Israel',
+  ZA: 'South Africa', KR: 'South Korea', CN: 'China', TW: 'Taiwan', NZ: 'New Zealand',
+  AR: 'Argentina', CL: 'Chile', CO: 'Colombia', PE: 'Peru', TR: 'Turkey',
+  SA: 'Saudi Arabia', QA: 'Qatar', KW: 'Kuwait', MA: 'Morocco', EG: 'Egypt',
+  NG: 'Nigeria', KE: 'Kenya', GR: 'Greece', HU: 'Hungary', RO: 'Romania',
+  BG: 'Bulgaria', HR: 'Croatia', SK: 'Slovakia', SI: 'Slovenia', EE: 'Estonia',
+  LV: 'Latvia', LT: 'Lithuania', IS: 'Iceland', MT: 'Malta', CY: 'Cyprus',
+  MY: 'Malaysia', TH: 'Thailand', VN: 'Vietnam', PH: 'Philippines', ID: 'Indonesia',
 };
-function flag(code?: string | null): string {
-  const c = (code || '').trim().toUpperCase().slice(0, 2);
-  return FLAGS[c] || (c ? '🌐' : '');
+
+// Reverse: every other shape we might see → ISO-2.
+const ALIAS_TO_ISO2: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  for (const [iso2, name] of Object.entries(ISO2_TO_NAME)) {
+    out[iso2] = iso2;
+    out[name.toUpperCase()] = iso2;
+  }
+  // Common alternates / ISO-3 codes we want to catch.
+  Object.assign(out, {
+    FRA: 'FR', DEU: 'DE', GER: 'DE', NOR: 'NO', IND: 'IN', MEX: 'MX',
+    USA: 'US', GBR: 'GB', ESP: 'ES', CAN: 'CA', BRA: 'BR', NLD: 'NL',
+    SGP: 'SG', JPN: 'JP', ARE: 'AE', ITA: 'IT', AUS: 'AU', HKG: 'HK',
+    CHE: 'CH', IRL: 'IE', PRT: 'PT', BEL: 'BE', AUT: 'AT', SWE: 'SE',
+    DNK: 'DK', FIN: 'FI', POL: 'PL', CZE: 'CZ', LUX: 'LU', ISR: 'IL',
+    'UNITED STATES OF AMERICA': 'US', 'UNITED KINGDOM': 'GB', UK: 'GB',
+    'HONG KONG SAR': 'HK', UAE: 'AE',
+  });
+  return out;
+})();
+
+function resolveISO2(raw?: string | null): string | null {
+  if (!raw) return null;
+  const norm = raw.trim().toUpperCase();
+  if (!norm) return null;
+  if (ALIAS_TO_ISO2[norm]) return ALIAS_TO_ISO2[norm]!;
+  if (norm.length === 2 && /^[A-Z]{2}$/.test(norm)) return norm; // unknown but valid ISO-2 shape
+  return null;
+}
+
+/** Render the country as a flag emoji built from regional indicator characters,
+ *  which works for any ISO-2 code without needing a hard-coded table. */
+function flagEmoji(iso2: string | null): string {
+  if (!iso2 || iso2.length !== 2) return '';
+  const base = 0x1f1e6;
+  const a = iso2.charCodeAt(0) - 65;
+  const b = iso2.charCodeAt(1) - 65;
+  if (a < 0 || a > 25 || b < 0 || b > 25) return '';
+  return String.fromCodePoint(base + a) + String.fromCodePoint(base + b);
 }
 
 // ── Status → pill tone (driven by raw backend status strings) ───────────────
@@ -324,24 +373,45 @@ export function MobilityControlCenterV2Page() {
       header: 'Visa',
       defaultWidth: 150,
       minWidth: 110,
-      cell: (row) => (
-        // No first-class visa column on case_assignments yet — derive a label
-        // from status where it surfaces, otherwise show em-dash.
-        <span className="text-[12.5px] text-slate-700">
-          {row.status && /visa/i.test(row.status) ? row.status.replace(/_/g, ' ') : '—'}
-        </span>
-      ),
+      cell: (row) => {
+        // visaLabel comes from wizard_cases.move_type / contract_type /
+        // employees.assignment_type. None of those is a true visa-program
+        // field, but it's the closest first-class signal we have today —
+        // we'd need a real `visa_type` column to show "Skilled Worker"
+        // exactly as the mock does.
+        if (!row.visaLabel) {
+          return <span className="text-[12.5px] text-slate-400">—</span>;
+        }
+        const label = row.visaLabel.replace(/_/g, ' ');
+        return (
+          <span className="text-[12.5px] text-slate-700" title="Best-available visa surrogate (move_type / contract_type)">
+            {label}
+          </span>
+        );
+      },
     },
     {
       id: 'household',
       header: 'Household',
-      defaultWidth: 130,
-      minWidth: 100,
-      cell: () => (
-        // Household composition isn't yet stored on case_assignments — render
-        // a placeholder so the column lines up with the mock without invention.
-        <span className="text-[12.5px] text-slate-400">—</span>
-      ),
+      defaultWidth: 150,
+      minWidth: 110,
+      cell: (row) => {
+        if (!row.household) {
+          return <span className="text-[12.5px] text-slate-400">—</span>;
+        }
+        // Pick an icon based on composition: 👤 solo, 👫 partner, 👨‍👩‍👧 family.
+        const icon = (row.childCount ?? 0) > 0
+          ? '👨‍👩‍👧'
+          : row.hasSpouse
+            ? '👫'
+            : '👤';
+        return (
+          <span className="inline-flex items-center gap-1.5 text-[12.5px] text-slate-700">
+            <span aria-hidden className="text-[14px] leading-none">{icon}</span>
+            <span>{row.household}</span>
+          </span>
+        );
+      },
     },
     {
       id: 'progress',

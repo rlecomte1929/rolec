@@ -2555,6 +2555,14 @@ export interface CommandCenterCaseRow {
   targetMoveDate?: string | null;
   ownerName?: string | null;
   updatedAt?: string | null;
+  /** Best-available visa surrogate (wizard.move_type → contract_type →
+   *  assignment_type). Null when none of those are set. */
+  visaLabel?: string | null;
+  /** Derived household composition string: "Solo" / "Partner" / "N kids" /
+   *  "Partner + N kids". Null when wizard family fields weren't answered. */
+  household?: string | null;
+  hasSpouse?: boolean | null;
+  childCount?: number | null;
 }
 
 export type TaskOwner = 'hr' | 'employee' | 'provider' | 'joint';
