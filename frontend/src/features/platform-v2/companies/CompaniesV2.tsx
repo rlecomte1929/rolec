@@ -5,6 +5,7 @@ import type {
   CompanyV2Status,
   CompanyV2Tone,
 } from './adapter';
+import { CompanyFormModal } from './CompanyFormModal';
 
 // ── Visual helpers ──────────────────────────────────────────────────────────
 
@@ -311,6 +312,7 @@ export interface CompaniesV2Props {
 export function CompaniesV2({ companies, loading = false, error = null, onRefresh }: CompaniesV2Props) {
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const countries = useMemo(
     () =>
@@ -378,16 +380,25 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
         <div className="mt-1.5 flex items-baseline gap-3">
           <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Companies</h1>
           <Pill className="bg-indigo-50 text-indigo-700 ring-indigo-200">v2 preview</Pill>
-          {onRefresh && (
+          <div className="ml-auto flex items-center gap-3">
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                className="text-xs font-medium text-indigo-600 underline-offset-2 hover:underline disabled:opacity-50"
+                disabled={loading}
+              >
+                {loading ? 'Refreshing…' : 'Refresh'}
+              </button>
+            )}
             <button
               type="button"
-              onClick={onRefresh}
-              className="ml-auto text-xs font-medium text-indigo-600 underline-offset-2 hover:underline"
-              disabled={loading}
+              onClick={() => setShowAddModal(true)}
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
             >
-              {loading ? 'Refreshing…' : 'Refresh'}
+              + Add tenant
             </button>
-          )}
+          </div>
         </div>
         <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
           Every tenant on the platform — people, activity, policy health and data quality, in one view. Click any row to inspect.
@@ -592,6 +603,17 @@ export function CompaniesV2({ companies, loading = false, error = null, onRefres
       </div>
 
       {activeCompany && <DetailPanel company={activeCompany} onClose={() => setActiveId(null)} />}
+
+      {showAddModal && (
+        <CompanyFormModal
+          mode="create"
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => {
+            setShowAddModal(false);
+            onRefresh?.();
+          }}
+        />
+      )}
     </div>
   );
 }
