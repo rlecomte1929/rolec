@@ -60,6 +60,10 @@ export const ROUTE_DEFS = {
   hrPolicyBuilder: { path: '/hr/settings/policy', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy exceptions inbox — HR review + approve/reject flow. */
   hrExceptions: { path: '/hr/exceptions', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** Policy vs. Reality compliance heatmap + per-case analysis. */
+  hrPolicyReality: { path: '/hr/policy-vs-reality', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** AI Requirements Discovery Engine — corridor requirement graph + timeline + source audit. */
+  hrDiscovery: { path: '/hr/discovery', roles: ['HR', 'ADMIN'] as RouteRole[] },
   employeePolicy: { path: '/employee/policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   submissionCenter: { path: '/submission-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompanyProfile: { path: '/hr/company-profile', roles: ['HR', 'ADMIN'] as RouteRole[] },

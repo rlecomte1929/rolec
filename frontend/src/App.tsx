@@ -78,6 +78,7 @@ const MobilityControlCenterV2Page = lazy(() => import('./features/platform-v2/mo
 const HrPolicyBuilder = lazy(() => import('./pages/HrPolicyBuilder').then((module) => ({ default: module.HrPolicyBuilder })));
 const HrExceptionsPage = lazy(() => import('./features/platform-v2/exceptions/HrExceptionsPage').then((module) => ({ default: module.HrExceptionsPage })));
 const HrPolicyRealityPage = lazy(() => import('./features/platform-v2/policy-reality/HrPolicyRealityPage').then((module) => ({ default: module.HrPolicyRealityPage })));
+const HrDiscoveryPage = lazy(() => import('./features/platform-v2/discovery/HrDiscoveryPage').then((module) => ({ default: module.HrDiscoveryPage })));
 const ProviderPortal = lazy(() => import('./pages/ProviderPortal').then((module) => ({ default: module.ProviderPortal })));
 const EmployeeTaskPage = lazy(() => import('./pages/employee/EmployeeTaskPage').then((module) => ({ default: module.EmployeeTaskPage })));
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings').then((module) => ({ default: module.NotificationSettings })));
@@ -246,6 +247,7 @@ function App() {
         <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<HrPolicyBuilder />} />
         <Route path={ROUTE_DEFS.hrExceptions.path} element={<HrExceptionsPage />} />
                 <Route path={ROUTE_DEFS.hrPolicyReality.path} element={<HrPolicyRealityPage />} />
+                <Route path={ROUTE_DEFS.hrDiscovery.path} element={<HrDiscoveryPage />} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<HrCaseSummary />} />
         <Route path={ROUTE_DEFS.hrReview.path} element={<Navigate to={ROUTE_DEFS.hrEmployeeDashboard.path} replace />} />
