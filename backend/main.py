@@ -12649,6 +12649,10 @@ class CommandCenterCaseRow(BaseModel):
     targetMoveDate: Optional[str] = None
     ownerName: Optional[str] = None
     updatedAt: Optional[str] = None
+    visaLabel: Optional[str] = None
+    household: Optional[str] = None
+    hasSpouse: Optional[bool] = None
+    childCount: Optional[int] = None
 
 
 class CommandCenterCaseDetail(BaseModel):

@@ -168,6 +168,42 @@ function Pill({ children, className = '' }: { children: React.ReactNode; classNa
   );
 }
 
+/**
+ * Marker for cells whose data isn't yet wired to Supabase. Renders as a
+ * small amber chip so it's instantly findable when grepping the rendered
+ * UI — these are TODOs, not legitimate empty values.
+ *
+ * Search for "⚑ tbd" in the browser to find every unlinked surface.
+ */
+function NotLinked({ label = 'tbd', title }: { label?: string; title?: string }) {
+  return (
+    <span
+      title={title || 'Not yet linked to Supabase — placeholder.'}
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200 bg-amber-50"
+    >
+      <span aria-hidden>⚑</span>
+      {label}
+    </span>
+  );
+}
+
+function Flag({ iso2, raw }: { iso2: string | null; raw?: string | null }) {
+  if (!iso2) {
+    return (
+      <span title={raw ? `Unknown country code: ${raw}` : 'No country recorded'} className="text-slate-400">
+        {raw ? `⚑ ${raw}` : '⚑ tbd'}
+      </span>
+    );
+  }
+  const emoji = flagEmoji(iso2);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-[14px] leading-none" aria-hidden>{emoji}</span>
+      <span className="font-mono text-[11px] text-slate-600">{iso2}</span>
+    </span>
+  );
+}
+
 interface KpiProps {
   label: string;
   value: string | number;
@@ -283,16 +319,19 @@ export function MobilityControlCenterV2Page() {
   useEffect(() => { void load(); }, [load]);
 
   // ── Derived sidebar data ──────────────────────────────────────────────────
+  // Aggregate the case list into a corridor histogram keyed by canonical
+  // ISO-2 codes so the sidebar matches the table flag rendering exactly
+  // (e.g. "France" + "FR" + "FRA" all collapse onto the same FR row).
   const corridorMix = useMemo(() => {
-    const counts = new Map<string, { origin: string; dest: string; count: number }>();
+    const counts = new Map<string, { origin: string | null; dest: string | null; rawOrigin: string | null; rawDest: string | null; count: number }>();
     for (const c of cases) {
-      const o = (c.originCountry || '').toUpperCase();
-      const d = (c.destCountry || '').toUpperCase();
-      if (!o && !d) continue;
-      const key = `${o}|${d}`;
+      const o = resolveISO2(c.originCountry);
+      const d = resolveISO2(c.destCountry);
+      if (!o && !d && !c.originCountry && !c.destCountry) continue;
+      const key = `${o ?? `?${c.originCountry ?? ''}`}|${d ?? `?${c.destCountry ?? ''}`}`;
       const cur = counts.get(key);
       if (cur) cur.count += 1;
-      else counts.set(key, { origin: o, dest: d, count: 1 });
+      else counts.set(key, { origin: o, dest: d, rawOrigin: c.originCountry ?? null, rawDest: c.destCountry ?? null, count: 1 });
     }
     return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 6);
   }, [cases]);
@@ -348,25 +387,19 @@ export function MobilityControlCenterV2Page() {
     {
       id: 'corridor',
       header: 'Corridor',
-      defaultWidth: 130,
-      minWidth: 100,
-      cell: (row) => (
-        <div className="flex items-center gap-1.5 text-[12.5px] text-slate-700">
-          {row.originCountry ? (
-            <>
-              <span className="text-[13px] leading-none">{flag(row.originCountry)}</span>
-              <span className="font-mono text-[11px] text-slate-600">{row.originCountry.toUpperCase()}</span>
-            </>
-          ) : <span className="text-slate-400">—</span>}
-          <span className="text-slate-400">›</span>
-          {row.destCountry ? (
-            <>
-              <span className="text-[13px] leading-none">{flag(row.destCountry)}</span>
-              <span className="font-mono text-[11px] text-slate-600">{row.destCountry.toUpperCase()}</span>
-            </>
-          ) : <span className="text-slate-400">—</span>}
-        </div>
-      ),
+      defaultWidth: 160,
+      minWidth: 120,
+      cell: (row) => {
+        const o = resolveISO2(row.originCountry);
+        const d = resolveISO2(row.destCountry);
+        return (
+          <div className="flex items-center gap-2 text-[12.5px] text-slate-700">
+            <Flag iso2={o} raw={row.originCountry} />
+            <span className="text-slate-400">›</span>
+            <Flag iso2={d} raw={row.destCountry} />
+          </div>
+        );
+      },
     },
     {
       id: 'visa',
@@ -374,17 +407,15 @@ export function MobilityControlCenterV2Page() {
       defaultWidth: 150,
       minWidth: 110,
       cell: (row) => {
-        // visaLabel comes from wizard_cases.move_type / contract_type /
-        // employees.assignment_type. None of those is a true visa-program
-        // field, but it's the closest first-class signal we have today —
-        // we'd need a real `visa_type` column to show "Skilled Worker"
-        // exactly as the mock does.
+        // visaLabel = wizard_cases.purpose (closest first-class signal).
+        // case_assignments has no dedicated visa_type column today, so the
+        // value is a surrogate; we surface NotLinked when nothing flows.
         if (!row.visaLabel) {
-          return <span className="text-[12.5px] text-slate-400">—</span>;
+          return <NotLinked title="No visa_type column on case_assignments — surrogate would come from wizard_cases.purpose / employees.assignment_type." />;
         }
         const label = row.visaLabel.replace(/_/g, ' ');
         return (
-          <span className="text-[12.5px] text-slate-700" title="Best-available visa surrogate (move_type / contract_type)">
+          <span className="text-[12.5px] text-slate-700" title="Best-available visa surrogate (wizard_cases.purpose)">
             {label}
           </span>
         );
@@ -393,11 +424,11 @@ export function MobilityControlCenterV2Page() {
     {
       id: 'household',
       header: 'Household',
-      defaultWidth: 150,
-      minWidth: 110,
+      defaultWidth: 160,
+      minWidth: 120,
       cell: (row) => {
         if (!row.household) {
-          return <span className="text-[12.5px] text-slate-400">—</span>;
+          return <NotLinked title="No household column — derive from employee_profiles.profile_json (spouse + children) once that schema is locked." />;
         }
         // Pick an icon based on composition: 👤 solo, 👫 partner, 👨‍👩‍👧 family.
         const icon = (row.childCount ?? 0) > 0
@@ -426,7 +457,9 @@ export function MobilityControlCenterV2Page() {
       defaultWidth: 140,
       minWidth: 110,
       cell: (row) => {
-        if (!row.ownerName) return <span className="text-[12px] italic text-slate-400">Unassigned</span>;
+        if (!row.ownerName) {
+          return <NotLinked label="unassigned" title="No HR owner — profiles.full_name missing for ca.hr_user_id. Either backfill the profile or assign an HR user." />;
+        }
         return <span className="text-[12.5px] text-slate-700">{row.ownerName}</span>;
       },
     },
@@ -445,8 +478,8 @@ export function MobilityControlCenterV2Page() {
   ], []);
 
   return (
-    <AppShell>
-      <div className="px-6 py-6">
+    <AppShell wide>
+      <div className="px-2 py-2 xl:px-4 xl:py-4">
         {/* Header */}
         <div className="mb-5">
           <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
@@ -525,8 +558,11 @@ export function MobilityControlCenterV2Page() {
           </div>
         )}
 
-        {/* Two-column layout: cases table + right-rail */}
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        {/* Two-column layout: cases table + right-rail. The right rail grows
+            up to 360px on wider monitors but the table always gets the
+            remaining viewport (no max-width cap). On <lg the rail stacks
+            below the table. */}
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)]">
           <div>
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-baseline gap-2">
@@ -562,13 +598,11 @@ export function MobilityControlCenterV2Page() {
               ) : (
                 <ul className="space-y-1.5">
                   {corridorMix.map((c) => (
-                    <li key={`${c.origin}-${c.dest}`} className="flex items-center justify-between text-[12.5px]">
-                      <span className="flex items-center gap-1.5 text-slate-700">
-                        <span>{flag(c.origin) || '🌐'}</span>
-                        <span className="font-mono text-[11px] text-slate-600">{c.origin || '??'}</span>
+                    <li key={`${c.origin ?? c.rawOrigin}-${c.dest ?? c.rawDest}`} className="flex items-center justify-between text-[12.5px]">
+                      <span className="flex items-center gap-2 text-slate-700">
+                        <Flag iso2={c.origin} raw={c.rawOrigin} />
                         <span className="text-slate-400">›</span>
-                        <span>{flag(c.dest) || '🌐'}</span>
-                        <span className="font-mono text-[11px] text-slate-600">{c.dest || '??'}</span>
+                        <Flag iso2={c.dest} raw={c.rawDest} />
                       </span>
                       <span className="tabular-nums text-slate-500">{c.count}</span>
                     </li>

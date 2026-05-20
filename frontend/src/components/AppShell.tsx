@@ -45,9 +45,15 @@ interface AppShellProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
+  /**
+   * When true, the main content area drops the max-w-7xl cap and fills the
+   * viewport (with a small gutter). Use for dense dashboards where the
+   * standard 1280px cap leaves dead space on wide monitors.
+   */
+  wide?: boolean;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle }) => {
+export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, wide = false }) => {
   const name = getAuthItem('relopass_name');
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
@@ -502,7 +508,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle })
       )}
 
       <main className="flex-1">
-        <Container maxWidth="xl" className="py-8">
+        <Container maxWidth={wide ? 'full' : 'xl'} className="py-8">
           {title && (
             <div className="mb-6">
               <h1 className="text-2xl font-semibold text-[#0b2b43]">{title}</h1>
