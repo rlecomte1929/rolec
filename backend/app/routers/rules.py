@@ -173,8 +173,8 @@ def check_breed(
 
 def _fetch_from_db(code: str) -> Optional[PetRestrictionsResponse]:
     try:
-        from ...services.supabase_client import get_supabase_client
-        sb = get_supabase_client()
+        from ...services.supabase_client import get_supabase_admin_client
+        sb = get_supabase_admin_client()
         result = (
             sb.table("pet_restrictions")
             .select("*")

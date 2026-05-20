@@ -162,6 +162,8 @@ from .app.routers import relocation_profile as relocation_profile_router
 from .app.routers import rules as rules_router
 from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
+from .app.routers import advisors as advisors_router
+from .app.routers import branding as branding_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -13533,6 +13535,10 @@ app.include_router(rules_router.router)
 app.include_router(marketplace_router.router)
 # GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
 app.include_router(hr_analytics_router.router)
+# GAP 4: Immigration advisor matching
+app.include_router(advisors_router.router)
+# GAP 10: Company branding config
+app.include_router(branding_router.router)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # AIQ-37-B: Policy Builder wizard CRUD — hr_policies router not yet implemented

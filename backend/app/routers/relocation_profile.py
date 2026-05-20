@@ -142,8 +142,8 @@ def _compute_completion(profile: Dict[str, Any]) -> int:
 def _get_profile_from_db(case_id: str) -> Optional[Dict[str, Any]]:
     """Fetch relocation_profile row from Supabase."""
     try:
-        from ...services.supabase_client import get_supabase_client
-        sb = get_supabase_client()
+        from ...services.supabase_client import get_supabase_admin_client
+        sb = get_supabase_admin_client()
         result = sb.table("relocation_profiles").select("*").eq("case_id", case_id).maybe_single().execute()
         if result and result.data:
             return result.data
@@ -154,10 +154,10 @@ def _get_profile_from_db(case_id: str) -> Optional[Dict[str, Any]]:
 
 def _upsert_profile_to_db(case_id: str, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
     """Upsert relocation_profile row in Supabase."""
-    from ...services.supabase_client import get_supabase_client
+    from ...services.supabase_client import get_supabase_admin_client
     import json
     from datetime import datetime, timezone
-    sb = get_supabase_client()
+    sb = get_supabase_admin_client()
     now = datetime.now(timezone.utc).isoformat()
     row = {
         "case_id": case_id,

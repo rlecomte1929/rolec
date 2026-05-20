@@ -54,11 +54,17 @@ class ExceptionRequestCreate(BaseModel):
     cap_amount: float = Field(..., ge=0)
     currency: str = Field(..., min_length=3, max_length=3)
     reason: str = Field(..., min_length=1, max_length=2000)
+    # GAP 7: Enriched fields (all optional for backward compat)
+    benefit_key: Optional[str] = Field(None, max_length=100)
+    type_label: Optional[str] = Field(None, max_length=200)
+    current_value: Optional[Dict[str, Any]] = None   # e.g. {"amount": 1500, "currency": "EUR"}
+    requested_value: Optional[Dict[str, Any]] = None  # e.g. {"amount": 2200, "currency": "EUR"}
 
 
 class ExceptionRequestPatch(BaseModel):
     status: str = Field(..., pattern=r"^(approved|rejected)$")
     hr_note: Optional[str] = Field(None, max_length=2000)
+    ai_insight: Optional[str] = Field(None, max_length=2000)
 
 
 class ExceptionRequestRead(BaseModel):
@@ -72,6 +78,13 @@ class ExceptionRequestRead(BaseModel):
     reason: str
     status: str
     hr_note: Optional[str]
+    # GAP 7: Enriched fields
+    benefit_key: Optional[str] = None
+    type_label: Optional[str] = None
+    current_value: Optional[Dict[str, Any]] = None
+    requested_value: Optional[Dict[str, Any]] = None
+    ai_insight: Optional[str] = None
+    audit_events: Optional[List[Dict[str, Any]]] = None
     requested_by_user_id: str
     resolved_by_user_id: Optional[str]
     created_at: str
@@ -348,3 +361,195 @@ def resolve_exception_request(
         },
     )
     return _row_to_dict(row)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GAP 7: Assignment-scoped exception endpoints (Supabase-backed)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AssignmentExceptionCreate(BaseModel):
+    """Body for creating an exception request scoped to an assignment (not a case draft)."""
+    benefit_key: str = Field(..., min_length=1, max_length=100)
+    type_label: str = Field(..., min_length=1, max_length=200)
+    current_value: Dict[str, Any]
+    requested_value: Dict[str, Any]
+    reason: str = Field(..., min_length=1, max_length=2000)
+
+
+class AssignmentExceptionRead(BaseModel):
+    id: str
+    assignment_id: str
+    benefit_key: str
+    type_label: Optional[str] = None
+    current_value: Optional[Dict[str, Any]] = None
+    requested_value: Optional[Dict[str, Any]] = None
+    reason: str
+    status: str  # pending | approved | rejected
+    hr_note: Optional[str] = None
+    ai_insight: Optional[str] = None
+    audit_events: Optional[List[Dict[str, Any]]] = None
+    requested_by_user_id: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+def _get_supabase():
+    from ...services.supabase_client import get_supabase_admin_client
+    return get_supabase_admin_client()
+
+
+@router.get(
+    "/api/assignments/{assignment_id}/exceptions",
+    response_model=List[AssignmentExceptionRead],
+)
+def list_assignment_exceptions(
+    assignment_id: str,
+    status: Optional[str] = None,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
+    """
+    GAP 7: List all exception requests for an assignment.
+    Optionally filter by status: pending | approved | rejected.
+    """
+    try:
+        sb = _get_supabase()
+        q = (
+            sb.table("exception_requests")
+            .select("*")
+            .eq("assignment_id", assignment_id)
+        )
+        if status:
+            q = q.eq("status", status)
+        result = q.order("created_at", desc=True).execute()
+        rows = result.data if result and result.data else []
+        return rows
+    except Exception:
+        logger.exception("list_assignment_exceptions failed assignment_id=%s", assignment_id)
+        return []
+
+
+@router.post(
+    "/api/assignments/{assignment_id}/exceptions",
+    response_model=AssignmentExceptionRead,
+    status_code=201,
+)
+def create_assignment_exception(
+    assignment_id: str,
+    body: AssignmentExceptionCreate,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    GAP 7: Employee requests an exception for a specific benefit on their assignment.
+    Saves to `exception_requests` table with enriched fields.
+    """
+    from datetime import timezone
+    now = datetime.now(timezone.utc).isoformat()
+    actor_id = user.get("id", "")
+
+    row = {
+        "id": str(uuid.uuid4()),
+        "assignment_id": assignment_id,
+        "benefit_key": body.benefit_key,
+        "type_label": body.type_label,
+        "current_value": body.current_value,
+        "requested_value": body.requested_value,
+        "reason": body.reason,
+        "status": "pending",
+        "requested_by_user_id": actor_id,
+        "audit_events": [
+            {"ts": now, "actor": actor_id, "action": "created", "note": "Exception request submitted"}
+        ],
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    try:
+        sb = _get_supabase()
+        result = sb.table("exception_requests").insert(row).execute()
+        if result and result.data:
+            return result.data[0]
+    except Exception:
+        logger.exception("create_assignment_exception failed assignment_id=%s", assignment_id)
+        raise HTTPException(status_code=500, detail="Failed to create exception request")
+
+    return row
+
+
+@router.patch(
+    "/api/assignments/{assignment_id}/exceptions/{exception_id}",
+    response_model=AssignmentExceptionRead,
+)
+def resolve_assignment_exception(
+    assignment_id: str,
+    exception_id: str,
+    body: ExceptionRequestPatch,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    GAP 7: HR approves or rejects an assignment-level exception request.
+    Appends an audit event and optionally saves an ai_insight note.
+    """
+    role = (user.get("role") or "").upper()
+    if role not in ("HR", "ADMIN") and not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="HR or Admin only")
+
+    from datetime import timezone
+    now = datetime.now(timezone.utc).isoformat()
+    actor_id = user.get("id", "")
+
+    try:
+        sb = _get_supabase()
+
+        # Fetch existing
+        result = (
+            sb.table("exception_requests")
+            .select("*")
+            .eq("id", exception_id)
+            .eq("assignment_id", assignment_id)
+            .maybe_single()
+            .execute()
+        )
+        if not result or not result.data:
+            raise HTTPException(status_code=404, detail="Exception request not found")
+        existing = result.data
+        if existing.get("status") != "pending":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Request is already {existing.get('status')}; cannot change.",
+            )
+
+        # Build audit trail
+        audit_events = existing.get("audit_events") or []
+        audit_events.append({
+            "ts": now,
+            "actor": actor_id,
+            "action": body.status,  # "approved" or "rejected"
+            "note": body.hr_note or "",
+        })
+
+        update_payload: Dict[str, Any] = {
+            "status": body.status,
+            "hr_note": body.hr_note,
+            "resolved_by_user_id": actor_id,
+            "resolved_at": now,
+            "updated_at": now,
+            "audit_events": audit_events,
+        }
+        if body.ai_insight:
+            update_payload["ai_insight"] = body.ai_insight
+
+        updated = (
+            sb.table("exception_requests")
+            .update(update_payload)
+            .eq("id", exception_id)
+            .execute()
+        )
+        if updated and updated.data:
+            return updated.data[0]
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("resolve_assignment_exception failed id=%s", exception_id)
+        raise HTTPException(status_code=500, detail="Failed to update exception request")
+
+    raise HTTPException(status_code=500, detail="Update returned no data")
