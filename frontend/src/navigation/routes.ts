@@ -49,9 +49,14 @@ export const ROUTE_DEFS = {
   hrResources: { path: '/hr/resources', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrPreferredSuppliers: { path: '/hr/preferred-suppliers', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrVendorCuration: { path: '/hr/vendor-curation', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  hrProviderGrid: { path: '/hr/provider-grid', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** Employee relocation task checklist portal (AIQ-34-B). */
+  employeeTaskPage: { path: '/employee/tasks', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrPolicy: { path: '/hr/policy', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeHrPolicy: { path: '/employee/hr-policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrPolicyManagement: { path: '/hr/policy-management', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** Policy Builder wizard (AIQ-37-B/C). */
+  hrPolicyBuilder: { path: '/hr/settings/policy', roles: ['HR', 'ADMIN'] as RouteRole[] },
   employeePolicy: { path: '/employee/policy', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   submissionCenter: { path: '/submission-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompanyProfile: { path: '/hr/company-profile', roles: ['HR', 'ADMIN'] as RouteRole[] },
@@ -108,6 +113,8 @@ export const ROUTE_DEFS = {
   adminOpsNotifications: { path: '/admin/ops/notifications', roles: ['ADMIN'] as RouteRole[] },
   adminMobilityCases: { path: '/admin/mobility/cases', roles: ['ADMIN'] as RouteRole[] },
   adminMobilityCaseInspect: { path: '/admin/mobility/cases/:caseId', roles: ['ADMIN'] as RouteRole[] },
+  /** External provider portal — authenticated via magic-link JWT, no ReloPass account needed */
+  providerPortal: { path: '/provider/portal', roles: ['PUBLIC'] as RouteRole[] },
 };
 
 export type RouteKey = keyof typeof ROUTE_DEFS;

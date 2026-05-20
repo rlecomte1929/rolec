@@ -11,9 +11,11 @@ const isOn = (raw: unknown): boolean =>
   typeof raw === 'string' && raw.trim().toLowerCase() === 'true';
 
 /**
- * Quotes / RFQ surface. OFF by default — the workflow is incomplete and is
- * deferred behind ExceptionRequest (T1.3) per the Sprint 1 execution plan.
- * Set `VITE_ENABLE_RFQ=true` in `.env.local` to bring it back for dev.
+ * Quotes / RFQ surface. Controls the RFQ tab in the Services nav ribbon.
+ * The core workflow (ServicesRfqNew + rfqAPI) is shipped; set this to `true`
+ * to surface the ribbon tab.  Step 4 in EmployeeJourney is always shown once
+ * the employee has shortlisted services (independent of this flag).
+ * Set `VITE_ENABLE_RFQ=true` in `.env.local` to enable the ribbon tab.
  */
 export const isRfqEnabled = (): boolean => isOn(import.meta.env.VITE_ENABLE_RFQ);
 

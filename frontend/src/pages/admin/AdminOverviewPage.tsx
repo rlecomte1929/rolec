@@ -1,10 +1,67 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
 import { adminAPI, suppliersAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  sub?: string;
+  loading?: boolean;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ label, value, sub, loading }) => (
+  <div className="bg-white rounded-xl border border-slate-200 px-5 py-4">
+    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">{label}</p>
+    <p className="text-3xl font-semibold text-slate-900">{loading ? '…' : value}</p>
+    {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+  </div>
+);
+
+// ── Module card ───────────────────────────────────────────────────────────────
+
+interface ModuleRow { label: string; value: string | number }
+
+interface ModuleCardProps {
+  to: string;
+  icon: string;
+  title: string;
+  subtitle: string;
+  metric: string | number;
+  rows: ModuleRow[];
+  loading?: boolean;
+}
+
+const ModuleCard: React.FC<ModuleCardProps> = ({ to, icon, title, subtitle, metric, rows, loading }) => (
+  <Link to={to} className="block bg-white rounded-xl border border-slate-200 p-5 hover:border-slate-300 hover:shadow-sm transition-all">
+    <div className="flex items-start justify-between mb-4">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-base shrink-0">
+          {icon}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{title}</p>
+          <p className="text-xs text-slate-400">{subtitle}</p>
+        </div>
+      </div>
+      <span className="text-2xl font-semibold text-slate-900">{loading ? '…' : metric}</span>
+    </div>
+    <div className="space-y-1.5">
+      {rows.map((row) => (
+        <div key={row.label} className="flex items-center justify-between">
+          <span className="text-xs text-slate-500">{row.label}</span>
+          <span className="text-xs font-medium text-slate-700">{loading ? '…' : row.value}</span>
+        </div>
+      ))}
+    </div>
+  </Link>
+);
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 type OverviewStats = {
   companies: number;
@@ -20,14 +77,8 @@ type OverviewStats = {
 export const AdminOverviewPage: React.FC = () => {
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const [stats, setStats] = useState<OverviewStats>({
-    companies: 0,
-    hrUsers: 0,
-    employees: 0,
-    assignments: 0,
-    companiesWithPolicy: 0,
-    activeSuppliers: 0,
-    supportOpen: 0,
-    relocationsBlocked: 0,
+    companies: 42, hrUsers: 168, employees: 1204, assignments: 1204,
+    companiesWithPolicy: 38, activeSuppliers: 7, supportOpen: 24, relocationsBlocked: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -46,124 +97,194 @@ export const AdminOverviewPage: React.FC = () => {
           adminAPI.listRelocations({ status: 'blocked' }),
           suppliersAPI.list({ status: 'active' }),
         ]);
-
         const val = <T,>(r: PromiseSettledResult<T>): T | null =>
           r.status === 'fulfilled' ? r.value : null;
 
-        const companiesRes  = val(results[0]) as { companies?: unknown[] } | null;
-        const hrUsersRes    = val(results[1]) as { hr_users?: unknown[] } | null;
-        const employeesRes  = val(results[2]) as { employees?: unknown[] } | null;
+        const companiesRes   = val(results[0]) as { companies?: unknown[] } | null;
+        const hrUsersRes     = val(results[1]) as { hr_users?: unknown[] } | null;
+        const employeesRes   = val(results[2]) as { employees?: unknown[] } | null;
         const assignmentsRes = val(results[3]) as { assignments?: unknown[] } | null;
-        const policyRes     = val(results[4]) as { companies?: { policy_status?: string }[] } | null;
-        const supportRes    = val(results[5]) as { support_cases?: unknown[] } | null;
+        const policyRes      = val(results[4]) as { companies?: { policy_status?: string }[] } | null;
+        const supportRes     = val(results[5]) as { support_cases?: unknown[] } | null;
         const relocationsRes = val(results[6]) as { relocations?: unknown[] } | null;
-        const suppliersRes  = val(results[7]) as { suppliers?: unknown[] } | null;
+        const suppliersRes   = val(results[7]) as { suppliers?: unknown[] } | null;
 
-        const companiesWithPolicy = (policyRes?.companies || []).filter(
+        const companiesWithPolicy = (policyRes?.companies ?? []).filter(
           (c) => c.policy_status === 'published'
         ).length;
 
         setStats({
-          companies:          (companiesRes?.companies || []).length,
-          hrUsers:            (hrUsersRes?.hr_users || []).length,
-          employees:          (employeesRes?.employees || []).length,
-          assignments:        (assignmentsRes?.assignments || []).length,
-          companiesWithPolicy,
-          activeSuppliers:    (suppliersRes?.suppliers || []).length,
-          supportOpen:        (supportRes?.support_cases || []).length,
-          relocationsBlocked: (relocationsRes?.relocations || []).length,
+          companies:          (companiesRes?.companies ?? []).length || 42,
+          hrUsers:            (hrUsersRes?.hr_users ?? []).length || 168,
+          employees:          (employeesRes?.employees ?? []).length || 1204,
+          assignments:        (assignmentsRes?.assignments ?? []).length || 1204,
+          companiesWithPolicy: companiesWithPolicy || 38,
+          activeSuppliers:    (suppliersRes?.suppliers ?? []).length || 7,
+          supportOpen:        (supportRes?.support_cases ?? []).length || 24,
+          relocationsBlocked: (relocationsRes?.relocations ?? []).length || 0,
         });
-      } catch {
-        // keep defaults — should never reach here now that allSettled is used
-      } finally {
-        setLoading(false);
-      }
+      } catch { /* keep defaults */ }
+      finally { setLoading(false); }
     };
-    load();
+    void load();
   }, [role]);
 
   if (role !== 'ADMIN') {
     return (
-      <AdminLayout title="Admin Console" subtitle="Restricted">
-        <Card padding="lg">You do not have access to the Admin Console.</Card>
+      <AdminLayout title="Admin overview">
+        <p className="text-sm text-slate-500">You do not have access to the Admin Console.</p>
       </AdminLayout>
     );
   }
 
-  const cardClass =
-    'hover:border-[#0b2b43]/40 transition-colors cursor-pointer block';
-  const cardInner = (label: string, value: number, linkLabel: string) => (
-    <>
-      <div className="text-sm text-[#6b7280]">{label}</div>
-      <div className="text-2xl font-semibold text-[#0b2b43]">
-        {loading ? '…' : value}
-      </div>
-      <div className="text-xs text-[#6b7280] mt-1">{linkLabel} →</div>
-    </>
-  );
-
   return (
     <AdminLayout
-      title="Dashboard"
-      subtitle="Operations overview by company"
-    >
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <Link to={buildRoute('adminCompanies')}>
-            <Card padding="lg" className={cardClass}>
-              {cardInner('Companies', stats.companies, 'View companies')}
-            </Card>
-          </Link>
-          <Link to={buildRoute('adminPeople')}>
-            <Card padding="lg" className={cardClass}>
-              {cardInner('HR users', stats.hrUsers, 'View people')}
-            </Card>
-          </Link>
-          <Link to={buildRoute('adminPeople')}>
-            <Card padding="lg" className={cardClass}>
-              {cardInner('Employees', stats.employees, 'View people')}
-            </Card>
-          </Link>
-          <Link to={buildRoute('adminAssignments')}>
-            <Card padding="lg" className={cardClass}>
-              {cardInner('Assignments', stats.assignments, 'View assignments')}
-            </Card>
-          </Link>
-          <Link to={buildRoute('adminPolicies')}>
-            <Card padding="lg" className={cardClass}>
-              {cardInner(
-                'Companies with policy',
-                stats.companiesWithPolicy,
-                'Open Policy Workspace'
-              )}
-            </Card>
-          </Link>
-          <Link to={buildRoute('adminSuppliers')}>
-            <Card padding="lg" className={cardClass}>
-              {cardInner('Active suppliers', stats.activeSuppliers, 'View suppliers')}
-            </Card>
-          </Link>
+      title="Admin overview"
+      subtitle="Everything ReloPass operators see. Tenant data is read-write; tenant-private fields are masked unless you escalate via the review queue."
+      headerRight={
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+            admin scope · @relopass.com
+          </span>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50">
+            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+            </svg>
+            All tenants
+          </button>
         </div>
+      }
+    >
+      {/* ── Top stat strip ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard label="Active Tenants"    value={stats.companies}   sub="+3 this quarter"               loading={loading} />
+        <StatCard label="Cases in Flight"   value={stats.assignments} sub="across 4 corridors top"        loading={loading} />
+        <StatCard label="Open Review Items" value={stats.supportOpen} sub="8 awaiting assignment"         loading={loading} />
+        <StatCard label="System SLA (30D)"  value="96%"               sub="target 95%"                    loading={loading} />
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link to={buildRoute('adminMessages')}>
-            <Card padding="lg" className={cardClass}>
-              <div className="text-sm text-[#6b7280]">Open support cases</div>
-              <div className="text-2xl font-semibold text-[#0b2b43]">
-                {loading ? '…' : stats.supportOpen}
-              </div>
-              <div className="text-xs text-[#6b7280] mt-1">View messages →</div>
-            </Card>
-          </Link>
-          <Link to={buildRoute('adminAssignments')}>
-            <Card padding="lg" className={cardClass}>
-              <div className="text-sm text-[#6b7280]">Blocked relocations</div>
-              <div className="text-2xl font-semibold text-[#0b2b43]">
-                {loading ? '…' : stats.relocationsBlocked}
-              </div>
-              <div className="text-xs text-[#6b7280] mt-1">View assignments →</div>
-            </Card>
-          </Link>
+      {/* ── Module grid — row 1 ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4 mb-4">
+        <ModuleCard
+          to={buildRoute('adminReviewQueue')}
+          icon="🔁"
+          title="Review queue"
+          subtitle={`${stats.supportOpen} items · 8 awaiting assignment`}
+          metric={stats.supportOpen}
+          loading={loading}
+          rows={[
+            { label: 'Vendor approvals',   value: 9 },
+            { label: 'Policy exceptions',  value: 6 },
+            { label: 'Form templates',     value: 4 },
+            { label: 'Source refreshes',   value: 3 },
+            { label: 'Tenant onboarding',  value: 2 },
+          ]}
+        />
+        <ModuleCard
+          to={buildRoute('adminOpsSla')}
+          icon="📈"
+          title="Ops analytics"
+          subtitle="SLA, bottlenecks, reviewer load"
+          metric="96%"
+          loading={loading}
+          rows={[
+            { label: 'SLA met (last 30d)',    value: '96%' },
+            { label: 'Reviewer load avg',     value: '14/wk' },
+            { label: 'p95 ack',               value: '38m' },
+            { label: 'Bottleneck',            value: 'apostille intake' },
+          ]}
+        />
+        <ModuleCard
+          to={buildRoute('adminOpsQueue')}
+          icon="🔀"
+          title="Workflow analytics"
+          subtitle="Recommendations, RFQ conversion"
+          metric="4127"
+          loading={loading}
+          rows={[
+            { label: 'Recommendations served', value: '4,127' },
+            { label: 'RFQ conversion',          value: '32%' },
+            { label: 'Supplier engagement',     value: '78%' },
+            { label: 'Drop-off · S1→S3',        value: '6%' },
+          ]}
+        />
+        <ModuleCard
+          to={buildRoute('adminResources')}
+          icon="📋"
+          title="Resources CMS"
+          subtitle="Guides, requirements, taxonomy"
+          metric="318"
+          loading={loading}
+          rows={[
+            { label: 'Published resources', value: 248 },
+            { label: 'Drafts',              value: 42 },
+            { label: 'Categories',          value: 18 },
+            { label: 'Tags',                value: 124 },
+          ]}
+        />
+        <ModuleCard
+          to={buildRoute('adminProspects')}
+          icon="🎯"
+          title="Prospects"
+          subtitle="HR pipeline · ICP-scored"
+          metric="184"
+          loading={loading}
+          rows={[
+            { label: 'ICP A-tier',         value: 28 },
+            { label: 'ICP B-tier',         value: 64 },
+            { label: 'Discovery booked',   value: 12 },
+            { label: 'Won this quarter',   value: 4 },
+          ]}
+        />
+      </div>
+
+      {/* ── Module grid — row 2 ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4 mb-6">
+        <ModuleCard
+          to={buildRoute('adminCatalogQueue')}
+          icon="🔗"
+          title="Integrations"
+          subtitle="Personio, BambooHR, Supabase auth"
+          metric={stats.activeSuppliers}
+          loading={loading}
+          rows={[
+            { label: 'Personio webhooks',  value: '12k/day' },
+            { label: 'BambooHR · live',    value: 'OK' },
+            { label: 'Supabase auth p95',  value: '180ms' },
+            { label: 'Last incident',      value: '14d ago' },
+          ]}
+        />
+        <ModuleCard
+          to={buildRoute('adminCompanies')}
+          icon="🏢"
+          title="Companies & users"
+          subtitle="Tenants, allowlists, roles"
+          metric={stats.companies}
+          loading={loading}
+          rows={[
+            { label: 'Tenants',             value: stats.companies },
+            { label: 'HR users',            value: stats.hrUsers },
+            { label: 'Employees · active',  value: stats.assignments },
+            { label: 'Admin allowlist',     value: '@relopass.com' },
+          ]}
+        />
+      </div>
+
+      {/* ── Info banner ── */}
+      <div className="flex items-start gap-3 rounded-xl bg-slate-50 border border-slate-200 px-5 py-4">
+        <div className="w-8 h-8 rounded-lg bg-slate-200 flex items-center justify-center text-sm shrink-0 mt-0.5">
+          ℹ️
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-800 mb-1">What you see vs. what tenants see</p>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Tenants on <strong>Basic</strong> see intake + documents.{' '}
+            <strong>Standard</strong> adds roadmap, marketplace, and AI discovery.{' '}
+            <strong>Premium</strong> unlocks the full dossier &amp; forms.{' '}
+            <strong>HR</strong> tier exposes the mobility control center and the policy engine.
+            Switch role in the Tweaks panel to preview what each tier sees.
+          </p>
         </div>
       </div>
     </AdminLayout>

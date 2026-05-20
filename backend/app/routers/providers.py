@@ -1,14 +1,19 @@
 """
 Provider coordination endpoints.
 
-POST /api/hr/providers/invite     — HR invites a provider to a case
-POST /api/provider/auth/accept    — Provider redeems invite token (marks first use)
-GET  /api/provider/auth/verify    — Lightweight token validation check
+HR management (require_admin_or_hr):
+  GET  /api/hr/providers           — list providers scoped to a case (or whole org)
+  GET  /api/hr/providers/org       — list all providers for the caller's org
+  POST /api/hr/providers           — create a new provider in the org
+  POST /api/hr/providers/invite    — invite a provider to a case (magic link)
+  GET  /api/hr/provider-tasks      — list provider tasks for a case
+  POST /api/hr/provider-tasks      — create and assign a task to a provider
+  PATCH /api/hr/provider-tasks/{task_id} — update task status / fields
+  GET  /api/hr/provider-status-grid — case × provider-type status matrix
 
-Auth model:
-  - /api/hr/*  routes: require HR or Admin role (existing require_admin_or_hr dep)
-  - /api/provider/* routes: Bearer token is the provider JWT itself; validated
-    inline — no Supabase auth session required for providers.
+Provider auth (provider JWT, no Supabase session):
+  POST /api/provider/auth/accept   — redeem invite token (marks first use)
+  GET  /api/provider/auth/verify   — lightweight token validity check
 
 Email delivery:
   If RESEND_API_KEY is set, the invite email is sent via Resend (api.resend.com).
@@ -22,10 +27,10 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests as http_requests
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr
 
 from ..auth_deps import require_admin_or_hr
@@ -136,7 +141,94 @@ If you were not expecting this invitation, you can safely ignore this email.
 
 
 # ---------------------------------------------------------------------------
-# Schemas
+# Schemas — provider management
+# ---------------------------------------------------------------------------
+
+class ProviderItem(BaseModel):
+    id: str
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    service_type: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: str
+
+
+class ProviderListResponse(BaseModel):
+    providers: List[ProviderItem]
+
+
+class CreateProviderRequest(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    service_type: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ProviderTaskItem(BaseModel):
+    id: str
+    case_id: str
+    provider_id: str
+    provider_name: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    status: str
+    due_date: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class ProviderTaskListResponse(BaseModel):
+    tasks: List[ProviderTaskItem]
+
+
+class CreateProviderTaskRequest(BaseModel):
+    case_id: str
+    provider_id: str
+    title: str
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class PatchProviderTaskRequest(BaseModel):
+    status: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Schemas — provider status grid
+# ---------------------------------------------------------------------------
+
+class ProviderGridCells(BaseModel):
+    housing: str
+    immigration: str
+    shipping: str
+    other: str
+
+
+class ProviderGridRow(BaseModel):
+    case_id: str
+    employee_name: str
+    employee_identifier: str
+    dest_country: Optional[str] = None
+    move_date: Optional[str] = None
+    coordination_status: str
+    cells: ProviderGridCells
+
+
+class ProviderGridResponse(BaseModel):
+    rows: List[ProviderGridRow]
+    total: int
+
+
+# ---------------------------------------------------------------------------
+# Schemas — invite
 # ---------------------------------------------------------------------------
 
 class InviteRequest(BaseModel):
@@ -173,6 +265,348 @@ class VerifyResponse(BaseModel):
 
 # ---------------------------------------------------------------------------
 # Routes
+# ---------------------------------------------------------------------------
+
+@router.get("/api/hr/provider-status-grid", response_model=ProviderGridResponse)
+def get_provider_status_grid(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> ProviderGridResponse:
+    """
+    Returns the case × provider-type status matrix for the HR grid view.
+
+    Each row is an active case assignment. Each row contains four cells
+    (housing / immigration / shipping / other) with a status value:
+      'on-track' | 'at-risk' | 'blocked' | 'complete' | 'not-assigned'
+
+    Recommended client polling interval: 60 seconds.
+    """
+    from ...database import db
+
+    profile = db.get_profile_record(user.get("id"))
+    company_id = (profile or {}).get("company_id") or user.get("company")
+    hr_user_id = user.get("id")
+
+    raw_rows = db.get_provider_status_grid(
+        company_id=str(company_id) if company_id else None,
+        hr_user_id=str(hr_user_id) if hr_user_id else None,
+    )
+
+    grid_rows: List[ProviderGridRow] = []
+    for r in raw_rows:
+        cells_raw = r.get("cells") or {}
+        grid_rows.append(
+            ProviderGridRow(
+                case_id=r["case_id"],
+                employee_name=r.get("employee_name") or r.get("employee_identifier") or "",
+                employee_identifier=r.get("employee_identifier") or "",
+                dest_country=r.get("dest_country"),
+                move_date=r.get("move_date"),
+                coordination_status=r.get("coordination_status") or "not-started",
+                cells=ProviderGridCells(
+                    housing=cells_raw.get("housing", "not-assigned"),
+                    immigration=cells_raw.get("immigration", "not-assigned"),
+                    shipping=cells_raw.get("shipping", "not-assigned"),
+                    other=cells_raw.get("other", "not-assigned"),
+                ),
+            )
+        )
+
+    return ProviderGridResponse(rows=grid_rows, total=len(grid_rows))
+
+
+@router.get("/api/hr/providers/org", response_model=ProviderListResponse)
+def list_org_providers(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> ProviderListResponse:
+    """List all providers registered for the caller's organisation."""
+    org_id = _caller_org_id(user)
+    supa = get_supabase_admin_client()
+    rows = (
+        supa.table("providers")
+        .select("id,name,email,phone,service_type,notes,created_at")
+        .eq("org_id", org_id)
+        .order("name")
+        .execute()
+    ).data or []
+    return ProviderListResponse(
+        providers=[
+            ProviderItem(
+                id=str(r["id"]),
+                name=r.get("name", ""),
+                email=r.get("email"),
+                phone=r.get("phone"),
+                service_type=r.get("service_type"),
+                notes=r.get("notes"),
+                created_at=str(r.get("created_at", "")),
+            )
+            for r in rows
+        ]
+    )
+
+
+@router.get("/api/hr/providers", response_model=ProviderListResponse)
+def list_case_providers(
+    case_id: str = Query(..., description="Case ID to scope provider list"),
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> ProviderListResponse:
+    """
+    List providers that have at least one task on a specific case.
+    Falls back to all org providers when no tasks exist yet.
+    """
+    org_id = _caller_org_id(user)
+    supa = get_supabase_admin_client()
+
+    # Providers with tasks on this case
+    task_rows = (
+        supa.table("provider_tasks")
+        .select("provider_id")
+        .eq("case_id", case_id)
+        .eq("org_id", org_id)
+        .execute()
+    ).data or []
+    linked_ids = list({r["provider_id"] for r in task_rows})
+
+    if linked_ids:
+        rows = (
+            supa.table("providers")
+            .select("id,name,email,phone,service_type,notes,created_at")
+            .in_("id", linked_ids)
+            .order("name")
+            .execute()
+        ).data or []
+    else:
+        # Return all org providers so HR can pick one
+        rows = (
+            supa.table("providers")
+            .select("id,name,email,phone,service_type,notes,created_at")
+            .eq("org_id", org_id)
+            .order("name")
+            .execute()
+        ).data or []
+
+    return ProviderListResponse(
+        providers=[
+            ProviderItem(
+                id=str(r["id"]),
+                name=r.get("name", ""),
+                email=r.get("email"),
+                phone=r.get("phone"),
+                service_type=r.get("service_type"),
+                notes=r.get("notes"),
+                created_at=str(r.get("created_at", "")),
+            )
+            for r in rows
+        ]
+    )
+
+
+@router.post("/api/hr/providers", response_model=ProviderItem)
+def create_provider(
+    body: CreateProviderRequest,
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> ProviderItem:
+    """Create a new provider record in the caller's organisation."""
+    org_id = _caller_org_id(user)
+    supa = get_supabase_admin_client()
+    provider_id = str(uuid.uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+    row = {
+        "id": provider_id,
+        "org_id": org_id,
+        "name": body.name,
+        "email": body.email,
+        "phone": body.phone,
+        "service_type": body.service_type,
+        "notes": body.notes,
+        "created_by": user.get("id", ""),
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    supa.table("providers").insert(row).execute()
+    log.info("Provider created: id=%s org_id=%s name=%s", provider_id, org_id, body.name)
+    return ProviderItem(
+        id=provider_id,
+        name=body.name,
+        email=body.email,
+        phone=body.phone,
+        service_type=body.service_type,
+        notes=body.notes,
+        created_at=now_iso,
+    )
+
+
+@router.get("/api/hr/provider-tasks", response_model=ProviderTaskListResponse)
+def list_provider_tasks(
+    case_id: str = Query(..., description="Case ID to filter tasks"),
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> ProviderTaskListResponse:
+    """List all provider tasks for a case, enriched with provider names."""
+    org_id = _caller_org_id(user)
+    supa = get_supabase_admin_client()
+
+    tasks = (
+        supa.table("provider_tasks")
+        .select("id,case_id,provider_id,title,description,status,due_date,notes,created_at,updated_at")
+        .eq("case_id", case_id)
+        .eq("org_id", org_id)
+        .order("created_at")
+        .execute()
+    ).data or []
+
+    # Enrich with provider names (batch lookup)
+    provider_ids = list({t["provider_id"] for t in tasks})
+    name_map: Dict[str, str] = {}
+    if provider_ids:
+        prov_rows = (
+            supa.table("providers")
+            .select("id,name")
+            .in_("id", provider_ids)
+            .execute()
+        ).data or []
+        name_map = {str(p["id"]): p.get("name", "") for p in prov_rows}
+
+    return ProviderTaskListResponse(
+        tasks=[
+            ProviderTaskItem(
+                id=str(t["id"]),
+                case_id=str(t["case_id"]),
+                provider_id=str(t["provider_id"]),
+                provider_name=name_map.get(str(t["provider_id"])),
+                title=t.get("title", ""),
+                description=t.get("description"),
+                status=t.get("status", "pending"),
+                due_date=str(t["due_date"]) if t.get("due_date") else None,
+                notes=t.get("notes"),
+                created_at=str(t.get("created_at", "")),
+                updated_at=str(t.get("updated_at", "")),
+            )
+            for t in tasks
+        ]
+    )
+
+
+@router.post("/api/hr/provider-tasks", response_model=ProviderTaskItem)
+def create_provider_task(
+    body: CreateProviderTaskRequest,
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> ProviderTaskItem:
+    """Create a task and assign it to a provider for a specific case."""
+    org_id = _caller_org_id(user)
+    supa = get_supabase_admin_client()
+
+    # Verify provider belongs to this org
+    prov_rows = (
+        supa.table("providers")
+        .select("id,name")
+        .eq("id", body.provider_id)
+        .eq("org_id", org_id)
+        .limit(1)
+        .execute()
+    ).data or []
+    if not prov_rows:
+        raise HTTPException(status_code=404, detail="Provider not found in this organisation.")
+    provider_name = prov_rows[0].get("name", "")
+
+    task_id = str(uuid.uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+    row = {
+        "id": task_id,
+        "case_id": body.case_id,
+        "provider_id": body.provider_id,
+        "org_id": org_id,
+        "title": body.title,
+        "description": body.description,
+        "status": "pending",
+        "due_date": body.due_date,
+        "notes": body.notes,
+        "created_by": user.get("id", ""),
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    supa.table("provider_tasks").insert(row).execute()
+    log.info("Provider task created: id=%s case=%s provider=%s", task_id, body.case_id, body.provider_id)
+
+    return ProviderTaskItem(
+        id=task_id,
+        case_id=body.case_id,
+        provider_id=body.provider_id,
+        provider_name=provider_name,
+        title=body.title,
+        description=body.description,
+        status="pending",
+        due_date=body.due_date,
+        notes=body.notes,
+        created_at=now_iso,
+        updated_at=now_iso,
+    )
+
+
+@router.patch("/api/hr/provider-tasks/{task_id}", response_model=ProviderTaskItem)
+def patch_provider_task(
+    task_id: str,
+    body: PatchProviderTaskRequest,
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> ProviderTaskItem:
+    """Update status or fields of a provider task."""
+    org_id = _caller_org_id(user)
+    supa = get_supabase_admin_client()
+
+    # Load existing task
+    task_rows = (
+        supa.table("provider_tasks")
+        .select("*")
+        .eq("id", task_id)
+        .eq("org_id", org_id)
+        .limit(1)
+        .execute()
+    ).data or []
+    if not task_rows:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    task = task_rows[0]
+
+    # Validate status value if provided
+    valid_statuses = {"pending", "in_progress", "completed", "blocked"}
+    if body.status and body.status not in valid_statuses:
+        raise HTTPException(status_code=422, detail=f"status must be one of {sorted(valid_statuses)}.")
+
+    updates: Dict[str, Any] = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    if body.status is not None:
+        updates["status"] = body.status
+    if body.title is not None:
+        updates["title"] = body.title
+    if body.description is not None:
+        updates["description"] = body.description
+    if body.due_date is not None:
+        updates["due_date"] = body.due_date
+    if body.notes is not None:
+        updates["notes"] = body.notes
+
+    supa.table("provider_tasks").update(updates).eq("id", task_id).execute()
+
+    # Enrich with provider name
+    prov_rows = (
+        supa.table("providers").select("name").eq("id", task["provider_id"]).limit(1).execute()
+    ).data or []
+    provider_name = prov_rows[0].get("name") if prov_rows else None
+
+    merged = {**task, **updates}
+    return ProviderTaskItem(
+        id=str(merged["id"]),
+        case_id=str(merged["case_id"]),
+        provider_id=str(merged["provider_id"]),
+        provider_name=provider_name,
+        title=merged.get("title", ""),
+        description=merged.get("description"),
+        status=merged.get("status", "pending"),
+        due_date=str(merged["due_date"]) if merged.get("due_date") else None,
+        notes=merged.get("notes"),
+        created_at=str(merged.get("created_at", "")),
+        updated_at=str(merged.get("updated_at", "")),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Routes — invite + auth
 # ---------------------------------------------------------------------------
 
 @router.post("/api/hr/providers/invite", response_model=InviteResponse)

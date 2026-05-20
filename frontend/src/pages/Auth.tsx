@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { Card, Input, Select, Alert, LoadingButton } from '../components/antigravity';
-import { PublicLayout } from '../components/public';
+import { Alert, Input, Select, LoadingButton } from '../components/antigravity';
 import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
@@ -9,10 +8,118 @@ import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
 import { getAuthItem } from '../utils/demo';
 import { supabase } from '../api/supabase';
 
+// ── Globe SVG ─────────────────────────────────────────────────────────────────
+
+const GlobeViz: React.FC = () => (
+  <svg viewBox="0 0 940 760" className="w-full h-full" aria-hidden="true">
+    <defs>
+      <style>{`
+        @keyframes drawArc {
+          from { stroke-dashoffset: 1200; opacity: 0.2; }
+          to   { stroke-dashoffset: 0;    opacity: 1; }
+        }
+        @keyframes cityPulse {
+          0%, 100% { r: 3; opacity: 0.9; }
+          50%       { r: 5; opacity: 1; }
+        }
+        .rp-arc {
+          stroke-dasharray: 1200;
+          stroke-dashoffset: 1200;
+          animation: drawArc 2.4s cubic-bezier(0.4,0,0.2,1) forwards;
+          fill: none;
+          stroke-linecap: round;
+        }
+        .rp-arc-gold  { stroke: #e6a817; stroke-width: 2;   animation-delay: 0.2s; }
+        .rp-arc-teal  { stroke: #38bdf8; stroke-width: 1.5; animation-delay: 0.7s; }
+        .rp-arc-blue  { stroke: #60a5fa; stroke-width: 1.5; animation-delay: 1.1s; }
+        .rp-arc-faint { stroke: #93c5fd; stroke-width: 1;   animation-delay: 1.4s; opacity: 0.45; }
+        .rp-city { animation: cityPulse 2.8s ease-in-out infinite; fill: #ffffff; }
+        .rp-lbl  { fill: #cbd5e1; font-size: 11px; font-family: ui-sans-serif,system-ui,sans-serif; }
+        .rp-rlbl { fill: #64748b;  font-size:  9px; font-family: ui-sans-serif,system-ui,sans-serif; }
+      `}</style>
+    </defs>
+
+    {/* Globe circle + halo */}
+    <circle cx="490" cy="420" r="290" fill="none" stroke="rgba(148,163,184,0.10)" strokeWidth="1" />
+    <circle cx="490" cy="420" r="290" fill="none" stroke="rgba(148,163,184,0.04)" strokeWidth="42" />
+    <ellipse cx="490" cy="420" rx="290" ry="80" fill="none" stroke="rgba(148,163,184,0.05)" strokeWidth="1" />
+
+    {/* Arcs */}
+    <path className="rp-arc rp-arc-gold"  d="M 205,278 Q 350,58  502,238" />
+    <path className="rp-arc rp-arc-faint" d="M 185,258 Q 360,46  548,220" />
+    <path className="rp-arc rp-arc-teal"  d="M 502,238 Q 622,292 704,365" />
+    <path className="rp-arc rp-arc-blue"  d="M 704,365 Q 802,420 892,478" />
+    <path className="rp-arc rp-arc-faint" d="M 490,242 Q 510,208 532,197" />
+
+    {/* Route labels */}
+    <text className="rp-rlbl" x="296" y="122">CA → DE</text>
+    <text className="rp-rlbl" x="308" y="142">US → GB</text>
+    <text className="rp-rlbl" x="586" y="250">DE → AE</text>
+    <text className="rp-rlbl" x="792" y="382">AE → SG</text>
+
+    {/* City dots + labels */}
+    <circle className="rp-city" cx="185" cy="262" r="3" style={{ animationDelay: '0.1s' }} />
+    <text className="rp-lbl" x="168" y="254">CA</text>
+    <circle className="rp-city" cx="205" cy="282" r="3" style={{ animationDelay: '0.4s' }} />
+    <text className="rp-lbl" x="190" y="274">US</text>
+    <circle className="rp-city" cx="532" cy="200" r="3" style={{ animationDelay: '0.6s' }} />
+    <text className="rp-lbl" x="536" y="196">NO</text>
+    <circle className="rp-city" cx="548" cy="222" r="3" style={{ animationDelay: '0.8s' }} />
+    <text className="rp-lbl" x="552" y="218">DE</text>
+    <circle className="rp-city" cx="502" cy="240" r="3" style={{ animationDelay: '1.0s' }} />
+    <text className="rp-lbl" x="488" y="232">GB</text>
+    <circle className="rp-city" cx="704" cy="368" r="3" style={{ animationDelay: '1.2s' }} />
+    <text className="rp-lbl" x="710" y="364">AE</text>
+    <circle className="rp-city" cx="892" cy="480" r="3" style={{ animationDelay: '1.6s' }} />
+    <text className="rp-lbl" x="877" y="474">SG</text>
+    <circle className="rp-city" cx="312" cy="602" r="3" style={{ animationDelay: '1.9s' }} />
+    <text className="rp-lbl" x="300" y="594">BR</text>
+  </svg>
+);
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+const EyeIcon: React.FC<{ open: boolean }> = ({ open }) =>
+  open ? (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+      strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+      <path strokeLinecap="round" strokeLinejoin="round"
+        d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+    </svg>
+  ) : (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+      strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+      <path strokeLinecap="round" strokeLinejoin="round"
+        d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+    </svg>
+  );
+
+const GoogleIcon = () => (
+  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+  </svg>
+);
+
+const MicrosoftIcon = () => (
+  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+    <path fill="#f25022" d="M1 1h10.5v10.5H1z"/>
+    <path fill="#00a4ef" d="M12.5 1H23v10.5H12.5z"/>
+    <path fill="#7fba00" d="M1 12.5h10.5V23H1z"/>
+    <path fill="#ffb900" d="M12.5 12.5H23V23H12.5z"/>
+  </svg>
+);
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export const Auth: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('EMPLOYEE');
@@ -21,17 +128,15 @@ export const Auth: React.FC = () => {
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
   const { login, register } = useAuth();
-  /** Blocks double-submit before React re-renders (e.g. double-click + Enter). */
   const authInFlight = useRef(false);
 
-  // Invite flow state
+  // Invite flow
   const [inviteMode, setInviteMode] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePassword, setInvitePassword] = useState('');
   const [inviteConfirm, setInviteConfirm] = useState('');
   const [inviteDone, setInviteDone] = useState(false);
 
-  // Detect Supabase invite token in URL hash on mount
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash) return;
@@ -40,17 +145,19 @@ export const Auth: React.FC = () => {
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token');
     if (!accessToken) return;
-
     setInviteMode(true);
-    // Establish Supabase session from the invite tokens
     supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken ?? '' })
-      .then(({ data }) => {
-        if (data.user?.email) setInviteEmail(data.user.email);
-      })
-      .catch(() => {/* session may be expired — user will see the form and get an error on submit */});
-    // Clean hash from URL without triggering a re-render
+      .then(({ data }) => { if (data.user?.email) setInviteEmail(data.user.email); })
+      .catch(() => {});
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }, []);
+
+  useEffect(() => {
+    const nextMode = searchParams.get('mode');
+    if (nextMode === 'register' || nextMode === 'login') setMode(nextMode);
+  }, [searchParams]);
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,42 +170,27 @@ export const Auth: React.FC = () => {
     try {
       const { error: supaErr } = await supabase.auth.updateUser({ password: invitePassword });
       if (supaErr) throw new Error(supaErr.message);
-      // Now log in to ReloPass with the new password so we get the ReloPass session token
       await login({ identifier: inviteEmail, password: invitePassword });
       setInviteDone(true);
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to set password. The invite link may have expired — ask your admin to resend it.');
+      setError(err?.message ?? 'Failed to set password. The invite link may have expired.');
     } finally {
       authInFlight.current = false;
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    const nextMode = searchParams.get('mode');
-    if (nextMode === 'register' || nextMode === 'login') {
-      setMode(nextMode);
-    }
-  }, [searchParams]);
-
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const doLogin = async (id: string, pw: string) => {
     if (authInFlight.current || isLoading) return;
     setError('');
     authInFlight.current = true;
     setIsLoading(true);
-
     try {
-      await login({ identifier, password });
+      await login({ identifier: id, password: pw });
     } catch (err: any) {
       const transport = getClientTransportErrorMessage(err);
       const msg = transport ?? getApiErrorMessage(err, 'Login failed. Check your email and password, then try again.');
-      try {
-        localStorage.setItem('debug_last_auth_error', msg);
-      } catch {
-        /* ignore */
-      }
+      try { localStorage.setItem('debug_last_auth_error', msg); } catch { /* ignore */ }
       setError(msg);
     } finally {
       authInFlight.current = false;
@@ -106,68 +198,40 @@ export const Auth: React.FC = () => {
     }
   };
 
+  const handleLogin = (e: React.FormEvent) => { e.preventDefault(); void doLogin(identifier, password); };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (authInFlight.current || isLoading) return;
     setError('');
-
     const hasUsername = username.trim().length > 0;
     const hasEmail = email.trim().length > 0;
-    if (!hasUsername && !hasEmail) {
-      setError('Provide a username or email.');
-      return;
-    }
-
+    if (!hasUsername && !hasEmail) { setError('Provide a username or email.'); return; }
     if (hasUsername && !/^[A-Za-z0-9_]{3,30}$/.test(username.trim())) {
-      setError('Username must be 3–30 characters, alphanumeric or underscore.');
-      return;
+      setError('Username must be 3–30 characters, alphanumeric or underscore.'); return;
     }
-
     if (hasEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
-      setError('Provide a valid email address.');
-      return;
+      setError('Provide a valid email address.'); return;
     }
-
-    if (!password.trim()) {
-      setError('Password is required.');
-      return;
-    }
-
+    if (!password.trim()) { setError('Password is required.'); return; }
     authInFlight.current = true;
     setIsLoading(true);
     try {
       await register({
         username: hasUsername ? username.trim() : undefined,
         email: hasEmail ? email.trim() : undefined,
-        password,
-        role,
+        password, role,
         name: name.trim() || undefined,
       });
     } catch (err: any) {
       const transport = getClientTransportErrorMessage(err);
-      if (transport) {
-        try {
-          localStorage.setItem('debug_last_auth_error', transport);
-        } catch {
-          /* ignore */
-        }
-        setError(transport);
-        return;
-      }
+      if (transport) { try { localStorage.setItem('debug_last_auth_error', transport); } catch {} setError(transport); return; }
       const detail = err.response?.data?.detail;
       let msg: string;
       if (err.response?.status === 400 && detail && typeof detail === 'object' && !Array.isArray(detail)) {
         const code = (detail as { code?: string }).code;
         const message = (detail as { message?: string }).message;
-        if (code === 'AUTH_EMAIL_TAKEN' && message) {
-          msg = message;
-        } else if (code === 'AUTH_USERNAME_TAKEN' && message) {
-          msg = message;
-        } else if (message) {
-          msg = message;
-        } else {
-          msg = 'Registration failed. Check email and password format, then try again.';
-        }
+        msg = (code === 'AUTH_EMAIL_TAKEN' || code === 'AUTH_USERNAME_TAKEN') && message ? message : (message ?? 'Registration failed.');
       } else if (err.response?.status === 400 && detail) {
         msg = Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail);
       } else if (!err.response) {
@@ -175,11 +239,7 @@ export const Auth: React.FC = () => {
       } else {
         msg = detail ? (Array.isArray(detail) ? (detail[0]?.msg || String(detail)) : String(detail)) : 'Registration failed. Try again.';
       }
-      try {
-        localStorage.setItem('debug_last_auth_error', msg);
-      } catch {
-        /* ignore */
-      }
+      try { localStorage.setItem('debug_last_auth_error', msg); } catch {}
       setError(msg);
     } finally {
       authInFlight.current = false;
@@ -187,215 +247,290 @@ export const Auth: React.FC = () => {
     }
   };
 
+  const handleDemoLogin = (demoRole: 'admin' | 'hr' | 'employee') => {
+    const credMap: Record<string, { user: string; pass: string }> = {
+      admin:    { user: import.meta.env.VITE_DEMO_ADMIN_USER ?? 'demo-admin',    pass: import.meta.env.VITE_DEMO_ADMIN_PASS ?? 'demo123' },
+      hr:       { user: import.meta.env.VITE_DEMO_HR_USER    ?? 'demo-hr',       pass: import.meta.env.VITE_DEMO_HR_PASS    ?? 'demo123' },
+      employee: { user: import.meta.env.VITE_DEMO_EMP_USER   ?? 'demo-employee', pass: import.meta.env.VITE_DEMO_EMP_PASS   ?? 'demo123' },
+    };
+    const { user, pass } = credMap[demoRole];
+    setIdentifier(user);
+    setPassword(pass);
+    setMode('login');
+    void doLogin(user, pass);
+  };
+
+  const handleGoogleSSO = () => {
+    void supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth?mode=login` },
+    });
+  };
+
+  // ── Redirect if already logged in ───────────────────────────────────────────
   if (getAuthItem('relopass_token')) {
     const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
-    if (key !== 'landing') {
-      return <Navigate to={buildRoute(key)} replace />;
-    }
+    if (key !== 'landing') return <Navigate to={buildRoute(key)} replace />;
   }
 
-  // ── Invite flow ────────────────────────────────────────────────────────────
+  // ── Invite flow ──────────────────────────────────────────────────────────────
   if (inviteMode) {
     return (
-      <PublicLayout>
-        <div className="max-w-md mx-auto">
-          <Card padding="lg">
-            {inviteDone ? (
-              <div className="text-center space-y-3">
-                <p className="text-2xl">✓</p>
-                <p className="font-semibold text-[#0b2b43]">Password set — you're in!</p>
-                <p className="text-sm text-[#6b7280]">Redirecting you to your dashboard…</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8">
+          {inviteDone ? (
+            <div className="text-center space-y-3">
+              <p className="text-3xl">✓</p>
+              <p className="font-semibold text-[#0b2b43]">Password set — you're in!</p>
+              <p className="text-sm text-slate-500">Redirecting you to your dashboard…</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSetPassword} className="space-y-5">
+              <div>
+                <h2 className="text-lg font-semibold text-[#0b2b43]">Set your password</h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Welcome to ReloPass{inviteEmail ? ` — ${inviteEmail}` : ''}. Choose a password to activate your account.
+                </p>
               </div>
-            ) : (
-              <form onSubmit={handleSetPassword} className="space-y-5">
-                <div>
-                  <h2 className="text-lg font-semibold text-[#0b2b43]">Set your password</h2>
-                  <p className="text-sm text-[#6b7280] mt-1">
-                    Welcome to ReloPass{inviteEmail ? ` — ${inviteEmail}` : ''}. Choose a password to activate your account.
-                  </p>
-                </div>
-                {error && <Alert variant="error">{error}</Alert>}
-                <Input
-                  type="password"
-                  value={invitePassword}
-                  onChange={setInvitePassword}
-                  label="New password"
-                  placeholder="At least 6 characters"
-                  autoComplete="new-password"
-                  fullWidth
-                />
-                <Input
-                  type="password"
-                  value={inviteConfirm}
-                  onChange={setInviteConfirm}
-                  label="Confirm password"
-                  placeholder="Repeat your password"
-                  autoComplete="new-password"
-                  fullWidth
-                />
-                <LoadingButton
-                  type="submit"
-                  fullWidth
-                  loading={isLoading}
-                  loadingLabel="Setting password…"
-                  disabled={!invitePassword || !inviteConfirm}
-                >
-                  Activate account
-                </LoadingButton>
-              </form>
-            )}
-          </Card>
+              {error && <Alert variant="error">{error}</Alert>}
+              <Input type="password" value={invitePassword} onChange={setInvitePassword}
+                label="New password" placeholder="At least 6 characters"
+                autoComplete="new-password" fullWidth />
+              <Input type="password" value={inviteConfirm} onChange={setInviteConfirm}
+                label="Confirm password" placeholder="Repeat your password"
+                autoComplete="new-password" fullWidth />
+              <LoadingButton type="submit" fullWidth loading={isLoading}
+                loadingLabel="Setting password…" disabled={!invitePassword || !inviteConfirm}>
+                Activate account
+              </LoadingButton>
+            </form>
+          )}
         </div>
-      </PublicLayout>
+      </div>
     );
   }
-  // ── End invite flow ────────────────────────────────────────────────────────
 
+  // ── Main layout ──────────────────────────────────────────────────────────────
   return (
-    <PublicLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-semibold text-[#0b2b43] leading-tight">
-              Run every relocation on one record.
-            </h1>
-            <p className="mt-3 text-[#4b5563] leading-relaxed">
-              ReloPass keeps cases, documents, and provider activity in one place — so HR stops chasing updates and employees always know what's next.
-            </p>
-          </div>
-          <ul className="space-y-2 text-sm text-[#4b5563]">
-            <li>• Open cases, track readiness, and run compliance on one workflow.</li>
-            <li>• Coordinate housing, schools, and providers from the same record.</li>
-            <li>• HR sees every case. Employees see their own next steps.</li>
-          </ul>
+    <div className="min-h-screen flex overflow-hidden">
+
+      {/* ── Left: dark globe panel ── */}
+      <div className="hidden lg:flex lg:flex-col lg:w-[58%] relative bg-[#061424] overflow-hidden select-none">
+
+        {/* Header */}
+        <div className="relative z-10 flex items-center gap-2.5 px-8 pt-7">
+          <img src="/logo.svg" alt="ReloPass" className="h-7 w-auto"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <span className="text-white font-semibold text-base tracking-tight">ReloPass</span>
+          <span className="text-slate-400 text-base">· Platform</span>
         </div>
 
-        <Card padding="lg">
-          <div className="space-y-5">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setMode('login')}
-                className={`px-3 py-2 text-sm rounded-md ${
-                  mode === 'login' ? 'bg-[#0b2b43] text-white' : 'bg-[#f3f4f6] text-[#4b5563]'
-                }`}
-              >
-                Sign in
-              </button>
-              <button
-                onClick={() => setMode('register')}
-                className={`px-3 py-2 text-sm rounded-md ${
-                  mode === 'register' ? 'bg-[#0b2b43] text-white' : 'bg-[#f3f4f6] text-[#4b5563]'
-                }`}
-              >
-                Create Account
-              </button>
+        {/* Globe */}
+        <div className="flex-1 relative">
+          <div className="absolute inset-0">
+            <GlobeViz />
+          </div>
+        </div>
+
+        {/* Live ticker */}
+        <div className="relative z-10 px-6 pb-7">
+          <div className="rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm px-5 py-4">
+            <p className="text-[10px] font-semibold tracking-widest text-emerald-400 uppercase mb-2">
+              · Live across 47 corridors
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white font-semibold shrink-0">
+                MB
+              </div>
+              <div>
+                <p className="text-sm text-white font-medium flex items-center gap-2">
+                  Marc B. · FR → NO
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    LIVE
+                  </span>
+                </p>
+                <p className="text-xs text-slate-400">
+                  visa approved · 2,882 active relocations across 47 corridors
+                </p>
+              </div>
             </div>
+          </div>
+        </div>
+      </div>
 
-            {error && <Alert variant="error">{error}</Alert>}
+      {/* ── Right: auth panel ── */}
+      <div className="flex-1 flex flex-col justify-center px-8 py-12 bg-white overflow-y-auto">
+        <div className="w-full max-w-sm mx-auto">
 
-            {mode === 'register' && role === 'EMPLOYEE' && (
-              <Alert variant="info" title="Signing up with a work email">
-                <p className="text-sm text-[#374151] leading-relaxed">
-                  HR can add your work email to a case before you register. You can still create an account here.
-                </p>
-                <p className="text-sm text-[#374151] mt-2 leading-relaxed">
-                  &quot;Email already in use&quot; means that address is already a login on ReloPass. Use the same email
-                  HR used and pending cases usually attach. If not, enter the assignment ID from HR on your dashboard.
-                </p>
-              </Alert>
+          {/* Mobile logo */}
+          <div className="flex items-center gap-2 mb-8 lg:hidden">
+            <img src="/logo.svg" alt="ReloPass" className="h-6 w-auto"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <span className="font-semibold text-[#0b2b43]">ReloPass</span>
+          </div>
+
+          {/* Mode tabs */}
+          <div className="flex rounded-lg bg-slate-100 p-1 mb-7">
+            {(['login', 'register'] as const).map((m) => (
+              <button key={m} onClick={() => { setMode(m); setError(''); }}
+                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  mode === m ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'
+                }`}>
+                {m === 'login' ? 'Sign in' : 'Create account'}
+              </button>
+            ))}
+          </div>
+
+          {/* Heading */}
+          <div className="mb-6">
+            {mode === 'login' ? (
+              <>
+                <h1 className="text-2xl font-semibold text-slate-900">Sign in to ReloPass</h1>
+                <p className="text-sm text-slate-500 mt-1">Welcome back. Pick up where you left off.</p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-2xl font-semibold text-slate-900">Create your account</h1>
+                <p className="text-sm text-slate-500 mt-1">Join your team on ReloPass.</p>
+              </>
             )}
+          </div>
 
-            {mode === 'login' && (
-              <form onSubmit={handleLogin} className="space-y-4">
-                <Input
-                  value={identifier}
-                  onChange={setIdentifier}
-                  label="Username or Email"
-                  placeholder="username or you@example.com"
-                  autoComplete="username"
-                  fullWidth
-                />
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={setPassword}
-                  label="Password"
-                  placeholder="Password"
-                  autoComplete="current-password"
-                  fullWidth
-                />
-                <LoadingButton
-                  type="submit"
-                  fullWidth
-                  loading={isLoading}
-                  loadingLabel="Signing in…"
-                  disabled={!identifier || !password}
-                >
-                  Sign in
-                </LoadingButton>
-              </form>
-            )}
+          {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
-            {mode === 'register' && (
+          {/* ── Login form ── */}
+          {mode === 'login' && (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Email or username
+                </label>
+                <input
+                  type="text" value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="you@company.com" autoComplete="username"
+                  className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700">Password</label>
+                  <button type="button" className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                    Forgot?
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'} value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••" autoComplete="current-password"
+                    className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
+                  />
+                  <button type="button" onClick={() => setShowPassword((p) => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                    <EyeIcon open={showPassword} />
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" disabled={isLoading || !identifier || !password}
+                className="w-full py-2.5 rounded-lg bg-[#0b2b43] text-white text-sm font-semibold hover:bg-[#0d3456] disabled:opacity-50 transition-colors">
+                {isLoading ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+          )}
+
+          {/* ── Register form ── */}
+          {mode === 'register' && (
+            <>
+              {role === 'EMPLOYEE' && (
+                <Alert variant="info" title="Signing up with a work email" className="mb-4">
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    HR can add your work email to a case before you register. &quot;Email already in use&quot; means that address is already on ReloPass — use the same email HR used.
+                  </p>
+                </Alert>
+              )}
               <form onSubmit={handleRegister} className="space-y-4">
-                <Input
-                  value={name}
-                  onChange={setName}
-                  label="Full name (optional)"
-                  placeholder="Alex Johnson"
-                  fullWidth
-                />
-                <Input
-                  value={username}
-                  onChange={setUsername}
-                  label="Username"
-                  placeholder="username (3–30 chars, letters/numbers/_)"
-                  autoComplete="username"
-                  fullWidth
-                />
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={setEmail}
-                  label="Email"
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  fullWidth
-                />
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={setPassword}
-                  label="Password"
-                  placeholder="Create a password"
-                  autoComplete="new-password"
-                  fullWidth
-                />
-                <Select
-                  value={role}
-                  onChange={(value) => setRole(value as UserRole)}
-                  label="Role"
+                <Input value={name} onChange={setName} label="Full name (optional)" placeholder="Alex Johnson" fullWidth />
+                <Input value={username} onChange={setUsername} label="Username"
+                  placeholder="username (3–30 chars)" autoComplete="username" fullWidth />
+                <Input type="email" value={email} onChange={setEmail} label="Email"
+                  placeholder="you@example.com" autoComplete="email" fullWidth />
+                <div className="relative">
+                  <Input type={showPassword ? 'text' : 'password'} value={password}
+                    onChange={setPassword} label="Password"
+                    placeholder="Create a password" autoComplete="new-password" fullWidth />
+                  <button type="button" onClick={() => setShowPassword((p) => !p)}
+                    className="absolute right-3 top-8 text-slate-400 hover:text-slate-600 transition-colors">
+                    <EyeIcon open={showPassword} />
+                  </button>
+                </div>
+                <Select value={role} onChange={(v) => setRole(v as UserRole)} label="Role"
                   options={[
                     { value: 'HR', label: 'HR manager' },
                     { value: 'EMPLOYEE', label: 'Employee' },
                     { value: 'ADMIN', label: 'Admin (full access)' },
-                  ]}
-                  fullWidth
-                />
-                <LoadingButton
-                  type="submit"
-                  fullWidth
-                  loading={isLoading}
+                  ]} fullWidth />
+                <LoadingButton type="submit" fullWidth loading={isLoading}
                   loadingLabel="Creating account…"
-                  disabled={!password.trim() || (!username.trim() && !email.trim())}
-                >
+                  disabled={!password.trim() || (!username.trim() && !email.trim())}>
                   Create account
                 </LoadingButton>
               </form>
-            )}
+            </>
+          )}
+
+          {/* ── SSO + create account link ── */}
+          {mode === 'login' && (
+            <>
+              <div className="flex items-center gap-3 my-5">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-xs text-slate-400">or</span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={handleGoogleSSO}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                  <GoogleIcon /> Google
+                </button>
+                <button
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                  <MicrosoftIcon /> Microsoft SSO
+                </button>
+              </div>
+
+              <p className="text-center text-sm text-slate-500 mt-5">
+                New to ReloPass?{' '}
+                <button onClick={() => { setMode('register'); setError(''); }}
+                  className="text-[#0b2b43] font-medium hover:underline">
+                  Create an account →
+                </button>
+              </p>
+            </>
+          )}
+
+          {/* ── One-click demo ── */}
+          <div className="mt-7 pt-6 border-t border-slate-100">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">One-click demo</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
+                PROTOTYPE
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(['admin', 'hr', 'employee'] as const).map((r) => (
+                <button key={r} onClick={() => handleDemoLogin(r)} disabled={isLoading}
+                  className="py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 capitalize transition-colors">
+                  {r === 'admin' ? 'Admin' : r === 'hr' ? 'HR' : 'Employee'}
+                </button>
+              ))}
+            </div>
           </div>
-        </Card>
+
+        </div>
       </div>
-    </PublicLayout>
+    </div>
   );
 };

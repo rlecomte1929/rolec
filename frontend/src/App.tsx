@@ -64,7 +64,12 @@ const HrEmployeeDetail = lazy(() => import('./pages/HrEmployeeDetail').then((mod
 const HrCommandCenter = lazy(() => import('./pages/HrCommandCenter').then((module) => ({ default: module.HrCommandCenter })));
 const HrCommandCenterCaseDetail = lazy(() => import('./pages/HrCommandCenterCaseDetail').then((module) => ({ default: module.HrCommandCenterCaseDetail })));
 const HrAnalytics = lazy(() => import('./pages/HrAnalytics').then((module) => ({ default: module.HrAnalytics })));
+const HrProviderGrid = lazy(() => import('./pages/HrProviderGrid').then((module) => ({ default: module.HrProviderGrid })));
+const HrPolicyBuilder = lazy(() => import('./pages/HrPolicyBuilder').then((module) => ({ default: module.HrPolicyBuilder })));
+const ProviderPortal = lazy(() => import('./pages/ProviderPortal').then((module) => ({ default: module.ProviderPortal })));
+const EmployeeTaskPage = lazy(() => import('./pages/employee/EmployeeTaskPage').then((module) => ({ default: module.EmployeeTaskPage })));
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings').then((module) => ({ default: module.NotificationSettings })));
+const DesignPreview = lazy(() => import('./pages/DesignPreview').then((module) => ({ default: module.DesignPreview })));
 
 const CountriesPage = lazy(() => import('./pages/admin/CountriesPage').then((module) => ({ default: module.CountriesPage })));
 const CountryDetailPage = lazy(() => import('./pages/admin/CountryDetailPage').then((module) => ({ default: module.CountryDetailPage })));
@@ -177,16 +182,23 @@ function App() {
         <Route path={ROUTE_DEFS.privacy.path} element={<PrivacyPage />} />
         <Route path={ROUTE_DEFS.access.path} element={<AccessPage />} />
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
+        {/* Design preview — sandboxed Claude Design handoff bundle in iframe. Static, no auth, mock data only. */}
+        <Route path="/design-preview" element={<DesignPreview />} />
+        {/* Provider portal — public, magic-link JWT auth */}
+        <Route path={ROUTE_DEFS.providerPortal.path} element={<ProviderPortal />} />
         <Route path="/journey" element={<Journey />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path={ROUTE_DEFS.employeeJourney.path} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeDashboard.path} element={<RequireEmployeeRoute><EmployeeJourney /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeQuoteRequest.path} element={<RequireEmployeeRoute><QuoteRequestPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeTaskPage.path} element={<RequireEmployeeRoute><EmployeeTaskPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.EMP_DASH} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
         <Route path={ROUTE_DEFS.hrAnalytics.path} element={<HrAnalytics />} />
         <Route path={ROUTE_DEFS.hrCommandCenter.path} element={<HrCommandCenter />} />
         <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<HrCommandCenterCaseDetail />} />
+        <Route path={ROUTE_DEFS.hrProviderGrid.path} element={<HrProviderGrid />} />
+        <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<HrPolicyBuilder />} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<HrCaseSummary />} />
         <Route path={ROUTE_DEFS.hrReview.path} element={<Navigate to={ROUTE_DEFS.hrEmployeeDashboard.path} replace />} />

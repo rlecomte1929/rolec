@@ -117,7 +117,9 @@ def list_demand_for_company(company_id: str, limit: int = 200) -> List[Dict[str,
     """
     if not company_id:
         return []
-    with db.engine.begin() as conn:
+    # Use connect() (read-only) not begin() — begin() acquires a write lock
+    # and can block on concurrent writes, causing the widget to hang (B16).
+    with db.engine.connect() as conn:
         rows = conn.execute(
             text(
                 "SELECT id, company_id, category, destination_city, destination_country, "

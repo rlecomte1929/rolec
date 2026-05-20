@@ -38,6 +38,7 @@ export const HrCaseSummary: React.FC = () => {
   const { caseId } = useParams();
   const navigate = useNavigate();
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+  const [draftCase, setDraftCase] = useState<{ id: string; status: 'draft'; created_at: string | null } | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
@@ -58,8 +59,13 @@ export const HrCaseSummary: React.FC = () => {
   ];
 
   const loadAssignment = async () => {
-    if (!caseId) return;
+    if (!caseId) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
+    setError('');
+    setDraftCase(null);
     try {
       const data = await hrAPI.getAssignment(caseId);
       setAssignment(data);
@@ -67,8 +73,18 @@ export const HrCaseSummary: React.FC = () => {
     } catch (err: any) {
       if (err.response?.status === 401) {
         safeNavigate(navigate, 'landing');
+        return;
+      }
+      if (err.response?.status === 404) {
+        // Might be a draft case (relocation_cases row, no assignment yet)
+        try {
+          const draft = await hrAPI.getDraftCase(caseId);
+          setDraftCase(draft);
+        } catch {
+          setError('Case not found or not visible.');
+        }
       } else {
-        setError('Assignment not found or not visible under RLS.');
+        setError('Unable to load case. Please try again.');
       }
     } finally {
       setIsLoading(false);
@@ -209,6 +225,42 @@ export const HrCaseSummary: React.FC = () => {
       )}
       {reopenSuccess && <Alert variant="success">{reopenSuccess}</Alert>}
       {isLoading && <div className="text-sm text-[#6b7280]">Loading…</div>}
+
+      {!isLoading && draftCase && !assignment && (
+        <Card padding="lg">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="text-xl font-semibold text-[#0b2b43]">Draft case</div>
+              <div className="text-sm text-[#6b7280] mt-1">
+                No employee assigned yet.
+                {draftCase.created_at && (
+                  <span className="ml-2">
+                    Created {new Date(draftCase.created_at).toLocaleDateString()}.
+                  </span>
+                )}
+              </div>
+            </div>
+            <Badge variant="neutral">Draft</Badge>
+          </div>
+          <div className="mt-4 text-sm text-[#4b5563]">
+            Assign an employee to this case to start the relocation process.
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              onClick={() =>
+                navigate(
+                  `${buildRoute('hrCommandCenter')}?assignCase=${draftCase.id}`
+                )
+              }
+            >
+              Assign employee
+            </Button>
+            <Button variant="outline" onClick={() => navigate(buildRoute('hrCommandCenter'))}>
+              Back to Dashboard
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {!isLoading && assignment && (
         <div className="space-y-6">

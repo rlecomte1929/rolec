@@ -706,6 +706,11 @@ export const hrAPI = {
     const response = await api.get(`/api/hr/command-center/cases/${assignmentId}`);
     return response.data;
   },
+  /** Provider × Case status matrix for the HR grid view (AIQ-14). */
+  getProviderStatusGrid: async (): Promise<ProviderGridResponse> => {
+    const response = await api.get('/api/hr/provider-status-grid');
+    return response.data;
+  },
   /** Bounded policy Q&A for the HR policy workspace (draft + published context). */
   postPolicyAssistantQuery: async (
     policyId: string,
@@ -948,6 +953,21 @@ export const hrAPI = {
     const response = await api.get('/api/hr/analytics');
     return response.data;
   },
+
+  // ── B10: Draft case info (no assignment yet) ─────────────────────────────
+
+  /** Fetch minimal info for a draft relocation case that has no assignment row yet. */
+  getDraftCase: async (caseId: string): Promise<{
+    id: string;
+    status: 'draft';
+    company_id: string | null;
+    created_at: string | null;
+    hr_user_id: string | null;
+  }> => {
+    const response = await api.get(`/api/hr/cases/${caseId}`);
+    return response.data;
+  },
+
 };
 
 // Company API (for header branding: HR and Employee)
@@ -2296,6 +2316,31 @@ export const servicesAPI = {
     const response = await api.post('/api/rfqs', { case_id: caseId, items, supplier_ids: supplierIds });
     return response.data;
   },
+
+  // ---- Task Portal (AIQ-34-B) ----
+
+  /** List all tasks for the current employee (auto-resolves case from linked assignment). */
+  getTasks: async (caseId?: string): Promise<EmployeeTaskListResponse> => {
+    const params: Record<string, string> = {};
+    if (caseId) params.case_id = caseId;
+    const response = await api.get('/api/employee/tasks', { params });
+    return response.data;
+  },
+
+  /** Get a single task by ID. */
+  getTask: async (taskId: string): Promise<EmployeeTask> => {
+    const response = await api.get(`/api/employee/tasks/${taskId}`);
+    return response.data;
+  },
+
+  /** Submit a task with optional form data and/or file URL. */
+  submitTask: async (
+    taskId: string,
+    payload: { submission_data?: Record<string, unknown>; file_url?: string }
+  ): Promise<EmployeeTask> => {
+    const response = await api.patch(`/api/employee/tasks/${taskId}`, payload);
+    return response.data;
+  },
 };
 
 export const rfqAPI = {
@@ -2430,6 +2475,34 @@ export const timelineAPI = {
     return response.data;
   },
 };
+
+// ── Provider Status Grid types (AIQ-14) ───────────────────────────────────────
+
+export type GridCellStatus = 'on-track' | 'at-risk' | 'blocked' | 'complete' | 'not-assigned';
+
+export type CoordinationStatus = 'not-started' | 'in-progress' | 'at-risk' | 'complete';
+
+export interface ProviderGridCells {
+  housing: GridCellStatus;
+  immigration: GridCellStatus;
+  shipping: GridCellStatus;
+  other: GridCellStatus;
+}
+
+export interface ProviderGridRow {
+  case_id: string;
+  employee_name: string;
+  employee_identifier: string;
+  dest_country: string | null;
+  move_date: string | null;
+  coordination_status: CoordinationStatus;
+  cells: ProviderGridCells;
+}
+
+export interface ProviderGridResponse {
+  rows: ProviderGridRow[];
+  total: number;
+}
 
 export type TaskOwner = 'hr' | 'employee' | 'provider' | 'joint';
 
@@ -3180,7 +3253,7 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function apiGet<T>(path: string, opts?: { headers?: Record<string, string>; requestId?: string }): Promise<T> {
+export async function apiGet<T>(path: string, opts?: { headers?: Record<string, string>; requestId?: string; signal?: AbortSignal }): Promise<T> {
   let response: Response;
   const tStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const requestId =
@@ -3192,6 +3265,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method: 'GET',
+      signal: opts?.signal,
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders(),

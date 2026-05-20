@@ -172,8 +172,8 @@ export interface EmployeeDemandRow {
   demand_count: number;
 }
 
-export const listEmployeeDemand = (): Promise<EmployeeDemandRow[]> =>
-  apiGet('/api/hr/catalog/employee-demand');
+export const listEmployeeDemand = (signal?: AbortSignal): Promise<EmployeeDemandRow[]> =>
+  apiGet('/api/hr/catalog/employee-demand', { signal });
 
 export interface HrNotificationCounts {
   employees_waiting: number;
