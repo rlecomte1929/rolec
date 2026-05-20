@@ -79,35 +79,68 @@ In solo, pre-customer mode the cost of committing speculative work is near zero 
 
 ---
 
-## OPEN — In-tree WIP overlapping prototype screens (now committed in baseline `191ad2a`)
+## In-tree WIP classification (completed 2026-05-20)
 
-The following files were committed to the baseline (`191ad2a`) on 2026-05-20 and overlap conceptually with platform-v2 screens. **Each one needs a verdict — to be filled in during the WIP classification session.**
-
-| File / dir | Overlaps prototype screen | Verdict | Notes |
-|---|---|---|---|
-| `frontend/src/pages/HrPolicyBuilder.tsx` | s5b · Policy Builder (HR) | TBD | |
-| `frontend/src/pages/HrProviderGrid.tsx` | s7 · Mobility Control provider view | TBD | |
-| `frontend/src/pages/ProviderPortal.tsx` | (separate but related) | TBD | |
-| `frontend/src/pages/employee/EmployeeTaskPage.tsx` | s3 · Roadmap task drawer | TBD | |
-| `frontend/src/features/policy-builder/` (6 files) | s5b · Policy Builder | TBD | |
-| `frontend/src/features/timeline/RelocationTimeline.tsx` (+stories, a11y audit) | s3 · Roadmap | TBD | |
-| `frontend/src/components/providers/` (6 files) | s6 · Marketplace / s7 provider grid | TBD | |
-| `frontend/src/api/policyBuilder.ts` | s5b backend wiring | TBD | |
-| `frontend/src/api/providerPortal.ts` | provider portal backend wiring | TBD | |
-| `frontend/src/api/providers.ts` | provider list backend wiring | TBD | |
-| `frontend/src/components/RequireEmployeeRoute.tsx` | (auth guard) | TBD | |
-| `frontend/src/hooks/useProviderRealtime.ts` | s7 realtime updates | TBD | |
-| `frontend/src/types/relocationPolicy.ts` | s5b types | TBD | |
-| `backend/app/routers/hr_policies.py` | s5b backend | TBD | |
-| `backend/app/routers/provider_portal.py` | provider portal backend | TBD | |
+Each WIP file committed in baseline `191ad2a` has been read and classified. Verdicts below.
 
 **Verdict legend:**
-- **ADOPT** — already prototype-aligned; integrate as the V2 implementation. Becomes the canonical V2 for that screen.
-- **REWORK** — useful logic but UI doesn't match prototype; harvest the data hooks / API wrappers, replace the UI.
-- **REPLACE** — start fresh from the prototype design. The current implementation gets deleted (or kept temporarily behind a flag).
-- **KEEP** — has nothing to do with prototype; leave alone, don't classify against platform-v2.
+- **ADOPT** — already prototype-aligned; use as the canonical V2 implementation for the matching prototype screen.
+- **REWORK** — data layer and APIs are sound; UI does not match the prototype. Keep the data layer, replace the visualization.
+- **REPLACE** — start fresh from the prototype design; the current implementation gets deleted once the V2 lands.
+- **KEEP** — has nothing to do with prototype; standalone feature, leave it alone.
 
-**Process for filling this in:** WIP classification session — for each file, read it, compare to the corresponding prototype JSX (`platform-s*.jsx`), write the verdict + a 1-line reason in the Notes column. No code changes during classification. Code changes come in the next session, one screen at a time, following the per-screen recipe.
+### Classification
+
+| File / dir | Overlaps prototype | Verdict | Notes |
+|---|---|---|---|
+| `frontend/src/pages/HrPolicyBuilder.tsx` | s5b · Policy Builder | **REWORK** | 13-line page shell that mounts `PolicyBuilderWizard`. Keep the page entry; swap the wizard for the prototype's matrix UI when s5b is ported. |
+| `frontend/src/pages/HrProviderGrid.tsx` | s7 · Mobility Control (provider view) | **ADOPT** | 60-line shell over `ProviderStatusGrid`. Aligned with the prototype's HR provider-status concept. Use as-is for s7's provider tab. |
+| `frontend/src/pages/ProviderPortal.tsx` | (none) | **KEEP** | Public magic-link portal for *external* providers. The prototype has no equivalent persona. Self-contained, well-designed. |
+| `frontend/src/pages/employee/EmployeeTaskPage.tsx` | (loose to s3) | **KEEP** | Standalone "my tasks" inbox over `servicesAPI.getTasks()`. The prototype roadmap (s3) has timeline steps but not a generic task list — distinct concept. |
+| `frontend/src/features/policy-builder/` (6 files: wizard, 3 steps, indicator, draft hook) | s5b · Policy Builder | **REWORK** | 5-step linear wizard around tiers/budgets/documents/vendor-categories/approval. Prototype wants a 6-category × 31-benefit matrix instead. **Preserve** `usePolicyDraft.ts` (draft persistence + flash UX) and the API layer; **replace** the StepX components with a matrix UI. Schema extension required (see Schema gap below). |
+| `frontend/src/features/timeline/RelocationTimeline.tsx` (+stories, a11y audit) | s3 · Roadmap | **REWORK** | Excellent vertical-timeline component with mobile bottom-sheet pattern and completed a11y audit. Prototype wants parallel tracks (immigration/housing/family/admin), not a single-axis timeline. Keep the data layer (`fetchRelocationPlanView`, status taxonomy, "mark done" PATCH); rework the visualization. The a11y audit work is reusable in the new component. |
+| `frontend/src/components/providers/` (6 files: status grid, row, status cell, invite modal, assign-task modal, coordination panel) | s7 provider grid + tasks | **ADOPT** | Provider × case matrix with 4 categories (housing/immigration/shipping/other) and 4 coordination statuses. Sortable, auto-refresh, mobile-friendly. The invite + assign flows go deeper than the prototype — that's additive, not conflict. Use the whole dir as the canonical V2 for s7's provider tab. |
+| `frontend/src/api/policyBuilder.ts` | s5b API | **REWORK** | Typed wrapper over `/api/hr/policies` CRUD. Sound, but contracts (`RelocationPolicyJson` shape) will evolve when s5b's canonical-benefits taxonomy lands. Extend rather than rewrite. |
+| `frontend/src/api/providerPortal.ts` | (none) | **KEEP** | Separate axios instance + token management for the external provider portal. Parallel surface; prototype-agnostic. |
+| `frontend/src/api/providers.ts` | s7 provider grid + tasks | **ADOPT** | Clean typed wrapper over `/api/hr/providers` and `/api/hr/provider-tasks`. Feeds the providers components. Use as-is. |
+| `frontend/src/components/RequireEmployeeRoute.tsx` | (auth infra) | **KEEP** | Pure role-gate route guard (EMPLOYEE + ADMIN pass, HR redirected to command center, unauth redirected to landing). Infrastructure; orthogonal to the prototype. |
+| `frontend/src/hooks/useProviderRealtime.ts` | s7 realtime | **KEEP** | Supabase realtime subscription for `provider_tasks` with exponential-backoff reconnect and 60s polling fallback. Well-engineered, generic. |
+| `frontend/src/types/relocationPolicy.ts` | s5b types | **REWORK** | TypeScript shape for the existing 5-dim policy JSON. Will be extended (not replaced) when the canonical-benefits taxonomy is added — `benefits` becomes a new top-level dimension alongside `budgets`. |
+| `backend/app/routers/hr_policies.py` | s5b backend | **REWORK** | 274-line CRUD router with org-scoping, audit log, and atomic activate. Schema lives in migration `20260513150000_relocation_policy_builder_schema.sql`. Will need a follow-up migration to add the canonical-benefits dimension; router stays. |
+| `backend/app/routers/provider_portal.py` | (provider portal) | **KEEP** | 561-line router with provider-JWT auth, task CRUD, case summary, profile, and 30s-debounced Resend email notifications. Parallel surface; not in scope for prototype port. |
+
+### Patterns observed
+
+1. **Infrastructure files are universally KEEP.** `RequireEmployeeRoute`, `useProviderRealtime`, `providerPortal` API + backend router — all standalone plumbing that's orthogonal to which UI sits on top.
+2. **Provider stack is ADOPT.** The existing provider grid + modals are a *superset* of what the prototype's s7 shows. The prototype is a sketch; this implementation is the real thing. Wire the prototype's s7 to *render* these components rather than trying to redesign them.
+3. **Policy stack is REWORK with schema work.** The existing implementation is solid engineering against the wrong data shape. Schema needs to grow (not shrink) before the prototype's matrix view can sit on top.
+4. **Timeline is REWORK.** Beautiful component, wrong visualization for the prototype. The a11y audit and mobile bottom-sheet pattern are transferable.
+
+### Schema gap surfaced
+
+**One follow-up migration needed before s5b can be ported:**
+
+The existing `policy_versions.json_schema` has dimensions: `tiers`, `budgets`, `documents`, `vendor_categories`, `approval_workflow`. The prototype s5b expects a `benefits` dimension keyed by **31 canonical benefit IDs across 6 categories**, with per-cell `{ covered: 'covered' | 'partial' | 'excluded', cap_amount, cap_currency, cost_estimate }`.
+
+**Decision deferred to the s5b porting session.** Two options to weigh then:
+- **(A) Extend** `RelocationPolicyJson` with an optional `benefits` dimension; new code reads/writes both old and new; old policies remain valid.
+- **(B) Replace** `json_schema` with a canonical-benefits-first shape; data migration converts existing tiers/budgets/documents into benefit cells.
+
+Recommendation when we get there: (A) — additive change, no breaking migration, reversible.
+
+### Next-session plan
+
+With verdicts in hand, the porting order from the original phased plan is unchanged but more concrete:
+
+1. **Phase 0 — `s9g Companies` proof.** Read-only, admin-only, no overlap with WIP. Pure adapter-pattern dry run.
+2. **Phase 1 — HR command center surface.** First ADOPT screens land here:
+   - s7 provider grid → wraps the existing `providers/` components into the prototype's s7 layout (mostly composition work, low risk).
+   - s7p Company Profile (no overlap; clean port).
+   - s10 Inbox (no overlap).
+3. **Phase 2 — Policy stack (REWORK + schema migration).** Highest-risk phase. Schema decision + matrix UI + adapter on top of `policyBuilder.ts`.
+4. **Phase 3 — Roadmap REWORK (s3 over RelocationTimeline data).**
+
+The KEEP files (provider portal, EmployeeTaskPage, RequireEmployeeRoute, useProviderRealtime) are out of scope for platform-v2 and do not need any further attention.
 
 ---
 
