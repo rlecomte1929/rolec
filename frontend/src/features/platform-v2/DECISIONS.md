@@ -399,6 +399,38 @@ Closer to REWORK than ADOPT (visual layer redone, data layer untouched). About *
 
 No `adapter.ts` because the input and output types are already aligned.
 
+### Step 7 — Solo-mode QA checklist (Company Profile)
+
+Run with both tabs open: `localhost:3000/hr/company-profile` (legacy, default) and `localhost:3000/hr/company-profile-v2` (V2 always).
+
+- [ ] V2 route loads without console errors specific to it
+- [ ] Eyebrow + h1 + v2 pill + sub-line render
+- [ ] All 4 sections render with completion % progress bars
+- [ ] Section A "Identity" — name, legal_name, industry select, size_band select, website
+- [ ] Section B "Location & contact" — country select with flags, hq_city, address, phone
+- [ ] Section C "HR & mobility defaults" — hr_contact, support_email, default destination country, default working location
+- [ ] Section D "Branding" — logo preview + Upload/Replace/Remove buttons
+- [ ] Pristine state: no sticky save bar at the bottom
+- [ ] Change any field → sticky save bar slides in at the bottom with "You have unsaved changes" + Discard + Save changes
+- [ ] Discard reverts the form to the original values; sticky bar disappears
+- [ ] Save → bar shows "✓ Saved.", then disappears 2.5s later; legacy `/hr/company-profile` tab shows the updated value after refresh
+- [ ] Try to save with empty name → "Name is required." in the sticky bar
+- [ ] Upload an SVG/PNG (<2MB) → logo preview updates after refresh
+- [ ] Try to upload a too-large file → "Logo must be 2MB or smaller." inline
+- [ ] Remove logo → confirm prompt → logo preview clears
+- [ ] Auth: HR + ADMIN access works; other roles blocked by the route guard
+
+### Commits
+
+| Commit | What |
+|---|---|
+| `0d26302` | step 1 — comparison + scope |
+| `29a883c` | V2 page + route + V2Gate |
+
+### Recipe lesson (carry forward)
+
+**Sticky save bar > scattered Save buttons.** With 4 sections and ~12 fields, putting a "Save" button in each section bloats the layout and creates a "which save?" question. A single sticky bar that appears only when the form is dirty is cleaner and matches how the prototype was sketched (the prototype didn't draw a save bar at all — but for real edit pages it's the right pattern). Add this to the recipe: any V2 screen with > 1 saveable section uses a sticky dirty-state save bar.
+
 ### Recipe lessons (carry forward to screen 2..N)
 
 1. **Antigravity primitives are form-shaped, not table-shaped.** `Badge`, `Card`, `Input`, `Select`, `ProgressBar` have opinionated APIs (closed string callbacks, options arrays, fixed paddings). They work great in HrPolicy and the policy assistant. For prototype-style data screens (table headers, sticky filters, compact KPIs, dense pills) plain HTML + Tailwind utilities give better control. **Recipe addition:** for any ported screen, the first sub-decision is "form-style or data-style"; data-style screens skip antigravity in favour of Tailwind utilities.
