@@ -248,10 +248,14 @@ export const Auth: React.FC = () => {
   };
 
   const handleDemoLogin = (demoRole: 'admin' | 'hr' | 'employee') => {
+    // Defaults match the credentials seeded by
+    // backend/scripts/seed_testingapril_accounts.py. Override per-env via
+    // VITE_DEMO_*_USER / VITE_DEMO_*_PASS. If you haven't run the seed
+    // script yet, login will fail with "Invalid username or email."
     const credMap: Record<string, { user: string; pass: string }> = {
-      admin:    { user: import.meta.env.VITE_DEMO_ADMIN_USER ?? 'demo-admin',    pass: import.meta.env.VITE_DEMO_ADMIN_PASS ?? 'demo123' },
-      hr:       { user: import.meta.env.VITE_DEMO_HR_USER    ?? 'demo-hr',       pass: import.meta.env.VITE_DEMO_HR_PASS    ?? 'demo123' },
-      employee: { user: import.meta.env.VITE_DEMO_EMP_USER   ?? 'demo-employee', pass: import.meta.env.VITE_DEMO_EMP_PASS   ?? 'demo123' },
+      admin:    { user: import.meta.env.VITE_DEMO_ADMIN_USER ?? 'admin@relopass.com',        pass: import.meta.env.VITE_DEMO_ADMIN_PASS ?? 'AdminPass!1' },
+      hr:       { user: import.meta.env.VITE_DEMO_HR_USER    ?? 'hr@testingapril.com',       pass: import.meta.env.VITE_DEMO_HR_PASS    ?? 'HrPass!1' },
+      employee: { user: import.meta.env.VITE_DEMO_EMP_USER   ?? 'employee@testingapril.com', pass: import.meta.env.VITE_DEMO_EMP_PASS   ?? 'EmpPass!1' },
     };
     const { user, pass } = credMap[demoRole];
     setIdentifier(user);
