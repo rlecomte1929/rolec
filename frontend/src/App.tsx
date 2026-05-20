@@ -20,6 +20,7 @@ import { SecurityPage } from './pages/public/SecurityPage';
 import { PrivacyPage } from './pages/public/PrivacyPage';
 import { Auth } from './pages/Auth';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
+import { AdminViewingCompanyProvider } from './features/admin/AdminViewingCompanyContext';
 import { V2Gate } from './features/platform-v2';
 import { RequireEmployeeRoute } from './features/employee/RequireEmployeeRoute';
 import { ROUTES as WIZARD_ROUTES } from './routes';
@@ -173,6 +174,7 @@ function App() {
       <SelectedCaseProvider>
       <EmployeeAssignmentProvider>
       <HrCompanyContextProvider>
+      <AdminViewingCompanyProvider>
       <ServicesFlowProvider>
       <QueryRedirect />
       <Suspense fallback={<RouteFallback />}>
@@ -377,6 +379,7 @@ function App() {
       </AppErrorBoundary>
       </Suspense>
       </ServicesFlowProvider>
+      </AdminViewingCompanyProvider>
       </HrCompanyContextProvider>
       </EmployeeAssignmentProvider>
       </SelectedCaseProvider>

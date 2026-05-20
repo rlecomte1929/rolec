@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { getAdminNotificationCounts, type AdminNotificationCounts } from '../../api/adminCatalog';
 import { getAuthItem } from '../../utils/demo';
+import { useAdminViewingCompany } from '../../features/admin/AdminViewingCompanyContext';
+import type { AdminCompany } from '../../types';
 
 interface Props {
   title?: string;
@@ -118,15 +120,7 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
 
         {/* Company switcher */}
         <div className="px-3 py-2 border-b border-slate-100">
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-left">
-            <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-              AE
-            </div>
-            <span className="text-sm font-medium text-slate-800 flex-1 truncate">Aurora Energy</span>
-            <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+          <CompanySwitcher />
         </div>
 
         {/* Search */}
@@ -263,6 +257,124 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
           </div>
         </main>
       </div>
+    </div>
+  );
+};
+
+// ── Company switcher (admin-only) ─────────────────────────────────────────────
+function logoInitials(name: string): string {
+  return name.split(/[\s&]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!).join('').toUpperCase() || '?';
+}
+
+function toneFromId(id: string): string {
+  let hash = 5381;
+  for (let i = 0; i < id.length; i++) hash = ((hash << 5) + hash + id.charCodeAt(i)) | 0;
+  const palette = [
+    'bg-indigo-600', 'bg-emerald-600', 'bg-amber-600',
+    'bg-sky-600', 'bg-rose-600', 'bg-violet-600',
+  ];
+  return palette[Math.abs(hash) % palette.length]!;
+}
+
+const CompanySwitcher: React.FC = () => {
+  const { companies, selectedCompany, setSelectedCompanyId, loading, error } = useAdminViewingCompany();
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickAnywhere = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('click', onClickAnywhere);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', onClickAnywhere);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  // Pick the visible label + tone from the selected company (fallback for empty / error states).
+  const displayName = selectedCompany?.name ?? (loading ? 'Loading…' : error ? 'No companies' : '—');
+  const displayId = selectedCompany?.id ?? '';
+  const initials = selectedCompany ? logoInitials(selectedCompany.name) : '··';
+  const toneClass = displayId ? toneFromId(displayId) : 'bg-slate-400';
+
+  // Filtered list for the dropdown — keeps it usable when there are dozens of tenants.
+  const q = filter.trim().toLowerCase();
+  const filtered = q
+    ? companies.filter((c) => (c.name || '').toLowerCase().includes(q))
+    : companies;
+
+  const handlePick = (c: AdminCompany) => {
+    setSelectedCompanyId(c.id);
+    setOpen(false);
+    setFilter('');
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        disabled={!companies.length}
+        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <div className={`w-6 h-6 rounded-md ${toneClass} flex items-center justify-center text-[10px] font-bold text-white shrink-0`}>
+          {initials}
+        </div>
+        <span className="text-sm font-medium text-slate-800 flex-1 truncate">{displayName}</span>
+        <svg className={`w-3 h-3 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-30 max-h-[60vh] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl ring-1 ring-black/5">
+          <div className="sticky top-0 z-10 border-b border-slate-100 bg-white p-2">
+            <input
+              type="search"
+              placeholder="Filter tenants…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              autoFocus
+              className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          {filtered.length === 0 ? (
+            <div className="px-3 py-3 text-xs text-slate-400">No tenants match.</div>
+          ) : (
+            filtered.map((c) => {
+              const isSelected = c.id === selectedCompany?.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => handlePick(c)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50 ${isSelected ? 'bg-indigo-50' : ''}`}
+                >
+                  <div className={`w-5 h-5 rounded ${toneFromId(c.id)} flex items-center justify-center text-[9px] font-bold text-white shrink-0`}>
+                    {logoInitials(c.name)}
+                  </div>
+                  <span className="flex-1 truncate font-medium text-slate-800">{c.name}</span>
+                  {c.country && (
+                    <span className="text-[10px] text-slate-400">{c.country}</span>
+                  )}
+                  {isSelected && (
+                    <span className="text-indigo-600 text-[11px]" aria-label="selected">✓</span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 };
