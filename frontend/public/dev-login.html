@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><title>Dev Login Helper</title></head>
+<body>
+<p>Logging in as hr@relopass.com...</p>
+<script>
+(async () => {
+  try {
+    const r = await fetch('http://localhost:8000/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({identifier: 'hr_test@relopass.com', password: 'Passw0rd!'})
+    });
+    const data = await r.json();
+    document.body.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    if (data.token) {
+      const user = data.user || {};
+      localStorage.setItem('relopass_token', data.token);
+      localStorage.setItem('relopass_user_id', user.id || 'seed-hr-testingapril');
+      localStorage.setItem('relopass_email', user.email || 'hr@testingapril.com');
+      localStorage.setItem('relopass_role', user.role || 'HR');
+      localStorage.setItem('relopass_name', user.name || 'HR Manager');
+      document.body.innerHTML += '<p style="color:green">✓ Logged in! Redirecting to /hr...</p>';
+      setTimeout(() => window.location.href = '/hr', 800);
+    } else {
+      document.body.innerHTML += '<p style="color:red">Login failed — see response above</p>';
+    }
+  } catch(e) {
+    document.body.innerHTML = '<pre style="color:red">Error: ' + e.message + '</pre>';
+  }
+})();
+</script>
+</body>
+</html>

@@ -157,6 +157,11 @@ from .app.routers import hr_vendors as hr_vendors_router
 from .app.routers import hr_rfq as hr_rfq_router
 from .app.routers import immigration as immigration_router
 from .app.routers import analytics as analytics_router
+# GAP analysis new routers (May 2026)
+from .app.routers import relocation_profile as relocation_profile_router
+from .app.routers import rules as rules_router
+from .app.routers import marketplace as marketplace_router
+from .app.routers import hr_analytics as hr_analytics_router
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -13518,6 +13523,17 @@ app.include_router(prescreening_router.router)
 app.include_router(personio_webhook_router.router)
 app.include_router(personio_settings_router.router)
 app.include_router(bamboohr_router.router)
+
+# ── Gap Analysis — new routers (May 2026 design sprint) ──────────────────────
+# GAP 1: Rich relocation preference profile (housing prefs, household, pets, FX)
+app.include_router(relocation_profile_router.router)
+# GAP 6: Pet & breed restriction rules (server-side, replaces client hardcode)
+app.include_router(rules_router.router)
+# GAP 8: Enriched service marketplace (policy coverage + preferred flag joined)
+app.include_router(marketplace_router.router)
+# GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
+app.include_router(hr_analytics_router.router)
+# ─────────────────────────────────────────────────────────────────────────────
 
 # AIQ-37-B: Policy Builder wizard CRUD — hr_policies router not yet implemented
 

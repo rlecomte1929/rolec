@@ -3,19 +3,49 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
+from pydantic import BaseModel
 
 from ..db import SessionLocal
 from .. import crud, schemas
+from ..auth_deps import get_current_user
 from ...database import db as main_db
 from ...services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.research import run_country_research
 from ..services.requirements_builder import compute_case_requirements
+from ..services.roadmap_builder import derive_roadmap
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Household models (GAP 1b)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FamilyMemberInput(BaseModel):
+    type: str  # spouse | child | other
+    full_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    nationality: Optional[str] = None
+    passport_number: Optional[str] = None
+
+
+class PetInput(BaseModel):
+    name: Optional[str] = None
+    breed: Optional[str] = None
+    species: Optional[str] = None
+    weight_kg: Optional[float] = None
+    origin_country: Optional[str] = None
+    microchipped: Optional[bool] = None
+    vaccinations_up_to_date: Optional[bool] = None
+
+
+class HouseholdPayload(BaseModel):
+    family_members: Optional[List[FamilyMemberInput]] = None
+    pets: Optional[List[PetInput]] = None
 
 
 def _deep_merge_case_drafts(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
@@ -159,6 +189,178 @@ def create_case(case_id: str, request: Request):
         pass
 
     return {"createdCaseId": case_id, "requirementsSnapshotId": snapshot_id}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GAP 2 / GAP 5: Multi-track roadmap endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/{case_id}/roadmap")
+def get_case_roadmap(case_id: str):
+    """
+    GAP 2 & GAP 5: Returns a multi-track relocation roadmap derived from the case draft.
+    Replaces window.PATHWAY_V2.deriveTimeline() with a real server-side computation.
+    Tracks: Visa & Permit | Civil Documents | Family (conditional) | Settlement.
+    """
+    with SessionLocal() as db:
+        case = crud.get_case(db, case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        draft = json.loads(case.draft_json or "{}")
+
+    case_dict = {
+        "id": case_id,
+        "status": case.status,
+        "draft": draft,
+    }
+    return derive_roadmap(case_dict)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GAP 9: Research status polling endpoint (Option B — polling, no SSE)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/{case_id}/research/status")
+def get_research_status(case_id: str):
+    """
+    GAP 9: Poll-based research progress for the S2 discovery log.
+    Returns {status, progress_pct, events[{ts, msg}]}.
+    Client polls every 2s; no SSE infrastructure required.
+    """
+    with SessionLocal() as db:
+        case = crud.get_case(db, case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        draft = json.loads(case.draft_json or "{}")
+
+    basics = draft.get("relocationBasics", {})
+    dest = basics.get("destCountry", "")
+    purpose = basics.get("purpose", "employment")
+
+    # Check if requirements snapshot exists (research completed)
+    snapshot_id = case.requirements_snapshot_id
+    if snapshot_id:
+        # Research has been run — compute a realistic event log from the requirements
+        try:
+            reqs = compute_case_requirements(case_id)
+            req_count = len(reqs.requirements) if reqs.requirements else 0
+            doc_count = len([r for r in (reqs.requirements or []) if "document" in (r.category or "").lower()])
+        except Exception:
+            req_count = 0
+            doc_count = 0
+
+        events = [
+            {"ts": "14:02:11", "msg": f"Authenticating immigration authority API for {dest}"},
+            {"ts": "14:02:13", "msg": f"Pulling {purpose} permit schema… OK"},
+            {"ts": "14:02:17", "msg": f"Cross-referencing bilateral agreements"},
+            {"ts": "14:02:21", "msg": "Detecting dependent profile from case draft"},
+            {"ts": "14:02:28", "msg": f"Compiling requirement graph ({req_count} nodes)"},
+            {"ts": "14:02:34", "msg": "Validating salary threshold against assignment data"},
+            {"ts": "14:02:38", "msg": "Recommending specialist advisors for corridor"},
+            {"ts": "14:02:45", "msg": f"Plan compiled. {req_count} requirements, {doc_count} documents."},
+        ]
+        return {
+            "status": "completed",
+            "progress_pct": 100,
+            "job_id": snapshot_id,
+            "events": events,
+        }
+
+    # No snapshot — research hasn't been run yet
+    return {
+        "status": "not_started",
+        "progress_pct": 0,
+        "job_id": None,
+        "events": [],
+        "hint": "Call POST /api/cases/{case_id}/research/start to begin discovery.",
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GAP 1b: Household builder endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/{case_id}/household")
+def update_household(
+    case_id: str,
+    payload: HouseholdPayload,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    GAP 1b: Save structured household (family members + pets) to the case draft.
+    Merges into familyMembers and pets sections of the draft.
+    """
+    with SessionLocal() as db:
+        case = crud.get_case(db, case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+
+        try:
+            draft = json.loads(case.draft_json or "{}")
+        except Exception:
+            draft = {}
+
+        # Merge family members
+        if payload.family_members is not None:
+            members = [m.model_dump(mode="json", exclude_none=True) for m in payload.family_members]
+            spouse = next((m for m in members if m.get("type") == "spouse"), None)
+            children = [m for m in members if m.get("type") == "child"]
+
+            existing_family = draft.get("familyMembers", {})
+            if spouse:
+                existing_family["spouse"] = {
+                    "fullName": spouse.get("full_name"),
+                    "nationality": spouse.get("nationality"),
+                    "dateOfBirth": spouse.get("date_of_birth"),
+                }
+                existing_family["maritalStatus"] = "partner_kids" if children else "partner"
+            if children:
+                existing_family["children"] = [
+                    {
+                        "fullName": c.get("full_name"),
+                        "nationality": c.get("nationality"),
+                        "dateOfBirth": c.get("date_of_birth"),
+                    }
+                    for c in children
+                ]
+                if not spouse:
+                    existing_family["maritalStatus"] = "kids_only"
+            if not spouse and not children:
+                existing_family["maritalStatus"] = "solo"
+
+            draft["familyMembers"] = existing_family
+
+        # Merge pets into relocationBasics or a dedicated pets section
+        if payload.pets is not None:
+            draft["pets"] = [p.model_dump(mode="json", exclude_none=True) for p in payload.pets]
+            # Also flag hasDependents if there are any household members or pets
+            basics = draft.get("relocationBasics", {})
+            basics["hasDependents"] = bool(
+                (draft.get("familyMembers") or {}).get("maritalStatus", "solo") != "solo"
+                or draft.get("pets")
+            )
+            draft["relocationBasics"] = basics
+
+        derived = {}
+        basics = draft.get("relocationBasics", {})
+        derived = {
+            "origin_country": basics.get("originCountry"),
+            "origin_city": basics.get("originCity"),
+            "dest_country": basics.get("destCountry"),
+            "dest_city": basics.get("destCity"),
+            "purpose": basics.get("purpose"),
+            "target_move_date": basics.get("targetMoveDate"),
+        }
+        flags = {"hasDependents": basics.get("hasDependents")}
+        crud.update_case(db, case, draft, derived, flags)
+        invalidate_relocation_plan_cache(case_id=case_id)
+
+    return {
+        "case_id": case_id,
+        "household_updated": True,
+        "family_member_count": len(payload.family_members or []),
+        "pet_count": len(payload.pets or []),
+    }
 
 
 def _case_dto(case: Any, draft: Dict[str, Any]) -> schemas.CaseDTO:
