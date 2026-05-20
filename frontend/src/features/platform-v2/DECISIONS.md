@@ -4,6 +4,35 @@ Append-only log of architectural and product decisions made during the platform-
 
 ---
 
+## 2026-05-20 · Admin tenant scoping — drill-down via URL, NOT global sidebar scope
+
+**Decision (R1):** The admin sidebar tenant switcher *navigates* to `/admin/companies/{id}` when a tenant is picked. It does **not** apply a silent global "scope" that other admin pages read.
+
+**Architecture:** the URL is the source of truth. `/admin/companies-v2` and `/admin/policies` and other top-level admin views remain cross-tenant. Tenant-scoped views live under `/admin/companies/:companyId/*` and are scoped by URL param.
+
+The persisted `admin_selected_company_id` localStorage value remains, but its role is now cosmetic — keeps the sidebar chip pointing at the last tenant the operator looked at. The `useAdminViewingCompany().selectedCompanyId` is still useful for UI affordances (e.g. "highlight this row") but is NEVER used to filter API responses.
+
+When the URL contains a tenant id, the sidebar selection auto-syncs to that id — so the chip always reflects what the page is actually showing.
+
+**Why:** Global sidebar scope (R2) has real risks:
+- **Data leakage perception** — even if UI hides rows, the Network panel shows all-tenants payloads.
+- **Inconsistent coverage** — with ~470 endpoints, "remember to filter everywhere" is a losing game.
+- **Stale-scope confusion** — operator forgets they're scoped to tenant X and misses tenant-Y data.
+- **Mode ambiguity** — `/hr/company-profile-v2` reads from `useHrCompanyContext` (operator's own company). If admin "is viewing as X" but lands on `/hr/company-profile-v2`, what should they see? Two competing sources of truth.
+- **Audit ambiguity** — when admin edits while scoped to X, whose action was it logged as?
+
+URL-as-scope dodges all of the above. `/admin/companies/abc123/profile` is unambiguous: the URL says what's scoped, refreshing or sharing the URL preserves the scope, closing the tab "exits".
+
+**Alternatives considered (rejected for now):**
+
+- **R2 — Banner-gated client filter.** Sidebar selection drives client-side filtering on each admin page, with a "Viewing as: X · Clear" banner. Rejected because of the listed risks; the "global scope mode" pattern is wrong for a multi-tenant SaaS admin surface.
+- **R3 — Server-side `?as_company=` query param.** Frontend appends `as_company=<id>` to admin requests; backend filters at DB layer. Rejected for now because (a) requires touching every admin endpoint, and (b) doesn't solve the mode-confusion problem on the frontend.
+- **Full impersonation (existing `/api/admin/impersonate/start`).** Admin "becomes" a specific HR user; backend issues a scoped token. Rejected for now — overkill for solo operator + introduces audit-trail complexity. May revisit when there are multiple admins.
+
+**Trigger to revisit:** if a workflow emerges that genuinely needs "act as a tenant globally" — most likely "view exactly what this tenant's HR sees" — wire the existing impersonation endpoint with a clear "Impersonating: X · Exit" banner. Don't reach for global scope state.
+
+---
+
 ## 2026-05-20 · Solo, pre-customer operating mode
 
 **Decision:** The repo runs in "solo mode" until first real customer is using the platform. Solo mode relaxes the production-grade safety rules. The matrix in [`README.md`](./README.md#operating-rules) is the source of truth.

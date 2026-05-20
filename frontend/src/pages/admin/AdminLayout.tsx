@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { buildRoute, ROUTE_DEFS } from '../../navigation/routes';
 import { getAdminNotificationCounts, type AdminNotificationCounts } from '../../api/adminCatalog';
 import { getAuthItem } from '../../utils/demo';
@@ -278,6 +278,18 @@ function toneFromId(id: string): string {
 
 const CompanySwitcher: React.FC = () => {
   const { companies, selectedCompany, setSelectedCompanyId, loading, error } = useAdminViewingCompany();
+  const navigate = useNavigate();
+  // URL is the source of truth for scope. If we're on /admin/companies/:companyId,
+  // sync the sidebar selection to that id so the chip reflects what the page
+  // is actually showing (and so the dropdown's ✓ marker is accurate).
+  const tenantUrl = useMatch('/admin/companies/:companyId/*');
+  const urlCompanyId = tenantUrl?.params.companyId ?? null;
+  useEffect(() => {
+    if (urlCompanyId && companies.some((c) => c.id === urlCompanyId)) {
+      setSelectedCompanyId(urlCompanyId);
+    }
+  }, [urlCompanyId, companies, setSelectedCompanyId]);
+
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -310,10 +322,15 @@ const CompanySwitcher: React.FC = () => {
     ? companies.filter((c) => (c.name || '').toLowerCase().includes(q))
     : companies;
 
+  // R1 model: picking a tenant navigates to its detail page rather than
+  // applying silent global scope. The URL becomes the canonical "what am I
+  // viewing" indicator — see DECISIONS.md for the rationale (rejected
+  // alternatives R2 banner-gated scope, R3 server-side query-param scope).
   const handlePick = (c: AdminCompany) => {
     setSelectedCompanyId(c.id);
     setOpen(false);
     setFilter('');
+    navigate(`/admin/companies/${c.id}`);
   };
 
   return (
