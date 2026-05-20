@@ -21,7 +21,7 @@ import { PrivacyPage } from './pages/public/PrivacyPage';
 import { Auth } from './pages/Auth';
 import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
 import { AdminViewingCompanyProvider } from './features/admin/AdminViewingCompanyContext';
-import { V2Gate } from './features/platform-v2';
+// V2Gate removed — all promoted flags now render V2 unconditionally
 import { RequireEmployeeRoute } from './features/employee/RequireEmployeeRoute';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
@@ -49,6 +49,7 @@ const ImmigrationPage = lazy(() => import('./pages/employee/ImmigrationPage').th
 const QuoteRequestPage = lazy(() => import('./pages/employee/QuoteRequestPage').then((module) => ({ default: module.QuoteRequestPage })));
 const ProvidersPage = lazy(() => import('./pages/ProvidersPage').then((module) => ({ default: module.ProvidersPage })));
 const Messages = lazy(() => import('./pages/Messages').then((module) => ({ default: module.Messages })));
+const InboxV2Page = lazy(() => import('./features/platform-v2/inbox/InboxV2Page').then((module) => ({ default: module.InboxV2Page })));
 const Resources = lazy(() => import('./pages/Resources').then((module) => ({ default: module.Resources })));
 const ServicesQuestions = lazy(() => import('./pages/services/ServicesQuestions').then((module) => ({ default: module.ServicesQuestions })));
 const ServicesRecommendations = lazy(() => import('./pages/services/ServicesRecommendations').then((module) => ({ default: module.ServicesRecommendations })));
@@ -64,9 +65,11 @@ const HrCompanyProfileV2 = lazy(() => import('./features/platform-v2/company-pro
 const HrResourcesPreview = lazy(() => import('./pages/HrResourcesPreview').then((module) => ({ default: module.HrResourcesPreview })));
 const HrEmployees = lazy(() => import('./pages/HrEmployees').then((module) => ({ default: module.HrEmployees })));
 const HrEmployeeDetail = lazy(() => import('./pages/HrEmployeeDetail').then((module) => ({ default: module.HrEmployeeDetail })));
+// HrCommandCenter: legacy, kept for /hr/command-center-legacy rollback route only
 const HrCommandCenter = lazy(() => import('./pages/HrCommandCenter').then((module) => ({ default: module.HrCommandCenter })));
 const HrCommandCenterCaseDetail = lazy(() => import('./pages/HrCommandCenterCaseDetail').then((module) => ({ default: module.HrCommandCenterCaseDetail })));
 const HrAnalytics = lazy(() => import('./pages/HrAnalytics').then((module) => ({ default: module.HrAnalytics })));
+// HrProviderGrid: legacy, kept for /hr/provider-grid-legacy rollback route only
 const HrProviderGrid = lazy(() => import('./pages/HrProviderGrid').then((module) => ({ default: module.HrProviderGrid })));
 const HrProviderGridV2 = lazy(() => import('./features/platform-v2/provider-grid/ProviderGridV2Page').then((module) => ({ default: module.ProviderGridV2Page })));
 const HrBacklogPage = lazy(() => import('./features/platform-v2/hr-backlog/HrBacklogPage').then((module) => ({ default: module.HrBacklogPage })));
@@ -87,6 +90,7 @@ const AdminCatalogQueuePage = lazy(() => import('./pages/admin/AdminCatalogQueue
 // row-by-row editor already living in the Policy Workspace ("Edit structured
 // baseline" bulk editor). Per product direction one editor is the source of
 // truth — the Policy Workspace row drawers. Route + page removed accordingly.
+// AdminCompanies: legacy, kept for /admin/companies-legacy rollback route only
 const AdminCompanies = lazy(() => import('./pages/admin/AdminCompanies').then((module) => ({ default: module.AdminCompanies })));
 const AdminCompaniesV2 = lazy(() => import('./features/platform-v2/companies/CompaniesV2Page').then((module) => ({ default: module.CompaniesV2Page })));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((module) => ({ default: module.AdminUsers })));
@@ -101,7 +105,6 @@ const AdminSupplierDetail = lazy(() => import('./pages/admin/AdminSupplierDetail
 const AdminCompanyDetail = lazy(() => import('./pages/admin/AdminCompanyDetail').then((module) => ({ default: module.AdminCompanyDetail })));
 const AdminCompanyProfilePage = lazy(() => import('./features/platform-v2/admin-company-profile/AdminCompanyProfilePage').then((module) => ({ default: module.AdminCompanyProfilePage })));
 const DataTableDemo = lazy(() => import('./features/platform-v2/data-table/DataTableDemo').then((module) => ({ default: module.DataTableDemo })));
-const PlatformSidebarPreview = lazy(() => import('./features/platform-v2/sidebar/PlatformSidebarPreview').then((module) => ({ default: module.PlatformSidebarPreview })));
 const AdminResources = lazy(() => import('./pages/admin/AdminResources').then((module) => ({ default: module.AdminResources })));
 const AdminResourceEditor = lazy(() => import('./pages/admin/AdminResourceEditor').then((module) => ({ default: module.AdminResourceEditor })));
 const AdminEvents = lazy(() => import('./pages/admin/AdminEvents').then((module) => ({ default: module.AdminEvents })));
@@ -123,6 +126,7 @@ const AdminFreshnessStaleContent = lazy(() => import('./pages/admin/freshness/Ad
 const AdminCrawlSchedules = lazy(() => import('./pages/admin/freshness/AdminCrawlSchedules').then((module) => ({ default: module.AdminCrawlSchedules })));
 const AdminCrawlJobRuns = lazy(() => import('./pages/admin/freshness/AdminCrawlJobRuns').then((module) => ({ default: module.AdminCrawlJobRuns })));
 const AdminCrawlJobRunDetail = lazy(() => import('./pages/admin/freshness/AdminCrawlJobRunDetail').then((module) => ({ default: module.AdminCrawlJobRunDetail })));
+// AdminReviewQueuePage: legacy, kept for /admin/review-queue-legacy rollback route only
 const AdminReviewQueuePage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueuePage').then((module) => ({ default: module.AdminReviewQueuePage })));
 const AdminReviewQueueV2Page = lazy(() => import('./features/platform-v2/review-queue/AdminReviewQueueV2Page').then((module) => ({ default: module.AdminReviewQueueV2Page })));
 const AdminReviewQueueDetailPage = lazy(() => import('./pages/admin/review-queue/AdminReviewQueueDetailPage').then((module) => ({ default: module.AdminReviewQueueDetailPage })));
@@ -197,7 +201,6 @@ function App() {
         <Route path={ROUTE_DEFS.auth.path} element={<Auth />} />
         {/* Design preview — sandboxed Claude Design handoff bundle in iframe. Static, no auth, mock data only. */}
         <Route path="/design-preview" element={<DesignPreview />} />
-        <Route path="/platform-v2/sidebar" element={<PlatformSidebarPreview />} />
         {/* Provider portal — public, magic-link JWT auth */}
         <Route path={ROUTE_DEFS.providerPortal.path} element={<ProviderPortal />} />
         <Route path="/journey" element={<Journey />} />
@@ -213,28 +216,26 @@ function App() {
             MobilityControlCenterV2Page (mock-aligned). OFF → legacy
             HrCommandCenter "Dashboard". Sibling /hr/command-center-v2
             always renders V2 for side-by-side comparison. */}
+        {/* platform-v2: mobility_control promoted to default-on (2026-05-20).
+            Legacy kept at /hr/command-center-legacy for emergency rollback. */}
         <Route
           path={ROUTE_DEFS.hrCommandCenter.path}
-          element={
-            <V2Gate flag="mobility_control" fallback={<HrCommandCenter />}>
-              <MobilityControlCenterV2Page />
-            </V2Gate>
-          }
+          element={<MobilityControlCenterV2Page />}
         />
         <Route path="/hr/command-center-v2" element={<MobilityControlCenterV2Page />} />
+        <Route path="/hr/command-center-legacy" element={<HrCommandCenter />} />
         <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<HrCommandCenterCaseDetail />} />
         {/* platform-v2: flag-gated. Default OFF → legacy HrProviderGrid renders.
             Enable per-session: localStorage.setItem('platform_v2_mobility_control', 'on').
             Sibling /hr/provider-grid-v2 always renders V2 for side-by-side comparison. */}
+        {/* platform-v2: provider grid promoted to default-on (2026-05-20).
+            Legacy kept at /hr/provider-grid-legacy for emergency rollback. */}
         <Route
           path={ROUTE_DEFS.hrProviderGrid.path}
-          element={
-            <V2Gate flag="mobility_control" fallback={<HrProviderGrid />}>
-              <HrProviderGridV2 />
-            </V2Gate>
-          }
+          element={<HrProviderGridV2 />}
         />
         <Route path="/hr/provider-grid-v2" element={<HrProviderGridV2 />} />
+        <Route path="/hr/provider-grid-legacy" element={<HrProviderGrid />} />
         {/* HR Backlog (V2): pending employee tasks across the HR's company.
             HR + ADMIN access — server-side filtering by company_id. */}
         <Route path="/hr/backlog" element={<HrBacklogPage />} />
@@ -283,21 +284,18 @@ function App() {
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCatalogQueue.path} element={<RequireAdminRoute><AdminCatalogQueuePage /></RequireAdminRoute>} />
-        {/* platform-v2: flag-gated. Default OFF → legacy AdminCompanies renders.
-            Enable per-session: localStorage.setItem('platform_v2_companies', 'on').
-            Enable globally: VITE_PLATFORM_V2_COMPANIES=true in env. */}
+        {/* platform-v2: companies promoted to default-on (2026-05-20).
+            Legacy kept at /admin/companies-legacy for emergency rollback. */}
         <Route
           path={ROUTE_DEFS.adminCompanies.path}
           element={
             <RequireAdminRoute>
-              <V2Gate flag="companies" fallback={<AdminCompanies />}>
-                <AdminCompaniesV2 />
-              </V2Gate>
+              <AdminCompaniesV2 />
             </RequireAdminRoute>
           }
         />
-        {/* Sibling route — kept so V2 stays reachable for side-by-side QA even while the flag is OFF on the legacy URL. */}
         <Route path="/admin/companies-v2" element={<RequireAdminRoute><AdminCompaniesV2 /></RequireAdminRoute>} />
+        <Route path="/admin/companies-legacy" element={<RequireAdminRoute><AdminCompanies /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminPeople.path} element={<RequireAdminRoute><AdminUsers /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminAssignments.path} element={<RequireAdminRoute><AdminAssignments /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminMobilityCases.path} element={<RequireAdminRoute><AdminMobilityCaseInspectPage /></RequireAdminRoute>} />
@@ -341,20 +339,18 @@ function App() {
         <Route path={ROUTE_DEFS.adminCrawlSchedules.path} element={<RequireAdminRoute><AdminCrawlSchedules /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCrawlJobRuns.path} element={<RequireAdminRoute><AdminCrawlJobRuns /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCrawlJobRunDetail.path} element={<RequireAdminRoute><AdminCrawlJobRunDetail /></RequireAdminRoute>} />
-        {/* platform-v2: flag-gated. Default OFF → legacy AdminReviewQueuePage.
-            Enable: localStorage.setItem('platform_v2_review_queue', 'on'). */}
+        {/* platform-v2: review_queue promoted to default-on (2026-05-20).
+            Legacy kept at /admin/review-queue-legacy for emergency rollback. */}
         <Route
           path={ROUTE_DEFS.adminReviewQueue.path}
           element={
             <RequireAdminRoute>
-              <V2Gate flag="review_queue" fallback={<AdminReviewQueuePage />}>
-                <AdminReviewQueueV2Page />
-              </V2Gate>
+              <AdminReviewQueueV2Page />
             </RequireAdminRoute>
           }
         />
-        {/* Sibling always-V2 route for side-by-side QA. */}
         <Route path="/admin/review-queue-v2" element={<RequireAdminRoute><AdminReviewQueueV2Page /></RequireAdminRoute>} />
+        <Route path="/admin/review-queue-legacy" element={<RequireAdminRoute><AdminReviewQueuePage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueWorkload.path} element={<RequireAdminRoute><AdminReviewQueueWorkloadPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminReviewQueueDetail.path} element={<RequireAdminRoute><AdminReviewQueueDetailPage /></RequireAdminRoute>} />
         {/* Ops analytics — Dashboard is the default landing; SLA / Queue /
@@ -366,10 +362,15 @@ function App() {
         <Route path={ROUTE_DEFS.adminOpsReviewers.path} element={<RequireAdminRoute><AdminOpsReviewersPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsDestinations.path} element={<RequireAdminRoute><AdminOpsDestinationsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsNotifications.path} element={<RequireAdminRoute><AdminOpsNotificationsPage /></RequireAdminRoute>} />
-        <Route
-          path={ROUTE_DEFS.messages.path}
-          element={<Messages />}
-        />
+        {/* platform-v2: V2 inbox renders by default. Legacy Messages remains
+            mounted at /messages-legacy + /hr/messages-legacy for emergency
+            rollback. Sibling /messages-v2 always renders V2 for side-by-side
+            QA against the legacy paths. */}
+        <Route path={ROUTE_DEFS.messages.path} element={<InboxV2Page />} />
+        <Route path={ROUTE_DEFS.hrMessages.path} element={<InboxV2Page />} />
+        <Route path="/messages-v2" element={<InboxV2Page />} />
+        <Route path="/messages-legacy" element={<Messages />} />
+        <Route path="/hr/messages-legacy" element={<Messages />} />
         <Route
           path={ROUTE_DEFS.resources.path}
           element={<Resources />}
@@ -377,10 +378,6 @@ function App() {
         <Route
           path={ROUTE_DEFS.caseResources.path}
           element={<Resources />}
-        />
-        <Route
-          path={ROUTE_DEFS.hrMessages.path}
-          element={<Messages />}
         />
         {/*
           Placeholder routes kept as dev-only. In prod they fall through to
