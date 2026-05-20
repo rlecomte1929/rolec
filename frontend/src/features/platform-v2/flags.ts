@@ -30,6 +30,8 @@ export type V2FlagKey =
   | 'companies_resizable'
   // Phase 1 — HR command center surface
   | 'mobility_control'
+  // Resizable + drag-reorder columns on Provider Grid V2
+  | 'provider_grid_resizable'
   | 'company_profile'
   | 'inbox'
   | 'employee_policy'
@@ -88,6 +90,7 @@ export const V2_FLAGS: ReadonlyArray<V2FlagKey> = [
   'companies',
   'companies_resizable',
   'mobility_control',
+  'provider_grid_resizable',
   'company_profile',
   'inbox',
   'employee_policy',
