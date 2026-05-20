@@ -6,50 +6,70 @@
 export const howItWorksContent = {
   hero: {
     eyebrow: 'For HR and mobility teams',
-    headline: 'How a relocation runs.',
+    headline: 'Four steps from fragmented to structured.',
     subheadline:
-      'From the first case to the final step. Everything on one record.',
+      'ReloPass is configured to your policy and corridors, then runs every case through the same structured workflow.',
     trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
 
   steps: [
     {
       number: '01',
-      title: 'A case opens.',
-      body: 'HR creates one record per employee: corridor, start date, policy applied. Every task, document, and update lives here.',
-      image: '/screenshot-hero-case-card.png',
+      title: 'Configure your policy and corridors.',
+      body: 'Define the relocation types you run, the steps required for each, the documents needed, and the providers assigned. This becomes the operating rulebook.',
+      image: '/screenshot-hr-assignments.png',
       imageAlt:
-        'ReloPass case view showing a France to Singapore relocation with status, milestones, and documents on one record.',
+        'Policy configuration screen showing corridor selector and required steps list.',
     },
     {
       number: '02',
-      title: 'The employee gets a plan.',
-      body: 'Steps are sequenced from day one. The employee always knows what is next and what needs attention.',
-      image: '/screenshot-employee-plan.png',
+      title: 'Open a case and apply the policy.',
+      body: 'When a relocation begins, create the case, assign the corridor, and let the system generate the structured workflow automatically. No manual assembly.',
+      image: '/screenshot-hero-case-card.png',
       imageAlt:
-        'Employee relocation plan showing five phases with Pre-departure complete and Immigration in progress.',
+        'Case creation modal showing corridor applied and timeline preview generated.',
     },
     {
       number: '03',
-      title: 'Providers are engaged.',
-      body: 'Vendor tasks attach to the case. Updates come back to the record, not to inboxes.',
+      title: 'Coordinate tasks across HR, employees, and providers.',
+      body: 'Tasks route to the right party at the right time. Documents are requested and tracked. Vendors receive structured assignments inside the case.',
       image: '/screenshot-provider-recommendations.png',
       imageAlt:
-        'Provider recommendations ranked by match score and policy alignment.',
+        'Task assignment view showing multi-party task routing and status per task.',
     },
     {
       number: '04',
-      title: 'HR has full visibility.',
-      body: 'Status, blockers, and deadlines across all active cases. No follow-up required.',
-      image: '/screenshot-hr-assignments.png',
+      title: 'Track progress to compliant close.',
+      body: 'Monitor open items, exceptions, and milestones. Every case closes with a complete evidence log. Audit-ready on day one.',
+      image: '/screenshot-employee-plan.png',
       imageAlt:
-        'HR assignments view showing active relocations with corridors, statuses, and deadlines.',
+        'Case timeline at completion showing completed states, evidence log, and close status.',
+    },
+  ],
+
+  setupTimeline: [
+    {
+      phase: 'Week 1',
+      label: 'Policy configuration',
+      description: 'Your relocation types, corridors, and operating rules are configured with your team.',
+    },
+    {
+      phase: 'Week 2',
+      label: 'First cases',
+      description: 'Run live cases through the system. Validate workflows against your existing process.',
+    },
+    {
+      phase: 'Ongoing',
+      label: 'Full operation',
+      description: 'Every new case opens in ReloPass. HR has visibility. Providers are coordinated. Cases close with evidence.',
     },
   ],
 
   cta: {
-    headline: 'See it with your corridors.',
+    headline: 'Start with one corridor. Run it in ReloPass.',
+    subtext: 'Most teams are fully operational within two weeks.',
     primaryCta: 'Book a demo',
+    secondaryCta: 'See the platform',
     trustMicrocopy: '30-minute walkthrough. No commitment.',
   },
 } as const;
