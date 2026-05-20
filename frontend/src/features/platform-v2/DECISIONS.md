@@ -297,6 +297,53 @@ Run with both tabs open: `localhost:3000/hr/provider-grid` (legacy, default) and
 
 **ADOPT verdict means single-commit port.** Don't fake the 10-step ritual when the underlying component is already correct — it's overhead with no protection added. The discipline that matters (tsc + build green, V2Gate, sibling route, written QA notes) still applies; the ceremony (multiple step commits, adapter + fixture + test trio) does not.
 
+---
+
+## Phase 0 follow-up · s9g Companies — write-surface parity (2026-05-20)
+
+The first Phase 0 port (commits `fa04b4e`..`fdc29ca`) was deliberately read-only — Add / Edit / Archive / Delete were deferred per the step-1 scope decision. This block restores them.
+
+Three commits, each adds one self-contained capability:
+
+| Commit | What | Files added | Risk |
+|---|---|---|---|
+| `cc20f99` C1 | `CompanyFormModal` (Add + Edit) + "+ Add tenant" button in header | `CompanyFormModal.tsx` | 🟢 Non-destructive |
+| `a9f6c91` C2 | `RowActionMenu` (⋯ dropdown) + Edit + Archive (soft, `window.confirm`) | `RowActionMenu.tsx` | 🟡 Soft delete |
+| `d785e38` C3 | `DeleteCompanyDialog` (hard, type-name confirmation) | `DeleteCompanyDialog.tsx` | 🔴 Irreversible |
+
+### UX guardrails by destruction level
+
+| Action | Guardrail | Reversible? |
+|---|---|---|
+| Add tenant | None — fill form, submit | n/a |
+| Edit | None — fill form, save | n/a |
+| Archive | Single `window.confirm` | Yes — set `status='active'` to undo |
+| Delete | Dedicated dialog. Operator must type the company name verbatim before the destructive button enables | No — orphans references |
+
+This is a deliberate departure from the legacy which used a bulk-select mode for both Archive and Delete (cheaper per-action but easier to mis-target). V2's per-row pattern with progressively stronger gates trades throughput for safety — the right call for an admin surface used by the same person who owns the data.
+
+### Where Add / Edit / Archive / Delete reach the backend
+
+| V2 trigger | adminAPI method | Endpoint |
+|---|---|---|
+| Add tenant modal submit (mode=create) | `createCompany(payload)` | `POST /api/admin/companies` |
+| Edit modal submit (mode=edit) | `updateCompany(id, payload)` | `PATCH /api/admin/companies/{id}` |
+| Row menu → Archive | `archiveCompany(id)` | `POST /api/admin/companies/{id}/archive` |
+| Row menu → Delete… (after type-name confirm) | `deleteCompany(id)` | `DELETE /api/admin/companies/{id}` |
+
+All four go through the same `adminAPI.invalidateApiCachePrefix('admin:companies:')` cache-bust, so the V2 `useCompaniesV2.refresh()` returns fresh data on the next call.
+
+### QA additions
+
+- [ ] Add tenant: open modal, enter name only, submit → new row appears in the table.
+- [ ] Add tenant: try to submit without a name → inline "Name is required" error.
+- [ ] Edit: open row menu → Edit → form prefilled with current values → change country → save → row updates.
+- [ ] Archive: open row menu → Archive → confirm dialog → row's status becomes `archived` (or row disappears if filtered).
+- [ ] Archive of an already-archived company: the Archive menu item is hidden (`disableArchive` prop).
+- [ ] Delete: open row menu → Delete… → dialog appears. Confirm button stays disabled until the typed name matches exactly. Type correctly → confirm → row removed from list.
+- [ ] Delete escape paths: ESC key dismisses; outside-click dismisses (unless submitting).
+- [ ] Error surfacing: kill the backend mid-action → `actionError` banner shows above the table with a Dismiss button.
+
 ### Recipe lessons (carry forward to screen 2..N)
 
 1. **Antigravity primitives are form-shaped, not table-shaped.** `Badge`, `Card`, `Input`, `Select`, `ProgressBar` have opinionated APIs (closed string callbacks, options arrays, fixed paddings). They work great in HrPolicy and the policy assistant. For prototype-style data screens (table headers, sticky filters, compact KPIs, dense pills) plain HTML + Tailwind utilities give better control. **Recipe addition:** for any ported screen, the first sub-decision is "form-style or data-style"; data-style screens skip antigravity in favour of Tailwind utilities.
