@@ -8985,49 +8985,126 @@ class Database:
         full_name: Optional[str],
         company_id: Optional[str] = None,
     ) -> None:
+        # Supabase profiles table enforces CHECK (role IN ('employee','hr','admin'))
+        # — always normalise to lowercase regardless of backend users.role casing.
+        role_norm = (role or "employee").lower()
+        email_norm = (email or "").strip().lower() if email else None
+        full_name_norm = full_name or ""
         now = datetime.utcnow().isoformat()
+
+        # Only query by id if user_id is a valid UUID — non-UUID legacy seed IDs
+        # (e.g. "seed-hr-testingapril") cause a PostgreSQL cast error on uuid columns.
+        #
+        # When the id IS a valid uuid, bind it as a `uuid.UUID` object rather than
+        # a Python string. Otherwise psycopg2 sends the parameter as text and
+        # PostgreSQL refuses to compare it against the `uuid`-typed profiles.id
+        # column with `operator does not exist: uuid = text`. Stringifying a
+        # uuid.UUID object on SQLite is harmless (sqlite3 calls str() on it).
+        try:
+            user_uuid = uuid.UUID(user_id)
+            user_id_is_uuid = True
+        except (ValueError, AttributeError):
+            user_uuid = None
+            user_id_is_uuid = False
+        id_param = user_uuid if user_id_is_uuid else user_id
+
         with self.engine.begin() as conn:
-            existing = conn.execute(
-                text("SELECT 1 FROM profiles WHERE id = :id"), {"id": user_id}
-            ).fetchone()
+            existing = None
+            if user_id_is_uuid:
+                existing = conn.execute(
+                    text("SELECT 1 FROM profiles WHERE id = :id"), {"id": id_param}
+                ).fetchone()
+
+            # --- Email fallback ---------------------------------------------------
+            # When the backend users.id (UUID) differs from the Supabase auth UUID
+            # (possible when fix_demo_passwords or supabase_auth_sync created the
+            # auth user independently), the id-based lookup finds nothing but the
+            # profile already exists under the Supabase auth UUID.  In that case
+            # we UPDATE by email instead of blindly INSERTing (which would fail the
+            # profiles_id_fkey FK constraint pointing at auth.users).
+            if not existing and email_norm:
+                existing_by_email = conn.execute(
+                    text("SELECT 1 FROM profiles WHERE LOWER(TRIM(email)) = :email"),
+                    {"email": email_norm},
+                ).fetchone()
+                if existing_by_email:
+                    try:
+                        if company_id is None:
+                            conn.execute(text(
+                                "UPDATE profiles SET role = :role, full_name = :full_name "
+                                "WHERE LOWER(TRIM(email)) = :email"
+                            ), {"role": role_norm, "full_name": full_name_norm, "email": email_norm})
+                        else:
+                            conn.execute(text(
+                                "UPDATE profiles SET role = :role, full_name = :full_name, company_id = :company_id "
+                                "WHERE LOWER(TRIM(email)) = :email"
+                            ), {"role": role_norm, "full_name": full_name_norm,
+                                "company_id": company_id, "email": email_norm})
+                    except Exception as _ep:
+                        log.warning(
+                            "ensure_profile_record email-update failed user_id=%s email=%s error=%s",
+                            (user_id or "")[:8], email_norm, _ep,
+                        )
+                    return
+            # ----------------------------------------------------------------------
+
             if existing:
                 if company_id is None:
                     conn.execute(text(
                         "UPDATE profiles SET role = :role, email = :email, full_name = :full_name "
                         "WHERE id = :id"
                     ), {
-                        "id": user_id,
-                        "role": role,
-                        "email": (email or "").strip().lower() if email else None,
-                        "full_name": full_name,
+                        "id": id_param,
+                        "role": role_norm,
+                        "email": email_norm,
+                        "full_name": full_name_norm,
                     })
                 else:
                     conn.execute(text(
                         "UPDATE profiles SET role = :role, email = :email, full_name = :full_name, company_id = :company_id "
                         "WHERE id = :id"
                     ), {
-                        "id": user_id,
-                        "role": role,
-                        "email": (email or "").strip().lower() if email else None,
-                        "full_name": full_name,
+                        "id": id_param,
+                        "role": role_norm,
+                        "email": email_norm,
+                        "full_name": full_name_norm,
                         "company_id": company_id,
                     })
             else:
-                conn.execute(text(
-                    "INSERT INTO profiles (id, role, email, full_name, company_id, created_at) "
-                    "VALUES (:id, :role, :email, :full_name, :company_id, :created_at)"
-                ), {
-                    "id": user_id,
-                    "role": role,
-                    "email": (email or "").strip().lower() if email else None,
-                    "full_name": full_name,
-                    "company_id": company_id,
-                    "created_at": now,
-                })
+                # INSERT — may fail on Supabase if user_id is not in auth.users
+                # (FK constraint).  Catch and log rather than surfacing a 500.
+                try:
+                    conn.execute(text(
+                        "INSERT INTO profiles (id, role, email, full_name, company_id, created_at) "
+                        "VALUES (:id, :role, :email, :full_name, :company_id, :created_at)"
+                    ), {
+                        "id": id_param,
+                        "role": role_norm,
+                        "email": email_norm,
+                        "full_name": full_name_norm,
+                        "company_id": company_id,
+                        "created_at": now,
+                    })
+                except Exception as _ei:
+                    log.warning(
+                        "ensure_profile_record insert failed user_id=%s email=%s error=%s",
+                        (user_id or "")[:8], email_norm, _ei,
+                    )
 
     def get_profile_record(self, user_id: str) -> Optional[Dict[str, Any]]:
+        # Supabase profiles.id is uuid — non-UUID legacy seed IDs cause a cast
+        # error; return None so callers fall back gracefully.
+        # Bind the parameter as a uuid.UUID object so psycopg2 sends it as the
+        # postgres uuid type (otherwise we'd hit `operator does not exist:
+        # uuid = text`).
+        try:
+            user_uuid = uuid.UUID(user_id)
+        except (ValueError, AttributeError):
+            return None
         with self.engine.connect() as conn:
-            row = conn.execute(text("SELECT * FROM profiles WHERE id = :id"), {"id": user_id}).fetchone()
+            row = conn.execute(
+                text("SELECT * FROM profiles WHERE id = :id"), {"id": user_uuid}
+            ).fetchone()
         return self._row_to_dict(row)
 
     def get_profile_by_email(self, email: str) -> Optional[Dict[str, Any]]:
