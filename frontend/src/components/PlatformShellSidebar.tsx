@@ -103,6 +103,7 @@ const SECTIONS: NavSection[] = [
       { id: 'ops-analytics', label: 'Ops analytics', to: ROUTE_DEFS.adminOps.path },
       { id: 'workflow-analytics', label: 'Workflow analytics', to: ROUTE_DEFS.adminOpsQueue.path },
       { id: 'resources-cms', label: 'Resources CMS', to: ROUTE_DEFS.adminResources.path },
+      { id: 'form-templates', label: 'Form templates', to: ROUTE_DEFS.adminFormTemplates.path, badge: { kind: 'static', variant: 'new' } },
       { id: 'prospects', label: 'Prospects', to: ROUTE_DEFS.adminProspects.path },
       {
         id: 'integrations',

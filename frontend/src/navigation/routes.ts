@@ -19,6 +19,8 @@ export const ROUTE_DEFS = {
   employeeCasePlan: { path: '/employee/case/:caseId/plan', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Immigration intake flow (consent → OCR → interview). */
   employeeCaseImmigration: { path: '/employee/case/:caseId/immigration', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  // [P1-5] Dossier & Forms list view
+  employeeCaseDossier: { path: '/employee/case/:caseId/dossier', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrDashboard: { path: '/hr/dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrAnalytics: { path: '/hr/analytics', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCommandCenter: { path: '/hr/command-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
@@ -125,6 +127,10 @@ export const ROUTE_DEFS = {
   adminOpsNotifications: { path: '/admin/ops/notifications', roles: ['ADMIN'] as RouteRole[] },
   adminMobilityCases: { path: '/admin/mobility/cases', roles: ['ADMIN'] as RouteRole[] },
   adminMobilityCaseInspect: { path: '/admin/mobility/cases/:caseId', roles: ['ADMIN'] as RouteRole[] },
+  // [P1-2] Form Template Registry
+  adminFormTemplates: { path: '/admin/form-templates', roles: ['ADMIN'] as RouteRole[] },
+  adminFormTemplatesNew: { path: '/admin/form-templates/new', roles: ['ADMIN'] as RouteRole[] },
+  adminFormTemplatesEdit: { path: '/admin/form-templates/:id', roles: ['ADMIN'] as RouteRole[] },
   /** External provider portal — authenticated via magic-link JWT, no ReloPass account needed */
   providerPortal: { path: '/provider/portal', roles: ['PUBLIC'] as RouteRole[] },
 };
