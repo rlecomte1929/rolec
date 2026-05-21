@@ -1728,6 +1728,64 @@ export const adminResourcesAPI = {
     api.put(`/api/admin/resources/taxonomy/sources/${id}`, payload).then((r) => r.data),
 };
 
+// [P1-2] Admin Form Templates API — catalog of official government forms.
+// Backend: backend/app/routers/admin_form_templates.py
+export interface FormTemplate {
+  id: string;
+  code: string;
+  name: string;
+  country: string;
+  authority_code: string | null;
+  authority_name: string | null;
+  category: string | null;
+  original_pdf_url: string | null;
+  version: string;
+  fields: Array<Record<string, unknown>>;
+  trigger_rules: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FormTemplateCreate = Omit<FormTemplate, 'id' | 'created_at' | 'updated_at'> & {
+  // All optional except code/name/country — backend supplies defaults.
+  authority_code?: string | null;
+  authority_name?: string | null;
+  category?: string | null;
+  original_pdf_url?: string | null;
+  version?: string;
+  fields?: Array<Record<string, unknown>>;
+  trigger_rules?: Record<string, unknown>;
+};
+
+export type FormTemplateUpdate = Partial<Omit<FormTemplate, 'id' | 'created_at' | 'updated_at'>>;
+
+export const adminFormTemplatesAPI = {
+  list: async (params?: {
+    country?: string;
+    category?: string;
+    code?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<FormTemplate[]> =>
+    api.get('/api/admin/form-templates', { params }).then((r) => r.data),
+
+  get: async (id: string): Promise<FormTemplate> =>
+    api.get(`/api/admin/form-templates/${id}`).then((r) => r.data),
+
+  create: async (payload: FormTemplateCreate): Promise<FormTemplate> =>
+    api.post('/api/admin/form-templates', payload).then((r) => r.data),
+
+  /**
+   * PATCH — two modes:
+   *  - In-place: omit `version` (or pass the current value) → row is mutated.
+   *  - Version bump: pass a NEW `version` → a new row is inserted carrying the
+   *    merged values; the old row is preserved so historical case_forms keep
+   *    pointing at it. The returned row is the new one.
+   */
+  update: async (id: string, payload: FormTemplateUpdate): Promise<FormTemplate> =>
+    api.patch(`/api/admin/form-templates/${id}`, payload).then((r) => r.data),
+};
+
 // Admin Staging Review API (admin-only)
 export const adminStagingAPI = {
   getDashboard: () => api.get('/api/admin/staging/dashboard').then((r) => r.data),
@@ -3283,6 +3341,33 @@ export const guidanceAPI = {
     const response = await api.get('/api/guidance/explain', { params: { case_id: caseId } });
     return response.data;
   },
+};
+
+// ── Policy Builder API ────────────────────────────────────────────────────────
+export interface PolicyTemplateCategoryOut {
+  category_id: string;
+  code: string;
+  display_name: string;
+  cap_value: number;
+  cap_unit: string;
+  cap_currency: string;
+  benchmark_source: string;
+}
+
+export interface PolicyTemplateTierOut {
+  tier: string;
+  tier_order: number;
+  categories: PolicyTemplateCategoryOut[];
+}
+
+export interface PolicyTemplatesResponse {
+  ok: boolean;
+  tiers: PolicyTemplateTierOut[];
+}
+
+export const policyBuilderAPI = {
+  getTemplates: (): Promise<PolicyTemplatesResponse> =>
+    api.get('/api/policy/templates').then((r) => r.data),
 };
 
 export default api;
