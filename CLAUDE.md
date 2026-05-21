@@ -116,3 +116,19 @@ Backend:
 - **Backend**: Render Web Service. Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 4 --proxy-headers`. Python 3.11.
 - **Database changes**: Apply Supabase migrations via `supabase db push` or the MCP (`apply_migration`). Never alter schema through the Supabase dashboard SQL editor directly — always commit migration files.
 - **Deploy trigger**: Push to `main` on GitHub → Render auto-deploys both services. Health check endpoint: `GET /health`.
+
+## Build hygiene (pre-push hook + CI)
+
+Render auto-deploys `main` on every push, so **every commit on `main` must build cleanly** — a broken build is a user-visible deploy failure.
+
+**Activate the local pre-push hook (one-time, per clone):**
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-push` runs `npm run build` in `frontend/` before any push that touches frontend files. If the build fails, the push is aborted. Skips automatically when the push contains no frontend changes.
+
+**Preferred workflow:** feature branch → PR → CI (`.github/workflows/ci.yml` runs `frontend-build` + `backend-tests`) → merge → Render deploys. Pushing directly to `main` still works but bypasses PR review, so the pre-push hook is the only local safety net.
+
+**Emergency bypass:** `git push --no-verify` skips the hook. Use sparingly — every avoided round-trip with Render is faster than every emergency bypass.
