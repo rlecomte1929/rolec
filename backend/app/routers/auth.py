@@ -312,9 +312,16 @@ def register(body: RegisterRequest, request: Request):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
+        # NEVER include str(e) in the response — psycopg2 errors carry the full
+        # SQL + parameters and have leaked to end users (e.g. profiles_role_check
+        # violations exposing DB internals on the registration page).
+        # The exception is already captured server-side by log.exception below.
         log.exception("auth_register unexpected error email=%s", getattr(body, "email", ""))
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Registration failed. Please try again or contact support.",
+        )
 
 
 @router.post("/api/auth/login", response_model=LoginResponse)
