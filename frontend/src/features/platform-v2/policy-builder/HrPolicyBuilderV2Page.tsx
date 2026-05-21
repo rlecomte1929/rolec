@@ -398,7 +398,7 @@ export function HrPolicyBuilderV2Page() {
                     </div>
                     {!isCol && cat.benefits.map(b => (
                       <div key={b.k} className="h-9 flex items-center gap-2 px-4 border-b border-gray-100 group">
-                        <Info size={11} className="text-gray-300 flex-shrink-0 group-hover:text-gray-400" title={b.tip}/>
+                        <Info size={11} className="text-gray-300 flex-shrink-0 group-hover:text-gray-400" aria-label={b.tip}/>
                         <span className="text-[11.5px] text-gray-600 truncate" title={b.lbl}>{b.lbl}</span>
                       </div>
                     ))}

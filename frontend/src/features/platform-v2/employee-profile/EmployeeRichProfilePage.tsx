@@ -479,7 +479,7 @@ export function EmployeeRichProfilePage() {
   const totalCompletion = useMemo(() => {
     const states = SECTIONS.map((s) => sectionCompletionState(s.id, profile, MEMBERS));
     const scored = states.map((st) => (st === 'complete' ? 1 : st === 'partial' ? 0.5 : 0));
-    return Math.round((scored.reduce((a, b) => a + b, 0) / SECTIONS.length) * 100);
+    return Math.round(((scored as number[]).reduce((a, b) => a + b, 0) / SECTIONS.length) * 100);
   }, [profile, SECTIONS]);
 
   const completeCount = SECTIONS.filter(

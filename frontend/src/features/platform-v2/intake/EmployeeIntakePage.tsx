@@ -499,7 +499,7 @@ function ChildCard({ m, onChange, onRemove, index, expanded, onToggle }: {
   );
 }
 
-function PetCard({ m, onChange, onRemove, index, expanded, onToggle, international, destCountry }: {
+function PetCard({ m, onChange, onRemove, index: _index, expanded, onToggle, international, destCountry }: {
   m: Member; onChange: (m: Member) => void; onRemove: () => void;
   index: number; expanded: boolean; onToggle: () => void;
   international: boolean; destCountry: string;
