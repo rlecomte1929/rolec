@@ -36,6 +36,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import text
 
 from ...database import db
+from .prefill_engine import run_prefill  # [P2-1] Pre-Fill Engine
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,8 @@ def _run(case_id: str, draft: Dict[str, Any], derived: Dict[str, Any]) -> int:
                         template_code=template["code"],
                         fired_event=fired_event,
                     )
+                    # [P2-1] Pre-Fill Engine — populate FieldValues immediately
+                    run_prefill(cf_id, case_uuid)
 
     # ── 6. Second pass — wire up blocker_form_id ───────────────────────────
     if created_ids:
