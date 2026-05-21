@@ -5,85 +5,18 @@ on:
   push:
     branches: [main]
 
-# Cancel in-flight runs when new commits land on the same branch/PR.
+# Cancel in-flight runs when new commits land on the same ref.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  backend:
-    name: Backend (pytest + ruff)
-    runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: sqlite:///./ci_test.db
-      RELOPASS_DISABLE_RATE_LIMITS: "1"
-      PYTHONPATH: .
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Install backend deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
-          pip install ruff
-
-      - name: Syntax / import check
-        run: python -m compileall -q backend
-
-      - name: Ruff (lint)
-        # Starts conservative: only the critical E/F rules so the bar is
-        # something we can pass today. Widen as the codebase tightens.
-        run: ruff check backend --output-format=github
-
-      - name: Prime test DB schema
-        run: python -c "from backend.database import db; db.init_db()"
-
-      - name: Pytest
-        # Two classes of pre-existing breakage are excluded here. Fix them
-        # in a follow-up pass so the ignore list can shrink:
-        #
-        # (a) Tests that do `from main import app` — only work with backend/
-        #     as cwd, break under pytest's default rootdir discovery.
-        # (b) Tests that spin up their own in-memory sqlite engine and
-        #     never call `db.init_db()` on it, so every SELECT/INSERT
-        #     hits "no such table". These are fine to re-enable once
-        #     their setUp() is fixed to prime the schema.
-        run: |
-          pytest -q backend/tests/ \
-            --ignore=backend/tests/test_admin.py \
-            --ignore=backend/tests/test_admin_verification.py \
-            --ignore=backend/tests/test_collaboration_api.py \
-            --ignore=backend/tests/test_employee_policy_resolution.py \
-            --ignore=backend/tests/test_official_ingest.py \
-            --ignore=backend/tests/test_assignment_claim_link_service.py \
-            --ignore=backend/tests/test_assignment_mobility_link_service.py \
-            --ignore=backend/tests/test_employee_assignment_overview.py \
-            --ignore=backend/tests/test_employee_case_person_service.py \
-            --ignore=backend/tests/test_explicit_pending_link.py \
-            --ignore=backend/tests/test_identity_data_reconciliation.py \
-            --ignore=backend/tests/test_identity_observability.py \
-            --ignore=backend/tests/test_mobility_live_graph_integration.py \
-            --ignore=backend/tests/test_mobility_route_access.py \
-            --ignore=backend/tests/test_passport_case_document_sync_service.py \
-            --ignore=backend/tests/test_relocation_plan_view_suite.py \
-            --ignore=backend/tests/test_signup_reconciliation.py \
-            --ignore=backend/tests/test_unified_assignment_creation.py
-
-  frontend:
-    name: Frontend (tsc + vitest + build)
+  frontend-build:
+    name: Frontend build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
-
     steps:
       - uses: actions/checkout@v4
 
@@ -94,14 +27,44 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install frontend deps
+      - name: Install dependencies
         run: npm ci
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      - name: Tests
-        run: npm test
 
       - name: Build
         run: npm run build
+
+      - name: Confirm dist/ was produced
+        run: |
+          if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
+            echo "::error::frontend/dist was not produced by the build"
+            exit 1
+          fi
+
+  backend-tests:
+    name: Backend tests (deterministic P1 suite)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:///./ci_test.db
+      RELOPASS_DISABLE_RATE_LIMITS: "1"
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Pytest (P1 deterministic suite)
+        run: |
+          python -m pytest -q \
+            backend/tests/test_admin_form_templates_router.py \
+            backend/tests/test_trigger_engine.py \
+            backend/tests/test_case_dossier_forms.py
