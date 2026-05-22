@@ -107,9 +107,6 @@ const CITIES_BY_COUNTRY: Record<string, string[]> = {
   AU: ['Sydney', 'Melbourne', 'Brisbane'],
 };
 
-const QUARANTINE_COUNTRIES = new Set(['GB', 'AU', 'JP', 'NZ', 'SG']);
-const RESTRICTED_BREEDS = ['pit bull', 'pitbull', 'american staffordshire', 'amstaff', 'rottweiler', 'doberman', 'dogo argentino'];
-
 const SERVICES = [
   { id: 'housing',     ico: '🏠', t: 'Housing search',       s: 'Apartment or house search at destination' },
   { id: 'immigration', ico: '🛂', t: 'Immigration',          s: 'Visas, permits, residence registration' },
@@ -164,12 +161,6 @@ function computeAge(dob?: string): number | null {
   const d = new Date(dob);
   if (isNaN(d.getTime())) return null;
   return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-}
-
-function isRestrictedBreed(breed?: string) {
-  if (!breed) return false;
-  const lower = breed.toLowerCase();
-  return RESTRICTED_BREEDS.some((b) => lower.includes(b));
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -499,73 +490,6 @@ function ChildCard({ m, onChange, onRemove, index, expanded, onToggle }: {
   );
 }
 
-function PetCard({ m, onChange, onRemove, index: _index, expanded, onToggle, international, destCountry }: {
-  m: Member; onChange: (m: Member) => void; onRemove: () => void;
-  index: number; expanded: boolean; onToggle: () => void;
-  international: boolean; destCountry: string;
-}) {
-  const restricted = isRestrictedBreed(m.breed);
-  const quarantine = QUARANTINE_COUNTRIES.has(destCountry);
-  const destName = COUNTRIES.find((c) => c.code === destCountry)?.name ?? 'destination';
-  const status: 'complete' | 'partial' | 'empty' = m.pet_type && m.count ? 'complete' : m.pet_type ? 'partial' : 'empty';
-  return (
-    <CardShell ico={m.pet_type === 'Cat' ? '🐱' : m.pet_type === 'Bird' ? '🐦' : '🐕'}
-      title={`${m.pet_type || 'Pet'} ${m.breed ? `· ${m.breed}` : ''}${(m.count ?? 1) > 1 ? ` × ${m.count}` : ''}`}
-      sub={international ? 'Vaccination, microchip, breed' : 'Type & count'}
-      status={status} expanded={expanded} onToggle={onToggle} onRemove={onRemove} urgent={restricted}>
-      <Grid>
-        <FieldWrap label="Type" required>
-          <select className={selectCls()} value={m.pet_type ?? ''} onChange={(e) => onChange({ ...m, pet_type: e.target.value })}>
-            <option value="">Select…</option>
-            <option>Dog</option><option>Cat</option><option>Bird</option><option>Exotic</option><option>Other</option>
-          </select>
-        </FieldWrap>
-        <FieldWrap label="Count" required>
-          <input type="number" min={1} max={10} className={inputCls()} value={m.count ?? 1}
-            onChange={(e) => onChange({ ...m, count: Number(e.target.value) })} />
-        </FieldWrap>
-        {(m.pet_type === 'Dog' || m.pet_type === 'Cat') && (
-          <FieldWrap label="Breed" required={m.pet_type === 'Dog'} className="sm:col-span-2"
-            why="Some breeds face housing restrictions or import limits. Flagging early saves problems later.">
-            <input className={inputCls()} value={m.breed ?? ''}
-              placeholder={m.pet_type === 'Dog' ? 'e.g. Labrador, Pit Bull' : 'e.g. Maine Coon'}
-              onChange={(e) => onChange({ ...m, breed: e.target.value })} />
-            {restricted && (
-              <div className="flex items-start gap-2 mt-1 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-                ⚠ <span><strong>This breed may face housing restrictions</strong> in {destName}. We'll flag this on housing options.</span>
-              </div>
-            )}
-          </FieldWrap>
-        )}
-        {international && (
-          <>
-            <FieldWrap label="Rabies vaccination">
-              <select className={selectCls()} value={m.rabies ?? ''} onChange={(e) => onChange({ ...m, rabies: e.target.value })}>
-                <option value="">Select…</option><option>Yes</option><option>No</option>
-              </select>
-            </FieldWrap>
-            <FieldWrap label="Microchipped">
-              <select className={selectCls()} value={m.microchipped ?? ''} onChange={(e) => onChange({ ...m, microchipped: e.target.value })}>
-                <option value="">Select…</option><option>Yes</option><option>No</option>
-              </select>
-            </FieldWrap>
-          </>
-        )}
-        <FieldWrap label="Notes for relocation" optional className="sm:col-span-2"
-          hint="e.g. vaccination details, special handling, size…">
-          <textarea rows={2} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-violet-300"
-            value={m.notes ?? ''} placeholder="Any special needs or requirements…"
-            onChange={(e) => onChange({ ...m, notes: e.target.value })} />
-        </FieldWrap>
-        {international && quarantine && (
-          <div className="sm:col-span-2 flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-            ℹ <span><strong>{destName} requires pet quarantine.</strong> Your roadmap will include a dedicated track — import permits, health certs, arrival inspection. Typical timeline: 6–12 months pre-arrival.</span>
-          </div>
-        )}
-      </Grid>
-    </CardShell>
-  );
-}
 
 // ─── Step components ──────────────────────────────────────────────────────────
 
@@ -584,7 +508,6 @@ function StepHd({ title, sub, required }: { title: string; sub: string; required
 function ReviewSummary({ data, goTo }: { data: IntakeData; goTo: (s: number) => void }) {
   const partner = data.members.find((m) => m.kind === 'partner');
   const children = data.members.filter((m) => m.kind === 'child');
-  const pets = data.members.filter((m) => m.kind === 'pet');
   const oC = COUNTRIES.find((c) => c.code === data.origin_country);
   const dC = COUNTRIES.find((c) => c.code === data.dest_country);
 
@@ -621,7 +544,6 @@ function ReviewSummary({ data, goTo }: { data: IntakeData; goTo: (s: number) => 
         ['Self', data.full_name || 'You'],
         ...(partner ? [['Partner', `${partner.name ?? '—'} · ${partner.employment ?? '—'}`] as [string, React.ReactNode]] : []),
         ...(children.length ? [['Children', children.map((c) => `${c.name ?? '?'} (${computeAge(c.dob) ?? '?'}y)`).join(', ')] as [string, React.ReactNode]] : []),
-        ...(pets.length ? [['Pets', pets.map((p) => `${p.pet_type ?? '?'}${p.breed ? ` (${p.breed})` : ''}`).join(', ')] as [string, React.ReactNode]] : []),
       ]} />
       <Card label="Work & commute" step={4} rows={[
         ['Job', `${data.job_title || '—'} · ${data.contract_type}`],
@@ -655,7 +577,6 @@ export function EmployeeIntakePage() {
 
   const partner = data.members.find((m) => m.kind === 'partner');
   const children = data.members.filter((m) => m.kind === 'child');
-  const pets = data.members.filter((m) => m.kind === 'pet');
 
   const addMember = (kind: MemberKind, extra?: Partial<Member>) => {
     const id = kind + Date.now();
@@ -666,12 +587,14 @@ export function EmployeeIntakePage() {
   const removeMember = (id: string) => setField('members', data.members.filter((m) => m.id !== id));
   const toggleMember = (id: string) => setExpanded((e) => ({ ...e, [id]: !e[id] }));
 
-  // Auto-select services on household change
+  // Auto-select services on household change.
+  // AIQ-289: pets entry is on hold (separate tab) — the Pet relocation
+  // service stays available in step "My Needs" so the employee can still
+  // request it manually, but we no longer auto-add based on members.
   useEffect(() => {
     const auto = new Set(data.services);
     auto.add('housing'); auto.add('immigration');
     if (children.length) auto.add('schools');
-    if (pets.length) auto.add('pets');
     if (partner) auto.add('spouse');
     const next = [...auto];
     if (next.length !== data.services.length || next.some((s) => !data.services.includes(s))) {
@@ -684,8 +607,10 @@ export function EmployeeIntakePage() {
     if (s === 1) return !!(data.origin_country && data.origin_city && data.dest_country && data.dest_city && data.target_date && data.purpose);
     if (s === 2) return !!(data.full_name && data.nationality && data.passport_country && data.passport_expiry);
     if (s === 3) return data.members.length >= 1;
-    if (s === 4) return !!(data.job_title && data.contract_start && data.contract_type && data.office_address && data.work_pattern && data.salary_band);
-    if (s === 5) return data.services.length >= 1;
+    // AIQ-289: step 4 is the Pets tab — on hold, always advance-able.
+    if (s === 4) return true;
+    if (s === 5) return !!(data.job_title && data.contract_start && data.contract_type && data.office_address && data.work_pattern && data.salary_band);
+    if (s === 6) return data.services.length >= 1;
     return true;
   };
 
@@ -694,8 +619,12 @@ export function EmployeeIntakePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const STEP_LABELS = ['Journey', 'About You', 'My People', 'Work & Place', 'My Needs', 'Review'];
-  const STEP_ICONS = ['🛫', '👤', '👪', '🗺️', '✅', '📋'];
+  // AIQ-289: insert a dimmed "Pets" tab between My People and Work & Place.
+  // The tab is visible but on-hold — index 3 of STEP_ON_HOLD marks it.
+  const STEP_LABELS = ['Journey', 'About You', 'My People', 'Pets', 'Work & Place', 'My Needs', 'Review'];
+  const STEP_ICONS  = ['🛫', '👤', '👪', '🐾', '🗺️', '✅', '📋'];
+  const STEP_ON_HOLD: Record<number, boolean> = { 4: true };
+  const TOTAL_STEPS = STEP_LABELS.length;
 
   const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
   const savedLabel = elapsedSecs < 60 ? 'just now' : 'a moment ago';
@@ -726,26 +655,35 @@ export function EmployeeIntakePage() {
             <div className="flex items-center justify-between mb-2 text-xs text-gray-400">
               <span className="font-semibold text-gray-600">Detailed Intake</span>
               <span>Auto-saved {savedLabel}</span>
-              <span>Step {step} / 6</span>
+              <span>Step {step} / {TOTAL_STEPS}</span>
             </div>
             <div className="flex items-center gap-1 overflow-x-auto">
               {STEP_LABELS.map((lbl, i) => {
                 const n = i + 1;
-                const isDone = stepValid(n) && n < step;
+                const onHold = !!STEP_ON_HOLD[n];
+                const isDone = !onHold && stepValid(n) && n < step;
                 const isActive = n === step;
                 return (
                   <button key={lbl} type="button"
                     onClick={() => n < step && goTo(n)}
                     disabled={n > step}
+                    title={onHold ? 'On hold — coming soon' : undefined}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-semibold flex-shrink-0 transition-colors ${
+                      onHold && !isActive ? 'text-gray-400 opacity-60' :
                       isActive ? 'bg-violet-100 text-violet-700' :
                       isDone ? 'text-green-600 cursor-pointer hover:bg-green-50' :
                       'text-gray-300'
                     }`}>
                     <span className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center flex-shrink-0 ${
+                      onHold && !isActive ? 'bg-gray-100 text-gray-400' :
                       isActive ? 'bg-violet-600 text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
                     }`}>{isDone ? '✓' : n}</span>
                     <span className="hidden sm:inline">{STEP_ICONS[i]} {lbl}</span>
+                    {onHold && (
+                      <span className="hidden sm:inline ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold">
+                        On hold
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -845,17 +783,12 @@ export function EmployeeIntakePage() {
                     <ChildCard key={c.id} m={c} index={i} onChange={(n) => updateMember(c.id, n)} onRemove={() => removeMember(c.id)}
                       expanded={!!expanded[c.id]} onToggle={() => toggleMember(c.id)} />
                   ))}
-                  {pets.map((p, i) => (
-                    <PetCard key={p.id} m={p} index={i} onChange={(n) => updateMember(p.id, n)} onRemove={() => removeMember(p.id)}
-                      expanded={!!expanded[p.id]} onToggle={() => toggleMember(p.id)}
-                      international={international} destCountry={data.dest_country} />
-                  ))}
+                  {/* AIQ-289: pets moved out of Family / My People into the dedicated Pets tab (on hold). */}
                 </div>
                 {/* Add buttons */}
                 <div className="flex flex-wrap gap-2 mb-3">
                   {!partner && <button type="button" onClick={() => addMember('partner')} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add partner</button>}
                   <button type="button" onClick={() => addMember('child')} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add a child</button>
-                  <button type="button" onClick={() => addMember('pet', { count: 1 })} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">+ Add a pet</button>
                 </div>
                 {data.members.length === 1 && (
                   <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
@@ -865,8 +798,28 @@ export function EmployeeIntakePage() {
               </>
             )}
 
-            {/* ── Step 4 — Work & Place ── */}
+            {/* ── Step 4 — Pets (On hold) ── AIQ-289 */}
             {step === 4 && (
+              <>
+                <StepHd title="Pets" sub="A dedicated section for the pets joining your move — coming soon." />
+                <div className="flex flex-col items-center justify-center gap-3 py-10 px-6 border border-dashed border-amber-200 bg-amber-50/40 rounded-2xl text-center">
+                  <span className="text-3xl">🐾</span>
+                  <div className="text-base font-bold text-gray-800">Pets section is on hold</div>
+                  <div className="text-xs text-gray-500 max-w-md leading-relaxed">
+                    We're building a richer flow for pets — microchip and vaccination capture,
+                    destination-country quarantine warnings, vet and import-permit tracking.
+                    For now, please continue. You'll be able to add pets here as soon as the
+                    section ships.
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">
+                    On hold · coming soon
+                  </span>
+                </div>
+              </>
+            )}
+
+            {/* ── Step 5 — Work & Place ── */}
+            {step === 5 && (
               <>
                 <StepHd title="Your work & commute" sub="Most of this is pre-filled by your HR team — confirm or update. Commute settings drive your housing pre-filter." required />
                 <Grid>
@@ -945,8 +898,8 @@ export function EmployeeIntakePage() {
               </>
             )}
 
-            {/* ── Step 5 — My Needs ── */}
-            {step === 5 && (
+            {/* ── Step 6 — My Needs ── */}
+            {step === 6 && (
               <>
                 <StepHd title="What do you need help with?" sub="We've pre-selected services most relevant to your household. Adjust freely." />
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
@@ -1022,8 +975,8 @@ export function EmployeeIntakePage() {
               </>
             )}
 
-            {/* ── Step 6 — Review ── */}
-            {step === 6 && (
+            {/* ── Step 7 — Review ── */}
+            {step === 7 && (
               <>
                 <StepHd title="Review & submit" sub="A quick check before we generate your roadmap. You can edit any section later." />
                 <ReviewSummary data={data} goTo={goTo} />
@@ -1053,7 +1006,7 @@ export function EmployeeIntakePage() {
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               🔒 Encrypted · only you and your HR team see this
             </div>
-            {step < 6 ? (
+            {step < TOTAL_STEPS ? (
               <button type="button" onClick={() => goTo(step + 1)} disabled={!stepValid(step)}
                 className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   stepValid(step) ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
