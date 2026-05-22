@@ -132,8 +132,8 @@ export const PdfCoordinateMapper: React.FC<PdfCoordinateMapperProps> = ({
           >
             <Document
               file={pdfUrl}
-              onLoadSuccess={({ numPages: n }) => { setNumPages(n); setLoadError(null); }}
-              onLoadError={(err) => setLoadError(err.message)}
+              onLoadSuccess={({ numPages: n }: { numPages: number }) => { setNumPages(n); setLoadError(null); }}
+              onLoadError={(err: Error) => setLoadError(err.message)}
               loading={
                 <div className="flex items-center justify-center py-16 text-sm text-slate-500">
                   Loading PDF…
