@@ -6044,7 +6044,12 @@ class Database:
         company boundaries. That forces the caller to go through the company-
         scoped path, where multi-tenant filtering is correct.
         """
-        with self.engine.connect() as conn:
+        with self.engine.begin() as conn:
+            # S4-fix: guard this fallback path with the same timeouts used by the
+            # company-scoped path, so a slow NOT EXISTS subquery cannot hang forever.
+            if not _is_sqlite:
+                conn.execute(text("SET LOCAL statement_timeout = '7500ms'"))
+                conn.execute(text("SET LOCAL lock_timeout = '5000ms'"))
             rows = self._exec(
                 conn,
                 "SELECT * FROM case_assignments "

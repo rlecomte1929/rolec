@@ -3828,7 +3828,10 @@ def assign_case(
                     defer_post_creation_hooks=True,
                 )
                 try:
-                    uar = _create_fut.result(timeout=20)
+                    # S5-fix: 8s matches the frontend axios timeout (12s) minus round-trip
+                    # overhead, and is below the E2E test FAIL threshold (8s).
+                    # The previous 20s value far exceeded both client caps, causing hung UX.
+                    uar = _create_fut.result(timeout=8)
                 except concurrent.futures.TimeoutError:
                     raise HTTPException(
                         status_code=503,
