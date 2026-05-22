@@ -5,6 +5,7 @@ Uses DATABASE_URL from db_config (single source of truth).
 import json
 import os
 import math
+import re
 import uuid
 import logging
 import time
@@ -9929,9 +9930,15 @@ class Database:
         plan_val = (plan_tier or "low").lower() if plan_tier else "low"
         if plan_val not in ("low", "medium", "premium"):
             plan_val = "low"
+        # Generate a URL-safe slug from the company name + short random suffix to satisfy
+        # the NOT NULL UNIQUE constraint on companies.slug.
+        _slug_base = re.sub(r"[^a-z0-9]+", "-", (name or "company").lower()).strip("-") or "company"
+        _slug_suffix = uuid.uuid4().hex[:6]
+        slug_val = f"{_slug_base}-{_slug_suffix}"
         params = {
             "id": company_id,
             "name": name,
+            "slug": slug_val,
             "country": country,
             "size_band": size_band,
             "address": address,
@@ -9962,6 +9969,7 @@ class Database:
             base_cols = [
                 "id",
                 "name",
+                "slug",
                 "country",
                 "size_band",
                 "address",
@@ -9995,6 +10003,8 @@ class Database:
             # Build ON CONFLICT update set only for columns that actually exist
             update_sets = [
                 "name = excluded.name",
+                # Keep existing slug on upsert — it's immutable once set
+                "slug = COALESCE(companies.slug, excluded.slug)",
                 "country = excluded.country",
                 "size_band = excluded.size_band",
                 "address = excluded.address",
