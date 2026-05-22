@@ -574,3 +574,9 @@ def _emit_case_form_created(
             "trigger_engine: failed to emit case_form.created event "
             "case=%s template=%s", case_uuid, template_code,
         )
+    # [P4-4] In-app + email notification to employee (fire-and-forget)
+    try:
+        from .dossier_notifications import notify_new_form_created  # lazy to avoid circular
+        notify_new_form_created(case_form_id)
+    except Exception:
+        logger.exception("trigger_engine: notify_new_form_created failed cf=%s", case_form_id)

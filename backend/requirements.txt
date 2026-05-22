@@ -26,5 +26,7 @@ slowapi==0.1.9
 sentry-sdk[fastapi]==2.17.0
 python-json-logger==2.0.7
 anthropic==0.39.0
+# [P5-8] AI observability — LangSmith trace forwarding (optional; no-op when LANGSMITH_API_KEY unset)
+langsmith>=0.1.147
 PyJWT>=2.10.1,<3.0.0
 email-validator>=2.0.0
