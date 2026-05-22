@@ -137,31 +137,25 @@ else:
 
 # ─── Step 4: Get auth token and call PDF endpoint ──────────────────────────
 print("\nStep 4: Testing the PDF endpoint...")
-print("  Need a valid auth token for api.relopass.com")
-print("  Attempting Supabase Auth sign-in with test user...")
+print("  Authenticating via ReloPass /api/auth/login (not Supabase Auth)...")
 
-# Try to sign in with a known test account
-test_email = os.environ.get("TEST_USER_EMAIL", "")
-test_pass  = os.environ.get("TEST_USER_PASSWORD", "")
+# The ReloPass backend uses its own session table — must call /api/auth/login,
+# NOT Supabase Auth. Supabase JWTs are not accepted by the backend.
+test_email = os.environ.get("TEST_USER_EMAIL", "admin@relopass.com")
+test_pass  = os.environ.get("TEST_USER_PASSWORD", "Passw0rd!")
 
 token = None
-if test_email and test_pass:
-    auth_resp = _req.post(
-        f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
-        headers={
-            "apikey": SERVICE_KEY,
-            "Content-Type": "application/json",
-        },
-        json={"email": test_email, "password": test_pass},
-    )
-    if auth_resp.status_code == 200:
-        token = auth_resp.json().get("access_token")
-        print(f"  Auth OK: got token for {test_email}")
-    else:
-        print(f"  Auth failed: {auth_resp.status_code} — {auth_resp.text[:200]}")
+auth_resp = _req.post(
+    f"{API_BASE}/api/auth/login",
+    headers={"Content-Type": "application/json"},
+    json={"identifier": test_email, "password": test_pass},
+    timeout=15,
+)
+if auth_resp.status_code == 200:
+    token = auth_resp.json().get("token")
+    print(f"  Auth OK: got session token for {test_email}")
 else:
-    print("  No TEST_USER_EMAIL/TEST_USER_PASSWORD set.")
-    print("  Set these env vars to test the live endpoint.")
+    print(f"  Auth failed: {auth_resp.status_code} — {auth_resp.text[:300]}")
 
 if token:
     pdf_url = f"{API_BASE}/api/cases/{CASE_ID}/forms/{CASE_FORM_ID}/pdf"
