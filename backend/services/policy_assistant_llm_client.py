@@ -88,10 +88,17 @@ class AnthropicClient:
         self._client = anthropic.Anthropic(api_key=api_key)
 
     def complete(self, req: LlmRequest) -> Dict[str, Any]:
+        # [P5-9 H1] Mask PII patterns in user_message before crossing the
+        # Anthropic API trust boundary. We do NOT mask `system` — that's
+        # template text we control, not user input. The masker is
+        # idempotent so this is safe even if the caller already masked.
+        from .pii_masker import mask_pii
+        masked_user_message = mask_pii(req.user_message)
+
         resp = self._client.messages.create(
             model=req.model,
             system=req.system,
-            messages=[{"role": "user", "content": req.user_message}],
+            messages=[{"role": "user", "content": masked_user_message}],
             temperature=req.temperature,
             max_tokens=req.max_tokens,
         )
