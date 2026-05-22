@@ -12,6 +12,7 @@ import { useAdminContext } from '../features/admin/useAdminContext';
 import { adminAPI } from '../api/client';
 import { CompanyBrand } from './CompanyBrand';
 import { FeedbackWidget } from './FeedbackWidget';
+import { GlobalApiErrorBanner } from './GlobalApiErrorBanner';
 import { PlatformShellSidebar, type SidebarRole } from './PlatformShellSidebar';
 
 function deriveInitials(name: string): string {
@@ -158,6 +159,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, w
         </header>
 
         {/* Banners */}
+        {/* B13: global API unavailability banner (network error / timeout) */}
+        <GlobalApiErrorBanner />
+
         {showEmployeeBanner && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-900 shrink-0">
             <span className="mr-2">⏳</span>

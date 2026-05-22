@@ -240,6 +240,20 @@ api.interceptors.response.use(
     const url = err?.config?.url ?? '';
     const isAuthEndpoint = /\/api\/auth\/(login|register)$/.test(url);
     const isDebugEndpoint = /\/api\/debug\//.test(url);
+
+    // B13 fix: when the API is completely unreachable (network error, DNS failure,
+    // or timeout), fire a window event so any mounted banner can surface the error.
+    // We skip this for AbortError (user-initiated cancellation, e.g. AbortController
+    // used for 5-second widget timeouts) and for 401s which already redirect to login.
+    const isAbort = err?.name === 'AbortError' || err?.code === 'ERR_CANCELED';
+    if (!isAbort && (!err?.response || err?.code === 'ECONNABORTED')) {
+      try {
+        window.dispatchEvent(new CustomEvent('api_unavailable'));
+      } catch {
+        // ignore in SSR / test environments that lack a window
+      }
+    }
+
     if (status === 401 && !isAuthEndpoint && !isDebugEndpoint) {
       try {
         const d = typeof err?.response?.data?.detail === 'string'

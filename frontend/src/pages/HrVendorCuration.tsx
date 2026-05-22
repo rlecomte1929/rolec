@@ -171,13 +171,19 @@ export const HrVendorCuration: React.FC = () => {
   const reloadDemand = useCallback(async () => {
     setDemandLoading(true);
     setDemandError(false);
+    // B16 fix: abort after 5 s so the widget never hangs on "Checking…" past
+    // the validation criterion (5 s). The existing catch sets demandError=true
+    // which renders "Could not load — check your connection and retry."
+    const ac = new AbortController();
+    const timer = window.setTimeout(() => ac.abort(), 5_000);
     try {
-      const list = await listEmployeeDemand();
+      const list = await listEmployeeDemand(ac.signal);
       setDemand(list);
     } catch {
       // Non-fatal — keep the widget visible but show an error state.
       setDemandError(true);
     } finally {
+      window.clearTimeout(timer);
       setDemandLoading(false);
     }
   }, []);

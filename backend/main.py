@@ -3281,10 +3281,12 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
         "support_email": request.support_email,
         "default_working_location": request.default_working_location,
     })
-    # Ensure hr_users row exists and matches (set_profile_company UPDATE may no-op if row missing)
-    prof_after = db.get_profile_record(effective["id"])
-    if prof_after and (prof_after.get("role") or "").strip().upper() == "HR":
-        db.ensure_hr_user_for_profile(effective["id"], company_id)
+    # Ensure hr_users row exists and is up-to-date.
+    # Always call this regardless of whether a profiles row exists yet: new HR users
+    # may have a delayed profiles insert (Supabase FK sync is async), but hr_users
+    # is plain-text pk and can always be written. _get_hr_company_id checks hr_users
+    # first, so the company association resolves correctly even without a profiles row.
+    db.ensure_hr_user_for_profile(effective["id"], company_id)
     return {"ok": True, "company_id": company_id}
 
 
