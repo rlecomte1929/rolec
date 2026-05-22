@@ -68,6 +68,8 @@ CREATE TABLE case_forms (
   deadline          TEXT,
   deadline_trigger  TEXT,
   blocker_form_id   TEXT,
+  rejection_reason  TEXT,
+  roadmap_step_id   TEXT,
   original_file_url TEXT,
   draft_pdf_url     TEXT,
   submitted_at      TEXT,
