@@ -152,6 +152,8 @@ export const Auth: React.FC = () => {
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
   }, []);
 
+  const sessionExpired = searchParams.get('reason') === 'session_expired';
+
   useEffect(() => {
     const nextMode = searchParams.get('mode');
     if (nextMode === 'register' || nextMode === 'login') setMode(nextMode);
@@ -384,6 +386,13 @@ export const Auth: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {/* Session expired banner */}
+          {sessionExpired && (
+            <Alert variant="warning" className="mb-5">
+              Your session has expired — please sign in again.
+            </Alert>
+          )}
 
           {/* Heading */}
           <div className="mb-6">

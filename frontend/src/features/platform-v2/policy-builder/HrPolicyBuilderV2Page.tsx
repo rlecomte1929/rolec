@@ -275,7 +275,7 @@ export function HrPolicyBuilderV2Page() {
 
   const status = tiers.length === 0 ? 'no-policy' : version ? 'published' : 'draft';
   const statusColour = status === 'draft' ? 'bg-amber-100 text-amber-700' : status === 'published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500';
-  const statusLbl = status === 'no-policy' ? 'No policy' : status === 'draft' ? 'Draft' : 'Published';
+  const statusLbl = status === 'no-policy' ? 'No policy yet' : status === 'draft' ? 'Draft' : 'Published';
 
   return (
     <AppShell wide>
@@ -340,8 +340,8 @@ export function HrPolicyBuilderV2Page() {
             <rect x="37" y="14" width="22" height="64" rx="4" fill="#ccfbf1" stroke="#0d9488" strokeWidth="1.5"/>
             <rect x="64" y="30" width="22" height="48" rx="4" fill="#fef3c7" stroke="#d97706" strokeWidth="1.5"/>
           </svg>
-          <h2 className="text-xl font-semibold text-gray-900">No tiers configured yet</h2>
-          <p className="text-sm text-gray-500 max-w-sm">Start from a template to be set up in minutes, or build your own tier structure from scratch.</p>
+          <h2 className="text-xl font-semibold text-gray-900">No tiers yet</h2>
+          <p className="text-sm text-gray-500 max-w-sm">Start from a template to get set up in minutes, or build a custom tier structure from scratch.</p>
           <div className="flex gap-3 mt-2">
             <button onClick={() => setTemplateOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">

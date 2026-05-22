@@ -254,7 +254,7 @@ api.interceptors.response.use(
       clearAuthItems();
       const path = window.location.pathname || '';
       if (!path.startsWith('/auth') && path !== '/' && path !== '') {
-        window.location.href = '/auth?mode=login';
+        window.location.href = '/auth?mode=login&reason=session_expired';
       }
     }
     return Promise.reject(err);

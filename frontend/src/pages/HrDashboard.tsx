@@ -271,12 +271,10 @@ export const HrDashboard: React.FC = () => {
             className="w-64 rounded-full border border-[#e2e8f0] bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b2b43]"
           />
           <Button variant="outline" onClick={() => setIsFilterOpen(true)}>Filter</Button>
-          {normalizeStoredRole(getAuthItem('relopass_role')) === 'ADMIN' ? (
+          {normalizeStoredRole(getAuthItem('relopass_role')) === 'ADMIN' && (
             <Link to={buildRoute('adminAssignments')}>
-              <Button>Add assignment</Button>
+              <Button>All assignments</Button>
             </Link>
-          ) : (
-            <Button onClick={handleCreateCase}>Add assignment</Button>
           )}
           <Button variant="outline" onClick={handleCreateCase}>Create case</Button>
         </div>
@@ -386,7 +384,7 @@ export const HrDashboard: React.FC = () => {
               {!isManageMode ? (
                 <>
                   <Button variant="outline" onClick={() => loadAssignments(false)}>Refresh</Button>
-                  <Button variant="outline" onClick={() => setIsManageMode(true)}>Manage Cases</Button>
+                  <Button variant="outline" onClick={() => setIsManageMode(true)}>Manage cases</Button>
                 </>
               ) : (
                 <>
@@ -463,7 +461,10 @@ export const HrDashboard: React.FC = () => {
             </div>
           )}
           {!isLoading && assignments.length === 0 && (
-            <div className="text-sm text-[#4b5563]">No assignments yet.</div>
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <p className="text-sm text-[#4b5563]">No relocation cases yet.</p>
+              <p className="text-xs text-[#6b7280]">Create your first case to start tracking an employee move.</p>
+            </div>
           )}
 
           {!isLoading && assignments.length > 0 && (

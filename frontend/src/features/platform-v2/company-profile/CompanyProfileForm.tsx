@@ -381,7 +381,7 @@ export function CompanyProfileForm({
             <Field
               label="Company name"
               required
-              helper="Pre-fills as the employer name in every new relocation case."
+              helper="Used as the employer name on new relocation cases."
             >
               <input
                 value={form.name}

@@ -77,15 +77,15 @@ const SECTIONS: NavSection[] = [
       { id: 'company-profile', label: 'Company profile', to: ROUTE_DEFS.hrCompanyProfile.path, exact: true },
       {
         id: 'mobility-control',
-        label: 'Mobility control',
+        label: 'Mobility control center',
         to: ROUTE_DEFS.hrCommandCenter.path,
         exact: true,
         badge: { kind: 'static-count', count: 12 },
       },
-      { id: 'policy-builder', label: 'Policy Builder', to: ROUTE_DEFS.hrPolicyBuilder.path, badge: { kind: 'static', variant: 'new' } },
-      { id: 'policy-benefits', label: 'Policy & benefits', to: ROUTE_DEFS.hrPolicy.path },
+      { id: 'policy-builder', label: 'Policy builder', to: ROUTE_DEFS.hrPolicyBuilder.path, badge: { kind: 'static', variant: 'new' } },
+      { id: 'policy-benefits', label: 'Mobility policy', to: ROUTE_DEFS.hrPolicy.path },
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path, badge: { kind: 'static', variant: 'new' } },
-      { id: 'exceptions', label: 'Exceptions', to: ROUTE_DEFS.hrCommandCenter.path },
+      { id: 'exceptions', label: 'Exceptions', to: ROUTE_DEFS.hrExceptions.path },
     ],
   },
   {
@@ -290,7 +290,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
             <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <span className="text-xs text-slate-400 flex-1">Search cases, vendors…</span>
+            <span className="text-xs text-slate-400 flex-1">Search cases and vendors</span>
             <kbd className="text-[10px] text-slate-300 border border-slate-200 rounded px-1">⌘K</kbd>
           </div>
         </div>

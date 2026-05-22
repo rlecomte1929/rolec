@@ -168,7 +168,7 @@ export function FeedbackWidget({ userId }: { userId: string | null }) {
       <button
         onClick={() => state === 'idle' ? setState('open') : close()}
         className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-gray-900 text-white text-xs font-semibold shadow-md hover:bg-gray-700 transition-colors"
-        aria-label="Open feedback panel"
+        aria-label="Give feedback"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round"

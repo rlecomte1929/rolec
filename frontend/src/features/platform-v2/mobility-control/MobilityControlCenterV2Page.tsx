@@ -160,9 +160,9 @@ function daysAgo(iso?: string | null): number | null {
 
 // ── Small visual primitives ─────────────────────────────────────────────────
 
-function Pill({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function Pill({ children, className = '', title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${className}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${className}`} title={title}>
       {children}
     </span>
   );
@@ -487,7 +487,7 @@ export function MobilityControlCenterV2Page() {
           </div>
           <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Mobility control center</h1>
-            <Pill className="bg-indigo-50 text-indigo-700 ring-indigo-200">v2 preview</Pill>
+            <Pill className="bg-slate-100 text-slate-500 ring-slate-200" title="This view is in beta — data is accurate but the layout may change.">Beta</Pill>
             <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
@@ -513,7 +513,7 @@ export function MobilityControlCenterV2Page() {
             </div>
           </div>
           <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
-            {kpis ? kpis.activeCases : '—'} active relocations · {corridorMix.length} corridor{corridorMix.length === 1 ? '' : 's'} · global team.
+            {kpis ? kpis.activeCases : '—'} active relocation{kpis && kpis.activeCases === 1 ? '' : 's'} across {corridorMix.length} corridor{corridorMix.length === 1 ? '' : 's'}
           </p>
         </div>
 
@@ -529,21 +529,21 @@ export function MobilityControlCenterV2Page() {
           <Kpi
             label="At risk"
             value={kpis?.atRiskCount ?? (loading ? '…' : 0)}
-            sub="delays > 5 days"
+            sub="Over 5 days delayed"
             tone="warning"
             progress={kpis?.activeCases ? Math.min(100, ((kpis.atRiskCount ?? 0) / kpis.activeCases) * 100) : 0}
           />
           <Kpi
             label="Completed YTD"
             value={kpis?.completedCount ?? (loading ? '…' : 0)}
-            sub="approved cases this year"
+            sub="completed relocations this year"
             tone="success"
             progress={kpis?.completedCount ? Math.min(100, kpis.completedCount * 5) : 0}
           />
           <Kpi
             label="Mobility spend"
             value={formatMoney(totalBudget.est)}
-            sub={totalBudget.limit ? `of ${formatMoney(totalBudget.limit)} budget` : 'no budget set'}
+            sub={totalBudget.limit ? `of ${formatMoney(totalBudget.limit)} budget` : '—'}
             tone={kpis?.budgetOverrunsCount ? 'danger' : 'default'}
             progress={totalBudget.limit ? Math.min(100, (totalBudget.est / totalBudget.limit) * 100) : 0}
           />
@@ -552,7 +552,7 @@ export function MobilityControlCenterV2Page() {
         {backendDegraded && (
           <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <span>
-              Some command center endpoints didn't respond. Page renders the layout with whatever loaded successfully.
+              Some data couldn't load — showing partial results. Refresh to try again.
             </span>
             <button type="button" onClick={() => void load()} className="text-amber-700 hover:underline">Retry</button>
           </div>
@@ -580,7 +580,7 @@ export function MobilityControlCenterV2Page() {
               rowKey={(r) => r.id}
               onRowClick={goToCase}
               ariaLabel="Mobility control cases"
-              emptyState={loading ? 'Loading cases…' : 'No active cases yet.'}
+              emptyState={loading ? 'Loading cases…' : 'No active relocations yet. Cases created on the Assignments page appear here.'}
               footerSlot={
                 <div className="flex items-center justify-between px-4 py-2 text-[11.5px] text-slate-500">
                   <span>{cases.length} case{cases.length === 1 ? '' : 's'}</span>
@@ -594,7 +594,7 @@ export function MobilityControlCenterV2Page() {
           <div className="space-y-3">
             <SidebarCard eyebrow="Corridor mix">
               {corridorMix.length === 0 ? (
-                <p className="text-[12px] text-slate-400">No corridors mapped yet.</p>
+                <p className="text-[12px] text-slate-400">Corridors appear once a case has an origin and destination country.</p>
               ) : (
                 <ul className="space-y-1.5">
                   {corridorMix.map((c) => (
@@ -640,7 +640,7 @@ export function MobilityControlCenterV2Page() {
 
             <SidebarCard eyebrow="Pending approvals">
               {approvals.length === 0 ? (
-                <p className="text-[12px] text-slate-400">Nothing waiting on you.</p>
+                <p className="text-[12px] text-slate-400">No pending approvals.</p>
               ) : (
                 <ul className="space-y-2">
                   {approvals.slice(0, 5).map((a) => (

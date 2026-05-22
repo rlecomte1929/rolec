@@ -77,7 +77,7 @@ export function ProviderGridV2Page() {
           </div>
           <div className="mt-1.5 flex items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Provider status</h1>
-            <Pill className="bg-indigo-50 text-indigo-700 ring-indigo-200">v2 preview</Pill>
+            <Pill className="bg-slate-100 text-slate-500 ring-slate-200" title="This view is in beta — data is accurate but the layout may change.">Beta</Pill>
             <button
               type="button"
               onClick={() => void fetchGrid()}
@@ -88,18 +88,18 @@ export function ProviderGridV2Page() {
             </button>
           </div>
           <p className="mt-1 max-w-3xl text-[13px] text-slate-500">
-            Real-time coordination state of every provider across active cases. Click any cell to drill into the case.
+            Live status for each provider across active relocations. Click a cell to view the case.
           </p>
         </div>
 
         {/* KPI strip */}
         <div className="mb-5 grid grid-cols-3 gap-3 md:grid-cols-6">
           <Kpi label="Active cases" value={kpis.total} sub="all in flight" />
-          <Kpi label="Not started" value={kpis.notStarted} sub="awaiting coord." tone="default" />
+          <Kpi label="Not started" value={kpis.notStarted} sub="Awaiting coordination" tone="default" />
           <Kpi label="In progress" value={kpis.inProgress} sub="under way" tone="accent" />
-          <Kpi label="At risk" value={kpis.atRisk} sub="delays > 5d" tone="warning" />
+          <Kpi label="At risk" value={kpis.atRisk} sub="Over 5 days delayed" tone="warning" />
           <Kpi label="Complete" value={kpis.complete} sub="ready" tone="success" />
-          <Kpi label="Blocked cells" value={kpis.blockedCells} sub="across providers" tone={kpis.blockedCells > 0 ? 'danger' : 'default'} />
+          <Kpi label="Blocked" value={kpis.blockedCells} sub="providers with a blocker" tone={kpis.blockedCells > 0 ? 'danger' : 'default'} />
         </div>
 
         {error && (
@@ -132,9 +132,9 @@ export function ProviderGridV2Page() {
 
 // ── Local visual primitives (same idiom as CompaniesV2) ─────────────────────
 
-function Pill({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function Pill({ children, className = '', title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${className}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${className}`} title={title}>
       {children}
     </span>
   );
