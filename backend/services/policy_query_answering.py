@@ -8,6 +8,8 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from sqlalchemy import text
+
 from ..database import Database
 
 STOPWORDS = {
@@ -60,7 +62,24 @@ def retrieve_company_scoped_policy_chunks(
     query: str,
     canonical_policy_document_id: Optional[str] = None,
     top_k: int = 5,
+    tier: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Retrieve top-K policy chunks + related facts for a company.
+
+    [P5-9 C1] The ``tier`` kwarg enforces tier isolation on facts:
+      - ``tier=None``  → no tier filter (admin/HR path)
+      - ``tier="X"``   → only facts where ``tier IS NULL OR tier = 'X'``
+                         are returned, so a Manager-tier user cannot
+                         retrieve Executive-tier benefit values via the
+                         assistant.
+
+    Chunks themselves are NOT tier-filtered yet — the canonical chunks
+    table has no ``tier`` column. That's an acceptable scope: chunks
+    carry section text (no specific benefit values); the sensitive
+    per-tier numbers live in ``canonical_policy_facts`` which IS now
+    filtered. The chunk-side filter is a follow-up that requires a
+    second schema change.
+    """
     document = (
         db.get_canonical_policy_document(canonical_policy_document_id)
         if canonical_policy_document_id
@@ -70,7 +89,11 @@ def retrieve_company_scoped_policy_chunks(
         raise RuntimeError("no_company_scoped_policy_document")
 
     chunks = db.list_canonical_policy_document_chunks(str(document["id"]), company_id=company_id)
-    facts = db.list_canonical_policy_facts(str(document["id"]), company_id=company_id)
+    facts = db.list_canonical_policy_facts(
+        str(document["id"]),
+        company_id=company_id,
+        tier=tier,
+    )
     query_tokens = _tokens(query)
     scored_chunks: List[Tuple[int, Dict[str, Any]]] = []
     for chunk in chunks:
@@ -191,6 +214,48 @@ class CanonicalPolicyQueryLLM:
         return response.choices[0].message.content if response.choices else ""
 
 
+def _resolve_caller_tier(db: Database, *, user_id: str, user_role: str) -> Optional[str]:
+    """[P5-9 C1] Look up the caller's current active tier from
+    ``employee_tiers`` so the retrieval path can enforce tier isolation.
+
+    Returns:
+      - tier name (e.g. "Manager") for an employee with an active row
+      - None for HR/admin (they see all tiers) OR for an employee with
+        no active assignment (treat as universal — they only see facts
+        with tier IS NULL, never tier-specific ones)
+
+    Notes:
+      - HR and admin intentionally bypass the filter because they
+        configure policies for every tier; their use case requires
+        the full set.
+      - Employees with no active tier get the safest possible default:
+        only universal facts. They can't escalate, but they also can't
+        see manager-only or executive-only content until HR assigns them.
+    """
+    role = (user_role or "").lower()
+    if role in ("hr", "admin"):
+        return None
+    try:
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT tier_name FROM employee_tiers "
+                    "WHERE employee_id = :uid AND end_date IS NULL "
+                    "LIMIT 1"
+                ),
+                {"uid": user_id},
+            ).mappings().first()
+    except Exception:
+        # Defensive: if employee_tiers lookup fails we MUST fall back
+        # to the strictest default (universal-only). Any other branch
+        # would risk leaking tier content on a transient DB error.
+        return "__NO_TIER__"
+    if row and row.get("tier_name"):
+        return str(row["tier_name"])
+    # Employee exists but no active tier → strict default.
+    return "__NO_TIER__"
+
+
 def answer_company_scoped_policy_query(
     db: Database,
     *,
@@ -202,11 +267,17 @@ def answer_company_scoped_policy_query(
     llm: Optional[CanonicalPolicyQueryLLM] = None,
 ) -> Dict[str, Any]:
     redacted_query = redact_pii_from_query(query)
+    # [P5-9 C1] Resolve caller's tier before retrieval. HR/admin → None
+    # (no filter). Employees without an active tier → "__NO_TIER__"
+    # which matches no real tier name, so only universal (NULL) facts
+    # come back.
+    caller_tier = _resolve_caller_tier(db, user_id=user_id, user_role=user_role)
     document, chunks, facts = retrieve_company_scoped_policy_chunks(
         db,
         company_id=company_id,
         query=redacted_query,
         canonical_policy_document_id=canonical_policy_document_id,
+        tier=caller_tier,
     )
     context_blocks = [
         f"[{idx + 1}] chunk_id={chunk['id']} section={chunk.get('section_path') or chunk.get('structure_type')}: {chunk.get('text_content')}"

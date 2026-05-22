@@ -13611,7 +13611,21 @@ class Database:
         value_type: Optional[str] = None,
         provider_entity: Optional[str] = None,
         assignment_type: Optional[str] = None,
+        tier: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
+        """List canonical policy facts for a document, scoped by company.
+
+        The ``tier`` kwarg implements the P5-9 C1 tier isolation rule
+        (migration ``20260522160000_canonical_policy_facts_tier.sql``):
+
+        - ``tier=None``  → no tier filter (HR/admin path: return everything)
+        - ``tier="X"``   → return facts where ``tier IS NULL OR tier = 'X'``.
+                          NULL rows are universal (apply to every tier).
+
+        Callers in the assistant retrieval path MUST pass the caller's
+        resolved tier; passing ``None`` there leaks Executive-tier
+        content to lower-tier employees.
+        """
         sql = "SELECT * FROM canonical_policy_facts WHERE canonical_policy_document_id = :id"
         params: Dict[str, Any] = {"id": document_id}
         if company_id:
@@ -13629,6 +13643,10 @@ class Database:
         if provider_entity:
             sql += " AND provider_entity = :provider_entity"
             params["provider_entity"] = provider_entity
+        # [P5-9 C1] Tier isolation: include only matching tier + universal (NULL).
+        if tier is not None:
+            sql += " AND (tier IS NULL OR tier = :tier_filter)"
+            params["tier_filter"] = tier
         sql += " ORDER BY created_at ASC"
         with self.engine.connect() as conn:
             rows = conn.execute(text(sql), params).fetchall()

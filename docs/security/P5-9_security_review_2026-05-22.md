@@ -15,10 +15,18 @@ and **has gaps on PII handling in the LLM prompt and error-log paths**.
 Before the Phase-6 pilot can start, two critical gaps must be remediated;
 five additional medium-severity gaps are recommended.
 
-**Verdict:** ⚠️ **Not yet ready for pilot.** With the two critical
+**Verdict (original):** ⚠️ **Not yet ready for pilot.** With the two critical
 remediations applied (≈1 day of focused work), the platform meets the
 bar for an internal pilot with synthetic data; a separate external
 pen-test is still required before any real customer data is loaded.
+
+**Verdict (2026-05-22 update):** ✅ **All three Critical/High findings
+that gated pilot have been remediated** (C1, C2, H1). The remaining
+two High findings (H2 audit log on retrieval, H3 central PII filter)
+are spawned as follow-up chips — neither is pilot-gating. **Platform
+is now ready for an internal pilot with synthetic data.** External
+pen test (Cure53 recommended, §3) is still required before any real
+customer data enters the system.
 
 ### Tally
 
@@ -250,13 +258,13 @@ follow-up engagement at Bishop Fox before Series A.
 
 ## 4 · Findings summary + remediation backlog
 
-| ID | Severity | Title                                                    | File / location                                              | Effort  |
+| ID | Severity | Title                                                    | File / location                                              | Status  |
 |----|----------|----------------------------------------------------------|--------------------------------------------------------------|---------|
-| C1 | Critical | No tier filter in retrieval path                         | `backend/services/policy_query_answering.py:56`              | ~1 hr   |
-| C2 | Critical | Raw query echoed in fallback response (logged + returned) | `backend/services/policy_query_answering.py:130`             | ~2 hr   |
-| H1 | High     | LLM payload not masked before send to Anthropic          | `backend/services/policy_assistant_llm_client.py:75`         | ~3 hr   |
-| H2 | High     | No audit_log entry for retrieval queries                 | `backend/services/policy_query_answering.py` (entry function)| ~1 hr   |
-| H3 | High     | No central log-filter for PII patterns                   | `backend/main.py` / `backend/app/main.py`                     | ~2 hr   |
+| C1 | Critical | No tier filter in retrieval path                         | `backend/services/policy_query_answering.py:56`              | ✅ **CLOSED** (commit landed 2026-05-22; migration + router + 11 tests) |
+| C2 | Critical | Raw query echoed in fallback response (logged + returned) | `backend/services/policy_query_answering.py:130`             | ✅ **CLOSED** (commit `b7479db` on main) |
+| H1 | High     | LLM payload not masked before send to Anthropic          | `backend/services/policy_assistant_llm_client.py:75`         | ✅ **CLOSED** (commit `b7479db` on main) |
+| H2 | High     | No audit_log entry for retrieval queries                 | `backend/services/policy_query_answering.py` (entry function)| 🪧 Spawned as follow-up chip |
+| H3 | High     | No central log-filter for PII patterns                   | `backend/main.py` / `backend/app/main.py`                     | 🪧 Spawned as follow-up chip |
 | M1 | Medium   | CSV import has no row-count cap                          | `backend/app/routers/employee_tiers.py:347`                  | ~30 min |
 | M2 | Medium   | No rate limit on POST /api/policy/feedback               | `backend/app/routers/policy_feedback.py:233`                 | ~30 min |
 | M3 | Medium   | review_queue response_summary / latest_comment not XSS-escaped at backend | `backend/app/routers/policy_feedback.py` | ~1 hr |
