@@ -3708,12 +3708,26 @@ def get_case(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     effective = _effective_user(user, UserRole.HR)
+    is_admin = bool(effective.get("is_admin"))
     company_id = _get_hr_company_id(effective)
-    if not company_id:
+    # Admins have no company of their own — skip the company check for them.
+    if not is_admin and not company_id:
         raise HTTPException(status_code=400, detail="No company linked to your profile.")
     case = db.get_case_by_id(case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+    # SECURITY: company-scoped — B5 fix. Scope access to the authenticated HR
+    # user's company. Use 404 (not 403) to avoid leaking case existence to
+    # users from other tenants. Admin users bypass this check.
+    if not is_admin:
+        case_company = case.get("company_id")
+        hr_owner = case.get("hr_user_id")
+        uid = effective.get("id")
+        if not (
+            (company_id and company_id == case_company)
+            or (uid and uid == hr_owner)
+        ):
+            raise HTTPException(status_code=404, detail="Case not found")
     return case
 
 
@@ -4947,40 +4961,9 @@ def submit_employee_task(
     return updated
 
 
-@app.get("/api/hr/cases/{case_id}")
-def get_hr_draft_case(
-    case_id: str,
-    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
-):
-    """
-    Return minimal info for a draft relocation case (no assignment yet).
-
-    Used by /hr/cases/:caseId when getAssignment() returns 404 — the case
-    exists in relocation_cases but has not been assigned to an employee yet.
-    Returns { id, status: 'draft', company_id, created_at } or 404.
-    """
-    effective = _effective_user(user, UserRole.HR)
-    case_row = db.get_case_by_id(case_id)
-    if not case_row:
-        raise HTTPException(status_code=404, detail="Case not found")
-    # HR access check: admin sees all; otherwise check company or owner
-    if not effective.get("is_admin"):
-        hr_company = _get_hr_company_id(effective)
-        case_company = case_row.get("company_id")
-        case_owner = case_row.get("hr_user_id")
-        uid = effective.get("id")
-        if not (
-            (hr_company and hr_company == case_company)
-            or (uid and uid == case_owner)
-        ):
-            raise HTTPException(status_code=404, detail="Case not found")
-    return {
-        "id": case_row.get("id") or case_id,
-        "status": "draft",
-        "company_id": case_row.get("company_id"),
-        "created_at": case_row.get("created_at"),
-        "hr_user_id": case_row.get("hr_user_id"),
-    }
+# B5-S2: get_hr_draft_case removed — it was registered to the same path as
+# get_case above and was therefore unreachable (FastAPI first-match wins).
+# The security check it contained has been merged into get_case (B5-S1).
 
 
 @app.get("/api/hr/cases/{case_id}/tasks")
