@@ -857,7 +857,7 @@ def list_case_forms(
         FROM {_pg_table('case_forms')} cf
         JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
-        LEFT JOIN {_pg_table('profiles')} p ON p.id = cf.person_id
+        LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = cf.person_id
         WHERE cf.case_id = :case_id{where_status}
         ORDER BY
           -- Forms with an unresolved blocker (UI-blocked) come first so the
@@ -1512,7 +1512,7 @@ def _fetch_single_form_summary(case_id: str, form_id: str) -> CaseFormSummary:
         FROM {_pg_table('case_forms')} cf
         JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
-        LEFT JOIN {_pg_table('profiles')} p ON p.id = cf.person_id
+        LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = cf.person_id
         WHERE cf.id = :form_id AND cf.case_id = :case_id
     """
     try:
@@ -1596,7 +1596,7 @@ def list_form_comments(
                     SELECT c.id, c.case_form_id, c.author_id, c.content, c.created_at,
                            p.full_name AS author_name
                     FROM {_pg_table('case_form_comments')} c
-                    LEFT JOIN {_pg_table('profiles')} p ON p.id = c.author_id
+                    LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = c.author_id
                     WHERE c.case_form_id = :form_id
                     ORDER BY c.created_at ASC
                     """
@@ -1720,7 +1720,7 @@ def list_form_events(
                            e.from_status, e.to_status, e.note, e.created_at,
                            p.full_name AS actor_name
                     FROM {_pg_table('case_form_events')} e
-                    LEFT JOIN {_pg_table('profiles')} p ON p.id = e.actor_id
+                    LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = e.actor_id
                     WHERE e.case_form_id = :form_id
                     ORDER BY e.created_at ASC
                     """

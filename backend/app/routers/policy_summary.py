@@ -227,7 +227,7 @@ def _load_values_for_version(
             f"FROM {_t('policy_values')} pv "
             f"JOIN {_t('policy_categories')} c ON c.id = pv.category_id "
             f"LEFT JOIN {_t('policy_tiers')} pt ON pt.id = pv.policy_tier_id "
-            f"LEFT JOIN {_t('profiles')} prof ON prof.id = pv.validated_by "
+            f"LEFT JOIN {_t('profiles')} prof ON CAST(prof.id AS TEXT) = pv.validated_by "
             f"WHERE pv.version_id = :vid {where_tier}"
         ),
         params,
