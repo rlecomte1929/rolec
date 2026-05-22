@@ -15,18 +15,28 @@ export const ROUTE_DEFS = {
   employeeJourney: { path: '/employee/journey', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeDashboard: { path: '/employee/dashboard', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   employeeQuoteRequest: { path: '/employee/quote-request', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  /** Employee document vault — categorised uploads with expiry & deadline tracking. */
+  employeeDocuments: { path: '/employee/documents', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Relocation task checklist (per assignment). */
   employeeCasePlan: { path: '/employee/case/:caseId/plan', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Immigration intake flow (consent → OCR → interview). */
   employeeCaseImmigration: { path: '/employee/case/:caseId/immigration', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   // [P1-5] Dossier & Forms list view
   employeeCaseDossier: { path: '/employee/case/:caseId/dossier', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  /** [P3-4] Dossier Builder — 3-step wizard: select, arrange, download. */
+  employeeCaseDossierBuild: { path: '/employee/case/:caseId/dossier/build', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  // [P1-6] Roadmap page with doc-count chips per step
+  employeeCaseRoadmap: { path: '/employee/case/:caseId/roadmap', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  // [P2-3] Form Editor — per-form field editing
+  employeeCaseFormEditor: { path: '/employee/case/:caseId/forms/:formId/edit', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrDashboard: { path: '/hr/dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrAnalytics: { path: '/hr/analytics', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCommandCenter: { path: '/hr/command-center', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCommandCenterCase: { path: '/hr/command-center/cases/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrEmployeeDashboard: { path: '/hr/employee-dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCaseSummary: { path: '/hr/cases/:caseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  // [P4-2] HR Operations dossier panel — full form list with comments, flags, history
+  hrCaseDossier: { path: '/hr/cases/:caseId/dossier', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrReview: { path: '/hr/review', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrReviewCase: { path: '/hr/review/case/:caseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrAssignmentReview: { path: '/hr/assignments/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
@@ -60,6 +70,10 @@ export const ROUTE_DEFS = {
   hrPolicyManagement: { path: '/hr/policy-management', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy Builder wizard (AIQ-37-B/C). */
   hrPolicyBuilder: { path: '/hr/settings/policy', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** [P2-6] HR validation gate — review extracted policy values before publishing */
+  hrPolicyBuilderReview: { path: '/hr/policy-builder/review', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** [P2-8] HR document management — upload history, status badges, version diffs */
+  hrPolicyBuilderDocuments: { path: '/hr/policy-builder/documents', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy exceptions inbox — HR review + approve/reject flow. */
   hrExceptions: { path: '/hr/exceptions', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy vs. Reality compliance heatmap + per-case analysis. */
@@ -131,6 +145,8 @@ export const ROUTE_DEFS = {
   adminFormTemplates: { path: '/admin/form-templates', roles: ['ADMIN'] as RouteRole[] },
   adminFormTemplatesNew: { path: '/admin/form-templates/new', roles: ['ADMIN'] as RouteRole[] },
   adminFormTemplatesEdit: { path: '/admin/form-templates/:id', roles: ['ADMIN'] as RouteRole[] },
+  // [P3-2] PDF coordinate mapper — must come before :id to avoid route ambiguity
+  adminFormTemplatesMap: { path: '/admin/form-templates/:id/map', roles: ['ADMIN'] as RouteRole[] },
   /** External provider portal — authenticated via magic-link JWT, no ReloPass account needed */
   providerPortal: { path: '/provider/portal', roles: ['PUBLIC'] as RouteRole[] },
 };
