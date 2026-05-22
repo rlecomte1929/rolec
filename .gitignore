@@ -64,3 +64,6 @@ venv/
 *.rej
 .fuse_hidden*
 *.ooNMPsk
+
+# Vite dev-server timestamp cache files
+frontend/vite.config.ts.timestamp-*

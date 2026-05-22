@@ -2267,13 +2267,31 @@ class Database:
                     currency TEXT NOT NULL,
                     reason TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'pending'
-                        CHECK (status IN ('pending','approved','rejected')),
+                        CHECK (status IN ('pending','approved','rejected','countered')),
                     hr_note TEXT,
+                    counter_amount REAL,
                     requested_by_user_id TEXT NOT NULL,
                     resolved_by_user_id TEXT,
                     created_at TEXT NOT NULL,
                     resolved_at TEXT,
                     updated_at TEXT NOT NULL
+                )
+            """))
+            # employee_cap_overrides: per-employee policy cap overrides written on
+            # exception approval or counter (P3-3). Base policy caps are never modified;
+            # overrides are scoped per-employee per-category.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS employee_cap_overrides (
+                    id TEXT PRIMARY KEY,
+                    employee_id TEXT NOT NULL,
+                    company_id TEXT NOT NULL,
+                    category_code TEXT NOT NULL,
+                    approved_cap REAL NOT NULL,
+                    currency TEXT NOT NULL,
+                    approved_by TEXT NOT NULL,
+                    approved_at TEXT NOT NULL,
+                    expiry_date TEXT,
+                    exception_id TEXT
                 )
             """))
             try:
@@ -2339,6 +2357,29 @@ class Database:
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_policy_answer_audits_company
                 ON policy_assistant_answer_audits(company_id, created_at)
+            """))
+            # [P5-8] AI trace table — one row per answer_policy_question() call.
+            # Raw query text is never stored here; only the anonymised query_hash.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS policy_assistant_traces (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT,
+                    query_hash TEXT NOT NULL,
+                    company_id TEXT NOT NULL,
+                    steps_json TEXT NOT NULL DEFAULT '[]',
+                    total_latency_ms INTEGER NOT NULL DEFAULT 0,
+                    fallback_triggered INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_pa_traces_company_created
+                ON policy_assistant_traces(company_id, created_at)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_pa_traces_session
+                ON policy_assistant_traces(session_id)
+                WHERE session_id IS NOT NULL
             """))
             _sqlite_ensure_policy_import_columns(conn)
             conn.execute(text("""
@@ -8362,11 +8403,45 @@ class Database:
                 except Exception:
                     pass
 
+            # [P4-1] Dossier health: aggregate case_forms per case_id
+            dossier_stats: Dict[str, Dict[str, Any]] = {}
+            case_ids = [r._mapping.get("case_id") for r in rows if r._mapping.get("case_id")]
+            if case_ids:
+                try:
+                    with self.engine.connect() as conn:
+                        placeholders = ", ".join(f":c{i}" for i in range(len(case_ids)))
+                        dr = conn.execute(
+                            text(
+                                f"SELECT cf.case_id, COUNT(cf.id) AS total_forms, "
+                                f"ROUND(AVG(cf.completion_pct)) AS avg_completion, "
+                                f"SUM(CASE WHEN cf.status IN ('ready','submitted','approved') THEN 1 ELSE 0 END) AS ready_count, "
+                                f"SUM(CASE WHEN cf.status IN ('in_progress','auto_filled') THEN 1 ELSE 0 END) AS action_count, "
+                                f"SUM(CASE WHEN cf.blocker_form_id IS NOT NULL "
+                                f"    AND cf.status NOT IN ('submitted','approved','rejected') THEN 1 ELSE 0 END) AS blocked_count "
+                                f"FROM public.case_forms cf "
+                                f"WHERE cf.case_id IN ({placeholders}) "
+                                f"GROUP BY cf.case_id"
+                            ),
+                            {f"c{i}": cid for i, cid in enumerate(case_ids)},
+                        ).fetchall()
+                        for r in dr:
+                            m = r._mapping
+                            dossier_stats[str(m["case_id"])] = {
+                                "total_forms": int(m.get("total_forms") or 0),
+                                "avg_completion": int(m.get("avg_completion") or 0),
+                                "ready_count": int(m.get("ready_count") or 0),
+                                "action_count": int(m.get("action_count") or 0),
+                                "blocked_count": int(m.get("blocked_count") or 0),
+                            }
+                except Exception:
+                    pass
+
             result = []
             for row in rows:
                 m = row._mapping
                 a_id = m["id"]
                 stats = task_stats.get(a_id, {"total": 0, "done": 0, "next_overdue": None})
+                dh = dossier_stats.get(str(m.get("case_id") or ""), {})
                 pct = round(100 * stats["done"] / stats["total"]) if stats["total"] else 0
                 wiz_o = m.get("wizard_origin_country")
                 wiz_d = m.get("wizard_dest_country")
@@ -8451,6 +8526,14 @@ class Database:
                     "household": household_label,
                     "hasSpouse": has_spouse,
                     "childCount": child_count,
+                    # [P4-1] dossier health
+                    **{
+                        "dossierTotalForms": dh.get("total_forms", 0),
+                        "dossierAvgCompletion": dh.get("avg_completion", 0),
+                        "dossierReadyCount": dh.get("ready_count", 0),
+                        "dossierActionCount": dh.get("action_count", 0),
+                        "dossierBlockedCount": dh.get("blocked_count", 0),
+                    }
                 })
             return result
         except Exception as e:
@@ -13783,6 +13866,47 @@ class Database:
                 },
             )
         return aid
+
+    # [P5-8] AI Trace Logger — write one trace row per RAG engine call.
+    def insert_policy_assistant_trace(
+        self,
+        *,
+        trace_id: str,
+        session_id: Optional[str],
+        query_hash: str,
+        company_id: str,
+        steps_json: str,
+        total_latency_ms: int,
+        fallback_triggered: bool,
+    ) -> None:
+        """
+        Persist one trace row. Called by ai_trace_logger._write_to_db().
+        Never raises — caller wraps in try/except.
+        Raw query text is NOT passed here; only the anonymised query_hash.
+        """
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO policy_assistant_traces
+                    (id, session_id, query_hash, company_id, steps_json,
+                     total_latency_ms, fallback_triggered, created_at)
+                    VALUES (:id, :sid, :qh, :cid, :sj, :lms, :fb, :now)
+                    ON CONFLICT(id) DO NOTHING
+                    """
+                ),
+                {
+                    "id": trace_id,
+                    "sid": session_id,
+                    "qh": query_hash,
+                    "cid": company_id,
+                    "sj": steps_json,
+                    "lms": int(total_latency_ms),
+                    "fb": 1 if fallback_triggered else 0,
+                    "now": now,
+                },
+            )
 
     def list_policy_assistant_answer_audits(
         self,

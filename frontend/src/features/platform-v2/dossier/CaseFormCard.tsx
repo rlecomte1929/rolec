@@ -8,8 +8,12 @@
  * the new Phase 1 admin/employee surfaces.
  */
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge, Card } from '../../../components/antigravity';
 import type { CaseFormStatus, CaseFormSummary } from '../../../api/dossier';
+import { buildRoute } from '../../../navigation/routes';
+import { formEditorAPI } from '../../../api/formEditor';
+import { OriginalPdfDrawer } from './OriginalPdfDrawer';
 
 // ---------------------------------------------------------------------------
 // Status → label + colour + banner copy
@@ -112,7 +116,9 @@ function statusBannerCopy(form: CaseFormSummary): { tone: string; text: string }
     case 'rejected':
       return {
         tone: 'bg-rose-50 border-rose-200 text-rose-900',
-        text: 'Rejected — check the response for required changes.',
+        text: form.rejection_reason
+          ? `⚠ Returned by ${form.template.authority_name ?? 'authority'}: ${form.rejection_reason}. Open form to correct and resubmit.`
+          : 'Rejected — check the response for required changes.',
       };
     case 'not_started':
     default:
@@ -170,6 +176,24 @@ export interface CaseFormCardProps {
 
 export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
   const [expanded, setExpanded] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
+  const navigate = useNavigate();
+
+  const canDownloadPdf =
+    form.status !== 'not_started' && displayStatus(form) !== 'blocked';
+
+  const handleDownloadPdf = async () => {
+    if (!canDownloadPdf || isDownloadingPdf) return;
+    setIsDownloadingPdf(true);
+    try {
+      await formEditorAPI.downloadPdf(form.case_id, form.id);
+    } catch (e) {
+      console.error('[P3-3] PDF download failed', e);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   const banner = statusBannerCopy(form);
   const chip = deadlineChip(form.deadline);
@@ -247,24 +271,67 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
         <div className="mt-4 grid gap-3">
           <div className={`rounded border px-3 py-2 text-sm ${banner.tone}`}>{banner.text}</div>
           <div className="flex items-center gap-3 flex-wrap">
+            {/* [P2-3] Open form editor — disabled for blocked/submitted/approved */}
+            {dStatus === 'blocked' || dStatus === 'submitted' || dStatus === 'approved' ? (
+              <button
+                type="button"
+                disabled
+                title={
+                  dStatus === 'blocked'
+                    ? `Blocked — ${form.blocker_form_code ?? 'another form'} must be submitted first`
+                    : 'Form already submitted'
+                }
+                className="px-3 py-1.5 rounded text-sm font-medium bg-[#0b2b43] text-white opacity-40 cursor-not-allowed"
+              >
+                Open form
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(buildRoute('employeeCaseFormEditor', { caseId: form.case_id, formId: form.id }))
+                }
+                className="px-3 py-1.5 rounded text-sm font-medium bg-[#0b2b43] text-white hover:bg-[#0e3a5c] transition-colors"
+              >
+                Open form
+              </button>
+            )}
+            {/* [P3-3] Download filled PDF */}
+            {canDownloadPdf ? (
+              <div className="flex flex-col items-start">
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadPdf()}
+                  disabled={isDownloadingPdf}
+                  className="text-sm text-[#0b2b43] hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                >
+                  {isDownloadingPdf ? (
+                    <>
+                      <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Generating…
+                    </>
+                  ) : (
+                    'Download PDF'
+                  )}
+                </button>
+                {form.draft_pdf_url && !isDownloadingPdf && (
+                  <span className="text-[10px] text-slate-400 mt-0.5">
+                    Last generated: {new Date(form.updated_at).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            ) : null}
+            {/* [P2-4] "View original" — opens OriginalPdfDrawer with signed URL */}
             <button
               type="button"
-              disabled
-              title="Form editor lands in P2-3 — coming soon"
-              className="px-3 py-1.5 rounded text-sm font-medium bg-[#0b2b43] text-white opacity-50 cursor-not-allowed"
+              onClick={() => setShowOriginal(true)}
+              className="text-sm text-[#0b2b43] hover:underline"
             >
-              Open form
+              View original PDF
             </button>
-            {form.template.id && form.original_file_url && (
-              <a
-                href={form.original_file_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-[#0b2b43] hover:underline"
-              >
-                View original PDF
-              </a>
-            )}
             <span className="text-xs text-slate-400 ml-auto">
               v{form.template.version} · updated{' '}
               {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : '—'}
@@ -272,6 +339,16 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
           </div>
         </div>
       )}
+
+      {/* [P2-4] Original PDF drawer — rendered outside the card scroll area */}
+      <OriginalPdfDrawer
+        isOpen={showOriginal}
+        onClose={() => setShowOriginal(false)}
+        caseId={form.case_id}
+        formId={form.id}
+        formName={form.template.name}
+        formCode={form.template.code}
+      />
     </Card>
   );
 };

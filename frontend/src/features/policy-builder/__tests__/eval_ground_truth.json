@@ -1,0 +1,710 @@
+{
+  "version": "1.0",
+  "created": "2026-05-22",
+  "description": "Hold-out labelled test set for P2-9 ingestion pipeline evaluation. 20 synthetic policy documents, 60 labelled chunks (3 per document), 8 known inter-document conflicts and 2 intra-document conflicts.",
+  "documents": [
+    {
+      "doc_id": "doc-001",
+      "doc_name": "TechCorp EMEA Global Mobility Policy 2025",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-001-c01",
+          "text": "The housing allowance for Manager grade employees is capped at EUR 3,500 per month including utilities.",
+          "expected_category": "CAT-01",
+          "expected_tier": "Manager",
+          "expected_values": [{"value": 3500, "unit": "EUR/month", "currency": "EUR", "condition": "including utilities"}],
+          "mock_extracted_values": [{"value": 3500, "unit": "EUR/month", "currency": "EUR", "condition": "including utilities"}]
+        },
+        {
+          "chunk_id": "doc-001-c02",
+          "text": "A one-time relocation lump sum of USD 10,000 is paid to the employee upon commencement of the assignment.",
+          "expected_category": "CAT-02",
+          "expected_tier": null,
+          "expected_values": [{"value": 10000, "unit": "USD", "currency": "USD", "condition": "upon commencement"}],
+          "mock_extracted_values": [{"value": 10000, "unit": "USD", "currency": "USD", "condition": "upon commencement"}]
+        },
+        {
+          "chunk_id": "doc-001-c03",
+          "text": "A tax equalization policy ensures the employee pays no more than their hypothetical home-country tax rate.",
+          "expected_category": "CAT-09",
+          "expected_tier": null,
+          "expected_values": [],
+          "mock_extracted_values": []
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-002",
+      "doc_name": "TechCorp APAC Global Mobility Policy 2025",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-002-c01",
+          "text": "The housing allowance for Manager grade employees is capped at EUR 3,500 per month.",
+          "expected_category": "CAT-01",
+          "expected_tier": "Manager",
+          "expected_values": [{"value": 3500, "unit": "EUR/month", "currency": "EUR", "condition": null}],
+          "mock_extracted_values": [{"value": 3500, "unit": "EUR/month", "currency": "EUR", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-002-c02",
+          "text": "School tuition fees for dependent children will be reimbursed up to CHF 25,000 per child per academic year.",
+          "expected_category": "CAT-07",
+          "expected_tier": null,
+          "expected_values": [{"value": 25000, "unit": "CHF/child/year", "currency": "CHF", "condition": null}],
+          "mock_extracted_values": [{"value": 25000, "unit": "CHF/child/year", "currency": "CHF", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-002-c03",
+          "text": "Employees and their family members are enrolled in the Cigna Global Health plan at company expense.",
+          "expected_category": "CAT-10",
+          "expected_tier": null,
+          "expected_values": [],
+          "mock_extracted_values": []
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-003",
+      "doc_name": "GlobalBank Relocation Policy v1",
+      "format": "DOCX",
+      "chunks": [
+        {
+          "chunk_id": "doc-003-c01",
+          "text": "The housing allowance cap for Manager grade is EUR 3,200 per month in all host locations.",
+          "expected_category": "CAT-01",
+          "expected_tier": "Manager",
+          "expected_values": [{"value": 3200, "unit": "EUR/month", "currency": "EUR", "condition": null}],
+          "mock_extracted_values": [{"value": 3200, "unit": "EUR/month", "currency": "EUR", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-003-c02",
+          "text": "Household goods shipping is reimbursed up to EUR 8,000 for standard container shipments.",
+          "expected_category": "CAT-03",
+          "expected_tier": null,
+          "expected_values": [{"value": 8000, "unit": "EUR", "currency": "EUR", "condition": "standard container"}],
+          "mock_extracted_values": [{"value": 8000, "unit": "EUR", "currency": "EUR", "condition": "standard container"}]
+        },
+        {
+          "chunk_id": "doc-003-c03",
+          "text": "The company provides up to 90 nights of temporary accommodation in a serviced apartment upon arrival.",
+          "expected_category": "CAT-04",
+          "expected_tier": null,
+          "expected_values": [{"value": 90, "unit": "nights", "currency": null, "condition": "serviced apartment upon arrival"}],
+          "mock_extracted_values": [{"value": 90, "unit": "nights", "currency": null, "condition": "serviced apartment upon arrival"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-004",
+      "doc_name": "GlobalBank Relocation Policy v2",
+      "format": "DOCX",
+      "chunks": [
+        {
+          "chunk_id": "doc-004-c01",
+          "text": "The housing allowance cap for Manager grade employees is EUR 4,000 per month, revised from previous policy.",
+          "expected_category": "CAT-01",
+          "expected_tier": "Manager",
+          "expected_values": [{"value": 4000, "unit": "EUR/month", "currency": "EUR", "condition": null}],
+          "mock_extracted_values": [{"value": 4000, "unit": "EUR/month", "currency": "EUR", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-004-c02",
+          "text": "Employees are entitled to 60 hours of language training in the host country language capped at EUR 2,500.",
+          "expected_category": "CAT-06",
+          "expected_tier": null,
+          "expected_values": [{"value": 60, "unit": "hours", "currency": null, "condition": null}, {"value": 2500, "unit": "EUR", "currency": "EUR", "condition": "cap"}],
+          "mock_extracted_values": [{"value": 60, "unit": "hours", "currency": null, "condition": null}, {"value": 2500, "unit": "EUR", "currency": "EUR", "condition": "cap"}]
+        },
+        {
+          "chunk_id": "doc-004-c03",
+          "text": "A COLA supplement of 15% of base salary applies for high-cost city postings, reviewed annually.",
+          "expected_category": "CAT-12",
+          "expected_tier": null,
+          "expected_values": [{"value": 15, "unit": "% of base salary", "currency": null, "condition": "high-cost cities, reviewed annually"}],
+          "mock_extracted_values": [{"value": 15, "unit": "% of base salary", "currency": null, "condition": "high-cost cities, reviewed annually"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-005",
+      "doc_name": "RetailCo Mobility Guide 2025",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-005-c01",
+          "text": "Director-level employees receive a monthly housing subsidy capped at GBP 5,000 in London postings.",
+          "expected_category": "CAT-01",
+          "expected_tier": "Director",
+          "expected_values": [{"value": 5000, "unit": "GBP/month", "currency": "GBP", "condition": "London postings"}],
+          "mock_extracted_values": [{"value": 5000, "unit": "GBP/month", "currency": "GBP", "condition": "London postings"}]
+        },
+        {
+          "chunk_id": "doc-005-c02",
+          "text": "Band 4 and Band 5 employees receive a flat-rate relocation cash allowance of EUR 6,000 gross.",
+          "expected_category": "CAT-02",
+          "expected_tier": null,
+          "expected_values": [{"value": 6000, "unit": "EUR", "currency": "EUR", "condition": "gross"}],
+          "mock_extracted_values": [{"value": 6000, "unit": "EUR", "currency": "EUR", "condition": "gross"}]
+        },
+        {
+          "chunk_id": "doc-005-c03",
+          "text": "Upon completion of the assignment, employees and family receive economy class repatriation flights to the home country.",
+          "expected_category": "CAT-14",
+          "expected_tier": null,
+          "expected_values": [{"value": null, "unit": "economy class flights", "currency": null, "condition": "includes family"}],
+          "mock_extracted_values": [{"value": null, "unit": "economy class flights", "currency": null, "condition": "includes family"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-006",
+      "doc_name": "RetailCo Benefits Addendum 2025",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-006-c01",
+          "text": "International school fees for dependants are covered up to EUR 15,000 per child per annum.",
+          "expected_category": "CAT-07",
+          "expected_tier": null,
+          "expected_values": [{"value": 15000, "unit": "EUR/child/year", "currency": "EUR", "condition": null}],
+          "mock_extracted_values": [{"value": 15000, "unit": "EUR/child/year", "currency": "EUR", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-006-c02",
+          "text": "The accompanying partner receives spousal career coaching in up to 6 sessions with an accredited coach.",
+          "expected_category": "CAT-08",
+          "expected_tier": null,
+          "expected_values": [{"value": 6, "unit": "sessions", "currency": null, "condition": "accredited coach"}],
+          "mock_extracted_values": [{"value": 6, "unit": "sessions", "currency": null, "condition": "accredited coach"}]
+        },
+        {
+          "chunk_id": "doc-006-c03",
+          "text": "An international health insurance allowance of up to EUR 4,000 per year is provided for Manager grade and above.",
+          "expected_category": "CAT-10",
+          "expected_tier": "Manager",
+          "expected_values": [{"value": 4000, "unit": "EUR/year", "currency": "EUR", "condition": "Manager and above"}],
+          "mock_extracted_values": [{"value": 4000, "unit": "EUR/year", "currency": "EUR", "condition": "Manager and above"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-007",
+      "doc_name": "ManuCo HR Policy Manual",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-007-c01",
+          "text": "The freight cost for shipping household goods is reimbursed up to USD 6,500 for international relocations.",
+          "expected_category": "CAT-03",
+          "expected_tier": null,
+          "expected_values": [{"value": 6500, "unit": "USD", "currency": "USD", "condition": "international relocations"}],
+          "mock_extracted_values": [{"value": 6500, "unit": "USD", "currency": "USD", "condition": "international relocations"}]
+        },
+        {
+          "chunk_id": "doc-007-c02",
+          "text": "Senior Managers are entitled to hotel accommodation for up to 30 days while arranging permanent housing.",
+          "expected_category": "CAT-04",
+          "expected_tier": "Senior Manager",
+          "expected_values": [{"value": 30, "unit": "days", "currency": null, "condition": "while arranging permanent housing"}],
+          "mock_extracted_values": [{"value": 30, "unit": "days", "currency": null, "condition": "while arranging permanent housing"}]
+        },
+        {
+          "chunk_id": "doc-007-c03",
+          "text": "Directors may claim up to EUR 20,000 towards estate agent fees incurred on the home sale of their primary residence.",
+          "expected_category": "CAT-11",
+          "expected_tier": "Director",
+          "expected_values": [{"value": 20000, "unit": "EUR", "currency": "EUR", "condition": "primary residence estate agent fees"}],
+          "mock_extracted_values": [{"value": 20000, "unit": "EUR", "currency": "EUR", "condition": "primary residence estate agent fees"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-008",
+      "doc_name": "ManuCo HR Policy Addendum",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-008-c01",
+          "text": "Director-level assignees receive a comprehensive settling-in services package worth up to EUR 5,000 via the DSP.",
+          "expected_category": "CAT-13",
+          "expected_tier": "Director",
+          "expected_values": [{"value": 5000, "unit": "EUR", "currency": "EUR", "condition": "via DSP"}],
+          "mock_extracted_values": [{"value": 5000, "unit": "EUR", "currency": "EUR", "condition": "via DSP"}]
+        },
+        {
+          "chunk_id": "doc-008-c02",
+          "text": "A repatriation lump sum is paid at end of assignment to all Band 4 employees returning to the home country.",
+          "expected_category": "CAT-14",
+          "expected_tier": "Band 4",
+          "expected_values": [{"value": null, "unit": null, "currency": null, "condition": "end of assignment"}],
+          "mock_extracted_values": [{"value": null, "unit": null, "currency": null, "condition": "end of assignment"}]
+        },
+        {
+          "chunk_id": "doc-008-c03",
+          "text": "Director-grade assignees and their partner may attend cross-cultural coaching sessions of up to 8 sessions.",
+          "expected_category": "CAT-06",
+          "expected_tier": "Director",
+          "expected_values": [{"value": 8, "unit": "sessions", "currency": null, "condition": "assignee and partner eligible"}],
+          "mock_extracted_values": [{"value": 8, "unit": "sessions", "currency": null, "condition": "assignee and partner eligible"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-009",
+      "doc_name": "FinCorp Expatriate Benefits Policy",
+      "format": "DOCX",
+      "chunks": [
+        {
+          "chunk_id": "doc-009-c01",
+          "text": "The housing allowance cap for Band 5 employees is EUR 4,500 per month in tier-1 cities.",
+          "expected_category": "CAT-01",
+          "expected_tier": "Band 5",
+          "expected_values": [{"value": 4500, "unit": "EUR/month", "currency": "EUR", "condition": "tier-1 cities"}],
+          "mock_extracted_values": [{"value": 4500, "unit": "EUR/month", "currency": "EUR", "condition": "tier-1 cities"}]
+        },
+        {
+          "chunk_id": "doc-009-c02",
+          "text": "Tax assistance includes a gross-up to ensure no additional tax burden arises from assignment allowances.",
+          "expected_category": "CAT-09",
+          "expected_tier": null,
+          "expected_values": [],
+          "mock_extracted_values": []
+        },
+        {
+          "chunk_id": "doc-009-c03",
+          "text": "VP assignees are entitled to full door-to-door household goods shipping with no cost cap.",
+          "expected_category": "CAT-03",
+          "expected_tier": "VP",
+          "expected_values": [{"value": null, "unit": null, "currency": null, "condition": "no cost cap, full reimbursement"}],
+          "mock_extracted_values": [{"value": null, "unit": null, "currency": null, "condition": "no cost cap, full reimbursement"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-010",
+      "doc_name": "FinCorp Policy Supplement",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-010-c01",
+          "text": "VP-level employees may take one home leave trip per year in business class; economy class for dependants.",
+          "expected_category": "CAT-05",
+          "expected_tier": "VP",
+          "expected_values": [{"value": 1, "unit": "trips/year", "currency": null, "condition": "business class employee, economy dependants"}],
+          "mock_extracted_values": [{"value": 1, "unit": "trips/year", "currency": null, "condition": "business class employee, economy dependants"}]
+        },
+        {
+          "chunk_id": "doc-010-c02",
+          "text": "School tuition fees are reimbursed up to CHF 30,000 per child per academic year for all eligible dependants.",
+          "expected_category": "CAT-07",
+          "expected_tier": null,
+          "expected_values": [{"value": 30000, "unit": "CHF/child/year", "currency": "CHF", "condition": null}],
+          "mock_extracted_values": [{"value": 30000, "unit": "CHF/child/year", "currency": "CHF", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-010-c03",
+          "text": "Short-term housing in a serviced apartment is available for the first 45 days post-arrival.",
+          "expected_category": "CAT-04",
+          "expected_tier": null,
+          "expected_values": [{"value": 45, "unit": "days", "currency": null, "condition": "post-arrival"}],
+          "mock_extracted_values": [{"value": 45, "unit": "days", "currency": null, "condition": "post-arrival"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-011",
+      "doc_name": "Startup Mobility Policy v1",
+      "format": "DOCX",
+      "chunks": [
+        {
+          "chunk_id": "doc-011-c01",
+          "text": "The accommodation allowance is set at USD 2,800 per month for all relocating staff regardless of grade.",
+          "expected_category": "CAT-01",
+          "expected_tier": null,
+          "expected_values": [{"value": 2800, "unit": "USD/month", "currency": "USD", "condition": null}],
+          "mock_extracted_values": [{"value": 2800, "unit": "USD/month", "currency": "USD", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-011-c02",
+          "text": "A language course allowance of EUR 1,500 is provided for the host country language training.",
+          "expected_category": "CAT-06",
+          "expected_tier": null,
+          "expected_values": [{"value": 1500, "unit": "EUR", "currency": "EUR", "condition": null}],
+          "mock_extracted_values": [{"value": 1500, "unit": "EUR", "currency": "EUR", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-011-c03",
+          "text": "Healthcare coverage via BUPA International is provided throughout the duration of the assignment.",
+          "expected_category": "CAT-10",
+          "expected_tier": null,
+          "expected_values": [],
+          "mock_extracted_values": []
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-012",
+      "doc_name": "Startup Mobility Policy v2",
+      "format": "DOCX",
+      "chunks": [
+        {
+          "chunk_id": "doc-012-c01",
+          "text": "The monthly housing allowance is USD 3,500 for all staff, updated from the previous policy.",
+          "expected_category": "CAT-01",
+          "expected_tier": null,
+          "expected_values": [{"value": 3500, "unit": "USD/month", "currency": "USD", "condition": null}],
+          "mock_extracted_values": [{"value": 3500, "unit": "USD/month", "currency": "USD", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-012-c02",
+          "text": "A hardship allowance of up to 20% of base pay is granted for Band 6 postings to hardship locations.",
+          "expected_category": "CAT-12",
+          "expected_tier": "Band 6",
+          "expected_values": [{"value": 20, "unit": "% of base pay", "currency": null, "condition": "hardship locations"}],
+          "mock_extracted_values": [{"value": 20, "unit": "% of base pay", "currency": null, "condition": "hardship locations"}]
+        },
+        {
+          "chunk_id": "doc-012-c03",
+          "text": "Early termination penalties on lease agreements for Director-grade employees are covered up to GBP 5,000.",
+          "expected_category": "CAT-11",
+          "expected_tier": "Director",
+          "expected_values": [{"value": 5000, "unit": "GBP", "currency": "GBP", "condition": "Director-grade"}],
+          "mock_extracted_values": [{"value": 5000, "unit": "GBP", "currency": "GBP", "condition": "Director-grade"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-013",
+      "doc_name": "ConsultCo EMEA Mobility Policy",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-013-c01",
+          "text": "The employee and up to 3 dependants will receive business class flights to the destination country.",
+          "expected_category": "CAT-05",
+          "expected_tier": null,
+          "expected_values": [{"value": 4, "unit": "business class flights", "currency": null, "condition": "employee + up to 3 dependants"}],
+          "mock_extracted_values": [{"value": 4, "unit": "business class flights", "currency": null, "condition": "employee + up to 3 dependants"}]
+        },
+        {
+          "chunk_id": "doc-013-c02",
+          "text": "A tax equalization policy based on hypothetical home-country tax ensures no net increase in tax burden.",
+          "expected_category": "CAT-09",
+          "expected_tier": null,
+          "expected_values": [],
+          "mock_extracted_values": []
+        },
+        {
+          "chunk_id": "doc-013-c03",
+          "text": "The company provides a 2-day destination orientation covering schools, neighbourhoods, and essential services.",
+          "expected_category": "CAT-13",
+          "expected_tier": null,
+          "expected_values": [{"value": 2, "unit": "days", "currency": null, "condition": "schools, neighbourhood and services orientation"}],
+          "mock_extracted_values": [{"value": 2, "unit": "days", "currency": null, "condition": "schools, neighbourhood and services orientation"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-014",
+      "doc_name": "ConsultCo Benefits Handbook",
+      "format": "DOCX",
+      "chunks": [
+        {
+          "chunk_id": "doc-014-c01",
+          "text": "Education allowance for dependent children is capped at USD 20,000 per child annually.",
+          "expected_category": "CAT-07",
+          "expected_tier": null,
+          "expected_values": [{"value": 20000, "unit": "USD/child/year", "currency": "USD", "condition": null}],
+          "mock_extracted_values": [{"value": 20000, "unit": "USD/child/year", "currency": "USD", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-014-c02",
+          "text": "An accompanying partner allowance of EUR 2,000 supports the partner's job search and professional integration.",
+          "expected_category": "CAT-08",
+          "expected_tier": null,
+          "expected_values": [{"value": 2000, "unit": "EUR", "currency": "EUR", "condition": "job search and professional integration"}],
+          "mock_extracted_values": [{"value": 2000, "unit": "EUR", "currency": "EUR", "condition": "job search and professional integration"}]
+        },
+        {
+          "chunk_id": "doc-014-c03",
+          "text": "Repatriation services at end of assignment include return relocation flights for the employee and family.",
+          "expected_category": "CAT-14",
+          "expected_tier": null,
+          "expected_values": [{"value": null, "unit": "return flights", "currency": null, "condition": "includes family"}],
+          "mock_extracted_values": [{"value": null, "unit": "return flights", "currency": null, "condition": "includes family"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-015",
+      "doc_name": "MedTech Global Mobility Framework",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-015-c01",
+          "text": "The company will reimburse the cost of shipping household goods up to EUR 8,000 for container shipments.",
+          "expected_category": "CAT-03",
+          "expected_tier": null,
+          "expected_values": [{"value": 8000, "unit": "EUR", "currency": "EUR", "condition": "container shipments"}],
+          "mock_extracted_values": [{"value": 8000, "unit": "EUR", "currency": "EUR", "condition": "container shipments"}]
+        },
+        {
+          "chunk_id": "doc-015-c02",
+          "text": "Short-term housing in a serviced apartment is available for the first 60 nights post-arrival.",
+          "expected_category": "CAT-04",
+          "expected_tier": null,
+          "expected_values": [{"value": 60, "unit": "nights", "currency": null, "condition": "post-arrival"}],
+          "mock_extracted_values": [{"value": 60, "unit": "nights", "currency": null, "condition": "post-arrival"}]
+        },
+        {
+          "chunk_id": "doc-015-c03",
+          "text": "Host country cultural training includes 10 cross-cultural coaching workshops for all assignees.",
+          "expected_category": "CAT-06",
+          "expected_tier": null,
+          "expected_values": [{"value": 10, "unit": "workshops", "currency": null, "condition": null}],
+          "mock_extracted_values": [{"value": 10, "unit": "workshops", "currency": null, "condition": null}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-016",
+      "doc_name": "MedTech Policy Addendum A",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-016-c01",
+          "text": "The housing allowance cap for Director-grade employees is EUR 4,500 per month in all host cities.",
+          "expected_category": "CAT-01",
+          "expected_tier": "Director",
+          "expected_values": [{"value": 4500, "unit": "EUR/month", "currency": "EUR", "condition": null}],
+          "mock_extracted_values": [{"value": 4500, "unit": "EUR/month", "currency": "EUR", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-016-c02",
+          "text": "A location premium index adjustment of 12% applies to base salary for hardship COLA postings.",
+          "expected_category": "CAT-12",
+          "expected_tier": null,
+          "expected_values": [{"value": 12, "unit": "% of base salary", "currency": null, "condition": "hardship COLA postings"}],
+          "mock_extracted_values": [{"value": 12, "unit": "% of base salary", "currency": null, "condition": "hardship COLA postings"}]
+        },
+        {
+          "chunk_id": "doc-016-c03",
+          "text": "A one-time relocation bonus of USD 10,000 is paid upon commencement of the international assignment.",
+          "expected_category": "CAT-02",
+          "expected_tier": null,
+          "expected_values": [{"value": 10000, "unit": "USD", "currency": "USD", "condition": "upon commencement"}],
+          "mock_extracted_values": [{"value": 10000, "unit": "USD", "currency": "USD", "condition": "upon commencement"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-017",
+      "doc_name": "MedTech Revised Policy 2025",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-017-c01",
+          "text": "The revised housing allowance cap for Director-grade employees is EUR 5,000 per month effective Q1 2025.",
+          "expected_category": "CAT-01",
+          "expected_tier": "Director",
+          "expected_values": [{"value": 5000, "unit": "EUR/month", "currency": "EUR", "condition": "effective Q1 2025"}],
+          "mock_extracted_values": [{"value": 5000, "unit": "EUR/month", "currency": "EUR", "condition": "effective Q1 2025"}]
+        },
+        {
+          "chunk_id": "doc-017-c02",
+          "text": "The employee and up to 3 dependants will receive business class flights to the destination country.",
+          "expected_category": "CAT-05",
+          "expected_tier": null,
+          "expected_values": [{"value": 4, "unit": "business class flights", "currency": null, "condition": "employee + up to 3 dependants"}],
+          "mock_extracted_values": [{"value": 4, "unit": "business class flights", "currency": null, "condition": "employee + up to 3 dependants"}]
+        },
+        {
+          "chunk_id": "doc-017-c03",
+          "text": "Directors receive an annual tax return preparation service funded by the company.",
+          "expected_category": "CAT-09",
+          "expected_tier": "Director",
+          "expected_values": [{"value": 1, "unit": "tax return/year", "currency": null, "condition": "company funded"}],
+          "mock_extracted_values": [{"value": 1, "unit": "tax return/year", "currency": null, "condition": "company funded"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-018",
+      "doc_name": "EnergyGroup Expatriate Policy",
+      "format": "PDF",
+      "chunks": [
+        {
+          "chunk_id": "doc-018-c01",
+          "text": "A one-time relocation lump sum of USD 8,000 is provided to all international assignees upon relocation.",
+          "expected_category": "CAT-02",
+          "expected_tier": null,
+          "expected_values": [{"value": 8000, "unit": "USD", "currency": "USD", "condition": null}],
+          "mock_extracted_values": [{"value": 8000, "unit": "USD", "currency": "USD", "condition": null}]
+        },
+        {
+          "chunk_id": "doc-018-c02",
+          "text": "Vehicle shipment costs are covered for international assignments exceeding 12 months duration.",
+          "expected_category": "CAT-03",
+          "expected_tier": null,
+          "expected_values": [],
+          "mock_extracted_values": []
+        },
+        {
+          "chunk_id": "doc-018-c03",
+          "text": "School tuition fees for dependent children are reimbursed up to CHF 30,000 per child per academic year.",
+          "expected_category": "CAT-07",
+          "expected_tier": null,
+          "expected_values": [{"value": 30000, "unit": "CHF/child/year", "currency": "CHF", "condition": null}],
+          "mock_extracted_values": [{"value": 30000, "unit": "CHF/child/year", "currency": "CHF", "condition": null}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-019",
+      "doc_name": "EnergyGroup Benefits Supplement",
+      "format": "DOCX",
+      "chunks": [
+        {
+          "chunk_id": "doc-019-c01",
+          "text": "The company provides up to 90 nights of temporary accommodation in a serviced apartment upon arrival.",
+          "expected_category": "CAT-04",
+          "expected_tier": null,
+          "expected_values": [{"value": 90, "unit": "nights", "currency": null, "condition": "serviced apartment upon arrival"}],
+          "mock_extracted_values": [{"value": 90, "unit": "nights", "currency": null, "condition": "serviced apartment upon arrival"}]
+        },
+        {
+          "chunk_id": "doc-019-c02",
+          "text": "Employees are entitled to 60 hours of language training in the host country language, capped at EUR 2,500.",
+          "expected_category": "CAT-06",
+          "expected_tier": null,
+          "expected_values": [{"value": 60, "unit": "hours", "currency": null, "condition": null}, {"value": 2500, "unit": "EUR", "currency": "EUR", "condition": "cap"}],
+          "mock_extracted_values": [{"value": 60, "unit": "hours", "currency": null, "condition": null}, {"value": 2500, "unit": "EUR", "currency": "EUR", "condition": "cap"}]
+        },
+        {
+          "chunk_id": "doc-019-c03",
+          "text": "A repatriation lump sum of EUR 5,000 is paid at end of assignment to all Band 4+ employees returning home.",
+          "expected_category": "CAT-14",
+          "expected_tier": "Band 4",
+          "expected_values": [{"value": 5000, "unit": "EUR", "currency": "EUR", "condition": "end of assignment"}],
+          "mock_extracted_values": [{"value": 5000, "unit": "EUR", "currency": "EUR", "condition": "end of assignment"}]
+        }
+      ]
+    },
+    {
+      "doc_id": "doc-020",
+      "doc_name": "TechStartup Relocation Policy",
+      "format": "DOCX",
+      "chunks": [
+        {
+          "chunk_id": "doc-020-c01",
+          "text": "The housing allowance for VP-grade employees is capped at GBP 6,000 per month for London postings.",
+          "expected_category": "CAT-01",
+          "expected_tier": "VP",
+          "expected_values": [{"value": 6000, "unit": "GBP/month", "currency": "GBP", "condition": "London postings"}],
+          "mock_extracted_values": [{"value": 6000, "unit": "GBP/month", "currency": "GBP", "condition": "London postings"}]
+        },
+        {
+          "chunk_id": "doc-020-c02",
+          "text": "A company provides a lease break allowance when early termination of the lease agreement is required.",
+          "expected_category": "CAT-11",
+          "expected_tier": null,
+          "expected_values": [],
+          "mock_extracted_values": []
+        },
+        {
+          "chunk_id": "doc-020-c03",
+          "text": "A destination services orientation covers school search, area tour, and utility setup on arrival.",
+          "expected_category": "CAT-13",
+          "expected_tier": null,
+          "expected_values": [],
+          "mock_extracted_values": []
+        }
+      ]
+    }
+  ],
+  "known_conflicts": [
+    {
+      "conflict_id": "conflict-001",
+      "chunk_a_id": "doc-003-c01",
+      "chunk_b_id": "doc-004-c01",
+      "description": "GlobalBank v1 vs v2: Manager housing cap EUR 3,200 vs EUR 4,000",
+      "category_code": "CAT-01",
+      "tier": "Manager",
+      "expected_type": "inter_document",
+      "expected_severity": "high"
+    },
+    {
+      "conflict_id": "conflict-002",
+      "chunk_a_id": "doc-011-c01",
+      "chunk_b_id": "doc-012-c01",
+      "description": "Startup v1 vs v2: All-grade housing USD 2,800 vs USD 3,500",
+      "category_code": "CAT-01",
+      "tier": null,
+      "expected_type": "inter_document",
+      "expected_severity": "high"
+    },
+    {
+      "conflict_id": "conflict-003",
+      "chunk_a_id": "doc-016-c01",
+      "chunk_b_id": "doc-017-c01",
+      "description": "MedTech Addendum vs Revised: Director housing EUR 4,500 vs EUR 5,000",
+      "category_code": "CAT-01",
+      "tier": "Director",
+      "expected_type": "inter_document",
+      "expected_severity": "high"
+    },
+    {
+      "conflict_id": "conflict-004",
+      "chunk_a_id": "doc-001-c02",
+      "chunk_b_id": "doc-018-c01",
+      "description": "TechCorp vs EnergyGroup: Lump sum USD 10,000 vs USD 8,000",
+      "category_code": "CAT-02",
+      "tier": null,
+      "expected_type": "inter_document",
+      "expected_severity": "high"
+    },
+    {
+      "conflict_id": "conflict-005",
+      "chunk_a_id": "doc-003-c02",
+      "chunk_b_id": "doc-015-c01",
+      "description": "GlobalBank vs MedTech: Household goods EUR 8,000 vs EUR 8,000 — consistent, NOT a conflict",
+      "category_code": "CAT-03",
+      "tier": null,
+      "expected_type": "none",
+      "expected_severity": null
+    },
+    {
+      "conflict_id": "conflict-006",
+      "chunk_a_id": "doc-007-c03",
+      "chunk_b_id": "doc-012-c03",
+      "description": "ManuCo EUR 20,000 home sale vs Startup GBP 5,000 lease break — different sub-categories, compare by category only if same tier",
+      "category_code": "CAT-11",
+      "tier": null,
+      "expected_type": "inter_document",
+      "expected_severity": "high"
+    },
+    {
+      "conflict_id": "conflict-007",
+      "chunk_a_id": "doc-004-c03",
+      "chunk_b_id": "doc-016-c02",
+      "description": "GlobalBank COLA 15% vs MedTech COLA 12% — same category, different percentage",
+      "category_code": "CAT-12",
+      "tier": null,
+      "expected_type": "inter_document",
+      "expected_severity": "high"
+    },
+    {
+      "conflict_id": "conflict-008",
+      "chunk_a_id": "doc-003-c03",
+      "chunk_b_id": "doc-019-c01",
+      "description": "GlobalBank 90 nights serviced apt vs EnergyGroup 90 nights serviced apt — consistent, NOT a conflict",
+      "category_code": "CAT-04",
+      "tier": null,
+      "expected_type": "none",
+      "expected_severity": null
+    }
+  ],
+  "real_conflicts": ["conflict-001", "conflict-002", "conflict-003", "conflict-004", "conflict-006", "conflict-007"]
+}

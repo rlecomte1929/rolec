@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Query, UploadFile, File, Request, Form, Body, APIRouter, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from typing import Annotated, Literal, Optional, Dict, Any, List, Tuple, Union
 import uuid
 from datetime import datetime, date
@@ -137,9 +137,11 @@ from .app.routers import admin_workflow_analytics as admin_workflow_analytics_ro
 from .app.routers import admin_collaboration as admin_collaboration_router
 from .app.routers import admin_prospects as admin_prospects_router
 from .app.routers import admin_form_templates as admin_form_templates_router
+from .app.routers import crons as crons_router  # [P4-4]
 from .app.routers import mobility_context as mobility_context_router
 from .app.routers import admin_mobility as admin_mobility_router
 from .app.routers import policy_canonical as policy_canonical_router
+from .app.routers import policy_templates as policy_templates_router
 from .app.routers import hr_coordination as hr_coordination_router
 from .app.routers import prescreening as prescreening_router
 from .app.routers import integrations_personio_webhook as personio_webhook_router
@@ -557,6 +559,7 @@ app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignm
 app.include_router(policy_publish_router.router)  # [P1-4] policy publish + version control
 app.include_router(policy_summary_router.router)  # [P1-5 backend] 14-category summary
 app.include_router(policy_feedback_router.router)  # [P5-5] feedback + HR review queue
+app.include_router(crons_router.router)  # [P4-4] cron endpoints
 app.include_router(exception_requests_router.router)
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
@@ -585,6 +588,7 @@ app.include_router(admin_form_templates_router.router, prefix="/api/admin")
 app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
 app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")
 app.include_router(policy_canonical_router.read_router, prefix="/api")
+app.include_router(policy_templates_router.router)  # P1-2: 3-tier template library
 app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
 app.include_router(hr_resources_router.router)
@@ -1274,6 +1278,26 @@ class EmployeePolicyAssistantQueryRequest(BaseModel):
     assignment_id: str
     message: str
     session: Optional[Dict[str, Any]] = None
+
+
+class PolicySessionExportTurnEvidence(BaseModel):
+    label: Optional[str] = None
+    excerpt: Optional[str] = None
+
+
+class PolicySessionExportTurn(BaseModel):
+    question: str
+    answer_text: str
+    evidence: Optional[List[PolicySessionExportTurnEvidence]] = None
+
+
+class PolicySessionExportRequest(BaseModel):
+    assignment_id: str
+    turns: List[PolicySessionExportTurn]
+    employee_name: Optional[str] = None
+    company_name: Optional[str] = None
+    tier: Optional[str] = None
+    policy_version: Optional[str] = None
 
 
 class HrPolicyAssistantQueryRequest(BaseModel):
@@ -8553,6 +8577,86 @@ def post_employee_policy_assistant_query(
     except Exception as exc:
         log.exception("employee policy assistant query failed assignment_id=%s", aid)
         raise HTTPException(status_code=500, detail="Policy assistant failed") from exc
+
+
+@app.post("/api/employee/policy-assistant/export-pdf")
+def post_employee_policy_session_export_pdf(
+    body: PolicySessionExportRequest,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+):
+    """
+    [P5-4] Generate a PDF export of a completed Policy Assistant Q&A session.
+
+    Returns a binary PDF stream with Content-Disposition: attachment.
+    File name: ReloPass_Policy_QA_<YYYY-MM-DD>.pdf
+    """
+    import io as _io
+    from datetime import datetime, timezone
+
+    aid = (body.assignment_id or "").strip()
+    if not aid:
+        raise HTTPException(status_code=400, detail="assignment_id is required")
+    if not body.turns:
+        raise HTTPException(status_code=400, detail="turns must not be empty")
+    if len(body.turns) > 50:
+        raise HTTPException(status_code=400, detail="too many turns (max 50)")
+
+    # Verify the caller is allowed to access this assignment.
+    assignment = _require_assignment_visibility(aid, user)
+
+    # Resolve header metadata: prefer client-supplied values, fall back to DB.
+    employee_name = body.employee_name
+    company_name = body.company_name
+    tier = body.tier
+    policy_version = body.policy_version
+
+    if not employee_name:
+        employee_name = user.get("name") or user.get("full_name") or None
+    if not company_name:
+        try:
+            company_row = db.get_company(str(assignment.get("company_id") or ""))
+            company_name = (company_row or {}).get("name") or None
+        except Exception:
+            pass
+
+    # Serialise turns into plain dicts.
+    turns_dicts = [
+        {
+            "question": t.question,
+            "answer_text": t.answer_text,
+            "evidence": [
+                {"label": ev.label, "excerpt": ev.excerpt}
+                for ev in (t.evidence or [])
+            ],
+        }
+        for t in body.turns
+    ]
+
+    try:
+        from .services.policy_session_pdf import build_policy_session_pdf
+        pdf_bytes = build_policy_session_pdf(
+            turns_dicts,
+            employee_name=employee_name,
+            company_name=company_name,
+            tier=tier,
+            policy_version=policy_version,
+        )
+    except RuntimeError as exc:
+        log.warning("PDF generation unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail="PDF generation unavailable") from exc
+    except Exception as exc:
+        log.exception("policy session PDF export failed assignment_id=%s", aid)
+        raise HTTPException(status_code=500, detail="PDF export failed") from exc
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    filename = f"ReloPass_Policy_QA_{today}.pdf"
+
+    return StreamingResponse(
+        _io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.post("/api/hr/policy-assistant/query")

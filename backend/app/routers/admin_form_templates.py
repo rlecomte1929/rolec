@@ -118,6 +118,11 @@ def _table() -> str:
     return "public.form_templates" if _dialect() == "postgresql" else "form_templates"
 
 
+def _qual(name: str) -> str:
+    """Schema-qualify a table name for Postgres; bare name for SQLite."""
+    return f"public.{name}" if _dialect() == "postgresql" else name
+
+
 def _jsonb_expr(param: str) -> str:
     """`CAST(:param AS jsonb)` on Postgres; bare `:param` on SQLite (column is TEXT)."""
     return f"CAST(:{param} AS jsonb)" if _dialect() == "postgresql" else f":{param}"
@@ -222,6 +227,91 @@ def list_form_templates(
     with db.engine.begin() as conn:
         rows = conn.execute(text(sql), params).mappings().all()
     return [_row_to_dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# [P4-6] Admin accuracy report — per-field AI override rates
+# IMPORTANT: This route must be declared before /{template_id} or FastAPI
+# will route GET /accuracy-report as get_form_template with template_id="accuracy-report"
+# ---------------------------------------------------------------------------
+
+class FieldAccuracyItem(BaseModel):
+    """One row in the accuracy report: a (form_code, field_id) pair with stats."""
+    form_template_id: str
+    form_code: str
+    field_id: str
+    total_ai_fills: int
+    overrides: int
+    override_rate_pct: int          # 0–100
+    accuracy_flag: Optional[str]    # 'low_accuracy' if override_rate_pct > 20, else None
+    # Deep-link for admin to navigate to the FieldDefinition editor
+    field_edit_url: str
+
+
+@router.get("/accuracy-report", response_model=List[FieldAccuracyItem])
+def get_accuracy_report(
+    user: Dict[str, Any] = Depends(require_admin),
+) -> List[FieldAccuracyItem]:
+    """
+    [P4-6] Returns per-(form_template, field) override statistics.
+
+    Rows are ordered by override_rate_pct DESC so the worst-performing
+    fields appear first. Fields with override_rate_pct > 20 are flagged
+    as 'low_accuracy'; the field_edit_url links the admin directly to the
+    FieldDefinition editor.
+    """
+    # Dialect-aware ROUND expression
+    if _dialect() == "postgresql":
+        rate_expr = (
+            "ROUND(COUNT(fvo.id) * 100.0 / NULLIF(COUNT(fv.id), 0))::int"
+        )
+    else:
+        rate_expr = (
+            "CAST(ROUND(COUNT(fvo.id) * 100.0 / NULLIF(COUNT(fv.id), 0)) AS INTEGER)"
+        )
+
+    sql = f"""
+        SELECT
+          ft.id        AS form_template_id,
+          ft.code      AS form_code,
+          fv.field_id,
+          COUNT(fv.id) AS total_ai_fills,
+          COUNT(fvo.id) AS overrides,
+          COALESCE({rate_expr}, 0) AS override_rate_pct
+        FROM {_qual('case_form_field_values')} fv
+        JOIN {_qual('case_forms')} cf  ON cf.id = fv.case_form_id
+        JOIN {_table()} ft             ON ft.id = cf.form_template_id
+        LEFT JOIN {_qual('field_value_overrides')} fvo
+          ON fvo.case_form_id = fv.case_form_id
+         AND fvo.field_id     = fv.field_id
+        WHERE fv.filled_by = 'ai'
+        GROUP BY ft.id, ft.code, fv.field_id
+        ORDER BY override_rate_pct DESC
+    """
+
+    try:
+        with db.engine.connect() as conn:
+            rows = conn.execute(text(sql)).mappings().all()
+    except Exception:
+        logger.exception("accuracy_report: query failed")
+        raise HTTPException(status_code=500, detail="Failed to generate accuracy report")
+
+    items: List[FieldAccuracyItem] = []
+    for row in rows:
+        tmpl_id  = str(row["form_template_id"])
+        field_id = str(row["field_id"])
+        rate     = int(row["override_rate_pct"] or 0)
+        items.append(FieldAccuracyItem(
+            form_template_id=tmpl_id,
+            form_code=str(row["form_code"]),
+            field_id=field_id,
+            total_ai_fills=int(row["total_ai_fills"] or 0),
+            overrides=int(row["overrides"] or 0),
+            override_rate_pct=rate,
+            accuracy_flag="low_accuracy" if rate > 20 else None,
+            field_edit_url=f"/admin/form-templates/{tmpl_id}?field={field_id}",
+        ))
+    return items
 
 
 @router.get("/{template_id}", response_model=FormTemplateRead)
@@ -450,3 +540,6 @@ def update_form_template(
 
     logger.info("form_template updated in-place id=%s by=%s", template_id, user.get("id"))
     return _row_to_dict(row)
+
+
+# (accuracy-report endpoint moved above /{template_id} — see earlier in this file)

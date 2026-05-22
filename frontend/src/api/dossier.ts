@@ -54,10 +54,15 @@ export interface CaseFormSummary {
   deadline_trigger: string | null;
   blocker_form_id: string | null;
   blocker_form_code: string | null;
+  /** [P2-6] Server-computed convenience flag — true when blocker_form_id is set
+   *  and the blocker has not yet been submitted/approved. */
+  is_blocked?: boolean;
   original_file_url: string | null;
   draft_pdf_url: string | null;
   submitted_at: string | null;
   receipt_ref: string | null;
+  rejection_reason: string | null;  // [P4-5] set when status='rejected'
+  roadmap_step_id?: string | null;  // [P1-6] step that triggered this form
   template: DossierFormTemplate;
   person: DossierFormPerson;
   fields_summary: DossierFieldsSummary;
@@ -68,4 +73,119 @@ export interface CaseFormSummary {
 export const dossierAPI = {
   list: async (caseId: string, params?: { status?: CaseFormStatus }): Promise<CaseFormSummary[]> =>
     api.get(`/api/cases/${caseId}/forms`, { params }).then((r: { data: CaseFormSummary[] }) => r.data),
+};
+
+// ── [P3-4] Dossier Package ────────────────────────────────────────────────────
+
+export interface DossierPackage {
+  id: string;
+  case_id: string;
+  name: string;
+  form_ids: string[];
+  cover_page: boolean;
+  pdf_url: string | null;
+  generated_at: string | null;
+  created_at: string;
+}
+
+/** [P3-6] DossierPackage with server-computed staleness flag. */
+export interface DossierPackageDetail extends DossierPackage {
+  is_stale: boolean;
+}
+
+export interface CreateDossierPackagePayload {
+  name: string;
+  form_ids: string[];
+  cover_page: boolean;
+}
+
+export const dossierPackageAPI = {
+  create: async (caseId: string, payload: CreateDossierPackagePayload): Promise<DossierPackage> =>
+    api
+      .post(`/api/cases/${caseId}/dossiers`, payload)
+      .then((r: { data: DossierPackage }) => r.data),
+
+  /** [P3-6] List all saved dossier packages for a case. */
+  list: async (caseId: string): Promise<DossierPackageDetail[]> =>
+    api
+      .get(`/api/cases/${caseId}/dossiers`)
+      .then((r: { data: DossierPackageDetail[] }) => r.data),
+
+  /** [P3-6] Get a single dossier package with staleness flag. */
+  get: async (caseId: string, dossierId: string): Promise<DossierPackageDetail> =>
+    api
+      .get(`/api/cases/${caseId}/dossiers/${dossierId}`)
+      .then((r: { data: DossierPackageDetail }) => r.data),
+
+  /** [P3-6] Rebuild the merged PDF with current field values. */
+  regenerate: async (caseId: string, dossierId: string): Promise<DossierPackageDetail> =>
+    api
+      .post(`/api/cases/${caseId}/dossiers/${dossierId}/regenerate`, {})
+      .then((r: { data: DossierPackageDetail }) => r.data),
+
+  /** [P3-6] Delete a dossier package. */
+  delete: async (caseId: string, dossierId: string): Promise<void> =>
+    api.delete(`/api/cases/${caseId}/dossiers/${dossierId}`).then(() => undefined),
+
+  getPdfUrl: (caseId: string, dossierId: string): string =>
+    `/api/cases/${caseId}/dossiers/${dossierId}/pdf`,
+
+  getZipUrl: (caseId: string, dossierId: string): string =>
+    `/api/cases/${caseId}/dossiers/${dossierId}/zip`,
+};
+
+// ── [P4-2] Comments, events, flag ────────────────────────────────────────────
+
+export interface FormComment {
+  id: string;
+  case_form_id: string;
+  author_id: string;
+  author_name: string | null;
+  content: string;
+  created_at: string;
+}
+
+export interface FormEvent {
+  id: string;
+  case_form_id: string;
+  event_type: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  from_status: string | null;
+  to_status: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface FormFlagResponse {
+  id: string;
+  flag_note: string | null;
+  flagged_at: string | null;
+  flagged_by: string | null;
+}
+
+export const commentsAPI = {
+  list: (caseId: string, formId: string): Promise<FormComment[]> =>
+    api
+      .get(`/api/cases/${caseId}/forms/${formId}/comments`)
+      .then((r: { data: FormComment[] }) => r.data),
+
+  create: (caseId: string, formId: string, content: string): Promise<FormComment> =>
+    api
+      .post(`/api/cases/${caseId}/forms/${formId}/comments`, { content })
+      .then((r: { data: FormComment }) => r.data),
+};
+
+export const eventsAPI = {
+  list: (caseId: string, formId: string): Promise<FormEvent[]> =>
+    api
+      .get(`/api/cases/${caseId}/forms/${formId}/events`)
+      .then((r: { data: FormEvent[] }) => r.data),
+};
+
+export const flagAPI = {
+  patch: (caseId: string, formId: string, flagNote: string | null): Promise<FormFlagResponse> =>
+    api
+      .patch(`/api/cases/${caseId}/forms/${formId}/flag`, { flag_note: flagNote })
+      .then((r: { data: FormFlagResponse }) => r.data),
 };
