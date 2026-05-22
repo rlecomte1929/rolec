@@ -2353,6 +2353,22 @@ export const employeeAPI = {
     const response = await api.get('/api/employee/quote-requests');
     return Array.isArray(response.data) ? response.data : [];
   },
+
+  exportPolicySessionPdf: async (
+    assignmentId: string,
+    turns: Array<{
+      question: string;
+      answer_text: string;
+      evidence: Array<{ label?: string; excerpt?: string }>;
+    }>
+  ): Promise<Blob> => {
+    const response = await api.post(
+      '/api/employee/policy-assistant/export-pdf',
+      { assignment_id: assignmentId, turns },
+      { responseType: 'blob' }
+    );
+    return response.data as Blob;
+  },
 };
 
 export const servicesAPI = {

@@ -34,6 +34,13 @@ import { Button } from '../../../../components/antigravity';
 
 export type FieldType = 'text' | 'date' | 'number' | 'boolean' | 'select';
 
+/** Fractional PDF coordinates (0–1 range, 0-based page index). */
+export type PdfCoordinates = {
+  page: number;
+  x: number;
+  y: number;
+};
+
 export interface FieldDefinition {
   id: string;
   label: string;
@@ -41,8 +48,9 @@ export interface FieldDefinition {
   required: boolean;
   prefill_source?: string;
   requires_original?: boolean;
-  position?: number;     // computed on save, not user-editable
-  options?: string[];    // type='select' only
+  position?: number;          // computed on save, not user-editable
+  options?: string[];         // type='select' only
+  pdf_coordinates?: PdfCoordinates;
 }
 
 const FIELD_TYPE_OPTIONS: FieldType[] = ['text', 'date', 'number', 'boolean', 'select'];
