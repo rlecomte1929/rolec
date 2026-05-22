@@ -1,7 +1,21 @@
-from pydantic import BaseModel, Field, AliasChoices
+import html as _html
+
+from pydantic import BaseModel, Field, AliasChoices, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import date
 from enum import Enum
+
+
+def _escape_html(v: Optional[str]) -> Optional[str]:
+    """XSS defence: escape HTML special chars in user-supplied free-text before storage.
+
+    Uses Python's stdlib html.escape so <script>alert(1)</script> becomes
+    &lt;script&gt;alert(1)&lt;/script&gt; and is never reflected unescaped.
+    No external library required.
+    """
+    if v is None:
+        return None
+    return _html.escape(str(v))
 
 
 class MaritalStatus(str, Enum):
@@ -186,6 +200,12 @@ class RegisterRequest(BaseModel):
     password: str
     role: UserRole
     name: Optional[str] = None
+
+    # XSS defence: strip HTML from user-supplied text before storage
+    @field_validator("name", mode="before")
+    @classmethod
+    def _sanitize_name(cls, v: Optional[str]) -> Optional[str]:
+        return _escape_html(v)
 
 
 class LoginRequest(BaseModel):
@@ -427,6 +447,12 @@ class AssignCaseRequest(BaseModel):
     employeeIdentifier: str = Field(validation_alias=AliasChoices("employeeIdentifier", "employee_email"))
     employeeFirstName: Optional[str] = None
     employeeLastName: Optional[str] = None
+
+    # XSS defence: strip HTML from user-supplied text before storage
+    @field_validator("employeeFirstName", "employeeLastName", mode="before")
+    @classmethod
+    def _sanitize_name_fields(cls, v: Optional[str]) -> Optional[str]:
+        return _escape_html(v)
 
 
 class AssignCaseResponse(BaseModel):

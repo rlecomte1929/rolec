@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import init_db
-from .routers import cases, admin, employee_quotes
+from .routers import cases, admin, employee_quotes, pets
 from .seed import seed_demo_cases
 from ..services.pii_log_filter import install_pii_log_filter
 
@@ -27,6 +27,7 @@ def create_app() -> FastAPI:
     app.include_router(cases.router)
     app.include_router(admin.router)
     app.include_router(employee_quotes.router)
+    app.include_router(pets.router)
     return app
 
 
