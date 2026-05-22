@@ -121,6 +121,7 @@ from .services.relocation_plan_view_service import (
 )
 from .app.routers import auth as auth_router
 from .app.routers import cases as cases_router
+from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import admin as admin_router
 from .app.routers import admin_resources as admin_resources_router
 from .app.routers import admin_staging as admin_staging_router
@@ -547,6 +548,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(compat_router.router)
 app.include_router(cases_router.router)
+app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(exception_requests_router.router)
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
