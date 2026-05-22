@@ -5945,7 +5945,7 @@ class Database:
             FROM case_assignments a
             LEFT JOIN relocation_cases rc ON {join_on}
             LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
-            LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, hu.company_id)
+            LEFT JOIN companies c ON CAST(c.id AS TEXT) = COALESCE(rc.company_id, hu.company_id)
             WHERE a.employee_user_id = :uid
             ORDER BY a.created_at DESC
         """
@@ -5986,7 +5986,7 @@ class Database:
             FROM case_assignments a
             INNER JOIN employee_contacts ec ON ec.id = a.employee_contact_id
             LEFT JOIN relocation_cases rc ON {join_on}
-            LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, ec.company_id)
+            LEFT JOIN companies c ON CAST(c.id AS TEXT) = COALESCE(rc.company_id, ec.company_id)
             WHERE TRIM(COALESCE(ec.linked_auth_user_id, '')) = :uid
             AND a.employee_user_id IS NULL
             AND LOWER(TRIM(COALESCE(a.employee_link_mode, ''))) = 'pending_claim'
@@ -6535,7 +6535,7 @@ class Database:
                       AND pcv.status = 'published') AS matrix_policy_count
             FROM case_assignments a
             LEFT JOIN relocation_cases rc ON {join_on_cases}
-            LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
+            LEFT JOIN companies c ON CAST(c.id AS TEXT) = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
             LEFT JOIN profiles emp_p ON CAST(emp_p.id AS TEXT) = a.employee_user_id
             LEFT JOIN profiles hr_p ON CAST(hr_p.id AS TEXT) = a.hr_user_id
             LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
@@ -6596,7 +6596,7 @@ class Database:
                         hu.company_id AS hr_company_id, emp.company_id AS employee_company_id
                     FROM case_assignments a
                     LEFT JOIN relocation_cases rc ON {join_on_cases}
-                    LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
+                    LEFT JOIN companies c ON CAST(c.id AS TEXT) = COALESCE(rc.company_id, (SELECT hu2.company_id FROM hr_users hu2 WHERE hu2.profile_id = a.hr_user_id LIMIT 1))
                     LEFT JOIN profiles emp_p ON CAST(emp_p.id AS TEXT) = a.employee_user_id
                     LEFT JOIN profiles hr_p ON CAST(hr_p.id AS TEXT) = a.hr_user_id
                     LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
@@ -6657,7 +6657,7 @@ class Database:
         """Set destination (host_country) on a relocation case (e.g. after admin create)."""
         with self.engine.begin() as conn:
             conn.execute(
-                text("UPDATE relocation_cases SET host_country = :host, updated_at = :ua WHERE id = :cid"),
+                text("UPDATE relocation_cases SET host_country = :host, updated_at = :ua WHERE id::text = :cid"),
                 {"host": host_country, "ua": datetime.utcnow().isoformat(), "cid": case_id},
             )
 
@@ -6683,7 +6683,7 @@ class Database:
         if host_country:
             parts.append("host_country = :host")
             params["host"] = host_country
-        sql = f"UPDATE relocation_cases SET {', '.join(parts)} WHERE id = :cid"
+        sql = f"UPDATE relocation_cases SET {', '.join(parts)} WHERE id::text = :cid"
         with self.engine.begin() as conn:
             conn.execute(text(sql), params)
 
@@ -11214,7 +11214,7 @@ class Database:
             LEFT JOIN case_assignments a ON {_eq_text("a.id", "m.assignment_id")}
             LEFT JOIN relocation_cases rc ON {_relocation_cases_join_on("a")}
             LEFT JOIN hr_users hu ON hu.profile_id = a.hr_user_id
-            LEFT JOIN companies c ON c.id = COALESCE(rc.company_id, hu.company_id)
+            LEFT JOIN companies c ON CAST(c.id AS TEXT) = COALESCE(rc.company_id, hu.company_id)
             LEFT JOIN profiles emp_p ON CAST(emp_p.id AS TEXT) = a.employee_user_id
             LEFT JOIN profiles hr_p ON CAST(hr_p.id AS TEXT) = a.hr_user_id
             WHERE {where_sql}
@@ -12236,7 +12236,7 @@ class Database:
                    cp.extraction_status, cp.extracted_at, cp.created_by, cp.created_at,
                    c.name AS company_name
             FROM company_policies cp
-            LEFT JOIN companies c ON c.id = cp.company_id
+            LEFT JOIN companies c ON CAST(c.id AS TEXT) = cp.company_id
             {where}
             ORDER BY cp.company_id, cp.created_at DESC
         """
