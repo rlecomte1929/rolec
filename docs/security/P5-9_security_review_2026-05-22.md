@@ -28,6 +28,18 @@ is now ready for an internal pilot with synthetic data.** External
 pen test (Cure53 recommended, §3) is still required before any real
 customer data enters the system.
 
+**Verdict (2026-05-22 follow-up):** ✅ **H3 now closed.** Central
+`PiiLogFilter` (`backend/services/pii_log_filter.py`) attached to the
+root logger from both entry points (`backend/main.py`,
+`backend/app/main.py`); every emitted log record is scrubbed against
+the 5 audit patterns. Per-callsite masking is no longer the only line
+of defence. Compromise note carried over: the filter rewrites
+`record.msg` only — `record.args` on the caller's tuple is untouched
+so Sentry/Datadog/LangSmith/Helicone consumers that read structured
+fields directly off the record still see the raw values. That is the
+intended trade-off (structured PII handling is bounded by the
+trust-boundary of the observability vendor contract, not by stdout).
+
 ### Tally
 
 | Severity | Count | Examples                                              |
@@ -264,7 +276,7 @@ follow-up engagement at Bishop Fox before Series A.
 | C2 | Critical | Raw query echoed in fallback response (logged + returned) | `backend/services/policy_query_answering.py:130`             | ✅ **CLOSED** (commit `b7479db` on main) |
 | H1 | High     | LLM payload not masked before send to Anthropic          | `backend/services/policy_assistant_llm_client.py:75`         | ✅ **CLOSED** (commit `b7479db` on main) |
 | H2 | High     | No audit_log entry for retrieval queries                 | `backend/services/policy_query_answering.py` (entry function)| 🪧 Spawned as follow-up chip |
-| H3 | High     | No central log-filter for PII patterns                   | `backend/main.py` / `backend/app/main.py`                     | 🪧 Spawned as follow-up chip |
+| H3 | High     | No central log-filter for PII patterns                   | `backend/main.py` / `backend/app/main.py`                     | ✅ **CLOSED** (`backend/services/pii_log_filter.py` + root-logger install in both entry points; tests in `backend/tests/test_pii_log_filter.py`) |
 | M1 | Medium   | CSV import has no row-count cap                          | `backend/app/routers/employee_tiers.py:347`                  | ~30 min |
 | M2 | Medium   | No rate limit on POST /api/policy/feedback               | `backend/app/routers/policy_feedback.py:233`                 | ~30 min |
 | M3 | Medium   | review_queue response_summary / latest_comment not XSS-escaped at backend | `backend/app/routers/policy_feedback.py` | ~1 hr |

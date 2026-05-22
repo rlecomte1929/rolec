@@ -11,6 +11,14 @@ import json as _json
 
 logging.basicConfig(level=logging.INFO)
 
+# [P5-9 H3] Install the central PII log filter on the root logger before
+# any other module gets a chance to emit a record. Scrubs the 5 patterns
+# from the audit (phone, IBAN, passport, SSN, email/ID) out of every
+# rendered log line — replaces the brittle per-callsite masking that
+# previously gated this.
+from .services.pii_log_filter import install_pii_log_filter  # noqa: E402
+install_pii_log_filter()
+
 # Configure observability (Sentry + structured logging) before anything else
 # logs, so early startup lines land in the right format. All of it is no-op
 # unless the relevant env vars are set.

@@ -4,9 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from .db import init_db
 from .routers import cases, admin, employee_quotes
 from .seed import seed_demo_cases
+from ..services.pii_log_filter import install_pii_log_filter
 
 
 def create_app() -> FastAPI:
+    # [P5-9 H3] Central PII scrubber on the root logger — keeps the 5
+    # audit patterns out of every record before any handler emits it.
+    install_pii_log_filter()
+
     init_db()
     seed_demo_cases()
 
