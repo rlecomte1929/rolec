@@ -67,7 +67,14 @@ export const HrCaseSummary: React.FC = () => {
     setError('');
     setDraftCase(null);
     try {
-      const data = await hrAPI.getAssignment(caseId);
+      // Use a short timeout so draft cases surface quickly instead of waiting
+      // the full 12 s default — if no assignment exists the server 404s fast,
+      // but network hiccups shouldn't leave users on a blank loading screen.
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 8000);
+      const data = await hrAPI
+        .getAssignment(caseId, { signal: ac.signal })
+        .finally(() => clearTimeout(timer));
       setAssignment(data);
       localStorage.setItem('relopass_last_assignment_id', data.id);
     } catch (err: any) {
@@ -75,13 +82,21 @@ export const HrCaseSummary: React.FC = () => {
         safeNavigate(navigate, 'landing');
         return;
       }
-      if (err.response?.status === 404) {
-        // Might be a draft case (relocation_cases row, no assignment yet)
+      // B10 fix: try the draft-case fallback for ANY non-auth error, not just
+      // 404. A 5xx or network timeout on the assignment lookup should still
+      // reveal the draft card when the underlying case exists.
+      const isAuthError =
+        err.response?.status === 401 || err.response?.status === 403;
+      if (!isAuthError) {
         try {
           const draft = await hrAPI.getDraftCase(caseId);
           setDraftCase(draft);
         } catch {
-          setError('Case not found or not visible.');
+          setError(
+            err.response?.status === 404
+              ? 'Case not found or not visible.'
+              : 'Unable to load case. Please try again.',
+          );
         }
       } else {
         setError('Unable to load case. Please try again.');

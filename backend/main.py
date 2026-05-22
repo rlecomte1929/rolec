@@ -3167,10 +3167,16 @@ def list_cases(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     effective = _effective_user(user, UserRole.HR)
+    is_admin = bool(effective.get("is_admin"))
     company_id = _get_hr_company_id(effective)
-    if not company_id:
-        raise HTTPException(status_code=400, detail="No company linked to your profile.")
-    items = db.list_relocation_cases(company_id=company_id, status=status)
+    # Admins can list all cases; non-admins with no company get an empty list
+    # (returning 400 here breaks CT1 and is wrong semantics — 200+[] is correct)
+    if not is_admin and not company_id:
+        return {"cases": []}
+    items = db.list_relocation_cases(
+        company_id=None if is_admin else company_id,
+        status=status,
+    )
     return {"cases": items}
 
 
