@@ -3,14 +3,20 @@ Company-scoped canonical policy retrieval and query answering with citations.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import os
 import re
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy import text
 
 from ..database import Database
+
+logger = logging.getLogger(__name__)
 
 STOPWORDS = {
     "a",
@@ -256,6 +262,73 @@ def _resolve_caller_tier(db: Database, *, user_id: str, user_role: str) -> Optio
     return "__NO_TIER__"
 
 
+def _hash_question(query: str) -> str:
+    """SHA-256 of the lowercased + whitespace-stripped question.
+
+    Same canonicalisation as the policy_feedback client (commit 92fb641)
+    so the hash is comparable across retrieval audit + HR review queue.
+    """
+    canonical = " ".join((query or "").lower().split())
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _audit_log_table_name(db: Database) -> str:
+    """`public.audit_log` on Postgres, bare `audit_log` on sqlite (tests)."""
+    try:
+        return "public.audit_log" if db.engine.dialect.name == "postgresql" else "audit_log"
+    except Exception:
+        return "public.audit_log"
+
+
+def _write_policy_query_audit_log(
+    db: Database,
+    *,
+    actor_user_id: str,
+    session_id: str,
+    company_id: str,
+    question_hash: str,
+    chunk_ids: List[str],
+) -> None:
+    """[P5-9 H2] Append a row to public.audit_log for each retrieval.
+
+    Hard contract: NO raw question text in the audit row — only the
+    SHA-256 question_hash. Failures are swallowed (logged) so a
+    retrieval never fails because audit_log is unavailable.
+    """
+    try:
+        table = _audit_log_table_name(db)
+        metadata = {
+            "company_id": company_id,
+            "question_hash": question_hash,
+            "chunk_ids": list(chunk_ids),
+            "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        }
+        with db.engine.begin() as conn:
+            conn.execute(
+                text(
+                    f"INSERT INTO {table} "
+                    f"  (id, actor_user_id, action_type, target_type, target_id, "
+                    f"   metadata_json, created_at) "
+                    f"VALUES (:id, :actor, 'policy.queried', 'policy_assistant', "
+                    f"        :target, :meta, :now)"
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "actor": actor_user_id,
+                    "target": session_id,
+                    "meta": json.dumps(metadata),
+                    "now": datetime.now(timezone.utc).isoformat(),
+                },
+            )
+    except Exception:
+        logger.warning(
+            "policy_query: audit_log write failed actor=%s session=%s",
+            actor_user_id,
+            session_id,
+            exc_info=True,
+        )
+
+
 def answer_company_scoped_policy_query(
     db: Database,
     *,
@@ -265,6 +338,7 @@ def answer_company_scoped_policy_query(
     query: str,
     canonical_policy_document_id: Optional[str] = None,
     llm: Optional[CanonicalPolicyQueryLLM] = None,
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     redacted_query = redact_pii_from_query(query)
     # [P5-9 C1] Resolve caller's tier before retrieval. HR/admin → None
@@ -304,10 +378,27 @@ def answer_company_scoped_policy_query(
         retrieved_chunk_ids=citations,
         answer_preview=answer[:280],
     )
+
+    # [P5-9 H2] Compliance audit row in the cross-cutting audit_log table.
+    # Hash the original (un-redacted) question — the hash is one-way and
+    # carries no PII; the redacted_query_text only matters for the
+    # domain-specific audit table above.
+    resolved_session_id = session_id or str(uuid.uuid4())
+    question_hash = _hash_question(query)
+    _write_policy_query_audit_log(
+        db,
+        actor_user_id=user_id,
+        session_id=resolved_session_id,
+        company_id=company_id,
+        question_hash=question_hash,
+        chunk_ids=citations,
+    )
+
     return {
         "company_id": company_id,
         "canonical_policy_document_id": str(document["id"]),
         "answer": answer,
         "citations": citation_labels,
         "retrieved_chunk_ids": citations,
+        "session_id": resolved_session_id,
     }

@@ -28,6 +28,17 @@ is now ready for an internal pilot with synthetic data.** External
 pen test (Cure53 recommended, §3) is still required before any real
 customer data enters the system.
 
+**Verdict (2026-05-22 follow-up #2):** ✅ **H2 now closed.** Every
+successful call to the policy assistant retrieval path writes a row
+into `public.audit_log` (`action_type='policy.queried'`,
+`target_type='policy_assistant'`, `target_id=session_id`) with a
+metadata payload of `{company_id, question_hash, chunk_ids,
+retrieved_at}`. The raw question never enters the row — only the
+SHA-256 hash (same canonicalisation as `policy_feedback`). Audit
+writes are wrapped in a swallowing try/except so retrieval cannot
+fail when `audit_log` is unavailable (tested in
+`test_policy_query_audit_log.py::test_audit_write_failure_does_not_break_retrieval`).
+
 **Verdict (2026-05-22 follow-up):** ✅ **H3 now closed.** Central
 `PiiLogFilter` (`backend/services/pii_log_filter.py`) attached to the
 root logger from both entry points (`backend/main.py`,
@@ -275,7 +286,7 @@ follow-up engagement at Bishop Fox before Series A.
 | C1 | Critical | No tier filter in retrieval path                         | `backend/services/policy_query_answering.py:56`              | ✅ **CLOSED** (commit landed 2026-05-22; migration + router + 11 tests) |
 | C2 | Critical | Raw query echoed in fallback response (logged + returned) | `backend/services/policy_query_answering.py:130`             | ✅ **CLOSED** (commit `b7479db` on main) |
 | H1 | High     | LLM payload not masked before send to Anthropic          | `backend/services/policy_assistant_llm_client.py:75`         | ✅ **CLOSED** (commit `b7479db` on main) |
-| H2 | High     | No audit_log entry for retrieval queries                 | `backend/services/policy_query_answering.py` (entry function)| 🪧 Spawned as follow-up chip |
+| H2 | High     | No audit_log entry for retrieval queries                 | `backend/services/policy_query_answering.py` (entry function)| ✅ **CLOSED** — `_write_policy_query_audit_log` helper writes `policy.queried` rows with SHA-256 question hash; tests in `test_policy_query_audit_log.py` |
 | H3 | High     | No central log-filter for PII patterns                   | `backend/main.py` / `backend/app/main.py`                     | ✅ **CLOSED** (`backend/services/pii_log_filter.py` + root-logger install in both entry points; tests in `backend/tests/test_pii_log_filter.py`) |
 | M1 | Medium   | CSV import has no row-count cap                          | `backend/app/routers/employee_tiers.py:347`                  | ~30 min |
 | M2 | Medium   | No rate limit on POST /api/policy/feedback               | `backend/app/routers/policy_feedback.py:233`                 | ~30 min |
