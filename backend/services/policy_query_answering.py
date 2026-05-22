@@ -126,8 +126,14 @@ def _fallback_answer(
             + "\n".join(f"- {_citation_for_chunk(chunk, idx + 1)}: {str(chunk.get('text_content') or '')[:220]}" for idx, chunk in enumerate(chunks[:3])),
             citations,
         )
+    # [P5-9 C2] Do NOT echo the user's query back here. The previous
+    # version included `Query reviewed: {query[:120]}` which leaked the
+    # first 120 chars of the user's question into backend logs and any
+    # APM tracing that captured response bodies (passport numbers,
+    # IBANs, etc.). Generic message keeps the surface clean.
     return (
-        f"I could not find support for this question in your company’s current policy document. Query reviewed: {query[:120]}",
+        "I could not find support for this question in your company’s current policy document. "
+        "Please contact your HR team for clarification.",
         [],
     )
 
