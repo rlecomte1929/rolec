@@ -1961,6 +1961,107 @@ def create_person(
     return {"person": profile, "invite_sent": invite_sent}
 
 
+@app.post("/api/admin/seed-test-personas", status_code=200)
+def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
+    """
+    Idempotent: create/refresh seeded test personas used by the automated test runner.
+    Safe to call on every test run.  All IDs are deterministic so repeated calls are no-ops.
+
+    Seeded accounts
+    ───────────────
+    HR1  : hr_seed@testco.com   / Passw0rd!  — company "Test Co (Seed)"
+    HR2  : hr2_seed@otherco.com / Passw0rd!  — company "Other Corp (Seed)"
+    EMP  : emp_seed@testco.com  / Passw0rd!  — same company as HR1
+    """
+    from passlib.context import CryptContext as _CCC
+    _pwd_ctx = _CCC(schemes=["pbkdf2_sha256"], deprecated="auto")
+    SEED_PW = "Passw0rd!"
+    pw_hash = _pwd_ctx.hash(SEED_PW)
+    now = datetime.utcnow().isoformat()
+
+    # ── Fixed deterministic UUIDs ───────────────────────────────────────────
+    TESTCO_CID   = "c1000000-0000-4000-8000-000000000001"
+    OTHERCO_CID  = "c2000000-0000-4000-8000-000000000002"
+    HR1_UID      = "a1000000-0000-4000-8000-000000000001"
+    HR2_UID      = "a2000000-0000-4000-8000-000000000002"
+    EMP_UID      = "a3000000-0000-4000-8000-000000000003"
+
+    created = []
+
+    # ── 1. Companies ─────────────────────────────────────────────────────────
+    db.create_company(TESTCO_CID,  "Test Co (Seed)",     plan_tier="low", status="active")
+    db.create_company(OTHERCO_CID, "Other Corp (Seed)",  plan_tier="low", status="active")
+    created.append("companies")
+
+    # ── 2. Users (UPSERT — ON CONFLICT(id) update pw hash so password is always fresh) ──
+    with db.engine.begin() as conn:
+        for uid, email, role, name in [
+            (HR1_UID, "hr_seed@testco.com",   "HR",       "HR Seed"),
+            (HR2_UID, "hr2_seed@otherco.com",  "HR",       "HR2 Seed"),
+            (EMP_UID, "emp_seed@testco.com",   "EMPLOYEE", "Emp Seed"),
+        ]:
+            conn.execute(text(
+                "INSERT INTO users (id, email, role, name, password_hash, created_at) "
+                "VALUES (:id, :email, :role, :name, :pw, :now) "
+                "ON CONFLICT (id) DO UPDATE SET password_hash = excluded.password_hash, "
+                "email = excluded.email, role = excluded.role"
+            ), {"id": uid, "email": email, "role": role, "name": name,
+                "pw": pw_hash, "now": now})
+    created.append("users")
+
+    # ── 3. Profiles (direct UPSERT — bypass ensure_profile_record FK path) ──
+    with db.engine.begin() as conn:
+        profile_cols_q = conn.execute(text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema='public' AND table_name='profiles'"
+        )).fetchall()
+        profile_cols = {r[0] if not hasattr(r, '_mapping') else r._mapping['column_name']
+                        for r in profile_cols_q}
+
+        for uid, email, role, cid in [
+            (HR1_UID, "hr_seed@testco.com",   "hr",       TESTCO_CID),
+            (HR2_UID, "hr2_seed@otherco.com",  "hr",       OTHERCO_CID),
+            (EMP_UID, "emp_seed@testco.com",   "employee", TESTCO_CID),
+        ]:
+            # Build column list from what actually exists (schema varies)
+            p_cols = ["id", "role", "email", "full_name"]
+            p_vals = {"id": uid, "role": role, "email": email, "full_name": email.split("@")[0]}
+            if "company_id" in profile_cols:
+                p_cols.append("company_id"); p_vals["company_id"] = cid
+            if "created_at" in profile_cols:
+                p_cols.append("created_at"); p_vals["created_at"] = now
+
+            col_clause = ", ".join(p_cols)
+            val_clause = ", ".join(f":{c}" for c in p_cols)
+            upd_clause = ", ".join(
+                f"{c} = excluded.{c}" for c in p_cols if c != "id"
+            )
+            conn.execute(text(
+                f"INSERT INTO profiles ({col_clause}) VALUES ({val_clause}) "
+                f"ON CONFLICT (id) DO UPDATE SET {upd_clause}"
+            ), p_vals)
+    created.append("profiles")
+
+    # ── 4. hr_users rows ────────────────────────────────────────────────────
+    db.ensure_hr_user_for_profile(HR1_UID, TESTCO_CID)
+    db.ensure_hr_user_for_profile(HR2_UID, OTHERCO_CID)
+    created.append("hr_users")
+
+    # ── 5. Employee row ─────────────────────────────────────────────────────
+    db.ensure_employee_for_profile(EMP_UID, TESTCO_CID)
+    created.append("employees")
+
+    log.info("seed_test_personas ok by=%s created=%s", user.get("id", "?")[:8], created)
+    return {
+        "ok": True,
+        "seeded": {
+            "hr1":  {"id": HR1_UID, "email": "hr_seed@testco.com",   "company_id": TESTCO_CID},
+            "hr2":  {"id": HR2_UID, "email": "hr2_seed@otherco.com", "company_id": OTHERCO_CID},
+            "emp":  {"id": EMP_UID, "email": "emp_seed@testco.com",  "company_id": TESTCO_CID},
+        },
+    }
+
+
 @app.patch("/api/admin/people/{person_id}")
 def update_person(person_id: str, body: AdminUpdatePersonRequest, user: Dict[str, Any] = Depends(require_admin)):
     existing = db.get_profile_record(person_id)
