@@ -224,6 +224,17 @@ async function suiteAuth() {
   tokens.newEmp_fresh = freshEmpR.data?.token || null;
   record('AT3_FRESH','Fresh Employee registration smoke test','Auth','200 + token',`${freshEmpR.status}/token=${!!tokens.newEmp_fresh}`, freshEmpR.ok && tokens.newEmp_fresh ? 'PASS':'FAIL', freshEmpR.ms, freshEmpR.error||`email=${CONFIG.CREDS.newEmp.email}`);
 
+  // ── HR2 pre-login (acquired here, before suiteRateLimiting fires a 429) ───
+  // suiteRLSIsolation runs after suiteRateLimiting and would get 429 if it
+  // attempted a fresh login.  We grab the token now and reuse it there.
+  {
+    const hr2PreR = await req('POST', '/api/auth/login', CONFIG.CREDS.seedHR2);
+    tokens.hr2 = hr2PreR.data?.token || null;
+    tokens.hr2_company_id = tokens.hr2 ? CONFIG.CREDS.seedHR2_company_id : null;
+    if (!tokens.hr2) console.log(`  ⚠ HR2 pre-login failed (${hr2PreR.status}) — RLS suite will be SKIP`);
+    else console.log(`  ℹ HR2 pre-login ok (${hr2PreR.status}) — token ready for RLS suite`);
+  }
+
   // ── AT4: Reject bad credentials ───────────────────────────────────────────
   r = await req('POST', '/api/auth/login', { identifier:'nobody@x.com', password:'wrong' });
   record('AT4','Invalid credentials rejected','Auth','401',`${r.status}`, r.status===401 ? 'PASS':'FAIL', r.ms);
@@ -400,10 +411,16 @@ async function suiteWizardPersistence() {
 async function suiteRLSIsolation() {
   section('RLS Isolation (T17, B5 regression)');
 
-  // Login with seeded HR2 — already linked to Other Corp (Seed)
-  const hr2R = await req('POST', '/api/auth/login', CONFIG.CREDS.seedHR2);
-  tokens.hr2 = hr2R.data?.token || null;
-  tokens.hr2_company_id = tokens.hr2 ? CONFIG.CREDS.seedHR2_company_id : null;
+  // HR2 token was acquired in suiteAuth() before the rate-limit suite fired.
+  // Reuse it here; fall back to a fresh login only if somehow missing.
+  let hr2R;
+  if (tokens.hr2) {
+    hr2R = { status: 200, ok: true, ms: 0, data: { token: tokens.hr2 } };
+  } else {
+    hr2R = await req('POST', '/api/auth/login', CONFIG.CREDS.seedHR2);
+    tokens.hr2 = hr2R.data?.token || null;
+    tokens.hr2_company_id = tokens.hr2 ? CONFIG.CREDS.seedHR2_company_id : null;
+  }
   if (!tokens.hr2 || !tokens.hr) {
     record('RLS0','RLS test setup','RLS','two HR tokens','missing tokens','SKIP',0,
       `HR1 token: ${!!tokens.hr}  HR2 token: ${!!tokens.hr2} — need both to test isolation`);
