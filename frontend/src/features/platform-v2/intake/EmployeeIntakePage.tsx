@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { patchCase } from '../../../api/cases';
+import { apiGet } from '../../../api/client';
 import { ROUTE_DEFS } from '../../../navigation/routes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -634,6 +635,61 @@ function StepHd({ title, sub, required }: { title: string; sub: string; required
   );
 }
 
+// ─── Budget summary panel (WZ3) ───────────────────────────────────────────────
+
+interface BudgetCategory {
+  name: string;
+  cap_amount: number | null;
+  cap_currency: string;
+  status: string;
+}
+
+function BudgetSummaryPanel({ caseId, services }: { caseId: string; services: string[] }) {
+  const [categories, setCategories] = useState<BudgetCategory[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!caseId) return;
+    setLoading(true);
+    apiGet<{ case_id: string; categories: BudgetCategory[] }>(`/api/cases/${caseId}/budget-summary`)
+      .then((res) => setCategories(res.categories))
+      .catch(() => setCategories(null))
+      .finally(() => setLoading(false));
+  }, [caseId]);
+
+  const displayCats: BudgetCategory[] = categories && categories.length > 0
+    ? categories
+    : services.map((s) => ({ name: s, cap_amount: null, cap_currency: 'EUR', status: 'no_cap' }));
+
+  return (
+    <div className="mt-4 border border-violet-100 rounded-xl p-4 bg-violet-50">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs font-bold text-violet-700 uppercase tracking-wide">Budget caps</span>
+        <span className="text-xs text-violet-400">(from your HR policy)</span>
+      </div>
+      {loading ? (
+        <p className="text-xs text-violet-400">Loading budget information…</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {displayCats.map((cat) => (
+            <div key={cat.name} className="flex items-center justify-between text-xs">
+              <span className="text-gray-600 capitalize">{cat.name.replace(/_/g, ' ')}</span>
+              <span className={`font-semibold ${cat.cap_amount != null ? 'text-gray-800' : 'text-gray-400'}`}>
+                {cat.cap_amount != null
+                  ? `${cat.cap_amount.toLocaleString()} ${cat.cap_currency}`
+                  : 'No cap set'}
+              </span>
+            </div>
+          ))}
+          {displayCats.length === 0 && (
+            <p className="text-xs text-violet-400">No services selected.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Review summary ───────────────────────────────────────────────────────────
 
 function ReviewSummary({ data, goTo }: { data: IntakeData; goTo: (s: number) => void }) {
@@ -1142,6 +1198,9 @@ export function EmployeeIntakePage() {
               <>
                 <StepHd title="Review & submit" sub="A quick check before we generate your roadmap. You can edit any section later." />
                 <ReviewSummary data={data} goTo={goTo} />
+                {data.services.length > 0 && (
+                  <BudgetSummaryPanel caseId={caseIdRef.current} services={data.services} />
+                )}
                 <div className="flex items-start gap-3 mt-5 p-4 border border-gray-100 rounded-xl bg-gray-50">
                   <input type="checkbox" checked={data.consent} id="consent-cb"
                     onChange={(e) => setField('consent', e.target.checked)}
