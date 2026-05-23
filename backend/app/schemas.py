@@ -58,6 +58,8 @@ class CaseDraftDTO(BaseModel):
     employeeProfile: Optional[EmployeeProfileDTO] = None
     familyMembers: Optional[FamilyMembersDTO] = None
     assignmentContext: Optional[AssignmentContextDTO] = None
+    # Employee wizard Step 2 — selected relocation services
+    services: Optional[List[str]] = None
 
 
 class CaseDTO(BaseModel):
