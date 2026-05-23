@@ -9218,10 +9218,17 @@ class Database:
 
     def set_profile_company(self, user_id: str, company_id: str) -> None:
         """Set profile company and keep hr_users/employees in sync."""
+        # profiles.id is uuid — bind as uuid.UUID to avoid
+        # "operator does not exist: uuid = text" on Postgres.
+        # hr_users.profile_id and employees.profile_id are TEXT, so plain string is fine.
+        try:
+            profiles_id_param = uuid.UUID(user_id)
+        except (ValueError, AttributeError):
+            profiles_id_param = user_id
         with self.engine.begin() as conn:
             conn.execute(text(
                 "UPDATE profiles SET company_id = :cid WHERE id = :id"
-            ), {"cid": company_id, "id": user_id})
+            ), {"cid": company_id, "id": profiles_id_param})
             conn.execute(text(
                 "UPDATE hr_users SET company_id = :cid WHERE profile_id = :id"
             ), {"cid": company_id, "id": user_id})
