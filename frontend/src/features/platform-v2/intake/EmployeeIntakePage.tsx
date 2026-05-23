@@ -696,6 +696,114 @@ function QuoteRequestPanel({ caseId, services }: { caseId: string; services: str
   );
 }
 
+// ─── Case messages thread (WZ5) ───────────────────────────────────────────────
+
+interface CaseMessage {
+  id: string;
+  case_id: string;
+  sender_id: string;
+  sender_role: string;
+  content: string;
+  created_at: string;
+}
+
+function CaseMessagesPanel({ caseId }: { caseId: string }) {
+  const [messages, setMessages] = useState<CaseMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const loadMessages = useCallback(async () => {
+    try {
+      const res = await apiGet<CaseMessage[]>(`/api/cases/${caseId}/messages`);
+      setMessages(res);
+    } catch {
+      // silently fail — thread may be empty or case not yet persisted
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId]);
+
+  useEffect(() => { loadMessages(); }, [loadMessages]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      const msg = await apiPost<CaseMessage>(`/api/cases/${caseId}/messages`, { content: text });
+      setMessages((prev) => [...prev, msg]);
+      setInput('');
+    } catch (e) {
+      setError((e as Error).message ?? 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const roleLabel = (role: string) =>
+    role === 'hr' ? 'HR' : role === 'admin' ? 'Admin' : 'You';
+
+  const roleColor = (role: string) =>
+    role === 'employee' ? 'bg-violet-100 text-violet-800' : 'bg-blue-100 text-blue-800';
+
+  return (
+    <div className="mt-4 border border-gray-100 rounded-xl bg-white overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+        <span className="text-xs font-bold text-gray-700">💬 Messages</span>
+        <span className="text-xs text-gray-400">between you and your HR team</span>
+      </div>
+      <div className="px-4 py-3 max-h-48 overflow-y-auto flex flex-col gap-2">
+        {loading && <p className="text-xs text-gray-400">Loading messages…</p>}
+        {!loading && messages.length === 0 && (
+          <p className="text-xs text-gray-400">No messages yet — send one below to start the conversation.</p>
+        )}
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex flex-col gap-0.5 ${msg.sender_role === 'employee' ? 'items-end' : 'items-start'}`}>
+            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${roleColor(msg.sender_role)}`}>
+              {roleLabel(msg.sender_role)}
+            </span>
+            <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${
+              msg.sender_role === 'employee'
+                ? 'bg-violet-600 text-white rounded-br-none'
+                : 'bg-gray-100 text-gray-800 rounded-bl-none'
+            }`}>
+              {msg.content}
+            </div>
+            <span className="text-[9px] text-gray-400">
+              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+      <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
+        <input
+          type="text"
+          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
+          placeholder="Write a message…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          disabled={sending}
+        />
+        <button type="button" onClick={handleSend} disabled={!input.trim() || sending}
+          className="px-3 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
+          {sending ? '…' : 'Send'}
+        </button>
+      </div>
+      {error && <p className="px-4 pb-3 text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
 // ─── Budget summary panel (WZ3) ───────────────────────────────────────────────
 
 interface BudgetCategory {
@@ -1265,6 +1373,7 @@ export function EmployeeIntakePage() {
                 {data.services.length > 0 && (
                   <BudgetSummaryPanel caseId={caseIdRef.current} services={data.services} />
                 )}
+                <CaseMessagesPanel caseId={caseIdRef.current} />
                 <div className="flex items-start gap-3 mt-5 p-4 border border-gray-100 rounded-xl bg-gray-50">
                   <input type="checkbox" checked={data.consent} id="consent-cb"
                     onChange={(e) => setField('consent', e.target.checked)}
