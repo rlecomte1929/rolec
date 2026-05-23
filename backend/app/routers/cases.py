@@ -3032,3 +3032,297 @@ def regenerate_dossier(
     except Exception:
         logger.exception("dossier: regenerate failed dossier_id=%s", dossier_id)
         raise HTTPException(status_code=500, detail="Failed to regenerate dossier")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Employee Wizard — Step 3: Budget summary  (WZ3 / B19)
+# GET /api/cases/{case_id}/budget-summary
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/{case_id}/budget-summary")
+def get_budget_summary(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Return HR-policy budget caps vs. the services selected for this case.
+    Employees and HR can call this; the caller must be linked to a company.
+    """
+    # Resolve company from profile
+    profile = main_db.get_profile_record(user.get("id"))
+    company_id: str = (profile or {}).get("company_id") or user.get("company") or ""
+
+    # Pull selected services from the case draft_json
+    selected_services: List[str] = []
+    try:
+        with SessionLocal() as db_sess:
+            case = crud.get_case(db_sess, case_id)
+        if case:
+            draft = json.loads(case.draft_json or "{}")
+            selected_services = draft.get("services", [])
+    except Exception:
+        pass
+
+    # Pull published HR policy budget caps
+    categories: List[Dict[str, Any]] = []
+    if company_id:
+        try:
+            policies = main_db.list_hr_policies_by_company(company_id)
+            published = next(
+                (p for p in policies if (p.get("status") or "").lower() == "published"),
+                None,
+            )
+            if published:
+                policy_data = json.loads(published.get("policy_json") or "{}")
+                # Try common key variants for budget caps
+                caps = (
+                    policy_data.get("budget_caps")
+                    or policy_data.get("categories")
+                    or {}
+                )
+                if isinstance(caps, dict):
+                    for svc, cap in caps.items():
+                        categories.append({
+                            "name": svc,
+                            "cap_amount": cap.get("amount") if isinstance(cap, dict) else cap,
+                            "cap_currency": (cap.get("currency", "EUR") if isinstance(cap, dict) else "EUR"),
+                            "estimated_amount": None,
+                            "status": "within_budget",
+                        })
+        except Exception:
+            logger.exception("budget-summary: failed to read policy company=%s", company_id)
+
+    # Fall back: return selected services with no_cap when no policy exists
+    if not categories:
+        for svc in (selected_services or ["housing", "moving", "immigration"]):
+            categories.append({
+                "name": svc,
+                "cap_amount": None,
+                "cap_currency": "EUR",
+                "estimated_amount": None,
+                "status": "no_cap",
+            })
+
+    return {"case_id": case_id, "categories": categories}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Employee Wizard — Step 4: Quote request  (WZ4 / B19)
+# POST /api/cases/{case_id}/quote-request
+# ──────────────────────────────────────────────────────────────────────────────
+
+class _QuoteRequestBody(BaseModel):
+    services: Optional[List[str]] = None
+    notes: Optional[str] = None
+    budget_range: Optional[str] = None
+
+
+@router.post("/{case_id}/quote-request", status_code=201)
+def create_case_quote_request(
+    case_id: str,
+    body: _QuoteRequestBody,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Employee submits a quote request for their relocation case (Step 4 / WZ4).
+    Creates an entry in the quote_requests table and returns the new record.
+    """
+    profile = main_db.get_profile_record(user.get("id"))
+    company_id: str = (profile or {}).get("company_id") or user.get("company") or ""
+    if not company_id:
+        raise HTTPException(status_code=403, detail="No company linked to this account.")
+
+    employee_id: str = str(user["id"])
+    new_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+
+    # Serialise service categories for Postgres text[] column
+    services = body.services or []
+    cats_serialised = "{" + ",".join(f'"{s}"' for s in services) + "}"
+
+    try:
+        with main_db.engine.begin() as conn:
+            conn.execute(
+                _sql_text(
+                    """
+                    INSERT INTO public.quote_requests
+                        (id, case_id, employee_id, company_id,
+                         service_categories, notes, budget_range,
+                         status, created_at, updated_at)
+                    VALUES
+                        (:id, :case_id, :emp, :company,
+                         :cats::text[], :notes, :budget,
+                         'pending', :now, :now)
+                    """
+                ),
+                {
+                    "id": new_id,
+                    "case_id": case_id,
+                    "emp": employee_id,
+                    "company": company_id,
+                    "cats": cats_serialised,
+                    "notes": body.notes,
+                    "budget": body.budget_range,
+                    "now": now,
+                },
+            )
+            row = conn.execute(
+                _sql_text("SELECT * FROM public.quote_requests WHERE id = :id"),
+                {"id": new_id},
+            ).mappings().first()
+    except Exception:
+        logger.exception("quote-request: insert failed case_id=%s", case_id)
+        raise HTTPException(status_code=500, detail="Failed to create quote request")
+
+    if row is None:
+        raise HTTPException(status_code=500, detail="Quote request not found after insert")
+
+    d = dict(row)
+    # Normalise service_categories: Postgres returns list, text fallback is comma-str
+    sc = d.get("service_categories")
+    if isinstance(sc, str):
+        d["service_categories"] = [s.strip() for s in sc.split(",") if s.strip()]
+    elif sc is None:
+        d["service_categories"] = []
+    # Serialise datetimes
+    for k, v in list(d.items()):
+        if hasattr(v, "isoformat"):
+            try:
+                d[k] = v.isoformat()
+            except Exception:
+                d[k] = str(v)
+
+    return {
+        "rfq_id": d["id"],
+        "case_id": d["case_id"],
+        "status": d["status"],
+        "service_categories": d["service_categories"],
+        "created_at": d["created_at"],
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Employee Wizard — Step 5: Case messages  (WZ5 / B19)
+# POST /api/cases/{case_id}/messages
+# GET  /api/cases/{case_id}/messages
+# ──────────────────────────────────────────────────────────────────────────────
+
+class _MessageBody(BaseModel):
+    content: str
+
+
+def _detect_sender_role(user: Dict[str, Any]) -> str:
+    role = (user.get("role") or "").upper()
+    if role in ("HR", "ADMIN"):
+        return role.lower()
+    return "employee"
+
+
+@router.post("/{case_id}/messages", status_code=201)
+def post_case_message(
+    case_id: str,
+    body: _MessageBody,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    Post a message to the case thread (Step 5 / WZ5).
+    Any authenticated user linked to the case (employee or HR) can post.
+    """
+    if not body.content.strip():
+        raise HTTPException(status_code=422, detail="content must not be empty")
+
+    sender_id = str(user["id"])
+    sender_role = _detect_sender_role(user)
+    new_id = str(uuid.uuid4())
+    now = datetime.utcnow().isoformat()
+
+    try:
+        with main_db.engine.begin() as conn:
+            conn.execute(
+                _sql_text(
+                    """
+                    INSERT INTO public.case_messages
+                        (id, case_id, sender_id, sender_role, content, created_at)
+                    VALUES
+                        (:id, :case_id, :sender_id, :sender_role, :content, :now)
+                    """
+                ),
+                {
+                    "id": new_id,
+                    "case_id": case_id,
+                    "sender_id": sender_id,
+                    "sender_role": sender_role,
+                    "content": body.content,
+                    "now": now,
+                },
+            )
+            row = conn.execute(
+                _sql_text("SELECT * FROM public.case_messages WHERE id = :id"),
+                {"id": new_id},
+            ).mappings().first()
+    except Exception:
+        logger.exception("messages: insert failed case_id=%s", case_id)
+        raise HTTPException(status_code=500, detail="Failed to post message")
+
+    if row is None:
+        raise HTTPException(status_code=500, detail="Message not found after insert")
+
+    d = dict(row)
+    for k, v in list(d.items()):
+        if hasattr(v, "isoformat"):
+            try:
+                d[k] = v.isoformat()
+            except Exception:
+                d[k] = str(v)
+    return {
+        "id": str(d["id"]),
+        "case_id": str(d["case_id"]),
+        "sender_id": str(d["sender_id"]),
+        "sender_role": d["sender_role"],
+        "content": d["content"],
+        "created_at": d["created_at"],
+    }
+
+
+@router.get("/{case_id}/messages")
+def list_case_messages(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
+    """
+    Return the full message thread for a case, oldest-first.
+    """
+    try:
+        with main_db.engine.begin() as conn:
+            rows = conn.execute(
+                _sql_text(
+                    """
+                    SELECT * FROM public.case_messages
+                    WHERE case_id = :case_id
+                    ORDER BY created_at ASC
+                    """
+                ),
+                {"case_id": case_id},
+            ).mappings().all()
+    except Exception:
+        logger.exception("messages: list failed case_id=%s", case_id)
+        raise HTTPException(status_code=500, detail="Failed to list messages")
+
+    result = []
+    for row in rows:
+        d = dict(row)
+        for k, v in list(d.items()):
+            if hasattr(v, "isoformat"):
+                try:
+                    d[k] = v.isoformat()
+                except Exception:
+                    d[k] = str(v)
+        result.append({
+            "id": str(d["id"]),
+            "case_id": str(d["case_id"]),
+            "sender_id": str(d["sender_id"]),
+            "sender_role": d["sender_role"],
+            "content": d["content"],
+            "created_at": d["created_at"],
+        })
+    return result

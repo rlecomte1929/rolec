@@ -2154,6 +2154,23 @@ class Database:
                 ON catalog_destination_requests (company_id, created_at DESC)
             """))
 
+            # Case messages — employee/HR messaging thread per case (WZ5 / B19).
+            # Postgres has this via supabase migration 20260524110000_case_messages.sql.
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS case_messages (
+                    id          TEXT NOT NULL PRIMARY KEY,
+                    case_id     TEXT NOT NULL,
+                    sender_id   TEXT NOT NULL,
+                    sender_role TEXT NOT NULL,
+                    content     TEXT NOT NULL,
+                    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_case_messages_case_id
+                ON case_messages (case_id, created_at DESC)
+            """))
+
             # Employee demand signal (Phase 2 notifications). Postgres has this
             # via supabase migration 20260427150000_catalog_employee_demand.sql.
             conn.execute(text("""
