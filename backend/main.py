@@ -127,6 +127,7 @@ from .services.relocation_plan_view_service import (
     get_relocation_plan_view_for_case_assignment,
     invalidate_relocation_plan_cache,
 )
+from .services.events_tracker import track as track_event  # FOUNDATION-1C
 from .app.routers import auth as auth_router
 from .app.routers import cases as cases_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
@@ -173,6 +174,7 @@ from .app.routers import hr_vendors as hr_vendors_router
 from .app.routers import hr_rfq as hr_rfq_router
 from .app.routers import immigration as immigration_router
 from .app.routers import analytics as analytics_router
+from .app.routers import analytics_query as analytics_query_router  # FOUNDATION-1E
 # GAP analysis new routers (May 2026)
 from .app.routers import relocation_profile as relocation_profile_router
 from .app.routers import rules as rules_router
@@ -578,6 +580,7 @@ app.include_router(hr_vendors_router.router)
 app.include_router(hr_rfq_router.router)
 app.include_router(immigration_router.router)
 app.include_router(analytics_router.router)
+app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 app.include_router(mobility_context_router.router)
 app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
@@ -1888,16 +1891,6 @@ def create_person(
         raise HTTPException(status_code=400, detail="email required")
     request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
     person_id = str(uuid.uuid4())
-    # profiles.id has a FK → auth.users(id). Create the Supabase auth user first so
-    # the insert doesn't fail with ForeignKeyViolation / masked 409.
-    try:
-        from .services.supabase_auth_sync import create_auth_user_and_get_id as _caagi
-        _auth_id = _caagi(email, full_name=body.full_name)
-        if _auth_id:
-            person_id = _auth_id
-            log.info("admin_create_person: using supabase auth uid=%s for email=%s", person_id[:8], email[:3] + "***")
-    except Exception as _ex:
-        log.debug("admin_create_person: supabase pre-create failed (will attempt profile insert anyway): %s", _ex)
     try:
         role = (body.role or "EMPLOYEE").strip().upper()
         db.create_profile(
@@ -2051,21 +2044,7 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
             ), u_vals)
     created.append("users")
 
-    # ── 2.5. Create Supabase auth users with fixed UUIDs so profiles_id_fkey is satisfied ──
-    log.info("seed_test_personas step 2.5: supabase auth users")
-    try:
-        from .services.supabase_auth_sync import create_auth_user_with_id as _cawid
-        for _uid, _email in [
-            (HR1_UID, "hr_seed@testco.com"),
-            (HR2_UID, "hr2_seed@otherco.com"),
-            (EMP_UID, "emp_seed@testco.com"),
-        ]:
-            result = _cawid(_uid, _email, SEED_PW, full_name=_email.split("@")[0])
-            log.info("seed_test_personas auth_user uid=%s email=%s ok=%s", _uid[:8], _email[:6], result)
-    except Exception as _auth_exc:
-        log.warning("seed_test_personas auth sync failed (non-fatal): %r", _auth_exc)
-
-    # ── 3. Profiles (direct UPSERT — bypass ensure_profile_record FK path) ──
+    # ── 3. Profiles (direct UPSERT — profiles_id_fkey dropped via migration so no auth.users FK) ──
     log.info("seed_test_personas step 3: profiles")
     with db.engine.begin() as conn:
         profile_cols_q = conn.execute(text(
@@ -2343,6 +2322,21 @@ def admin_update_assignment_status(
             detail=f"Failed to update assignment status: {reason}",
         ) from e
     db.log_audit(user["id"], "UPDATE_STATUS", "assignment", assignment_id, None, {"status": status})
+    _ADMIN_STATUS_TO_EVENT = {
+        "completed":  "assignment.completed",
+        "cancelled":  "assignment.cancelled",
+        "disputed":   "assignment.disputed",
+        "in_progress": "assignment.in_progress",
+    }
+    evt = _ADMIN_STATUS_TO_EVENT.get(status)
+    if evt:
+        track_event(
+            evt,
+            entity_type="assignment",
+            entity_id=assignment_id,
+            user_id=user.get("id"),
+            properties={"new_status": status, "source": "admin"},
+        )
     return {"ok": True, "status": status}
 
 
@@ -2917,6 +2911,14 @@ def patch_support_case(
     if not out:
         raise HTTPException(status_code=404, detail="Support case not found")
     db.log_audit(user["id"], "UPDATE", "support_case", case_id, None, payload)
+    if body.status == "resolved":
+        track_event(
+            "support_ticket.resolved",
+            entity_type="support_case",
+            entity_id=case_id,
+            user_id=user.get("id"),
+            properties={"category": body.category, "priority": body.priority},
+        )
     return out
 
 
@@ -4067,6 +4069,14 @@ def assign_case(
             (time.perf_counter() - t0) * 1000,
             side_effects_dispatched,
         )
+        track_event(
+            "assignment.created",
+            entity_type="assignment",
+            entity_id=assignment_id,
+            user_id=effective.get("id"),
+            company_id=hr_company_id,
+            properties={"case_id": case_id, "request_id": request_id},
+        )
         return AssignCaseResponse(assignmentId=assignment_id, inviteToken=invite_token)
     except HTTPException:
         # Let explicit 4xx/404 propagate as-is.
@@ -5012,6 +5022,13 @@ def submit_assignment(assignment_id: str, user: Dict[str, Any] = Depends(require
     else:
         log.warning("submit_assignment: missing case_id for event assignment_id=%s", assignment_id)
 
+    track_event(
+        "assignment.submitted",
+        entity_type="assignment",
+        entity_id=assignment_id,
+        user_id=effective.get("id"),
+        properties={"case_id": case_id},
+    )
     return {"success": True}
 
 
