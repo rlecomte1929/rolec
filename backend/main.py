@@ -3245,28 +3245,37 @@ def get_current_user_company(request: Request, user: Dict[str, Any] = Depends(ge
 def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
-    profile = db.get_profile_record(effective["id"])
-    company_id = (profile.get("company_id") if profile else None) or _get_hr_company_id(effective)
-    if not company_id:
-        company_id = str(uuid.uuid4())
-        db.set_profile_company(effective["id"], company_id)
-    db.create_company(
-        company_id,
-        request.name,
-        request.country,
-        request.size_band,
-        request.address,
-        request.phone,
-        request.hr_contact,
-        legal_name=request.legal_name,
-        website=request.website,
-        hq_city=request.hq_city,
-        industry=request.industry,
-        default_destination_country=request.default_destination_country,
-        support_email=request.support_email,
-        default_working_location=request.default_working_location,
-    )
-    db.log_audit(effective["id"], "UPDATE", "company", company_id, "HR company profile update", {
+    uid = effective.get("id", "")
+    log.info("save_company_profile start user_id=%s name=%r", uid[:8] if uid else "?", request.name)
+    try:
+        profile = db.get_profile_record(uid)
+        company_id = (profile.get("company_id") if profile else None) or _get_hr_company_id(effective)
+        log.info("save_company_profile resolved company_id=%s (profile=%s)", company_id, bool(profile))
+        if not company_id:
+            company_id = str(uuid.uuid4())
+            log.info("save_company_profile new company_id=%s", company_id)
+            db.set_profile_company(uid, company_id)
+        db.create_company(
+            company_id,
+            request.name,
+            request.country,
+            request.size_band,
+            request.address,
+            request.phone,
+            request.hr_contact,
+            legal_name=request.legal_name,
+            website=request.website,
+            hq_city=request.hq_city,
+            industry=request.industry,
+            default_destination_country=request.default_destination_country,
+            support_email=request.support_email,
+            default_working_location=request.default_working_location,
+        )
+        log.info("save_company_profile create_company ok company_id=%s", company_id)
+    except Exception as _exc:
+        log.error("save_company_profile FAILED user_id=%s error=%r", uid[:8] if uid else "?", _exc)
+        raise HTTPException(status_code=500, detail=f"Company profile save failed: {_exc}")
+    db.log_audit(uid, "UPDATE", "company", company_id, "HR company profile update", {
         "name": request.name,
         "country": request.country,
         "size_band": request.size_band,
@@ -3286,7 +3295,8 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
     # may have a delayed profiles insert (Supabase FK sync is async), but hr_users
     # is plain-text pk and can always be written. _get_hr_company_id checks hr_users
     # first, so the company association resolves correctly even without a profiles row.
-    db.ensure_hr_user_for_profile(effective["id"], company_id)
+    db.ensure_hr_user_for_profile(uid, company_id)
+    log.info("save_company_profile done user_id=%s company_id=%s", uid[:8] if uid else "?", company_id)
     return {"ok": True, "company_id": company_id}
 
 
