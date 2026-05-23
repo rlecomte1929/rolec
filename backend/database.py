@@ -9312,7 +9312,8 @@ class Database:
         """Insert a new profile (admin provisioning). Idempotent: uses upsert if exists."""
         now = datetime.utcnow().isoformat()
         email_clean = (email or "").strip().lower()
-        role_clean = (role or "EMPLOYEE").strip().upper()
+        # profiles.role CHECK allows only lowercase: 'employee', 'hr', 'admin'
+        role_clean = (role or "employee").strip().lower()
         if _is_sqlite:
             with self.engine.begin() as conn:
                 conn.execute(

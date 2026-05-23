@@ -2098,6 +2098,23 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
     db.ensure_employee_for_profile(EMP_UID, TESTCO_CID)
     created.append("employees")
 
+    # ── 6. Supabase Auth sync — create auth users with fixed UUIDs and known password ──
+    # Without this step, signInWithPassword fails for seeded personas because
+    # Supabase Auth doesn't know about local-DB-only users.
+    log.info("seed_test_personas step 6: supabase auth sync")
+    try:
+        from .services.supabase_auth_sync import create_auth_user_with_id as _create_auth_user
+        for uid, email, name in [
+            (HR1_UID, "hr_seed@testco.com",   "HR Seed"),
+            (HR2_UID, "hr2_seed@otherco.com",  "HR2 Seed"),
+            (EMP_UID, "emp_seed@testco.com",   "Emp Seed"),
+        ]:
+            ok = _create_auth_user(uid, email, SEED_PW, full_name=name)
+            log.info("seed_test_personas auth sync uid=%s email=%s ok=%s", uid[:8], email[:3] + "***", ok)
+        created.append("supabase_auth")
+    except Exception as _auth_exc:
+        log.warning("seed_test_personas auth sync failed (non-fatal): %r", _auth_exc)
+
     log.info("seed_test_personas ok by=%s created=%s", user.get("id", "?")[:8], created)
     return {
         "ok": True,
