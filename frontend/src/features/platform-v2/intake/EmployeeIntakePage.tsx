@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { patchCase } from '../../../api/cases';
-import { apiGet } from '../../../api/client';
+import { apiGet, apiPost } from '../../../api/client';
 import { ROUTE_DEFS } from '../../../navigation/routes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -635,6 +635,67 @@ function StepHd({ title, sub, required }: { title: string; sub: string; required
   );
 }
 
+// ─── Quote request panel (WZ4) ────────────────────────────────────────────────
+
+function QuoteRequestPanel({ caseId, services }: { caseId: string; services: string[] }) {
+  const [notes, setNotes] = useState('');
+  const [budgetRange, setBudgetRange] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSend = async () => {
+    if (sending || sent) return;
+    setSending(true);
+    setError(null);
+    try {
+      await apiPost(`/api/cases/${caseId}/quote-request`, {
+        services,
+        notes: notes || undefined,
+        budget_range: budgetRange || undefined,
+      });
+      setSent(true);
+    } catch (e) {
+      setError((e as Error).message ?? 'Failed to send request');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <div className="mt-3 flex items-start gap-2 p-3 bg-green-50 border border-green-100 rounded-xl text-xs text-green-700">
+        ✅ <span>Quote request sent — your HR team will be in touch.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 border border-gray-100 rounded-xl p-4 bg-white">
+      <div className="text-xs font-bold text-gray-700 mb-3">📋 Request vendor quotes</div>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-600">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
+          <textarea rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none"
+            placeholder="Any specific requirements or context for the vendor…"
+            value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-600">Budget range <span className="text-gray-400 font-normal">(optional)</span></label>
+          <input type="text" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
+            placeholder="e.g. 5 000–10 000 €"
+            value={budgetRange} onChange={(e) => setBudgetRange(e.target.value)} />
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <button type="button" onClick={handleSend} disabled={sending}
+          className="self-start px-4 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
+          {sending ? 'Sending…' : 'Send quote request'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Budget summary panel (WZ3) ───────────────────────────────────────────────
 
 interface BudgetCategory {
@@ -1189,6 +1250,9 @@ export function EmployeeIntakePage() {
                       </FieldWrap>
                     </Grid>
                   </div>
+                )}
+                {data.services.length > 0 && (
+                  <QuoteRequestPanel caseId={caseIdRef.current} services={data.services} />
                 )}
               </>
             )}
