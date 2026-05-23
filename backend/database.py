@@ -9934,9 +9934,9 @@ class Database:
     ) -> None:
         now = datetime.utcnow().isoformat()
         status_val = (status or "active").lower() if status else "active"
-        plan_val = (plan_tier or "low").lower() if plan_tier else "low"
-        if plan_val not in ("low", "medium", "premium"):
-            plan_val = "low"
+        plan_val = (plan_tier or "starter").lower() if plan_tier else "starter"
+        if plan_val not in ("starter", "growth", "enterprise"):
+            plan_val = "starter"
         # Generate a URL-safe slug from the company name + short random suffix to satisfy
         # the NOT NULL UNIQUE constraint on companies.slug.
         _slug_base = re.sub(r"[^a-z0-9]+", "-", (name or "company").lower()).strip("-") or "company"

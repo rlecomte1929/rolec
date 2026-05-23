@@ -1998,8 +1998,8 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
 
     # ── 1. Companies ─────────────────────────────────────────────────────────
     log.info("seed_test_personas step 1: companies")
-    db.create_company(TESTCO_CID,  "Test Co (Seed)",     plan_tier="low", status="active")
-    db.create_company(OTHERCO_CID, "Other Corp (Seed)",  plan_tier="low", status="active")
+    db.create_company(TESTCO_CID,  "Test Co (Seed)",     plan_tier="starter")
+    db.create_company(OTHERCO_CID, "Other Corp (Seed)",  plan_tier="starter")
     created.append("companies")
 
     # ── 2. Users (UPSERT — ON CONFLICT(id) update pw hash so password is always fresh) ──
