@@ -3637,11 +3637,23 @@ class Database:
     def _row_to_dict(row: Any) -> Optional[Dict[str, Any]]:
         if row is None:
             return None
-        return dict(row._mapping)
+        # PostgreSQL/psycopg2 returns UUID columns as Python uuid.UUID objects.
+        # Pydantic v2 models typed as str reject uuid.UUID inputs, causing 500s
+        # on production (Supabase Postgres) that never appear on SQLite dev.
+        # Coerce all uuid.UUID values to str so callers always get plain strings.
+        import uuid as _uuid
+        return {
+            k: str(v) if isinstance(v, _uuid.UUID) else v
+            for k, v in row._mapping.items()
+        }
 
     @staticmethod
     def _rows_to_list(rows: Any) -> List[Dict[str, Any]]:
-        return [dict(r._mapping) for r in rows]
+        import uuid as _uuid
+        return [
+            {k: str(v) if isinstance(v, _uuid.UUID) else v for k, v in r._mapping.items()}
+            for r in rows
+        ]
 
     # ==================================================================
     # User operations
