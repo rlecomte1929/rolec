@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
+import { patchCase } from '../../../api/cases';
+import { ROUTE_DEFS } from '../../../navigation/routes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -686,12 +689,17 @@ function ReviewSummary({ data, goTo }: { data: IntakeData; goTo: (s: number) => 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function EmployeeIntakePage() {
+  const navigate = useNavigate();
   const [data, setData] = useState<IntakeData>(INITIAL_DATA);
   const [step, setStep] = useState(1);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [locks, setLocks] = useState({ dest: true, destCity: true, email: true, job: true, contractType: true, contractStart: true, salary: true, office: true });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [savedAt, setSavedAt] = useState(Date.now());
+  // Stable case ID for the duration of this intake session.
+  const caseIdRef = useRef<string>(crypto.randomUUID());
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const setField = useCallback(<K extends keyof IntakeData>(k: K, v: IntakeData[K]) => {
     setData((d) => ({ ...d, [k]: v }));
@@ -1168,21 +1176,32 @@ export function EmployeeIntakePage() {
                 Continue →
               </button>
             ) : (
-              <button type="button" disabled={!data.consent}
-                onClick={() => {
-                  /* TODO: submit to API */
-                  alert('Roadmap generation queued — navigating to /employee/dashboard');
-                }}
-                className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  data.consent ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                }`}>
-                ✦ Generate my roadmap
-              </button>
+              <>
+                {submitError && (
+                  <p className="text-xs text-red-500 mr-2">{submitError}</p>
+                )}
+                <button type="button" disabled={!data.consent || submitting}
+                  onClick={async () => {
+                    setSubmitting(true);
+                    setSubmitError(null);
+                    try {
+                      await patchCase(caseIdRef.current, { services: data.services });
+                      navigate(ROUTE_DEFS.employeeDashboard.path);
+                    } catch (e) {
+                      setSubmitError((e as Error).message ?? 'Submission failed. Please try again.');
+                      setSubmitting(false);
+                    }
+                  }}
+                  className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                    data.consent && !submitting ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                  }`}>
+                  {submitting ? 'Submitting…' : '✦ Generate my roadmap'}
+                </button>
+              </>
             )}
           </div>
         </div>
       </div>
     </AppShell>
   );
-  // TODO: on submit: await employeeAPI.submitIntake(data); navigate(ROUTE_DEFS.employeeDashboard.path);
 }

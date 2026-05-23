@@ -388,6 +388,8 @@ export interface CaseDraftDTO {
   employeeProfile: EmployeeProfileDTO;
   familyMembers: FamilyMembersDTO;
   assignmentContext: AssignmentContextDTO;
+  /** Employee wizard Step 2 — selected relocation services (e.g. ['housing', 'immigration']). */
+  services?: string[];
 }
 
 export interface CaseDTO {
