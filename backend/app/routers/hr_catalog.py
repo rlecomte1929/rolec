@@ -351,6 +351,75 @@ def list_my_destination_requests(
     )
 
 
+class DestinationRequestResolve(BaseModel):
+    status: str = Field(..., description="Must be 'approved' or 'rejected'")
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+@router.patch("/destination-requests/{request_id}")
+def resolve_destination_request_hr(
+    request_id: str,
+    body: DestinationRequestResolve,
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """
+    HR approves or rejects a destination request from their company.
+
+    When approved the destination (city, country) is automatically added to the
+    catalog_destination_allowlist so the AI catalog can be populated for that
+    city in future sessions.
+
+    Only requests that belong to the caller's company can be resolved here;
+    cross-company access returns 404.
+    """
+    from ...services import scrape_safety
+
+    if body.status not in ("approved", "rejected"):
+        raise HTTPException(status_code=422, detail="status must be 'approved' or 'rejected'")
+
+    company_id = _caller_company_id(user)
+
+    # Verify the request belongs to this company before allowing resolution
+    company_reqs = scrape_safety.list_destination_requests(company_id=company_id, limit=500)
+    matching = next((r for r in company_reqs if r["id"] == request_id), None)
+    if not matching:
+        raise HTTPException(status_code=404, detail="Destination request not found for your company")
+
+    try:
+        result = scrape_safety.resolve_destination_request(
+            request_id=request_id,
+            new_status=body.status,
+            actor_user_id=str(user["id"]),
+            notes=body.notes,
+        )
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Destination request not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+    # If approved, add city+country to the destination allowlist so the catalog
+    # can be populated for future HR requests
+    if body.status == "approved":
+        try:
+            scrape_safety.add_allowlist_entry(
+                city=matching["city"],
+                country=matching["country"],
+                approved_by_user_id=str(user["id"]),
+                notes=f"Approved via HR portal (request_id={request_id})",
+            )
+            logger.info(
+                "HR approved destination request %s — %s, %s added to allowlist",
+                request_id, matching["city"], matching["country"],
+            )
+        except Exception:
+            # Non-fatal: the request was resolved successfully even if allowlist update failed
+            logger.exception(
+                "Failed to add allowlist entry after HR approval request_id=%s", request_id
+            )
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Phase 2b — destination-scoped flow (replaces single-category as the primary path)
 # ---------------------------------------------------------------------------

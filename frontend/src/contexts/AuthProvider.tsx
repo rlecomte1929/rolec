@@ -24,6 +24,7 @@ import {
 import { supabase, onAuthChange, signIn as supabaseSignIn, signOut as supabaseSignOut } from '../lib/supabase';
 import type { PlanTier, UserRole } from '../types/relopass-api-contracts';
 import { LoadingSpinner } from '../features/platform-v2/shared/index';
+import { initRelopassAnalytics, resetRelopassAnalytics, trackEvent } from '../lib/analytics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,7 +89,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session?.user) {
         const profile = await fetchProfile(session.user.id);
-        if (!cancelled) setUser(profile);
+        if (!cancelled) {
+          if (profile) {
+            await initRelopassAnalytics({ userId: profile.id, companyId: null });
+          }
+          setUser(profile);
+        }
       }
 
       setLoading(false);
@@ -100,8 +106,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (supabaseUser) {
         const profile = await fetchProfile(supabaseUser.id);
+        if (profile) {
+          await initRelopassAnalytics({ userId: profile.id, companyId: null });
+          trackEvent('user_signed_in');
+        }
         setUser(profile);
       } else {
+        resetRelopassAnalytics();
         setUser(null);
       }
     });
@@ -118,6 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    trackEvent('user_signed_out');
     await supabaseSignOut();
     // onAuthChange will handle clearing user state after sign-out
   }, []);

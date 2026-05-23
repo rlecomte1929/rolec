@@ -17,12 +17,21 @@ interface Member {
   dob?: string;
   school?: string;
   // pet
-  pet_type?: string;
+  pet_type?: string;        // maps to species in backend
   breed?: string;
   count?: number;
   rabies?: string;
   microchipped?: string;
   notes?: string;
+  // pet — extended fields (AIQ-160-C)
+  microchip_number?: string;
+  date_of_birth?: string;
+  passport_number?: string;
+  health_cert_expiry?: string;
+  vaccinations_json?: string;   // JSON stringified: [{vax_name, vax_date, vax_expiry}]
+  vet_name?: string;
+  vet_phone?: string;
+  vet_country?: string;
   // adult
   full_name?: string;
   relationship?: string;
@@ -491,6 +500,125 @@ function ChildCard({ m, onChange, onRemove, index, expanded, onToggle }: {
 }
 
 
+// ─── Pet card ─────────────────────────────────────────────────────────────────
+
+type VaxEntry = { vax_name: string; vax_date: string; vax_expiry: string };
+
+function PetCard({ m, onChange, onRemove, index, expanded, onToggle }: {
+  m: Member; onChange: (m: Member) => void; onRemove: () => void;
+  index: number; expanded: boolean; onToggle: () => void;
+}) {
+  const vaccinations: VaxEntry[] = (() => {
+    try { return JSON.parse(m.vaccinations_json || '[]'); } catch { return []; }
+  })();
+
+  const setVax = (next: VaxEntry[]) => onChange({ ...m, vaccinations_json: JSON.stringify(next) });
+  const addVax = () => setVax([...vaccinations, { vax_name: '', vax_date: '', vax_expiry: '' }]);
+  const updateVax = (i: number, field: keyof VaxEntry, value: string) =>
+    setVax(vaccinations.map((v, idx) => idx === i ? { ...v, [field]: value } : v));
+  const removeVax = (i: number) => setVax(vaccinations.filter((_, idx) => idx !== i));
+
+  const status: 'complete' | 'partial' | 'empty' =
+    m.name && m.pet_type ? 'complete' : m.name || m.pet_type ? 'partial' : 'empty';
+
+  return (
+    <CardShell ico="🐾"
+      title={`Pet ${index + 1}${m.name ? ` · ${m.name}` : ''}${m.pet_type ? ` (${m.pet_type})` : ''}`}
+      sub={m.breed ? m.breed : m.pet_type ? m.pet_type : 'Name + species required'}
+      status={status} expanded={expanded} onToggle={onToggle} onRemove={onRemove}>
+
+      <Grid>
+        <FieldWrap label="Pet name">
+          <input className={inputCls()} value={m.name ?? ''} placeholder="e.g. Luna"
+            onChange={(e) => onChange({ ...m, name: e.target.value })} />
+        </FieldWrap>
+        <FieldWrap label="Species" required>
+          <select className={selectCls()} value={m.pet_type ?? ''}
+            onChange={(e) => onChange({ ...m, pet_type: e.target.value })}>
+            <option value="">Select…</option>
+            <option value="dog">Dog</option>
+            <option value="cat">Cat</option>
+            <option value="bird">Bird</option>
+            <option value="rabbit">Rabbit</option>
+            <option value="other">Other</option>
+          </select>
+        </FieldWrap>
+        <FieldWrap label="Breed">
+          <input className={inputCls()} value={m.breed ?? ''} placeholder="e.g. Labrador"
+            onChange={(e) => onChange({ ...m, breed: e.target.value })} />
+        </FieldWrap>
+        <FieldWrap label="Microchip number" why="Required by most countries — usually a 15-digit ISO chip.">
+          <input className={inputCls()} value={m.microchip_number ?? ''} placeholder="e.g. 985112345678901"
+            onChange={(e) => onChange({ ...m, microchip_number: e.target.value })} />
+        </FieldWrap>
+        <FieldWrap label="Date of birth">
+          <input type="date" className={inputCls()} value={m.date_of_birth ?? ''}
+            onChange={(e) => onChange({ ...m, date_of_birth: e.target.value })} />
+        </FieldWrap>
+        <FieldWrap label="Passport / pet book number">
+          <input className={inputCls()} value={m.passport_number ?? ''} placeholder="e.g. 900123456"
+            onChange={(e) => onChange({ ...m, passport_number: e.target.value })} />
+        </FieldWrap>
+        <FieldWrap label="Health cert expiry" why="Many countries require a cert issued within 10 days of travel.">
+          <input type="date" className={inputCls()} value={m.health_cert_expiry ?? ''}
+            onChange={(e) => onChange({ ...m, health_cert_expiry: e.target.value })} />
+        </FieldWrap>
+      </Grid>
+
+      {/* Vaccinations */}
+      <div className="mt-4">
+        <div className="text-xs font-semibold text-gray-600 mb-2">Vaccinations</div>
+        {vaccinations.length > 0 && (
+          <div className="space-y-2 mb-2">
+            {vaccinations.map((vax, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <input className={`${inputCls()} flex-1`} value={vax.vax_name} placeholder="Vaccine name"
+                  onChange={(e) => updateVax(i, 'vax_name', e.target.value)} />
+                <input type="date" className={`${inputCls()} flex-1`} value={vax.vax_date}
+                  title="Date given"
+                  onChange={(e) => updateVax(i, 'vax_date', e.target.value)} />
+                <input type="date" className={`${inputCls()} flex-1`} value={vax.vax_expiry}
+                  title="Expiry date"
+                  onChange={(e) => updateVax(i, 'vax_expiry', e.target.value)} />
+                <button type="button" onClick={() => removeVax(i)}
+                  className="text-gray-300 hover:text-red-400 text-sm font-bold flex-shrink-0">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <button type="button" onClick={addVax}
+          className="text-xs text-violet-600 hover:text-violet-800 font-semibold">
+          + Add vaccination
+        </button>
+      </div>
+
+      {/* Vet information */}
+      <div className="mt-4">
+        <div className="text-xs font-semibold text-gray-600 mb-2">Vet information</div>
+        <Grid>
+          <FieldWrap label="Vet name">
+            <input className={inputCls()} value={m.vet_name ?? ''} placeholder="e.g. Dr. Smith"
+              onChange={(e) => onChange({ ...m, vet_name: e.target.value })} />
+          </FieldWrap>
+          <FieldWrap label="Vet phone">
+            <input className={inputCls()} value={m.vet_phone ?? ''} placeholder="+33 6 12 34 56 78"
+              onChange={(e) => onChange({ ...m, vet_phone: e.target.value })} />
+          </FieldWrap>
+          <FieldWrap label="Vet country">
+            <select className={selectCls()} value={m.vet_country ?? ''}
+              onChange={(e) => onChange({ ...m, vet_country: e.target.value })}>
+              <option value="">Select…</option>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+              ))}
+            </select>
+          </FieldWrap>
+        </Grid>
+      </div>
+    </CardShell>
+  );
+}
+
 // ─── Step components ──────────────────────────────────────────────────────────
 
 function StepHd({ title, sub, required }: { title: string; sub: string; required?: boolean }) {
@@ -577,6 +705,7 @@ export function EmployeeIntakePage() {
 
   const partner = data.members.find((m) => m.kind === 'partner');
   const children = data.members.filter((m) => m.kind === 'child');
+  const pets = data.members.filter((m) => m.kind === 'pet');
 
   const addMember = (kind: MemberKind, extra?: Partial<Member>) => {
     const id = kind + Date.now();
@@ -623,7 +752,7 @@ export function EmployeeIntakePage() {
   // The tab is visible but on-hold — index 3 of STEP_ON_HOLD marks it.
   const STEP_LABELS = ['Journey', 'About You', 'My People', 'Pets', 'Work & Place', 'My Needs', 'Review'];
   const STEP_ICONS  = ['🛫', '👤', '👪', '🐾', '🗺️', '✅', '📋'];
-  const STEP_ON_HOLD: Record<number, boolean> = { 4: true };
+  const STEP_ON_HOLD: Record<number, boolean> = {};  // AIQ-160-C: step 4 (Pets) is now active
   const TOTAL_STEPS = STEP_LABELS.length;
 
   const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
@@ -798,22 +927,47 @@ export function EmployeeIntakePage() {
               </>
             )}
 
-            {/* ── Step 4 — Pets (On hold) ── AIQ-289 */}
+            {/* ── Step 4 — Pets ── AIQ-160-C */}
             {step === 4 && (
               <>
-                <StepHd title="Pets" sub="A dedicated section for the pets joining your move — coming soon." />
-                <div className="flex flex-col items-center justify-center gap-3 py-10 px-6 border border-dashed border-amber-200 bg-amber-50/40 rounded-2xl text-center">
-                  <span className="text-3xl">🐾</span>
-                  <div className="text-base font-bold text-gray-800">Pets section is on hold</div>
-                  <div className="text-xs text-gray-500 max-w-md leading-relaxed">
-                    We're building a richer flow for pets — microchip and vaccination capture,
-                    destination-country quarantine warnings, vet and import-permit tracking.
-                    For now, please continue. You'll be able to add pets here as soon as the
-                    section ships.
-                  </div>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">
-                    On hold · coming soon
-                  </span>
+                <StepHd title="Pets" sub="Tell us about the pets joining your move — we'll track microchip, vaccination, and destination import requirements." />
+
+                <div className="space-y-3">
+                  {pets.length === 0 && (
+                    <div className="flex flex-col items-center justify-center gap-3 py-10 px-6 border border-dashed border-gray-200 bg-gray-50/40 rounded-2xl text-center">
+                      <span className="text-3xl">🐾</span>
+                      <div className="text-sm font-semibold text-gray-600">No pets added yet</div>
+                      <div className="text-xs text-gray-400 max-w-sm leading-relaxed">
+                        Add your pets below — we'll surface microchip, vaccination, and import requirements for your destination country.
+                      </div>
+                    </div>
+                  )}
+
+                  {pets.map((pet, i) => (
+                    <PetCard
+                      key={pet.id}
+                      m={pet}
+                      index={i}
+                      expanded={!!expanded[pet.id]}
+                      onToggle={() => toggleMember(pet.id)}
+                      onChange={(next) => updateMember(pet.id, next)}
+                      onRemove={() => {
+                        if (window.confirm(`Remove ${pet.name || `Pet ${i + 1}`}?`)) {
+                          removeMember(pet.id);
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <button type="button"
+                  onClick={() => addMember('pet', { pet_type: '' })}
+                  className="mt-3 w-full py-3 text-sm font-semibold text-violet-600 border-2 border-dashed border-violet-200 rounded-xl hover:bg-violet-50 transition-colors">
+                  🐾 Add a pet
+                </button>
+
+                <div className="flex items-start gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+                  ℹ <span><strong>No pets travelling with you?</strong> Skip this step — click Continue.</span>
                 </div>
               </>
             )}

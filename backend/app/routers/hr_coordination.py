@@ -18,6 +18,8 @@ from sqlalchemy import text
 
 from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
+from ....services.events_tracker import track as track_event
+from ....services.outcome_recorder import record_outcome
 
 router = APIRouter(prefix="/api/hr", tags=["hr-coordination"])
 
@@ -38,6 +40,13 @@ class UpdateTaskBody(BaseModel):
     description: Optional[str] = None
     due_date: Optional[str] = None
     status: Optional[str] = None
+    # Optional outcome fields — only recorded when status → 'completed'
+    quality_score: Optional[float] = None          # 1.0–5.0
+    speed_score: Optional[float] = None            # 1.0–5.0
+    communication_score: Optional[float] = None    # 1.0–5.0
+    completed_on_time: Optional[bool] = None
+    budget_variance_pct: Optional[float] = None    # (actual-budget)/budget×100
+    hr_feedback: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +193,15 @@ def assign_task(
             },
         )
 
+    track_event(
+        "assignment.supplier_assigned",
+        entity_type="provider_task",
+        entity_id=task_id,
+        user_id=hr_user.get("id"),
+        company_id=org_id,
+        properties={"case_id": case_id, "provider_id": body.provider_id, "title": body.title},
+    )
+
     return {
         "task": {
             "id": task_id,
@@ -285,6 +303,43 @@ def update_task(
         if hasattr(v, "isoformat"):
             row[col] = v.isoformat()
 
+    # Emit lifecycle event when status changes
+    if body.status is not None:
+        _STATUS_TO_EVENT = {
+            "completed":  "assignment.completed",
+            "cancelled":  "assignment.cancelled",
+            "in_progress": "assignment.in_progress",
+        }
+        evt = _STATUS_TO_EVENT.get(body.status)
+        if evt:
+            track_event(
+                evt,
+                entity_type="provider_task",
+                entity_id=task_id,
+                user_id=hr_user.get("id"),
+                company_id=org_id,
+                properties={"new_status": body.status, "case_id": row.get("case_id")},
+            )
+
+        # Record outcome when a task is marked completed (MATCHING-5B)
+        # Scores are optional — the outcome row is still created without them
+        # so we always capture completion facts even without quality ratings.
+        if body.status == "completed":
+            provider_id = row.get("provider_id")
+            if provider_id:
+                record_outcome(
+                    assignment_id=task_id,
+                    supplier_id=provider_id,
+                    rated_by=hr_user.get("id"),
+                    quality_score=body.quality_score,
+                    speed_score=body.speed_score,
+                    communication_score=body.communication_score,
+                    completed_on_time=body.completed_on_time,
+                    budget_variance_pct=body.budget_variance_pct,
+                    hr_feedback=body.hr_feedback,
+                    source_table="provider_tasks",
+                )
+
     return {"task": row}
 
 
@@ -324,3 +379,12 @@ def cancel_task(
             ),
             {"tid": task_id, "org_id": org_id, "now": datetime.utcnow().isoformat()},
         )
+
+    track_event(
+        "assignment.cancelled",
+        entity_type="provider_task",
+        entity_id=task_id,
+        user_id=hr_user.get("id"),
+        company_id=org_id,
+        properties={"reason_code": "hr_cancelled"},
+    )

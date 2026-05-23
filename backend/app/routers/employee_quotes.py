@@ -297,3 +297,68 @@ def list_service_categories(
     Return the available service category options for the quote request form.
     """
     return {"service_categories": SERVICE_CATEGORIES}
+
+
+# ---------------------------------------------------------------------------
+# Destination Request — employee requests an unsupported relocation destination
+# ---------------------------------------------------------------------------
+
+class EmployeeDestinationRequestCreate(BaseModel):
+    city: str = Field(..., min_length=1, max_length=200, description="Destination city name")
+    country: str = Field(..., min_length=1, max_length=200, description="Destination country name")
+    notes: Optional[str] = Field(None, max_length=1000, description="Optional context or reason for the request")
+
+
+@router.post("/api/employee/destination-request", status_code=201)
+def submit_destination_request(
+    body: EmployeeDestinationRequestCreate,
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+) -> Dict[str, Any]:
+    """
+    Employee (or HR on behalf of an employee) requests a destination that is not
+    yet in the supported destination list.  The request lands in the HR dashboard
+    for the employee's company.  HR can then approve or reject it via
+    PATCH /api/hr/catalog/destination-requests/{id}.
+
+    Deduplication: if a pending request already exists for the same
+    (city, country, company), the existing ticket is returned instead of
+    creating a duplicate.
+    """
+    from ...services import scrape_safety
+
+    profile = db.get_profile_record(user.get("id"))
+    company_id = (profile or {}).get("company_id") or user.get("company")
+    if not company_id:
+        raise HTTPException(status_code=403, detail="No company linked to this account.")
+
+    ticket = scrape_safety.open_destination_request(
+        city=body.city,
+        country=body.country,
+        category="Relocation destination",
+        requested_by_user_id=str(user["id"]),
+        company_id=str(company_id),
+        notes=body.notes,
+    )
+    return ticket
+
+
+@router.get("/api/employee/destination-requests")
+def list_employee_destination_requests(
+    user: Dict[str, Any] = Depends(require_hr_or_employee),
+) -> List[Dict[str, Any]]:
+    """
+    Employee lists their own pending destination requests so they can track status.
+    """
+    from ...services import scrape_safety
+
+    profile = db.get_profile_record(user.get("id"))
+    company_id = (profile or {}).get("company_id") or user.get("company")
+    if not company_id:
+        return []
+
+    all_reqs = scrape_safety.list_destination_requests(company_id=str(company_id), limit=200)
+    # Filter to requests opened by this user (employees only see their own)
+    role = (user.get("role") or "").upper()
+    if role == UserRole.EMPLOYEE.value:
+        return [r for r in all_reqs if r.get("requested_by") == str(user["id"])]
+    return all_reqs

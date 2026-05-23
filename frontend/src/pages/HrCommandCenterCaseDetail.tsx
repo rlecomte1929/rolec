@@ -15,6 +15,7 @@ import { PendingRfqsPanel } from '../components/case/PendingRfqsPanel';
 import { ImmigrationStatusPanel } from '../components/case/ImmigrationStatusPanel';
 import { AdvisorsPanel } from '../components/case/AdvisorsPanel';
 import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptionsPanel';
+import { PetRequirementsSection } from '../components/case/PetRequirementsSection';
 
 type QuoteRequest = {
   id: string;
@@ -260,6 +261,12 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
         {/* ── GAP 4: Immigration advisors matched to corridor ── */}
         <AdvisorsPanel
           destinationCountry={detail.destCountry}
+        />
+
+        {/* ── AIQ-160-E: Pet import requirements for destination country ── */}
+        <PetRequirementsSection
+          caseId={detail.id}
+          destCountry={detail.destCountry}
         />
 
         {/* ── GAP 7: Assignment-level policy exception requests ── */}

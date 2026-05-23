@@ -30,6 +30,7 @@ import { PlaceholderPage } from './pages/PlaceholderPage';
 import { DebugAuth } from './pages/DebugAuth';
 import { AssignmentDebugPage } from './pages/AssignmentDebugPage';
 import { PerfPanel } from './components/PerfPanel';
+import { FeatureFlagProvider } from './lib/feature-flags.tsx';
 
 const Journey = lazy(() => import('./pages/Journey').then((module) => ({ default: module.Journey })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
@@ -123,6 +124,7 @@ const AdminEventEditor = lazy(() => import('./pages/admin/AdminEventEditor').the
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories').then((module) => ({ default: module.AdminCategories })));
 const AdminTags = lazy(() => import('./pages/admin/AdminTags').then((module) => ({ default: module.AdminTags })));
 const AdminSources = lazy(() => import('./pages/admin/AdminSources').then((module) => ({ default: module.AdminSources })));
+const AdminAbTestsPage = lazy(() => import('./pages/admin/AdminAbTestsPage').then((module) => ({ default: module.AdminAbTestsPage })));
 const AdminStagingDashboard = lazy(() => import('./pages/admin/staging/AdminStagingDashboard').then((module) => ({ default: module.AdminStagingDashboard })));
 const AdminStagingResources = lazy(() => import('./pages/admin/staging/AdminStagingResources').then((module) => ({ default: module.AdminStagingResources })));
 const AdminStagingResourceDetail = lazy(() => import('./pages/admin/staging/AdminStagingResourceDetail').then((module) => ({ default: module.AdminStagingResourceDetail })));
@@ -190,6 +192,7 @@ function App() {
   return (
     <ErrorBoundary>
     <Router>
+      <FeatureFlagProvider>
       <ScrollToTop />
       <NavigationLogger />
       <DemoBookingProvider>
@@ -339,6 +342,8 @@ function App() {
         <Route path={ROUTE_DEFS.adminResources.path} element={<RequireAdminRoute><AdminResources /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResourcesNew.path} element={<RequireAdminRoute><AdminResourceEditor /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminResourcesEdit.path} element={<RequireAdminRoute><AdminResourceEditor /></RequireAdminRoute>} />
+        {/* [PRODUCT-6E] A/B test experiment dashboard */}
+        <Route path={ROUTE_DEFS.adminAbTests.path} element={<RequireAdminRoute><AdminAbTestsPage /></RequireAdminRoute>} />
         {/* [P1-2] Form Template Registry */}
         <Route path={ROUTE_DEFS.adminFormTemplates.path} element={<RequireAdminRoute><AdminFormTemplates /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFormTemplatesNew.path} element={<RequireAdminRoute><AdminFormTemplateEditor /></RequireAdminRoute>} />
@@ -444,6 +449,7 @@ function App() {
       <BookDemoModal />
       </DemoBookingProvider>
       <PerfPanel />
+      </FeatureFlagProvider>
     </Router>
     </ErrorBoundary>
   );

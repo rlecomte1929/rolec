@@ -147,6 +147,8 @@ export const ROUTE_DEFS = {
   adminFormTemplatesEdit: { path: '/admin/form-templates/:id', roles: ['ADMIN'] as RouteRole[] },
   // [P3-2] PDF coordinate mapper — must come before :id to avoid route ambiguity
   adminFormTemplatesMap: { path: '/admin/form-templates/:id/map', roles: ['ADMIN'] as RouteRole[] },
+  // [PRODUCT-6E] A/B test experiment dashboard
+  adminAbTests: { path: '/admin/ab-tests', roles: ['ADMIN'] as RouteRole[] },
   /** External provider portal — authenticated via magic-link JWT, no ReloPass account needed */
   providerPortal: { path: '/provider/portal', roles: ['PUBLIC'] as RouteRole[] },
 };

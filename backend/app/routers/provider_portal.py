@@ -30,6 +30,7 @@ from pydantic import BaseModel
 
 from ...services.provider_jwt import verify_provider_token
 from ...services.supabase_client import get_supabase_admin_client
+from ...services.events_tracker import track as track_event
 
 log = logging.getLogger(__name__)
 
@@ -453,6 +454,30 @@ def patch_provider_task(
             )
         except Exception as exc:
             log.error("Notification error (non-fatal): %s", exc)
+
+    # Emit structured event when the supplier changes task status
+    if body.status and body.status != old_status:
+        _PROVIDER_STATUS_TO_EVENT = {
+            "in_progress": "assignment.supplier_accepted",
+            "completed":   "assignment.completed",
+            "blocked":     "assignment.disputed",
+        }
+        evt = _PROVIDER_STATUS_TO_EVENT.get(new_status)
+        if evt:
+            track_event(
+                evt,
+                entity_type="provider_task",
+                entity_id=task_id,
+                company_id=org_id,
+                properties={
+                    "case_id":      case_id,
+                    "provider_id":  provider_id,
+                    "old_status":   old_status,
+                    "new_status":   new_status,
+                    "reason_code":  body.provider_note or None,
+                },
+                source="api",
+            )
 
     merged = {**task, **updates}
     return ProviderTaskDetail(
