@@ -778,7 +778,8 @@ async function suiteT14FullStack() {
   record('T14_EMPLOYER', 'Cross-role case: employer = "Test Co (Seed)" (B5)', 'Scenario (Cross-Role)', '"Test Co (Seed)"', `"${employer}"`,
     employerOk ? 'PASS' : employer ? 'FAIL' : 'WARN', detailR.ms, employerOk ? '' : `Got "${employer}" — B5 cross-company data leak`);
 
-  r = await req('POST', `/api/hr/cases/${caseId}/assign`, { employee_email: CONFIG.CREDS.newEmp.email }, hrToken, 8000);
+  // Assign to seeded employee so empToken (seeded emp) can see the case
+  r = await req('POST', `/api/hr/cases/${caseId}/assign`, { employee_email: CONFIG.CREDS.seedEmp.identifier }, hrToken, 8000);
   const assignOk = r.ok && r.ms < 8000 && !r.error;
   steps.push({ name:'assign_employee (B3)', ok: assignOk });
   record('T14_ASSIGN', 'HR assigns case to employee (B3 regression)', 'Scenario (Cross-Role)', '200 <8s', `${r.status} ${r.ms}ms`,

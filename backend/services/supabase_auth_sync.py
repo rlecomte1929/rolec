@@ -206,6 +206,121 @@ def invite_admin_created_user(
         return False
 
 
+def create_auth_user_with_id(
+    user_id: str,
+    email: str,
+    password: str,
+    *,
+    full_name: Optional[str] = None,
+) -> bool:
+    """
+    Create a Supabase Auth user with a *specific* UUID — used by seed_test_personas
+    so that profiles.id FK (→ auth.users.id) is satisfied for fixed test UUIDs.
+    Idempotent: silently succeeds if the user already exists.
+    Never raises.
+    """
+    if os.getenv("DISABLE_SUPABASE_AUTH_SYNC", "").lower() in ("1", "true", "yes"):
+        return True
+    if not user_id or not email or not password:
+        return False
+    if get_supabase_admin_client is None:
+        return False
+    try:
+        client = get_supabase_admin_client()
+    except Exception as ex:
+        log.debug("create_auth_user_with_id: no admin client: %s", ex)
+        return False
+
+    attrs: dict[str, Any] = {
+        "id": user_id,
+        "email": email.strip().lower(),
+        "password": password,
+        "email_confirm": True,
+    }
+    if full_name and str(full_name).strip():
+        attrs["user_metadata"] = {"full_name": str(full_name).strip()}
+
+    try:
+        _call_with_timeout(client.auth.admin.create_user, attrs)  # type: ignore[union-attr]
+        log.info("create_auth_user_with_id: created user_id=%s email=%s", user_id[:8], email[:3] + "***")
+        return True
+    except concurrent.futures.TimeoutError:
+        log.warning("create_auth_user_with_id: timed_out user_id=%s", user_id[:8])
+        return False
+    except Exception as ex:
+        if _duplicate_user_error(ex):
+            log.debug("create_auth_user_with_id: already present user_id=%s", user_id[:8])
+            return True
+        log.warning("create_auth_user_with_id: failed user_id=%s error=%s", user_id[:8], ex)
+        return False
+
+
+def create_auth_user_and_get_id(
+    email: str,
+    *,
+    full_name: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Create a Supabase Auth user (confirmed, no password) and return the UUID
+    assigned by Supabase. Used by admin create_person so the profiles.id FK
+    (→ auth.users.id) is satisfied before the local profile row is inserted.
+
+    Returns the UUID string on success, or None when Supabase is not
+    configured or on failure.  Never raises.
+    """
+    if os.getenv("DISABLE_SUPABASE_AUTH_SYNC", "").lower() in ("1", "true", "yes"):
+        return None
+    e = (email or "").strip().lower()
+    if not e:
+        return None
+    if get_supabase_admin_client is None:
+        return None
+    try:
+        client = get_supabase_admin_client()
+    except Exception as ex:
+        log.debug("create_auth_user_and_get_id: no admin client: %s", ex)
+        return None
+
+    attrs: dict[str, Any] = {
+        "email": e,
+        "email_confirm": False,  # invite flow sets the password later
+    }
+    if full_name and str(full_name).strip():
+        attrs["user_metadata"] = {"full_name": str(full_name).strip()}
+
+    try:
+        resp = _call_with_timeout(client.auth.admin.create_user, attrs)  # type: ignore[union-attr]
+        user = getattr(resp, "user", resp)
+        uid = str(getattr(user, "id", None)) if user else None
+        if uid and uid != "None":
+            log.info("create_auth_user_and_get_id: created uid=%s email=%s", uid[:8], e[:3] + "***")
+            return uid
+        log.warning("create_auth_user_and_get_id: no id in response for email=%s", e[:3] + "***")
+        return None
+    except concurrent.futures.TimeoutError:
+        log.warning("create_auth_user_and_get_id: timed_out email=%s", e[:3] + "***")
+        return None
+    except Exception as ex:
+        if _duplicate_user_error(ex):
+            # User already exists — try to fetch their UUID
+            log.debug("create_auth_user_and_get_id: user already present, attempting lookup email=%s", e[:3] + "***")
+            try:
+                users_resp = _call_with_timeout(
+                    client.auth.admin.list_users,  # type: ignore[union-attr]
+                )
+                users = getattr(users_resp, "users", users_resp) or []
+                for u in users:
+                    if (getattr(u, "email", "") or "").lower() == e:
+                        uid = str(getattr(u, "id", None))
+                        if uid and uid != "None":
+                            return uid
+            except Exception as le:
+                log.debug("create_auth_user_and_get_id: lookup failed: %s", le)
+            return None
+        log.warning("create_auth_user_and_get_id: failed email=%s error=%s", e[:3] + "***", ex)
+        return None
+
+
 def revoke_supabase_session(access_token: str) -> bool:
     """
     Best-effort server-side Supabase sign-out. Called on logout so the

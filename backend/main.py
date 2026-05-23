@@ -1888,6 +1888,16 @@ def create_person(
         raise HTTPException(status_code=400, detail="email required")
     request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
     person_id = str(uuid.uuid4())
+    # profiles.id has a FK → auth.users(id). Create the Supabase auth user first so
+    # the insert doesn't fail with ForeignKeyViolation / masked 409.
+    try:
+        from .services.supabase_auth_sync import create_auth_user_and_get_id as _caagi
+        _auth_id = _caagi(email, full_name=body.full_name)
+        if _auth_id:
+            person_id = _auth_id
+            log.info("admin_create_person: using supabase auth uid=%s for email=%s", person_id[:8], email[:3] + "***")
+    except Exception as _ex:
+        log.debug("admin_create_person: supabase pre-create failed (will attempt profile insert anyway): %s", _ex)
     try:
         role = (body.role or "EMPLOYEE").strip().upper()
         db.create_profile(
@@ -2040,6 +2050,20 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
                 f"ON CONFLICT (id) DO UPDATE SET {u_upd_clause}"
             ), u_vals)
     created.append("users")
+
+    # ── 2.5. Create Supabase auth users with fixed UUIDs so profiles_id_fkey is satisfied ──
+    log.info("seed_test_personas step 2.5: supabase auth users")
+    try:
+        from .services.supabase_auth_sync import create_auth_user_with_id as _cawid
+        for _uid, _email in [
+            (HR1_UID, "hr_seed@testco.com"),
+            (HR2_UID, "hr2_seed@otherco.com"),
+            (EMP_UID, "emp_seed@testco.com"),
+        ]:
+            result = _cawid(_uid, _email, SEED_PW, full_name=_email.split("@")[0])
+            log.info("seed_test_personas auth_user uid=%s email=%s ok=%s", _uid[:8], _email[:6], result)
+    except Exception as _auth_exc:
+        log.warning("seed_test_personas auth sync failed (non-fatal): %r", _auth_exc)
 
     # ── 3. Profiles (direct UPSERT — bypass ensure_profile_record FK path) ──
     log.info("seed_test_personas step 3: profiles")
