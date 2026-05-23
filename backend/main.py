@@ -1973,6 +1973,14 @@ def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
     HR2  : hr2_seed@otherco.com / Passw0rd!  — company "Other Corp (Seed)"
     EMP  : emp_seed@testco.com  / Passw0rd!  — same company as HR1
     """
+    try:
+        return _seed_test_personas_impl(user)
+    except Exception as _exc:
+        log.error("seed_test_personas FAILED error=%r", _exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Seed failed: {_exc}")
+
+
+def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
     from passlib.context import CryptContext as _CCC
     _pwd_ctx = _CCC(schemes=["pbkdf2_sha256"], deprecated="auto")
     SEED_PW = "Passw0rd!"
@@ -1989,27 +1997,52 @@ def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
     created = []
 
     # ── 1. Companies ─────────────────────────────────────────────────────────
+    log.info("seed_test_personas step 1: companies")
     db.create_company(TESTCO_CID,  "Test Co (Seed)",     plan_tier="low", status="active")
     db.create_company(OTHERCO_CID, "Other Corp (Seed)",  plan_tier="low", status="active")
     created.append("companies")
 
     # ── 2. Users (UPSERT — ON CONFLICT(id) update pw hash so password is always fresh) ──
+    log.info("seed_test_personas step 2: users")
     with db.engine.begin() as conn:
+        # Detect which columns exist in users table
+        users_cols_q = conn.execute(text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema='public' AND table_name='users'"
+        )).fetchall()
+        users_cols = {(r[0] if not hasattr(r, '_mapping') else r._mapping['column_name'])
+                      for r in users_cols_q}
+        log.info("seed_test_personas users columns: %s", sorted(users_cols))
+
         for uid, email, role, name in [
             (HR1_UID, "hr_seed@testco.com",   "HR",       "HR Seed"),
             (HR2_UID, "hr2_seed@otherco.com",  "HR",       "HR2 Seed"),
             (EMP_UID, "emp_seed@testco.com",   "EMPLOYEE", "Emp Seed"),
         ]:
+            u_cols = ["id", "email", "role"]
+            u_vals: Dict[str, Any] = {"id": uid, "email": email, "role": role}
+            if "name" in users_cols:
+                u_cols.append("name"); u_vals["name"] = name
+            if "password_hash" in users_cols:
+                u_cols.append("password_hash"); u_vals["password_hash"] = pw_hash
+            elif "hashed_password" in users_cols:
+                u_cols.append("hashed_password"); u_vals["hashed_password"] = pw_hash
+            if "created_at" in users_cols:
+                u_cols.append("created_at"); u_vals["created_at"] = now
+
+            u_col_clause = ", ".join(u_cols)
+            u_val_clause = ", ".join(f":{c}" for c in u_cols)
+            u_upd_clause = ", ".join(
+                f"{c} = excluded.{c}" for c in u_cols if c not in ("id", "created_at")
+            )
             conn.execute(text(
-                "INSERT INTO users (id, email, role, name, password_hash, created_at) "
-                "VALUES (:id, :email, :role, :name, :pw, :now) "
-                "ON CONFLICT (id) DO UPDATE SET password_hash = excluded.password_hash, "
-                "email = excluded.email, role = excluded.role"
-            ), {"id": uid, "email": email, "role": role, "name": name,
-                "pw": pw_hash, "now": now})
+                f"INSERT INTO users ({u_col_clause}) VALUES ({u_val_clause}) "
+                f"ON CONFLICT (id) DO UPDATE SET {u_upd_clause}"
+            ), u_vals)
     created.append("users")
 
     # ── 3. Profiles (direct UPSERT — bypass ensure_profile_record FK path) ──
+    log.info("seed_test_personas step 3: profiles")
     with db.engine.begin() as conn:
         profile_cols_q = conn.execute(text(
             "SELECT column_name FROM information_schema.columns "
@@ -2017,6 +2050,7 @@ def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
         )).fetchall()
         profile_cols = {r[0] if not hasattr(r, '_mapping') else r._mapping['column_name']
                         for r in profile_cols_q}
+        log.info("seed_test_personas profiles columns: %s", sorted(profile_cols))
 
         for uid, email, role, cid in [
             (HR1_UID, "hr_seed@testco.com",   "hr",       TESTCO_CID),
@@ -2024,8 +2058,14 @@ def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
             (EMP_UID, "emp_seed@testco.com",   "employee", TESTCO_CID),
         ]:
             # Build column list from what actually exists (schema varies)
-            p_cols = ["id", "role", "email", "full_name"]
-            p_vals = {"id": uid, "role": role, "email": email, "full_name": email.split("@")[0]}
+            p_cols = ["id"]
+            p_vals: Dict[str, Any] = {"id": uid}
+            if "role" in profile_cols:
+                p_cols.append("role"); p_vals["role"] = role
+            if "email" in profile_cols:
+                p_cols.append("email"); p_vals["email"] = email
+            if "full_name" in profile_cols:
+                p_cols.append("full_name"); p_vals["full_name"] = email.split("@")[0]
             if "company_id" in profile_cols:
                 p_cols.append("company_id"); p_vals["company_id"] = cid
             if "created_at" in profile_cols:
@@ -2034,7 +2074,7 @@ def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
             col_clause = ", ".join(p_cols)
             val_clause = ", ".join(f":{c}" for c in p_cols)
             upd_clause = ", ".join(
-                f"{c} = excluded.{c}" for c in p_cols if c != "id"
+                f"{c} = excluded.{c}" for c in p_cols if c not in ("id", "created_at")
             )
             conn.execute(text(
                 f"INSERT INTO profiles ({col_clause}) VALUES ({val_clause}) "
@@ -2043,11 +2083,13 @@ def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
     created.append("profiles")
 
     # ── 4. hr_users rows ────────────────────────────────────────────────────
+    log.info("seed_test_personas step 4: hr_users")
     db.ensure_hr_user_for_profile(HR1_UID, TESTCO_CID)
     db.ensure_hr_user_for_profile(HR2_UID, OTHERCO_CID)
     created.append("hr_users")
 
     # ── 5. Employee row ─────────────────────────────────────────────────────
+    log.info("seed_test_personas step 5: employees")
     db.ensure_employee_for_profile(EMP_UID, TESTCO_CID)
     created.append("employees")
 
