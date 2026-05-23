@@ -251,7 +251,7 @@ async function suiteCases() {
   if (caseId) {
     const r2 = await req('GET', `/api/cases/${caseId}`, null, T);
     const emp = r2.data?.profile_json?.employer?.name || r2.data?.employer?.name || null;
-    record('CT3','New case employer matches HR company (B5)','Cases','employer="Test company"',`employer="${emp}"`, emp==='Test company' ? 'PASS' : emp ? 'FAIL':'WARN', r2.ms, `full: ${JSON.stringify(r2.data?.profile_json?.employer)}`);
+    record('CT3','New case employer matches HR company (B5)','Cases','employer="Test Co (Seed)"',`employer="${emp}"`, emp==='Test Co (Seed)' ? 'PASS' : emp ? 'FAIL':'WARN', r2.ms, `full: ${JSON.stringify(r2.data?.profile_json?.employer)}`);
 
     const r3 = await req('POST', `/api/hr/cases/${caseId}/assign`, { employee_email: CONFIG.CREDS.newEmp.email }, T, 8000);
     record('CT4','Case assign responds within 8s (B3)','Cases','<8000ms, not timeout', r3.error?.includes('abort') ? 'TIMEOUT':String(r3.status), r3.error?.includes('abort') ? 'FAIL' : r3.ok ? 'PASS':'WARN', r3.ms, r3.error||`status=${r3.status}`);
@@ -623,7 +623,7 @@ async function suitePersonaFlows(scenarioIds) {
 
     const detailR  = await req('GET', `/api/cases/${caseId}`, null, T);
     const employer = detailR.data?.profile_json?.employer?.name || detailR.data?.employer?.name || null;
-    const employerOk = employer === 'Test company';
+    const employerOk = employer === 'Test Co (Seed)';
 
     const assignR = await req('POST', `/api/hr/cases/${caseId}/assign`, { employee_email: CONFIG.CREDS.newEmp.email }, T, 8000);
     const assignOk = assignR.ok && !assignR.error?.includes('abort');
@@ -773,9 +773,9 @@ async function suiteT14FullStack() {
 
   const detailR  = await req('GET', `/api/cases/${caseId}`, null, hrToken);
   const employer = detailR.data?.profile_json?.employer?.name || detailR.data?.employer?.name || null;
-  const employerOk = employer === 'Test company';
+  const employerOk = employer === 'Test Co (Seed)';
   steps.push({ name:'employer_correct (B5)', ok: employerOk });
-  record('T14_EMPLOYER', 'Cross-role case: employer = "Test company" (B5)', 'Scenario (Cross-Role)', '"Test company"', `"${employer}"`,
+  record('T14_EMPLOYER', 'Cross-role case: employer = "Test Co (Seed)" (B5)', 'Scenario (Cross-Role)', '"Test Co (Seed)"', `"${employer}"`,
     employerOk ? 'PASS' : employer ? 'FAIL' : 'WARN', detailR.ms, employerOk ? '' : `Got "${employer}" — B5 cross-company data leak`);
 
   r = await req('POST', `/api/hr/cases/${caseId}/assign`, { employee_email: CONFIG.CREDS.newEmp.email }, hrToken, 8000);
