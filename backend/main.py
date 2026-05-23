@@ -1891,12 +1891,14 @@ def create_person(
         raise HTTPException(status_code=400, detail="email required")
     request_id = getattr(request.state, "request_id", None) if hasattr(request, "state") else None
     person_id = str(uuid.uuid4())
+    # profiles.full_name has a NOT NULL constraint; derive a default from the email if omitted
+    full_name = (body.full_name or "").strip() or email.split("@")[0]
     try:
         role = (body.role or "EMPLOYEE").strip().upper()
         db.create_profile(
             person_id=person_id,
             email=email,
-            full_name=body.full_name,
+            full_name=full_name,
             role=role,
             company_id=body.company_id,
         )
