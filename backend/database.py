@@ -10007,39 +10007,48 @@ class Database:
             values_clause = ", ".join(f":{c}" for c in insert_cols)
             columns_clause = ", ".join(insert_cols)
 
-            # Build ON CONFLICT update set only for columns that actually exist
-            update_sets = [
-                "name = excluded.name",
-                # Keep existing slug on upsert — it's immutable once set
-                "slug = COALESCE(companies.slug, excluded.slug)",
-                "country = excluded.country",
-                "size_band = excluded.size_band",
-                "address = excluded.address",
-                "phone = excluded.phone",
-                "hr_contact = excluded.hr_contact",
-                "legal_name = COALESCE(excluded.legal_name, companies.legal_name)",
-                "website = COALESCE(excluded.website, companies.website)",
-                "hq_city = COALESCE(excluded.hq_city, companies.hq_city)",
-                "industry = COALESCE(excluded.industry, companies.industry)",
-                "logo_url = COALESCE(excluded.logo_url, companies.logo_url)",
-                "brand_color = COALESCE(excluded.brand_color, companies.brand_color)",
-                "updated_at = excluded.updated_at",
-                "default_destination_country = COALESCE(excluded.default_destination_country, companies.default_destination_country)",
-                "support_email = COALESCE(excluded.support_email, companies.support_email)",
-                "default_working_location = COALESCE(excluded.default_working_location, companies.default_working_location)",
+            # Build ON CONFLICT update set — only for columns that are in insert_cols
+            # (i.e., columns that actually exist in the table AND were included in VALUES).
+            # Referencing excluded.<col> for a column not in the INSERT raises
+            # "column excluded.<col> does not exist" in Postgres.
+            _insert_set = set(insert_cols)
+
+            def _upd(col: str, expr: str) -> Optional[str]:
+                """Return the update expression only if col was actually inserted."""
+                return expr if col in _insert_set else None
+
+            _all_update_candidates = [
+                _upd("name",       "name = excluded.name"),
+                # slug is immutable once set — preserve existing value
+                _upd("slug",       "slug = COALESCE(companies.slug, excluded.slug)"),
+                _upd("country",    "country = excluded.country"),
+                _upd("size_band",  "size_band = excluded.size_band"),
+                _upd("address",    "address = excluded.address"),
+                _upd("phone",      "phone = excluded.phone"),
+                _upd("hr_contact", "hr_contact = excluded.hr_contact"),
+                _upd("legal_name", "legal_name = COALESCE(excluded.legal_name, companies.legal_name)"),
+                _upd("website",    "website = COALESCE(excluded.website, companies.website)"),
+                _upd("hq_city",    "hq_city = COALESCE(excluded.hq_city, companies.hq_city)"),
+                _upd("industry",   "industry = COALESCE(excluded.industry, companies.industry)"),
+                _upd("logo_url",   "logo_url = COALESCE(excluded.logo_url, companies.logo_url)"),
+                _upd("brand_color","brand_color = COALESCE(excluded.brand_color, companies.brand_color)"),
+                _upd("updated_at", "updated_at = excluded.updated_at"),
+                _upd("default_destination_country",
+                     "default_destination_country = COALESCE(excluded.default_destination_country, companies.default_destination_country)"),
+                _upd("support_email",
+                     "support_email = COALESCE(excluded.support_email, companies.support_email)"),
+                _upd("default_working_location",
+                     "default_working_location = COALESCE(excluded.default_working_location, companies.default_working_location)"),
+                _upd("status",
+                     "status = COALESCE(excluded.status, companies.status)"),
+                _upd("plan_tier",
+                     "plan_tier = COALESCE(excluded.plan_tier, companies.plan_tier)"),
+                _upd("hr_seat_limit",
+                     "hr_seat_limit = COALESCE(excluded.hr_seat_limit, companies.hr_seat_limit)"),
+                _upd("employee_seat_limit",
+                     "employee_seat_limit = COALESCE(excluded.employee_seat_limit, companies.employee_seat_limit)"),
             ]
-            if "status" in company_cols:
-                update_sets.append("status = COALESCE(excluded.status, companies.status)")
-            if "plan_tier" in company_cols:
-                update_sets.append("plan_tier = COALESCE(excluded.plan_tier, companies.plan_tier)")
-            if "hr_seat_limit" in company_cols:
-                update_sets.append(
-                    "hr_seat_limit = COALESCE(excluded.hr_seat_limit, companies.hr_seat_limit)"
-                )
-            if "employee_seat_limit" in company_cols:
-                update_sets.append(
-                    "employee_seat_limit = COALESCE(excluded.employee_seat_limit, companies.employee_seat_limit)"
-                )
+            update_sets = [s for s in _all_update_candidates if s is not None]
 
             sql = f"""
                 INSERT INTO companies ({columns_clause})
