@@ -77,3 +77,6 @@ commit_rls0.sh
 
 # Claude Code / Cowork skill bundles — local tooling, not project code
 skills/zinzlTfG/
+
+# Cowork / Claude Code skill bundles installed locally
+skills/
