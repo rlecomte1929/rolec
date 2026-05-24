@@ -1,0 +1,44 @@
+{
+  "_comment": "Feature flag reference document — source of truth for flag names, defaults, and structure.",
+  "_naming_convention": {
+    "format": "<feature_area>_<description>_<version>",
+    "examples": ["onboarding_flow_v2", "hr_policy_section_c_v1", "employee_dashboard_v2"],
+    "rules": [
+      "Lowercase snake_case only",
+      "Suffix with _v<N> when replacing an existing flow (enables gradual rollout)",
+      "Boolean flags: enabled true/false + variants + traffic_split",
+      "traffic_split values must sum to 100",
+      "Retire flag + legacy code path once variant_a hits 100% traffic"
+    ]
+  },
+  "_environments": {
+    "EDGE_CONFIG": "Set in Vercel / Cloudflare / Supabase vault per environment",
+    "fallback": "If EDGE_CONFIG is unavailable, all flags default to enabled:false (safe default)"
+  },
+  "flags": {
+    "onboarding_flow_v2": {
+      "enabled": false,
+      "variants": ["control", "variant_a"],
+      "traffic_split": [100, 0],
+      "description": "New onboarding flow with progress bar and inline validation. variant_a = new flow, control = current flow.",
+      "owner": "product",
+      "created": "2026-05-23"
+    },
+    "hr_policy_assistant_v2": {
+      "enabled": false,
+      "variants": ["control", "variant_a"],
+      "traffic_split": [100, 0],
+      "description": "Redesigned HR policy assistant with streaming responses and source citations.",
+      "owner": "product",
+      "created": "2026-05-23"
+    },
+    "employee_dashboard_v2": {
+      "enabled": false,
+      "variants": ["control", "variant_a"],
+      "traffic_split": [100, 0],
+      "description": "Platform V2 employee dashboard. variant_a = new card-based layout.",
+      "owner": "product",
+      "created": "2026-05-23"
+    }
+  }
+}

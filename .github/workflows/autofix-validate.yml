@@ -1,0 +1,382 @@
+# autofix-validate.yml — DEV-LOOP-2D
+# ─────────────────────────────────────────────────────────────────────────────
+# Runs on every push to autofix/* branches.
+# On E2E pass  → squash-merges to main, deploys to Vercel production.
+# On E2E fail  → leaves branch open, updates Notion task to 'Human Review'.
+# On deploy fail → triggers automatic revert commit on main.
+#
+# Secrets required (Settings → Secrets):
+#   VERCEL_TOKEN      — Vercel personal access token
+#   NOTION_API_KEY    — Notion integration secret
+#   GH_PAT            — GitHub PAT with repo + pull_requests scope (for squash-merge)
+#
+# Variables required (Settings → Variables):
+#   RELOPASS_STAGING_URL  — Staging URL for E2E smoke tests
+#   VERCEL_ORG_ID         — Vercel org ID
+#   VERCEL_PROJECT_ID     — Vercel project ID
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Autofix Validate & Deploy
+
+on:
+  push:
+    branches:
+      - 'autofix/**'
+
+# Prevent two runs for the same branch from conflicting
+concurrency:
+  group: autofix-validate-${{ github.ref }}
+  cancel-in-progress: false   # Must complete cleanly; cancel would leave Notion stale
+
+env:
+  NODE_VERSION: '20'
+  NOTION_VERSION: '2022-06-28'
+
+jobs:
+  # ── E2E Validation ───────────────────────────────────────────────────────────
+  validate:
+    name: E2E Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      pr_number:  ${{ steps.find_pr.outputs.pr_number }}
+      notion_url: ${{ steps.extract_notion.outputs.notion_url }}
+      notion_id:  ${{ steps.extract_notion.outputs.notion_id }}
+      bug_title:  ${{ steps.extract_notion.outputs.bug_title }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Quick safety gate before spending 15 min on E2E
+      - name: Verify blocklist (changed files must not be in protected paths)
+        run: |
+          git fetch origin main --depth=2
+          CHANGED=$(git diff --name-only origin/main HEAD 2>/dev/null || echo "")
+          echo "Changed files: $CHANGED"
+          # Inline node check — fast, no extra deps
+          node --input-type=module << 'JSEOF'
+          import { readFileSync } from 'fs';
+          const changed = process.env.CHANGED_FILES?.split('\n').filter(Boolean) ?? [];
+          const BLOCKED = [
+            /\/auth\//i, /^auth\//i, /\/token/i, /\/session/i, /\/billing/i,
+            /\/payment/i, /\/stripe/i, /\/webhook/i, /\/migration/i, /\/schema/i,
+            /\/password/i, /\/secret/i, /\/pii/i, /\/gdpr/i, /\/\.env/i,
+            /\/deploy/i, /\/\.github\//i, /\/encrypt/i
+          ];
+          const blocked = changed.filter(f => BLOCKED.some(p => p.test(f)));
+          if (blocked.length) {
+            console.error('BLOCKED FILES:', blocked);
+            process.exit(1);
+          }
+          console.log('All changed files safe:', changed.join(', ') || '(none)');
+          JSEOF
+        env:
+          CHANGED_FILES: ${{ env.CHANGED_FILES }}
+
+      # Run the E2E smoke suite against staging
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Run E2E smoke tests
+        id: e2e
+        run: |
+          npx playwright test \
+            --project=chromium \
+            --reporter=html \
+            2>&1 | tee e2e-output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        working-directory: frontend
+        env:
+          BASE_URL: ${{ vars.RELOPASS_STAGING_URL || 'https://app.relopass.com' }}
+        continue-on-error: true
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-${{ github.sha }}
+          path: frontend/playwright-report/
+          retention-days: 14
+
+      # Find the draft PR opened by autofix-pipeline (DEV-LOOP-2C)
+      - name: Find associated PR
+        id: find_pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const prs = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${branch}`,
+              state: 'open',
+            });
+            if (prs.data.length === 0) {
+              core.warning(`No open PR found for branch ${branch}`);
+              return;
+            }
+            const pr = prs.data[0];
+            core.setOutput('pr_number', pr.number);
+            core.setOutput('pr_title', pr.title);
+            core.setOutput('pr_body', pr.body ?? '');
+            core.info(`Found PR #${pr.number}: ${pr.title}`);
+
+      # Extract Notion URL and task ID from the PR body (set by autofix-pipeline)
+      - name: Extract Notion metadata from PR
+        id: extract_notion
+        run: |
+          PR_BODY='${{ steps.find_pr.outputs.pr_body }}'
+          # Notion URL appears as: **Notion:** https://www.notion.so/...
+          NOTION_URL=$(echo "$PR_BODY" | grep -oP 'https://www\.notion\.so/\S+' | head -1 | tr -d "'")
+          # Bug title from PR title: "fix: My Bug Title"
+          PR_TITLE='${{ steps.find_pr.outputs.pr_title }}'
+          BUG_TITLE=$(echo "$PR_TITLE" | sed 's/^fix: //')
+          # Notion page ID from branch name: autofix/bug-{16-char-id}
+          BRANCH='${{ github.ref }}'
+          NOTION_BRANCH_ID=$(echo "$BRANCH" | grep -oP '(?<=autofix/bug-)[a-f0-9]+' | head -1)
+          echo "notion_url=$NOTION_URL" >> $GITHUB_OUTPUT
+          echo "notion_id=$NOTION_BRANCH_ID" >> $GITHUB_OUTPUT
+          echo "bug_title=$BUG_TITLE" >> $GITHUB_OUTPUT
+          echo "Notion URL: $NOTION_URL"
+          echo "Notion branch ID: $NOTION_BRANCH_ID"
+          echo "Bug title: $BUG_TITLE"
+
+      # Fail the job if E2E tests failed (deferred so we could upload report first)
+      - name: Assert E2E passed
+        if: steps.e2e.outputs.exit_code != '0'
+        run: |
+          echo "E2E tests failed (exit code ${{ steps.e2e.outputs.exit_code }})"
+          exit 1
+
+  # ── Auto-merge and Deploy ────────────────────────────────────────────────────
+  auto-merge:
+    name: Squash-merge & Deploy
+    needs: [validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: success()
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      # Convert draft PR to ready and squash-merge
+      - name: Squash-merge PR to main
+        id: merge
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = parseInt('${{ needs.validate.outputs.pr_number }}');
+            const bugTitle = '${{ needs.validate.outputs.bug_title }}';
+            const notionId = '${{ needs.validate.outputs.notion_id }}';
+            const notionUrl = '${{ needs.validate.outputs.notion_url }}';
+
+            if (!prNumber) {
+              core.warning('No PR number found — attempting direct merge via push');
+              return;
+            }
+
+            // Mark PR as ready (convert from draft)
+            try {
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                draft: false,
+              });
+            } catch (e) {
+              core.info(`Could not un-draft PR (may not be draft): ${e.message}`);
+            }
+
+            // Squash merge with the specified commit message format
+            const result = await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              merge_method: 'squash',
+              commit_title: `autofix: ${bugTitle} [#${notionId}]`,
+              commit_message: [
+                `Auto-merged by ReloPass autofix-pipeline after E2E validation pass.`,
+                ``,
+                `Notion: ${notionUrl}`,
+                `Branch: ${context.ref.replace('refs/heads/', '')}`,
+                `Validated: ${new Date().toISOString()}`,
+              ].join('\n'),
+            });
+
+            core.setOutput('merge_sha', result.data.sha);
+            core.setOutput('merged', 'true');
+            core.info(`Squash-merged: ${result.data.sha}`);
+
+      # Deploy to Vercel production
+      - name: Deploy to Vercel production
+        id: deploy
+        run: |
+          cd frontend
+          npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          DEPLOY_URL=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | grep -oP 'https://[^\s]+\.vercel\.app' | tail -1)
+          echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $DEPLOY_URL"
+        env:
+          VERCEL_ORG_ID:     ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        continue-on-error: true
+
+      # Rollback: if deploy failed, revert the squash commit on main
+      - name: Rollback on deploy failure
+        if: steps.deploy.outcome == 'failure' && steps.merge.outputs.merged == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const mergeSha = '${{ steps.merge.outputs.merge_sha }}';
+            const { owner, repo } = context.repo;
+
+            // Get the commit to revert
+            const commit = await github.rest.git.getCommit({ owner, repo, commit_sha: mergeSha });
+            const parentSha = commit.data.parents[0]?.sha;
+
+            if (!parentSha) {
+              core.error('Cannot revert — no parent commit found');
+              return;
+            }
+
+            // Get parent tree
+            const parent = await github.rest.git.getCommit({ owner, repo, commit_sha: parentSha });
+
+            // Create revert commit (restores parent tree)
+            const revertCommit = await github.rest.git.createCommit({
+              owner, repo,
+              message: `revert: autofix deploy failed — reverting ${mergeSha.slice(0, 7)}\n\nRevert of "${commit.data.message.split('\n')[0]}" due to Vercel deploy failure.`,
+              tree: parent.data.tree.sha,
+              parents: [mergeSha],
+            });
+
+            // Update main branch to point to revert commit
+            await github.rest.git.updateRef({
+              owner, repo,
+              ref: 'heads/main',
+              sha: revertCommit.data.sha,
+            });
+
+            core.warning(`Rolled back: main now at ${revertCommit.data.sha}`);
+
+      # Update Notion on success
+      - name: Update Notion → Done
+        if: steps.deploy.outcome == 'success'
+        run: |
+          NOTION_URL="${{ needs.validate.outputs.notion_url }}"
+          if [ -z "$NOTION_URL" ]; then exit 0; fi
+          # Extract page ID from Notion URL
+          PAGE_ID=$(echo "$NOTION_URL" | grep -oP '[a-f0-9]{32}' | head -1)
+          if [ -z "$PAGE_ID" ]; then exit 0; fi
+          curl -s -X PATCH "https://api.notion.com/v1/pages/$PAGE_ID" \
+            -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+            -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"properties\": {
+                \"Status\": {\"select\": {\"name\": \"Done\"}},
+                \"Execution Notes\": {\"rich_text\": [{\"type\": \"text\", \"text\": {\"content\": \"Auto-fix merged and deployed. Deploy URL: ${{ steps.deploy.outputs.deploy_url }}. Merge SHA: ${{ steps.merge.outputs.merge_sha }}\"}}]}
+              }
+            }"
+
+      # Update Notion on deploy failure (after rollback)
+      - name: Update Notion → Human Review (deploy failed)
+        if: steps.deploy.outcome == 'failure'
+        run: |
+          NOTION_URL="${{ needs.validate.outputs.notion_url }}"
+          if [ -z "$NOTION_URL" ]; then exit 0; fi
+          PAGE_ID=$(echo "$NOTION_URL" | grep -oP '[a-f0-9]{32}' | head -1)
+          if [ -z "$PAGE_ID" ]; then exit 0; fi
+          curl -s -X PATCH "https://api.notion.com/v1/pages/$PAGE_ID" \
+            -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+            -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"properties\": {
+                \"Status\": {\"select\": {\"name\": \"Human Review\"}},
+                \"Execution Notes\": {\"rich_text\": [{\"type\": \"text\", \"text\": {\"content\": \"E2E passed but Vercel deploy FAILED. Merge was auto-reverted. Manual review required.\"}}]}
+              }
+            }"
+
+      - name: Fail workflow if deploy failed
+        if: steps.deploy.outcome == 'failure'
+        run: |
+          echo "Vercel deploy failed — changes have been reverted on main"
+          exit 1
+
+  # ── Notify on E2E Failure ────────────────────────────────────────────────────
+  notify-failure:
+    name: Notify E2E Failure
+    needs: [validate]
+    runs-on: ubuntu-latest
+    if: failure()
+
+    steps:
+      - name: Update Notion task → Human Review
+        run: |
+          NOTION_URL="${{ needs.validate.outputs.notion_url }}"
+          if [ -z "$NOTION_URL" ]; then
+            echo "No Notion URL found — skipping Notion update"
+            exit 0
+          fi
+          PAGE_ID=$(echo "$NOTION_URL" | grep -oP '[a-f0-9]{32}' | head -1)
+          if [ -z "$PAGE_ID" ]; then
+            echo "Could not extract page ID from: $NOTION_URL"
+            exit 0
+          fi
+
+          BRANCH="${{ github.ref }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          curl -s -X PATCH "https://api.notion.com/v1/pages/$PAGE_ID" \
+            -H "Authorization: Bearer ${{ secrets.NOTION_API_KEY }}" \
+            -H "Notion-Version: ${{ env.NOTION_VERSION }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"properties\": {
+                \"Status\": {\"select\": {\"name\": \"Human Review\"}},
+                \"Execution Notes\": {\"rich_text\": [{\"type\": \"text\", \"text\": {\"content\": \"E2E validation FAILED on branch ${BRANCH}. Branch left open for manual review. CI run: ${RUN_URL}\"}}]}
+              }
+            }"
+
+          echo "Notion task updated to Human Review"
+
+      - name: Add failure comment to PR
+        if: needs.validate.outputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = parseInt('${{ needs.validate.outputs.pr_number }}');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: [
+                '## ❌ Autofix E2E Validation Failed',
+                '',
+                'The automated E2E test suite did not pass for this auto-fix.',
+                'This branch has been left open for **manual review**.',
+                '',
+                `**CI run:** ${runUrl}`,
+                '',
+                'The Notion task has been updated to **Human Review** status.',
+              ].join('\n'),
+            });
