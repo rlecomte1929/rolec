@@ -67,3 +67,13 @@ venv/
 
 # Vite dev-server timestamp cache files
 frontend/vite.config.ts.timestamp-*
+
+# Runtime / one-shot artifacts — never ship
+backend/relopass.db-journal
+results/
+test_results.json
+commit_dest_request.sh
+commit_rls0.sh
+
+# Claude Code / Cowork skill bundles — local tooling, not project code
+skills/zinzlTfG/
