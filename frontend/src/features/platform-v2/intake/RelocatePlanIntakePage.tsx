@@ -19,6 +19,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 // useNavigate is used in the completion screen CTA
 import { AppShell } from '../../../components/AppShell';
+import { logger } from '../../../lib/logger';
 import { patchCase } from '../../../api/cases';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../../utils/demo';
@@ -873,7 +874,7 @@ export function RelocatePlanIntakePage() {
       await patchCase(caseId, patch as any);
     } catch (err) {
       // Non-blocking — show in console only
-      console.warn('[RelocatePlanIntake] save failed', err);
+      logger.warn('[RelocatePlanIntake] save failed', err);
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Button } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
+import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminCompany, CompanyPlanTier } from '../../types';
 import { Link } from 'react-router-dom';
@@ -224,7 +225,7 @@ export const AdminCompanies: React.FC = () => {
       setEditDraft({});
       await load();
     } catch (e) {
-      console.error(e);
+      logger.error(e);
     } finally {
       setSavingId(null);
     }
@@ -237,7 +238,7 @@ export const AdminCompanies: React.FC = () => {
       await adminAPI.deactivateCompany(c.id);
       await load();
     } catch (e) {
-      console.error(e);
+      logger.error(e);
     }
   };
 

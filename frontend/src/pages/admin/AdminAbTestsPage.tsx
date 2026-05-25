@@ -15,6 +15,7 @@ import { AdminLayout } from './AdminLayout';
 import { useIsAdmin } from '../../features/admin/useIsAdmin';
 import { supabase } from '../../lib/supabase';
 import { AbTestExperimentCard } from './AbTestExperimentCard';
+import { logger } from '../../lib/logger';
 import type { FeatureFlag, ExperimentResult } from './AbTestExperimentCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -87,7 +88,7 @@ export const AdminAbTestsPage: React.FC = () => {
           .maybeSingle();
 
         if (summaryErr) {
-          console.warn('[AdminAbTestsPage] friction_analysis query error:', summaryErr.message);
+          logger.warn('[AdminAbTestsPage] friction_analysis query error:', summaryErr.message);
         }
 
         if (summary?.raw_counts) {

@@ -39,6 +39,7 @@ import { retrievePolicy } from './retrieve_policy';
 import type { PolicyChunk } from './retrieve_policy';
 import { runOutputGuardrails } from './output_guardrails';
 import { runGuardrails } from './input_guardrails';
+import { logger } from '../../lib/logger';
 
 // Re-export so consumers have a single import point
 export type { FallbackReason };
@@ -135,7 +136,7 @@ export async function isPolicyExpired(companyId: string): Promise<boolean> {
       .maybeSingle();
 
     if (error || !data) {
-      console.warn(`[assistant_router] Policy expiry check failed for company=${companyId}: no approved document`);
+      logger.warn(`[assistant_router] Policy expiry check failed for company=${companyId}: no approved document`);
       return true; // no approved document → treat as expired
     }
 
@@ -150,13 +151,13 @@ export async function isPolicyExpired(companyId: string): Promise<boolean> {
     const expired = effectiveDate < thresholdDate;
 
     if (expired) {
-      console.warn(
+      logger.warn(
         `[assistant_router] Policy expired for company=${companyId}: effective_date=${data.effective_date}`,
       );
     }
     return expired;
   } catch (err) {
-    console.error('[assistant_router] isPolicyExpired threw:', err);
+    logger.error('[assistant_router] isPolicyExpired threw:', err);
     return true; // fail-safe: treat as expired if check errors
   }
 }
@@ -342,7 +343,7 @@ export async function processQuery(
   // If guardrails hard-reject the query (off-topic or unsafe), return immediately
   if (!guardrailResult.safe && guardrailResult.topic_rejection) {
     const reason: FallbackReason = 'TOPIC_REJECTED';
-    console.log(
+    logger.log(
       `[assistant_router] GUARDRAIL_REJECT reason=${reason} hash=${guardrailResult.query_hash}`,
     );
     return {
@@ -362,7 +363,7 @@ export async function processQuery(
 
   if (classification.category === 'off_topic') {
     const reason: FallbackReason = 'TOPIC_REJECTED';
-    console.log(
+    logger.log(
       `[assistant_router] FALLBACK reason=${reason} hash=${classification.query_hash}`,
     );
     return {
@@ -391,7 +392,7 @@ export async function processQuery(
 
   if (topScore < MIN_RRF_SCORE || chunks.length === 0) {
     const reason: FallbackReason = 'LOW_CONFIDENCE';
-    console.log(
+    logger.log(
       `[assistant_router] FALLBACK reason=${reason} top_rrf=${topScore.toFixed(3)} company=${profile.company_id}`,
     );
     return {
@@ -408,7 +409,7 @@ export async function processQuery(
 
   if (expired) {
     const reason: FallbackReason = 'POLICY_EXPIRED';
-    console.log(
+    logger.log(
       `[assistant_router] FALLBACK reason=${reason} company=${profile.company_id}`,
     );
     return {
@@ -424,7 +425,7 @@ export async function processQuery(
 
   if (!apiKey) {
     // No API key: serve raw excerpts (safer than no response)
-    console.warn('[assistant_router] No API key — serving raw excerpt fallback');
+    logger.warn('[assistant_router] No API key — serving raw excerpt fallback');
     const reason: FallbackReason = 'FAITHFULNESS_FAIL';
     return {
       answer_text: buildRawExcerptResponse(chunks),
@@ -455,7 +456,7 @@ export async function processQuery(
 
   if (guardrailCheck1.action === 'SERVE_RAW') {
     const reason: FallbackReason = 'FAITHFULNESS_FAIL';
-    console.log(
+    logger.log(
       `[assistant_router] FALLBACK reason=${reason}` +
         ` faithfulness=${guardrailCheck1.faithfulness_score}` +
         ` session=${sessionId}`,
@@ -473,7 +474,7 @@ export async function processQuery(
   if (guardrailCheck1.action === 'REGENERATE') {
     // Cross-tier leak detected — attempt one regeneration
     const reason: FallbackReason = 'FAITHFULNESS_FAIL';
-    console.warn(
+    logger.warn(
       `[assistant_router] CROSS_TIER_DETECTED — regenerating session=${sessionId}` +
         ` leaks=${guardrailCheck1.leaks?.length}`,
     );
@@ -491,7 +492,7 @@ export async function processQuery(
 
     if (guardrailCheck2.action !== 'PASS') {
       // Second failure → serve raw excerpts (never return a potentially leaky response)
-      console.warn(
+      logger.warn(
         `[assistant_router] OUTPUT_GUARDRAIL_DOUBLE_FAIL — serving raw excerpt session=${sessionId}`,
       );
       return {
@@ -509,7 +510,7 @@ export async function processQuery(
       ? `${regeneratedText}\n\n${guardrailResult.escalation_footer}`
       : regeneratedText;
 
-    console.log(
+    logger.log(
       `[assistant_router] OK (after regeneration) faithfulness=${guardrailCheck2.faithfulness_score}` +
         ` chunks=${chunks.length} latency=${Date.now() - t0}ms session=${sessionId}`,
     );
@@ -525,7 +526,7 @@ export async function processQuery(
 
   // ── Happy path: original response passed all guardrails ───────────────────
 
-  console.log(
+  logger.log(
     `[assistant_router] OK faithfulness=${guardrailCheck1.faithfulness_score}` +
       ` chunks=${chunks.length} latency=${Date.now() - t0}ms`,
   );

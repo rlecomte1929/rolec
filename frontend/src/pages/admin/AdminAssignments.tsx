@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card, Button, Badge, Input, Select } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
+import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminAssignment, AdminAssignmentDetail, AdminCompany } from '../../types';
 import { buildRoute } from '../../navigation/routes';
@@ -352,7 +353,7 @@ export const AdminAssignments: React.FC = () => {
                             setTimeout(() => setDeleteFeedback('idle'), 8000);
                           }
                         } catch (e: any) {
-                          console.error(e);
+                          logger.error(e);
                           await loadAssignments();
                           setDeleteErrorDetail(
                             e?.response?.data?.detail || e?.message || 'unknown error',

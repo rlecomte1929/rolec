@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, LoadingButton } from '../../../components/antigravity';
+import { logger } from '../../../lib/logger';
 import type { CaseDraftDTO } from '../../../types';
 import { ROUTES } from '../../../routes';
 
@@ -139,7 +140,7 @@ export const Step4AssignmentContext: React.FC<StepProps> = ({ draft, requiredFie
               try {
                 await onSave(nextDraft);
                 if (import.meta.env.DEV) {
-                  console.debug('Save & Exit -> /employee/dashboard');
+                  logger.debug('Save & Exit -> /employee/dashboard');
                 }
                 navigate(ROUTES.EMP_DASH);
               } catch (err: any) {

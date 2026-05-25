@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { logger } from '../lib/logger';
 import { trackRouteEntry, trackShellRender, trackPolicyStage } from '../perf/pagePerf';
 import { Alert, Button, Card } from '../components/antigravity';
 import { policyDocumentsAPI } from '../api/client';
@@ -619,7 +620,7 @@ export function PolicyDocumentIntakeSection({
     setUploading(true);
     try {
       if (import.meta.env.DEV) {
-        console.info('policy upload handleUpload', {
+        logger.info('policy upload handleUpload', {
           name: fileToUpload.name,
           size: fileToUpload.size,
           type: fileToUpload.type,

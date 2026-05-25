@@ -23,6 +23,8 @@
  *   if (!result.pass) { serveRawExcerpts(chunks); }
  */
 
+import { logger } from '../../lib/logger';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -228,7 +230,7 @@ Reply with ONLY a JSON array of booleans (one per sentence, in order):
     // Pad or trim to match sentence count
     return sentences.map((_, i) => parsed[i] ?? true);
   } catch {
-    console.warn('[faithfulness_checker] Failed to parse NLI batch response, defaulting to all-entailed');
+    logger.warn('[faithfulness_checker] Failed to parse NLI batch response, defaulting to all-entailed');
     return sentences.map(() => true);
   }
 }
@@ -290,7 +292,7 @@ export async function checkFaithfulness(
 
     if (!apiKey) {
       // No API key: conservative fallback — mark all as entailed (don't block)
-      console.warn('[faithfulness_checker] No API key — skipping NLI check');
+      logger.warn('[faithfulness_checker] No API key — skipping NLI check');
     } else {
       const nliSentences = nliQueue.map((q) => q.sentence);
       const nliResults = await batchNliCheck(nliSentences, retrievedChunks, apiKey, apiBase);

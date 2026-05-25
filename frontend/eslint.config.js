@@ -37,6 +37,35 @@ export default [
        * keyboard support excludes all keyboard-only and switch-access users.
        */
       'local/no-clickable-div': 'error',
+
+      /**
+       * AUDIT-A8: Ban direct console.* calls in application code.
+       * Use the logger wrapper (src/lib/logger.ts) instead — it no-ops in production.
+       * The logger module itself is exempt via the override block below.
+       */
+      'no-console': 'error',
+    },
+  },
+
+  {
+    // logger.ts is the one place allowed to call console directly
+    files: ['src/lib/logger.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
+  {
+    // eval_*.ts and *_pipeline.ts are Node.js CLI scripts that intentionally
+    // write to stdout/stderr as their primary output. console.* is fine here.
+    files: [
+      'src/features/policy-builder/eval_*.ts',
+      'src/features/policy-builder/eval_*.ts',
+      'src/features/policy-builder/*_pipeline.ts',
+      'src/features/policy-builder/__tests__/**',
+    ],
+    rules: {
+      'no-console': 'off',
     },
   },
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { Card, Button, Badge } from '../../components/antigravity';
 import { AdminLayout } from './AdminLayout';
+import { logger } from '../../lib/logger';
 import { adminAPI } from '../../api/client';
 import type { AdminProfile, AdminCompany } from '../../types';
 
@@ -164,7 +165,7 @@ export const AdminUsers: React.FC = () => {
                         setTimeout(() => setDeleteFeedback('idle'), 5000);
                       }
                     } catch (e) {
-                      console.error(e);
+                      logger.error(e);
                       await loadPeople();
                       setDeleteFeedback('error');
                       setTimeout(() => setDeleteFeedback('idle'), 5000);

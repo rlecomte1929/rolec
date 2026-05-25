@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Card } from '../../../components/antigravity';
+import { logger } from '../../../lib/logger';
 import type { CaseFormStatus, CaseFormSummary } from '../../../api/dossier';
 import { buildRoute } from '../../../navigation/routes';
 import { formEditorAPI } from '../../../api/formEditor';
@@ -189,7 +190,7 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
     try {
       await formEditorAPI.downloadPdf(form.case_id, form.id);
     } catch (e) {
-      console.error('[P3-3] PDF download failed', e);
+      logger.error('[P3-3] PDF download failed', e);
     } finally {
       setIsDownloadingPdf(false);
     }

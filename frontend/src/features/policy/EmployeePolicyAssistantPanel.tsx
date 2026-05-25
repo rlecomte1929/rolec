@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
 import { employeeAPI } from '../../api/client';
+import { logger } from '../../lib/logger';
 import { formatRichMessage } from '../../utils/richMessage';
 import {
   formatAnswerWithCitations,
@@ -293,9 +294,8 @@ function AnswerResultCard({
                       // underneath would do nothing visible — skip.
                       if (!isCitationDeepLinkAvailable()) return;
                       const ok = scrollToPolicyReference(ref);
-                      if (!ok && typeof console !== 'undefined') {
-                        // eslint-disable-next-line no-console
-                        console.warn(
+                      if (!ok) {
+                        logger.warn(
                           `[policy-assistant] no policy clause matched evidence reference "${ref}"`
                         );
                       }

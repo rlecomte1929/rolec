@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { logger } from '../lib/logger';
 import { EmployeeScopedAssignmentPicker } from '../components/employee/EmployeeScopedAssignmentPicker';
 import { Alert, Button, Card } from '../components/antigravity';
 import { API_BASE_URL, employeeAPI } from '../api/client';
@@ -179,7 +180,7 @@ export const ProvidersPage: React.FC = () => {
         if (import.meta.env.DEV) {
           setLoadErrorDetails(`status=${status || 'n/a'} url=${err?.config?.url || ''} detail=${detail || ''}`);
           // eslint-disable-next-line no-console
-          console.error('[services] load error', err);
+          logger.error('[services] load error', err);
         }
         if (!API_BASE_URL && !import.meta.env.DEV) {
           setLoadErrorDetails('Missing VITE_API_URL in frontend build.');
@@ -238,7 +239,7 @@ export const ProvidersPage: React.FC = () => {
       setMessage(friendly || "Couldn't save. Try again.");
       if (import.meta.env.DEV && detail) {
         // eslint-disable-next-line no-console
-        console.error('[services] save error', err);
+        logger.error('[services] save error', err);
       }
       return false;
     } finally {
