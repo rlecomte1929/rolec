@@ -1,0 +1,124 @@
+{
+  "run_date": "2026-05-25",
+  "run_timestamp": "2026-05-25T12:05:27.865Z",
+  "mode": "mock",
+  "document_count": 20,
+  "chunk_count": 60,
+  "overall_pass": true,
+  "metrics": {
+    "classification_accuracy": {
+      "score": 0.983,
+      "target": 0.92,
+      "pass": true,
+      "details": "59/60 chunks correctly classified",
+      "failures": [
+        {
+          "chunk_id": "doc-007-c02",
+          "doc_name": "ManuCo HR Policy Manual",
+          "text_excerpt": "Senior Managers are entitled to hotel accommodation for up to 30 days while arranging permanent hous",
+          "expected": "CAT-04",
+          "got": "CAT-01"
+        }
+      ]
+    },
+    "value_extraction_precision": {
+      "score": 1,
+      "target": 0.95,
+      "pass": true,
+      "details": "53/53 expected values correctly extracted"
+    },
+    "conflict_detection_recall": {
+      "score": 1,
+      "target": 0.98,
+      "pass": true,
+      "details": "6/6 known conflicts detected"
+    }
+  },
+  "category_breakdown": [
+    {
+      "category_code": "CAT-01",
+      "total": 11,
+      "correct": 11,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-02",
+      "total": 4,
+      "correct": 4,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-03",
+      "total": 5,
+      "correct": 5,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-04",
+      "total": 5,
+      "correct": 4,
+      "accuracy": 0.8
+    },
+    {
+      "category_code": "CAT-05",
+      "total": 3,
+      "correct": 3,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-06",
+      "total": 5,
+      "correct": 5,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-07",
+      "total": 5,
+      "correct": 5,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-08",
+      "total": 2,
+      "correct": 2,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-09",
+      "total": 4,
+      "correct": 4,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-10",
+      "total": 3,
+      "correct": 3,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-11",
+      "total": 3,
+      "correct": 3,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-12",
+      "total": 3,
+      "correct": 3,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-13",
+      "total": 3,
+      "correct": 3,
+      "accuracy": 1
+    },
+    {
+      "category_code": "CAT-14",
+      "total": 4,
+      "correct": 4,
+      "accuracy": 1
+    }
+  ],
+  "summary": "✅ PASS — All 3 metrics meet their targets. Pipeline is production-ready."
+}
