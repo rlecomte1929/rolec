@@ -37,7 +37,7 @@ import { classifyQuery } from './topic_classifier';
 import type { FallbackReason } from './topic_classifier';
 import { retrievePolicy } from './retrieve_policy';
 import type { PolicyChunk } from './retrieve_policy';
-import { checkFaithfulness } from './faithfulness_checker';
+import { runOutputGuardrails } from './output_guardrails';
 import { runGuardrails } from './input_guardrails';
 
 // Re-export so consumers have a single import point
@@ -437,33 +437,100 @@ export async function processQuery(
 
   const generatedText = await generateResponse(safeQuery, chunks, apiKey, apiBase);
 
-  // ── Step 5: Faithfulness check ────────────────────────────────────────────
+  // ── Step 5: Output guardrails (cross-tier fence + faithfulness hard-block) ─
+  //
+  // Runs after every generation. On REGENERATE, one retry is attempted.
+  // Second failure on any check → serve raw excerpts immediately.
 
-  const chunkTexts = chunks.map((c) => c.text);
-  const faithfulness = await checkFaithfulness(generatedText, chunkTexts, apiKey, apiBase);
+  const sessionId = `${employeeId}-${t0}`;
 
-  if (!faithfulness.pass) {
+  const guardrailCheck1 = await runOutputGuardrails(
+    generatedText,
+    chunks,
+    profile.employee_tier,
+    apiKey,
+    apiBase,
+    sessionId,
+  );
+
+  if (guardrailCheck1.action === 'SERVE_RAW') {
     const reason: FallbackReason = 'FAITHFULNESS_FAIL';
     console.log(
-      `[assistant_router] FALLBACK reason=${reason} score=${faithfulness.score} flagged=${faithfulness.flaggedSentences.length}`,
+      `[assistant_router] FALLBACK reason=${reason}` +
+        ` faithfulness=${guardrailCheck1.faithfulness_score}` +
+        ` session=${sessionId}`,
     );
     return {
       answer_text: buildRawExcerptResponse(chunks),
       answer_type: 'raw_excerpt',
       fallback_reason: reason,
       chunks,
-      faithfulness_score: faithfulness.score,
+      faithfulness_score: guardrailCheck1.faithfulness_score,
       latency_ms: Date.now() - t0,
     };
   }
 
-  // ── Happy path: return generated response ─────────────────────────────────
+  if (guardrailCheck1.action === 'REGENERATE') {
+    // Cross-tier leak detected — attempt one regeneration
+    const reason: FallbackReason = 'FAITHFULNESS_FAIL';
+    console.warn(
+      `[assistant_router] CROSS_TIER_DETECTED — regenerating session=${sessionId}` +
+        ` leaks=${guardrailCheck1.leaks?.length}`,
+    );
+
+    const regeneratedText = await generateResponse(safeQuery, chunks, apiKey, apiBase);
+
+    const guardrailCheck2 = await runOutputGuardrails(
+      regeneratedText,
+      chunks,
+      profile.employee_tier,
+      apiKey,
+      apiBase,
+      `${sessionId}-retry`,
+    );
+
+    if (guardrailCheck2.action !== 'PASS') {
+      // Second failure → serve raw excerpts (never return a potentially leaky response)
+      console.warn(
+        `[assistant_router] OUTPUT_GUARDRAIL_DOUBLE_FAIL — serving raw excerpt session=${sessionId}`,
+      );
+      return {
+        answer_text: buildRawExcerptResponse(chunks),
+        answer_type: 'raw_excerpt',
+        fallback_reason: reason,
+        chunks,
+        faithfulness_score: guardrailCheck2.faithfulness_score,
+        latency_ms: Date.now() - t0,
+      };
+    }
+
+    // Regeneration passed — use regenerated text
+    const finalRegenText = guardrailResult.escalation_footer
+      ? `${regeneratedText}\n\n${guardrailResult.escalation_footer}`
+      : regeneratedText;
+
+    console.log(
+      `[assistant_router] OK (after regeneration) faithfulness=${guardrailCheck2.faithfulness_score}` +
+        ` chunks=${chunks.length} latency=${Date.now() - t0}ms session=${sessionId}`,
+    );
+
+    return {
+      answer_text: finalRegenText,
+      answer_type: 'generated',
+      chunks,
+      faithfulness_score: guardrailCheck2.faithfulness_score,
+      latency_ms: Date.now() - t0,
+    };
+  }
+
+  // ── Happy path: original response passed all guardrails ───────────────────
 
   console.log(
-    `[assistant_router] OK faithfulness=${faithfulness.score} chunks=${chunks.length} latency=${Date.now() - t0}ms`,
+    `[assistant_router] OK faithfulness=${guardrailCheck1.faithfulness_score}` +
+      ` chunks=${chunks.length} latency=${Date.now() - t0}ms`,
   );
 
-  // Append escalation footer if guardrails detected dispute/escalation language
+  // Append escalation footer if input guardrails detected dispute language
   const finalText = guardrailResult.escalation_footer
     ? `${generatedText}\n\n${guardrailResult.escalation_footer}`
     : generatedText;
@@ -472,7 +539,7 @@ export async function processQuery(
     answer_text: finalText,
     answer_type: 'generated',
     chunks,
-    faithfulness_score: faithfulness.score,
+    faithfulness_score: guardrailCheck1.faithfulness_score,
     latency_ms: Date.now() - t0,
   };
 }
