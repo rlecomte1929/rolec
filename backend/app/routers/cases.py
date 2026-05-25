@@ -134,11 +134,12 @@ def _deep_merge_case_drafts(base: Dict[str, Any], update: Dict[str, Any]) -> Dic
 
 
 @router.get("/{case_id}", response_model=schemas.CaseDTO)
-def get_case(case_id: str):
+def get_case(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
+        _assert_case_access(user, case_id)
         draft = json.loads(case.draft_json)
         return _case_dto(case, draft)
 
