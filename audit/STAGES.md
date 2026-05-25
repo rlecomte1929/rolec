@@ -1,0 +1,109 @@
+# Audit Remediation — Stages Rolling Log
+
+**Purpose:** One row per completed stage. Append-only. Visible trend of progress.
+
+**Reading order:**
+1. `audit/00-synthesis.md` — what the audit found (state on 2026-05-25).
+2. `audit/REMEDIATION_PLAN.md` — how we're fixing it, stage by stage.
+3. `audit/STAGES.md` — what we've actually done (this file).
+4. `audit/re-audit-stage-N-*.md` — per-stage proof of improvement.
+5. `audit/00-synthesis-v2.md` — Stage 10 output; supersedes v1 once cut.
+
+---
+
+## Stages log
+
+| Stage | Date | Branch | PR | Findings closed | Re-audit doc | Score deltas | Notes |
+|---|---|---|---|---|---|---|---|
+| 0 | 2026-05-25 | `audit/stage-0-governance` | [#118](https://github.com/rlecomte1929/rolec/pull/118) | A7 (CLAUDE.md uvicorn fix) + governance scaffold + audit/* committed | n/a (Stage 0 = scaffolding) | n/a | 14 Notion AI Work Queue entries created; branch convention documented; rolling log + composite-score timeline + Tier A/B/C findings tracker scaffolded. PR awaiting merge. |
+
+---
+
+## Composite-score timeline
+
+This table is updated at the end of each stage that re-audits a lens. Compare against the Phase-2 baseline.
+
+| Lens | Baseline (2026-05-25) | After S1 | After S2 | After S3 | After S4 | After S5 | After S6 | After S7 | After S8 | After S9 | After S10 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| CEO / strategy | 8.5 | — | — | — | — | — | — | — | — | — | — |
+| Eng manager | 6.0 | — | — | — | — | — | — | — | — | — | — |
+| Designer (intent) | 7.0 | — | — | — | — | — | — | — | — | — | — |
+| DevEx (intent) | 5.5 | — | — | — | — | — | — | — | — | — | — |
+| Full-stack (live) | 5.5 | — | — | — | — | — | — | — | — | — | — |
+| Designer (live) | 5.5 | — | — | — | — | — | — | — | — | — | — |
+| Accessibility | 4.5 | — | — | — | — | — | — | — | — | — | — |
+| UX copy | 4.0 | — | — | — | — | — | — | — | — | — | — |
+| QA | 6.0 | — | — | — | — | — | — | — | — | — | — |
+| Security | 6.5 | — | — | — | — | — | — | — | — | — | — |
+| Performance | 6.0 | — | — | — | — | — | — | — | — | — | — |
+| **Composite** | **6.0** | — | — | — | — | — | — | — | — | — | — |
+
+---
+
+## Findings tracker
+
+This table mirrors the `audit/00-synthesis.md` "Tiered punch list" (A/B/C). Mark each cell as the stage that closes the finding.
+
+### Tier A (close before next release)
+
+| ID | Title | Source | Notion URL | Closed in | PR |
+|---|---|---|---|---|---|
+| A1 | Root-cause + fix `ensure_initialized` startup transaction abort | SEC-1 / QA-1 / PERF-8 | [AUDIT-A1](https://www.notion.so/36b887c64d4881e6a865d0bda0fb78db) | Stage 1 | — |
+| A2 | Add `Depends(get_current_user)` to `cases.py:101 get_case` defensively | SEC-3 | [AUDIT-A2](https://www.notion.so/36b887c64d48811dbe6ff3e8bc6ca05b) | Stage 1 | — |
+| A3 | RLS coverage CI guard | SEC-2 | [AUDIT-A3](https://www.notion.so/36b887c64d4881b1b9a2efda2dc6d0a7) | Stage 1 | — |
+| A4 | Rewrite W1 surface copy | COPY-1, COPY-3, DES-LIVE-1 | [AUDIT-A4](https://www.notion.so/36b887c64d4881fa8b88f3fe2b464cf2) | Stage 2 | — |
+| A5 | `statusLabel()` utility + replace render sites | COPY-2 / DES-LIVE-2 | [AUDIT-A5](https://www.notion.so/36b887c64d4881dba8a2ce2305d52089) | Stage 2 | — |
+| A6 | Auth.tsx label associations + icon-only aria-labels | A11Y-1, A11Y-4 | [AUDIT-A6](https://www.notion.so/36b887c64d488191a70bcc576e43a394) | Stage 3 | — |
+| A7 | Fix CLAUDE.md local-dev uvicorn command | DX-3 | n/a (doc only) | **Stage 0** | [#118](https://github.com/rlecomte1929/rolec/pull/118) |
+| A8 | Strip 19 console.* statements; route through real logger | QA-4 | [AUDIT-A8](https://www.notion.so/36b887c64d48815391e4c3d24cf9d600) | Stage 4 | — |
+| A9 | Decide + document `backend/services/` vs `app/services/` | ENG-3 / P0-2 | [AUDIT-A9](https://www.notion.so/36b887c64d48810bac10ee37c94977d8) | Stage 4 | — |
+
+### Tier B (next sprint)
+
+| ID | Title | Source | Notion URL | Closed in | PR |
+|---|---|---|---|---|---|
+| B1 | Estimate Review redesign per Side-Output A | DES-LIVE-3 / W2 | (existing queue entry — to confirm) | Stage 5 | — |
+| B2 | Migrate 37 raw `<button>`/`<input>` to antigravity | DES-LIVE-4 / P1-8 | (no entry yet — defer to Stage 6 prep) | Stage 6 | — |
+| B3 | Empty-state pass across 6 highest-traffic pages | COPY-4 | (defer) | Stage 6 | — |
+| B4 | Error-message map for top 10 failure modes | COPY-3 | (defer to Stage 2 / 6 prep) | Stage 2 / 6 | — |
+| B5 | `llm_client.py` wrapper | ENG-7 / SEC-5 / P1-6 | [AUDIT-B5](https://www.notion.so/36b887c64d4881cbbe0ffb7a89863224) | Stage 7 | — |
+| B6 | Route-auth CI check | ENG-2 | [AUDIT-B6](https://www.notion.so/36b887c64d488193b15dca3faca08067) | Stage 8a | — |
+| B7 | Per-request query-count middleware | PERF-5 | [AUDIT-B7](https://www.notion.so/36b887c64d488125b03bd286e279ef0e) | Stage 8b | — |
+| B8 | Bundle profile + decompose chunks | PERF-3 | (defer to Stage 8c prep) | Stage 8c | — |
+| B9 | Decompose `cases.py` + `immigration.py` | P1-3 | (defer to Stage 8e/f prep) | Stage 8e/f | — |
+| B10 | Customer-discovery wave (5-10 interviews) | CEO-1 | [AUDIT-B10](https://www.notion.so/36b887c64d4881f19656dc8b4bd68ff7) | Stage 9 | — |
+
+### Tier C (backlog)
+
+| ID | Title | Source | Notion URL | Closed in | PR |
+|---|---|---|---|---|---|
+| C1 | `backend/main.py` + `database.py` decomposition (~30k LOC combined) | PERF-1, PERF-2 | — | Stage 8g | — |
+| C2 | 6:61 dual-layer migration plan with monthly milestones | ENG-1 | [AUDIT-C2](https://www.notion.so/36b887c64d4881a89f72decb4f6eb2b9) | Stage 8d | — |
+| C3 | Full a11y axe-core scan against authenticated surfaces | A11Y deferred items | — | Stage 10 follow-up | — |
+| C4 | Lighthouse/Web Vitals baseline against production frontend | PERF deferred items | — | Stage 10 follow-up | — |
+| C5 | Webhook signature verification audit | SEC-8 | — | post-Stage 10 | — |
+| C6 | OpenAPI spec published + "Integrate with ReloPass" doc | DX-1 | — | post-Stage 10 | — |
+| C7 | Provider portal UX completion | AIQ-4-D family | (existing queue entries) | post-Stage 10 | — |
+| C8 | Brand-site rewrite to address 27/50 | `relopass-brand-audit-2026-04-23.md` | — | post-Stage 10 | — |
+| C9 | `assistant_router.ts` security deep-dive | SEC-6 | — | Stage 7 follow-up | — |
+| C10 | Squash old migrations once schema stable | PERF-10 | — | post-Stage 10 | — |
+
+### Cross-cutting hygiene (not in Tier A/B/C but tracked)
+
+| Item | Source | Notion URL | Closed in |
+|---|---|---|---|
+| `relopass-brand-voice` doc — add "Product copy" appendix | UX copy review cross-cutting patterns | [AUDIT-BRAND](https://www.notion.so/36b887c64d4881e58b4cf5b32d86562e) | Stage 2 |
+
+---
+
+## Per-stage notes
+
+### Stage 0 — 2026-05-25
+
+- Branch `audit/stage-0-governance` created off `main`.
+- CLAUDE.md fix: `cd backend && uvicorn main:app` → `uvicorn backend.main:app` (run from repo root).
+- CLAUDE.md addition: new "Audit remediation workflow" section documenting branch convention + Notion system-of-record + gate discipline.
+- Notion AI Work Queue entries created for: A1, A2, A3, A4, A5, A6, A8, A9, B5, B6, B7, B10, C2, brand-voice product-copy appendix (~14 entries).
+- This rolling log + composite scorecard + findings tracker scaffolded.
+- No re-audit (Stage 0 is the audit infrastructure itself).
+- Optional: weekly `/health` snapshot via `/loop` — **NOT** configured in this stage; defer to user decision.

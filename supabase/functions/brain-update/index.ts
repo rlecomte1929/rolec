@@ -517,8 +517,9 @@ async function createReviewPage(
   });
 
   if (!res.ok) {
-    console.error(`Failed to create review page: ${res.status} ${await res.text()}`);
-    return null;
+    const errText = await res.text();
+    console.error(`Failed to create review page: ${res.status} ${errText}`);
+    throw new Error(`Notion create page failed (${res.status}): ${errText}`);
   }
 
   const data = await res.json();
@@ -955,15 +956,48 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // Load environment variables
-  const notionToken      = Deno.env.get("NOTION_TOKEN") ?? "";
-  const anthropicKey     = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+  // Load environment variables — SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are
+  // auto-injected by Supabase for all edge functions. Other secrets may be set
+  // either as project-level env vars (Deno.env) OR in vault.secrets (SQL vault).
+  // We try Deno.env first, then fall back to vault for NOTION_TOKEN and ANTHROPIC_API_KEY.
   const supabaseUrl      = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey       = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const brainPageId      = Deno.env.get("BRAIN_PAGE_ID") ?? DEFAULT_BRAIN_PAGE_ID;
   const painPointsDbId   = Deno.env.get("PAIN_POINTS_DB_ID") ?? DEFAULT_PAIN_POINTS_DB_ID;
   const opportunitiesDbId = Deno.env.get("OPPORTUNITIES_DB_ID") ?? DEFAULT_OPPORTUNITIES_DB_ID;
   const featuresDbId     = Deno.env.get("FEATURES_DB_ID") ?? DEFAULT_FEATURES_DB_ID;
+
+  // Helper: read a single vault secret by name via the Postgres REST endpoint
+  async function getVaultSecret(name: string): Promise<string> {
+    if (!supabaseUrl || !serviceKey) return "";
+    try {
+      const r = await fetch(
+        `${supabaseUrl}/rest/v1/rpc/get_vault_secret`,
+        {
+          method: "POST",
+          headers: {
+            "apikey": serviceKey,
+            "Authorization": `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ secret_name: name }),
+        },
+      );
+      if (!r.ok) return "";
+      const val = await r.text();
+      // Response is a JSON string like "\"secret-value\"" or null
+      return val ? JSON.parse(val) ?? "" : "";
+    } catch {
+      return "";
+    }
+  }
+
+  let notionToken  = Deno.env.get("NOTION_TOKEN") ?? "";
+  let anthropicKey = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+
+  // Fall back to vault if not in Deno.env
+  if (!notionToken)  notionToken  = await getVaultSecret("NOTION_TOKEN");
+  if (!anthropicKey) anthropicKey = await getVaultSecret("ANTHROPIC_API_KEY");
 
   if (!notionToken) {
     return new Response(JSON.stringify({ error: "NOTION_TOKEN not set" }), {

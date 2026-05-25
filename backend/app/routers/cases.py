@@ -19,6 +19,13 @@ from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.trigger_engine import fire_roadmap_events
 from ..services.prefill_engine import run_prefill_for_dependents
+from ...services.audit_log_service import (
+    insert_audit_log,
+    ACTION_INSERT,
+    ACTION_UPDATE,
+    ACTOR_HUMAN,
+    ACTOR_SYSTEM,
+)
 from sqlalchemy import text as _sql_text
 import io
 import zipfile as _zipfile
@@ -60,6 +67,34 @@ def _sql_uuid_gen() -> str:
     return "gen_random_uuid()" if dialect_name == "postgresql" else "lower(hex(randomblob(16)))"
 
 
+def _audit_case(
+    *,
+    entity_type: str,
+    entity_id: str,
+    action_type: str,
+    actor_type: str = ACTOR_SYSTEM,
+    actor_id: Optional[str] = None,
+    new_value: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Write one audit_logs row; never raises so callers need no try/except."""
+    try:
+        with main_db.engine.begin() as conn:
+            insert_audit_log(
+                conn,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                action_type=action_type,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                new_value=new_value,
+            )
+    except Exception:
+        logger.exception(
+            "audit: failed to log %s %s entity_id=%s",
+            action_type, entity_type, entity_id,
+        )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Household models (GAP 1b)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -99,11 +134,12 @@ def _deep_merge_case_drafts(base: Dict[str, Any], update: Dict[str, Any]) -> Dic
 
 
 @router.get("/{case_id}", response_model=schemas.CaseDTO)
-def get_case(case_id: str):
+def get_case(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
+        _assert_case_access(user, case_id)
         draft = json.loads(case.draft_json)
         return _case_dto(case, draft)
 
@@ -146,6 +182,7 @@ def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
         # P1-3: Trigger Engine — auto-create CaseForms for matched templates
         fire_roadmap_events(case_id, draft, derived)
         invalidate_relocation_plan_cache(case_id=case_id)
+        _audit_case(entity_type="case", entity_id=case_id, action_type=ACTION_UPDATE)
         return _case_dto(case, draft)
 
 
@@ -162,11 +199,13 @@ def start_research(case_id: str):
             raise HTTPException(status_code=400, detail="Destination country required")
 
     run_country_research(dest_country, basics.get("purpose", "employment"), {})
+    _audit_case(entity_type="case", entity_id=case_id, action_type=ACTION_UPDATE, new_value={"event": "research_started"})
     return {"jobId": str(uuid.uuid4())}
 
 
 @router.get("/{case_id}/requirements", response_model=schemas.CaseRequirementsDTO)
-def get_case_requirements(case_id: str):
+def get_case_requirements(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
+    _assert_case_access(user, case_id)
     try:
         return compute_case_requirements(case_id)
     except ValueError:
@@ -216,6 +255,7 @@ def create_case(case_id: str, request: Request):
         case.requirements_snapshot_id = snapshot_id
         db.commit()
 
+    _audit_case(entity_type="case", entity_id=case_id, action_type=ACTION_UPDATE, new_value={"status": "CREATED"})
     try:
         from ...services.analytics_service import emit_event, EVENT_CASE_CREATED
         req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
@@ -237,12 +277,13 @@ def create_case(case_id: str, request: Request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/{case_id}/roadmap")
-def get_case_roadmap(case_id: str):
+def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
     """
     GAP 2 & GAP 5: Returns a multi-track relocation roadmap derived from the case draft.
     Replaces window.PATHWAY_V2.deriveTimeline() with a real server-side computation.
     Tracks: Visa & Permit | Civil Documents | Family (conditional) | Settlement.
     """
+    _assert_case_access(user, case_id)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
@@ -534,6 +575,14 @@ def update_household(
         crud.update_case(db, case, draft, derived, flags)
         invalidate_relocation_plan_cache(case_id=case_id)
 
+    _audit_case(
+        entity_type="case",
+        entity_id=case_id,
+        action_type=ACTION_UPDATE,
+        actor_type=ACTOR_HUMAN,
+        actor_id=user.get("id") or user.get("sub"),
+        new_value={"event": "household_updated"},
+    )
     return {
         "case_id": case_id,
         "household_updated": True,
@@ -1201,6 +1250,20 @@ def bulk_update_form_fields(
                 {"pct": pct, "status": new_status, "form_id": form_id},
             )
 
+            # Audit log for bulk field update
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="case_form",
+                    entity_id=form_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=user.get("id") or user.get("sub"),
+                    new_value={"event": "fields_updated", "field_count": len(payload.fields)},
+                )
+            except Exception:
+                logger.exception("audit: bulk_update_form_fields cf=%s", form_id)
+
     except HTTPException:
         raise
     except Exception:
@@ -1394,6 +1457,20 @@ def patch_form_status(
                     )
                 except Exception:
                     pass  # case_form_events table may not exist in legacy test schemas
+
+            # Audit log for form status change
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="case_form",
+                    entity_id=form_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=user_id,
+                    new_value={"status": payload.status},
+                )
+            except Exception:
+                logger.exception("audit: patch_form_status cf=%s", form_id)
 
     except HTTPException:
         raise
@@ -1662,6 +1739,21 @@ def create_form_comment(
                 ),
                 {"form_id": form_id, "author_id": author_id, "content": payload.content.strip()},
             ).mappings().first()
+
+            # Audit log for comment creation
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="case_form_comment",
+                    entity_id=str(row["id"]),
+                    action_type=ACTION_INSERT,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=author_id,
+                    new_value={"case_form_id": form_id},
+                )
+            except Exception:
+                logger.exception("audit: create_form_comment form_id=%s", form_id)
+
     except HTTPException:
         raise
     except Exception:
@@ -1852,6 +1944,21 @@ def patch_form_flag(
                 ),
                 {"form_id": form_id},
             ).mappings().first()
+
+            # Audit log for flag change
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="case_form",
+                    entity_id=form_id,
+                    action_type=ACTION_UPDATE,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=user_id,
+                    new_value={"flagged": not clearing},
+                )
+            except Exception:
+                logger.exception("audit: patch_form_flag cf=%s", form_id)
+
     except HTTPException:
         raise
     except Exception:
@@ -2559,6 +2666,20 @@ def create_dossier(
                 ),
                 {"id": dossier_id},
             ).mappings().first()
+
+            # Audit log for dossier creation
+            try:
+                insert_audit_log(
+                    conn,
+                    entity_type="dossier_package",
+                    entity_id=dossier_id,
+                    action_type=ACTION_INSERT,
+                    actor_type=ACTOR_HUMAN,
+                    actor_id=user_id,
+                    new_value={"case_id": case_id, "form_count": len(payload.form_ids)},
+                )
+            except Exception:
+                logger.exception("audit: create_dossier dossier_id=%s", dossier_id)
 
     except HTTPException:
         raise

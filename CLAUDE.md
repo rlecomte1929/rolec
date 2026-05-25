@@ -13,7 +13,7 @@ cd frontend && npx vitest            # Run all frontend tests
 cd frontend && npx vitest path/to/test.ts  # Run a single test file
 
 # Backend
-cd backend && uvicorn main:app --reload --port 8000   # Dev server
+uvicorn backend.main:app --reload --port 8000        # Dev server (run from repo root — relative imports require package path)
 cd backend && pytest                 # All tests
 cd backend && pytest path/to/test.py::test_function   # Single test
 RELOPASS_DISABLE_RATE_LIMITS=1 pytest  # Bypass slowapi limits in tests
@@ -132,3 +132,13 @@ git config core.hooksPath .githooks
 **Preferred workflow:** feature branch → PR → CI (`.github/workflows/ci.yml` runs `frontend-build` + `backend-tests`) → merge → Render deploys. Pushing directly to `main` still works but bypasses PR review, so the pre-push hook is the only local safety net.
 
 **Emergency bypass:** `git push --no-verify` skips the hook. Use sparingly — every avoided round-trip with Render is faster than every emergency bypass.
+
+## Audit remediation workflow
+
+A multi-stage remediation plan lives at `audit/REMEDIATION_PLAN.md` with a rolling log at `audit/STAGES.md` and per-stage re-audit docs at `audit/re-audit-stage-N-*.md`.
+
+**Branch naming convention for audit remediation:** `audit/stage-N-<slug>` (e.g. `audit/stage-1-security`, `audit/stage-2-copy`). One branch per stage; one PR per stage; one re-audit doc per stage. Sub-stages use `audit/stage-Na-<slug>` (e.g. `audit/stage-8a-route-auth-ci`).
+
+**System of record:** Each finding has a Notion AI Work Queue entry (DB id `7adc643a-c448-4a1a-ba80-e27e417f42d6`) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
+
+**Gate discipline:** No stage starts until the previous stage's PR is merged + canary clean. See `audit/REMEDIATION_PLAN.md` §"Universal stage protocol" for the per-stage checklist.

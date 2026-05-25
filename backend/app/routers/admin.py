@@ -142,6 +142,13 @@ def get_country(country_code: str, user: dict = Depends(require_admin)):
 @router.post("/countries/{country_code}/research/rerun")
 def rerun_country(country_code: str, user: dict = Depends(require_admin), opts: Optional[dict] = None):
     run_country_research(country_code, (opts or {}).get("purpose", "employment"), {})
+    _audit_postgres(
+        entity_type="country_research",
+        entity_id=country_code,
+        action_type=ACTION_UPDATE,
+        actor_id=user.get("id") or user.get("sub"),
+        new_value={"event": "research_rerun"},
+    )
     return {"jobId": country_code.lower() + "-job"}
 
 
