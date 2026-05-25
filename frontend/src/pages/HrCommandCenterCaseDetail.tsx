@@ -397,7 +397,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       {rfqSuccessMsg && (
         <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-5 py-3 shadow-lg text-sm text-[#166534] font-medium">
           ✓ {rfqSuccessMsg}
-          <button type="button" onClick={() => setRfqSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</button>
+          <button type="button" aria-label="Dismiss notification" onClick={() => setRfqSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</button>
         </div>
       )}
       <RfqModal
