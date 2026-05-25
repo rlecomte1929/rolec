@@ -13,7 +13,7 @@
  *   - Secure: EDGE_CONFIG token never reaches the browser — reads go via the
  *     get-feature-flags Supabase Edge Function
  * ─────────────────────────────────────────────────────────────────────────────
- */
+ *
 
 import {
   createContext,
@@ -23,6 +23,7 @@ import {
   type ReactNode,
 } from 'react';
 import { supabase } from './supabase';
+import { getAuthItem } from '../utils/demo';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,13 +156,15 @@ export function FeatureFlagProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Load variants for the current session immediately
     supabase.auth.getUser().then(({ data }) => {
-      loadVariants(data.user?.id ?? null);
+      const userId = data.user?.id ?? getAuthItem('relopass_email') ?? null;
+            loadVariants(userId);
     });
 
     // Re-resolve whenever the user signs in or out
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        loadVariants(session?.user?.id ?? null);
+        const userId = session?.user?.id ?? getAuthItem('relopass_email') ?? null;
+                loadVariants(userId);
       },
     );
 
