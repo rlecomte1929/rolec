@@ -15,7 +15,7 @@
 
 | Stage | Date | Branch | PR | Findings closed | Re-audit doc | Score deltas | Notes |
 |---|---|---|---|---|---|---|---|
-| 0 | 2026-05-25 | `audit/stage-0-governance` | (pending) | A7 (CLAUDE.md uvicorn fix) + governance scaffold | n/a (Stage 0 = scaffolding) | n/a | Created Notion AI Work Queue entries for Tier-A + new Tier-B items; established branch convention; this rolling log skeleton. |
+| 0 | 2026-05-25 | `audit/stage-0-governance` | [#118](https://github.com/rlecomte1929/rolec/pull/118) | A7 (CLAUDE.md uvicorn fix) + governance scaffold + audit/* committed | n/a (Stage 0 = scaffolding) | n/a | 14 Notion AI Work Queue entries created; branch convention documented; rolling log + composite-score timeline + Tier A/B/C findings tracker scaffolded. PR awaiting merge. |
 
 ---
 
@@ -54,7 +54,7 @@ This table mirrors the `audit/00-synthesis.md` "Tiered punch list" (A/B/C). Mark
 | A4 | Rewrite W1 surface copy | COPY-1, COPY-3, DES-LIVE-1 | [AUDIT-A4](https://www.notion.so/36b887c64d4881fa8b88f3fe2b464cf2) | Stage 2 | — |
 | A5 | `statusLabel()` utility + replace render sites | COPY-2 / DES-LIVE-2 | [AUDIT-A5](https://www.notion.so/36b887c64d4881dba8a2ce2305d52089) | Stage 2 | — |
 | A6 | Auth.tsx label associations + icon-only aria-labels | A11Y-1, A11Y-4 | [AUDIT-A6](https://www.notion.so/36b887c64d488191a70bcc576e43a394) | Stage 3 | — |
-| A7 | Fix CLAUDE.md local-dev uvicorn command | DX-3 | n/a (doc only) | **Stage 0** | (this PR) |
+| A7 | Fix CLAUDE.md local-dev uvicorn command | DX-3 | n/a (doc only) | **Stage 0** | [#118](https://github.com/rlecomte1929/rolec/pull/118) |
 | A8 | Strip 19 console.* statements; route through real logger | QA-4 | [AUDIT-A8](https://www.notion.so/36b887c64d48815391e4c3d24cf9d600) | Stage 4 | — |
 | A9 | Decide + document `backend/services/` vs `app/services/` | ENG-3 / P0-2 | [AUDIT-A9](https://www.notion.so/36b887c64d48810bac10ee37c94977d8) | Stage 4 | — |
 
