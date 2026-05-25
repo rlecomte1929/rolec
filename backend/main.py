@@ -3439,10 +3439,13 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
         profile = db.get_profile_record(uid)
         company_id = (profile.get("company_id") if profile else None) or _get_hr_company_id(effective)
         log.info("save_company_profile resolved company_id=%s (profile=%s)", company_id, bool(profile))
-        if not company_id:
+        is_new_company = not company_id
+        if is_new_company:
             company_id = str(uuid.uuid4())
             log.info("save_company_profile new company_id=%s", company_id)
-            db.set_profile_company(uid, company_id)
+        # Create/upsert the company row FIRST so the profiles FK is satisfied.
+        # (profiles.company_id has a FK → companies.id; updating profiles before
+        # inserting the company row causes a ForeignKeyViolation.)
         db.create_company(
             company_id,
             request.name,
@@ -3460,6 +3463,9 @@ def save_company_profile(request: CompanyProfileRequest, user: Dict[str, Any] = 
             default_working_location=request.default_working_location,
         )
         log.info("save_company_profile create_company ok company_id=%s", company_id)
+        # Now it is safe to link the profile — the company row exists.
+        if is_new_company:
+            db.set_profile_company(uid, company_id)
     except Exception as _exc:
         log.error("save_company_profile FAILED user_id=%s error=%r", uid[:8] if uid else "?", _exc)
         raise HTTPException(status_code=500, detail=f"Company profile save failed: {_exc}")
