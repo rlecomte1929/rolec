@@ -12,6 +12,7 @@ import { safeNavigate } from '../navigation/safeNavigate';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
+import { CalibrationAlertBanner } from '../components/CalibrationAlertBanner';
 
 const PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -249,6 +250,9 @@ export const HrDashboard: React.FC = () => {
   return (
     <AppShell title="Assignments" subtitle="Create cases, assign people, track status.">
       <div className="space-y-6">
+        {/* P5-7: Policy calibration alerts — shown to HR/Admin when benefit caps need review */}
+        <CalibrationAlertBanner />
+
         {error && (
           <Alert variant="error">
             <span>{error}</span>

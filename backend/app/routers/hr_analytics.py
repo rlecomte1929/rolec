@@ -293,3 +293,119 @@ def get_policy_compliance_matrix(
             benefit_labels=BENEFIT_LABELS,
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# P5-7: Policy Calibration Alerts
+# ---------------------------------------------------------------------------
+# Generated weekly by the gap-detection-weekly Edge Function.
+# HR/Admin see undismissed alerts for their organisation; they can dismiss them
+# individually via the PATCH endpoint.
+# ---------------------------------------------------------------------------
+
+class CalibrationAlertOut(BaseModel):
+    id: str
+    organization_id: str
+    category: str
+    tier_name: Optional[str]
+    exception_count: int
+    avg_excess_pct: float
+    alert_message: str
+    created_at: str
+
+
+@router.get(
+    "/calibration-alerts",
+    response_model=List[CalibrationAlertOut],
+    summary="List undismissed policy calibration alerts for the caller's organisation",
+)
+def list_calibration_alerts(
+    user: dict = Depends(require_admin_or_hr),
+):
+    """
+    Returns all non-dismissed policy_calibration_alerts rows for the
+    caller's organisation, newest first.
+    """
+    company_id: Optional[str] = user.get("company_id")
+    if not company_id:
+        return []
+
+    with main_db.engine.connect() as conn:
+        rows = conn.execute(
+            main_db.text(
+                """
+                SELECT id, organization_id, category, tier_name,
+                       exception_count, avg_excess_pct, alert_message,
+                       created_at
+                FROM public.policy_calibration_alerts
+                WHERE organization_id = :org_id
+                  AND dismissed_at IS NULL
+                ORDER BY created_at DESC
+                """
+            ),
+            {"org_id": company_id},
+        ).fetchall()
+
+    return [
+        CalibrationAlertOut(
+            id=str(r["id"]),
+            organization_id=str(r["organization_id"]),
+            category=r["category"],
+            tier_name=r["tier_name"],
+            exception_count=r["exception_count"],
+            avg_excess_pct=float(r["avg_excess_pct"]),
+            alert_message=r["alert_message"],
+            created_at=str(r["created_at"]),
+        )
+        for r in rows
+    ]
+
+
+@router.patch(
+    "/calibration-alerts/{alert_id}/dismiss",
+    status_code=204,
+    summary="Dismiss a policy calibration alert",
+)
+def dismiss_calibration_alert(
+    alert_id: str,
+    user: dict = Depends(require_admin_or_hr),
+):
+    """
+    Sets dismissed_at = NOW() and dismissed_by = current user on the given
+    alert row.  Returns 404 if the alert doesn't exist or belongs to a
+    different organisation.
+    """
+    from fastapi import HTTPException
+    import uuid
+
+    company_id: Optional[str] = user.get("company_id")
+    user_id: Optional[str] = user.get("id") or user.get("sub")
+
+    if not company_id:
+        raise HTTPException(status_code=403, detail="No company context")
+
+    with main_db.engine.begin() as conn:
+        result = conn.execute(
+            main_db.text(
+                """
+                UPDATE public.policy_calibration_alerts
+                SET    dismissed_at = NOW(),
+                       dismissed_by = :user_id
+                WHERE  id = :alert_id
+                  AND  organization_id = :org_id
+                  AND  dismissed_at IS NULL
+                """
+            ),
+            {
+                "alert_id": alert_id,
+                "org_id": company_id,
+                "user_id": user_id,
+            },
+        )
+
+    if result.rowcount == 0:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=404,
+            detail="Alert not found or already dismissed",
+        )

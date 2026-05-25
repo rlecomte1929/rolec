@@ -399,6 +399,18 @@ export interface EmployeeTaskListResponse {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── P5-7: Policy calibration alerts ─────────────────────────────────────────
+export interface CalibrationAlert {
+  id: string;
+  organization_id: string;
+  category: string;
+  tier_name: string | null;
+  exception_count: number;
+  avg_excess_pct: number;
+  alert_message: string;
+  created_at: string;
+}
+
 // ── HR-side backlog: pending employee tasks across the HR's company ────────
 
 export interface HrBacklogTask {
@@ -1012,6 +1024,19 @@ export const hrAPI = {
   }> => {
     const response = await api.get(`/api/hr/cases/${caseId}`);
     return response.data;
+  },
+
+  // ── P5-7: Policy calibration alerts ────────────────────────────────────
+
+  /** List undismissed policy calibration alerts for the caller's organisation. */
+  listCalibrationAlerts: async (): Promise<CalibrationAlert[]> => {
+    const response = await api.get('/api/hr/calibration-alerts');
+    return response.data;
+  },
+
+  /** Dismiss a single calibration alert by ID. */
+  dismissCalibrationAlert: async (alertId: string): Promise<void> => {
+    await api.patch(`/api/hr/calibration-alerts/${alertId}/dismiss`);
   },
 
 };
