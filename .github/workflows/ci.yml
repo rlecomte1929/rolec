@@ -68,3 +68,23 @@ jobs:
             backend/tests/test_admin_form_templates_router.py \
             backend/tests/test_trigger_engine.py \
             backend/tests/test_case_dossier_forms.py
+
+  rls-coverage:
+    # AUDIT-A3: lists `public.*` tables with zero RLS policies and asserts each
+    # one is on the supabase/rls_allowlist.txt allowlist. Drains over time.
+    # Requires DATABASE_URL secret pointing at the live/staging Supabase (read-only).
+    name: RLS coverage check
+    runs-on: ubuntu-latest
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' || secrets.RLS_COVERAGE_DATABASE_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Run RLS coverage audit
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_rls_coverage.py

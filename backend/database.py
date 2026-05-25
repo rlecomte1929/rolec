@@ -2255,6 +2255,9 @@ class Database:
                 )
             """))
             # Migrate any old budget-exception tables that are missing the new columns
+            # AUDIT-A1: savepoint per column — on Postgres the column already exists
+            # (added by `_maybe_ensure_postgres_*` helpers), the bare ADD COLUMN fails,
+            # and without a savepoint the caught error aborts the outer transaction.
             for _col, _dflt in [
                 ("severity", "'warning'"),
                 ("exception_type", "''"),
@@ -2264,27 +2267,33 @@ class Database:
                 ("resolution_notes", "NULL"),
             ]:
                 try:
-                    conn.execute(text(
-                        f"ALTER TABLE exception_requests ADD COLUMN {_col} TEXT NOT NULL DEFAULT {_dflt}"
-                        if _dflt not in ("NULL",) else
-                        f"ALTER TABLE exception_requests ADD COLUMN {_col} TEXT"
-                    ))
+                    with conn.begin_nested():
+                        conn.execute(text(
+                            f"ALTER TABLE exception_requests ADD COLUMN {_col} TEXT NOT NULL DEFAULT {_dflt}"
+                            if _dflt not in ("NULL",) else
+                            f"ALTER TABLE exception_requests ADD COLUMN {_col} TEXT"
+                        ))
                 except Exception:
                     pass
+            # AUDIT-A1: savepoint isolates the failing DDL so a caught error
+            # doesn't abort the outer Postgres transaction (SQLite was tolerant
+            # of caught errors mid-transaction; Postgres isn't).
             try:
-                conn.execute(text("""
-                    CREATE INDEX IF NOT EXISTS idx_exception_requests_case
-                    ON exception_requests (case_id, created_at DESC)
-                """))
+                with conn.begin_nested():
+                    conn.execute(text("""
+                        CREATE INDEX IF NOT EXISTS idx_exception_requests_case
+                        ON exception_requests (case_id, created_at DESC)
+                    """))
             except Exception:
                 pass
             try:
                 # organization_id only exists in the older budget-exceptions schema;
                 # the P2/P3 immigration-flags schema does not have it — skip safely.
-                conn.execute(text("""
-                    CREATE INDEX IF NOT EXISTS idx_exception_requests_org_status
-                    ON exception_requests (organization_id, status, created_at DESC)
-                """))
+                with conn.begin_nested():
+                    conn.execute(text("""
+                        CREATE INDEX IF NOT EXISTS idx_exception_requests_org_status
+                        ON exception_requests (organization_id, status, created_at DESC)
+                    """))
             except Exception:
                 pass
             # policy_cap_requests: employee-initiated cost override requests (B18 fix).
@@ -2327,15 +2336,22 @@ class Database:
                     exception_id TEXT
                 )
             """))
+            # AUDIT-A1: savepoint per index so a column-mismatch failure on Postgres
+            # doesn't abort the outer transaction.
             try:
-                conn.execute(text("""
-                    CREATE INDEX IF NOT EXISTS idx_policy_cap_requests_case
-                    ON policy_cap_requests (case_id, created_at DESC)
-                """))
-                conn.execute(text("""
-                    CREATE INDEX IF NOT EXISTS idx_policy_cap_requests_org_status
-                    ON policy_cap_requests (organization_id, status, created_at DESC)
-                """))
+                with conn.begin_nested():
+                    conn.execute(text("""
+                        CREATE INDEX IF NOT EXISTS idx_policy_cap_requests_case
+                        ON policy_cap_requests (case_id, created_at DESC)
+                    """))
+            except Exception:
+                pass
+            try:
+                with conn.begin_nested():
+                    conn.execute(text("""
+                        CREATE INDEX IF NOT EXISTS idx_policy_cap_requests_org_status
+                        ON policy_cap_requests (organization_id, status, created_at DESC)
+                    """))
             except Exception:
                 pass
 
@@ -2573,49 +2589,55 @@ class Database:
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_policy_versions_policy ON policy_versions(policy_id)
             """))
-            try:
-                pv_cols = conn.execute(text("PRAGMA table_info(policy_versions)")).fetchall()
-                pv_names = {r[1] for r in pv_cols}
-                if "normalization_draft_json" not in pv_names:
-                    conn.execute(text("ALTER TABLE policy_versions ADD COLUMN normalization_draft_json TEXT"))
-                if "normalization_state" not in pv_names:
-                    conn.execute(text("ALTER TABLE policy_versions ADD COLUMN normalization_state TEXT"))
-            except Exception:
-                pass
+            # AUDIT-A1: PRAGMA is SQLite-only and was aborting the Postgres transaction.
+            if _is_sqlite:
+                try:
+                    pv_cols = conn.execute(text("PRAGMA table_info(policy_versions)")).fetchall()
+                    pv_names = {r[1] for r in pv_cols}
+                    if "normalization_draft_json" not in pv_names:
+                        conn.execute(text("ALTER TABLE policy_versions ADD COLUMN normalization_draft_json TEXT"))
+                    if "normalization_state" not in pv_names:
+                        conn.execute(text("ALTER TABLE policy_versions ADD COLUMN normalization_state TEXT"))
+                except Exception:
+                    pass
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_policy_benefit_rules_version ON policy_benefit_rules(policy_version_id)
             """))
             # Policy template source columns (company_policies) + default_policy_templates
-            try:
-                cols = conn.execute(text("PRAGMA table_info(company_policies)")).fetchall()
-                col_names = {r[1] for r in cols}
-                for col, ctype in [
-                    ("template_source", "TEXT NOT NULL DEFAULT 'company_uploaded'"),
-                    ("template_name", "TEXT"),
-                    ("is_default_template", "INTEGER NOT NULL DEFAULT 0"),
-                ]:
-                    if col not in col_names:
-                        conn.execute(text(f"ALTER TABLE company_policies ADD COLUMN {col} {ctype}"))
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS default_policy_templates (
-                        id TEXT PRIMARY KEY,
-                        template_name TEXT NOT NULL,
-                        version TEXT NOT NULL,
-                        status TEXT NOT NULL DEFAULT 'active',
-                        is_default_template INTEGER NOT NULL DEFAULT 0,
-                        snapshot_json TEXT NOT NULL DEFAULT '{}',
-                        created_at TEXT NOT NULL,
-                        updated_at TEXT NOT NULL
-                    )
-                """))
-                # Seed one default template if none
-                row = conn.execute(text(
-                    "SELECT id FROM default_policy_templates WHERE is_default_template = 1 LIMIT 1"
-                )).fetchone()
-                if not row:
-                    _seed_default_policy_template_sqlite(conn)
-            except Exception:
-                pass
+            # AUDIT-A1: PRAGMA + default_policy_templates seeding are SQLite-only;
+            # they were aborting the Postgres transaction. Postgres has the equivalent
+            # in supabase/migrations.
+            if _is_sqlite:
+                try:
+                    cols = conn.execute(text("PRAGMA table_info(company_policies)")).fetchall()
+                    col_names = {r[1] for r in cols}
+                    for col, ctype in [
+                        ("template_source", "TEXT NOT NULL DEFAULT 'company_uploaded'"),
+                        ("template_name", "TEXT"),
+                        ("is_default_template", "INTEGER NOT NULL DEFAULT 0"),
+                    ]:
+                        if col not in col_names:
+                            conn.execute(text(f"ALTER TABLE company_policies ADD COLUMN {col} {ctype}"))
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS default_policy_templates (
+                            id TEXT PRIMARY KEY,
+                            template_name TEXT NOT NULL,
+                            version TEXT NOT NULL,
+                            status TEXT NOT NULL DEFAULT 'active',
+                            is_default_template INTEGER NOT NULL DEFAULT 0,
+                            snapshot_json TEXT NOT NULL DEFAULT '{}',
+                            created_at TEXT NOT NULL,
+                            updated_at TEXT NOT NULL
+                        )
+                    """))
+                    # Seed one default template if none
+                    row = conn.execute(text(
+                        "SELECT id FROM default_policy_templates WHERE is_default_template = 1 LIMIT 1"
+                    )).fetchone()
+                    if not row:
+                        _seed_default_policy_template_sqlite(conn)
+                except Exception:
+                    pass
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS resolved_assignment_policies (
                     id TEXT PRIMARY KEY,
@@ -2985,21 +3007,23 @@ class Database:
             """))
 
             # Ensure coverage column exists for local guidance packs
-            try:
-                cols = conn.execute(text("PRAGMA table_info(relocation_guidance_packs)")).fetchall()
-                col_names = {r[1] for r in cols}
-                if "coverage" not in col_names:
-                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN coverage TEXT"))
-                if "guidance_mode" not in col_names:
-                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN guidance_mode TEXT"))
-                if "pack_hash" not in col_names:
-                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN pack_hash TEXT"))
-                if "rule_set" not in col_names:
-                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN rule_set TEXT"))
-                if "canonical_case_id" not in col_names:
-                    conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN canonical_case_id TEXT"))
-            except Exception:
-                pass
+            # AUDIT-A1: PRAGMA is SQLite-only and was aborting the Postgres transaction.
+            if _is_sqlite:
+                try:
+                    cols = conn.execute(text("PRAGMA table_info(relocation_guidance_packs)")).fetchall()
+                    col_names = {r[1] for r in cols}
+                    if "coverage" not in col_names:
+                        conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN coverage TEXT"))
+                    if "guidance_mode" not in col_names:
+                        conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN guidance_mode TEXT"))
+                    if "pack_hash" not in col_names:
+                        conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN pack_hash TEXT"))
+                    if "rule_set" not in col_names:
+                        conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN rule_set TEXT"))
+                    if "canonical_case_id" not in col_names:
+                        conn.execute(text("ALTER TABLE relocation_guidance_packs ADD COLUMN canonical_case_id TEXT"))
+                except Exception:
+                    pass
             for tbl in ("dossier_answers", "dossier_case_questions", "dossier_case_answers", "dossier_source_suggestions", "relocation_trace_events"):
                 try:
                     cols = conn.execute(text(f"PRAGMA table_info({tbl})")).fetchall()
@@ -3007,36 +3031,40 @@ class Database:
                         conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN canonical_case_id TEXT"))
                 except Exception:
                     pass
-            try:
-                cols = conn.execute(text("PRAGMA table_info(knowledge_docs)")).fetchall()
-                col_names = {r[1] for r in cols}
-                if "fetched_at" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN fetched_at TEXT"))
-                if "fetch_status" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN fetch_status TEXT"))
-                if "content_excerpt" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN content_excerpt TEXT"))
-                if "content_sha256" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN content_sha256 TEXT"))
-                if "last_verified_at" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN last_verified_at TEXT"))
-            except Exception:
-                pass
-            try:
-                cols = conn.execute(text("PRAGMA table_info(knowledge_rules)")).fetchall()
-                col_names = {r[1] for r in cols}
-                if "version" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN version INTEGER NOT NULL DEFAULT 1"))
-                if "supersedes_rule_id" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN supersedes_rule_id TEXT"))
-                if "is_baseline" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN is_baseline INTEGER NOT NULL DEFAULT 0"))
-                if "baseline_priority" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN baseline_priority INTEGER NOT NULL DEFAULT 100"))
-                if "is_active" not in col_names:
-                    conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"))
-            except Exception:
-                pass
+            # AUDIT-A1: PRAGMA is SQLite-only and was aborting the Postgres transaction.
+            if _is_sqlite:
+                try:
+                    cols = conn.execute(text("PRAGMA table_info(knowledge_docs)")).fetchall()
+                    col_names = {r[1] for r in cols}
+                    if "fetched_at" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN fetched_at TEXT"))
+                    if "fetch_status" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN fetch_status TEXT"))
+                    if "content_excerpt" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN content_excerpt TEXT"))
+                    if "content_sha256" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN content_sha256 TEXT"))
+                    if "last_verified_at" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_docs ADD COLUMN last_verified_at TEXT"))
+                except Exception:
+                    pass
+            # AUDIT-A1: PRAGMA is SQLite-only and was aborting the Postgres transaction.
+            if _is_sqlite:
+                try:
+                    cols = conn.execute(text("PRAGMA table_info(knowledge_rules)")).fetchall()
+                    col_names = {r[1] for r in cols}
+                    if "version" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN version INTEGER NOT NULL DEFAULT 1"))
+                    if "supersedes_rule_id" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN supersedes_rule_id TEXT"))
+                    if "is_baseline" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN is_baseline INTEGER NOT NULL DEFAULT 0"))
+                    if "baseline_priority" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN baseline_priority INTEGER NOT NULL DEFAULT 100"))
+                    if "is_active" not in col_names:
+                        conn.execute(text("ALTER TABLE knowledge_rules ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"))
+                except Exception:
+                    pass
 
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS support_cases (
@@ -3328,15 +3356,17 @@ class Database:
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_status ON support_cases(status)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_support_cases_severity ON support_cases(severity)"))
-            try:
-                cols = conn.execute(text("PRAGMA table_info(support_cases)")).fetchall()
-                col_names = {r[1] for r in cols}
-                if "priority" not in col_names:
-                    conn.execute(text("ALTER TABLE support_cases ADD COLUMN priority TEXT DEFAULT 'medium'"))
-                if "assignee_id" not in col_names:
-                    conn.execute(text("ALTER TABLE support_cases ADD COLUMN assignee_id TEXT"))
-            except Exception:
-                pass
+            # AUDIT-A1: PRAGMA is SQLite-only and was aborting the Postgres transaction.
+            if _is_sqlite:
+                try:
+                    cols = conn.execute(text("PRAGMA table_info(support_cases)")).fetchall()
+                    col_names = {r[1] for r in cols}
+                    if "priority" not in col_names:
+                        conn.execute(text("ALTER TABLE support_cases ADD COLUMN priority TEXT DEFAULT 'medium'"))
+                    if "assignee_id" not in col_names:
+                        conn.execute(text("ALTER TABLE support_cases ADD COLUMN assignee_id TEXT"))
+                except Exception:
+                    pass
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_relocation_cases_status ON relocation_cases(status)"))
 
             # HR Command Center: risk/budget columns, tasks, case_events
