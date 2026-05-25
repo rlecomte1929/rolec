@@ -34,18 +34,18 @@ CREATE POLICY "case_messages_select_employee"
         EXISTS (
             SELECT 1 FROM public.case_assignments ca
             WHERE ca.case_id = case_messages.case_id
-              AND ca.employee_id = auth.uid()::text
+              AND ca.employee_user_id = auth.uid()::text
         )
         OR
         EXISTS (
             SELECT 1 FROM public.relocation_cases rc
-            WHERE rc.id = case_messages.case_id
-              AND rc.created_by = auth.uid()::text
+            WHERE rc.id::text = case_messages.case_id
+              AND rc.hr_user_id = auth.uid()::text
         )
         OR
         EXISTS (
             SELECT 1 FROM public.profiles p
-            WHERE p.id = auth.uid()::text
+            WHERE p.id = auth.uid()
               AND p.role IN ('HR', 'ADMIN')
         )
     );
