@@ -1461,13 +1461,23 @@ class Database:
             # older ci_test.db or a dev sqlite), add the new column with the
             # same "applies to all levels" default so existing rows keep
             # their effective meaning.
-            try:
-                conn.execute(text(
-                    "ALTER TABLE policy_config_benefits ADD COLUMN employee_levels TEXT NOT NULL DEFAULT '[]'"
-                ))
-            except Exception:
-                # Column already exists or SQLite refuses to re-add — safe to ignore.
-                pass
+            # AUDIT-A1: SQLite-only back-compat. On Postgres the equivalent
+            # column was already ensured as jsonb by
+            # _maybe_ensure_compensation_allowance_policy_config() (line ~711
+            # above) which uses `ADD COLUMN IF NOT EXISTS`. Running this ALTER
+            # on Postgres caused the column-already-exists error to be caught
+            # in Python but the transaction was already aborted by Postgres,
+            # cascading into `InFailedSqlTransaction` on the next CREATE INDEX
+            # below. See audit/02-expert-security.md SEC-1 / audit/02-expert-qa.md QA-1.
+            if _is_sqlite:
+                try:
+                    conn.execute(text(
+                        "ALTER TABLE policy_config_benefits ADD COLUMN employee_levels TEXT NOT NULL DEFAULT '[]'"
+                    ))
+                except Exception:
+                    # Column already exists — safe to ignore in SQLite (caught error
+                    # does not abort SQLite transactions).
+                    pass
 
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_sqlite_pc_benefits_version
@@ -1785,7 +1795,10 @@ class Database:
                 )
             """))
             # Must run before indexes on policy_document_chunks.snapshot_id (upgrade path for older SQLite files).
-            _sqlite_ensure_policy_hardening_columns(conn)
+            # AUDIT-A1: the helper uses `sqlite_master` / `PRAGMA table_info`, which fail on Postgres and
+            # abort the surrounding transaction (caught Python error doesn't roll back Postgres). Guard.
+            if _is_sqlite:
+                _sqlite_ensure_policy_hardening_columns(conn)
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_policy_document_chunks_doc
                 ON policy_document_chunks(policy_document_id)
@@ -1981,7 +1994,9 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_canonical_policy_fact_validation_errors_company
                 ON canonical_policy_fact_validation_errors(company_id)
             """))
-            _sqlite_ensure_canonical_policy_tenant_columns(conn)
+            # AUDIT-A1: SQLite-only helper. See note on _sqlite_ensure_policy_hardening_columns above.
+            if _is_sqlite:
+                _sqlite_ensure_canonical_policy_tenant_columns(conn)
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS canonical_policy_query_audit_logs (
                     id TEXT PRIMARY KEY,
@@ -2399,7 +2414,9 @@ class Database:
                 ON policy_assistant_traces(session_id)
                 WHERE session_id IS NOT NULL
             """))
-            _sqlite_ensure_policy_import_columns(conn)
+            # AUDIT-A1: SQLite-only helper. See note on _sqlite_ensure_policy_hardening_columns above.
+            if _is_sqlite:
+                _sqlite_ensure_policy_import_columns(conn)
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS policy_versions (
                     id TEXT PRIMARY KEY,
