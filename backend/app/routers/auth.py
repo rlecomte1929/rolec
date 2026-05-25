@@ -43,6 +43,12 @@ from ...schemas import (
     UserRole,
 )
 from ...services.assignment_claim_link_service import reconcile_pending_assignment_claims
+from ...services.audit_log_service import (
+    insert_audit_log,
+    ACTION_INSERT,
+    ACTION_DELETE,
+    ACTOR_HUMAN,
+)
 from ..auth_deps import _is_admin_user
 
 log = logging.getLogger(__name__)
@@ -76,6 +82,31 @@ _supabase_sync_executor = concurrent.futures.ThreadPoolExecutor(
     max_workers=int(os.getenv("AUTH_SUPABASE_SYNC_MAX_WORKERS", "4")),
     thread_name_prefix="auth-supabase-sync",
 )
+
+
+def _audit_auth(
+    *,
+    entity_type: str,
+    entity_id: str,
+    action_type: str,
+    actor_id: Optional[str] = None,
+) -> None:
+    """Write one audit_logs row; never raises."""
+    try:
+        with db.engine.begin() as conn:
+            insert_audit_log(
+                conn,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                action_type=action_type,
+                actor_type=ACTOR_HUMAN,
+                actor_id=actor_id,
+            )
+    except Exception:
+        log.exception(
+            "audit: failed to log %s %s entity_id=%s",
+            action_type, entity_type, entity_id,
+        )
 
 
 def _dispatch_supabase_sync(
@@ -291,6 +322,7 @@ def register(body: RegisterRequest, request: Request):
             principal_fingerprint=principal_fingerprint(email, username),
         )
         log.info("auth_register success user_id=%s username=%s", user_id[:8], username)
+        _audit_auth(entity_type="user", entity_id=user_id, action_type=ACTION_INSERT, actor_id=user_id)
         if email:
             _dispatch_supabase_sync(
                 email,
@@ -472,6 +504,7 @@ def login(body: LoginRequest, request: Request):
         principal_fingerprint=principal_fingerprint(user.get("email"), user.get("username")),
     )
     log.info("auth_login success user_id=%s", user["id"][:8])
+    _audit_auth(entity_type="session", entity_id=user["id"], action_type=ACTION_INSERT, actor_id=user["id"])
     if user.get("email"):
         _dispatch_supabase_sync(
             user["email"],
@@ -523,6 +556,7 @@ def logout(
         if token:
             db.delete_session_by_token(token)
             log.info("auth_logout legacy_token_invalidated")
+            _audit_auth(entity_type="session", entity_id=token[:8] + "***", action_type=ACTION_DELETE)
 
     supabase_access_token = (payload or {}).get("supabase_access_token") if isinstance(payload, dict) else None
     if supabase_access_token and isinstance(supabase_access_token, str):
