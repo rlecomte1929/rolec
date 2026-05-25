@@ -204,7 +204,8 @@ def start_research(case_id: str):
 
 
 @router.get("/{case_id}/requirements", response_model=schemas.CaseRequirementsDTO)
-def get_case_requirements(case_id: str):
+def get_case_requirements(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
+    _assert_case_access(user, case_id)
     try:
         return compute_case_requirements(case_id)
     except ValueError:
@@ -276,12 +277,13 @@ def create_case(case_id: str, request: Request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/{case_id}/roadmap")
-def get_case_roadmap(case_id: str):
+def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
     """
     GAP 2 & GAP 5: Returns a multi-track relocation roadmap derived from the case draft.
     Replaces window.PATHWAY_V2.deriveTimeline() with a real server-side computation.
     Tracks: Visa & Permit | Civil Documents | Family (conditional) | Settlement.
     """
+    _assert_case_access(user, case_id)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
