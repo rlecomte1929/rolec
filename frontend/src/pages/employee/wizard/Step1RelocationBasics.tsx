@@ -13,9 +13,17 @@ interface StepProps {
   onSave: (draft: CaseDraftDTO) => Promise<void>;
   onNext: (draft: CaseDraftDTO) => Promise<void>;
   isSaving?: boolean;
+  /** Fields pre-filled by variant A smart-defaults — show a chip on those fields */
+  preFilled?: Set<string>;
 }
 
-export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, banner, onSave, onNext, isSaving }) => {
+const PreFilledChip: React.FC = () => (
+  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#e6f7f7] px-2 py-0.5 text-[10px] font-medium text-[#1f8e8b]">
+    ✨ Pre-filled from your profile
+  </span>
+);
+
+export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, banner, onSave, onNext, isSaving, preFilled }) => {
   const navigate = useNavigate();
   const [local, setLocal] = useState(draft.relocationBasics);
   const [error, setError] = useState('');
@@ -65,6 +73,7 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="text-sm text-[#0b2b43]">
             Origin Country{missing.originCountry && <span className="text-red-600"> *</span>}
+            {preFilled?.has('originCountry') && <PreFilledChip />}
             <select
               value={local.originCountry || ''}
               onChange={(event) => update('originCountry', event.target.value)}
@@ -108,7 +117,8 @@ export const Step1RelocationBasics: React.FC<StepProps> = ({ draft, requiredFiel
           </label>
           <label className="text-sm text-[#0b2b43]">
             Destination Country{missing.destCountry && <span className="text-red-600"> *</span>}
-            {local.destCountry && (
+            {preFilled?.has('destCountry') && <PreFilledChip />}
+            {!preFilled?.has('destCountry') && local.destCountry && (
               <span className="ml-2 text-xs text-[#1f8e8b]">(Set by HR: you can change if needed)</span>
             )}
             <select

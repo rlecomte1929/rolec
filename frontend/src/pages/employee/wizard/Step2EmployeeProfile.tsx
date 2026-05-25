@@ -12,9 +12,17 @@ interface StepProps {
   onNext: (draft: CaseDraftDTO) => Promise<void>;
   onBack: () => void;
   isSaving?: boolean;
+  /** Fields pre-filled by variant A smart-defaults — show a chip on those fields */
+  preFilled?: Set<string>;
 }
 
-export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, onSave, onNext, onBack, isSaving }) => {
+const PreFilledChip: React.FC = () => (
+  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#e6f7f7] px-2 py-0.5 text-[10px] font-medium text-[#1f8e8b]">
+    ✨ Pre-filled from your profile
+  </span>
+);
+
+export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredFields: _requiredFields, onSave, onNext, onBack, isSaving, preFilled }) => {
   const navigate = useNavigate();
   const [local, setLocal] = useState(draft.employeeProfile);
   const [passportFileName, setPassportFileName] = useState('');
@@ -149,6 +157,7 @@ export const Step2EmployeeProfile: React.FC<StepProps> = ({ draft, requiredField
         <label className="text-sm text-[#0b2b43]">
           Residence country
           {requiredMissing.residenceCountry && <span className="text-red-600"> *</span>}
+          {preFilled?.has('residenceCountry') && <PreFilledChip />}
           <select
             value={local.residenceCountry || ''}
             onChange={(event) => update('residenceCountry', event.target.value)}

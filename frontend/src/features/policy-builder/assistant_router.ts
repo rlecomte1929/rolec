@@ -38,6 +38,7 @@ import type { FallbackReason } from './topic_classifier';
 import { retrievePolicy } from './retrieve_policy';
 import type { PolicyChunk } from './retrieve_policy';
 import { checkFaithfulness } from './faithfulness_checker';
+import { runGuardrails } from './input_guardrails';
 
 // Re-export so consumers have a single import point
 export type { FallbackReason };
@@ -330,9 +331,34 @@ export async function processQuery(
       ? (import.meta.env?.VITE_ANTHROPIC_API_KEY as string | undefined)
       : process.env.ANTHROPIC_API_KEY);
 
+  // ── Step 0: Input guardrails (PII masking, escalation detection) ─────────
+  // Must run BEFORE any LLM call. Uses the sanitized query for all downstream steps.
+
+  const guardrailResult = await runGuardrails(query, {
+    anthropic_key: apiKey,
+    skip_topic_check: true, // topic classification handled in Step 1 below
+  });
+
+  // If guardrails hard-reject the query (off-topic or unsafe), return immediately
+  if (!guardrailResult.safe && guardrailResult.topic_rejection) {
+    const reason: FallbackReason = 'TOPIC_REJECTED';
+    console.log(
+      `[assistant_router] GUARDRAIL_REJECT reason=${reason} hash=${guardrailResult.query_hash}`,
+    );
+    return {
+      answer_text: guardrailResult.topic_rejection,
+      answer_type: 'refusal',
+      fallback_reason: reason,
+      latency_ms: Date.now() - t0,
+    };
+  }
+
+  // Use sanitized (PII-stripped) query for all downstream pipeline steps
+  const safeQuery = guardrailResult.sanitized_query;
+
   // ── Step 1: Topic classification ─────────────────────────────────────────
 
-  const classification = await classifyQuery(query, apiKey);
+  const classification = await classifyQuery(safeQuery, apiKey);
 
   if (classification.category === 'off_topic') {
     const reason: FallbackReason = 'TOPIC_REJECTED';
@@ -354,7 +380,7 @@ export async function processQuery(
   // ── Step 2: Policy retrieval ──────────────────────────────────────────────
 
   const retrievalResult = await retrievePolicy({
-    query,
+    query: safeQuery,
     employee_tier: profile.employee_tier,
     company_id: profile.company_id,
     k,
@@ -409,7 +435,7 @@ export async function processQuery(
     };
   }
 
-  const generatedText = await generateResponse(query, chunks, apiKey, apiBase);
+  const generatedText = await generateResponse(safeQuery, chunks, apiKey, apiBase);
 
   // ── Step 5: Faithfulness check ────────────────────────────────────────────
 
@@ -437,8 +463,13 @@ export async function processQuery(
     `[assistant_router] OK faithfulness=${faithfulness.score} chunks=${chunks.length} latency=${Date.now() - t0}ms`,
   );
 
+  // Append escalation footer if guardrails detected dispute/escalation language
+  const finalText = guardrailResult.escalation_footer
+    ? `${generatedText}\n\n${guardrailResult.escalation_footer}`
+    : generatedText;
+
   return {
-    answer_text: generatedText,
+    answer_text: finalText,
     answer_type: 'generated',
     chunks,
     faithfulness_score: faithfulness.score,

@@ -21,6 +21,8 @@ import { Step3FamilyMembers } from './wizard/Step3FamilyMembers';
 import { Step4AssignmentContext } from './wizard/Step4AssignmentContext';
 import { Step5ReviewCreate } from './wizard/Step5ReviewCreate';
 import { useTrackLastVisited } from '../../hooks/useTrackLastVisited';
+import { useVariant } from '../../lib/feature-flags';
+import type { EmployeeLinkedOverviewRow } from '../../types/employeeAssignmentOverview';
 
 function buildDefaultDraft(): CaseDraftDTO {
   const name = getAuthItem('relopass_name');
@@ -78,6 +80,48 @@ function caseToWizardDraft(caseData: CaseDTO | null, assignment?: { employee_ful
       ...base.assignmentContext,
       ...(caseData.draft?.assignmentContext || {}),
     },
+  };
+}
+
+/**
+ * Variant A — smart pre-fill from assignment context.
+ * Only fills fields that are still empty; never overwrites what the employee typed.
+ * Returns the enhanced draft plus the set of field keys that were seeded,
+ * so the UI can render a "Pre-filled from your profile" chip on those fields.
+ */
+function buildVariantADraft(
+  base: CaseDraftDTO,
+  overviewRow: EmployeeLinkedOverviewRow | null,
+): { displayDraft: CaseDraftDTO; preFilled: Set<string> } {
+  const preFilled = new Set<string>();
+  if (!overviewRow?.destination) return { displayDraft: base, preFilled };
+
+  const relBas = { ...base.relocationBasics };
+  const empProf = { ...base.employeeProfile };
+
+  const homeCountry = overviewRow.destination.home_country?.trim() || '';
+  const hostCountry = overviewRow.destination.host_country?.trim() || '';
+
+  if (!relBas.originCountry && homeCountry) {
+    relBas.originCountry = homeCountry;
+    preFilled.add('originCountry');
+  }
+
+  if (!relBas.destCountry && hostCountry) {
+    relBas.destCountry = hostCountry;
+    preFilled.add('destCountry');
+  }
+
+  // Mirror origin → residenceCountry so the employee doesn't need to re-pick it
+  const effectiveOrigin = relBas.originCountry || '';
+  if (!empProf.residenceCountry && effectiveOrigin) {
+    empProf.residenceCountry = effectiveOrigin;
+    preFilled.add('residenceCountry');
+  }
+
+  return {
+    displayDraft: { ...base, relocationBasics: relBas, employeeProfile: empProf },
+    preFilled,
   };
 }
 
@@ -309,6 +353,18 @@ export const CaseWizardPage: React.FC = () => {
     [linkedSummaries, assignmentId]
   );
 
+  // A/B: onboarding_flow_v2 — variant_a applies smart pre-fill from assignment context
+  const onboardingVariant = useVariant('onboarding_flow_v2');
+  const { displayDraft, preFilled } = useMemo(
+    (): { displayDraft: CaseDraftDTO; preFilled: Set<string> } => {
+      if (onboardingVariant !== 'variant_a') {
+        return { displayDraft: draft, preFilled: new Set<string>() };
+      }
+      return buildVariantADraft(draft, overviewRowForAssignment);
+    },
+    [draft, onboardingVariant, overviewRowForAssignment],
+  );
+
   // Assignment status from canonical overview (avoid extra GET /assignments/current per wizard step).
   useEffect(() => {
     if (overviewRowForAssignment?.status) {
@@ -463,7 +519,7 @@ export const CaseWizardPage: React.FC = () => {
 
   const stepProps = {
     caseId: resolvedCaseId || assignmentId || '',
-    draft,
+    draft: displayDraft,
     requiredFields,
     onSave: onSaveForSteps,
     onNext: handleNext,
@@ -471,6 +527,7 @@ export const CaseWizardPage: React.FC = () => {
     onGoToStep: (stepNumber: number) =>
       assignmentId && navigate(`/employee/case/${assignmentId}/wizard/${stepNumber}`),
     isSaving,
+    preFilled,
   };
 
   const stepNode = useMemo(() => {
