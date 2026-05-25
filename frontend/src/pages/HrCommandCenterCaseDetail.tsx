@@ -8,6 +8,7 @@ import { hrAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
+import { statusLabel } from '../lib/statusLabel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
 import { RfqModal } from '../components/case/RfqModal';
@@ -171,7 +172,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                           <span className={t.status === 'overdue' ? 'text-[#ef4444] font-medium' : ''}>
                             {t.title}
                           </span>
-                          <span className="text-xs text-[#94a3b8]">{t.status}</span>
+                          <span className="text-xs text-[#94a3b8]">{statusLabel(t.status)}</span>
                           {t.due_date && <span className="text-xs">· {t.due_date}</span>}
                         </li>
                       ))}
@@ -343,7 +344,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                               : 'text-[#d97706]'
                           }
                         >
-                          {qr.status}
+                          {statusLabel(qr.status)}
                         </span>
                       </p>
                     </div>

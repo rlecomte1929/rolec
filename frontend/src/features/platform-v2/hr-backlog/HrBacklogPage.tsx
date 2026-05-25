@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { hrAPI, type HrBacklogTask } from '../../../api/client';
 import { DataTable, ResetColumnsLink, type DataTableColumn } from '../data-table';
+import { statusLabel } from '../../../lib/statusLabel';
 
 /**
  * HR Backlog — pending employee tasks across the HR user's company.
@@ -67,10 +68,7 @@ const STATUS_PILL: Record<string, string> = {
   revision_requested: 'bg-rose-50 text-rose-700 ring-rose-200',
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'To do',
-  revision_requested: 'Needs revision',
-};
+// STATUS_LABEL removed — replaced by the shared statusLabel() utility (AUDIT-A5)
 
 const OWNER_TONES = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-sky-100 text-sky-700', 'bg-rose-100 text-rose-700', 'bg-violet-100 text-violet-700'];
 
@@ -237,7 +235,7 @@ export function HrBacklogPage() {
         minWidth: 110,
         cell: (t) => (
           <Pill className={STATUS_PILL[t.status] ?? STATUS_PILL.pending}>
-            {STATUS_LABEL[t.status] ?? t.status}
+            {statusLabel(t.status)}
           </Pill>
         ),
       },

@@ -4,6 +4,7 @@ import { AppShell } from '../../components/AppShell';
 import { Button, Card } from '../../components/antigravity';
 import { vendorAPI } from '../../api/client';
 import type { RfqSummary } from '../../api/client';
+import { statusLabel } from '../../lib/statusLabel';
 
 export const VendorInbox: React.FC = () => {
   const navigate = useNavigate();
@@ -81,7 +82,7 @@ export const VendorInbox: React.FC = () => {
             <div>
               <div className="font-medium text-[#0b2b43]">{rfq.rfq_ref}</div>
               <div className="text-sm text-[#6b7280]">
-                {rfq.items?.length || 0} items · {rfq.status}
+                {rfq.items?.length || 0} items · {statusLabel(rfq.status)}
               </div>
             </div>
             <Button onClick={() => navigate(`/vendor/rfq/${rfq.id}`)}>
