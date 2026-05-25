@@ -1,23 +1,23 @@
 /**
- * get-feature-flags — Supabase Edge Function (PRODUCT-6A)
+ * get-feature-flags — Supabase Edge Function (PRODUCT-6A) v7
  * ─────────────────────────────────────────────────────────────────────────────
  * Safe proxy for Vercel Edge Config feature flags.
  * The browser never receives the EDGE_CONFIG token — all reads go server-side.
  *
  * Usage (frontend):
  *   GET /functions/v1/get-feature-flags
- *   → { flags: { onboarding_flow_v2: { enabled: false, ... }, ... } }
+ *   → { flags: { onboarding_flow_v2: { enabled: true, ... }, ... } }
  *
  * Usage (curl):
- *   curl https://<project>.supabase.co/functions/v1/get-feature-flags \
- *     -H "Authorization: Bearer <anon-key>"
+ *   curl https://<project>.supabase.co/functions/v1/get-feature-flags
+ *   (no Authorization header required — verify_jwt: false)
  *
  * Environment variables (set in Supabase vault):
  *   EDGE_CONFIG   — Vercel Edge Config connection string
  *                   Format: https://edge-config.vercel.com/<id>?token=<token>
- *                   OR the short form: ecfg_<token>
+ *                   (short ecfg_<token> form is NOT supported)
  *
- * If EDGE_CONFIG is not set, falls back to safe defaults (all flags disabled).
+ * If EDGE_CONFIG is not set or unreachable, falls back to safe defaults (all flags disabled).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -63,16 +63,16 @@ interface FlagsPayload {
 
 /**
  * Parse the EDGE_CONFIG env var into a usable REST URL.
- * Vercel Edge Config connection strings come in two forms:
- *   1. Full URL: https://edge-config.vercel.com/<id>?token=<token>
- *   2. Short:    ecfg_<token>  (not enough info to build URL — treat as missing)
+ * Only the full URL form is supported:
+ *   https://edge-config.vercel.com/<id>?token=<token>
+ * The short ecfg_<token> form does NOT contain enough info to build a URL.
  */
 function buildEdgeConfigUrl(connectionString: string): string | null {
   if (connectionString.startsWith("https://edge-config.vercel.com/")) {
-    // Already a full URL — append /item/flags to read the flags key
     const base = connectionString.replace(/\/$/, "");
     return `${base}/item/flags`;
   }
+  console.warn("[get-feature-flags] EDGE_CONFIG must be the full URL form (https://edge-config.vercel.com/...). Short ecfg_ form is not supported.");
   return null;
 }
 
@@ -131,8 +131,8 @@ serve(async (req: Request) => {
       headers: {
         ...CORS_HEADERS,
         "Content-Type": "application/json",
-        // Cache for 60 s on the CDN — flags don't change per-request
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=30",
+        // no-store: always fetch fresh flags — avoids CDN serving stale flag state
+        "Cache-Control": "no-store",
       },
     });
   } catch (err) {
@@ -141,7 +141,7 @@ serve(async (req: Request) => {
       JSON.stringify({ flags: FLAG_DEFAULTS, _error: "Edge Config unavailable; using defaults." }),
       {
         status: 200, // still return 200 with defaults so the app never hard-fails on flags
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json", "Cache-Control": "no-store" },
       }
     );
   }
