@@ -13,7 +13,7 @@
  *   - Secure: EDGE_CONFIG token never reaches the browser — reads go via the
  *     get-feature-flags Supabase Edge Function
  * ─────────────────────────────────────────────────────────────────────────────
- *
+ */
 
 import {
   createContext,
