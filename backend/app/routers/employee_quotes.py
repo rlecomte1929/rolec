@@ -324,7 +324,7 @@ def submit_destination_request(
     (city, country, company), the existing ticket is returned instead of
     creating a duplicate.
     """
-    from ...services import scrape_safety
+    from ..services import scrape_safety
 
     profile = db.get_profile_record(user.get("id"))
     company_id = (profile or {}).get("company_id") or user.get("company")
@@ -349,7 +349,7 @@ def list_employee_destination_requests(
     """
     Employee lists their own pending destination requests so they can track status.
     """
-    from ...services import scrape_safety
+    from ..services import scrape_safety
 
     profile = db.get_profile_record(user.get("id"))
     company_id = (profile or {}).get("company_id") or user.get("company")

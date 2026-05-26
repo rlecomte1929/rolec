@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..auth_deps import require_admin
-from ...services import service_catalog
+from ..services import service_catalog
 
 router = APIRouter(prefix="/api/admin/catalog", tags=["admin_catalog"])
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ class ResolveTicketBody(BaseModel):
 def list_destination_allowlist(
     user: Dict[str, Any] = Depends(require_admin),
 ) -> List[Dict[str, Any]]:
-    from ...services import scrape_safety
+    from ..services import scrape_safety
     return scrape_safety.list_allowlist()
 
 
@@ -86,7 +86,7 @@ def add_destination_to_allowlist(
     body: AllowlistAddBody,
     user: Dict[str, Any] = Depends(require_admin),
 ) -> Dict[str, Any]:
-    from ...services import scrape_safety
+    from ..services import scrape_safety
     try:
         return scrape_safety.add_allowlist_entry(
             city=body.city,
@@ -104,7 +104,7 @@ def list_destination_requests(
     user: Dict[str, Any] = Depends(require_admin),
 ) -> List[Dict[str, Any]]:
     """Admin queue of HR-opened tickets. ?status=pending|approved|rejected."""
-    from ...services import scrape_safety
+    from ..services import scrape_safety
     if status and status not in ("pending", "approved", "rejected"):
         raise HTTPException(status_code=400, detail="status must be pending, approved, or rejected")
     return scrape_safety.list_destination_requests(status=status, limit=200)
@@ -121,7 +121,7 @@ def resolve_destination_request(
     is added to the allowlist; the original requester can then re-trigger
     the populate-with-ai endpoint and the scrape will fire (subject to quota).
     """
-    from ...services import scrape_safety
+    from ..services import scrape_safety
     try:
         ticket = scrape_safety.resolve_destination_request(
             request_id=request_id,

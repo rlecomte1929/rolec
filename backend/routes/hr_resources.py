@@ -39,7 +39,7 @@ def list_hr_resources_destinations(
     user: Dict[str, Any] = Depends(_require_hr_or_admin),
 ) -> List[Dict[str, Any]]:
     """List all supported destinations (HR view). Alias for /api/resources/destinations."""
-    from ..services import scrape_safety
+    from ..app.services import scrape_safety
     return scrape_safety.list_allowlist()
 
 
