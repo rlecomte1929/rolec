@@ -556,6 +556,17 @@ app.add_middleware(
     max_age=86400,
 )
 
+# AUDIT-B7 / PERF-5 — query-count middleware. Logs per-request SQL count.
+# WARNING when count > threshold (default 10) flags likely N+1 patterns.
+# Set `RELOPASS_QUERY_COUNTER_OFF=1` in env to disable for synthetic load tests.
+from .app.services.query_counter import (  # noqa: E402
+    QueryCountMiddleware,
+    install_query_counter,
+)
+
+install_query_counter(db.engine)
+app.add_middleware(QueryCountMiddleware, threshold=10)
+
 # [AUDIT-C2.3 Month-1] auth_router → moved to backend/app/main.py
 app.include_router(compat_router.router)
 # [AUDIT-C2.3 Month-1] cases_router → moved to backend/app/main.py
