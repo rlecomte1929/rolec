@@ -71,7 +71,7 @@ const SECTIONS: NavSection[] = [
       { id: 'company-profile', label: 'Company profile', to: ROUTE_DEFS.hrCompanyProfile.path, exact: true },
       {
         id: 'mobility-control',
-        label: 'Mobility control center',
+        label: 'Mobility center',
         to: ROUTE_DEFS.hrCommandCenter.path,
         exact: true,
         badge: { kind: 'static-count', count: 12 },
