@@ -16,18 +16,24 @@ import {
   EMPLOYEE_POLICY_COMPARISON_UNAVAILABLE_SECONDARY,
 } from '../policy/employeePolicyMessages';
 import {
+  convertToUsd,
   convertUsdToDisplay,
   formatEstimationFromUsd,
   formatServicesMoney,
   SERVICES_CURRENCY_FOOTNOTE,
 } from '../services/servicesCurrency';
+import { budgetAPI, type BudgetSummaryCategory } from '../../api/budget';
 
-/** Category key to policy-budget cap key (from resolved HR policy) */
-const CATEGORY_TO_CAP: Record<string, string> = {
-  housing: 'housing_monthly_usd',
-  schools: 'schools_usd',
-  movers: 'movers_usd',
-};
+// AIQ-280 follow-up #4 — replaced the hardcoded CATEGORY_TO_CAP map with
+// a runtime lookup driven by GET /api/cases/:caseId/budget-summary. The
+// previous map was a 3-entry compile-time list (housing/movers/schools);
+// the new approach keys directly by the backend category name so adding
+// a category to a policy doesn't need a frontend code change.
+//
+// Categories on the recommendation side that don't have a backend cap
+// (banks, insurance, electricity, etc.) map to "no_cap" naturally —
+// categoryCaps.get(category) returns undefined and the comparison logic
+// falls into the noCapMapping branch.
 
 const CATEGORY_COST_TYPE: Record<string, 'monthly' | 'annual' | 'one_time'> = {
   housing: 'monthly',
@@ -35,18 +41,33 @@ const CATEGORY_COST_TYPE: Record<string, 'monthly' | 'annual' | 'one_time'> = {
   movers: 'one_time',
 };
 
+/** Build a category-name → USD-cap map from a BudgetSummary response. */
+function budgetSummaryToCategoryCaps(
+  categories: BudgetSummaryCategory[] | null | undefined,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!categories) return out;
+  for (const c of categories) {
+    if (c.cap_amount == null) continue;
+    // Caps come back in the policy's native currency; PackageSummary's
+    // comparison logic expects USD baseline (matches the recommendation
+    // items' estimated_cost_usd). Convert here so the existing math
+    // stays correct.
+    const usd = convertToUsd(c.cap_amount, c.cap_currency || 'USD');
+    out.set(c.name, usd);
+    // Accept the 'moving' alias the backend can emit alongside 'movers'.
+    if (c.name === 'moving') out.set('movers', usd);
+    if (c.name === 'movers') out.set('moving', usd);
+  }
+  return out;
+}
+
 function getItemCost(item: RecommendationItem, costType: string): number {
   const usd = item.metadata?.estimated_cost_usd;
   if (usd == null) return 0;
   if (costType === 'monthly') return usd;
   if (costType === 'annual') return usd;
   return usd;
-}
-
-interface PolicyCaps {
-  housing_monthly_usd: number;
-  movers_usd: number;
-  schools_usd: number;
 }
 
 interface Props {
@@ -67,7 +88,11 @@ export const PackageSummary: React.FC<Props> = ({
   onStartOver,
   displayCurrency,
 }) => {
-  const [policyCaps, setPolicyCaps] = useState<PolicyCaps | null>(null);
+  // AIQ-280 follow-up #4 — categoryCaps is keyed by backend category name
+  // (e.g. 'housing', 'movers', 'schools') and stores per-category USD caps.
+  // Replaces the old PolicyCaps shape (housing_monthly_usd / movers_usd /
+  // schools_usd) which required a hardcoded mapping.
+  const [categoryCaps, setCategoryCaps] = useState<Map<string, number> | null>(null);
   const [comparisonAvailable, setComparisonAvailable] = useState<boolean | null>(null);
   const [hasPublishedPolicy, setHasPublishedPolicy] = useState(false);
   const [capsLoading, setCapsLoading] = useState(true);
@@ -91,40 +116,50 @@ export const PackageSummary: React.FC<Props> = ({
     let cancelled = false;
     setCapsLoading(true);
 
+    // Helper: convert the legacy PolicyCaps shape (USD numerics) into the
+    // categoryCaps Map shape the new comparison loop expects. Used by the
+    // company-default fallback path below.
+    const fromPolicyCaps = (c: { housing_monthly_usd: number; movers_usd: number; schools_usd: number } | null): Map<string, number> | null => {
+      if (!c) return null;
+      const m = new Map<string, number>();
+      if (c.housing_monthly_usd) m.set('housing', c.housing_monthly_usd);
+      if (c.movers_usd) {
+        m.set('movers', c.movers_usd);
+        m.set('moving', c.movers_usd);
+      }
+      if (c.schools_usd) m.set('schools', c.schools_usd);
+      return m;
+    };
+
     const run = async () => {
       try {
         if (assignmentId) {
           try {
-            const res = await employeeAPI.getPolicyBudget(assignmentId);
+            // AIQ-280 follow-up #4 — primary path is the new budget-summary
+            // endpoint. Returns categories keyed by backend service name with
+            // cap_amount in the policy's native currency.
+            const res = await budgetAPI.getBudgetSummary(assignmentId);
             if (cancelled) return;
-            const hp = res?.has_policy === true;
-            setHasPublishedPolicy(hp);
-            const cmp = res?.comparison_available !== false;
-            setComparisonAvailable(cmp);
-            if (!cmp) {
-              setPolicyCaps(null);
+            const caps = budgetSummaryToCategoryCaps(res?.categories);
+            const anyCap = Array.from(caps.values()).some((v) => v > 0);
+            setHasPublishedPolicy(anyCap);
+            setComparisonAvailable(true);
+            if (caps.size > 0) {
+              setCategoryCaps(caps);
               return;
             }
-            const caps = res?.caps || {};
-            if (Object.keys(caps).length > 0) {
-              setPolicyCaps({
-                housing_monthly_usd: caps.housing ?? 0,
-                movers_usd: caps.movers ?? 0,
-                schools_usd: caps.schools ?? 0,
-              });
-              return;
-            }
+            // Empty categories — fall through to company-defaults.
             const c = await employeeAPI.getPolicyCaps();
-            if (!cancelled) setPolicyCaps(c);
+            if (!cancelled) setCategoryCaps(fromPolicyCaps(c));
           } catch {
             if (cancelled) return;
             setComparisonAvailable(null);
             setHasPublishedPolicy(false);
             try {
               const c = await employeeAPI.getPolicyCaps();
-              if (!cancelled) setPolicyCaps(c);
+              if (!cancelled) setCategoryCaps(fromPolicyCaps(c));
             } catch {
-              if (!cancelled) setPolicyCaps(null);
+              if (!cancelled) setCategoryCaps(null);
             }
           }
         } else {
@@ -132,9 +167,9 @@ export const PackageSummary: React.FC<Props> = ({
           setHasPublishedPolicy(false);
           try {
             const c = await employeeAPI.getPolicyCaps();
-            if (!cancelled) setPolicyCaps(c);
+            if (!cancelled) setCategoryCaps(fromPolicyCaps(c));
           } catch {
-            if (!cancelled) setPolicyCaps(null);
+            if (!cancelled) setCategoryCaps(null);
           }
         }
       } finally {
@@ -164,27 +199,23 @@ export const PackageSummary: React.FC<Props> = ({
     cap: number;
     covered: number;
     extra: number;
-    /** Published policy exists but no mapped numeric cap for this service category — treat as uncovered for estimates. */
+    /** Published policy exists but no numeric cap for this service category — treat as uncovered for estimates. */
     noPublishedCapForCategory: boolean;
-    /** No mapping exists in CATEGORY_TO_CAP at all (e.g. banks/insurance/electricity). */
+    /** No cap available for this category at all (e.g. banks/insurance/electricity have no policy entry). */
     noCapMapping: boolean;
     status: CapStatus;
   }[] = [];
-  if (policyCaps) {
+  if (categoryCaps) {
     for (const { category, item } of packageItems) {
-      const capKey = CATEGORY_TO_CAP[category];
       const costType = CATEGORY_COST_TYPE[category] || 'one_time';
       const total = getItemCost(item, costType);
-      const cap =
-        capKey === 'housing_monthly_usd'
-          ? policyCaps.housing_monthly_usd
-          : capKey === 'movers_usd'
-            ? policyCaps.movers_usd
-            : capKey === 'schools_usd'
-              ? policyCaps.schools_usd
-              : 0;
-      const noCapMapping = !capKey;
-      const noPublishedCapForCategory = Boolean(hasPublishedPolicy && capKey && cap <= 0);
+      // AIQ-280 follow-up #4 — direct category-name lookup instead of the
+      // old hardcoded CATEGORY_TO_CAP intermediate. categoryCaps stores
+      // USD-normalised caps (currency conversion happened in the adapter).
+      const capLookup = categoryCaps.get(category);
+      const cap = capLookup ?? 0;
+      const noCapMapping = capLookup === undefined;
+      const noPublishedCapForCategory = Boolean(hasPublishedPolicy && !noCapMapping && cap <= 0);
       const covered = Math.min(total, cap);
       const extra = Math.max(0, total - cap);
       const status: CapStatus =
@@ -417,7 +448,7 @@ export const PackageSummary: React.FC<Props> = ({
             </Card>
           )}
 
-          {policyCaps && comparison.length > 0 && comparisonAvailable !== false && (
+          {categoryCaps && comparison.length > 0 && comparisonAvailable !== false && (
             <Card padding="lg">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <h3 className="font-semibold text-[#0b2b43]">HR Policy Comparison</h3>
@@ -604,7 +635,7 @@ export const PackageSummary: React.FC<Props> = ({
             </Card>
           )}
 
-          {!policyCaps && comparisonAvailable !== false && !capsLoading && (
+          {!categoryCaps && comparisonAvailable !== false && !capsLoading && (
             <p className="text-sm text-[#6b7280]">
               Policy caps could not be loaded. Cost comparison is based on estimated values from recommendations. View &quot;Assignment Package &amp; Limits&quot; for your company&apos;s policy summary.
             </p>

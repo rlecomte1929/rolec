@@ -45,6 +45,22 @@ export function convertUsdToDisplay(usd: number, displayCurrency: string): numbe
   return usd * mult;
 }
 
+/**
+ * Inverse of convertUsdToDisplay — convert an amount denominated in `fromCurrency`
+ * back to USD. Used by the PackageSummary refactor (AIQ-280 follow-up) to normalise
+ * policy caps from the budget-summary endpoint (which returns native cap currency)
+ * to USD for the existing PackageSummary comparison logic.
+ *
+ * Unknown currencies fall through as USD (multiplier 1) — same default as
+ * convertUsdToDisplay so the two helpers are symmetric.
+ */
+export function convertToUsd(amount: number, fromCurrency: string): number {
+  const cur = normalizeServicesCurrency(fromCurrency);
+  const mult = USD_TO[cur] ?? 1;
+  // mult is "1 USD = mult units of cur" so the inverse is amount / mult.
+  return mult === 0 ? amount : amount / mult;
+}
+
 export function formatServicesMoney(amount: number, currencyCode: string): string {
   const cur = normalizeServicesCurrency(currencyCode);
   const maxFrac = cur === 'JPY' ? 0 : 2;
