@@ -147,8 +147,8 @@ export interface CompanyProfileFormProps {
   onUploadLogo?: (file: File) => Promise<void>;
   /** Optional logo remove handler. If absent, the remove button is hidden. */
   onRemoveLogo?: () => Promise<void>;
-  /** Eyebrow path shown above the h1. */
-  eyebrow: string;
+  /** Eyebrow path shown above the h1. Omit to hide. */
+  eyebrow?: string;
   /** Main heading. */
   title: string;
   /** One-line description shown below the h1. */
@@ -347,7 +347,9 @@ export function CompanyProfileForm({
       {topSlot}
 
       <div className="mb-5">
-        <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">{eyebrow}</div>
+        {eyebrow && (
+          <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">{eyebrow}</div>
+        )}
         <div className="mt-1.5 flex items-baseline gap-3">
           <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">{title}</h1>
           {badge && (

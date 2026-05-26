@@ -72,10 +72,7 @@ export function ProviderGridV2Page() {
       <div className="px-6 py-6">
         {/* Header */}
         <div className="mb-5">
-          <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
-            ReloPass · /hr/provider-grid
-          </div>
-          <div className="mt-1.5 flex items-baseline gap-3">
+          <div className="flex items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Provider status</h1>
             <button
               type="button"

@@ -54,7 +54,6 @@ export function CompanyProfileV2Page() {
           onSave={handleSave}
           onUploadLogo={handleUploadLogo}
           onRemoveLogo={handleRemoveLogo}
-          eyebrow="ReloPass · /hr/company-profile"
           title="Company profile"
           subtitle="How your company appears to employees, providers, and relocation partners on ReloPass. Changes are saved to your company account."
         />
