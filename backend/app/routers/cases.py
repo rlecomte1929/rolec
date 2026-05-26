@@ -186,6 +186,33 @@ def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
         return _case_dto(case, draft)
 
 
+@router.patch("/{case_id}/relocationBasics", response_model=schemas.CaseDTO)
+def patch_case_relocation_basics(
+    case_id: str,
+    basics: schemas.RelocationBasicsDTO,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> schemas.CaseDTO:
+    """
+    Alias endpoint: accepts RelocationBasicsDTO and wraps it into CaseDraftDTO.
+    Resolves B17/WZ1a — PATCH /relocationBasics returned 405.
+    """
+    wrapped = schemas.CaseDraftDTO(relocationBasics=basics)
+    return patch_case(case_id, wrapped)
+
+
+@router.patch("/{case_id}/serviceSelections", response_model=schemas.CaseDTO)
+def patch_case_service_selections(
+    case_id: str,
+    body: schemas.CaseDraftDTO,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> schemas.CaseDTO:
+    """
+    Alias endpoint: accepts service selections payload.
+    Resolves B19/WZ2 — PATCH /serviceSelections returned 405.
+    """
+    return patch_case(case_id, body)
+
+
 @router.post("/{case_id}/research/start")
 def start_research(case_id: str):
     with SessionLocal() as db:
