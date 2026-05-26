@@ -41,16 +41,16 @@ const CONFIG = {
     admin:  { identifier: 'admin@relopass.com', password: 'Passw0rd!' },
     // ── Seeded personas — always exist in DB, login never fails ──────────────
     // Created/refreshed via POST /api/admin/seed-test-personas at run start.
-    seedHR:  { identifier: 'hr_seed@testco.com',   password: 'Passw0rd!' },
-    seedHR2: { identifier: 'hr2_seed@otherco.com',  password: 'Passw0rd!' },
-    seedEmp: { identifier: 'emp_seed@testco.com',   password: 'Passw0rd!' },
+    seedHR:  { identifier: 'romain+hr_seed@hotmail.com',   password: 'Passw0rd!' },
+    seedHR2: { identifier: 'romain+hr2_seed@hotmail.com',  password: 'Passw0rd!' },
+    seedEmp: { identifier: 'romain+emp_seed@hotmail.com',   password: 'Passw0rd!' },
     // Known company IDs matching the seed endpoint (deterministic UUIDs)
     seedHR_company_id:  'c1000000-0000-4000-8000-000000000001',
     seedHR2_company_id: 'c2000000-0000-4000-8000-000000000002',
     // ── Fresh registration accounts (smoke tests only, not used for functional flows) ──
-    newHR:  { first_name:'HR',  last_name:'TestRun', email:`hr_run_${RUN_EPOCH}@testco.com`,  password:'Passw0rd!', role:'HR'       },
-    newEmp: { first_name:'Emp', last_name:'TestRun', email:`emp_run_${RUN_EPOCH}@testco.com`, password:'Passw0rd!', role:'EMPLOYEE' },
-    newHR2: { first_name:'HR2', last_name:'OtherCo', email:`hr2_run_${RUN_EPOCH}@otherco.com`, password:'Passw0rd!', role:'HR'     },
+    newHR:  { first_name:'HR',  last_name:'TestRun', email:`romain+hr_run_${RUN_EPOCH}@hotmail.com`,  password:'Passw0rd!', role:'HR'       },
+    newEmp: { first_name:'Emp', last_name:'TestRun', email:`romain+emp_run_${RUN_EPOCH}@hotmail.com`, password:'Passw0rd!', role:'EMPLOYEE' },
+    newHR2: { first_name:'HR2', last_name:'OtherCo', email:`romain+hr2_run_${RUN_EPOCH}@hotmail.com`, password:'Passw0rd!', role:'HR'     },
   },
   // 8 personas — keyed by scenario ID
   PERSONAS: {
@@ -157,7 +157,7 @@ function section(name) { console.log(`\n══ ${name} ══`); }
 // ─────────────────────────────────────────────────────────────
 async function runCleanup() {
   if (!tokens.admin) { console.log('  ⚠ Cleanup skipped — no admin token'); return; }
-  console.log('\n── Pre-run cleanup (clearing previous @testco.com / @otherco.com test accounts) ──');
+  console.log('\n── Pre-run cleanup (clearing previous romain+*@hotmail.com test accounts) ──');
   const endpoints = [
     ['DELETE', '/api/admin/users/cleanup',  { email_domain: 'testco.com' }],
     ['POST',   '/api/admin/cleanup',         { domain: 'testco.com' }],
@@ -187,7 +187,7 @@ async function suiteAuth() {
   await runCleanup();
 
   // ── SEED: Create/refresh seeded test personas (admin-only, idempotent) ────
-  // This creates hr_seed@testco.com, emp_seed@testco.com, hr2_seed@otherco.com
+  // This creates romain+hr_seed@hotmail.com, romain+emp_seed@hotmail.com, romain+hr2_seed@hotmail.com
   // with all the correct DB associations so they can be used immediately.
   if (tokens.admin) {
     const seedR = await req('POST', '/api/admin/seed-test-personas', {}, tokens.admin);
@@ -199,7 +199,7 @@ async function suiteAuth() {
   r = await req('POST', '/api/auth/login', CONFIG.CREDS.seedHR);
   tokens.hr           = r.data?.token || null;
   tokens.hr_company_id = tokens.hr ? CONFIG.CREDS.seedHR_company_id : null;
-  record('AT2','Seeded HR login (hr_seed@testco.com)','Auth','200 + token',`${r.status}/token=${!!tokens.hr}`, r.ok && tokens.hr ? 'PASS':'FAIL', r.ms, r.error||`email=${CONFIG.CREDS.seedHR.identifier}`);
+  record('AT2','Seeded HR login (romain+hr_seed@hotmail.com)','Auth','200 + token',`${r.status}/token=${!!tokens.hr}`, r.ok && tokens.hr ? 'PASS':'FAIL', r.ms, r.error||`email=${CONFIG.CREDS.seedHR.identifier}`);
 
   // ── AT2b: Verify seeded HR already has company linked (smoke) ─────────────
   if (tokens.hr) {
@@ -219,7 +219,7 @@ async function suiteAuth() {
   r = await req('POST', '/api/auth/login', CONFIG.CREDS.seedEmp);
   tokens.emp    = r.data?.token || null;
   tokens.newEmp = tokens.emp;
-  record('AT3','Seeded Employee login (emp_seed@testco.com)','Auth','200 + token',`${r.status}/token=${!!tokens.emp}`, r.ok && tokens.emp ? 'PASS':'FAIL', r.ms, r.error||`email=${CONFIG.CREDS.seedEmp.identifier}`);
+  record('AT3','Seeded Employee login (romain+emp_seed@hotmail.com)','Auth','200 + token',`${r.status}/token=${!!tokens.emp}`, r.ok && tokens.emp ? 'PASS':'FAIL', r.ms, r.error||`email=${CONFIG.CREDS.seedEmp.identifier}`);
 
   // ── AT3_FRESH: Fresh employee registration smoke test ─────────────────────
   const freshEmpR = await req('POST', '/api/auth/register', CONFIG.CREDS.newEmp);
@@ -257,7 +257,7 @@ async function suiteCases() {
   let r = await req('GET', '/api/hr/cases', null, T);
   record('CT1','GET /api/hr/cases not 405 (B12)','Cases','≠405',`${r.status}`, r.status!==405 ? 'PASS':'FAIL', r.ms);
 
-  r = await req('POST', '/api/hr/cases', { first_name:'Smoke', last_name:`Test_${Date.now()}`, email:`smoke_${Date.now()}@testco.com` }, T);
+  r = await req('POST', '/api/hr/cases', { first_name:'Smoke', last_name:`Test_${Date.now()}`, email:`romain+smoke_${Date.now()}@hotmail.com` }, T);
   const caseId = r.data?.caseId;
   record('CT2','POST /api/hr/cases creates draft','Cases','200+caseId',`${r.status}/id=${caseId||'null'}`, r.ok && caseId ? 'PASS':'FAIL', r.ms, r.error||'');
 
@@ -359,7 +359,7 @@ async function suiteWizardPersistence() {
 
   // Create a dedicated case for wizard tests
   const wizCaseR = await req('POST', '/api/hr/cases', {
-    first_name:'Wizard', last_name:`Test_${Date.now()}`, email:`wizard_${Date.now()}@testco.com`
+    first_name:'Wizard', last_name:`Test_${Date.now()}`, email:`romain+wizard_${Date.now()}@hotmail.com`
   }, T);
   const wizCaseId = wizCaseR.data?.caseId || wizCaseR.data?.id || wizCaseR.data?.case_id;
   if (!wizCaseId) {
@@ -437,10 +437,10 @@ async function suiteRLSIsolation() {
     `hr2_email=${CONFIG.CREDS.seedHR2.identifier}`);
 
   // HR1 creates a case (Company A)
-  const c1R = await req('POST', '/api/hr/cases', { first_name:'RLS', last_name:'CaseA', email:`rls_a_${Date.now()}@testco.com` }, tokens.hr);
+  const c1R = await req('POST', '/api/hr/cases', { first_name:'RLS', last_name:'CaseA', email:`romain+rls_a_${Date.now()}@hotmail.com` }, tokens.hr);
   const caseAId = c1R.data?.caseId || c1R.data?.id;
   // HR2 creates a case (Company B)
-  const c2R = await req('POST', '/api/hr/cases', { first_name:'RLS', last_name:'CaseB', email:`rls_b_${Date.now()}@otherco.com` }, tokens.hr2);
+  const c2R = await req('POST', '/api/hr/cases', { first_name:'RLS', last_name:'CaseB', email:`romain+rls_b_${Date.now()}@hotmail.com` }, tokens.hr2);
   const caseBId = c2R.data?.caseId || c2R.data?.id;
 
   if (!caseAId || !caseBId) {
@@ -541,7 +541,7 @@ async function suiteXSSProtection() {
   const createR = await req('POST', '/api/hr/cases', {
     first_name: xssPayload,
     last_name:  'XSSTest',
-    email:      `xss_probe_${Date.now()}@testco.com`,
+    email:      `romain+xss_probe_${Date.now()}@hotmail.com`,
   }, T);
 
   const xssCaseId = createR.data?.caseId || createR.data?.id;
@@ -687,7 +687,7 @@ async function suitePersonaFlows(scenarioIds) {
     }
 
     const ts = Date.now();
-    const email = `${p.first_name.toLowerCase()}_${sid.toLowerCase()}_${ts}@testco.com`;
+    const email = `romain+${p.first_name.toLowerCase()}_${sid.toLowerCase()}_${ts}@hotmail.com`;
     const createR = await req('POST', '/api/hr/cases', { first_name: p.first_name, last_name: p.last_name, email }, T);
     if (!createR.ok || !createR.data?.caseId) {
       record(`${sid}_FLOW`, `${sid} (${p.first_name}): case creation failed`, 'Scenario', '201+caseId', `${createR.status}`, 'FAIL', createR.ms, createR.error||JSON.stringify(createR.data).slice(0,100));
@@ -788,7 +788,7 @@ async function suiteT13AdminOnboarding() {
     b9pass ? 'PASS' : r.status === 500 ? 'FAIL' : 'WARN', r.ms,
     r.status === 500 ? 'Still returning 500 — B9 not fixed' : r.ok ? `Assignment found (id=${probeId})` : r.status === 404 ? 'Endpoint works — 404 because no assignment at that ID' : `status=${r.status}`);
 
-  const newUserEmail = `onboard_t13_${Date.now()}@testco.com`;
+  const newUserEmail = `romain+onboard_t13_${Date.now()}@hotmail.com`;
   r = await req('POST', '/api/admin/users', { first_name:'Onboard', last_name:'Test', email: newUserEmail, role:'HR', company_id: null }, T);
   const adminCreateOk = r.ok;
   steps.push({ name:'admin_can_create_user (B2 API)', ok: adminCreateOk });
@@ -840,7 +840,7 @@ async function suiteT14FullStack() {
   const steps = [];
   let r;
 
-  r = await req('POST', '/api/hr/cases', { first_name:'CrossRole', last_name:'FullStack', email:`crossrole_t14_${Date.now()}@testco.com` }, hrToken);
+  r = await req('POST', '/api/hr/cases', { first_name:'CrossRole', last_name:'FullStack', email:`romain+crossrole_t14_${Date.now()}@hotmail.com` }, hrToken);
   const caseId = r.data?.id || r.data?.case_id || r.data?.caseId || null;
   const createOk = r.ok && !!caseId;
   steps.push({ name:'hr_creates_case', ok: createOk });

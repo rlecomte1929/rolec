@@ -1974,9 +1974,9 @@ def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
 
     Seeded accounts
     ───────────────
-    HR1  : hr_seed@testco.com   / Passw0rd!  — company "Test Co (Seed)"
-    HR2  : hr2_seed@otherco.com / Passw0rd!  — company "Other Corp (Seed)"
-    EMP  : emp_seed@testco.com  / Passw0rd!  — same company as HR1
+    HR1  : romain+hr_seed@hotmail.com   / Passw0rd!  — company "Test Co (Seed)"
+    HR2  : romain+hr2_seed@hotmail.com / Passw0rd!  — company "Other Corp (Seed)"
+    EMP  : romain+emp_seed@hotmail.com  / Passw0rd!  — same company as HR1
     """
     try:
         return _seed_test_personas_impl(user)
@@ -2020,9 +2020,9 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
         log.info("seed_test_personas users columns: %s", sorted(users_cols))
 
         for uid, email, role, name in [
-            (HR1_UID, "hr_seed@testco.com",   "HR",       "HR Seed"),
-            (HR2_UID, "hr2_seed@otherco.com",  "HR",       "HR2 Seed"),
-            (EMP_UID, "emp_seed@testco.com",   "EMPLOYEE", "Emp Seed"),
+            (HR1_UID, "romain+hr_seed@hotmail.com",   "HR",       "HR Seed"),
+            (HR2_UID, "romain+hr2_seed@hotmail.com",  "HR",       "HR2 Seed"),
+            (EMP_UID, "romain+emp_seed@hotmail.com",   "EMPLOYEE", "Emp Seed"),
         ]:
             u_cols = ["id", "email", "role"]
             u_vals: Dict[str, Any] = {"id": uid, "email": email, "role": role}
@@ -2058,9 +2058,9 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
         log.info("seed_test_personas profiles columns: %s", sorted(profile_cols))
 
         for uid, email, role, cid in [
-            (HR1_UID, "hr_seed@testco.com",   "hr",       TESTCO_CID),
-            (HR2_UID, "hr2_seed@otherco.com",  "hr",       OTHERCO_CID),
-            (EMP_UID, "emp_seed@testco.com",   "employee", TESTCO_CID),
+            (HR1_UID, "romain+hr_seed@hotmail.com",   "hr",       TESTCO_CID),
+            (HR2_UID, "romain+hr2_seed@hotmail.com",  "hr",       OTHERCO_CID),
+            (EMP_UID, "romain+emp_seed@hotmail.com",   "employee", TESTCO_CID),
         ]:
             # Build column list from what actually exists (schema varies)
             p_cols = ["id"]
@@ -2105,9 +2105,9 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
     try:
         from .app.services.supabase_auth_sync import create_auth_user_with_id as _create_auth_user
         for uid, email, name in [
-            (HR1_UID, "hr_seed@testco.com",   "HR Seed"),
-            (HR2_UID, "hr2_seed@otherco.com",  "HR2 Seed"),
-            (EMP_UID, "emp_seed@testco.com",   "Emp Seed"),
+            (HR1_UID, "romain+hr_seed@hotmail.com",   "HR Seed"),
+            (HR2_UID, "romain+hr2_seed@hotmail.com",  "HR2 Seed"),
+            (EMP_UID, "romain+emp_seed@hotmail.com",   "Emp Seed"),
         ]:
             ok = _create_auth_user(uid, email, SEED_PW, full_name=name)
             log.info("seed_test_personas auth sync uid=%s email=%s ok=%s", uid[:8], email[:3] + "***", ok)
@@ -2119,9 +2119,9 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "ok": True,
         "seeded": {
-            "hr1":  {"id": HR1_UID, "email": "hr_seed@testco.com",   "company_id": TESTCO_CID},
-            "hr2":  {"id": HR2_UID, "email": "hr2_seed@otherco.com", "company_id": OTHERCO_CID},
-            "emp":  {"id": EMP_UID, "email": "emp_seed@testco.com",  "company_id": TESTCO_CID},
+            "hr1":  {"id": HR1_UID, "email": "romain+hr_seed@hotmail.com",   "company_id": TESTCO_CID},
+            "hr2":  {"id": HR2_UID, "email": "romain+hr2_seed@hotmail.com", "company_id": OTHERCO_CID},
+            "emp":  {"id": EMP_UID, "email": "romain+emp_seed@hotmail.com",  "company_id": TESTCO_CID},
         },
     }
 
