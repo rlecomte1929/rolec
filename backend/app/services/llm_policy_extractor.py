@@ -46,7 +46,9 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime
+import time
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 
@@ -255,6 +257,7 @@ def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
         f"DOCUMENT (truncated={truncated}):\n{document_text}"
     )
 
+    call_started_at = time.time()
     try:
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
@@ -270,7 +273,17 @@ def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
             "llm_policy_extractor: Anthropic API call failed (%s); falling back to regex.",
             exc.__class__.__name__,
         )
+        _forward_to_langsmith(
+            model=model,
+            document_chars=len(document_text),
+            truncated=truncated,
+            latency_ms=int((time.time() - call_started_at) * 1000),
+            success=False,
+            error=exc.__class__.__name__,
+            benefits_count=0,
+        )
         return None
+    call_latency_ms = int((time.time() - call_started_at) * 1000)
 
     tool_input = _first_tool_input(message)
     if tool_input is None:
@@ -299,7 +312,7 @@ def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
             continue
         seen[key] = _normalize_benefit(raw)
 
-    return {
+    result = {
         "policy_meta": {
             "title": meta.get("title") or "Relocation Policy",
             "version": meta.get("version"),
@@ -311,6 +324,16 @@ def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
         "model": model,
         "truncated": truncated,
     }
+    _forward_to_langsmith(
+        model=model,
+        document_chars=len(document_text),
+        truncated=truncated,
+        latency_ms=call_latency_ms,
+        success=True,
+        error=None,
+        benefits_count=len(result["benefits"]),
+    )
+    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -358,3 +381,77 @@ def _clamp_confidence(value: Any) -> float:
     if f > 1:
         return 1.0
     return f
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Langsmith tracing (AIQ-285-followup)
+#
+# Defensive, fire-and-forget. Never raises. Skips silently when:
+#   - LANGSMITH_API_KEY is unset (most environments)
+#   - langsmith package is not installed
+#   - the Client.create_run call itself errors
+#
+# Same idiom as ai_trace_logger._forward_to_langsmith() — no LangChain
+# dependency, no global state, no rate-limiting concerns. We capture only
+# operational metadata: model, document size, truncation flag, latency,
+# success, benefit count. Raw policy text is NEVER sent (PII guardrail).
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _forward_to_langsmith(
+    *,
+    model: str,
+    document_chars: int,
+    truncated: bool,
+    latency_ms: int,
+    success: bool,
+    error: Optional[str],
+    benefits_count: int,
+) -> None:
+    """Push a single ``policy_extraction`` run to LangSmith.
+
+    All keyword args. Silent no-op when LANGSMITH_API_KEY is unset or the
+    SDK is missing. Failures inside the call are logged at DEBUG so the
+    main extraction flow is never blocked.
+    """
+    api_key = os.environ.get("LANGSMITH_API_KEY", "").strip()
+    if not api_key:
+        return
+
+    project = os.environ.get(
+        "LANGSMITH_PROJECT", "relopass-policy-extraction"
+    ).strip() or "relopass-policy-extraction"
+
+    try:
+        from langsmith import Client  # type: ignore
+    except ImportError:
+        logger.debug(
+            "llm_policy_extractor: langsmith SDK not installed; tracing skipped."
+        )
+        return
+
+    try:
+        client = Client(api_key=api_key)
+        now = datetime.now(timezone.utc)
+        client.create_run(
+            id=uuid.uuid4(),
+            name="policy_extraction",
+            run_type="llm",
+            project_name=project,
+            inputs={
+                "document_chars": document_chars,
+                "truncated": truncated,
+                "model": model,
+            },
+            outputs={
+                "success": success,
+                "benefits_count": benefits_count,
+                "latency_ms": latency_ms,
+                "error": error,
+            },
+            start_time=now,
+            end_time=now,
+            extra={"metadata": {"task_id": "AIQ-285"}},
+        )
+    except Exception:  # noqa: BLE001 — tracing must never block extraction
+        logger.debug("llm_policy_extractor: langsmith forward failed", exc_info=True)
