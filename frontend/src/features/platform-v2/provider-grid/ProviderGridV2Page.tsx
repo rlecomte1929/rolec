@@ -77,7 +77,6 @@ export function ProviderGridV2Page() {
           </div>
           <div className="mt-1.5 flex items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Provider status</h1>
-            <Pill className="bg-slate-100 text-slate-500 ring-slate-200" title="This view is in beta — data is accurate but the layout may change.">Beta</Pill>
             <button
               type="button"
               onClick={() => void fetchGrid()}
@@ -131,14 +130,6 @@ export function ProviderGridV2Page() {
 }
 
 // ── Local visual primitives (same idiom as CompaniesV2) ─────────────────────
-
-function Pill({ children, className = '', title }: { children: React.ReactNode; className?: string; title?: string }) {
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${className}`} title={title}>
-      {children}
-    </span>
-  );
-}
 
 interface KpiProps {
   label: string;

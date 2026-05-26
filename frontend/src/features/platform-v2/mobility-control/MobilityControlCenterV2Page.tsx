@@ -487,7 +487,6 @@ export function MobilityControlCenterV2Page() {
           </div>
           <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Mobility control center</h1>
-            <Pill className="bg-slate-100 text-slate-500 ring-slate-200" title="This view is in beta — data is accurate but the layout may change.">Beta</Pill>
             <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
