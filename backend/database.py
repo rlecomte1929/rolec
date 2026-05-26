@@ -12252,17 +12252,19 @@ class Database:
             if has_status:
                 clauses.append("(COALESCE(TRIM(LOWER(p.status)), 'active') <> 'inactive')")
         where = " AND " + " AND ".join(clauses) if clauses else ""
+        # B9b: p.created_at removed — column may not exist in production Supabase profiles
+        # table (schema drift). Ordering falls back to full_name-only to avoid
+        # ProgrammingError → 500. If created_at is later confirmed present, add it back.
         sql = f"""
             SELECT p.id, p.role, p.email, p.full_name, p.company_id,
                    'active' AS status,
-                   p.created_at,
                    c.name AS company_name,
                    (SELECT COUNT(*) FROM hr_users hu WHERE hu.profile_id = p.id) AS hr_link_count,
                    (SELECT COUNT(*) FROM employees e WHERE e.profile_id = p.id) AS employee_link_count
             FROM profiles p
             LEFT JOIN companies c ON c.id = p.company_id
             WHERE 1=1 {where}
-            ORDER BY p.full_name ASC NULLS LAST, p.created_at DESC
+            ORDER BY p.full_name ASC NULLS LAST
         """
         with self.engine.connect() as conn:
             rows = conn.execute(text(sql), params).fetchall()

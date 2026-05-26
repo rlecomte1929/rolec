@@ -64,16 +64,10 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: 'AI Engine',
-    minRole: 'HR',
-    items: [
-      { id: 'requirements-discovery', label: 'Requirements discovery', to: ROUTE_DEFS.hrPolicy.path, badge: { kind: 'static', variant: 'live' } },
-    ],
-  },
-  {
     label: 'HR Operations',
     minRole: 'HR',
     items: [
+      { id: 'requirements-discovery', label: 'Requirements discovery', to: ROUTE_DEFS.hrPolicy.path, badge: { kind: 'static', variant: 'live' } },
       { id: 'company-profile', label: 'Company profile', to: ROUTE_DEFS.hrCompanyProfile.path, exact: true },
       {
         id: 'mobility-control',

@@ -614,6 +614,28 @@ app.include_router(hr_resources_router.router)
 # [AUDIT-C2.3 Month-1] relocation_router.api_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] relocation_classify_router → moved to backend/app/main.py
 
+# B21-CORS: Catch-all OPTIONS handler to ensure preflight requests always return 200
+# with correct CORS headers. CORSMiddleware should intercept preflights first, but in
+# Starlette 0.41.x some route configurations can propagate 405 before the middleware
+# generates its response. This handler acts as a guaranteed backstop.
+@app.options("/{path:path}", include_in_schema=False)
+async def cors_preflight_handler(path: str, request: Request):
+    origin = request.headers.get("origin", "")
+    allowed = origin in default_origins or bool(
+        _cors_origin_pattern and _cors_origin_pattern.fullmatch(origin)
+    )
+    headers = {
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Request-ID",
+        "Access-Control-Max-Age": "86400",
+        "Vary": "Origin",
+    }
+    if allowed and origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return Response(status_code=200, headers=headers)
+
+
 @contextmanager
 def timed(span: str, request_id: Optional[str] = None):
   """
@@ -1858,7 +1880,14 @@ def list_people(
     user: Dict[str, Any] = Depends(require_admin),
 ):
     """Admin people list with company, role, and text filters. Returns admin-safe fields including company_name, status."""
-    people, summary = db.get_admin_people_index(company_id=company_id, query=query, role=role)
+    # B9b: guard against schema drift (e.g. missing column) that previously caused
+    # an unhandled ProgrammingError → 500. Return an empty-but-valid payload so the
+    # admin UI degrades gracefully and the error is surfaced in logs only.
+    try:
+        people, summary = db.get_admin_people_index(company_id=company_id, query=query, role=role)
+    except Exception as exc:
+        log.exception("list_people: DB query failed (schema drift?): %s", exc)
+        return {"people": [], "summary": {"count": 0, "orphans_without_company": 0}}
     db.log_audit(user["id"], "READ", "people", None, None, {"company_id": company_id, "role": role, "query": query})
     return {"people": people, "summary": summary}
 

@@ -46,7 +46,23 @@ interface FormState {
 const fieldClass =
   'w-full rounded-lg bg-[#1e293b] border border-[#334155] text-[#e2e8f0] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b82f6] placeholder-[#475569]';
 
+// appearance-none removes OS-native select chrome so bg/text CSS is respected on all platforms
+const selectClass =
+  'w-full appearance-none rounded-lg bg-[#1e293b] border border-[#334155] text-[#e2e8f0] px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-[#3b82f6] cursor-pointer';
+
 const labelClass = 'block text-sm font-medium text-[#cbd5e1] mb-1';
+
+// Wrapper that adds a custom dropdown chevron for appearance-none selects
+const SelectWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="relative">
+    {children}
+    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[#64748b]">
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    </span>
+  </div>
+);
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -201,29 +217,31 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
               {loadingAssignments ? (
                 <p className="text-[#64748b] text-sm py-2">Loading cases…</p>
               ) : (
-                <select
-                  id="imm-case-select"
-                  value={form.caseId}
-                  onChange={(e) => handleCaseSelect(e.target.value)}
-                  required
-                  className={fieldClass}
-                  aria-label="Select relocation case"
-                >
-                  <option value="">Select a case…</option>
-                  {assignments.map((a) => (
-                    <option key={a.caseId} value={a.caseId}>
-                      {[
-                        a.employeeFirstName,
-                        a.employeeLastName,
-                        a.case?.home_country && a.case?.host_country
-                          ? `(${a.case.home_country} → ${a.case.host_country})`
-                          : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ') || a.caseId}
-                    </option>
-                  ))}
-                </select>
+                <SelectWrapper>
+                  <select
+                    id="imm-case-select"
+                    value={form.caseId}
+                    onChange={(e) => handleCaseSelect(e.target.value)}
+                    required
+                    className={selectClass}
+                    aria-label="Select relocation case"
+                  >
+                    <option value="">Select a case…</option>
+                    {assignments.map((a) => (
+                      <option key={a.caseId} value={a.caseId}>
+                        {[
+                          a.employeeFirstName,
+                          a.employeeLastName,
+                          a.case?.home_country && a.case?.host_country
+                            ? `(${a.case.home_country} → ${a.case.host_country})`
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ') || a.caseId}
+                      </option>
+                    ))}
+                  </select>
+                </SelectWrapper>
               )}
             </div>
 
@@ -248,23 +266,25 @@ export const ImmigrationCaseCreatePage: React.FC = () => {
               <label htmlFor="imm-permit-type" className={labelClass}>
                 Permit type <span className="text-red-400">*</span>
               </label>
-              <select
-                id="imm-permit-type"
-                value={form.permitType}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, permitType: e.target.value as PermitType }))
-                }
-                required
-                className={fieldClass}
-                aria-label="Select permit type"
-              >
-                <option value="">Select permit type…</option>
-                {(Object.keys(PERMIT_TYPE_LABELS) as PermitType[]).map((k) => (
-                  <option key={k} value={k}>
-                    {PERMIT_TYPE_LABELS[k]}
-                  </option>
-                ))}
-              </select>
+              <SelectWrapper>
+                <select
+                  id="imm-permit-type"
+                  value={form.permitType}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, permitType: e.target.value as PermitType }))
+                  }
+                  required
+                  className={selectClass}
+                  aria-label="Select permit type"
+                >
+                  <option value="">Select permit type…</option>
+                  {(Object.keys(PERMIT_TYPE_LABELS) as PermitType[]).map((k) => (
+                    <option key={k} value={k}>
+                      {PERMIT_TYPE_LABELS[k]}
+                    </option>
+                  ))}
+                </select>
+              </SelectWrapper>
             </div>
 
             {/* Immigration partner */}

@@ -77,7 +77,7 @@ const MOCK_REQUESTS: ExcRequest[] = [
     unread: true,
     audit: [
       { kind: 'submit', who: 'Marc Bouchard', what: 'Submitted exception request for International school.', when: '2h ago · 09:23 CET' },
-      { kind: 'ai',     who: 'ReloPass AI',   what: 'Classified · "Tier 2 escalation · school benefit". Precedent: 73% approved.', when: '2h ago · 09:23 CET' },
+      { kind: 'ai',     who: 'System',        what: 'Classified · "Tier 2 escalation · school benefit". Precedent: 73% approved.', when: '2h ago · 09:23 CET' },
     ],
   },
   {
@@ -115,7 +115,7 @@ const MOCK_REQUESTS: ExcRequest[] = [
     unread: false,
     audit: [
       { kind: 'submit',  who: 'Lucas Reyes',   what: 'Submitted timeline-extension request.', when: '3d ago · 11:10 PST' },
-      { kind: 'ai',      who: 'ReloPass AI',   what: 'Cross-referenced USCIS processing data. L-1A premium queue at p95 = 11 weeks.', when: '3d ago · 11:11 PST' },
+      { kind: 'ai',      who: 'System',        what: 'Cross-referenced USCIS processing data. L-1A premium queue at p95 = 11 weeks.', when: '3d ago · 11:11 PST' },
       { kind: 'approve', who: 'Helena Müller', what: 'Approved with note.', quote: 'Approved — USCIS L-1A delays are well-documented this quarter.', when: '2d ago · 08:30 CET' },
     ],
   },
