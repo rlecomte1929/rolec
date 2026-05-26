@@ -39,7 +39,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 
 from ..auth_deps import require_admin_or_hr
 from ..services.hris_token_crypto import decrypt_token
-from ...services.supabase_client import get_supabase_admin_client
+from ..services.supabase_client import get_supabase_admin_client
 
 log = logging.getLogger(__name__)
 

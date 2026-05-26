@@ -182,7 +182,7 @@ def _advisor_matches_corridor(advisor: Dict[str, Any], dest: str, origin: str) -
 def _get_preferred_advisor_ids_for_company(company_id: str) -> set:
     """Return set of advisor IDs that are preferred for this company."""
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         result = (
             sb.table("preferred_advisors")
@@ -200,7 +200,7 @@ def _get_preferred_advisor_ids_for_company(company_id: str) -> set:
 def _get_db_advisors(dest: str, origin: str, purpose: str) -> List[Dict[str, Any]]:
     """Attempt to fetch advisors from Supabase immigration_advisors table."""
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         result = (
             sb.table("immigration_advisors")
@@ -291,7 +291,7 @@ def get_advisor(
     """GAP 4: Fetch a single advisor profile by ID."""
     # Try DB first
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         result = sb.table("immigration_advisors").select("*").eq("id", advisor_id).maybe_single().execute()
         if result and result.data:

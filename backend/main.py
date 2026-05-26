@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 # from the audit (phone, IBAN, passport, SSN, email/ID) out of every
 # rendered log line — replaces the brittle per-callsite masking that
 # previously gated this.
-from .services.pii_log_filter import install_pii_log_filter  # noqa: E402
+from .app.services.pii_log_filter import install_pii_log_filter  # noqa: E402
 install_pii_log_filter()
 
 # Configure observability (Sentry + structured logging) before anything else
@@ -52,20 +52,20 @@ from .schemas import (
     UpdateProfilePhotoRequest, PolicyExceptionRequest, ComplianceActionRequest,
     AddEvidenceRequest, AddEvidenceResponse,
 )
-from .services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
-from .services.guidance_pack_service import generate_guidance_pack
-from .services.policy_adapter import normalize_policy_caps
-from .services.policy_extractor import extract_policy_from_bytes
+from .app.services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
+from .app.services.guidance_pack_service import generate_guidance_pack
+from .app.services.policy_adapter import normalize_policy_caps
+from .app.services.policy_extractor import extract_policy_from_bytes
 from .app.services.timeline_service import compute_default_milestones, compute_timeline_summary
 from .hr_case_readiness_view import build_intake_checklist_items, build_hr_case_readiness_ui
-from .services.country_resources import (
+from .app.services.country_resources import (
     build_profile_context,
     get_personalization_hints,
     get_default_section_content,
     RESOURCE_SECTIONS,
     SECTION_LABELS,
 )
-from .services.rkg_resources import (
+from .app.services.rkg_resources import (
     get_resource_context,
     get_country_resources as rkg_get_country_resources,
     get_country_events as rkg_get_country_events,
@@ -78,9 +78,9 @@ from .app.services.requirements_sufficiency import compute_requirements_sufficie
 from .db_config import DATABASE_URL as _db_url, get_masked_db_log_line
 log.info("Startup DB config (user/host only, no password): %s", get_masked_db_log_line())
 from .database import db, Database
-from .services.policy_config_matrix_service import PolicyConfigMatrixService
+from .app.services.policy_config_matrix_service import PolicyConfigMatrixService
 from .schemas_policy_caps import CapsCompareRequest
-from .services.policy_config_targeting import (
+from .app.services.policy_config_targeting import (
     normalize_assignment_type,
     normalize_family_status,
     validate_optional_query_assignment_type,
@@ -89,21 +89,21 @@ from .services.policy_config_targeting import (
 )
 
 policy_config_matrix_svc = PolicyConfigMatrixService(db)
-from .services.unified_assignment_creation import create_assignment_with_contact_and_invites
-from .services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
-from .services.employee_case_person_service import ensure_employee_case_person_for_assignment
-from .services.passport_case_document_sync_service import ensure_passport_case_document_for_assignment
+from .app.services.unified_assignment_creation import create_assignment_with_contact_and_invites
+from .app.services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
+from .app.services.employee_case_person_service import ensure_employee_case_person_for_assignment
+from .app.services.passport_case_document_sync_service import ensure_passport_case_document_for_assignment
 from .identity_errors import IdentityErrorCode, err_detail
 from .identity_observability import (
     identity_event,
     principal_fingerprint,
     principal_fingerprint_from_login_identifier,
 )
-from .services.assignment_claim_link_service import reconcile_pending_assignment_claims
-from .services.employee_assignment_overview import build_employee_assignment_overview
-from .services.employee_policy_assistant_service import employee_policy_assistant_query_response_dict
-from .services.hr_policy_assistant_service import hr_policy_assistant_query_response_dict
-from .services.explicit_pending_link_service import (
+from .app.services.assignment_claim_link_service import reconcile_pending_assignment_claims
+from .app.services.employee_assignment_overview import build_employee_assignment_overview
+from .app.services.employee_policy_assistant_service import employee_policy_assistant_query_response_dict
+from .app.services.hr_policy_assistant_service import hr_policy_assistant_query_response_dict
+from .app.services.explicit_pending_link_service import (
     execute_pending_explicit_link,
     finalize_assignment_claim_attach,
     PENDING_LINK_COMPANY_MISMATCH,
@@ -123,11 +123,11 @@ from .policy_engine import PolicyEngine
 from .app.db import init_db, SessionLocal
 from .app import crud as app_crud
 from .relocation_plan_view_schemas import RelocationPlanViewResponse
-from .services.relocation_plan_view_service import (
+from .app.services.relocation_plan_view_service import (
     get_relocation_plan_view_for_case_assignment,
     invalidate_relocation_plan_cache,
 )
-from .services.events_tracker import track as track_event  # FOUNDATION-1C
+from .app.services.events_tracker import track as track_event  # FOUNDATION-1C
 from .app.routers import auth as auth_router
 from .app.routers import cases as cases_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
@@ -201,7 +201,7 @@ DISABLE_STARTUP_SEED = os.getenv("DISABLE_STARTUP_SEED", "").lower() in ("1", "t
 
 
 def _get_supabase_admin_client():
-    from .services.supabase_client import get_supabase_admin_client
+    from .app.services.supabase_client import get_supabase_admin_client
 
     return get_supabase_admin_client()
 
@@ -330,7 +330,7 @@ def _run_runtime_startup_initialization() -> None:
     )
 
     def _storage_diag() -> None:
-        from .services.policy_storage_health import log_startup_storage_diagnostic
+        from .app.services.policy_storage_health import log_startup_storage_diagnostic
         log_startup_storage_diagnostic(db)
 
     _run_startup_step_with_timeout("policy_storage_diag", _storage_diag, timeout_s=30)
@@ -339,7 +339,7 @@ def _run_runtime_startup_initialization() -> None:
     # the previous process exited. Without this they stay stuck in-flight
     # forever and the upload idempotency guard (see #7) blocks retries.
     def _reconcile() -> None:
-        from .services.policy_ingest_reconciler import reconcile_orphaned_policy_ingest_jobs
+        from .app.services.policy_ingest_reconciler import reconcile_orphaned_policy_ingest_jobs
         summary = reconcile_orphaned_policy_ingest_jobs(db, actor_label="startup")
         if summary.get("failed"):
             log.warning(
@@ -666,8 +666,8 @@ def supabase_health(probe: int = 0):
 
     # Live probe — bounded by the same timeout as the auth sync path.
     import concurrent.futures
-    from .services.supabase_auth_sync import _SUPABASE_CALL_TIMEOUT_S, _call_with_timeout
-    from .services.supabase_client import get_supabase_admin_client
+    from .app.services.supabase_auth_sync import _SUPABASE_CALL_TIMEOUT_S, _call_with_timeout
+    from .app.services.supabase_client import get_supabase_admin_client
 
     try:
         client = get_supabase_admin_client()
@@ -1947,7 +1947,7 @@ def create_person(
     # B2 fix: send Supabase Auth invite email so the created user can log in.
     # Previously the profile was created silently with no way to set a password.
     # invite_admin_created_user is best-effort and never raises.
-    from .services.supabase_auth_sync import invite_admin_created_user as _invite
+    from .app.services.supabase_auth_sync import invite_admin_created_user as _invite
     _app_url = os.environ.get("APP_URL", "https://relopass.com")
     invite_sent = _invite(
         email,
@@ -2103,7 +2103,7 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
     # Supabase Auth doesn't know about local-DB-only users.
     log.info("seed_test_personas step 6: supabase auth sync")
     try:
-        from .services.supabase_auth_sync import create_auth_user_with_id as _create_auth_user
+        from .app.services.supabase_auth_sync import create_auth_user_with_id as _create_auth_user
         for uid, email, name in [
             (HR1_UID, "hr_seed@testco.com",   "HR Seed"),
             (HR2_UID, "hr2_seed@otherco.com",  "HR2 Seed"),
@@ -2835,7 +2835,7 @@ def patch_admin_policy(
         version = db.get_policy_version(vid)
         if not version or version.get("policy_id") != policy_id:
             raise HTTPException(status_code=400, detail="Version not found or does not belong to this policy")
-        from .services.policy_publish_gate import require_employee_publishable_policy_version
+        from .app.services.policy_publish_gate import require_employee_publishable_policy_version
 
         require_employee_publishable_policy_version(db, vid)
         db.archive_other_published_versions(policy_id, vid)
@@ -2986,7 +2986,7 @@ def list_admin_message_threads(
         hr_threads = []
     if not thread_type or thread_type == "collaboration":
         try:
-            from .services.collaboration_service import list_all_threads
+            from .app.services.collaboration_service import list_all_threads
             collab_threads = list_all_threads(
                 user.get("id", ""),
                 target_type=None,
@@ -3794,7 +3794,7 @@ def _dispatch_hr_assign_side_effects(
     on failure — the user has already received the assignment_id/invite_token
     response by the time this fires.
     """
-    from .services.unified_assignment_creation import run_assignment_post_creation_hooks
+    from .app.services.unified_assignment_creation import run_assignment_post_creation_hooks
 
     def _run() -> None:
         run_assignment_post_creation_hooks(db, assignment_id, request_id=request_id)
@@ -4132,7 +4132,7 @@ def _sanitize_assignment_row_dict(row: Optional[Dict[str, Any]]) -> Optional[Dic
     """JSON-safe case_assignments row (Postgres may return UUID/datetime-like values)."""
     if not row:
         return row
-    from .services.employee_assignment_overview import _json_scalar
+    from .app.services.employee_assignment_overview import _json_scalar
 
     return {k: _json_scalar(v) for k, v in row.items()}
 
@@ -6201,7 +6201,7 @@ def get_hr_resolved_policy(
     if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
 
-    from .services.policy_resolution import resolve_policy_for_assignment
+    from .app.services.policy_resolution import resolve_policy_for_assignment
     case_id = assignment.get("case_id")
     case = db.get_relocation_case(case_id) if case_id else None
     profile = None
@@ -6247,7 +6247,7 @@ def recompute_resolved_policy(
     if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
 
-    from .services.policy_resolution import resolve_policy_for_assignment
+    from .app.services.policy_resolution import resolve_policy_for_assignment
     case_id = assignment.get("case_id")
     case = db.get_relocation_case(case_id) if case_id else None
     profile = None
@@ -6944,7 +6944,7 @@ def _hr_publish_policy_version(
     _require_policy_access(user, policy)
     company_id = (policy or {}).get("company_id") if policy else None
     try:
-        from .services.policy_pipeline_analytics import (
+        from .app.services.policy_pipeline_analytics import (
             emit_policy_publish_completed,
             emit_policy_publish_failed,
             emit_policy_publish_started,
@@ -6960,13 +6960,13 @@ def _hr_publish_policy_version(
         )
     except Exception:
         pass
-    from .services.policy_publish_gate import require_employee_publishable_policy_version
+    from .app.services.policy_publish_gate import require_employee_publishable_policy_version
 
     try:
         require_employee_publishable_policy_version(db, policy_version_id)
     except HTTPException as gate_exc:
         try:
-            from .services.policy_pipeline_analytics import emit_policy_publish_failed
+            from .app.services.policy_pipeline_analytics import emit_policy_publish_failed
 
             emit_policy_publish_failed(
                 request_id=request_id,
@@ -6985,7 +6985,7 @@ def _hr_publish_policy_version(
         db.archive_other_published_versions(policy_id, policy_version_id)
         db.update_policy_version_status(policy_version_id, "published")
         try:
-            from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+            from .app.services.policy_comparison_readiness import invalidate_comparison_readiness_cache
 
             invalidate_comparison_readiness_cache(policy_version_id)
         except Exception:
@@ -6993,7 +6993,7 @@ def _hr_publish_policy_version(
         updated = db.get_policy_version(policy_version_id) or {}
     except Exception as exc:
         try:
-            from .services.policy_pipeline_analytics import emit_policy_publish_failed
+            from .app.services.policy_pipeline_analytics import emit_policy_publish_failed
 
             emit_policy_publish_failed(
                 request_id=request_id,
@@ -7017,7 +7017,7 @@ def _hr_publish_policy_version(
         publish_source,
     )
     try:
-        from .services.policy_pipeline_analytics import emit_policy_publish_completed
+        from .app.services.policy_pipeline_analytics import emit_policy_publish_completed
 
         emit_policy_publish_completed(
             request_id=request_id,
@@ -7034,7 +7034,7 @@ def _hr_publish_policy_version(
 
 def _map_storage_exception_to_response(exc: Exception, bucket: str) -> tuple[str, str]:
     """Return (error_code, user_safe_message). No secrets."""
-    from .services.policy_storage_health import (
+    from .app.services.policy_storage_health import (
         STORAGE_MISSING_SERVICE_ROLE,
         STORAGE_BUCKET_NOT_FOUND,
         STORAGE_ACCESS_DENIED,
@@ -7069,8 +7069,8 @@ def _run_policy_document_ingest_background(
     extraction_failed = False
     num_clauses = 0
     try:
-        from .services.policy_document_intake import process_uploaded_document
-        from .services.policy_pipeline_analytics import (
+        from .app.services.policy_document_intake import process_uploaded_document
+        from .app.services.policy_pipeline_analytics import (
             emit_policy_classify_completed,
             emit_policy_classify_failed,
             emit_policy_classify_started,
@@ -7130,7 +7130,7 @@ def _run_policy_document_ingest_background(
                 pass
             if result.get("raw_text"):
                 try:
-                    from .services.policy_document_clauses import segment_document_from_raw_text
+                    from .app.services.policy_document_clauses import segment_document_from_raw_text
 
                     policy_segment_ctx = {
                         "id": doc_id,
@@ -7163,7 +7163,7 @@ def _run_policy_document_ingest_background(
             request_id=request_id,
         )
         try:
-            from .services.policy_pipeline_analytics import emit_policy_classify_failed
+            from .app.services.policy_pipeline_analytics import emit_policy_classify_failed
 
             emit_policy_classify_failed(
                 request_id=request_id,
@@ -7327,7 +7327,7 @@ def upsert_assignment_services(
         updated = db.list_case_services(assignment["id"])
         invalidate_relocation_plan_cache(case_id=case_id, assignment_id=assignment["id"])
         try:
-            from .services.analytics_service import emit_event, EVENT_SERVICES_SELECTED
+            from .app.services.analytics_service import emit_event, EVENT_SERVICES_SELECTED
             selected = [s["service_key"] for s in items if s.get("selected")]
             emit_event(
                 EVENT_SERVICES_SELECTED,
@@ -7484,7 +7484,7 @@ def upsert_service_answers(
             request_id, effective_case_id, assignment_id, dur_ms,
         )
         try:
-            from .services.analytics_service import emit_event, EVENT_SERVICES_ANSWERS_SAVED
+            from .app.services.analytics_service import emit_event, EVENT_SERVICES_ANSWERS_SAVED
             emit_event(
                 EVENT_SERVICES_ANSWERS_SAVED,
                 request_id=request_id,
@@ -7561,7 +7561,7 @@ def create_rfq(
         raise HTTPException(status_code=500, detail="RFQ creation failed. Check logs for details.")
 
     try:
-        from .services.analytics_service import (
+        from .app.services.analytics_service import (
             emit_event,
             EVENT_RFQ_CREATED,
             EVENT_SUPPLIER_SELECTED,
@@ -7638,7 +7638,7 @@ def list_quotes_for_rfq(
     quotes = db.list_quotes_for_rfq(rfq_id, request_id=getattr(req.state, "request_id", None))
     if comparison and len(quotes) >= 2:
         try:
-            from .services.analytics_service import emit_event, EVENT_QUOTE_COMPARED
+            from .app.services.analytics_service import emit_event, EVENT_QUOTE_COMPARED
             emit_event(
                 EVENT_QUOTE_COMPARED,
                 request_id=getattr(req.state, "request_id", None),
@@ -7669,7 +7669,7 @@ def accept_quote(
     if not updated:
         raise HTTPException(status_code=404, detail="Quote not found")
     try:
-        from .services.analytics_service import emit_event, EVENT_QUOTE_ACCEPTED
+        from .app.services.analytics_service import emit_event, EVENT_QUOTE_ACCEPTED
         emit_event(
             EVENT_QUOTE_ACCEPTED,
             request_id=getattr(req.state, "request_id", None),
@@ -7754,7 +7754,7 @@ def submit_vendor_quote(
         request_id=request_id,
     )
     try:
-        from .services.analytics_service import emit_event, EVENT_QUOTE_RECEIVED
+        from .app.services.analytics_service import emit_event, EVENT_QUOTE_RECEIVED
         emit_event(
             EVENT_QUOTE_RECEIVED,
             request_id=request_id,
@@ -7790,7 +7790,7 @@ def _finalize_employee_policy_resolution(
     telemetry: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Attach comparison_readiness / comparison_available for employee policy consumers."""
-    from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
+    from .app.services.policy_comparison_readiness import evaluate_version_comparison_readiness
 
     if not out.get("has_policy"):
         out["comparison_readiness"] = {
@@ -7811,7 +7811,7 @@ def _finalize_employee_policy_resolution(
     vid_enrich = out.get("version_id") or (out.get("version") or {}).get("id")
     if out.get("benefits") and vid_enrich:
         try:
-            from .services.policy_rule_comparison_readiness import enrich_resolved_benefits_with_rule_comparison
+            from .app.services.policy_rule_comparison_readiness import enrich_resolved_benefits_with_rule_comparison
 
             out["benefits"] = enrich_resolved_benefits_with_rule_comparison(
                 db, str(vid_enrich), list(out["benefits"])
@@ -7826,7 +7826,7 @@ def _emit_employee_policy_telemetry(out: Dict[str, Any], telemetry: Optional[Dic
     if not telemetry:
         return
     try:
-        from .services.policy_pipeline_analytics import record_employee_policy_resolution
+        from .app.services.policy_pipeline_analytics import record_employee_policy_resolution
 
         record_employee_policy_resolution(
             request_id=telemetry.get("request_id"),
@@ -7860,13 +7860,13 @@ def _resolve_published_policy_for_employee(
 
     read_only: do not create cases or back-fill company_id on profile/case (GET employee policy paths).
     """
-    from .services.policy_resolution import (
+    from .app.services.policy_resolution import (
         resolve_policy_for_assignment,
         collect_company_id_candidates_for_assignment,
         find_first_published_company_policy,
         extract_resolution_context,
     )
-    from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
+    from .app.services.policy_comparison_readiness import evaluate_version_comparison_readiness
 
     assignment = _require_assignment_visibility(assignment_id, user)
     case_id = assignment.get("case_id")
@@ -7936,7 +7936,7 @@ def _resolve_published_policy_for_employee(
     candidates = collect_company_id_candidates_for_assignment(db, assignment, case)
     pub = find_first_published_company_policy(db, candidates) if candidates else None
     if not pub:
-        from .services.employee_policy_matrix_bridge import find_published_matrix_version, build_matrix_assignment_package
+        from .app.services.employee_policy_matrix_bridge import find_published_matrix_version, build_matrix_assignment_package
 
         ctx = extract_resolution_context(assignment, case, profile, employee_profile)
         search_company_ids = list(candidates) if candidates else []
@@ -8395,8 +8395,8 @@ def get_employee_assignment_entitlements(
     entitlement rows. Read-only; does not fabricate caps.
     """
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
-    from .services.employee_entitlement_read_model import build_employee_entitlement_read_model
-    from .services.employee_entitlement_serializer import serialize_employee_entitlement_payload
+    from .app.services.employee_entitlement_read_model import build_employee_entitlement_read_model
+    from .app.services.employee_entitlement_serializer import serialize_employee_entitlement_payload
 
     try:
         assignment = _require_assignment_visibility(assignment_id, user)
@@ -8474,7 +8474,7 @@ def get_employee_policy_envelope(
     if not data.get("benefits"):
         return data
     # Map to envelope shape: included, capped, excluded, approval-required
-    from .services.policy_taxonomy import get_benefit_meta
+    from .app.services.policy_taxonomy import get_benefit_meta
     envelopes = []
     for b in data["benefits"]:
         meta = get_benefit_meta(b.get("benefit_key", ""))
@@ -8509,7 +8509,7 @@ def get_employee_policy_service_comparison(
     slice: rule ``comparison_readiness`` + envelope status; no fabricated deltas).
     """
     _ = _require_assignment_visibility(assignment_id, user)
-    from .services.policy_service_comparison import compute_policy_service_comparison
+    from .app.services.policy_service_comparison import compute_policy_service_comparison
     return compute_policy_service_comparison(
         db, assignment_id, include_diagnostics=False, employee_gate=True
     )
@@ -8527,7 +8527,7 @@ def post_employee_service_comparison_engine(
     "estimated_cost", "currency", ... }, ... ] }``. Same auth as policy-service-comparison.
     """
     _ = _require_assignment_visibility(assignment_id, user)
-    from .services.policy_service_comparison import compute_policy_service_comparison
+    from .app.services.policy_service_comparison import compute_policy_service_comparison
 
     payload = body or {}
     raw = payload.get("selected_services")
@@ -8560,7 +8560,7 @@ def get_hr_policy_service_comparison(
         raise HTTPException(status_code=404, detail="Assignment not found")
     if not _hr_can_access_assignment(assignment, user):
         raise HTTPException(status_code=403, detail="Not authorized for this assignment")
-    from .services.policy_service_comparison import compute_policy_service_comparison
+    from .app.services.policy_service_comparison import compute_policy_service_comparison
     return compute_policy_service_comparison(db, assignment_id, assignment=assignment, include_diagnostics=True)
 
 
@@ -8601,7 +8601,7 @@ def get_employee_services_policy_context(
             "source": "resolved_assignment_policy",
         }
 
-    from .services.employee_services_policy_context import build_employee_services_policy_context
+    from .app.services.employee_services_policy_context import build_employee_services_policy_context
 
     payload = build_employee_services_policy_context(result)
     pol = result.get("policy")
@@ -8628,8 +8628,8 @@ def get_assignment_policy_budget(
     employee see identical numbers.
     """
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
-    from .services.policy_adapter import caps_from_resolved_benefits, DEFAULT_CURRENCY
-    from .services.fx_service import convert_usd_to_display, normalize_display_currency
+    from .app.services.policy_adapter import caps_from_resolved_benefits, DEFAULT_CURRENCY
+    from .app.services.fx_service import convert_usd_to_display, normalize_display_currency
 
     try:
         result = _resolve_published_policy_for_employee(assignment_id, user, request_id, read_only=True)
@@ -8855,7 +8855,7 @@ def post_employee_policy_session_export_pdf(
     ]
 
     try:
-        from .services.policy_session_pdf import build_policy_session_pdf
+        from .app.services.policy_session_pdf import build_policy_session_pdf
         pdf_bytes = build_policy_session_pdf(
             turns_dicts,
             employee_name=employee_name,
@@ -8979,7 +8979,7 @@ def post_policy_assistant_rag_query(
     }
 
     try:
-        from .services.policy_assistant_rag_engine import answer_policy_question
+        from .app.services.policy_assistant_rag_engine import answer_policy_question
         result = answer_policy_question(
             company_id=str(company_id),
             user_id=str(user.get("id") or ""),
@@ -9022,14 +9022,14 @@ def post_policy_assistant_analytics_beacon(
     surface label, source enum, status enum, booleans, request_id only.
     """
     request_id = getattr(req.state, "request_id", None) or str(uuid.uuid4())
-    from .services.policy_assistant_analytics import (
+    from .app.services.policy_assistant_analytics import (
         emit_assistant_follow_up_clicked,
         emit_assistant_opened,
         emit_assistant_question_submitted,
         emit_assistant_answer_received,
         emit_assistant_dismissed,
     )
-    from .services.policy_assistant_contract import PolicyAssistantRoleScope
+    from .app.services.policy_assistant_contract import PolicyAssistantRoleScope
 
     role_upper = (user.get("role") or "").upper()
     rs = PolicyAssistantRoleScope.HR if role_upper == "HR" else PolicyAssistantRoleScope.EMPLOYEE
@@ -10265,7 +10265,7 @@ def get_employee_policy_caps(
     regardless of who's calling. Existing `*_usd` fields are preserved for
     backward compatibility (T1.4 from Sprint 2 plan).
     """
-    from .services.fx_service import convert_usd_to_display, normalize_display_currency
+    from .app.services.fx_service import convert_usd_to_display, normalize_display_currency
 
     policy = policy_engine.load_policy()
     caps = policy.get("caps", {})
@@ -10390,7 +10390,7 @@ def hr_initialize_company_policy_from_template(
     if not company_id:
         raise HTTPException(status_code=400, detail="User missing company association")
 
-    from .services.policy_company_policy_template_init import (
+    from .app.services.policy_company_policy_template_init import (
         StarterPolicyTemplateInitError,
         initialize_company_policy_from_starter_template,
     )
@@ -10535,7 +10535,7 @@ def policy_documents_health(user: Dict[str, Any] = Depends(require_role(UserRole
     Returns: supabase_project_ref, database_project_ref, project_refs_match,
     bucket_probe (list_buckets, list_objects, diagnosis), table checks.
     """
-    from .services.policy_storage_health import check_policy_storage_health
+    from .app.services.policy_storage_health import check_policy_storage_health
     health = check_policy_storage_health(db)
     return health
 
@@ -10553,7 +10553,7 @@ async def upload_policy_document(
     When admin is viewing a company's policy workspace, pass company_id so the document is stored for that company.
     Stages: A.validate -> B.storage -> C.db_insert -> D.queue_background_ingest -> E.return
     """
-    from .services.policy_storage_health import (
+    from .app.services.policy_storage_health import (
         check_policy_storage_health,
         STORAGE_MISSING_SERVICE_ROLE,
         STORAGE_BUCKET_NOT_FOUND,
@@ -10581,7 +10581,7 @@ async def upload_policy_document(
                 request_id=request_id,
             )
         company_id = cid.strip()
-        from .services.policy_assistant_access import require_company_access
+        from .app.services.policy_assistant_access import require_company_access
 
         require_company_access(user, company_id, db)
     except HTTPException:
@@ -10641,8 +10641,8 @@ async def upload_policy_document(
     # fires BEFORE storage upload so rejected files never leave a trail
     # in Supabase storage.
     try:
-        from .services.policy_filetype import validate_upload_bytes
-        from .services.policy_intake_errors import (
+        from .app.services.policy_filetype import validate_upload_bytes
+        from .app.services.policy_intake_errors import (
             DocumentSizeError,
             EncryptedDocumentError,
             IntakePipelineUnavailableError,
@@ -10679,7 +10679,7 @@ async def upload_policy_document(
 
     _upload_wall_start = time.monotonic()
     try:
-        from .services.policy_pipeline_analytics import emit_policy_upload_started
+        from .app.services.policy_pipeline_analytics import emit_policy_upload_started
 
         emit_policy_upload_started(
             request_id=request_id,
@@ -10734,7 +10734,7 @@ async def upload_policy_document(
 
     checksum = None
     try:
-        from .services.policy_document_intake import compute_checksum
+        from .app.services.policy_document_intake import compute_checksum
         checksum = compute_checksum(content)
     except Exception as e:
         log.warning("request_id=%s policy_upload checksum failed: %s", request_id, e)
@@ -10849,7 +10849,7 @@ async def upload_policy_document(
         request_id, doc_id, company_id, user_id, success,
     )
     try:
-        from .services.policy_pipeline_analytics import emit_policy_upload_completed
+        from .app.services.policy_pipeline_analytics import emit_policy_upload_completed
 
         emit_policy_upload_completed(
             request_id=request_id,
@@ -10904,7 +10904,7 @@ def get_policy_document(
     request_id = getattr(req.state, "request_id", None)
     doc = db.get_policy_document(doc_id, request_id=request_id)
     _require_document_access(user, doc)
-    from .services.policy_pipeline_layers import enrich_policy_document_for_hr
+    from .app.services.policy_pipeline_layers import enrich_policy_document_for_hr
 
     return {"document": enrich_policy_document_for_hr(doc)}
 
@@ -10937,8 +10937,8 @@ def get_hr_policy_review(
             raise HTTPException(status_code=404, detail="Policy not found")
         _require_policy_access(user, pol_row)
 
-    from .services.policy_hr_review_service import build_hr_policy_review_payload
-    from .services.policy_hr_review_serializer import serialize_hr_policy_review_payload
+    from .app.services.policy_hr_review_service import build_hr_policy_review_payload
+    from .app.services.policy_hr_review_serializer import serialize_hr_policy_review_payload
 
     try:
         payload = build_hr_policy_review_payload(
@@ -11080,8 +11080,8 @@ async def reprocess_policy_document(
         log.warning("request_id=%s policy_document_reprocess download failed: %s", request_id, exc)
         raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, BUCKET_HR_POLICIES))
     try:
-        from .services.policy_document_intake import process_uploaded_document
-        from .services.policy_pipeline_analytics import (
+        from .app.services.policy_document_intake import process_uploaded_document
+        from .app.services.policy_pipeline_analytics import (
             emit_policy_classify_completed,
             emit_policy_classify_failed,
             emit_policy_classify_started,
@@ -11137,7 +11137,7 @@ async def reprocess_policy_document(
         # Re-segment clauses
         if result.get("raw_text") and result.get("processing_status") != "failed":
             try:
-                from .services.policy_document_clauses import segment_document_from_raw_text
+                from .app.services.policy_document_clauses import segment_document_from_raw_text
                 policy_segment_ctx = {
                     "id": doc_id,
                     "document_id": doc_id,
@@ -11164,7 +11164,7 @@ async def reprocess_policy_document(
             doc_id, processing_status="failed", extraction_error=str(exc), request_id=request_id
         )
         try:
-            from .services.policy_pipeline_analytics import emit_policy_classify_failed
+            from .app.services.policy_pipeline_analytics import emit_policy_classify_failed
 
             emit_policy_classify_failed(
                 request_id=request_id,
@@ -11207,7 +11207,7 @@ def normalize_policy_document(
     _require_document_access(user, doc)
     clauses = db.list_policy_document_clauses(doc_id, request_id=request_id)
     try:
-        from .services.policy_pipeline_analytics import emit_policy_normalize_started
+        from .app.services.policy_pipeline_analytics import emit_policy_normalize_started
 
         emit_policy_normalize_started(
             request_id=request_id,
@@ -11218,7 +11218,7 @@ def normalize_policy_document(
     except Exception:
         pass
     try:
-        from .services.normalization_input import (
+        from .app.services.normalization_input import (
             NormalizationInputInvalid,
             issues_to_jsonable,
             validate_and_prepare_normalization_input,
@@ -11235,7 +11235,7 @@ def normalize_policy_document(
             [i.code for i in inv.issues],
         )
         try:
-            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+            from .app.services.policy_pipeline_analytics import emit_policy_normalize_failed
 
             emit_policy_normalize_failed(
                 request_id=request_id,
@@ -11274,8 +11274,8 @@ def normalize_policy_document(
             len(repair_only),
         )
     try:
-        from .services.policy_normalization import run_normalization
-        from .services.policy_normalization_errors import PolicyNormalizationPayloadInvalid
+        from .app.services.policy_normalization import run_normalization
+        from .app.services.policy_normalization_errors import PolicyNormalizationPayloadInvalid
 
         result = run_normalization(
             db, doc_prepared, clauses_prepared, created_by=user.get("id"), request_id=request_id
@@ -11333,7 +11333,7 @@ def normalize_policy_document(
                     exc_info=True,
                 )
                 try:
-                    from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+                    from .app.services.policy_pipeline_analytics import emit_policy_normalize_failed
 
                     emit_policy_normalize_failed(
                         request_id=request_id,
@@ -11412,7 +11412,7 @@ def normalize_policy_document(
                     comparison_readiness_code = "COMPARISON_NOT_READY"
 
         try:
-            from .services.policy_pipeline_analytics import emit_policy_normalize_completed
+            from .app.services.policy_pipeline_analytics import emit_policy_normalize_completed
 
             emit_policy_normalize_completed(
                 request_id=request_id,
@@ -11486,7 +11486,7 @@ def normalize_policy_document(
             [d.get("field") for d in body.get("details") or []],
         )
         try:
-            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+            from .app.services.policy_pipeline_analytics import emit_policy_normalize_failed
 
             emit_policy_normalize_failed(
                 request_id=request_id,
@@ -11504,7 +11504,7 @@ def normalize_policy_document(
         err_str = str(exc)
         log.warning("request_id=%s normalize validation: %s", request_id, err_str)
         try:
-            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+            from .app.services.policy_pipeline_analytics import emit_policy_normalize_failed
 
             emit_policy_normalize_failed(
                 request_id=request_id,
@@ -11527,7 +11527,7 @@ def normalize_policy_document(
             type(exc).__name__, safe_msg, exc_info=True,
         )
         try:
-            from .services.policy_pipeline_analytics import emit_policy_normalize_failed
+            from .app.services.policy_pipeline_analytics import emit_policy_normalize_failed
 
             emit_policy_normalize_failed(
                 request_id=request_id,
@@ -11610,7 +11610,7 @@ def admin_policy_assistant_extract(
                 "message": "Apply database migrations for policy assistant import.",
             },
         )
-    from .services.policy_assistant_import_pipeline import run_policy_assistant_import_pipeline
+    from .app.services.policy_assistant_import_pipeline import run_policy_assistant_import_pipeline
 
     out = run_policy_assistant_import_pipeline(
         db, document_id, request_id=request_id, user_id=user.get("id")
@@ -11719,7 +11719,7 @@ def admin_policy_assistant_company_source(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """Active assistant policy source for a company."""
-    from .services.policy_assistant_access import require_company_access
+    from .app.services.policy_assistant_access import require_company_access
 
     cid = _resolve_company_for_policy(user, company_id)
     require_company_access(user, cid, db)
@@ -11762,8 +11762,8 @@ def policy_assistant_case_context(
     """
     PolicyAssistantContext for grounding: company, case profile, applicable facts, supporting chunks.
     """
-    from .services.policy_assistant_access import require_company_access
-    from .services.policy_assistant_case_context_service import build_policy_assistant_context
+    from .app.services.policy_assistant_access import require_company_access
+    from .app.services.policy_assistant_case_context_service import build_policy_assistant_context
 
     ctx = build_policy_assistant_context(db, case_id)
     cid = ctx.get("company_id")
@@ -11778,7 +11778,7 @@ def admin_policy_assistant_company_history(
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
     """Documents, extraction runs, snapshots (append-only), activation metadata."""
-    from .services.policy_assistant_access import require_company_access
+    from .app.services.policy_assistant_access import require_company_access
 
     cid = _resolve_company_for_policy(user, company_id)
     require_company_access(user, cid, db)
@@ -11825,7 +11825,7 @@ def admin_policy_assistant_answer_audits(
     created_before: Optional[str] = Query(None, description="ISO8601 upper bound"),
     limit: int = Query(100, ge=1, le=500),
 ):
-    from .services.policy_assistant_access import require_company_access
+    from .app.services.policy_assistant_access import require_company_access
 
     if user.get("is_admin"):
         if not company_id or not str(company_id).strip():
@@ -11858,8 +11858,8 @@ def admin_policy_assistant_snapshot_diff(
     newer_snapshot_id: str = Query(..., description="Later snapshot"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
-    from .services.policy_assistant_access import require_company_access, require_two_snapshots_same_company
-    from .services.policy_snapshot_diff_service import compare_snapshots
+    from .app.services.policy_assistant_access import require_company_access, require_two_snapshots_same_company
+    from .app.services.policy_snapshot_diff_service import compare_snapshots
 
     cid = _resolve_company_for_policy(user, company_id)
     require_company_access(user, cid, db)
@@ -11906,7 +11906,7 @@ def get_normalized_policy(
     version_public, normalization_draft = _version_and_draft(version)
     published_comparison_readiness = None
     if published_version and published_version.get("id") and include_readiness:
-        from .services.policy_comparison_readiness import evaluate_version_comparison_readiness
+        from .app.services.policy_comparison_readiness import evaluate_version_comparison_readiness
 
         published_comparison_readiness = evaluate_version_comparison_readiness(db, str(published_version["id"]))
 
@@ -11918,7 +11918,7 @@ def get_normalized_policy(
     ) -> Optional[Dict[str, Any]]:
         if not include_readiness:
             return None
-        from .services.policy_processing_readiness import evaluate_stored_policy_readiness
+        from .app.services.policy_processing_readiness import evaluate_stored_policy_readiness
 
         src_doc = None
         if version and version.get("source_policy_document_id"):
@@ -11940,7 +11940,7 @@ def get_normalized_policy(
         pr_summary = None
         if include_readiness and version and version.get("id"):
             vid0 = str(version["id"])
-            from .services.policy_hr_rule_override_layer import merge_benefit_rules_for_effective_readiness
+            from .app.services.policy_hr_rule_override_layer import merge_benefit_rules_for_effective_readiness
 
             br0 = db.list_policy_benefit_rules(vid0)
             try:
@@ -11954,7 +11954,7 @@ def get_normalized_policy(
                 db.list_policy_assignment_applicability(vid0),
             )
         elif include_readiness:
-            from .services.policy_processing_readiness import evaluate_stored_policy_readiness
+            from .app.services.policy_processing_readiness import evaluate_stored_policy_readiness
 
             pr_summary = evaluate_stored_policy_readiness(
                 latest_version=version,
@@ -11983,7 +11983,7 @@ def get_normalized_policy(
         }
 
     if not version:
-        from .services.policy_processing_readiness import evaluate_stored_policy_readiness
+        from .app.services.policy_processing_readiness import evaluate_stored_policy_readiness
 
         pr_empty = (
             evaluate_stored_policy_readiness(
@@ -12021,7 +12021,7 @@ def get_normalized_policy(
     assignment_applicability = db.list_policy_assignment_applicability(vid)
     family_applicability = db.list_policy_family_applicability(vid)
     source_links = db.list_policy_source_links(vid)
-    from .services.policy_hr_rule_override_layer import (
+    from .app.services.policy_hr_rule_override_layer import (
         build_effective_entitlement_preview,
         merge_benefit_rules_for_effective_readiness,
     )
@@ -12090,7 +12090,7 @@ def patch_benefit_rule(
     )
     updated = db.get_policy_benefit_rule(benefit_rule_id)
     try:
-        from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+        from .app.services.policy_comparison_readiness import invalidate_comparison_readiness_cache
 
         pv = updated.get("policy_version_id") if updated else None
         if pv:
@@ -12153,7 +12153,7 @@ def patch_hr_benefit_rule_override(
         )
         raise HTTPException(status_code=500, detail="Failed to save HR override") from exc
     try:
-        from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+        from .app.services.policy_comparison_readiness import invalidate_comparison_readiness_cache
 
         invalidate_comparison_readiness_cache(str(version_id))
     except Exception:
@@ -12184,7 +12184,7 @@ def delete_hr_benefit_rule_override(
     if not ok:
         raise HTTPException(status_code=404, detail="No HR override to delete")
     try:
-        from .services.policy_comparison_readiness import invalidate_comparison_readiness_cache
+        from .app.services.policy_comparison_readiness import invalidate_comparison_readiness_cache
 
         invalidate_comparison_readiness_cache(str(version_id))
     except Exception:
@@ -12212,7 +12212,7 @@ def patch_policy_version_status_latest(
     if status not in ("draft", "review_required", "reviewed", "published", "archived"):
         raise HTTPException(status_code=400, detail="Invalid status")
     if status == "published":
-        from .services.policy_publish_gate import require_employee_publishable_policy_version
+        from .app.services.policy_publish_gate import require_employee_publishable_policy_version
 
         require_employee_publishable_policy_version(db, version_id)
     try:
@@ -12272,7 +12272,7 @@ def patch_policy_version_status(
     if status not in ("draft", "review_required", "reviewed", "published", "archived"):
         raise HTTPException(status_code=400, detail="Invalid status")
     if status == "published":
-        from .services.policy_publish_gate import require_employee_publishable_policy_version
+        from .app.services.policy_publish_gate import require_employee_publishable_policy_version
 
         require_employee_publishable_policy_version(db, version_id)
     try:
@@ -12328,7 +12328,7 @@ def get_canonical_policy_diff(
     returns empty summary counts and version=null instead so the UI
     can render the clean-state message.
     """
-    from .services.policy_canonical_diff import compute_canonical_diff
+    from .app.services.policy_canonical_diff import compute_canonical_diff
 
     policy = db.get_company_policy(policy_id)
     _require_policy_access(user, policy)
@@ -12350,7 +12350,7 @@ def hr_get_canonical_policy_diff_for_company(
     for the company so the frontend can render a neutral "no canonical
     policy yet" state instead of a 404.
     """
-    from .services.policy_canonical_diff import (
+    from .app.services.policy_canonical_diff import (
         compute_canonical_diff,
         resolve_primary_policy_id_for_company,
     )
@@ -13452,7 +13452,7 @@ def hr_get_policy_config_templates(
     "Start from a template" card. Returns lightweight metadata only;
     the full row expansion happens server-side when HR applies one.
     """
-    from .services.policy_config_templates import list_templates
+    from .app.services.policy_config_templates import list_templates
 
     _ = user  # auth already enforced by require_role
     return {"templates": list_templates()}
@@ -13746,7 +13746,7 @@ def admin_get_policy_config_history(
 def admin_get_policy_config_templates(
     user: Dict[str, Any] = Depends(require_admin),
 ):
-    from .services.policy_config_templates import list_templates
+    from .app.services.policy_config_templates import list_templates
 
     _ = user
     return {"templates": list_templates()}
@@ -13892,7 +13892,7 @@ def employee_get_policy_config(
     resolved_country = country
     resolved_level = employee_level
     if assign_for_ctx and (not atype or not fstat or not resolved_country or not resolved_level):
-        from .services.policy_resolution import extract_resolution_context
+        from .app.services.policy_resolution import extract_resolution_context
 
         aid = str(assign_for_ctx.get("id") or "").strip()
         case_id_inner = assign_for_ctx.get("case_id")

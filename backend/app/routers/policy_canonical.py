@@ -9,17 +9,17 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ...database import db
-from ...services.policy_canonical_access import (
+from ..services.policy_canonical_access import (
     ensure_company_scope_for_read,
     ensure_company_scope_for_write,
     resolve_target_company_id,
     resolve_user_company_id,
 )
-from ...services.policy_canonical_chunking import chunk_canonical_policy_document
-from ...services.policy_canonical_extraction import extract_canonical_policy_facts
-from ...services.policy_canonical_ingestion import ingest_canonical_policy_document
-from ...services.policy_query_answering import answer_company_scoped_policy_query
-from ...services.policy_rendering import render_canonical_policy_markdown
+from ..services.policy_canonical_chunking import chunk_canonical_policy_document
+from ..services.policy_canonical_extraction import extract_canonical_policy_facts
+from ..services.policy_canonical_ingestion import ingest_canonical_policy_document
+from ..services.policy_query_answering import answer_company_scoped_policy_query
+from ..services.policy_rendering import render_canonical_policy_markdown
 
 
 def _authenticated_user(authorization: Optional[str] = Header(None)) -> dict:

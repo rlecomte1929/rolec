@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from ..auth_deps import require_admin_or_hr
 from ...database import db
-from ...services import service_catalog, vendor_curation
+from ..services import service_catalog, vendor_curation
 
 router = APIRouter(prefix="/api/hr/catalog", tags=["hr_catalog"])
 logger = logging.getLogger(__name__)
@@ -275,7 +275,7 @@ def populate_with_ai(
                       callers won't re-burn tokens for a populated slot
       L7 audit      → every dispatch + every ticket open writes an audit_logs row
     """
-    from ...services import scrape_safety, catalog_scraper
+    from ..services import scrape_safety, catalog_scraper
 
     company_id = _caller_company_id(user)
     actor_id = user["id"]
@@ -335,7 +335,7 @@ def get_scrape_quota(
     user: Dict[str, Any] = Depends(require_admin_or_hr),
 ) -> Dict[str, Any]:
     """Return today's quota state for the caller's company. Used by the UI."""
-    from ...services import scrape_safety
+    from ..services import scrape_safety
     return scrape_safety.get_quota_state(_caller_company_id(user))
 
 
@@ -344,7 +344,7 @@ def list_my_destination_requests(
     user: Dict[str, Any] = Depends(require_admin_or_hr),
 ) -> List[Dict[str, Any]]:
     """HR sees the tickets they (or their company) have opened."""
-    from ...services import scrape_safety
+    from ..services import scrape_safety
     return scrape_safety.list_destination_requests(
         company_id=_caller_company_id(user),
         limit=100,
@@ -372,7 +372,7 @@ def resolve_destination_request_hr(
     Only requests that belong to the caller's company can be resolved here;
     cross-company access returns 404.
     """
-    from ...services import scrape_safety
+    from ..services import scrape_safety
 
     if body.status not in ("approved", "rejected"):
         raise HTTPException(status_code=422, detail="status must be 'approved' or 'rejected'")
@@ -440,7 +440,7 @@ def list_allowlisted_destinations(
     destinations, never type a free-form string. Anything else goes through
     the "Request a new destination" ticket flow.
     """
-    from ...services import scrape_safety
+    from ..services import scrape_safety
     return scrape_safety.list_allowlist()
 
 
@@ -467,7 +467,7 @@ def populate_destination_with_ai(
                      short-circuit (L1) and do NOT increment the quota.
       L1 already-populated → skipped per-category.
     """
-    from ...services import scrape_safety, catalog_scraper
+    from ..services import scrape_safety, catalog_scraper
     from ..recommendations.registry import list_categories
 
     company_id = _caller_company_id(user)
@@ -514,7 +514,7 @@ def populate_destination_with_ai(
     for cat in categories:
         # L1 pre-check: if rows already exist, mark as skipped without
         # touching quota or the scraper at all.
-        from ...services import service_catalog
+        from ..services import service_catalog
         if service_catalog.count_by_category_city(cat, city) > 0:
             skipped_existing += 1
             results.append({"category": cat, "status": "skipped_existing", "inserted": 0})
@@ -579,7 +579,7 @@ def list_employee_demand(
     hit the "HR is finalizing" empty state, plus how many times that
     combo has been seen across the company.
     """
-    from ...services import employee_demand
+    from ..services import employee_demand
     return employee_demand.list_demand_for_company(_caller_company_id(user))
 
 

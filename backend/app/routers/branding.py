@@ -64,7 +64,7 @@ def _get_company_branding(company_id: str) -> tuple[Optional[str], Optional[Dict
     Returns (company_name, branding_dict) or (None, None) on failure.
     """
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         result = (
             sb.table("companies")
@@ -169,7 +169,7 @@ def update_branding_config(
         )
 
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         branding_data = payload.model_dump(mode="json", exclude_none=True)
         result = (

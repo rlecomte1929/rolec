@@ -9,11 +9,11 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from ...database import db
-from ...services.change_detection_service import (
+from ..services.change_detection_service import (
     get_document_change,
     list_document_changes,
 )
-from ...services.crawl_scheduler_service import (
+from ..services.crawl_scheduler_service import (
     create_job_run,
     acquire_job_lock,
     complete_job_run,
@@ -29,7 +29,7 @@ from ...services.crawl_scheduler_service import (
     trigger_schedule_now,
     update_schedule,
 )
-from ...services.freshness_service import (
+from ..services.freshness_service import (
     get_freshness_by_country,
     get_freshness_by_source,
     get_freshness_overview,
@@ -133,7 +133,7 @@ def get_schedule_detail(
     schedule_id: str,
     user: Dict[str, Any] = Depends(_require_admin),
 ):
-    from ...services.crawl_scheduler_service import get_schedule
+    from ..services.crawl_scheduler_service import get_schedule
     s = get_schedule(schedule_id)
     if not s:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -275,8 +275,8 @@ def post_trigger_crawl(
             summary=report,
         )
         try:
-            from ...services.change_detection_service import run_change_detection_for_crawl_run
-            from ...services.freshness_service import refresh_freshness_metrics
+            from ..services.change_detection_service import run_change_detection_for_crawl_run
+            from ..services.freshness_service import refresh_freshness_metrics
             run_change_detection_for_crawl_run(report.get("run_id"), job_run_id=job["id"])
             refresh_freshness_metrics()
         except Exception:

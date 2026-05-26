@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from ..auth_deps import require_admin_or_hr
 from ...database import db
-from ...services.supabase_client import get_supabase_admin_client
+from ..services.supabase_client import get_supabase_admin_client
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/hr/policies", tags=["hr_policies"])

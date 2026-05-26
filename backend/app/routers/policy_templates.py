@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ...services.supabase_client import get_supabase_admin_client
+from ..services.supabase_client import get_supabase_admin_client
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/policy/templates", tags=["policy_templates"])

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .db import init_db
 from .routers import cases, admin, employee_quotes, pets, support, ab_tests
 from .seed import seed_demo_cases
-from ..services.pii_log_filter import install_pii_log_filter
+from .services.pii_log_filter import install_pii_log_filter
 
 
 def create_app() -> FastAPI:
