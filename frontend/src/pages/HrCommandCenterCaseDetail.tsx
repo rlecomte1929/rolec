@@ -353,6 +353,9 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                         type="button"
                         disabled={updatingQrId === qr.id}
                         onClick={() => handleQuoteStatusUpdate(qr.id, 'acknowledged')}
+                        // A11Y-8: composed aria-label so screen readers can
+                        // distinguish one quote-request button from the next.
+                        aria-label={`Acknowledge quote request for ${qr.service_categories.join(', ') || 'services'}, requested ${new Date(qr.created_at).toLocaleDateString()}`}
                         className="shrink-0 rounded-lg border border-[#2563eb] bg-white px-3 py-1.5 text-xs font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50 transition-colors"
                       >
                         {updatingQrId === qr.id ? '…' : 'Acknowledge'}
@@ -363,6 +366,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                         type="button"
                         disabled={updatingQrId === qr.id}
                         onClick={() => handleQuoteStatusUpdate(qr.id, 'fulfilled')}
+                        aria-label={`Mark quote request as fulfilled for ${qr.service_categories.join(', ') || 'services'}, requested ${new Date(qr.created_at).toLocaleDateString()}`}
                         className="shrink-0 rounded-lg border border-[#16a34a] bg-white px-3 py-1.5 text-xs font-medium text-[#16a34a] hover:bg-[#f0fdf4] disabled:opacity-50 transition-colors"
                       >
                         {updatingQrId === qr.id ? '…' : 'Mark fulfilled'}
