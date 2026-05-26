@@ -69,6 +69,22 @@ jobs:
             backend/tests/test_trigger_engine.py \
             backend/tests/test_case_dossier_forms.py
 
+  route-auth-check:
+    # AUDIT-B6: enumerate every GET route in the FastAPI apps (via AST, no DB
+    # required) and assert each one uses an auth Depends() or is explicitly
+    # allowlisted in scripts/route_auth_allowlist.txt (with a comment).
+    # Exit 1 if any unguarded GET route is found outside the allowlist.
+    name: Route-auth audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run route-auth check
+        run: python scripts/check_route_auth.py --root .
+
   rls-coverage:
     # AUDIT-A3: lists `public.*` tables with zero RLS policies and asserts each
     # one is on the supabase/rls_allowlist.txt allowlist. Drains over time.
