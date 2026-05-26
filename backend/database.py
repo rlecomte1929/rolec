@@ -1177,6 +1177,16 @@ class Database:
             else:
                 self._create_users_table(conn)
 
+        # AUDIT-A1-followup (AIQ-383): On Postgres every table is managed by
+        # Supabase migrations. The CREATE TABLE / CREATE INDEX block below is
+        # SQLite-only dev scaffolding. Running it on Postgres causes
+        # InFailedSqlTransaction because an earlier try/except ALTER in init_db
+        # can leave the connection in a failed state. Exit early; nothing below
+        # is needed on Postgres.
+        if not _is_sqlite:
+            return
+
+        with self.engine.begin() as conn:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     token TEXT PRIMARY KEY,
