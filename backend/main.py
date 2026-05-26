@@ -569,7 +569,7 @@ app.add_middleware(QueryCountMiddleware, threshold=10)
 
 app.include_router(auth_router.router)  # [AUDIT-C2.3] re-added — auth routes must be in deployed main.py
 app.include_router(compat_router.router)
-# [AUDIT-C2.3 Month-1] cases_router → moved to backend/app/main.py
+app.include_router(cases_router.router)  # [AUDIT-C2.3] re-added — wizard PATCH, quote-request, messages (B17/B19/WZ1a-WZ5)
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
 # [AUDIT-C2.3 Month-1] policy_publish_router → moved to backend/app/main.py
@@ -579,7 +579,7 @@ app.include_router(crons_router.router)  # [P4-4] cron endpoints
 # [AUDIT-C2.3 Month-1] exception_requests_router → moved to backend/app/main.py
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
-# [AUDIT-C2.3 Month-1] hr_catalog_router → moved to backend/app/main.py
+app.include_router(hr_catalog_router.router)  # [AUDIT-C2.3] re-added — vendor curation, notification-counts (B16)
 app.include_router(providers_router.router)
 app.include_router(employee_quotes_router.router)
 app.include_router(hr_vendors_router.router)
