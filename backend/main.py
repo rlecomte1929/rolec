@@ -561,27 +561,27 @@ app.add_middleware(
     max_age=86400,
 )
 
-app.include_router(auth_router.router)
+# [AUDIT-C2.3 Month-1] auth_router → moved to backend/app/main.py
 app.include_router(compat_router.router)
-app.include_router(cases_router.router)
+# [AUDIT-C2.3 Month-1] cases_router → moved to backend/app/main.py
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
-app.include_router(policy_publish_router.router)  # [P1-4] policy publish + version control
-app.include_router(policy_summary_router.router)  # [P1-5 backend] 14-category summary
-app.include_router(policy_feedback_router.router)  # [P5-5] feedback + HR review queue
+# [AUDIT-C2.3 Month-1] policy_publish_router → moved to backend/app/main.py
+# [AUDIT-C2.3 Month-1] policy_summary_router → moved to backend/app/main.py
+# [AUDIT-C2.3 Month-1] policy_feedback_router → moved to backend/app/main.py
 app.include_router(crons_router.router)  # [P4-4] cron endpoints
-app.include_router(exception_requests_router.router)
+# [AUDIT-C2.3 Month-1] exception_requests_router → moved to backend/app/main.py
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
-app.include_router(hr_catalog_router.router)
+# [AUDIT-C2.3 Month-1] hr_catalog_router → moved to backend/app/main.py
 app.include_router(providers_router.router)
 app.include_router(employee_quotes_router.router)
 app.include_router(hr_vendors_router.router)
 app.include_router(hr_rfq_router.router)
-app.include_router(immigration_router.router)
+# [AUDIT-C2.3 Month-1] immigration_router → moved to backend/app/main.py
 app.include_router(analytics_router.router)
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
-app.include_router(mobility_context_router.router)
+# [AUDIT-C2.3 Month-1] mobility_context_router → moved to backend/app/main.py
 app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
 app.include_router(admin_resources_router.router, prefix="/api/admin")
@@ -596,17 +596,17 @@ app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
 app.include_router(admin_prospects_router.router, prefix="/api/admin")
 app.include_router(admin_form_templates_router.router, prefix="/api/admin")
-app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
-app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")
-app.include_router(policy_canonical_router.read_router, prefix="/api")
-app.include_router(policy_templates_router.router)  # P1-2: 3-tier template library
+# [AUDIT-C2.3 Month-1] admin_recommendations_debug_router → moved to backend/app/main.py
+# [AUDIT-C2.3 Month-1] policy_canonical_router.admin_router → moved to backend/app/main.py
+# [AUDIT-C2.3 Month-1] policy_canonical_router.read_router → moved to backend/app/main.py
+# [AUDIT-C2.3 Month-1] policy_templates_router → moved to backend/app/main.py
 app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
 app.include_router(hr_resources_router.router)
-app.include_router(recommendations_router)
-app.include_router(relocation_router.router)
-app.include_router(relocation_router.api_router)
-app.include_router(relocation_classify_router.router)
+# [AUDIT-C2.3 Month-1] recommendations_router → moved to backend/app/main.py
+# [AUDIT-C2.3 Month-1] relocation_router.router → moved to backend/app/main.py
+# [AUDIT-C2.3 Month-1] relocation_router.api_router → moved to backend/app/main.py
+# [AUDIT-C2.3 Month-1] relocation_classify_router → moved to backend/app/main.py
 
 @contextmanager
 def timed(span: str, request_id: Optional[str] = None):
@@ -14002,7 +14002,7 @@ app.include_router(hr_policy_config_router)
 app.include_router(admin_policy_config_router)
 app.include_router(employee_policy_config_router)
 app.include_router(public_policy_config_router)
-app.include_router(hr_coordination_router.router)
+# [AUDIT-C2.3 Month-1] hr_coordination_router → moved to backend/app/main.py
 app.include_router(prescreening_router.router)
 app.include_router(personio_webhook_router.router)
 app.include_router(personio_settings_router.router)
@@ -14010,15 +14010,15 @@ app.include_router(bamboohr_router.router)
 
 # ── Gap Analysis — new routers (May 2026 design sprint) ──────────────────────
 # GAP 1: Rich relocation preference profile (housing prefs, household, pets, FX)
-app.include_router(relocation_profile_router.router)
+# [AUDIT-C2.3 Month-1] relocation_profile_router → moved to backend/app/main.py
 # GAP 6: Pet & breed restriction rules (server-side, replaces client hardcode)
 app.include_router(rules_router.router)
 # GAP 8: Enriched service marketplace (policy coverage + preferred flag joined)
-app.include_router(marketplace_router.router)
+# [AUDIT-C2.3 Month-1] marketplace_router → moved to backend/app/main.py
 # GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
-app.include_router(hr_analytics_router.router)
+# [AUDIT-C2.3 Month-1] hr_analytics_router → moved to backend/app/main.py
 # GAP 4: Immigration advisor matching
-app.include_router(advisors_router.router)
+# [AUDIT-C2.3 Month-1] advisors_router → moved to backend/app/main.py
 # GAP 10: Company branding config
 app.include_router(branding_router.router)
 # ─────────────────────────────────────────────────────────────────────────────
