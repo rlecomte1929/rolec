@@ -3256,8 +3256,12 @@ def create_case_quote_request(
         # Resolves WZ4/B11 — employees assigned via HR portal lack company_id.
         try:
             with main_db.engine.connect() as _conn:
+                # Cases created via POST /api/hr/cases are stored in relocation_cases
+                # (via db.create_case). The public.cases table only holds seed data.
                 _case_row = _conn.execute(
-                    _sql_text("SELECT company_id FROM public.cases WHERE id = :cid"),
+                    _sql_text(
+                        "SELECT company_id FROM public.relocation_cases WHERE id::text = :cid"
+                    ),
                     {"cid": case_id},
                 ).mappings().first()
             if _case_row and _case_row.get("company_id"):
