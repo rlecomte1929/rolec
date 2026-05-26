@@ -1,8 +1,11 @@
 import io
+import logging
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 # Deterministic category mapping per MVP spec
@@ -228,4 +231,176 @@ def extract_policy_from_bytes(file_bytes: bytes, file_type: str) -> Dict[str, An
         "policy_meta": meta,
         "benefits": benefits,
         "extracted_at": datetime.utcnow().isoformat(),
+        "extracted_by": "regex",
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AIQ-285 — LLM-augmented extraction with 3-way diff
+#
+# Adds an LLM extraction path alongside the deterministic regex one and
+# exposes a single orchestrator that returns both results plus a merged
+# preview. The merge prefers LLM values when present and falls back to regex
+# for fields the LLM didn't return — concretely, the merged benefits[] list
+# is the union of both, keyed by benefit_key, with LLM rows overwriting regex
+# rows when both exist.
+#
+# The orchestrator is the surface used by the new /extract-preview endpoint.
+# The original `extract_policy_from_bytes` is unchanged so the legacy auto-
+# saving /extract endpoint keeps working for any caller that depends on it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _parse_lines_from_bytes(file_bytes: bytes, file_type: str) -> List[str]:
+    """Shared parsing step — used by both the regex path and the LLM path."""
+    if file_type == "docx":
+        return _extract_text_from_docx(file_bytes)
+    if file_type == "pdf":
+        return _extract_text_from_pdf(file_bytes)
+    raise ValueError("Unsupported file type")
+
+
+def _build_regex_extraction(lines: List[str]) -> Dict[str, Any]:
+    """Re-run the existing regex extractor over pre-parsed lines.
+
+    Mirrors `extract_policy_from_bytes` but skips the docx/pdf parse step so
+    the orchestrator can hand both the regex and LLM paths the same input.
+    """
+    meta = _guess_meta(lines)
+    benefits: List[Dict[str, Any]] = []
+    seen_keys: set = set()
+    current_section = ""
+
+    for i, line in enumerate(lines):
+        lower = line.lower()
+        if len(line) < 80 and re.match(r"^[\d.]+\s+\w+", line):
+            current_section = line.strip()
+        for key, label, keywords, category in BENEFIT_KEYS:
+            if key in seen_keys:
+                continue
+            if any(k in lower for k in keywords):
+                context = " ".join(lines[max(0, i - 1) : i + 2])
+                elig = _extract_eligibility(context)
+                limits = _extract_limits(context)
+                benefits.append(
+                    {
+                        "service_category": category,
+                        "benefit_key": key,
+                        "benefit_label": label,
+                        "eligibility": elig or None,
+                        "limits": limits or None,
+                        "notes": None,
+                        "source_section": current_section or None,
+                        "source_quote": (line[:200] if len(line) > 30 else context[:200]),
+                        "confidence": 0.6 if limits or elig else 0.4,
+                    }
+                )
+                seen_keys.add(key)
+
+    return {
+        "policy_meta": meta,
+        "benefits": benefits,
+        "extracted_at": datetime.utcnow().isoformat(),
+        "extracted_by": "regex",
+    }
+
+
+def _merge_extractions(
+    regex_result: Dict[str, Any],
+    llm_result: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Produce a merged extraction.
+
+    Rules:
+    - When the LLM result is None, the merged result is the regex result with
+      `extracted_by="regex"`.
+    - When both exist, prefer LLM-extracted benefits (by benefit_key); fall
+      back to regex for keys the LLM missed.
+    - Policy meta prefers LLM when present, else regex.
+    """
+    if not llm_result:
+        return {**regex_result, "extracted_by": "regex"}
+
+    regex_benefits = {b.get("benefit_key"): b for b in regex_result.get("benefits", []) if isinstance(b, dict)}
+    llm_benefits = {b.get("benefit_key"): b for b in llm_result.get("benefits", []) if isinstance(b, dict)}
+    merged_keys = list(llm_benefits.keys()) + [k for k in regex_benefits if k not in llm_benefits]
+    merged_benefits: List[Dict[str, Any]] = []
+    for key in merged_keys:
+        if key in llm_benefits:
+            row = dict(llm_benefits[key])
+            row["extracted_by"] = "ai"
+            merged_benefits.append(row)
+        else:
+            row = dict(regex_benefits[key])
+            row["extracted_by"] = "regex"
+            merged_benefits.append(row)
+
+    regex_meta = regex_result.get("policy_meta") or {}
+    llm_meta = llm_result.get("policy_meta") or {}
+    merged_meta = {
+        "title": llm_meta.get("title") or regex_meta.get("title"),
+        "version": llm_meta.get("version") or regex_meta.get("version"),
+        "effective_date": llm_meta.get("effective_date") or regex_meta.get("effective_date"),
+    }
+    return {
+        "policy_meta": merged_meta,
+        "benefits": merged_benefits,
+        "extracted_at": datetime.utcnow().isoformat(),
+        "extracted_by": "merged",
+    }
+
+
+def extract_policy_with_diff(file_bytes: bytes, file_type: str) -> Dict[str, Any]:
+    """Run regex + LLM extraction over a policy document and return a 3-way diff.
+
+    The shape is::
+
+        {
+            "regex_extracted": { policy_meta, benefits, extracted_at, extracted_by="regex" },
+            "llm_extracted":   { ... } | None,
+            "merged":          { policy_meta, benefits, extracted_at, extracted_by="ai"|"regex"|"merged" },
+            "llm_used":        bool,
+            "llm_unavailable_reason": "no_api_key" | "sdk_missing" | "call_failed" | "parse_failed" | None,
+        }
+
+    The caller is responsible for deciding what to do with the result — the
+    new ``/extract-preview`` endpoint returns it verbatim to the Policy Builder
+    UI; the legacy ``/extract`` endpoint does not call this orchestrator.
+    """
+    lines = _parse_lines_from_bytes(file_bytes, file_type)
+
+    regex_result = _build_regex_extraction(lines)
+
+    llm_result: Optional[Dict[str, Any]] = None
+    llm_unavailable_reason: Optional[str] = None
+    try:
+        # Import locally so the regex-only path doesn't pay the cost / risk
+        # of pulling the LLM module into modules that never need it.
+        from .llm_policy_extractor import extract_policy_with_llm
+
+        llm_result = extract_policy_with_llm(lines)
+        if llm_result is None:
+            # The LLM module logs the specific reason; here we just record
+            # that it was unavailable so the UI can decide whether to warn.
+            import os as _os
+            if not _os.environ.get("ANTHROPIC_API_KEY"):
+                llm_unavailable_reason = "no_api_key"
+            else:
+                llm_unavailable_reason = "call_failed"
+    except ImportError:
+        llm_unavailable_reason = "sdk_missing"
+    except Exception as exc:  # noqa: BLE001 — never block the upload flow
+        logger.warning(
+            "extract_policy_with_diff: LLM layer raised unexpectedly (%s); using regex only.",
+            exc.__class__.__name__,
+        )
+        llm_unavailable_reason = "call_failed"
+
+    merged = _merge_extractions(regex_result, llm_result)
+    return {
+        "regex_extracted": regex_result,
+        "llm_extracted": llm_result,
+        "merged": merged,
+        "llm_used": llm_result is not None,
+        "llm_unavailable_reason": llm_unavailable_reason,
     }

@@ -55,7 +55,10 @@ from .schemas import (
 from .app.services.dossier import evaluate_applies_if, validate_answer, fetch_search_results, build_suggested_questions
 from .app.services.guidance_pack_service import generate_guidance_pack
 from .app.services.policy_adapter import normalize_policy_caps
-from .app.services.policy_extractor import extract_policy_from_bytes
+from .app.services.policy_extractor import (
+    extract_policy_from_bytes,
+    extract_policy_with_diff,
+)
 from .app.services.timeline_service import compute_default_milestones, compute_timeline_summary
 from .hr_case_readiness_view import build_intake_checklist_items, build_hr_case_readiness_ui
 from .app.services.country_resources import (
@@ -12771,6 +12774,60 @@ def extract_company_policy(
     policy = db.get_company_policy(policy_id)
     benefits = db.list_policy_benefits(policy_id)
     return {"policy": policy, "benefits": benefits}
+
+
+@app.post("/api/policies/{policy_id}/extract-preview")
+def extract_company_policy_preview(
+    policy_id: str,
+    req: Request,
+    user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
+):
+    """AIQ-285: LLM-augmented extraction with a 3-way diff for HR review.
+
+    Returns both the regex-extracted and (when available) LLM-extracted
+    benefits plus a merged preview. **Does NOT auto-save** — the caller (the
+    Policy Builder UI) must show the diff to HR, collect explicit confirmation,
+    and then call a separate save endpoint with the chosen benefits payload.
+
+    Response shape::
+
+        {
+          "policy": <existing policy row>,
+          "preview": {
+            "regex_extracted": {policy_meta, benefits, extracted_at, extracted_by="regex"},
+            "llm_extracted":   {policy_meta, benefits, extracted_at, extracted_by="ai", model, truncated} | None,
+            "merged":          {policy_meta, benefits, extracted_at, extracted_by="ai"|"regex"|"merged"},
+            "llm_used":        bool,
+            "llm_unavailable_reason": "no_api_key" | "sdk_missing" | "call_failed" | None
+          }
+        }
+
+    If ``ANTHROPIC_API_KEY`` is not configured, ``llm_extracted`` is null,
+    ``llm_used`` is false, and ``llm_unavailable_reason`` is ``"no_api_key"``.
+    The merged result falls back to the regex output cleanly in that case.
+    """
+    request_id = getattr(req.state, "request_id", None)
+    policy = db.get_company_policy(policy_id)
+    _require_policy_access(user, policy)
+    file_path = policy.get("file_url") or ""
+    object_key = normalize_policy_storage_object_key(file_path)
+    log.info(
+        "request_id=%s extract-preview bucket=%s object_key=%s",
+        request_id, BUCKET_HR_POLICIES, object_key,
+    )
+    try:
+        supabase = _get_supabase_admin_client()
+        data = supabase.storage.from_(BUCKET_HR_POLICIES).download(object_key)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, BUCKET_HR_POLICIES))
+    try:
+        preview = extract_policy_with_diff(data, policy.get("file_type") or "docx")
+    except Exception as exc:
+        log.exception("request_id=%s extract-preview failed for policy_id=%s", request_id, policy_id)
+        raise HTTPException(status_code=500, detail=f"Extraction preview failed: {exc}")
+    # Intentionally NOT writing to db.replace_policy_benefits or marking the
+    # policy as 'extracted' — HR must confirm before any save.
+    return {"policy": policy, "preview": preview}
 
 
 @app.get("/api/hr/policies/{policy_id}")
