@@ -15,6 +15,8 @@
  * 8 hex chars) — never the raw query — for privacy.
  */
 
+import { logger } from '../../lib/logger';
+
 // ---------------------------------------------------------------------------
 // Public constants — fixed strings, never LLM-generated
 // ---------------------------------------------------------------------------
@@ -214,7 +216,7 @@ export async function classify(
     parsed = JSON.parse(cleaned);
   } catch {
     // If parsing fails, default to borderline (safe fallback — triggers clarification)
-    console.warn(`[topic_classifier] JSON parse failed for hash=${query_hash}, raw="${rawText.slice(0, 100)}"`);
+    logger.warn(`[topic_classifier] JSON parse failed for hash=${query_hash}, raw="${rawText.slice(0, 100)}"`);
     parsed = { category: 'borderline', confidence: 0.5 };
   }
 
@@ -231,7 +233,7 @@ export async function classify(
   const latency_ms = Date.now() - t0;
 
   // Log (never the raw query — only the hash and category)
-  console.log(
+  logger.log(
     `[topic_classifier] hash=${query_hash} category=${category} confidence=${confidence.toFixed(2)} latency=${latency_ms}ms`,
   );
 

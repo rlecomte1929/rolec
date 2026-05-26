@@ -153,7 +153,9 @@ export const HrCommandCenter: React.FC = () => {
                     <tr
                       key={row.id}
                       onClick={() => handleRowClick(row.id)}
-                      className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] cursor-pointer transition-colors"
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRowClick(row.id); } }}
+                      tabIndex={0}
+                      className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0b2b43]"
                     >
                       <td className="py-3 pr-4 text-[#0b2b43] font-medium">{row.employeeIdentifier}</td>
                       <td className="py-3 pr-4 text-[#4b5563]">{row.destCountry || '-'}</td>

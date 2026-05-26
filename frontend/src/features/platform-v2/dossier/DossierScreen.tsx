@@ -5,6 +5,7 @@
 
 import type { Form, FormType } from '../../../types/relopass-api-contracts';
 import { StatusBadge, DateFormatter, EmptyState, Pill } from '../shared';
+import { logger } from '../../../lib/logger';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -170,7 +171,7 @@ function FormCard({ form, onOpen }: FormCardProps) {
 export function DossierScreen({ forms }: DossierScreenProps) {
   function handleOpenForm(formId: string) {
     // Event already dispatched in FormCard; parent can wire up navigation here.
-    console.debug('[DossierScreen] open form', formId);
+    logger.debug('[DossierScreen] open form', formId);
   }
 
   return (

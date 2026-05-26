@@ -1,6 +1,7 @@
 /**
  * Phase 1 Step 6: Lightweight instrumentation for services workflow.
  */
+import { logger } from '../../lib/logger';
 
 type WorkflowEvent =
   | 'save_answers_started'
@@ -31,7 +32,7 @@ type WorkflowEvent =
 export function logServicesWorkflow(event: WorkflowEvent, meta?: Record<string, unknown>) {
   if (process.env.NODE_ENV === 'development' || typeof window !== 'undefined') {
     try {
-      console.debug(`[services-workflow] ${event}`, meta ?? {});
+      logger.debug(`[services-workflow] ${event}`, meta ?? {});
     } catch {
       // no-op
     }

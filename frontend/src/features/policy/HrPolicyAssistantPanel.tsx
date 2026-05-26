@@ -4,6 +4,7 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
 import { Alert, Button, Card } from '../../components/antigravity';
+import { logger } from '../../lib/logger';
 import { hrAPI } from '../../api/client';
 import { formatRichMessage } from '../../utils/richMessage';
 import {
@@ -204,9 +205,8 @@ function HrAnswerResultCard({
                       if (!ref) return;
                       if (!isCitationDeepLinkAvailable()) return;
                       const ok = scrollToPolicyReference(ref);
-                      if (!ok && typeof console !== 'undefined') {
-                        // eslint-disable-next-line no-console
-                        console.warn(
+                      if (!ok) {
+                        logger.warn(
                           `[hr-policy-assistant] no policy clause matched evidence reference "${ref}"`
                         );
                       }

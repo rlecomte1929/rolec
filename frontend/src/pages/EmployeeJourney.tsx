@@ -13,6 +13,7 @@ import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/api
 import { formatRichMessage } from '../utils/richMessage';
 import { logEmployeeEntry } from '../utils/employeeJourneyPerf';
 import { trackAssignmentFlow, ASSIGNMENT_FLOW_EVENTS } from '../perf/assignmentLinkingInstrumentation';
+import { statusLabel } from '../lib/statusLabel';
 import { getApiErrorCode } from '../utils/apiDetail';
 import { trackFirstMeaningfulContent, trackRouteEntry, trackShellRender } from '../perf/pagePerf';
 import { getLastVisited } from '../utils/employeeCaseProgress';
@@ -45,7 +46,7 @@ type FlowStep = {
   mutedHint?: string;
 };
 
-/** Basic UUID shape: used to catch swapped claim fields. */
+/** Pattern to detect a case code pasted into the wrong field. */
 const ASSIGNMENT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -65,6 +66,12 @@ function formatOverviewDate(iso: string | null | undefined): string {
 function linkedStatusLabel(row: EmployeeLinkedOverviewRow): string {
   const parts = [row.status, row.current_stage].filter(Boolean);
   return parts.length ? parts.join(' · ') : '-';
+}
+
+/** Maps backend claim-state codes to human-readable strings.
+ *  Delegates to the shared statusLabel() utility (AUDIT-A5 / AIQ-358). */
+function claimStateLabel(state: string): string {
+  return statusLabel(state);
 }
 
 function ManualClaimInstructions({ signedInPrincipal }: { signedInPrincipal: string | null }) {
@@ -136,7 +143,7 @@ export const EmployeeJourney: React.FC = () => {
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimingPendingId, setClaimingPendingId] = useState<string | null>(null);
   const [linkRec, setLinkRec] = useState<PostSignupReconciliation | null>(null);
-  /** Hub: collapsed manual UUID form unless user opens it (always expanded for primary fallback). */
+  /** Hub: collapsed manual claim form unless user opens it (always expanded for primary fallback). */
   const [manualClaimExpanded, setManualClaimExpanded] = useState(false);
   const [bannerDismissNonce, setBannerDismissNonce] = useState(0);
 
@@ -145,7 +152,7 @@ export const EmployeeJourney: React.FC = () => {
   /** No linked and no auto-detected pending → full assignment-ID / manual claim experience. */
   const showPrimaryManualClaimPage = !hasLinked && !hasPendingOnly;
   const showPendingSection = pendingCount > 0;
-  /** Secondary manual path: linked and/or pending hub: recovery & HR UUID without a parallel API. */
+  /** Secondary manual path: linked and/or pending hub: recovery & HR case code without a parallel API. */
   const showSecondaryManualClaimCard = hasLinked || hasPendingOnly;
 
   const pendingIdsSignature = useMemo(
@@ -261,7 +268,7 @@ export const EmployeeJourney: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pre-fill ?assignment_id= (no token present — HR sent a plain link with the UUID)
+  // Pre-fill ?assignment_id= (no token present — HR sent a plain link with the case code)
   useEffect(() => {
     const urlAssignmentId = searchParams.get('assignment_id');
     if (urlAssignmentId && !claimId) setClaimId(urlAssignmentId);
@@ -335,7 +342,7 @@ export const EmployeeJourney: React.FC = () => {
       navigate(`/employee/case/${nextAssignment}/summary`);
     } catch (err: unknown) {
       const transport = getClientTransportErrorMessage(err);
-      setError(transport ?? getApiErrorMessage(err, 'Unable to link this assignment.'));
+      setError(transport ?? getApiErrorMessage(err, "We couldn't link this case. Check the code from HR and try again, or contact your HR team if the issue persists."));
       trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.linkPendingComplete, {
         ok: false,
         assignmentId: pendingAssignmentId,
@@ -352,7 +359,7 @@ export const EmployeeJourney: React.FC = () => {
       trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.manualClaimClientValidationFailed, {
         reason: 'missing_fields',
       });
-      setError('Fill both fields: your login (left) and the assignment ID from HR (right).');
+      setError('Fill in both fields: your login email on the left, and the case code from HR on the right.');
       return;
     }
     const idTrim = claimId.trim();
@@ -362,7 +369,7 @@ export const EmployeeJourney: React.FC = () => {
         reason: 'assignment_id_in_login_field',
       });
       setError(
-        'You pasted the assignment ID into the first field. Put the long ID (with dashes) in “Assignment ID” on the right, and your ReloPass email or username on the left.'
+        'That case code goes in the second field. Put your ReloPass email or username on the left, and the case code from HR on the right.'
       );
       return;
     }
@@ -371,7 +378,7 @@ export const EmployeeJourney: React.FC = () => {
         reason: 'email_in_assignment_field',
       });
       setError(
-        'The assignment ID is not an email address: use the UUID from HR in the right field only.'
+        'That looks like an email address — paste the case code from HR instead. It looks like abc-123-….'
       );
       return;
     }
@@ -391,7 +398,28 @@ export const EmployeeJourney: React.FC = () => {
       navigate(`/employee/case/${nextAssignment}/summary`);
     } catch (err: unknown) {
       const transport = getClientTransportErrorMessage(err);
-      setError(transport ?? getApiErrorMessage(err, 'Unable to claim assignment.'));
+      if (transport) {
+        setError(transport);
+      } else {
+        const code = getApiErrorCode(err);
+        const perModeMessages: Record<string, string> = {
+          CLAIM_ACCOUNT_IDENTIFIER_MISMATCH:
+            "Your email doesn't match what HR registered. Try the email on your offer letter, or ask HR to update it.",
+          CLAIM_PENDING_CONTACT_MISMATCH:
+            "Your email doesn't match what HR registered. Try the email on your offer letter, or ask HR to update it.",
+          CLAIM_ASSIGNMENT_ALREADY_CLAIMED:
+            'This case code is already claimed by another account. If that wasn\'t you, contact your HR team.',
+          CLAIM_ASSIGNMENT_NOT_PENDING:
+            'This case code is already claimed by another account. If that wasn\'t you, contact your HR team.',
+          CLAIM_ASSIGNMENT_IDENTIFIER_MISMATCH:
+            'We couldn\'t find that case code. Double-check the email from HR — codes look like `abc-123-…`.',
+          CLAIM_MISSING_REQUEST_IDENTIFIER:
+            'We couldn\'t find that case code. Double-check the email from HR — codes look like `abc-123-…`.',
+        };
+        const friendlyMessage = (code && perModeMessages[code])
+          ?? getApiErrorMessage(err, 'Something went wrong linking your case. Please try again or contact HR.');
+        setError(friendlyMessage);
+      }
       trackAssignmentFlow(ASSIGNMENT_FLOW_EVENTS.manualClaimComplete, {
         ok: false,
         assignmentId: idTrim,
@@ -500,7 +528,7 @@ export const EmployeeJourney: React.FC = () => {
     ) {
       blocks.push(
         <Alert key="ambiguous" variant="warning" className="mb-4" title="Could not link automatically">
-          Another account may already own this contact or assignment. Send HR your work email and assignment ID to confirm
+          Another account may already own this case. Send HR your work email and the case code to confirm
           the correct login.
         </Alert>
       );
@@ -550,7 +578,7 @@ export const EmployeeJourney: React.FC = () => {
       ? 'Open a case or pick up where you left off.'
       : hasPendingOnly
         ? 'Accept your pending case below, then open it to get started.'
-        : 'Link a case with the assignment ID from HR, or wait for HR to match your email.';
+        : 'Enter the case code from HR to link your case, or wait for HR to match your email.';
 
   return (
     <AppShell title={shellTitle} subtitle={shellSubtitle}>
@@ -641,7 +669,6 @@ export const EmployeeJourney: React.FC = () => {
                         {formatOverviewDate(row.updated_at || row.created_at)}
                       </span>
                     </div>
-                    <div className="text-xs font-mono text-[#94a3b8] pt-1">{row.assignment_id}</div>
                   </div>
                   <div className="flex sm:flex-col sm:justify-center shrink-0">
                     <Button onClick={() => navigate(openCaseHref(row.assignment_id, row.status))}>Open case</Button>
@@ -685,14 +712,13 @@ export const EmployeeJourney: React.FC = () => {
                       <span className="font-medium text-[#0b2b43]">{formatOverviewDate(row.created_at)}</span>
                     </div>
                     {st ? (
-                      <div className="text-xs text-[#94a3b8]">Claim state: {st}</div>
+                      <div className="text-xs text-[#94a3b8]">{claimStateLabel(st)}</div>
                     ) : null}
-                    <div className="text-xs font-mono text-[#cbd5e1]">{row.assignment_id}</div>
                   </div>
                   <div className="flex sm:flex-col sm:justify-center shrink-0">
                     {blocked ? (
                       <p className="text-sm text-[#b45309] max-w-xs">
-                        Needs HR follow-up or manual claim. Use the form below if you have the assignment ID.
+                        Needs HR follow-up. Use the form below if you have the case code from HR.
                       </p>
                     ) : (
                       <LoadingButton
@@ -730,8 +756,8 @@ export const EmployeeJourney: React.FC = () => {
             <Input
               value={claimId}
               onChange={setClaimId}
-              label="Step 2: Assignment ID from HR (UUID)"
-              placeholder="Paste only the ID from HR, not your email"
+              label="Step 2: Case code from HR"
+              placeholder="The code HR sent you — it looks like abc-123-…"
               fullWidth
             />
           </div>

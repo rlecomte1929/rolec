@@ -10,6 +10,7 @@
  */
 
 import { classifyQuery, REJECTION_MSG } from './topic_classifier';
+import { logger } from '../../lib/logger';
 
 // ---------------------------------------------------------------------------
 // Public constants
@@ -134,7 +135,7 @@ function auditLog(entry: {
   trigger_type: TriggerType;
   timestamp: string;
 }): void {
-  console.log(
+  logger.log(
     `[input_guardrails] session=${entry.session_id ?? 'unknown'} ` +
     `trigger=${entry.trigger_type} ts=${entry.timestamp}`,
   );

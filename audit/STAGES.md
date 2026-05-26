@@ -15,7 +15,8 @@
 
 | Stage | Date | Branch | PR | Findings closed | Re-audit doc | Score deltas | Notes |
 |---|---|---|---|---|---|---|---|
-| 0 | 2026-05-25 | `audit/stage-0-governance` | [#118](https://github.com/rlecomte1929/rolec/pull/118) | A7 (CLAUDE.md uvicorn fix) + governance scaffold + audit/* committed | n/a (Stage 0 = scaffolding) | n/a | 14 Notion AI Work Queue entries created; branch convention documented; rolling log + composite-score timeline + Tier A/B/C findings tracker scaffolded. PR awaiting merge. |
+| 0 | 2026-05-25 | `audit/stage-0-governance` | [#118](https://github.com/rlecomte1929/rolec/pull/118) | A7 (CLAUDE.md uvicorn fix) + governance scaffold + audit/* committed | n/a (Stage 0 = scaffolding) | n/a | 14 Notion AI Work Queue entries created; branch convention documented; rolling log + composite-score timeline + Tier A/B/C findings tracker scaffolded. **Merged 2026-05-25.** |
+| 1 | 2026-05-25 | `audit/stage-1-security` | [#119](https://github.com/rlecomte1929/rolec/pull/119) | **A2** (already done by team commit 4a3b43c — verified) + **A3** (script + CI guard shipped; 113-entry seed allowlist; triage queued as A3-followup) + **A1 partial** (5 PRAGMA blocks guarded, 3 helpers guarded, 4 savepoint protections — original failing statement no longer fails; deeper init_db DDL has same class issue, queued as A1-followup). PR also carries parallel team work: **A4** (W1 copy), **A5** (statusLabel utility), **A6** partial (icon aria-labels), **A8** (logger + strip console.*) | [`audit/re-audit-stage-1-security.md`](re-audit-stage-1-security.md) | Security: **6.5 → 7.5** (+1.0) | Discovered `patch_case` likely also unguarded (new P1 finding). Two follow-ups: [A1-followup](https://www.notion.so/36b887c64d48819a92dcf3583373e6f7), [A3-followup](https://www.notion.so/36b887c64d48813abfe4dfbc4e2fb8a2). |
 
 ---
 
@@ -34,7 +35,7 @@ This table is updated at the end of each stage that re-audits a lens. Compare ag
 | Accessibility | 4.5 | — | — | — | — | — | — | — | — | — | — |
 | UX copy | 4.0 | — | — | — | — | — | — | — | — | — | — |
 | QA | 6.0 | — | — | — | — | — | — | — | — | — | — |
-| Security | 6.5 | — | — | — | — | — | — | — | — | — | — |
+| Security | 6.5 | **7.5** | — | — | — | — | — | — | — | — | — |
 | Performance | 6.0 | — | — | — | — | — | — | — | — | — | — |
 | **Composite** | **6.0** | — | — | — | — | — | — | — | — | — | — |
 
@@ -48,9 +49,9 @@ This table mirrors the `audit/00-synthesis.md` "Tiered punch list" (A/B/C). Mark
 
 | ID | Title | Source | Notion URL | Closed in | PR |
 |---|---|---|---|---|---|
-| A1 | Root-cause + fix `ensure_initialized` startup transaction abort | SEC-1 / QA-1 / PERF-8 | [AUDIT-A1](https://www.notion.so/36b887c64d4881e6a865d0bda0fb78db) | Stage 1 | — |
-| A2 | Add `Depends(get_current_user)` to `cases.py:101 get_case` defensively | SEC-3 | [AUDIT-A2](https://www.notion.so/36b887c64d48811dbe6ff3e8bc6ca05b) | Stage 1 | — |
-| A3 | RLS coverage CI guard | SEC-2 | [AUDIT-A3](https://www.notion.so/36b887c64d4881b1b9a2efda2dc6d0a7) | Stage 1 | — |
+| A1 | Root-cause + fix `ensure_initialized` startup transaction abort | SEC-1 / QA-1 / PERF-8 | [AUDIT-A1](https://www.notion.so/36b887c64d4881e6a865d0bda0fb78db) | Stage 1 (partial) + [A1-followup](https://www.notion.so/36b887c64d48819a92dcf3583373e6f7) | (stage-1) |
+| A2 | Add `Depends(get_current_user)` to `cases.py:101 get_case` defensively | SEC-3 | [AUDIT-A2](https://www.notion.so/36b887c64d48811dbe6ff3e8bc6ca05b) | Stage 1 (was already team-fixed in commit 4a3b43c) | (stage-1) |
+| A3 | RLS coverage CI guard | SEC-2 | [AUDIT-A3](https://www.notion.so/36b887c64d4881b1b9a2efda2dc6d0a7) | Stage 1 (instrumentation) + [A3-followup](https://www.notion.so/36b887c64d48813abfe4dfbc4e2fb8a2) | (stage-1) |
 | A4 | Rewrite W1 surface copy | COPY-1, COPY-3, DES-LIVE-1 | [AUDIT-A4](https://www.notion.so/36b887c64d4881fa8b88f3fe2b464cf2) | Stage 2 | — |
 | A5 | `statusLabel()` utility + replace render sites | COPY-2 / DES-LIVE-2 | [AUDIT-A5](https://www.notion.so/36b887c64d4881dba8a2ce2305d52089) | Stage 2 | — |
 | A6 | Auth.tsx label associations + icon-only aria-labels | A11Y-1, A11Y-4 | [AUDIT-A6](https://www.notion.so/36b887c64d488191a70bcc576e43a394) | Stage 3 | — |

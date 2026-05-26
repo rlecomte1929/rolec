@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen, ChevronRight } from 'lucide-react';
 import { NavIcon } from '../features/platform-v2/sidebar/navIcons';
-import { ROUTE_DEFS } from '../navigation/routes';
+import { ROUTE_DEFS, buildRoute } from '../navigation/routes';
 import { getHrNotificationCounts, type HrNotificationCounts } from '../api/hrCatalog';
 import { getAdminNotificationCounts, type AdminNotificationCounts } from '../api/adminCatalog';
 
@@ -229,8 +229,23 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
 
   const notifCtx: NotifContext = { hr: hrNotif, admin: adminNotif };
 
+  // Extract caseId from the URL when on a case-scoped employee route
+  // e.g. /employee/case/43556892-2f33-4ab1-8533-9c11095e5565/wizard/1 → caseId
+  const urlCaseId = location.pathname.match(/\/employee\/case\/([^/]+)/)?.[1] ?? null;
+
+  // Resolve the effective `to` for an item, allowing case-scoped overrides
+  const resolveItemTo = (item: SectionItem): string => {
+    if (item.id === 'roadmap' && urlCaseId) {
+      return buildRoute('employeeCaseRoadmap', { caseId: urlCaseId });
+    }
+    if (item.id === 'dossier' && urlCaseId) {
+      return buildRoute('employeeCaseDossier', { caseId: urlCaseId });
+    }
+    return item.toByRole?.[role] ?? item.to;
+  };
+
   const isActive = (item: SectionItem) => {
-    const path = item.toByRole?.[role] ?? item.to;
+    const path = resolveItemTo(item);
     if (item.exact) return location.pathname === path;
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
@@ -307,7 +322,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
             />
             {section.items.map((item) => {
               const active = isActive(item);
-              const to = item.toByRole?.[role] ?? item.to;
+              const to = resolveItemTo(item);
 
               let badgeVariant: BadgeVariant | undefined;
               let badgeCount: number | undefined;

@@ -27,6 +27,8 @@ export const ROUTE_DEFS = {
   employeeCaseDossierBuild: { path: '/employee/case/:caseId/dossier/build', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   // [P1-6] Roadmap page with doc-count chips per step
   employeeCaseRoadmap: { path: '/employee/case/:caseId/roadmap', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  // [MVG-6B] Employee immigration document checklist (added by commit 2757862).
+  employeeCaseImmigrationChecklist: { path: '/employee/case/:caseId/immigration/checklist', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   // [P2-3] Form Editor — per-form field editing
   employeeCaseFormEditor: { path: '/employee/case/:caseId/forms/:formId/edit', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrDashboard: { path: '/hr/dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
@@ -43,6 +45,10 @@ export const ROUTE_DEFS = {
   hrComplianceIndex: { path: '/hr/compliance', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompliance: { path: '/hr/compliance/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrPackage: { path: '/hr/package/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  // [MVG-6A] HR immigration case create form + timeline (added by commit 2757862;
+  // route keys were missing from this registry, breaking the TS build).
+  hrImmigrationCreate: { path: '/hr/immigration/new', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  hrImmigrationCase: { path: '/hr/immigration/:immigrationCaseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
   auditNavigation: { path: '/audit/navigation', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   providers: { path: '/providers', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },
   services: { path: '/services', roles: ['HR', 'EMPLOYEE', 'ADMIN'] as RouteRole[] },

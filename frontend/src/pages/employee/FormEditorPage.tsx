@@ -30,6 +30,7 @@ import React, {
 } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { logger } from '../../lib/logger';
 import { buildRoute } from '../../navigation/routes';
 import { formEditorAPI } from '../../api/formEditor';
 import { dossierAPI } from '../../api/dossier';
@@ -300,7 +301,7 @@ export const FormEditorPage: React.FC = () => {
       await formEditorAPI.downloadPdf(caseId, formId);
     } catch (e) {
       // Non-blocking: log and surface nothing — user can retry
-      console.error('[P3-3] PDF download failed', e);
+      logger.error('[P3-3] PDF download failed', e);
     } finally {
       setIsDownloadingPdf(false);
     }

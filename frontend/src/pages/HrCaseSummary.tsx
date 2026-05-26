@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { logger } from '../lib/logger';
 import { Alert, Badge, Button, Card } from '../components/antigravity';
 import { hrAPI } from '../api/client';
 import { hrReopenAssignment } from '../api/rpc';
@@ -171,7 +172,7 @@ export const HrCaseSummary: React.FC = () => {
     setReopenSuccess('');
     setIsReopening(true);
     if (import.meta.env.DEV) {
-      console.debug('RPC transition_assignment: HR_REOPEN', {
+      logger.debug('RPC transition_assignment: HR_REOPEN', {
         assignmentId: assignment.id,
         note: reopenNote || null,
       });

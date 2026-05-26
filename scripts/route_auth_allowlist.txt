@@ -1,0 +1,88 @@
+# Route-auth allowlist — AUDIT-B6
+# =================================
+# Each non-comment line has format:  relative/path/to/file.py:function_name
+# Lines starting with # are ignored.
+#
+# Add a route here ONLY if it is:
+#   (a) intentionally public (health checks, static reference data), OR
+#   (b) uses a non-standard auth mechanism (manual JWT header extraction) that
+#       the AST scanner cannot detect, OR
+#   (c) a known security gap tracked in the backlog (add a TODO:SEC comment).
+#
+# Rule: every allowlist entry MUST have a comment explaining why it is exempt.
+# Blank entries without justification will be rejected in code review.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+# ── Intentionally public — no auth needed ─────────────────────────────────────
+
+backend/main.py:supabase_health
+# Health probe. Returns degraded-state body but no PII. Always 200.
+# Used by uptime monitors and the frontend splash screen.
+
+backend/app/routers/providers.py:verify_provider_token_endpoint
+# Token validity check: the *token itself* is the credential.
+# Returns {valid: true/false} — does not expose sensitive data.
+# A valid provider token is issued by the server, so this is safe.
+
+backend/app/routers/rules.py:get_pet_restrictions
+# Returns static country-level pet import rules (public IATA/gov data).
+# No user data; used by the household builder before login.
+
+backend/app/routers/rules.py:check_breed
+# Returns public breed-restriction lookup for a destination country.
+# Same reasoning as get_pet_restrictions above.
+
+backend/app/routers/policy_templates.py:get_policy_templates
+# Returns the 3-tier template library (Conservative/Standard/Premium).
+# Seeded from public benchmark data (AIRINC, Mercer, ECA).
+# No company-specific data; used for HR onboarding before policy is created.
+
+
+# ── Non-standard auth — manual JWT extraction via Authorization header ─────────
+# These routes call get_supabase_client_from_header() / _get_client() on the
+# raw Authorization header instead of using FastAPI Depends().
+# The AST scanner cannot detect header-based auth patterns.
+
+backend/routes/compat.py:compat_get_case
+# Compat shim; manually validates Supabase JWT via Authorization header.
+# See routes/compat.py:_get_supabase_client_from_header.
+
+backend/routes/compat.py:compat_get_requirements
+# Same pattern as compat_get_case above.
+
+backend/routes/compat.py:compat_admin_context
+# Same pattern. Validates @relopass.com admin JWT manually.
+
+backend/routes/relocation.py:list_relocation_cases
+# Manual Supabase JWT check via Authorization header + looks_like_supabase_jwt().
+
+backend/routes/relocation.py:get_relocation_case
+# Same pattern as list_relocation_cases above.
+
+backend/routes/relocation.py:list_relocation_runs
+# Same pattern as list_relocation_cases above.
+
+backend/routes/relocation_classify.py:get_relocation_classification
+# Same pattern: _get_client(authorization) validates Supabase JWT in header.
+
+
+# ── Known security gaps — tracked in backlog ──────────────────────────────────
+# TODO:SEC — these routes expose sensitive data without enforced auth.
+# Remove from this allowlist once the fix is deployed.
+
+backend/main.py:debug_db
+# TODO:SEC Remove unauthenticated debug endpoint before production launch.
+# Tracked: AUDIT — backend/main.py debug endpoints need auth guard or removal.
+# Exposes DB connectivity info; low-risk but non-zero.
+
+backend/main.py:debug_kv_get
+# TODO:SEC Same as debug_db. KV store key lookups should require admin auth.
+
+backend/main.py:debug_supabase
+# TODO:SEC Unauthenticated Supabase debug probe. Same remediation as debug_db.
+
+backend/app/routers/cases.py:get_research_status
+# TODO:SEC GAP-9 research status endpoint has no auth — case data exposed by ID.
+# Tracked: add Depends(get_current_user) and enforce case ownership check.
+# Low-urgency (research progress only, no PII), but must be fixed pre-launch.

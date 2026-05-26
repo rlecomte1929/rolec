@@ -5,6 +5,7 @@ import { RecommendationPanel } from '../components/RecommendationPanel';
 import { dashboardAPI } from '../api/client';
 import type { DashboardResponse } from '../types';
 import { AppShell } from '../components/AppShell';
+import { statusLabel } from '../lib/statusLabel';
 
 export const Dashboard: React.FC = () => {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
@@ -105,7 +106,7 @@ export const Dashboard: React.FC = () => {
               <div className="flex justify-between items-start">
                 <h3 className="font-semibold text-gray-900">Immigration Readiness</h3>
                 <Badge variant={getReadinessColor(dashboard.immigrationReadiness.status)}>
-                  {dashboard.immigrationReadiness.status}
+                  {statusLabel(dashboard.immigrationReadiness.status)}
                 </Badge>
               </div>
               <div className="text-3xl font-bold text-gray-900">
@@ -155,7 +156,7 @@ export const Dashboard: React.FC = () => {
 
       <div className="mb-6">
         <div className="border-b border-[#e2e8f0]">
-          <nav className="flex -mb-px space-x-8">
+          <nav role="tablist" aria-label="Dashboard sections" className="flex -mb-px space-x-8">
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'timeline', label: 'Timeline' },
@@ -166,6 +167,10 @@ export const Dashboard: React.FC = () => {
             ].map((tab) => (
               <button
                 key={tab.id}
+                id={`dashboard-tab-${tab.id}`}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                aria-controls={`dashboard-panel-${tab.id}`}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
@@ -185,7 +190,11 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div>
+      <div
+        role="tabpanel"
+        id={`dashboard-panel-${activeTab}`}
+        aria-labelledby={`dashboard-tab-${activeTab}`}
+      >
         {activeTab === 'overview' && (
           <div className="space-y-8">
               {/* Immigration Readiness Details */}

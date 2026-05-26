@@ -664,7 +664,7 @@ export const HrAssignmentReview: React.FC = () => {
                     <div className="text-sm font-semibold text-[#0b2b43]">ReloPass Assistant</div>
                     <div className="text-xs text-[#6b7280]">AI Guidance</div>
                   </div>
-                  <button className="text-[#94a3b8] hover:text-[#0b2b43]">⋯</button>
+                  <button aria-label="More options" className="text-[#94a3b8] hover:text-[#0b2b43]">⋯</button>
                 </div>
                 <div className="mt-4 space-y-3 text-sm text-[#4b5563]">
                   <div className="border border-[#e2e8f0] rounded-lg p-3 bg-[#f8fafc]">

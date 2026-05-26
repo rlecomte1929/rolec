@@ -478,7 +478,7 @@ export function MobilityControlCenterV2Page() {
   ], []);
 
   return (
-    <AppShell wide>
+    <AppShell wide title="Mobility control center">
       <div className="px-2 py-2 xl:px-4 xl:py-4">
         {/* Header */}
         <div className="mb-5">

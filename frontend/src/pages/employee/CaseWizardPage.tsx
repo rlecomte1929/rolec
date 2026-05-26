@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
+import { logger } from '../../lib/logger';
 import { PolicyAssistantFab } from '../../features/policy/PolicyAssistantFab';
 import { PolicyAssistantDockedShell } from '../../features/policy/PolicyAssistantDockedShell';
 import { EmployeePolicyAssistantPanel } from '../../features/policy/EmployeePolicyAssistantPanel';
@@ -345,7 +346,7 @@ export const CaseWizardPage: React.FC = () => {
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     if (!caseData) return;
-    console.debug('Wizard defaults (relocationBasics):', caseToWizardDraft(caseData).relocationBasics);
+    logger.debug('Wizard defaults (relocationBasics):', caseToWizardDraft(caseData).relocationBasics);
   }, [caseData?.id, caseData?.updatedAt]);
 
   const overviewRowForAssignment = useMemo(

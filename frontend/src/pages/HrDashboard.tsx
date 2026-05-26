@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AppShell } from '../components/AppShell';
+import { logger } from '../lib/logger';
 import { Card, Button, Input, Alert, Badge } from '../components/antigravity';
 import { hrAPI } from '../api/client';
 import type { AssignmentSummary } from '../types';
@@ -177,7 +178,7 @@ export const HrDashboard: React.FC = () => {
       const msg = data?.detail || data?.error || 'Unable to assign case.';
       setError(msg);
       // Log full error to console for debugging (see docs/DEBUG_ASSIGN_ERROR.md)
-      console.error('[Assign failed]', msg, data || err);
+      logger.error('[Assign failed]', msg, data || err);
     } finally {
       // Measure click -> UI render (best-effort).
       void endInteraction(interaction);

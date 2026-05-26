@@ -37,6 +37,7 @@
 
 import { checkFaithfulness } from './faithfulness_checker';
 import type { PolicyChunk } from './retrieve_policy';
+import { logger } from '../../lib/logger';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -270,7 +271,7 @@ export async function runOutputGuardrails(
       timestamp: new Date().toISOString(),
     };
 
-    console.warn(
+    logger.warn(
       `[output_guardrails] CROSS_TIER_BLOCK session=${sessionId}` +
         ` employee_tier=${employeeTier}` +
         ` flagged_value="${firstLeak.value}"` +
@@ -300,7 +301,7 @@ export async function runOutputGuardrails(
       timestamp: new Date().toISOString(),
     };
 
-    console.warn(
+    logger.warn(
       `[output_guardrails] FAITHFULNESS_BLOCK session=${sessionId}` +
         ` score=${faithfulness.score}` +
         ` flagged_sentences=${faithfulness.flaggedSentences.length}`,

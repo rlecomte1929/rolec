@@ -8,6 +8,7 @@ import type { RfqSummary } from '../../api/client';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { buildRoute } from '../../navigation/routes';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId, withAssignmentQuery } from '../../utils/employeeAssignmentScope';
+import { statusLabel } from '../../lib/statusLabel';
 
 export const QuotesInbox: React.FC = () => {
   const navigate = useNavigate();
@@ -129,7 +130,7 @@ export const QuotesInbox: React.FC = () => {
                   <div className="font-medium text-[#0b2b43]">{rfq.rfq_ref}</div>
                   <div className="text-sm text-[#6b7280]">
                     {rfq.items?.length || 0} items · {rfq.recipients?.length || 0} recipients ·{' '}
-                    {rfq.status}
+                    {statusLabel(rfq.status)}
                   </div>
                 </div>
                 <Button

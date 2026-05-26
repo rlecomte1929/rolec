@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
+import { logger } from '../../lib/logger';
 import { Card, Button, Badge, Alert } from '../../components/antigravity';
 import { adminAPI, adminCollaborationAPI } from '../../api/client';
 import { ROUTE_DEFS } from '../../navigation/routes';
@@ -289,7 +290,7 @@ export const AdminMessages: React.FC = () => {
       setEditingTicket(null);
       loadSupportCases();
     } catch (e) {
-      console.error(e);
+      logger.error(e);
     }
   };
 
@@ -391,7 +392,7 @@ export const AdminMessages: React.FC = () => {
                               const note = window.prompt('Internal note:');
                               if (note) {
                                 const reason = window.prompt('Reason for note (required):');
-                                if (reason) adminAPI.addSupportNote(c.id, { note, reason }).then(loadSupportCases).catch(console.error);
+                                if (reason) adminAPI.addSupportNote(c.id, { note, reason }).then(loadSupportCases).catch(logger.error);
                               }
                             }}
                           >
@@ -403,7 +404,7 @@ export const AdminMessages: React.FC = () => {
                             onClick={() => {
                               const reason = window.prompt('Reason for export (required):');
                               if (reason) {
-                                adminAPI.adminAction('export-support-bundle', { reason, payload: { support_case_id: c.id } }).then(() => alert('Export requested.')).catch(console.error);
+                                adminAPI.adminAction('export-support-bundle', { reason, payload: { support_case_id: c.id } }).then(() => alert('Export requested.')).catch(logger.error);
                               }
                             }}
                           >

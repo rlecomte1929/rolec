@@ -16,7 +16,6 @@ Public API
 from __future__ import annotations
 
 import base64
-import json
 import logging
 import os
 import uuid
@@ -297,43 +296,27 @@ async def extract_passport(image_bytes: bytes, mime_type: str = "image/jpeg") ->
     """
     Send the passport image to GPT-4o vision and return a PassportExtractionResult.
     Raises ValueError for low-quality or non-passport images.
-    """
-    try:
-        from openai import AsyncOpenAI  # type: ignore
-    except ImportError:
-        raise RuntimeError("openai package is not installed. Run: pip install openai")
 
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY environment variable not set.")
+    Uses llm_client.complete() for timeout, retry, and structured logging.
+    """
+    from .llm_client import complete as llm_complete  # local import avoids circular dep
 
     # Encode image as base64 data URL
     b64 = base64.b64encode(image_bytes).decode("utf-8")
     data_url = f"data:{mime_type};base64,{b64}"
 
-    client = AsyncOpenAI(api_key=api_key)
-
-    response = await client.chat.completions.create(
+    # Call GPT-4o vision via the shared wrapper.
+    # We pass an empty schema so the wrapper uses json_object mode (free-form JSON),
+    # which is required here because the response includes dynamic "confidence" keys.
+    data = await llm_complete(
+        system="",
+        user=_EXTRACTION_PROMPT,
+        schema={},
+        image_url=data_url,
+        timeout=45.0,       # vision calls are slower; allow extra time
+        max_retries=2,
         model="gpt-4o",
-        max_tokens=1024,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": _EXTRACTION_PROMPT},
-                    {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
-                ],
-            }
-        ],
-        response_format={"type": "json_object"},
     )
-
-    raw = response.choices[0].message.content or "{}"
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        log.error("GPT-4o returned non-JSON: %s", raw[:200])
-        raise ValueError("Could not parse OCR response from GPT-4o.") from exc
 
     # Check for non-passport or low-quality flags
     if data.get("not_a_passport"):

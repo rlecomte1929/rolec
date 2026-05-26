@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, Button } from '../../components/antigravity';
+import { logger } from '../../lib/logger';
 
 interface Props {
   children: React.ReactNode;
@@ -25,7 +26,7 @@ export class PolicyConfigRouteErrorBoundary extends React.Component<Props, State
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[PolicyConfigRouteErrorBoundary]', error.message, info.componentStack);
+    logger.error('[PolicyConfigRouteErrorBoundary]', error.message, info.componentStack);
   }
 
   render() {

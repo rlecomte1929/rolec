@@ -8,6 +8,7 @@ import { hrAPI } from '../api/client';
 import { buildRoute } from '../navigation/routes';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
+import { statusLabel } from '../lib/statusLabel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
 import { RfqModal } from '../components/case/RfqModal';
@@ -171,7 +172,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                           <span className={t.status === 'overdue' ? 'text-[#ef4444] font-medium' : ''}>
                             {t.title}
                           </span>
-                          <span className="text-xs text-[#94a3b8]">{t.status}</span>
+                          <span className="text-xs text-[#94a3b8]">{statusLabel(t.status)}</span>
                           {t.due_date && <span className="text-xs">· {t.due_date}</span>}
                         </li>
                       ))}
@@ -343,7 +344,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                               : 'text-[#d97706]'
                           }
                         >
-                          {qr.status}
+                          {statusLabel(qr.status)}
                         </span>
                       </p>
                     </div>
@@ -396,7 +397,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       {rfqSuccessMsg && (
         <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-5 py-3 shadow-lg text-sm text-[#166534] font-medium">
           ✓ {rfqSuccessMsg}
-          <button type="button" onClick={() => setRfqSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</button>
+          <button type="button" aria-label="Dismiss notification" onClick={() => setRfqSuccessMsg('')} className="ml-3 text-[#16a34a] hover:text-[#166534]">✕</button>
         </div>
       )}
       <RfqModal
