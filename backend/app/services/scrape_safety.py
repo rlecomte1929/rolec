@@ -315,6 +315,9 @@ def resolve_destination_request(
 
 def _ticket_to_dict(row: Any) -> Dict[str, Any]:
     d = dict(row)
+    for k in ("id", "company_id", "requested_by"):
+        if k in d and d[k] is not None:
+            d[k] = str(d[k])
     for k in ("created_at", "updated_at", "resolved_at"):
         v = d.get(k)
         if hasattr(v, "isoformat"):
