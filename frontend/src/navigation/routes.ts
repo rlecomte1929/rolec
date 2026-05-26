@@ -28,7 +28,8 @@ export const ROUTE_DEFS = {
   // [P1-6] Roadmap page with doc-count chips per step
   employeeCaseRoadmap: { path: '/employee/case/:caseId/roadmap', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   // [MVG-6B] Employee immigration document checklist (added by commit 2757862).
-  employeeCaseImmigrationChecklist: { path: '/employee/case/:caseId/immigration/checklist', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  // HR role added so HR users can view the checklist from the immigration timeline "View employee checklist" button.
+  employeeCaseImmigrationChecklist: { path: '/employee/case/:caseId/immigration/checklist', roles: ['EMPLOYEE', 'HR', 'ADMIN'] as RouteRole[] },
   // [P2-3] Form Editor — per-form field editing
   employeeCaseFormEditor: { path: '/employee/case/:caseId/forms/:formId/edit', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   hrDashboard: { path: '/hr/dashboard', roles: ['HR', 'ADMIN'] as RouteRole[] },
