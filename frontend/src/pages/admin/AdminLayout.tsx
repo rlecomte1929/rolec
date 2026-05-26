@@ -28,6 +28,14 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
 
+      {/* AIQ-397: skip-link for keyboard users — visually hidden until focused. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-[#0b2b43] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
+
       <PlatformShellSidebar
         role="ADMIN"
         companySlot={<CompanySwitcher />}
@@ -74,7 +82,7 @@ export const AdminLayout: React.FC<Props> = ({ title, subtitle, children, header
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main id="main-content" className="flex-1 overflow-y-auto">
           <div className="px-8 py-7">
             {(title || headerRight) && (
               <div className="flex items-start justify-between mb-6">

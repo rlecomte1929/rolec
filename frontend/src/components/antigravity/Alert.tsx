@@ -7,6 +7,19 @@ interface AlertProps {
   className?: string;
 }
 
+// AIQ-397 (AUDIT-A11Y-P2-followup):
+//   - error → role="alert" + aria-live="assertive" so screen readers interrupt
+//     immediately when something has gone wrong.
+//   - info / success / warning → role="status" + aria-live="polite" so the
+//     announcement waits its turn (non-interrupting) — matches WCAG SC 4.1.3
+//     guidance for transient status messages.
+const ARIA_BY_VARIANT: Record<NonNullable<AlertProps['variant']>, { role: 'alert' | 'status'; live: 'assertive' | 'polite' }> = {
+  info:    { role: 'status', live: 'polite' },
+  success: { role: 'status', live: 'polite' },
+  warning: { role: 'status', live: 'polite' },
+  error:   { role: 'alert',  live: 'assertive' },
+};
+
 export const Alert: React.FC<AlertProps> = ({
   children,
   variant = 'info',
@@ -19,9 +32,14 @@ export const Alert: React.FC<AlertProps> = ({
     warning: 'bg-[#f6f2e9] border-[#e2d6bf] text-[#7a5e2a]',
     error: 'bg-[#f7eeee] border-[#e6c9c9] text-[#7a2a2a]',
   };
-  
+  const aria = ARIA_BY_VARIANT[variant];
+
   return (
-    <div className={`border-l-4 p-4 rounded ${variants[variant]} ${className}`}>
+    <div
+      role={aria.role}
+      aria-live={aria.live}
+      className={`border-l-4 p-4 rounded ${variants[variant]} ${className}`}
+    >
       {title && <h3 className="font-semibold mb-1">{title}</h3>}
       <div className="text-sm">{children}</div>
     </div>

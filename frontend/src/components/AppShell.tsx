@@ -122,6 +122,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800">
 
+      {/* AIQ-397: skip-link for keyboard users — visually hidden until focused,
+          then jumps over the sidebar + topbar straight to the page content. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-[#0b2b43] focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
+
       <PlatformShellSidebar
         role={sbRole}
         companySlot={role !== 'ADMIN' ? <CompanyBrand /> : null}
@@ -194,7 +203,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
         )}
 
         {/* Main scrollable area */}
-        <main className="flex-1 overflow-y-auto">
+        <main id="main-content" className="flex-1 overflow-y-auto">
           <div className={wide ? 'px-6 py-6' : 'px-8 py-7 max-w-7xl mx-auto'}>
             {title && (
               <div className="mb-6">
