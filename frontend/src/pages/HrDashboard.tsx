@@ -249,7 +249,7 @@ export const HrDashboard: React.FC = () => {
   };
 
   return (
-    <AppShell title="Assignments" subtitle="Create cases, assign people, track status.">
+    <AppShell title="Cases" subtitle="Track every relocation case. Assign stakeholders, manage status, run the full lifecycle.">
       <div className="space-y-6">
         {/* P5-7: Policy calibration alerts — shown to HR/Admin when benefit caps need review */}
         <CalibrationAlertBanner />
