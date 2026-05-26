@@ -59,6 +59,18 @@ async def get_current_user(
     return user
 
 
+def require_role(role: UserRole):
+    """Return a FastAPI dependency that requires *role*. ADMIN users pass all role checks."""
+    def dependency(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+        user_role = user.get("role")
+        if user_role == UserRole.ADMIN.value:
+            return user
+        if user_role != role.value:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return user
+    return dependency
+
+
 def require_hr_or_employee(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Allow HR or Employee. Admin passes as HR."""
     r = user.get("role")
