@@ -309,7 +309,7 @@ function TierGate({ tier, required, label, children }: { tier: Tier; required: T
           </div>
           <div className="text-xs text-gray-500 mt-1">Ask your HR team to upgrade your ReloPass plan to unlock {label}.</div>
           <button className="mt-3 px-4 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors">
-            ✨ Request upgrade
+            Request upgrade
           </button>
         </div>
       </div>

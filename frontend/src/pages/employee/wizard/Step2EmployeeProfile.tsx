@@ -19,7 +19,7 @@ interface StepProps {
 
 const PreFilledChip: React.FC = () => (
   <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#e6f7f7] px-2 py-0.5 text-[10px] font-medium text-[#1f8e8b]">
-    ✨ Pre-filled from your profile
+    Pre-filled from your profile
   </span>
 );
 
