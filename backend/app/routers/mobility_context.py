@@ -18,10 +18,10 @@ async def mobility_authenticated_user(
     request: Request,
     authorization: Optional[str] = Header(None),
 ) -> Dict[str, Any]:
-    """Same as main.get_current_user; imported lazily to avoid circular imports at startup."""
-    from backend.main import get_current_user as main_get_current_user  # noqa: WPS433
+    """Delegates to auth_deps.get_current_user (P2 circular-import fix — AUDIT-C2.3)."""
+    from backend.app.auth_deps import get_current_user as _get_current_user  # noqa: WPS433
 
-    return await main_get_current_user(request, authorization)
+    return await _get_current_user(request, authorization)
 
 
 @router.get("/cases/{case_id}/context")
