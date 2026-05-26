@@ -52,6 +52,7 @@ const EmployeeDossierPage = lazy(() => import('./pages/employee/EmployeeDossierP
 // [P1-6] Case roadmap page
 const EmployeeCaseRoadmapPage = lazy(() => import('./pages/employee/EmployeeCaseRoadmapPage').then((module) => ({ default: module.EmployeeCaseRoadmapPage })));
 const ImmigrationPage = lazy(() => import('./pages/employee/ImmigrationPage').then((module) => ({ default: module.ImmigrationPage })));
+// [MVG-6] Immigration workflow screens
 const ImmigrationCaseCreatePage = lazy(() => import('./pages/hr/ImmigrationCaseCreatePage').then((module) => ({ default: module.ImmigrationCaseCreatePage })));
 const ImmigrationCasePage = lazy(() => import('./pages/hr/ImmigrationCasePage').then((module) => ({ default: module.ImmigrationCasePage })));
 const ImmigrationChecklistPage = lazy(() => import('./pages/employee/ImmigrationChecklistPage').then((module) => ({ default: module.ImmigrationChecklistPage })));

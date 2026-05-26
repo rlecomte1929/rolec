@@ -4,12 +4,12 @@
  * To run:
  *   cd frontend && npx eslint src --ext .ts,.tsx
  *
- * AUDIT-A6 (AIQ-359): initial config wires up the custom no-clickable-div rule.
- * Add eslint-plugin-react, @typescript-eslint, and eslint-plugin-jsx-a11y as
- * needed when ESLint is added to package.json and CI.
+ * AUDIT-A6 (AIQ-359): custom no-clickable-div rule + jsx-a11y for aria/label enforcement.
+ * MVP-9 (AIQ-376): jsx-a11y wired as full plugin to catch aria-label and role violations.
  */
 
 import noClickableDiv from './eslint-rules/no-clickable-div.js';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 export default [
   {
@@ -26,6 +26,13 @@ export default [
           'no-clickable-div': noClickableDiv,
         },
       },
+
+      /**
+       * jsx-a11y: WCAG-aligned accessibility rules for JSX elements.
+       * MVP-9 / AUDIT-A6: enforces aria-label on interactive elements,
+       * proper label associations for inputs, alt text on images, etc.
+       */
+      'jsx-a11y': jsxA11y,
     },
 
     rules: {
@@ -44,6 +51,17 @@ export default [
        * The logger module itself is exempt via the override block below.
        */
       'no-console': 'error',
+
+      // jsx-a11y: key WCAG 2.1 rules for interactive elements and form inputs
+      'jsx-a11y/alt-text': 'error',
+      'jsx-a11y/aria-props': 'error',
+      'jsx-a11y/aria-proptypes': 'error',
+      'jsx-a11y/aria-unsupported-elements': 'error',
+      'jsx-a11y/no-redundant-roles': 'warn',
+      // Warn (not error) on missing aria-label — many icon buttons are already fixed
+      // but some may remain in lower-priority screens. Escalate to error after a
+      // full sweep (see AUDIT-A6 known gaps).
+      'jsx-a11y/interactive-supports-focus': 'warn',
     },
   },
 
