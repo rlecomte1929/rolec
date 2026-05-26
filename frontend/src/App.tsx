@@ -37,6 +37,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ def
 const EmployeeJourney = lazy(() => import('./pages/EmployeeJourney').then((module) => ({ default: module.EmployeeJourney })));
 const HrDashboard = lazy(() => import('./pages/HrDashboard').then((module) => ({ default: module.HrDashboard })));
 const HrCaseSummary = lazy(() => import('./pages/HrCaseSummary').then((module) => ({ default: module.HrCaseSummary })));
+const HrCaseEstimatePage = lazy(() => import('./pages/hr/HrCaseEstimatePage').then((module) => ({ default: module.HrCaseEstimatePage })));
 const HrAssignmentReview = lazy(() => import('./pages/HrAssignmentReview').then((module) => ({ default: module.HrAssignmentReview })));
 const HrComplianceCheck = lazy(() => import('./pages/HrComplianceCheck').then((module) => ({ default: module.HrComplianceCheck })));
 const HrAssignmentPackageReview = lazy(() => import('./pages/HrAssignmentPackageReview').then((module) => ({ default: module.HrAssignmentPackageReview })));
@@ -276,6 +277,7 @@ function App() {
                 <Route path={ROUTE_DEFS.hrDiscovery.path} element={<HrDiscoveryPage />} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<HrCaseSummary />} />
+        <Route path={ROUTE_DEFS.hrCaseEstimate.path} element={<HrCaseEstimatePage />} />
         <Route path={ROUTE_DEFS.hrReview.path} element={<Navigate to={ROUTE_DEFS.hrEmployeeDashboard.path} replace />} />
         <Route path={ROUTE_DEFS.hrReviewCase.path} element={<ReviewToEmployeeDashboardRedirect />} />
         <Route path={ROUTE_DEFS.hrAssignmentReview.path} element={<HrAssignmentReview />} />

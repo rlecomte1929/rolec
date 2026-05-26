@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { PackageSummary } from '../../features/recommendations/PackageSummary';
 import { ServicesNavRibbon } from '../../features/services/ServicesNavRibbon';
 import { useServicesFlow } from '../../features/services/ServicesFlowContext';
+import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
 import { useEmployeeAssignment } from '../../contexts/EmployeeAssignmentContext';
 import { parseAssignmentSearchParam, resolveScopedAssignmentId } from '../../utils/employeeAssignmentScope';
 import { buildRoute } from '../../navigation/routes';
@@ -48,6 +49,16 @@ export const ServicesEstimate: React.FC = () => {
   if (!recommendations) {
     return (
       <AppShell title="Estimate review" subtitle="Your services vs your company's policy.">
+        {/* AIQ-280: even before service selection, show the policy caps so the
+            user knows what their company budgeted for each category. Fixes
+            the "No estimate yet" dead-end where the page taught nothing. */}
+        {assignmentId && (
+          <BudgetSummaryTable
+            caseId={assignmentId}
+            displayCurrency={displayCurrency}
+            className="mb-6"
+          />
+        )}
         <Card padding="lg">
           {/* Stage 5 (audit): outcome-described empty state per docs/product-copy-rules.md
               ("Empty states: No X yet. [Reason or guidance] → [CTA]") */}
@@ -92,6 +103,17 @@ export const ServicesEstimate: React.FC = () => {
           .
         </p>
       </Alert>
+      {/* AIQ-280: policy caps overview at the top — independent of shortlist
+          state. PackageSummary below this still renders the per-shortlist-item
+          cap comparison; this table answers the "what are my caps?" question
+          regardless of whether the user has picked services yet. */}
+      {assignmentId && (
+        <BudgetSummaryTable
+          caseId={assignmentId}
+          displayCurrency={displayCurrency}
+          className="mb-6"
+        />
+      )}
       <PackageSummary
         results={recommendations}
         selectedPackage={shortlist}

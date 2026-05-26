@@ -213,6 +213,16 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
                 </div>
               )}
             </div>
+            {/* AIQ-280: link out to the per-category estimate view. The
+                rich table lives at /hr/cases/:caseId/estimate so we don't
+                bloat this already-dense detail page with another panel. */}
+            <Button
+              variant="outline"
+              className="mt-3 text-xs"
+              onClick={() => navigate(buildRoute('hrCaseEstimate', { caseId: detail.id }))}
+            >
+              View detailed estimate
+            </Button>
           </Card>
 
           {/* Activity log */}

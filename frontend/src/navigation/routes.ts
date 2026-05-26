@@ -40,6 +40,8 @@ export const ROUTE_DEFS = {
   hrCaseSummary: { path: '/hr/cases/:caseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
   // [P4-2] HR Operations dossier panel — full form list with comments, flags, history
   hrCaseDossier: { path: '/hr/cases/:caseId/dossier', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  // [T1.5/AIQ-280] HR Estimate Review — per-category policy caps view
+  hrCaseEstimate: { path: '/hr/cases/:caseId/estimate', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrReview: { path: '/hr/review', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrReviewCase: { path: '/hr/review/case/:caseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrAssignmentReview: { path: '/hr/assignments/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
