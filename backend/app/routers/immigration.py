@@ -1441,25 +1441,29 @@ def get_immigration_case_employee(
     (HR has not opened one), so the employee checklist page can show a friendly
     "contact HR" message.
     """
-    employee_id = current_user["id"]
+    user_role = (current_user.get("role") or current_user.get("user_role") or "").upper()
+    is_hr_or_admin = user_role in ("HR", "ADMIN")
 
-    # Verify this employee has access to the relocation case
-    with db.engine.begin() as conn:
-        assignment = conn.execute(
-            text("""
-                SELECT id FROM public.case_assignments
-                WHERE (id = :case_id OR case_id = :case_id)
-                  AND employee_user_id = :employee_id
-                LIMIT 1
-            """),
-            {"case_id": case_id, "employee_id": employee_id},
-        ).mappings().first()
+    if not is_hr_or_admin:
+        # Employees must own the relocation case
+        employee_id = current_user["id"]
+        with db.engine.begin() as conn:
+            assignment = conn.execute(
+                text("""
+                    SELECT id FROM public.case_assignments
+                    WHERE (id = :case_id OR case_id = :case_id)
+                      AND employee_user_id = :employee_id
+                    LIMIT 1
+                """),
+                {"case_id": case_id, "employee_id": employee_id},
+            ).mappings().first()
 
-    if not assignment:
-        raise HTTPException(
-            status_code=403,
-            detail="You do not have access to this relocation case.",
-        )
+        if not assignment:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have access to this relocation case.",
+            )
+    # HR/Admin: skip ownership check — they can view any case's checklist
 
     # Look up immigration case by relocation case_id
     with db.engine.begin() as conn:
