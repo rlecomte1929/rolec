@@ -31,7 +31,13 @@ const INTERACTIVE_ROLES = new Set([
   'slider', 'spinbutton', 'switch', 'gridcell',
 ]);
 
-module.exports = {
+// AUDIT-A6 followup: frontend/package.json has `"type": "module"`, so ESLint
+// loads this file as ESM. `module.exports` is CommonJS — it's not exposed as
+// a named or default export under ESM, which causes:
+//   SyntaxError: The requested module './eslint-rules/no-clickable-div.js'
+//                does not provide an export named 'default'
+// Use `export default` so eslint.config.js can `import noClickableDiv from …`.
+export default {
   meta: {
     type: 'problem',
     docs: {
