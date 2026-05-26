@@ -468,7 +468,7 @@ export const HrDashboard: React.FC = () => {
           {!isLoading && assignments.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
               <p className="text-sm text-[#4b5563]">No relocation cases yet.</p>
-              <p className="text-xs text-[#6b7280]">Create your first case to start tracking an employee move.</p>
+              <p className="text-xs text-[#6b7280]">Create your first case to start tracking a relocation.</p>
             </div>
           )}
 
