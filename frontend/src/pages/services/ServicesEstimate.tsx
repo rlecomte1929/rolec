@@ -47,18 +47,20 @@ export const ServicesEstimate: React.FC = () => {
 
   if (!recommendations) {
     return (
-      <AppShell title="Estimate review" subtitle="Shortlist vs HR policy caps.">
+      <AppShell title="Estimate review" subtitle="Your services vs your company's policy.">
         <Card padding="lg">
-          <p className="text-sm font-medium text-[#0b2b43] mb-1">No estimate yet on this case</p>
+          {/* Stage 5 (audit): outcome-described empty state per docs/product-copy-rules.md
+              ("Empty states: No X yet. [Reason or guidance] → [CTA]") */}
+          <p className="text-sm font-medium text-[#0b2b43] mb-1">No estimate yet</p>
           <p className="text-sm text-[#6b7280] mb-4">
-            Pick the services you need, answer a few preferences, then choose providers from the
-            recommendations to build your shortlist. Your selections save automatically and you
-            can come back here any time to see the cost overview vs your HR policy caps.
+            You haven't picked any services yet. Choose what you need, set a few preferences,
+            and we'll build a side-by-side view of what your company's policy covers and what
+            comes out of pocket. Your selections save automatically — you can come back any time.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => go(buildRoute('services'))}>Start with Select services</Button>
+            <Button onClick={() => go(buildRoute('services'))}>Start picking services</Button>
             <Button variant="outline" onClick={() => go(buildRoute('servicesRecommendations'))}>
-              Open Recommendations
+              See recommendations
             </Button>
           </div>
         </Card>
@@ -71,10 +73,15 @@ export const ServicesEstimate: React.FC = () => {
   return (
     <AppShell title="Estimate review" subtitle="Shortlist vs HR policy caps.">
       <ServicesNavRibbon />
+      {/* Stage 5 (audit) — replaced generic numbered list with outcome-described copy
+          per audit/re-audit-stage-2-copy.md COPY-5 + docs/product-copy-rules.md
+          ("Action button labels: outcome-described, not generic"). */}
       <Card padding="lg" className="mb-6">
-        <div className="text-sm text-[#4b5563]">
-          Next steps: 1) Select vendors  2) Request quotations  3) Receive offers  4) Decide
-        </div>
+        <p className="text-sm text-[#0b2b43] font-medium mb-1">What happens next</p>
+        <p className="text-sm text-[#4b5563]">
+          Pick the vendors you want quotes from — we'll send the request in one click.
+          Offers come back here as vendors respond, then you compare and decide.
+        </p>
       </Card>
       <Alert variant="info" className="mb-4">
         <p className="text-sm">

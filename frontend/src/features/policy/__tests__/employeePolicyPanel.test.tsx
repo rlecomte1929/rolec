@@ -20,6 +20,11 @@ vi.mock('../../../api/client', () => ({
   },
 }));
 
+vi.mock('../../../utils/demo', () => ({
+  getAuthItem: (k: string) => (k === 'relopass_role' ? 'ADMIN' : k === 'relopass_token' ? 't' : null),
+  normalizeStoredRole: (r: string | null) => (r ?? '').trim().toUpperCase(),
+}));
+
 function row(
   overrides: Partial<EffectiveServiceComparisonRow> & Pick<EffectiveServiceComparisonRow, 'service_key' | 'comparison_status'>
 ): EffectiveServiceComparisonRow {
@@ -63,7 +68,7 @@ describe('EmployeePolicyPanel — lifecycle messaging', () => {
   // in this file pass because their render paths don't hit getAuthItem. Skip
   // until AUDIT-CITESTS-followup wires up @testing-library/jest-dom or a
   // vitest setup file that polyfills storage.
-  it.skip('no published policy: neutral banner copy', () => {
+  it('no published policy: neutral banner copy', () => {
     renderPanel(mockEmployeePackage('no_policy_found'));
     expect(screen.getByText(/No live relocation policy yet/i)).toBeInTheDocument();
     expect(screen.getByText(/HR has not published/i)).toBeInTheDocument();

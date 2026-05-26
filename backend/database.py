@@ -1177,6 +1177,16 @@ class Database:
             else:
                 self._create_users_table(conn)
 
+        # AUDIT-A1-followup (AIQ-383): On Postgres every table is managed by
+        # Supabase migrations. The CREATE TABLE / CREATE INDEX block below is
+        # SQLite-only dev scaffolding. Running it on Postgres causes
+        # InFailedSqlTransaction because an earlier try/except ALTER in init_db
+        # can leave the connection in a failed state. Exit early; nothing below
+        # is needed on Postgres.
+        if not _is_sqlite:
+            return
+
+        with self.engine.begin() as conn:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     token TEXT PRIMARY KEY,
@@ -3932,7 +3942,7 @@ class Database:
 
         Returns True if a row was redacted, False if no such case exists.
         """
-        from .services.audit_log_service import insert_audit_log, ACTOR_HUMAN, ACTOR_SYSTEM
+        from .app.services.audit_log_service import insert_audit_log, ACTOR_HUMAN, ACTOR_SYSTEM
         from ._time import utcnow_iso_naive
         now = utcnow_iso_naive()
         with self.engine.begin() as conn:
@@ -8749,7 +8759,7 @@ class Database:
         Returns True on success, False if the assignment did not exist or was
         already archived (idempotent).
         """
-        from .services.audit_log_service import (
+        from .app.services.audit_log_service import (
             insert_audit_log,
             ACTION_DELETE,
             ACTOR_HUMAN,
@@ -12676,7 +12686,7 @@ class Database:
             try:
                 val = d.get("extracted_metadata")
                 raw = json.loads(val) if isinstance(val, str) else (val if isinstance(val, dict) else None)
-                from .services.policy_document_intake import normalize_extracted_metadata
+                from .app.services.policy_document_intake import normalize_extracted_metadata
                 d["extracted_metadata"] = normalize_extracted_metadata(raw)
             except Exception:
                 d["extracted_metadata"] = {}
@@ -12694,7 +12704,7 @@ class Database:
                 request_id=request_id,
             ).fetchall()
         items = self._rows_to_list(rows)
-        from .services.policy_document_intake import normalize_extracted_metadata
+        from .app.services.policy_document_intake import normalize_extracted_metadata
         for d in items:
             try:
                 val = d.get("extracted_metadata")

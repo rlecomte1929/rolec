@@ -172,5 +172,5 @@ def list_supported_destinations(
     user: Dict[str, Any] = Depends(_require_hr_or_employee),
 ) -> List[Dict[str, Any]]:
     """List all destinations supported by the platform (from catalog allowlist)."""
-    from ..services import scrape_safety
+    from ..app.services import scrape_safety
     return scrape_safety.list_allowlist()
