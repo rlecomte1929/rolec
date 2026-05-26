@@ -655,3 +655,88 @@ def hr_notification_counts(
         "destinations_with_demand": int(distinct_count),
         "pending_admin_tickets": int(pending),
     }
+
+
+@router.get("/vendor-assignments/pending")
+def list_pending_vendor_assignments(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """
+    Returns demand rows where HR has not yet curated a vendor for the employee.
+    Used by the vendor curation widget to show "pending vendor assignments".
+    Resolves B16 — endpoint was missing (404).
+    """
+    from sqlalchemy import text as _sql
+    company_id = _caller_company_id_optional(user)
+    if not company_id:
+        return {"count": 0, "items": []}
+    try:
+        with db.engine.connect() as conn:
+            rows = conn.execute(
+                _sql(
+                    "SELECT ed.id, ed.category, ed.destination_city, ed.demand_count, "
+                    "       ed.last_employee_id, ed.created_at "
+                    "FROM catalog_employee_demand ed "
+                    "WHERE ed.company_id = :co "
+                    "  AND NOT EXISTS ("
+                    "    SELECT 1 FROM company_vendor_selections cvs"
+                    "    WHERE cvs.company_id = ed.company_id"
+                    "      AND cvs.category = ed.category"
+                    "      AND (cvs.destination_city = ed.destination_city"
+                    "           OR cvs.destination_city IS NULL)"
+                    "      AND (cvs.custom_item_json IS NOT NULL"
+                    "           OR (cvs.master_item_id IS NOT NULL AND cvs.selected = TRUE))"
+                    "  ) "
+                    "ORDER BY ed.demand_count DESC LIMIT 50"
+                ),
+                {"co": company_id},
+            ).mappings().all()
+        items = []
+        for r in rows:
+            d = dict(r)
+            for k, v in d.items():
+                if hasattr(v, "isoformat"):
+                    d[k] = v.isoformat()
+            items.append(d)
+        return {"count": len(items), "items": items}
+    except Exception:
+        logger.exception("list_pending_vendor_assignments failed company_id=%s", company_id)
+        return {"count": 0, "items": []}
+
+
+@router.get("/employees/waiting")
+def employees_waiting_count(
+    user: Dict[str, Any] = Depends(require_admin_or_hr),
+) -> Dict[str, Any]:
+    """
+    Returns the count of employees waiting for vendor curation (uncurated demand).
+    Thin wrapper over the employees_waiting field in notification-counts.
+    Resolves B16 — endpoint was missing (404).
+    """
+    from sqlalchemy import text as _sql
+    company_id = _caller_company_id_optional(user)
+    if not company_id:
+        return {"count": 0}
+    try:
+        with db.engine.connect() as conn:
+            row = conn.execute(
+                _sql(
+                    "SELECT COALESCE(SUM(ed.demand_count), 0) AS waiting "
+                    "FROM catalog_employee_demand ed "
+                    "WHERE ed.company_id = :co "
+                    "  AND NOT EXISTS ("
+                    "    SELECT 1 FROM company_vendor_selections cvs"
+                    "    WHERE cvs.company_id = ed.company_id"
+                    "      AND cvs.category = ed.category"
+                    "      AND (cvs.destination_city = ed.destination_city"
+                    "           OR cvs.destination_city IS NULL)"
+                    "      AND (cvs.custom_item_json IS NOT NULL"
+                    "           OR (cvs.master_item_id IS NOT NULL AND cvs.selected = TRUE))"
+                    "  )"
+                ),
+                {"co": company_id},
+            ).mappings().first()
+        return {"count": int((row or {}).get("waiting") or 0)}
+    except Exception:
+        logger.exception("employees_waiting_count failed company_id=%s", company_id)
+        return {"count": 0}

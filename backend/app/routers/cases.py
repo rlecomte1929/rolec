@@ -3251,6 +3251,20 @@ def create_case_quote_request(
     profile = main_db.get_profile_record(user.get("id"))
     company_id: str = (profile or {}).get("company_id") or user.get("company") or ""
     if not company_id:
+        # Fallback: derive company_id from the case itself (employee may be
+        # assigned to a case without having an explicit company in their profile).
+        # Resolves WZ4/B11 — employees assigned via HR portal lack company_id.
+        try:
+            with main_db.engine.connect() as _conn:
+                _case_row = _conn.execute(
+                    _sql_text("SELECT company_id FROM public.cases WHERE id = :cid"),
+                    {"cid": case_id},
+                ).mappings().first()
+            if _case_row and _case_row.get("company_id"):
+                company_id = str(_case_row["company_id"])
+        except Exception:
+            pass
+    if not company_id:
         raise HTTPException(status_code=403, detail="No company linked to this account.")
 
     employee_id: str = str(user["id"])
