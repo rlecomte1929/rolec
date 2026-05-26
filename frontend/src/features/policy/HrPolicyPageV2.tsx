@@ -219,7 +219,7 @@ const BuildNextVersionSection: React.FC<{
           beneath the primary action. */}
       <div className="mt-4">
         <Button onClick={onTemplateClick} data-testid="start-from-template-card">
-          ✨ Start from a template
+          Start from a template
         </Button>
         <button
           type="button"
