@@ -584,7 +584,7 @@ app.include_router(providers_router.router)
 app.include_router(employee_quotes_router.router)
 app.include_router(hr_vendors_router.router)
 app.include_router(hr_rfq_router.router)
-# [AUDIT-C2.3 Month-1] immigration_router → moved to backend/app/main.py
+app.include_router(immigration_router.router)  # [MVG-6] re-wired — app/main.py create_app() is not called by this entrypoint
 app.include_router(analytics_router.router)
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 # [AUDIT-C2.3 Month-1] mobility_context_router → moved to backend/app/main.py
