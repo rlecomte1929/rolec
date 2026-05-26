@@ -3233,7 +3233,15 @@ def get_budget_summary(
     """
     Return HR-policy budget caps vs. the services selected for this case.
     Employees and HR can call this; the caller must be linked to a company.
+
+    AUDIT-A2-followup: access is gated by _assert_case_access — employees must
+    own the case, HR must belong to the same company, admins always pass.
+    Returns 404 for missing cases and 403 for cross-company / cross-tenant
+    access attempts. Mirrors the pattern from get_case / patch_case /
+    list_case_forms.
     """
+    _assert_case_access(user, case_id)
+
     # Resolve company from profile
     profile = main_db.get_profile_record(user.get("id"))
     company_id: str = (profile or {}).get("company_id") or user.get("company") or ""
