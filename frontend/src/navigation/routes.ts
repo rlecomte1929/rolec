@@ -157,13 +157,6 @@ export const ROUTE_DEFS = {
   adminAbTests: { path: '/admin/ab-tests', roles: ['ADMIN'] as RouteRole[] },
   /** External provider portal — authenticated via magic-link JWT, no ReloPass account needed */
   providerPortal: { path: '/provider/portal', roles: ['PUBLIC'] as RouteRole[] },
-  // [MVG-6] Immigration workflow screens
-  /** MVG-6A: HR form to create an immigration case */
-  hrImmigrationCreate: { path: '/hr/immigration/new', roles: ['HR', 'ADMIN'] as RouteRole[] },
-  /** MVG-6A/6C: HR view/timeline of an existing immigration case */
-  hrImmigrationCase: { path: '/hr/immigration/:immigrationCaseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
-  /** MVG-6B: Employee document checklist for their immigration case */
-  employeeCaseImmigrationChecklist: { path: '/employee/case/:caseId/immigration/checklist', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
 };
 
 export type RouteKey = keyof typeof ROUTE_DEFS;
