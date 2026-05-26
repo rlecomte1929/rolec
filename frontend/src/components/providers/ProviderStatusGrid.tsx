@@ -159,10 +159,9 @@ export const ProviderStatusGrid: React.FC<ProviderStatusGridProps> = ({
             color: '#9ca3af',
           }}
         >
-          <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
-          <p style={{ margin: 0, fontWeight: 500, fontSize: 15 }}>No provider assignments yet</p>
+          <p style={{ margin: 0, fontWeight: 500, fontSize: 15 }}>No providers assigned.</p>
           <p style={{ margin: '6px 0 0', fontSize: 13 }}>
-            Assign providers to cases from the Command Center to see them here.
+            Assign providers from the Mobility Control Center to track their status across cases.
           </p>
         </div>
       )}

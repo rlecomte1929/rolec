@@ -84,7 +84,9 @@ const HrProviderGrid = lazy(() => import('./pages/HrProviderGrid').then((module)
 const HrProviderGridV2 = lazy(() => import('./features/platform-v2/provider-grid/ProviderGridV2Page').then((module) => ({ default: module.ProviderGridV2Page })));
 const HrBacklogPage = lazy(() => import('./features/platform-v2/hr-backlog/HrBacklogPage').then((module) => ({ default: module.HrBacklogPage })));
 const MobilityControlCenterV2Page = lazy(() => import('./features/platform-v2/mobility-control/MobilityControlCenterV2Page').then((module) => ({ default: module.MobilityControlCenterV2Page })));
-const HrPolicyBuilder = lazy(() => import('./features/platform-v2/policy-builder/HrPolicyBuilderV2Page').then((module) => ({ default: module.HrPolicyBuilderV2Page })));
+// HrPolicyBuilder lazy import removed — /hr/settings/policy now redirects to
+// /hr/policy?tab=builder via <Navigate> below. HrPolicyBuilderV2Page is
+// imported directly by HrPolicy.tsx for the embedded tab.
 const HrExceptionsPage = lazy(() => import('./features/platform-v2/exceptions/HrExceptionsPage').then((module) => ({ default: module.HrExceptionsPage })));
 const HrPolicyRealityPage = lazy(() => import('./features/platform-v2/policy-reality/HrPolicyRealityPage').then((module) => ({ default: module.HrPolicyRealityPage })));
 const HrDiscoveryPage = lazy(() => import('./features/platform-v2/discovery/HrDiscoveryPage').then((module) => ({ default: module.HrDiscoveryPage })));
@@ -266,7 +268,9 @@ function App() {
         {/* HR Backlog (V2): pending employee tasks across the HR's company.
             HR + ADMIN access — server-side filtering by company_id. */}
         <Route path="/hr/backlog" element={<HrBacklogPage />} />
-        <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<HrPolicyBuilder />} />
+        {/* /hr/settings/policy → /hr/policy?tab=builder — policy builder is now
+            a tab on the Policy page rather than a standalone route. */}
+        <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<Navigate to={`${ROUTE_DEFS.hrPolicy.path}?tab=builder`} replace />} />
         <Route path={ROUTE_DEFS.hrExceptions.path} element={<HrExceptionsPage />} />
                 <Route path={ROUTE_DEFS.hrPolicyReality.path} element={<HrPolicyRealityPage />} />
                 <Route path={ROUTE_DEFS.hrDiscovery.path} element={<HrDiscoveryPage />} />

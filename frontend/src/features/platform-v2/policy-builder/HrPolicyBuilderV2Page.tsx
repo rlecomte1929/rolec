@@ -232,7 +232,7 @@ function timeAgo(ts: number): string {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-export function HrPolicyBuilderV2Page() {
+export function HrPolicyBuilderV2Page({ embedded = false }: { embedded?: boolean } = {}) {
   const [tiers, setTiers]             = useState<Tier[]>([]);
   const [mode, setMode]               = useState<'template' | 'document'>('template');
   const [templateOpen, setTemplateOpen] = useState(false);
@@ -278,9 +278,11 @@ export function HrPolicyBuilderV2Page() {
   const statusColour = status === 'draft' ? 'bg-amber-100 text-amber-700' : status === 'published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500';
   const statusLbl = status === 'no-policy' ? 'No policy yet' : status === 'draft' ? 'Draft' : 'Published';
 
-  return (
-    <AppShell wide>
-      <Breadcrumb section="HR Operations" title="Policy builder" className="px-6 pt-4 pb-2" />
+  // When embedded as a tab inside another AppShell (e.g. HrPolicy.tsx), we
+  // skip the outer AppShell and Breadcrumb to avoid double-shell nesting.
+  const inner = (
+    <>
+      {!embedded && <Breadcrumb section="HR Operations" title="Policy builder" className="px-6 pt-4 pb-2" />}
       {/* ── Header ── */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200 flex items-center gap-4 px-6 py-3">
         <div className="flex-1 min-w-0">
@@ -525,8 +527,11 @@ export function HrPolicyBuilderV2Page() {
           </div>
         </div>
       )}
-    </AppShell>
+    </>
   );
+
+  if (embedded) return inner;
+  return <AppShell wide>{inner}</AppShell>;
 }
 
 // ─── TierColumn ───────────────────────────────────────────────────────────────
