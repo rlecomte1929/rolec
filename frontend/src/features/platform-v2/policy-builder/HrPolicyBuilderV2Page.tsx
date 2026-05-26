@@ -335,11 +335,6 @@ export function HrPolicyBuilderV2Page() {
       {/* ── Empty state — template ── */}
       {mode === 'template' && tiers.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-          <svg viewBox="0 0 96 96" width={96} height={96}>
-            <rect x="10" y="22" width="22" height="56" rx="4" fill="#dbeafe" stroke="#3b82f6" strokeWidth="1.5"/>
-            <rect x="37" y="14" width="22" height="64" rx="4" fill="#ccfbf1" stroke="#0d9488" strokeWidth="1.5"/>
-            <rect x="64" y="30" width="22" height="48" rx="4" fill="#fef3c7" stroke="#d97706" strokeWidth="1.5"/>
-          </svg>
           <h2 className="text-xl font-semibold text-gray-900">No tiers yet</h2>
           <p className="text-sm text-gray-500 max-w-sm">Start from a template to get set up in minutes, or build a custom tier structure from scratch.</p>
           <div className="flex gap-3 mt-2">
