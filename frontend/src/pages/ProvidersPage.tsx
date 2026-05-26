@@ -262,7 +262,7 @@ export const ProvidersPage: React.FC = () => {
 
   if (assignmentLoading || isLoading) {
     return (
-      <AppShell title="Services">
+      <AppShell section="Employee" title="Services">
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0b2b43] mx-auto mb-4" />
           <p className="text-[#0b2b43] font-medium">Loading services and policy context…</p>
@@ -276,7 +276,7 @@ export const ProvidersPage: React.FC = () => {
 
   if (!assignmentLoading && needsPicker && linkedSummaries.length > 0) {
     return (
-      <AppShell title="Services" subtitle="Pick the assignment for this session.">
+      <AppShell section="Employee" title="Services" subtitle="Pick the assignment for this session.">
         <EmployeeScopedAssignmentPicker
           title="Which assignment are you working on?"
           subtitle="Pick one assignment for this session. Change it anytime from the dashboard or by reopening Services with another choice."
@@ -289,9 +289,9 @@ export const ProvidersPage: React.FC = () => {
 
   if (!assignmentId) {
     return (
-      <AppShell title="Services" subtitle="Select what you need for this move.">
+      <AppShell section="Employee" title="Services" subtitle="Select what you need for this move.">
         <Alert variant="info" className="mb-6">
-          <p className="mb-3">No assignment found. You need an active assignment to use Services. If you completed the intake wizard, try refreshing your assignment.</p>
+          <p className="mb-3">No case linked. Select a case to access services for this relocation.</p>
           <div className="flex gap-3">
             <Button onClick={() => refetch()}>Refresh assignment</Button>
             <Button variant="outline" onClick={() => navigate(buildRoute('employeeDashboard'))}>
@@ -304,7 +304,7 @@ export const ProvidersPage: React.FC = () => {
   }
 
   return (
-    <AppShell title="Services">
+    <AppShell section="Employee" title="Services">
       <div className="mb-6">
         <p className="text-[#6b7280]">Select what you need. We save it for the next steps.</p>
         <p className="text-sm text-[#94a3b8] mt-1">~3 min to complete</p>

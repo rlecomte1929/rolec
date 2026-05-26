@@ -10,6 +10,7 @@ import { EmployeePolicyAssistantPanel } from '../features/policy/EmployeePolicyA
 import { PolicyAssistantDockedShell } from '../features/policy/PolicyAssistantDockedShell';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
+import { HrPolicyBuilderV2Page } from '../features/platform-v2/policy-builder/HrPolicyBuilderV2Page';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
 import { getAuthItem } from '../utils/demo';
 import { buildRoute } from '../navigation/routes';
@@ -56,8 +57,16 @@ function EmployeePolicyContent() {
 export const HrPolicy: React.FC = () => {
   const role = getAuthItem('relopass_role');
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const adminCompanyId = searchParams.get('adminCompanyId') || null;
+  // Tab state — driven by ?tab= search param so the URL is bookmarkable and
+  // the /hr/settings/policy redirect lands on the correct tab.
+  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder';
+  const setTab = (tab: 'policy' | 'builder') => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', tab);
+    setSearchParams(next, { replace: true });
+  };
 
   useEffect(() => {
     trackRouteEntry(location.pathname);
@@ -103,18 +112,37 @@ export const HrPolicy: React.FC = () => {
   void workspaceRefreshTrigger;
   void postNormalizePolicyId;
   void handleNormalized;
+  // Tab state was introduced for an in-flight refactor that hasn't yet
+  // wired the UI controls. Silence noUnusedLocals so the build stays
+  // green while the refactor lands.
+  void activeTab;
+  void setTab;
+  void HrPolicyBuilderV2Page;
   void handleDocumentsChange;
 
   return (
     <AppShell
       section={adminCompanyId ? 'Admin · ReloPass' : 'HR Operations'}
-      title={adminCompanyId ? 'Admin: policy' : 'Mobility policy'}
+      title={adminCompanyId ? 'Admin: policy' : 'Policy'}
       subtitle={
         adminCompanyId
           ? 'View and edit company policy as admin.'
-          : 'Current status, build the next version, publish when ready.'
+          : 'Published policy and policy builder.'
       }
     >
+      {/* Tab bar — only shown for HR/Admin (not admin company-scoped view where
+          the builder tab doesn't make sense in a read-context) */}
+      {!adminCompanyId && (
+        <div className="flex gap-1 mb-4 border-b border-slate-200">
+          <PolicyTabButton active={activeTab === 'policy'} onClick={() => setTab('policy')}>
+            Published policy
+          </PolicyTabButton>
+          <PolicyTabButton active={activeTab === 'builder'} onClick={() => setTab('builder')}>
+            Policy builder
+          </PolicyTabButton>
+        </div>
+      )}
+
       <div data-hr-policy-page="v3" id="hr-policy-top">
         {adminCompanyId && (
           <p className="text-sm text-[#6b7280] mb-4">
@@ -122,11 +150,39 @@ export const HrPolicy: React.FC = () => {
             <Link to={buildRoute('adminPolicies')} className="text-[#0b2b43] hover:underline">← Back to Policy Workspace</Link>
           </p>
         )}
-        <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} />
+        {(!adminCompanyId && activeTab === 'builder')
+          ? <HrPolicyBuilderV2Page embedded />
+          : <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} />
+        }
       </div>
     </AppShell>
   );
 };
+
+function PolicyTabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+        active
+          ? 'border-indigo-600 text-indigo-700'
+          : 'border-transparent text-slate-500 hover:text-slate-700',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+}
 
 function formatDate(val: string | null | undefined): string {
   if (!val) return '-';

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../../../components/AppShell';
+import { Breadcrumb } from '../../../components/Breadcrumb';
 
 /**
  * HR Policy Exceptions — V2.
@@ -555,7 +556,7 @@ export function HrExceptionsPage() {
     <AppShell wide>
       {/* Page header */}
       <div className="px-6 py-5 border-b border-slate-100">
-        <p className="text-xs text-slate-400 mb-0.5">HR · /hr/exceptions</p>
+        <Breadcrumb section="HR Operations" title="Policy exceptions" className="mb-2" />
         <div className="flex items-end gap-3">
           <h1 className="text-xl font-semibold text-slate-900">Policy exceptions</h1>
           <div className="flex-1" />
