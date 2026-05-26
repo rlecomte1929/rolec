@@ -82,7 +82,7 @@ def _benefit_key_for_category(cat: str) -> Optional[str]:
 def _get_covered_benefit_keys(assignment_id: str) -> set:
     """Return the set of benefit keys covered by the assignment's policy."""
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         # Use policy_config_benefits for the assignment's company + policy_config
         assign = main_db.get_assignment_by_id(assignment_id)
@@ -109,7 +109,7 @@ def _get_covered_benefit_keys(assignment_id: str) -> set:
 def _get_preferred_supplier_ids(company_id: str) -> set:
     """Return supplier IDs marked as preferred/preferred_partner by HR for this company."""
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         result = (
             sb.table("supplier_scoring_metadata")
@@ -127,7 +127,7 @@ def _get_preferred_supplier_ids(company_id: str) -> set:
 def _fetch_suppliers(dest_country: Optional[str]) -> List[Dict[str, Any]]:
     """Fetch suppliers with their scoring metadata and capabilities."""
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
 
         # Get suppliers with scoring metadata joined

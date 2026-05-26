@@ -18,8 +18,8 @@ from sqlalchemy import text
 
 from ..auth_deps import get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
-from ...services.events_tracker import track as track_event
-from ...services.outcome_recorder import record_outcome
+from ..services.events_tracker import track as track_event
+from ..services.outcome_recorder import record_outcome
 
 router = APIRouter(prefix="/api/hr", tags=["hr-coordination"])
 

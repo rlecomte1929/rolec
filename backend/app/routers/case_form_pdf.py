@@ -181,7 +181,7 @@ def get_form_original_pdf(
     expires_in = 60 * 60  # 1 hour
     signed_url: Optional[str] = None
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         signed = sb.storage.from_("form-templates").create_signed_url(path, expires_in)
         signed_url = signed.get("signedURL") or signed.get("signedUrl")

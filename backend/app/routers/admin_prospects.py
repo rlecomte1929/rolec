@@ -23,12 +23,12 @@ from sqlalchemy import desc
 from ..auth_deps import require_admin
 from ..db import SessionLocal
 from ..models import ProspectCandidate
-from ...services.prospect_enrichment_service import (
+from ..services.prospect_enrichment_service import (
     EnrichmentRequest,
     enrich_prospect,
 )
-from ...services.prospect_icp_config import ICP_CONFIG
-from ...services.prospect_web_search import (
+from ..services.prospect_icp_config import ICP_CONFIG
+from ..services.prospect_web_search import (
     TAVILY_COST_PER_QUERY_USD,
     estimate_batch_cost_usd,
 )

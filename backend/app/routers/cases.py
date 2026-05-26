@@ -13,13 +13,13 @@ from ..db import SessionLocal
 from .. import crud, schemas
 from ..auth_deps import get_current_user
 from ...database import db as main_db
-from ...services.relocation_plan_view_service import invalidate_relocation_plan_cache
+from ..services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.research import run_country_research
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.trigger_engine import fire_roadmap_events
 from ..services.prefill_engine import run_prefill_for_dependents
-from ...services.audit_log_service import (
+from ..services.audit_log_service import (
     insert_audit_log,
     ACTION_INSERT,
     ACTION_UPDATE,
@@ -257,7 +257,7 @@ def create_case(case_id: str, request: Request):
 
     _audit_case(entity_type="case", entity_id=case_id, action_type=ACTION_UPDATE, new_value={"status": "CREATED"})
     try:
-        from ...services.analytics_service import emit_event, EVENT_CASE_CREATED
+        from ..services.analytics_service import emit_event, EVENT_CASE_CREATED
         req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
         emit_event(
             EVENT_CASE_CREATED,
@@ -2116,7 +2116,7 @@ def _try_store_draft_pdf(
     Returns the public URL, or None if storage is unavailable (dev mode).
     """
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         ts = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%S")
         path = f"case-forms/{case_form_id}/draft_{ts}.pdf"
@@ -2190,7 +2190,7 @@ def get_form_original(
     # Supabase Storage path: "<bucket>/<path/to/file.pdf>"
     # Generate a 1-hour signed URL so the raw bucket URL is never exposed.
     try:
-        from ...services.supabase_client import get_supabase_admin_client  # lazy import
+        from ..services.supabase_client import get_supabase_admin_client  # lazy import
         sb = get_supabase_admin_client()
         bucket, _, path = original_url.partition("/")
         signed = sb.storage.from_(bucket).create_signed_url(path, 3600)
@@ -2520,7 +2520,7 @@ def _try_store_dossier_pdf(
 ) -> Optional[str]:
     """Upload merged dossier PDF to Supabase Storage and update dossier_packages.pdf_url."""
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         ts = _dt.datetime.utcnow().strftime("%Y%m%dT%H%M%S")
         path = f"dossier-packages/{dossier_id}/dossier_{ts}.pdf"

@@ -6,10 +6,10 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from ...database import db
-from ...services.case_context_service import CaseContextService, CaseContextError
-from ...services.mobility_route_access import enforce_mobility_graph_read_access
-from ...services.next_action_service import NextActionService
-from ...services.requirement_evaluation_service import RequirementEvaluationService
+from ..services.case_context_service import CaseContextService, CaseContextError
+from ..services.mobility_route_access import enforce_mobility_graph_read_access
+from ..services.next_action_service import NextActionService
+from ..services.requirement_evaluation_service import RequirementEvaluationService
 
 router = APIRouter(prefix="/api/mobility", tags=["mobility"])
 

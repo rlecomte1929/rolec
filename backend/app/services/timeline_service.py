@@ -314,7 +314,7 @@ def compute_default_milestones(
     active_phases: Optional[set] = None
     if contract_type and contract_type not in ("unknown", ""):
         try:
-            from ...services.plan_scope import active_phases_for_case_type
+            from .plan_scope import active_phases_for_case_type
             from ...relocation_plan_task_library import TASK_BY_MILESTONE_TYPE
             _active_list = active_phases_for_case_type(contract_type)
             active_phases = set(_active_list)
@@ -370,7 +370,7 @@ def compute_default_milestones(
     # ── Inject family workstream milestones (S5) ─────────────────────────────
     if family_profile:
         try:
-            from ...services.family_propagation import FamilyPropagator
+            from .family_propagation import FamilyPropagator
             propagator = FamilyPropagator()
             workstreams = propagator.get_required_workstreams(
                 family_profile=family_profile,
@@ -409,7 +409,7 @@ def compute_default_milestones(
     # Runs whenever nationality or destination_country is known.
     if destination_country or nationality:
         try:
-            from ...services.immigration_regime import ImmigrationRegimeRouter
+            from .immigration_regime import ImmigrationRegimeRouter
             regime_router = ImmigrationRegimeRouter()
             regime = regime_router.detect_regime(
                 nationality=nationality,

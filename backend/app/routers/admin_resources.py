@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from ...database import db
-from ...services.admin_resources import (
+from ..services.admin_resources import (
     approve_event,
     approve_resource,
     archive_event,

@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from ...database import db
-from ...services.ops_notification_service import (
+from ..services.ops_notification_service import (
     acknowledge_notification,
     get_notification_events,
     get_notification_feed,

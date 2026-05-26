@@ -3,12 +3,12 @@ from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Header, HTTPException
 
-from ..services.relocation_classification import (
+from ..app.services.relocation_classification import (
     compute_case_classification,
     persist_case_classification,
 )
-from ..services.relocation_profile import compute_missing_fields
-from ..services.supabase_client import get_supabase_client
+from ..app.services.relocation_profile import compute_missing_fields
+from ..app.services.supabase_client import get_supabase_client
 from .relocation import _extract_bearer_token, _is_permission_error, build_relocation_case_payload_relopass, looks_like_supabase_jwt
 
 router = APIRouter(prefix="/api/relocation", tags=["relocation"])

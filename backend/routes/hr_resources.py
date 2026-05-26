@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
 
 from ..database import db
-from ..services.resources.public_service import get_resources_page_data_for_preview
+from ..app.services.resources.public_service import get_resources_page_data_for_preview
 
 router = APIRouter(prefix="/api/hr/resources", tags=["hr-resources"])
 
