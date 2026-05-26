@@ -52,6 +52,9 @@ const EmployeeDossierPage = lazy(() => import('./pages/employee/EmployeeDossierP
 // [P1-6] Case roadmap page
 const EmployeeCaseRoadmapPage = lazy(() => import('./pages/employee/EmployeeCaseRoadmapPage').then((module) => ({ default: module.EmployeeCaseRoadmapPage })));
 const ImmigrationPage = lazy(() => import('./pages/employee/ImmigrationPage').then((module) => ({ default: module.ImmigrationPage })));
+const ImmigrationCaseCreatePage = lazy(() => import('./pages/hr/ImmigrationCaseCreatePage').then((module) => ({ default: module.ImmigrationCaseCreatePage })));
+const ImmigrationCasePage = lazy(() => import('./pages/hr/ImmigrationCasePage').then((module) => ({ default: module.ImmigrationCasePage })));
+const ImmigrationChecklistPage = lazy(() => import('./pages/employee/ImmigrationChecklistPage').then((module) => ({ default: module.ImmigrationChecklistPage })));
 const QuoteRequestPage = lazy(() => import('./pages/employee/QuoteRequestPage').then((module) => ({ default: module.QuoteRequestPage })));
 const ProvidersPage = lazy(() => import('./pages/ProvidersPage').then((module) => ({ default: module.ProvidersPage })));
 const Messages = lazy(() => import('./pages/Messages').then((module) => ({ default: module.Messages })));
@@ -244,6 +247,10 @@ function App() {
         <Route path="/hr/command-center-v2" element={<MobilityControlCenterV2Page />} />
         <Route path="/hr/command-center-legacy" element={<HrCommandCenter />} />
         <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<HrCommandCenterCaseDetail />} />
+        {/* [MVG-6A] HR — create immigration case */}
+        <Route path={ROUTE_DEFS.hrImmigrationCreate.path} element={<ImmigrationCaseCreatePage />} />
+        {/* [MVG-6A/6C] HR — immigration case status timeline */}
+        <Route path={ROUTE_DEFS.hrImmigrationCase.path} element={<ImmigrationCasePage />} />
         {/* platform-v2: flag-gated. Default OFF → legacy HrProviderGrid renders.
             Enable per-session: localStorage.setItem('platform_v2_mobility_control', 'on').
             Sibling /hr/provider-grid-v2 always renders V2 for side-by-side comparison. */}
@@ -306,6 +313,8 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseDossier.path} element={<RequireEmployeeRoute><EmployeeDossierPage /></RequireEmployeeRoute>} />
         {/* [P1-6] Case roadmap */}
         <Route path={ROUTE_DEFS.employeeCaseRoadmap.path} element={<RequireEmployeeRoute><EmployeeCaseRoadmapPage /></RequireEmployeeRoute>} />
+        {/* [MVG-6B] Employee — immigration document checklist */}
+        <Route path={ROUTE_DEFS.employeeCaseImmigrationChecklist.path} element={<RequireEmployeeRoute><ImmigrationChecklistPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
