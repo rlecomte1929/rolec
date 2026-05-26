@@ -133,7 +133,13 @@ export const HrCommandCenter: React.FC = () => {
               ))}
             </div>
           ) : cases.length === 0 ? (
-            <div className="text-sm text-[#6b7280] py-8">No cases match your criteria.</div>
+            /* Stage 6 (audit): empty-state copy per docs/product-copy-rules.md */
+            <div className="py-10 text-center">
+              <p className="text-sm font-medium text-[#0b2b43] mb-1">No cases match this filter</p>
+              <p className="text-sm text-[#6b7280]">
+                Try changing the risk level or destination above, or clear the search box to see every case.
+              </p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

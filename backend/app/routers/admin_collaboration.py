@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from ...database import db
-from ...services.collaboration_service import (
+from ..services.collaboration_service import (
     close_thread,
     create_comment,
     delete_comment,

@@ -32,7 +32,7 @@ def get_recommendations_debug(
     """
     from ...database import db
     from ...policy_engine import PolicyEngine
-    from ...services.policy_adapter import normalize_policy_caps
+    from ..services.policy_adapter import normalize_policy_caps
     from ..db import SessionLocal
     from .. import crud as app_crud
 

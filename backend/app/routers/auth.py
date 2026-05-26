@@ -42,8 +42,8 @@ from ...schemas import (
     UserResponse,
     UserRole,
 )
-from ...services.assignment_claim_link_service import reconcile_pending_assignment_claims
-from ...services.audit_log_service import (
+from ..services.assignment_claim_link_service import reconcile_pending_assignment_claims
+from ..services.audit_log_service import (
     insert_audit_log,
     ACTION_INSERT,
     ACTION_DELETE,
@@ -122,7 +122,7 @@ def _dispatch_supabase_sync(
     response past Cloudflare's 100s edge timeout and the frontend's 45s axios
     cap, surfacing as "Request timed out" to users.
     """
-    from ...services.supabase_auth_sync import sync_relopass_user_to_supabase_auth
+    from ..services.supabase_auth_sync import sync_relopass_user_to_supabase_auth
 
     try:
         future = _supabase_sync_executor.submit(
@@ -562,7 +562,7 @@ def logout(
     if supabase_access_token and isinstance(supabase_access_token, str):
         # Imported lazily to avoid a hard dependency on the Supabase SDK at
         # module import time in environments without Supabase configured.
-        from ...services.supabase_auth_sync import revoke_supabase_session
+        from ..services.supabase_auth_sync import revoke_supabase_session
 
         def _revoke_outcome(fut: "concurrent.futures.Future[bool]") -> None:
             try:

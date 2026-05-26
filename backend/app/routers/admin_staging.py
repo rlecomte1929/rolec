@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from ...database import db
-from ...services.staging_review_service import (
+from ..services.staging_review_service import (
     approve_event_candidate_as_new,
     approve_resource_candidate_as_new,
     get_event_candidate_matches,

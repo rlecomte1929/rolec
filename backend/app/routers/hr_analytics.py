@@ -140,7 +140,7 @@ def _compute_cells(
 def _get_matrix_data(company_id: str, period_months: int) -> List[Dict[str, Any]]:
     """Fetch assignment + benefit data from Supabase for the compliance matrix."""
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
 
         # Active assignments for this company
@@ -162,7 +162,7 @@ def _get_matrix_data(company_id: str, period_months: int) -> List[Dict[str, Any]
 def _get_covered_benefits_for_company(company_id: str) -> Dict[str, Dict[str, Any]]:
     """Return {benefit_key: {cap, coverage_type}} for the company's active policy."""
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         result = (
             sb.table("policy_config_benefits")
@@ -184,7 +184,7 @@ def _get_covered_benefits_for_company(company_id: str) -> Dict[str, Dict[str, An
 def _get_exception_keys_for_assignment(assignment_id: str) -> set:
     """Return benefit keys with a pending exception request for this assignment."""
     try:
-        from ...services.supabase_client import get_supabase_admin_client
+        from ..services.supabase_client import get_supabase_admin_client
         sb = get_supabase_admin_client()
         result = (
             sb.table("exception_requests")

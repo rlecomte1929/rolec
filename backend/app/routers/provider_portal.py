@@ -28,9 +28,9 @@ import requests as http_requests
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ...services.provider_jwt import verify_provider_token
-from ...services.supabase_client import get_supabase_admin_client
-from ...services.events_tracker import track as track_event
+from ..services.provider_jwt import verify_provider_token
+from ..services.supabase_client import get_supabase_admin_client
+from ..services.events_tracker import track as track_event
 
 log = logging.getLogger(__name__)
 

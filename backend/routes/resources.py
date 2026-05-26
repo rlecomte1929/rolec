@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from ..database import db
 from ..app.db import SessionLocal
 from ..app import crud as app_crud
-from ..services.resources.public_service import (
+from ..app.services.resources.public_service import (
     get_resource_context as build_context,
     get_published_resources,
     get_published_events,
@@ -172,5 +172,5 @@ def list_supported_destinations(
     user: Dict[str, Any] = Depends(_require_hr_or_employee),
 ) -> List[Dict[str, Any]]:
     """List all destinations supported by the platform (from catalog allowlist)."""
-    from ..services import scrape_safety
+    from ..app.services import scrape_safety
     return scrape_safety.list_allowlist()

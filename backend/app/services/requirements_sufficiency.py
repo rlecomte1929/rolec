@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from ...database import db
 from ...app.db import SessionLocal
 from ...app import crud
-from ...services.guidance_pack_service import build_profile_snapshot
+from .guidance_pack_service import build_profile_snapshot
 
 log = logging.getLogger(__name__)
 

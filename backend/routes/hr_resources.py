@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
 
 from ..database import db
-from ..services.resources.public_service import get_resources_page_data_for_preview
+from ..app.services.resources.public_service import get_resources_page_data_for_preview
 
 router = APIRouter(prefix="/api/hr/resources", tags=["hr-resources"])
 
@@ -39,7 +39,7 @@ def list_hr_resources_destinations(
     user: Dict[str, Any] = Depends(_require_hr_or_admin),
 ) -> List[Dict[str, Any]]:
     """List all supported destinations (HR view). Alias for /api/resources/destinations."""
-    from ..services import scrape_safety
+    from ..app.services import scrape_safety
     return scrape_safety.list_allowlist()
 
 
