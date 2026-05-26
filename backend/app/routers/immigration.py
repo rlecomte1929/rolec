@@ -1299,6 +1299,190 @@ def erasure_request_stub(case_id: str, current_user: Dict[str, Any] = Depends(ge
 
 
 # ---------------------------------------------------------------------------
+# MVG-6 immigration case management (HR create/view + employee checklist)
+# ---------------------------------------------------------------------------
+
+VALID_PERMIT_TYPES = {
+    "eu_blue_card", "work_permit", "skilled_worker_visa", "eea_registration", "other"
+}
+
+
+class ImmigrationCaseCreate(BaseModel):
+    case_id: str
+    corridor_from: str
+    corridor_to: str
+    permit_type: str
+    partner_name: Optional[str] = None
+    expected_submission_date: Optional[str] = None   # ISO date string yyyy-mm-dd
+    expected_grant_date: Optional[str] = None        # ISO date string yyyy-mm-dd
+
+
+def _serialize_imm_case(row: Any) -> Dict[str, Any]:
+    """Convert a DB row from immigration_cases to a JSON-safe dict."""
+    r = dict(row)
+    for col in ("created_at", "updated_at", "expected_submission_date",
+                "expected_grant_date", "permit_expiry_date"):
+        v = r.get(col)
+        if hasattr(v, "isoformat"):
+            r[col] = v.isoformat()
+    # Ensure UUIDs are strings
+    for col in ("id", "case_id", "created_by_hr_id"):
+        if r.get(col) is not None:
+            r[col] = str(r[col])
+    return r
+
+
+@router.post("/hr/immigration/cases", status_code=status.HTTP_201_CREATED)
+def create_immigration_case(
+    body: ImmigrationCaseCreate,
+    hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """
+    MVG-6A — HR creates a permit tracking record for an existing relocation case.
+
+    Validates permit_type, inserts into immigration_cases, and returns the new record.
+    Returns 409 if an immigration case for this case_id already exists.
+    """
+    if body.permit_type not in VALID_PERMIT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid permit_type '{body.permit_type}'. "
+                   f"Allowed: {', '.join(sorted(VALID_PERMIT_TYPES))}.",
+        )
+
+    # Prevent duplicates — one active immigration case per relocation case
+    with db.engine.begin() as conn:
+        existing = conn.execute(
+            text("SELECT id FROM public.immigration_cases WHERE case_id = :case_id LIMIT 1"),
+            {"case_id": body.case_id},
+        ).mappings().first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"An immigration case already exists for case_id '{body.case_id}'. "
+                   f"Immigration case id: {existing['id']}",
+        )
+
+    imm_case_id = str(uuid.uuid4())
+    now = _now_iso()
+
+    with db.engine.begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO public.immigration_cases
+                    (id, case_id, corridor_from, corridor_to, permit_type,
+                     partner_name, expected_submission_date, expected_grant_date,
+                     status, document_statuses, created_by_hr_id, created_at, updated_at)
+                VALUES
+                    (:id, :case_id, :corridor_from, :corridor_to, :permit_type,
+                     :partner_name, :expected_submission_date, :expected_grant_date,
+                     'initiated', '{}', :created_by_hr_id, :now, :now)
+            """),
+            {
+                "id": imm_case_id,
+                "case_id": body.case_id,
+                "corridor_from": body.corridor_from,
+                "corridor_to": body.corridor_to,
+                "permit_type": body.permit_type,
+                "partner_name": body.partner_name,
+                "expected_submission_date": body.expected_submission_date,
+                "expected_grant_date": body.expected_grant_date,
+                "created_by_hr_id": hr_user.get("id"),
+                "now": now,
+            },
+        )
+
+    # Fetch and return the full record
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT * FROM public.immigration_cases WHERE id = :id"),
+            {"id": imm_case_id},
+        ).mappings().first()
+
+    log.info("Immigration case created: %s for case_id %s by HR %s",
+             imm_case_id, body.case_id, hr_user.get("id"))
+    return _serialize_imm_case(row)
+
+
+@router.get("/hr/immigration/cases/{immigration_case_id}")
+def get_immigration_case_hr(
+    immigration_case_id: str,
+    hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """
+    MVG-6A/6C — HR fetches an immigration case by its own ID.
+
+    Returns the full record including status, dates, and corridor.
+    """
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT * FROM public.immigration_cases WHERE id = :id"),
+            {"id": immigration_case_id},
+        ).mappings().first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Immigration case not found.")
+
+    return _serialize_imm_case(row)
+
+
+@router.get("/employee/cases/{case_id}/immigration")
+def get_immigration_case_employee(
+    case_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    MVG-6B — Employee fetches the immigration case for their relocation case.
+
+    Verifies the authenticated employee owns the given relocation case before
+    returning the record.  Returns 404 if no immigration case exists yet
+    (HR has not opened one), so the employee checklist page can show a friendly
+    "contact HR" message.
+    """
+    employee_id = current_user["id"]
+
+    # Verify this employee has access to the relocation case
+    with db.engine.begin() as conn:
+        assignment = conn.execute(
+            text("""
+                SELECT id FROM public.case_assignments
+                WHERE (id = :case_id OR case_id = :case_id)
+                  AND employee_user_id = :employee_id
+                LIMIT 1
+            """),
+            {"case_id": case_id, "employee_id": employee_id},
+        ).mappings().first()
+
+    if not assignment:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have access to this relocation case.",
+        )
+
+    # Look up immigration case by relocation case_id
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT * FROM public.immigration_cases
+                WHERE case_id = :case_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """),
+            {"case_id": case_id},
+        ).mappings().first()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="No immigration case found for this relocation. Contact your HR team.",
+        )
+
+    return _serialize_imm_case(row)
+
+
+# ---------------------------------------------------------------------------
 # Private DB helpers
 # ---------------------------------------------------------------------------
 
