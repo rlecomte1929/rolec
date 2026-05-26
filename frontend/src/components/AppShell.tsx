@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Breadcrumb } from './Breadcrumb';
+import { ChangelogBell } from './ChangelogBell';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { useBrandingConfig } from '../hooks/useBrandingConfig';
@@ -149,6 +150,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, s
             AppShell-backed pages and v2 custom-layout pages. */}
         <header className="flex items-center justify-end px-6 py-3 bg-white border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-3 shrink-0">
+            <ChangelogBell />
             <LogoutButton />
             {identity && (
               <Link
