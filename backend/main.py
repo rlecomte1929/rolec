@@ -567,7 +567,7 @@ from .app.services.query_counter import (  # noqa: E402
 install_query_counter(db.engine)
 app.add_middleware(QueryCountMiddleware, threshold=10)
 
-# [AUDIT-C2.3 Month-1] auth_router → moved to backend/app/main.py
+app.include_router(auth_router.router)  # [AUDIT-C2.3] re-added — auth routes must be in deployed main.py
 app.include_router(compat_router.router)
 # [AUDIT-C2.3 Month-1] cases_router → moved to backend/app/main.py
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
