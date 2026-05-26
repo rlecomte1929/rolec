@@ -255,7 +255,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
   return (
     <aside
       aria-label="Platform navigation"
-      className={`${collapsed ? 'w-[64px]' : 'w-[224px]'} shrink-0 flex flex-col bg-white border-r border-slate-200 overflow-y-auto transition-[width] duration-200 ease-out`}
+      className={`${collapsed ? 'w-[64px]' : 'w-[240px]'} shrink-0 flex flex-col bg-white border-r border-slate-200 overflow-y-auto transition-[width] duration-200 ease-out`}
     >
       {/* Brand + collapse toggle */}
       <div className={`flex items-center border-b border-slate-100 px-3 py-3 ${collapsed ? 'justify-center' : 'gap-2'}`}>
@@ -340,7 +340,7 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                 <Link
                   key={item.id}
                   to={to}
-                  title={collapsed ? item.label : undefined}
+                  title={item.label}
                   className={`group relative flex items-center gap-2.5 rounded-lg text-sm transition-colors ${
                     collapsed ? 'justify-center px-2 py-2' : 'px-3 py-1.5'
                   } ${
