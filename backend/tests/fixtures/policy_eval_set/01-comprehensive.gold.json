@@ -1,0 +1,22 @@
+{
+  "name": "01-comprehensive",
+  "description": "Full-coverage policy mentioning all major benefits explicitly",
+  "policy_meta": {
+    "title": "Acme Corporation Global Mobility Policy",
+    "version": "3.2",
+    "effective_date": "2026-01-01"
+  },
+  "benefits": [
+    "temporary_housing",
+    "rental_deposit",
+    "shipment",
+    "education_support",
+    "visa_support",
+    "travel_host",
+    "settling_in_allowance",
+    "tax_assistance",
+    "spousal_support",
+    "language_training",
+    "repatriation"
+  ]
+}

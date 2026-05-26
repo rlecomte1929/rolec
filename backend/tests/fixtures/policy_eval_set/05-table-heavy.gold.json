@@ -1,0 +1,20 @@
+{
+  "name": "05-table-heavy",
+  "description": "Table-formatted benefit schedule + free-form scouting/home-sale lines",
+  "policy_meta": {
+    "title": "Stark Industries Mobility Policy",
+    "version": "4.0",
+    "effective_date": "2026-05-01"
+  },
+  "benefits": [
+    "temporary_housing",
+    "rental_deposit",
+    "shipment",
+    "tax_assistance",
+    "settling_in_allowance",
+    "travel_host",
+    "spousal_support",
+    "home_sale_purchase",
+    "scouting_trip"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "02-minimal",
+  "description": "Bare-minimum policy with only 2 benefits stated",
+  "policy_meta": {
+    "title": "Lemma Ltd Relocation Policy",
+    "version": "1.0",
+    "effective_date": "2026-03-15"
+  },
+  "benefits": [
+    "visa_support",
+    "travel_host"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "03-ambiguous-housing",
+  "description": "Multi-currency housing caps, ambiguous shipment + education amounts",
+  "policy_meta": {
+    "title": "Globex International Mobility Policy",
+    "version": "2.1",
+    "effective_date": "2026-02-01"
+  },
+  "benefits": [
+    "temporary_housing",
+    "shipment",
+    "education_support"
+  ]
+}
