@@ -20,6 +20,7 @@
 | 2 | 2026-05-26 | `audit/stage-2-copy` | [#120](https://github.com/rlecomte1929/rolec/pull/120) | A4 + A5 + BRAND verified landed via PR #119. Jargon hunt across HR/Admin/dev surfaces identified 9 remaining sites (HrDashboard, AdminMobilityCaseInspectPage, AdminAssignments, CaseEssentialsCard, AssignmentDebugPanel) — decision: retain on operator surfaces. COPY-8 acknowledged-not-closed. | [`audit/re-audit-stage-2-copy.md`](re-audit-stage-2-copy.md) | UX copy: **4.0 → 7.0** (+3.0); Design (live): **5.5 → 6.8** (+1.3) | No source-code edits. Stage 2 contribution is verification + jargon hunt + scoring doc. |
 | 3 | 2026-05-26 | `audit/stage-3-a11y` | [#121](https://github.com/rlecomte1929/rolec/pull/121) | **A11Y-1 + A11Y-7** closed via root-fix at antigravity `Input.tsx` primitive (useId + htmlFor + aria-describedby + role=alert) — app-wide effect. **A11Y-8** closed via composed aria-label on Acknowledge / Mark-fulfilled quote buttons. **A11Y-2, A11Y-3, A11Y-4, A11Y-5, A11Y-6** already closed pre-Stage-3 (tab pattern + tr keyboard + icon aria-label + color+text + AppShell h1). **A11Y-9** acknowledged: 303 `no-clickable-div` violations surfaced via AIQ-395, drained by AIQ-397 sprint. | [`audit/re-audit-stage-3-a11y.md`](re-audit-stage-3-a11y.md) | Accessibility: **4.5 → 7.5** (+3.0) | 2 files, ~20 LOC net source-code change. P2 items (skip-link, live regions, autocomplete) recommended as `AUDIT-A11Y-P2-followup`. |
 | 4 | 2026-05-26 | `audit/stage-4-hygiene` | [#123](https://github.com/rlecomte1929/rolec/pull/123) | **A8** verified closed on main (logger.ts + 0 non-exempt console.* in production frontend). **A9** acknowledged-not-closed: A9.1 + A9.2 docs landed but A9.3 (155-file migration) + A9.4 (97 router import corrections) are stranded on local audit/stage-1-security branch — never pushed to main. Dual services tree persists on main. AIQ-397 sprint drained 303 → 0 no-clickable-div errors. AIQ-398 has 9 `no-console` residuals in src/api/*. | [`audit/re-audit-stage-4-hygiene.md`](re-audit-stage-4-hygiene.md) | Full-stack (live): **5.5 → 7.5** (+2.0) | Filed AUDIT-A9-followup to land the stranded A9.3/A9.4 commits. Docs-only PR. |
+| 5 | 2026-05-26 | `audit/stage-5-estimate-review` | [#124](https://github.com/rlecomte1929/rolec/pull/124) | **W2 (Estimate Review redesign)** substantially closed: PackageSummary.tsx is a comprehensive Side-Output A implementation (cap comparison + visual bars + personal-cost callout + exception flow + currency conversion + multi-role view). Stage 5 own contribution: page-wrapper copy patch — "Next steps" generic list rewritten to outcome-described prose; empty-state polish per docs/product-copy-rules.md. ECB FX date stamping + multiplier transparency flagged as P2 followups. | [`audit/re-audit-stage-5-estimate-review.md`](re-audit-stage-5-estimate-review.md) | ServicesEstimate page: **4.0 → 8.5** (+4.5); Design (live): **6.8 → 7.3** (+0.5) | 1 file, ~14 LOC net change. The bulk of the W2 redesign was already on main via parallel team work; Stage 5 is verification + small polish. |
 
 ---
 
@@ -34,7 +35,7 @@ This table is updated at the end of each stage that re-audits a lens. Compare ag
 | Designer (intent) | 7.0 | — | — | — | — | — | — | — | — | — | — |
 | DevEx (intent) | 5.5 | — | — | — | — | — | — | — | — | — | — |
 | Full-stack (live) | 5.5 | — | — | — | **7.5** | — | — | — | — | — | — |
-| Designer (live) | 5.5 | — | **6.8** | — | — | — | — | — | — | — | — |
+| Designer (live) | 5.5 | — | **6.8** | — | — | **7.3** | — | — | — | — | — |
 | Accessibility | 4.5 | — | — | **7.5** | — | — | — | — | — | — | — |
 | UX copy | 4.0 | — | **7.0** | — | — | — | — | — | — | — | — |
 | QA | 6.0 | — | — | — | — | — | — | — | — | — | — |
@@ -66,7 +67,7 @@ This table mirrors the `audit/00-synthesis.md` "Tiered punch list" (A/B/C). Mark
 
 | ID | Title | Source | Notion URL | Closed in | PR |
 |---|---|---|---|---|---|
-| B1 | Estimate Review redesign per Side-Output A | DES-LIVE-3 / W2 | (existing queue entry — to confirm) | Stage 5 | — |
+| B1 | Estimate Review redesign per Side-Output A | DES-LIVE-3 / W2 | (existing queue entry — to confirm) | Stage 5 (substantially closed; ECB FX + multiplier transparency = P2 followups) | — |
 | B2 | Migrate 37 raw `<button>`/`<input>` to antigravity | DES-LIVE-4 / P1-8 | (no entry yet — defer to Stage 6 prep) | Stage 6 | — |
 | B3 | Empty-state pass across 6 highest-traffic pages | COPY-4 | (defer) | Stage 6 | — |
 | B4 | Error-message map for top 10 failure modes | COPY-3 | (defer to Stage 2 / 6 prep) | Stage 2 / 6 | — |
