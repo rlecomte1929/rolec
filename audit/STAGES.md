@@ -16,7 +16,8 @@
 | Stage | Date | Branch | PR | Findings closed | Re-audit doc | Score deltas | Notes |
 |---|---|---|---|---|---|---|---|
 | 0 | 2026-05-25 | `audit/stage-0-governance` | [#118](https://github.com/rlecomte1929/rolec/pull/118) | A7 (CLAUDE.md uvicorn fix) + governance scaffold + audit/* committed | n/a (Stage 0 = scaffolding) | n/a | 14 Notion AI Work Queue entries created; branch convention documented; rolling log + composite-score timeline + Tier A/B/C findings tracker scaffolded. **Merged 2026-05-25.** |
-| 1 | 2026-05-25 | `audit/stage-1-security` | [#119](https://github.com/rlecomte1929/rolec/pull/119) | **A2** (already done by team commit 4a3b43c — verified) + **A3** (script + CI guard shipped; 113-entry seed allowlist; triage queued as A3-followup) + **A1 partial** (5 PRAGMA blocks guarded, 3 helpers guarded, 4 savepoint protections — original failing statement no longer fails; deeper init_db DDL has same class issue, queued as A1-followup). PR also carries parallel team work: **A4** (W1 copy), **A5** (statusLabel utility), **A6** partial (icon aria-labels), **A8** (logger + strip console.*) | [`audit/re-audit-stage-1-security.md`](re-audit-stage-1-security.md) | Security: **6.5 → 7.5** (+1.0) | Discovered `patch_case` likely also unguarded (new P1 finding). Two follow-ups: [A1-followup](https://www.notion.so/36b887c64d48819a92dcf3583373e6f7), [A3-followup](https://www.notion.so/36b887c64d48813abfe4dfbc4e2fb8a2). |
+| 1 | 2026-05-25 | `audit/stage-1-security` | [#119](https://github.com/rlecomte1929/rolec/pull/119) (merged) | **A2** (already done by team commit 4a3b43c — verified) + **A3** (script + CI guard shipped; 113-entry seed allowlist; triage queued as A3-followup) + **A1 partial** (5 PRAGMA blocks guarded, 3 helpers guarded, 4 savepoint protections — original failing statement no longer fails; deeper init_db DDL has same class issue, queued as A1-followup). PR also carries parallel team work: **A4** (W1 copy), **A5** (statusLabel utility), **A6** partial (icon aria-labels), **A8** (logger + strip console.*) | [`audit/re-audit-stage-1-security.md`](re-audit-stage-1-security.md) | Security: **6.5 → 7.5** (+1.0) | Discovered `patch_case` likely also unguarded (new P1 finding). Two follow-ups: [A1-followup](https://www.notion.so/36b887c64d48819a92dcf3583373e6f7), [A3-followup](https://www.notion.so/36b887c64d48813abfe4dfbc4e2fb8a2). |
+| 2 | 2026-05-26 | `audit/stage-2-copy` | [#120](https://github.com/rlecomte1929/rolec/pull/120) | A4 + A5 + BRAND verified landed via PR #119. Jargon hunt across HR/Admin/dev surfaces identified 9 remaining sites (HrDashboard, AdminMobilityCaseInspectPage, AdminAssignments, CaseEssentialsCard, AssignmentDebugPanel) — decision: retain on operator surfaces. COPY-8 acknowledged-not-closed. | [`audit/re-audit-stage-2-copy.md`](re-audit-stage-2-copy.md) | UX copy: **4.0 → 7.0** (+3.0); Design (live): **5.5 → 6.8** (+1.3) | No source-code edits. Stage 2 contribution is verification + jargon hunt + scoring doc. |
 
 ---
 
@@ -31,9 +32,9 @@ This table is updated at the end of each stage that re-audits a lens. Compare ag
 | Designer (intent) | 7.0 | — | — | — | — | — | — | — | — | — | — |
 | DevEx (intent) | 5.5 | — | — | — | — | — | — | — | — | — | — |
 | Full-stack (live) | 5.5 | — | — | — | — | — | — | — | — | — | — |
-| Designer (live) | 5.5 | — | — | — | — | — | — | — | — | — | — |
+| Designer (live) | 5.5 | — | **6.8** | — | — | — | — | — | — | — | — |
 | Accessibility | 4.5 | — | — | — | — | — | — | — | — | — | — |
-| UX copy | 4.0 | — | — | — | — | — | — | — | — | — | — |
+| UX copy | 4.0 | — | **7.0** | — | — | — | — | — | — | — | — |
 | QA | 6.0 | — | — | — | — | — | — | — | — | — | — |
 | Security | 6.5 | **7.5** | — | — | — | — | — | — | — | — | — |
 | Performance | 6.0 | — | — | — | — | — | — | — | — | — | — |

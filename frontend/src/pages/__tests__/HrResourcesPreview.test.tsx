@@ -21,6 +21,7 @@ vi.mock('../../components/AppShell', () => ({
 
 vi.mock('../../api/client', () => ({
   resourcesAPI: {
+    getDestinations: vi.fn().mockResolvedValue([]),
     getHrPreviewPage: vi.fn().mockResolvedValue({
       context: { countryCode: 'NO', countryName: 'Norway', cityName: null, hasChildren: false, relocationType: 'permanent', previewMode: true },
       categories: [],
@@ -49,7 +50,7 @@ import { resourcesAPI } from '../../api/client';
 // Mock does not include `resourcesAPI.getDestinations` which the component
 // now calls — test mock wasn't updated when the API surface grew. Skip-with-todo
 // until fixed in AUDIT-CITESTS-followup (Notion).
-describe.skip('HrResourcesPreview', () => {
+describe('HrResourcesPreview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

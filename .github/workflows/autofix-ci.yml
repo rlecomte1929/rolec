@@ -59,15 +59,15 @@ jobs:
         working-directory: frontend
 
       - name: ESLint
-        # Stage-2 fix: scope to src/ to match eslint.config.js (which only
-        # configures parsing for `src/**/*.{ts,tsx}`). Also non-blocking until
-        # AUDIT-A6-followup lands: the current eslint.config.js doesn't configure
-        # a TypeScript parser (`@typescript-eslint/parser` isn't in package.json),
-        # so ESLint uses the default espree parser and fails to parse every .ts/.tsx
-        # file with "Parsing error". The AUDIT-A6 commit (97ecef9) introduced
-        # ESLint + the no-clickable-div rule but left the TS parser piece TBD.
-        # Once `@typescript-eslint/parser` is added and wired in eslint.config.js,
-        # flip `continue-on-error` back to false.
+        # AUDIT-A6-followup (AIQ-395): @typescript-eslint/parser is now wired
+        # in eslint.config.js — ESLint can parse all .ts/.tsx files and the
+        # no-clickable-div + no-console rules are active. However, enabling the
+        # TS parser for the first time surfaced 303 pre-existing no-clickable-div
+        # violations and 25 pre-existing no-console violations that were hidden
+        # when ESLint couldn't parse TypeScript. These are tracked in AIQ-397
+        # (a11y cleanup sprint) and AIQ-398 (no-console cleanup). Until those
+        # sprints land, keep non-blocking to avoid breaking every PR. Flip back
+        # to blocking (`continue-on-error: false`) once AIQ-397 drains to 0.
         run: npx eslint src --ext .ts,.tsx --max-warnings 0
         working-directory: frontend
         continue-on-error: true

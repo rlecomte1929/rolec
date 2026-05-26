@@ -5,10 +5,13 @@
  *   cd frontend && npx eslint src --ext .ts,.tsx
  *
  * AUDIT-A6 (AIQ-359): initial config wires up the custom no-clickable-div rule.
- * Add eslint-plugin-react, @typescript-eslint, and eslint-plugin-jsx-a11y as
- * needed when ESLint is added to package.json and CI.
+ * AUDIT-A6-followup (AIQ-395): adds @typescript-eslint/parser so ESLint can
+ * actually parse .ts/.tsx files (without this every file errored with
+ * "Parsing error" because the default espree parser doesn't understand TS syntax).
  */
 
+import tsParser from '@typescript-eslint/parser';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
 import noClickableDiv from './eslint-rules/no-clickable-div.js';
 
 export default [
@@ -16,7 +19,17 @@ export default [
     // Apply to all TypeScript/TSX source files
     files: ['src/**/*.{ts,tsx}'],
 
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        ecmaFeatures: { jsx: true },
+      },
+    },
+
     plugins: {
+      '@typescript-eslint': tsPlugin,
       /**
        * "local" namespace for project-specific custom rules.
        * Usage: 'local/no-clickable-div': 'error'
