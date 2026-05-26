@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from ...database import db
-from ...services.ops_analytics_service import (
+from ..services.ops_analytics_service import (
     get_destination_ops_metrics,
     get_notification_ops_metrics,
     get_ops_bottlenecks,

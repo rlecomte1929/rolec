@@ -5,8 +5,8 @@ from fastapi import APIRouter, Header, HTTPException
 from sqlalchemy import text
 
 from .._jwt_claims import get_unverified_claims as _jwt_unverified_claims
-from ..services.relocation_profile import compute_missing_fields
-from ..services.supabase_client import get_supabase_client
+from ..app.services.relocation_profile import compute_missing_fields
+from ..app.services.supabase_client import get_supabase_client
 from .relocation import _extract_bearer_token, _is_permission_error
 from ..database import db
 from ..app.db import SessionLocal

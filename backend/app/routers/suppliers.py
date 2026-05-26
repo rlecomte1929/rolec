@@ -114,7 +114,7 @@ def get_supplier_api(
         if not s:
             raise HTTPException(status_code=404, detail="Supplier not found")
         try:
-            from ...services.analytics_service import emit_event, EVENT_SUPPLIER_VIEWED
+            from ..services.analytics_service import emit_event, EVENT_SUPPLIER_VIEWED
             emit_event(
                 EVENT_SUPPLIER_VIEWED,
                 request_id=getattr(request.state, "request_id", None),

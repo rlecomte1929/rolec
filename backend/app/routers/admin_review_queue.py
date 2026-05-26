@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from ...database import db
-from ...services.review_queue_service import (
+from ..services.review_queue_service import (
     assign_queue_item,
     backfill_queue_from_signals,
     change_queue_item_status,

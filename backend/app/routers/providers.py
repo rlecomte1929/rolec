@@ -34,8 +34,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr
 
 from ..auth_deps import require_admin_or_hr
-from ...services.supabase_client import get_supabase_admin_client
-from ...services.provider_jwt import generate_provider_token, verify_provider_token, hash_token
+from ..services.supabase_client import get_supabase_admin_client
+from ..services.provider_jwt import generate_provider_token, verify_provider_token, hash_token
 
 log = logging.getLogger(__name__)
 

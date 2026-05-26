@@ -74,7 +74,7 @@ from ..services.bamboohr_client import (
     is_relocation_required,
     test_connection,
 )
-from ...services.supabase_client import get_supabase_admin_client
+from ..services.supabase_client import get_supabase_admin_client
 
 log = logging.getLogger(__name__)
 

@@ -8,13 +8,13 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 from .._jwt_claims import get_unverified_claims as _jwt_unverified_claims
-from ..services.relocation_profile import compute_missing_fields
-from ..services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
-from ..services.relocation_classification import (
+from ..app.services.relocation_profile import compute_missing_fields
+from ..app.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _extract_profile
+from ..app.services.relocation_classification import (
     compute_case_classification,
     persist_case_classification,
 )
-from ..services.supabase_client import get_supabase_client
+from ..app.services.supabase_client import get_supabase_client
 from ..database import db as _rp_db
 
 router = APIRouter(prefix="/relocation", tags=["relocation"])

@@ -13,7 +13,7 @@ from ...database import db, Database
 from .. import crud, schemas, models
 from ..services.research import run_country_research
 from ..services.official_ingest_service import ingest_url_to_knowledge_doc
-from ...services.audit_log_service import (
+from ..services.audit_log_service import (
     ACTION_INSERT,
     ACTION_UPDATE,
     ACTOR_HUMAN,
@@ -535,7 +535,7 @@ def list_policy_ingest_orphans(
     user: dict = Depends(require_admin),
 ):
     """Read-only: list policy_documents stuck mid-extraction for > max_age_seconds."""
-    from ...services.policy_ingest_reconciler import find_orphaned_policy_documents
+    from ..services.policy_ingest_reconciler import find_orphaned_policy_documents
     rows = find_orphaned_policy_documents(db, max_age_seconds=max_age_seconds)
     return {"max_age_seconds": max_age_seconds, "count": len(rows), "orphans": rows}
 
@@ -549,7 +549,7 @@ def reconcile_policy_ingest(
     Mark orphaned policy_documents as failed so affected users can retry by
     re-uploading. Accepts {"max_age_seconds": int}; defaults to 15 minutes.
     """
-    from ...services.policy_ingest_reconciler import reconcile_orphaned_policy_ingest_jobs
+    from ..services.policy_ingest_reconciler import reconcile_orphaned_policy_ingest_jobs
     max_age = int((payload or {}).get("max_age_seconds") or 900)
     if max_age < 60:
         raise HTTPException(status_code=400, detail="max_age_seconds must be >= 60")

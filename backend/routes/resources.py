@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from ..database import db
 from ..app.db import SessionLocal
 from ..app import crud as app_crud
-from ..services.resources.public_service import (
+from ..app.services.resources.public_service import (
     get_resource_context as build_context,
     get_published_resources,
     get_published_events,

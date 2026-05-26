@@ -33,8 +33,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Request, Header, Depends
 from pydantic import BaseModel, EmailStr
 
-from ...services.supabase_client import get_supabase_admin_client
-from ...services.events_tracker import track
+from ..services.supabase_client import get_supabase_admin_client
+from ..services.events_tracker import track
 
 logger = logging.getLogger(__name__)
 

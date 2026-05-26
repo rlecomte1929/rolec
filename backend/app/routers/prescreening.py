@@ -22,7 +22,7 @@ from ..services.prescreening_notification import (
     send_prescreening_complete_email,
     get_reviewer_email_for_case,
 )
-from ...services.supabase_client import get_supabase_admin_client
+from ..services.supabase_client import get_supabase_admin_client
 
 log = logging.getLogger(__name__)
 

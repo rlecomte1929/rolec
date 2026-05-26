@@ -51,7 +51,7 @@ def post_recommendations_batch(
     # Avoid circular imports
     from ...database import db
     from ...policy_engine import PolicyEngine
-    from ...services.policy_adapter import normalize_policy_caps
+    from ..services.policy_adapter import normalize_policy_caps
 
     from ..db import SessionLocal
     from .. import crud as app_crud
@@ -155,7 +155,7 @@ def post_recommendations_batch(
         request_id, req.assignment_id, list(results.keys()), dur_ms,
     )
     try:
-        from ...services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
+        from ..services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
         total_count = sum(len(r.get("items", [])) for r in results.values())
         emit_event(
             EVENT_RECOMMENDATIONS_GENERATED,
@@ -238,7 +238,7 @@ def post_recommend(
             request_id, category, dest or "(none)", dur_ms,
         )
         try:
-            from ...services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
+            from ..services.analytics_service import emit_event, EVENT_RECOMMENDATIONS_GENERATED
             items = result.get("items", []) if isinstance(result, dict) else []
             emit_event(
                 EVENT_RECOMMENDATIONS_GENERATED,

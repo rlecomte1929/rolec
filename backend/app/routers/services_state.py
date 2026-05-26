@@ -29,7 +29,7 @@ from sqlalchemy import text
 
 from ..auth_deps import require_hr_or_employee, require_case_access
 from ...database import db, _jb
-from ...services.audit_log_service import (
+from ..services.audit_log_service import (
     ACTION_INSERT,
     ACTION_UPDATE,
     ACTOR_HUMAN,
