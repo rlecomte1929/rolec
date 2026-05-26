@@ -368,7 +368,7 @@ export function HrDiscoveryPage() {
         <div className="mb-6">
           <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-1">AI Engine</div>
           <div className="flex items-end justify-between gap-4">
-            <h1 className="text-2xl font-bold text-gray-900">Requirements discovery</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Requirements</h1>
             <div className="flex items-center gap-2">
               <button className="px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 ⚡ Corridor: <strong>FR → NO</strong>

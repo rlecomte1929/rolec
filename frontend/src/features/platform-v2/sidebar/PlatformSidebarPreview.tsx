@@ -32,7 +32,7 @@ export const PlatformSidebarPreview: React.FC = () => {
               <div className="font-medium text-slate-900">Sections</div>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-600">
                 <li><strong>Employee</strong> — Intake, Detailed intake, Roadmap, Documents, Dossier &amp; forms, Service providers, Inbox</li>
-                <li><strong>AI Engine</strong> — Requirements discovery</li>
+                <li><strong>AI Engine</strong> — Requirements</li>
                 <li><strong>HR Operations</strong> — Company profile, Mobility control, Policy Builder, Policy &amp; benefits, Policy vs. Reality, Exceptions</li>
                 <li><strong>Admin · ReloPass</strong> — Admin overview, Companies, Review queue, Ops analytics, Workflow analytics, Resources CMS, Prospects, Integrations</li>
               </ul>

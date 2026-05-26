@@ -60,7 +60,7 @@ function defaultSections(): NavSection[] {
     {
       label: 'AI Engine',
       items: [
-        { id: 'requirements-discovery', name: 'Requirements discovery', to: r('resources'), badge: { label: 'LIVE', tone: 'live' } },
+        { id: 'requirements-discovery', name: 'Requirements', to: r('resources'), badge: { label: 'LIVE', tone: 'live' } },
       ],
     },
     {
