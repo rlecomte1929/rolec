@@ -19,6 +19,7 @@
 | 1 | 2026-05-25 | `audit/stage-1-security` | [#119](https://github.com/rlecomte1929/rolec/pull/119) (merged) | **A2** (already done by team commit 4a3b43c — verified) + **A3** (script + CI guard shipped; 113-entry seed allowlist; triage queued as A3-followup) + **A1 partial** (5 PRAGMA blocks guarded, 3 helpers guarded, 4 savepoint protections — original failing statement no longer fails; deeper init_db DDL has same class issue, queued as A1-followup). PR also carries parallel team work: **A4** (W1 copy), **A5** (statusLabel utility), **A6** partial (icon aria-labels), **A8** (logger + strip console.*) | [`audit/re-audit-stage-1-security.md`](re-audit-stage-1-security.md) | Security: **6.5 → 7.5** (+1.0) | Discovered `patch_case` likely also unguarded (new P1 finding). Two follow-ups: [A1-followup](https://www.notion.so/36b887c64d48819a92dcf3583373e6f7), [A3-followup](https://www.notion.so/36b887c64d48813abfe4dfbc4e2fb8a2). |
 | 2 | 2026-05-26 | `audit/stage-2-copy` | [#120](https://github.com/rlecomte1929/rolec/pull/120) | A4 + A5 + BRAND verified landed via PR #119. Jargon hunt across HR/Admin/dev surfaces identified 9 remaining sites (HrDashboard, AdminMobilityCaseInspectPage, AdminAssignments, CaseEssentialsCard, AssignmentDebugPanel) — decision: retain on operator surfaces. COPY-8 acknowledged-not-closed. | [`audit/re-audit-stage-2-copy.md`](re-audit-stage-2-copy.md) | UX copy: **4.0 → 7.0** (+3.0); Design (live): **5.5 → 6.8** (+1.3) | No source-code edits. Stage 2 contribution is verification + jargon hunt + scoring doc. |
 | 3 | 2026-05-26 | `audit/stage-3-a11y` | [#121](https://github.com/rlecomte1929/rolec/pull/121) | **A11Y-1 + A11Y-7** closed via root-fix at antigravity `Input.tsx` primitive (useId + htmlFor + aria-describedby + role=alert) — app-wide effect. **A11Y-8** closed via composed aria-label on Acknowledge / Mark-fulfilled quote buttons. **A11Y-2, A11Y-3, A11Y-4, A11Y-5, A11Y-6** already closed pre-Stage-3 (tab pattern + tr keyboard + icon aria-label + color+text + AppShell h1). **A11Y-9** acknowledged: 303 `no-clickable-div` violations surfaced via AIQ-395, drained by AIQ-397 sprint. | [`audit/re-audit-stage-3-a11y.md`](re-audit-stage-3-a11y.md) | Accessibility: **4.5 → 7.5** (+3.0) | 2 files, ~20 LOC net source-code change. P2 items (skip-link, live regions, autocomplete) recommended as `AUDIT-A11Y-P2-followup`. |
+| 4 | 2026-05-26 | `audit/stage-4-hygiene` | (pending) | **A8** verified closed on main (logger.ts + 0 non-exempt console.* in production frontend). **A9** acknowledged-not-closed: A9.1 + A9.2 docs landed but A9.3 (155-file migration) + A9.4 (97 router import corrections) are stranded on local audit/stage-1-security branch — never pushed to main. Dual services tree persists on main. AIQ-397 sprint drained 303 → 0 no-clickable-div errors. AIQ-398 has 9 `no-console` residuals in src/api/*. | [`audit/re-audit-stage-4-hygiene.md`](re-audit-stage-4-hygiene.md) | Full-stack (live): **5.5 → 7.5** (+2.0) | Filed AUDIT-A9-followup to land the stranded A9.3/A9.4 commits. Docs-only PR. |
 
 ---
 
@@ -32,7 +33,7 @@ This table is updated at the end of each stage that re-audits a lens. Compare ag
 | Eng manager | 6.0 | — | — | — | — | — | — | — | — | — | — |
 | Designer (intent) | 7.0 | — | — | — | — | — | — | — | — | — | — |
 | DevEx (intent) | 5.5 | — | — | — | — | — | — | — | — | — | — |
-| Full-stack (live) | 5.5 | — | — | — | — | — | — | — | — | — | — |
+| Full-stack (live) | 5.5 | — | — | — | **7.5** | — | — | — | — | — | — |
 | Designer (live) | 5.5 | — | **6.8** | — | — | — | — | — | — | — | — |
 | Accessibility | 4.5 | — | — | **7.5** | — | — | — | — | — | — | — |
 | UX copy | 4.0 | — | **7.0** | — | — | — | — | — | — | — | — |
@@ -58,8 +59,8 @@ This table mirrors the `audit/00-synthesis.md` "Tiered punch list" (A/B/C). Mark
 | A5 | `statusLabel()` utility + replace render sites | COPY-2 / DES-LIVE-2 | [AUDIT-A5](https://www.notion.so/36b887c64d4881dba8a2ce2305d52089) | Stage 2 | — |
 | A6 | Auth.tsx label associations + icon-only aria-labels | A11Y-1, A11Y-4 | [AUDIT-A6](https://www.notion.so/36b887c64d488191a70bcc576e43a394) | Stage 3 | — |
 | A7 | Fix CLAUDE.md local-dev uvicorn command | DX-3 | n/a (doc only) | **Stage 0** | [#118](https://github.com/rlecomte1929/rolec/pull/118) |
-| A8 | Strip 19 console.* statements; route through real logger | QA-4 | [AUDIT-A8](https://www.notion.so/36b887c64d48815391e4c3d24cf9d600) | Stage 4 | — |
-| A9 | Decide + document `backend/services/` vs `app/services/` | ENG-3 / P0-2 | [AUDIT-A9](https://www.notion.so/36b887c64d48810bac10ee37c94977d8) | Stage 4 | — |
+| A8 | Strip 19 console.* statements; route through real logger | QA-4 | [AUDIT-A8](https://www.notion.so/36b887c64d48815391e4c3d24cf9d600) | Stage 4 (verified closed) | — |
+| A9 | Decide + document `backend/services/` vs `app/services/` | ENG-3 / P0-2 | [AUDIT-A9](https://www.notion.so/36b887c64d48810bac10ee37c94977d8) | Stage 4 (A9.1/A9.2 closed; A9.3/A9.4 stranded → [A9-followup](https://www.notion.so/36c887c64d488148918dd44c45fcd9c4)) | — |
 
 ### Tier B (next sprint)
 
