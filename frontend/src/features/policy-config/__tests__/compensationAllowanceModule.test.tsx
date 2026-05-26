@@ -34,6 +34,10 @@ vi.mock('../../../api/client', () => ({
   adminAPI: {
     listCompanies: (...args: unknown[]) => apiMocks.adminListCompanies(...args),
   },
+  // EmployeePolicyView also calls employeeAPI.getServicesPolicyContext — must be present in mock
+  employeeAPI: {
+    getServicesPolicyContext: vi.fn().mockResolvedValue(null),
+  },
 }));
 
 vi.mock('../../../utils/demo', () => ({
@@ -53,6 +57,16 @@ vi.mock('../../../components/AppShell', () => ({
 
 vi.mock('../usePolicyConfigLeaveGuard', () => ({
   usePolicyConfigLeaveGuard: () => {},
+}));
+
+vi.mock('../../../contexts/EmployeeAssignmentContext', () => ({
+  useEmployeeAssignment: () => ({
+    assignmentId: 'asg-test-1',
+    linkedCount: 1,
+    isLoading: false,
+    linkedSummaries: [],
+    refresh: async () => {},
+  }),
 }));
 
 vi.mock('../../../pages/admin/AdminLayout', () => ({
@@ -154,7 +168,7 @@ describe('Compensation & Allowance — routes render', () => {
   // provided by the test's MemoryRouter wrapper. Test never worked reliably
   // outside the integrated app shell. Skip-with-todo until fixed in
   // AUDIT-CITESTS-followup (Notion).
-  it.skip('renders /employee/policy with covered benefit only', async () => {
+  it('renders /employee/policy with covered benefit only', async () => {
     render(
       <MemoryRouter initialEntries={['/employee/policy']}>
         <Routes>
