@@ -196,7 +196,7 @@ export const CaseReadinessCore: React.FC<CaseReadinessCoreProps> = ({ assignment
     const body =
       summary.user_message ||
       (summary.reason === 'no_destination'
-        ? 'Set destination in the employee move plan (or case host country) to see immigration route, documents, and milestones.'
+        ? 'Set destination in the relocation plan (or case host country) to see immigration route, documents, and milestones.'
         : summary.reason === 'readiness_store_unavailable'
           ? 'Readiness database is not available in this environment. Apply the readiness migration or contact operations.'
           : `No readiness template for destination “${summary.destination_key || summary.destination_raw || 'unknown'}” yet.`);
