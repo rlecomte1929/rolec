@@ -133,6 +133,44 @@ def _deep_merge_case_drafts(base: Dict[str, Any], update: Dict[str, Any]) -> Dic
     return out
 
 
+@router.get("", tags=["cases"])
+def list_employee_cases(
+    request: Request,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    GET /api/cases — returns the authenticated employee's assigned cases.
+    Mirrors /api/employee/cases for frontend and E2E test compatibility.
+    HR/admin tokens receive an empty list (use /api/hr/cases instead).
+    Fixes B12b: previously returned 404 because no root route existed on this router.
+    """
+    role = (user.get("role") or "employee").lower()
+    if role not in ("employee",):
+        # Role isolation: HR/admin must use /api/hr/cases, not this endpoint.
+        return {"cases": []}
+
+    uid = user.get("id") or user.get("user_id") or user.get("sub")
+    rid = getattr(request.state, "request_id", None)
+    try:
+        linked = main_db.list_linked_assignments_for_employee(uid, request_id=rid)
+    except Exception:
+        logger.exception("list_employee_cases: DB query failed for uid=%s", uid)
+        linked = []
+
+    cases = []
+    for row in linked:
+        d = dict(row)
+        case_id = d.get("case_id") or d.get("id")
+        cases.append({
+            "id": case_id,
+            "caseId": case_id,
+            "assignmentId": d.get("id"),
+            "status": d.get("status"),
+            "employeeIdentifier": d.get("employee_identifier"),
+        })
+    return {"cases": cases}
+
+
 @router.get("/{case_id}", response_model=schemas.CaseDTO)
 def get_case(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
     with SessionLocal() as db:
