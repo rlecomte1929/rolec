@@ -62,9 +62,15 @@ export const Dashboard: React.FC = () => {
     return (
       <AppShell title="Relocation Dashboard">
         <Card padding="lg">
+          {/* Stage 6 (audit): empty-state copy per docs/product-copy-rules.md
+              ("No X yet. [Reason or guidance] → [CTA]"). */}
           <Alert variant="info">
-            <p className="mb-4">Profile is empty. Complete setup to see your relocation plan.</p>
-            <Button onClick={() => navigate('/journey')}>Complete profile</Button>
+            <p className="font-medium text-[#0b2b43] mb-1">No relocation plan yet</p>
+            <p className="mb-4">
+              Tell us your origin, destination, and target move date — we'll build a tailored
+              plan with documents, milestones, and provider recommendations.
+            </p>
+            <Button onClick={() => navigate('/journey')}>Start your profile</Button>
           </Alert>
         </Card>
       </AppShell>
