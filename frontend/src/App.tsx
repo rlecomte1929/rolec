@@ -49,6 +49,8 @@ const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSumm
 const EmployeeRelocationPlanPage = lazy(() => import('./pages/employee/EmployeeRelocationPlanPage').then((module) => ({ default: module.EmployeeRelocationPlanPage })));
 // [P1-5] Dossier & Forms list view
 const EmployeeDossierPage = lazy(() => import('./pages/employee/EmployeeDossierPage').then((module) => ({ default: module.EmployeeDossierPage })));
+// [P1-6] Case roadmap page
+const EmployeeCaseRoadmapPage = lazy(() => import('./pages/employee/EmployeeCaseRoadmapPage').then((module) => ({ default: module.EmployeeCaseRoadmapPage })));
 const ImmigrationPage = lazy(() => import('./pages/employee/ImmigrationPage').then((module) => ({ default: module.ImmigrationPage })));
 const QuoteRequestPage = lazy(() => import('./pages/employee/QuoteRequestPage').then((module) => ({ default: module.QuoteRequestPage })));
 const ProvidersPage = lazy(() => import('./pages/ProvidersPage').then((module) => ({ default: module.ProvidersPage })));
@@ -302,6 +304,8 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseImmigration.path} element={<RequireEmployeeRoute><ImmigrationPage /></RequireEmployeeRoute>} />
         {/* [P1-5] Dossier & Forms list view */}
         <Route path={ROUTE_DEFS.employeeCaseDossier.path} element={<RequireEmployeeRoute><EmployeeDossierPage /></RequireEmployeeRoute>} />
+        {/* [P1-6] Case roadmap */}
+        <Route path={ROUTE_DEFS.employeeCaseRoadmap.path} element={<RequireEmployeeRoute><EmployeeCaseRoadmapPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />

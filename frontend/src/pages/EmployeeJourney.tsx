@@ -669,7 +669,6 @@ export const EmployeeJourney: React.FC = () => {
                         {formatOverviewDate(row.updated_at || row.created_at)}
                       </span>
                     </div>
-                    <div className="text-xs font-mono text-[#94a3b8] pt-1">{row.assignment_id}</div>
                   </div>
                   <div className="flex sm:flex-col sm:justify-center shrink-0">
                     <Button onClick={() => navigate(openCaseHref(row.assignment_id, row.status))}>Open case</Button>
@@ -715,7 +714,6 @@ export const EmployeeJourney: React.FC = () => {
                     {st ? (
                       <div className="text-xs text-[#94a3b8]">{claimStateLabel(st)}</div>
                     ) : null}
-                    <div className="text-xs font-mono text-[#cbd5e1]">{row.assignment_id}</div>
                   </div>
                   <div className="flex sm:flex-col sm:justify-center shrink-0">
                     {blocked ? (
