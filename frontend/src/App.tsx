@@ -314,8 +314,8 @@ function App() {
         <Route path={ROUTE_DEFS.employeeCaseDossier.path} element={<RequireEmployeeRoute><EmployeeDossierPage /></RequireEmployeeRoute>} />
         {/* [P1-6] Case roadmap */}
         <Route path={ROUTE_DEFS.employeeCaseRoadmap.path} element={<RequireEmployeeRoute><EmployeeCaseRoadmapPage /></RequireEmployeeRoute>} />
-        {/* [MVG-6B] Employee — immigration document checklist */}
-        <Route path={ROUTE_DEFS.employeeCaseImmigrationChecklist.path} element={<RequireEmployeeRoute><ImmigrationChecklistPage /></RequireEmployeeRoute>} />
+        {/* [MVG-6B] Employee — immigration document checklist; allowHR so HR can view via timeline link */}
+        <Route path={ROUTE_DEFS.employeeCaseImmigrationChecklist.path} element={<RequireEmployeeRoute allowHR><ImmigrationChecklistPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRIES} element={<CountriesPage />} />
         <Route path={WIZARD_ROUTES.ADMIN_COUNTRY_DETAIL} element={<CountryDetailPage />} />
         <Route path={ROUTE_DEFS.adminConsole.path} element={<RequireAdminRoute><AdminOverviewPage /></RequireAdminRoute>} />
