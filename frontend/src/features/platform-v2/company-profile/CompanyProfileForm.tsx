@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { CompanyProfilePayload } from '../../../types';
+import { Breadcrumb } from '../../../components/Breadcrumb';
 
 // ── Option lists (mirror the prototype's static lists) ──────────────────────
 
@@ -149,6 +150,8 @@ export interface CompanyProfileFormProps {
   onRemoveLogo?: () => Promise<void>;
   /** Eyebrow path shown above the h1. Omit to hide. */
   eyebrow?: string;
+  /** Breadcrumb section, e.g. 'HR Operations'. Omit to skip the breadcrumb. */
+  breadcrumbSection?: string;
   /** Main heading. */
   title: string;
   /** One-line description shown below the h1. */
@@ -173,6 +176,7 @@ export function CompanyProfileForm({
   onUploadLogo,
   onRemoveLogo,
   eyebrow,
+  breadcrumbSection,
   title,
   subtitle,
   badge,
@@ -346,6 +350,9 @@ export function CompanyProfileForm({
     <div className="mx-auto max-w-[1400px] px-6 py-6 pb-28">
       {topSlot}
 
+      {breadcrumbSection && (
+        <Breadcrumb section={breadcrumbSection} title={title} className="mb-3" />
+      )}
       <div className="mb-5">
         {eyebrow && (
           <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">{eyebrow}</div>

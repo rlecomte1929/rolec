@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
+import { Breadcrumb } from '../../../components/Breadcrumb';
 import api, { hrAPI } from '../../../api/client';
 import type { CommandCenterCaseRow } from '../../../api/client';
 import { DataTable, ResetColumnsLink, type DataTableColumn } from '../data-table';
@@ -478,14 +479,14 @@ export function MobilityControlCenterV2Page() {
   ], []);
 
   return (
-    <AppShell wide title="Mobility control center">
+    <AppShell wide>
       <div className="px-2 py-2 xl:px-4 xl:py-4">
-        {/* Header */}
+        {/* Header — breadcrumb above h1; the 'HR · Global mobility' eyebrow was
+            removed per P4 audit ('Mobility Control Center no longer shows
+            HR · GLOBAL MOBILITY as a standalone sub-header'). */}
+        <Breadcrumb section="HR Operations" title="Mobility control center" className="mb-3" />
         <div className="mb-5">
-          <div className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
-            HR · Global mobility
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
+          <div className="flex flex-wrap items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Mobility control center</h1>
             <div className="ml-auto flex items-center gap-2">
               <button

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Breadcrumb } from './Breadcrumb';
 import { getAuthItem, normalizeStoredRole } from '../utils/demo';
 import { authAPI } from '../api/client';
 import { useBrandingConfig } from '../hooks/useBrandingConfig';
@@ -56,6 +57,13 @@ interface AppShellProps {
   title?: string;
   subtitle?: string;
   /**
+   * Top-level breadcrumb section, e.g. 'HR Operations' or 'Employee'.
+   * Mirrors the sidebar SECTIONS taxonomy. When omitted the breadcrumb
+   * collapses to two segments (ReloPass / Page) — present for backward
+   * compatibility with pages not yet migrated to the 3-segment standard.
+   */
+  section?: string;
+  /**
    * When true, the main content area drops the max-w-7xl cap and fills the
    * viewport (with a small gutter). Use for dense dashboards where the
    * standard 1280px cap leaves dead space on wide monitors.
@@ -63,7 +71,7 @@ interface AppShellProps {
   wide?: boolean;
 }
 
-export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, wide = false }) => {
+export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, section, wide = false }) => {
   const name = getAuthItem('relopass_name');
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const identity = name || getAuthItem('relopass_email') || getAuthItem('relopass_username');
@@ -127,19 +135,10 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, w
       {/* ── Right side: topbar + banners + main + footer ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        {/* Slim topbar */}
-        <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-slate-200 shrink-0">
-          <div className="flex items-center gap-1.5 text-sm text-slate-500 min-w-0">
-            <Link to={homeHref} className="text-slate-400 hover:text-slate-700 transition-colors">
-              ReloPass
-            </Link>
-            {title && (
-              <>
-                <span className="text-slate-300">/</span>
-                <span className="truncate text-slate-700 font-medium">{title}</span>
-              </>
-            )}
-          </div>
+        {/* Slim topbar — breadcrumb moved inline above H1 (P4/AIQ-408).
+            Topbar now carries only user-context controls; consistent across
+            AppShell-backed pages and v2 custom-layout pages. */}
+        <header className="flex items-center justify-end px-6 py-3 bg-white border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-3 shrink-0">
             <LogoutButton />
             {identity && (
@@ -199,6 +198,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children, title, subtitle, w
           <div className={wide ? 'px-6 py-6' : 'px-8 py-7 max-w-7xl mx-auto'}>
             {title && (
               <div className="mb-6">
+                <Breadcrumb section={section} title={title} homeHref={homeHref} className="mb-3" />
                 <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
                 {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
               </div>

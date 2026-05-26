@@ -6,6 +6,7 @@ import {
   Pencil, Activity, Minus, AlertTriangle,
 } from 'lucide-react';
 import { AppShell } from '../../../components/AppShell';
+import { Breadcrumb } from '../../../components/Breadcrumb';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BenefitValueType = 'currency' | 'percentage' | 'text' | 'none';
@@ -279,6 +280,7 @@ export function HrPolicyBuilderV2Page() {
 
   return (
     <AppShell wide>
+      <Breadcrumb section="HR Operations" title="Policy builder" className="px-6 pt-4 pb-2" />
       {/* ── Header ── */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200 flex items-center gap-4 px-6 py-3">
         <div className="flex-1 min-w-0">

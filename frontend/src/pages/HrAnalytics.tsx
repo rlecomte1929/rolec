@@ -317,7 +317,7 @@ export const HrAnalytics: React.FC = () => {
     ws && ind ? completionDelta(ws.avg_completion_days, ind.median_completion_days) : null;
 
   return (
-    <AppShell title="Analytics" subtitle="Benchmarking and performance insights across your relocation cases.">
+    <AppShell section="HR Operations" title="Analytics" subtitle="Benchmarking and performance insights across your relocation cases.">
       <div className="space-y-6 pb-12">
 
         {/* Error */}
@@ -330,10 +330,9 @@ export const HrAnalytics: React.FC = () => {
         {/* Empty state */}
         {isEmpty && !error && (
           <Card className="p-10 text-center">
-            <p className="text-lg font-semibold text-[#111827] mb-2">Not enough data yet</p>
+            <p className="text-lg font-semibold text-[#111827] mb-2">Benchmarks build over time.</p>
             <p className="text-sm text-[#6b7280]">
-              Analytics will appear once your workspace has at least 5 active cases tracked over
-              a 90-day window.
+              Run at least 5 cases to see performance data across corridors.
             </p>
           </Card>
         )}

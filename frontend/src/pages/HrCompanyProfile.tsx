@@ -184,6 +184,7 @@ export const HrCompanyProfile: React.FC = () => {
 
   return (
     <AppShell
+      section="HR Operations"
       title="Company profile"
       subtitle={profileLoading ? 'Loading…' : 'Used to prefill new employee cases.'}
     >

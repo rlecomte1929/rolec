@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../../../components/AppShell';
+import { Breadcrumb } from '../../../components/Breadcrumb';
 import { ProviderStatusGrid } from '../../../components/providers/ProviderStatusGrid';
 import { hrAPI } from '../../../api/client';
 import type { ProviderGridRow } from '../../../api/client';
@@ -71,6 +72,7 @@ export function ProviderGridV2Page() {
           without horizontal scroll on larger monitors. */}
       <div className="px-6 py-6">
         {/* Header */}
+        <Breadcrumb section="HR Operations" title="Provider status" className="mb-3" />
         <div className="mb-5">
           <div className="flex items-baseline gap-3">
             <h1 className="text-[26px] font-semibold tracking-tight text-slate-900">Provider status</h1>
@@ -111,7 +113,7 @@ export function ProviderGridV2Page() {
         {resizableOn ? (
           <ProviderGridV2Table
             rows={rows}
-            emptyState={loading ? 'Loading provider grid…' : 'No provider assignments yet.'}
+            emptyState={loading ? 'Loading provider grid…' : 'No providers assigned. Assign providers from the Mobility Control Center to track their status across cases.'}
           />
         ) : (
           <ProviderStatusGrid

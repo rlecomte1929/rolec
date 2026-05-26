@@ -82,6 +82,7 @@ export const HrPolicy: React.FC = () => {
   if (role === 'EMPLOYEE') {
     return (
       <AppShell
+        section="Employee"
         title="Mobility policy"
         subtitle="Published policy from your employer (read-only). Use Policy Assistant (top right) to open a side panel without leaving this page."
       >
@@ -106,6 +107,7 @@ export const HrPolicy: React.FC = () => {
 
   return (
     <AppShell
+      section={adminCompanyId ? 'Admin · ReloPass' : 'HR Operations'}
       title={adminCompanyId ? 'Admin: policy' : 'Mobility policy'}
       subtitle={
         adminCompanyId
