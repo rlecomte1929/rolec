@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Breadcrumb } from '../../components/Breadcrumb';
 import { listAIDecisions } from '../../api/aiDecisions';
 import type { AIDecisionAction, AIDecisionRecord } from '../../api/aiDecisions';
 
 /**
- * AIDecisionsAuditPage (AI-002) — EU AI Act Art. 14(4)(c) human oversight audit view.
+ * AIDecisionsAuditPage (AI-002 + AI-007) — EU AI Act Art. 14(4)(c) audit view.
  *
  * Lists every HR action recorded on an AI recommendation in `public.ai_decisions`.
- * Filterable by feature and decision. Read-only — decisions are append-only and
- * cannot be edited from the UI.
+ * Filterable by feature, decision, and recommendation_id (via ?recommendation_id=
+ * query param — used by the deep-link from AIRecommendationCard). Rows whose
+ * `ai_output.prior_decision` references another row render a clickable "← prior"
+ * tag that scrolls to and highlights the prior row. CSV export of the current
+ * filter is in the page header. Read-only — decisions are append-only.
  */
 
 const DECISION_BADGE: Record<AIDecisionAction, string> = {
@@ -33,12 +37,68 @@ function formatTimestamp(iso: string): string {
   }
 }
 
+function priorDecisionId(record: AIDecisionRecord): string | null {
+  const prior = (record.ai_output as { prior_decision?: { id?: string } } | null)?.prior_decision;
+  return prior?.id ?? null;
+}
+
+// CSV serialisation — RFC 4180 quoting (double-quote escape, wrap fields with
+// commas/quotes/newlines). Kept inline; no library dep for one call site.
+function csvEscape(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const s = typeof value === 'string' ? value : JSON.stringify(value);
+  if (/[",\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function buildCSV(records: AIDecisionRecord[]): string {
+  const header = ['when', 'feature', 'recommendation_id', 'decision', 'reason', 'actor_id', 'ai_output'];
+  const rows = records.map((r) => [
+    r.created_at,
+    r.feature,
+    r.recommendation_id,
+    r.decision,
+    r.reason ?? '',
+    r.actor_id ?? '',
+    r.ai_output,
+  ]);
+  return [header.join(','), ...rows.map((row) => row.map(csvEscape).join(','))].join('\n');
+}
+
+function downloadCSV(csv: string, filename: string): void {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export function AIDecisionsAuditPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [records, setRecords] = useState<AIDecisionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [featureFilter, setFeatureFilter] = useState<string>('');
   const [decisionFilter, setDecisionFilter] = useState<AIDecisionAction | ''>('');
+
+  // Deep-link from AIRecommendationCard: ?recommendation_id=<id> pre-filters
+  // the table to just that recommendation's decision history.
+  const recommendationIdFilter = searchParams.get('recommendation_id') ?? '';
+  const clearRecommendationFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('recommendation_id');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // Track row DOM refs so the chain "← prior" tag can scroll to the matched row.
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,15 +132,43 @@ export function AIDecisionsAuditPage() {
     return Array.from(set).sort();
   }, [records]);
 
+  // Apply the URL-driven recommendation_id filter client-side (after the
+  // feature/decision query — we don't ask the backend for this filter).
+  const visibleRecords = useMemo(() => {
+    if (!recommendationIdFilter) return records;
+    return records.filter((r) => r.recommendation_id === recommendationIdFilter);
+  }, [records, recommendationIdFilter]);
+
+  const loadedIds = useMemo(() => new Set(records.map((r) => r.id)), [records]);
+
   const counts = useMemo(
     () => ({
-      total: records.length,
-      accept: records.filter((r) => r.decision === 'accept').length,
-      override: records.filter((r) => r.decision === 'override').length,
-      reject: records.filter((r) => r.decision === 'reject').length,
+      total: visibleRecords.length,
+      accept: visibleRecords.filter((r) => r.decision === 'accept').length,
+      override: visibleRecords.filter((r) => r.decision === 'override').length,
+      reject: visibleRecords.filter((r) => r.decision === 'reject').length,
     }),
-    [records]
+    [visibleRecords]
   );
+
+  const handlePriorClick = useCallback(
+    (priorId: string) => {
+      if (!loadedIds.has(priorId)) return;
+      const el = rowRefs.current[priorId];
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightId(priorId);
+        window.setTimeout(() => setHighlightId(null), 1800);
+      }
+    },
+    [loadedIds]
+  );
+
+  const handleExport = useCallback(() => {
+    if (visibleRecords.length === 0) return;
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCSV(buildCSV(visibleRecords), `ai_decisions_${stamp}.csv`);
+  }, [visibleRecords]);
 
   return (
     <AppShell wide>
@@ -92,6 +180,14 @@ export function AIDecisionsAuditPage() {
           <span className="text-xs text-slate-500">
             {counts.total} decisions · {counts.accept} accepted · {counts.override} overridden · {counts.reject} rejected
           </span>
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={visibleRecords.length === 0}
+            className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Export CSV
+          </button>
         </div>
         <p className="mt-1 text-sm text-slate-500 leading-relaxed">
           Every accept, override, or reject your team recorded on an AI-generated recommendation. Append-only — required by EU AI Act Art. 14(4)(c).
@@ -125,6 +221,21 @@ export function AIDecisionsAuditPage() {
             <option value="reject">Reject</option>
           </select>
         </label>
+        {recommendationIdFilter && (
+          <span className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-violet-50 text-xs text-violet-700 ring-1 ring-violet-200">
+            <span>
+              recommendation_id: <span className="font-mono">{recommendationIdFilter}</span>
+            </span>
+            <button
+              type="button"
+              onClick={clearRecommendationFilter}
+              className="text-violet-500 hover:text-violet-700"
+              aria-label="Clear recommendation_id filter"
+            >
+              ×
+            </button>
+          </span>
+        )}
       </div>
 
       <div className="px-6 py-5">
@@ -134,13 +245,13 @@ export function AIDecisionsAuditPage() {
         {error && !loading && (
           <p className="text-sm text-rose-600">{error}</p>
         )}
-        {!loading && !error && records.length === 0 && (
+        {!loading && !error && visibleRecords.length === 0 && (
           <div className="text-center py-10">
             <p className="text-sm text-slate-500">No AI decisions recorded yet.</p>
             <p className="text-xs text-slate-400 mt-1">As HR admins accept, override, or reject AI recommendations, they will appear here.</p>
           </div>
         )}
-        {!loading && !error && records.length > 0 && (
+        {!loading && !error && visibleRecords.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -153,21 +264,50 @@ export function AIDecisionsAuditPage() {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100 last:border-b-0 align-top">
-                    <td className="py-3 pr-3 text-xs text-slate-500 whitespace-nowrap">{formatTimestamp(r.created_at)}</td>
-                    <td className="py-3 pr-3 text-xs text-slate-700">{r.feature}</td>
-                    <td className="py-3 pr-3 text-xs text-slate-700 max-w-xs truncate" title={r.recommendation_id}>{r.recommendation_id}</td>
-                    <td className="py-3 pr-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide ${DECISION_BADGE[r.decision]}`}>
-                        {r.decision}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-3 text-xs text-slate-600 max-w-md">
-                      {r.reason ? <span className="italic">"{r.reason}"</span> : <span className="text-slate-300">—</span>}
-                    </td>
-                  </tr>
-                ))}
+                {visibleRecords.map((r) => {
+                  const priorId = priorDecisionId(r);
+                  const priorLoaded = priorId ? loadedIds.has(priorId) : false;
+                  return (
+                    <tr
+                      key={r.id}
+                      ref={(el) => { rowRefs.current[r.id] = el; }}
+                      className={`border-b border-slate-100 last:border-b-0 align-top transition-colors ${
+                        highlightId === r.id ? 'bg-amber-50' : ''
+                      }`}
+                    >
+                      <td className="py-3 pr-3 text-xs text-slate-500 whitespace-nowrap">{formatTimestamp(r.created_at)}</td>
+                      <td className="py-3 pr-3 text-xs text-slate-700">{r.feature}</td>
+                      <td className="py-3 pr-3 text-xs text-slate-700 max-w-xs truncate" title={r.recommendation_id}>
+                        <div className="flex items-center gap-2">
+                          <span className="truncate">{r.recommendation_id}</span>
+                          {priorId && (
+                            <button
+                              type="button"
+                              onClick={() => priorLoaded && handlePriorClick(priorId)}
+                              disabled={!priorLoaded}
+                              title={priorLoaded ? 'Scroll to prior decision' : 'Prior decision is outside the current view'}
+                              className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ring-1 transition-colors ${
+                                priorLoaded
+                                  ? 'bg-violet-50 text-violet-700 ring-violet-200 hover:bg-violet-100 cursor-pointer'
+                                  : 'bg-slate-50 text-slate-400 ring-slate-200 cursor-not-allowed'
+                              }`}
+                            >
+                              ← prior
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide ${DECISION_BADGE[r.decision]}`}>
+                          {r.decision}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-3 text-xs text-slate-600 max-w-md">
+                        {r.reason ? <span className="italic">"{r.reason}"</span> : <span className="text-slate-300">—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
