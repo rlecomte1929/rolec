@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
+import { AIRecommendationCard } from '../../ai-oversight/AIRecommendationCard';
 
 /**
  * HR Policy Exceptions — V2.
@@ -328,17 +329,23 @@ function ExcDetail({
           </div>
         </section>
 
-        {/* AI precedent insight — only on pending, undecided */}
+        {/* AI precedent insight (AI-002) — Art. 14 oversight wrapper.
+            HR must accept / override / reject the AI recommendation before deciding
+            on the exception itself. The action is logged to public.ai_decisions. */}
         {r.aiInsight && !decided && !submitted && (
-          <div className="flex gap-3 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
-            <svg className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <div className="text-sm text-violet-800">
-              <strong>Precedent · </strong>{r.aiInsight}
-              <p className="text-xs text-violet-500 mt-1">Based on similar cases · last 24 months</p>
-            </div>
-          </div>
+          <AIRecommendationCard
+            recommendationId={`${r.id}-precedent`}
+            feature="exception_insight"
+            title="AI precedent insight"
+            rationale={<><strong>Precedent · </strong>{r.aiInsight}</>}
+            aiOutput={{
+              exception_request_id: r.id,
+              exception_type: r.type,
+              benefit: r.benefit,
+              insight: r.aiInsight,
+              source: 'historical_precedent_v1',
+            }}
+          />
         )}
 
         {/* Decision panel */}
