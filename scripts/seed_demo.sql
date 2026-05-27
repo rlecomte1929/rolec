@@ -53,9 +53,9 @@ BEGIN;
 -- =============================================================================
 INSERT INTO public.companies (id, name, slug, country_code, plan_tier, hr_contact_email, active_case_count, total_case_count, settings, created_at, updated_at)
 VALUES
-  ('d0e00001-0000-4000-8000-000000000001'::uuid, 'GlobalTech SAS',   'globaltech-sas',   'FR', 'pro', 'hr@globaltech-demo.com',   1, 1, '{"demo": true}'::jsonb, NOW(), NOW()),
-  ('d0e00002-0000-4000-8000-000000000002'::uuid, 'Meridian Capital', 'meridian-capital', 'FR', 'pro', 'hr@meridian-demo.com',     1, 1, '{"demo": true}'::jsonb, NOW(), NOW()),
-  ('d0e00003-0000-4000-8000-000000000003'::uuid, 'Nexora Labs',      'nexora-labs',      'ES', 'pro', 'hr@nexora-demo.com',       1, 1, '{"demo": true}'::jsonb, NOW(), NOW())
+  ('d0e00001-0000-4000-8000-000000000001'::uuid, 'GlobalTech SAS',   'globaltech-sas',   'FR', 'growth', 'hr@globaltech-demo.com',   1, 1, '{"demo": true}'::jsonb, NOW(), NOW()),
+  ('d0e00002-0000-4000-8000-000000000002'::uuid, 'Meridian Capital', 'meridian-capital', 'FR', 'growth', 'hr@meridian-demo.com',     1, 1, '{"demo": true}'::jsonb, NOW(), NOW()),
+  ('d0e00003-0000-4000-8000-000000000003'::uuid, 'Nexora Labs',      'nexora-labs',      'ES', 'growth', 'hr@nexora-demo.com',       1, 1, '{"demo": true}'::jsonb, NOW(), NOW())
 ON CONFLICT (id) DO UPDATE SET
   name              = EXCLUDED.name,
   slug              = EXCLUDED.slug,
@@ -106,7 +106,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- =============================================================================
 INSERT INTO public.cases (
   id, company_id, employee_id, hr_owner_id,
-  origin_country_code, dest_country_code, dest_city, corridor,
+  origin_country_code, dest_country_code, dest_city,
   purpose, target_move_date, status, stage,
   overall_progress_pct, risk_level, delay_days,
   budget_cap, currency, notes, created_at, updated_at
@@ -118,12 +118,12 @@ VALUES
     'd0e00001-0000-4000-8000-000000000001'::uuid,  -- GlobalTech SAS
     'd0e00100-0000-4000-8000-000000000100'::uuid,  -- Adrien Martin
     'd0e00010-0000-4000-8000-000000000010'::uuid,  -- Hannah Müller (HR)
-    'FR', 'DE', 'Berlin', 'FR-DE',
+    'FR', 'DE', 'Berlin',
     'work', '2026-09-01',
-    'active', 'immigration',
+    'active', 'in_progress',
     55, 'medium', 0,
     22400, 'EUR',
-    'Demo scenario: International hire — Lyon → Berlin. EU Blue Card application in progress.',
+    'Demo scenario: International hire — Lyon to Berlin. EU Blue Card application in progress.',
     NOW(), NOW()
   ),
   -- Scenario 2: Céline Dupont — Paris → London — UK Skilled Worker
@@ -132,12 +132,12 @@ VALUES
     'd0e00002-0000-4000-8000-000000000002'::uuid,  -- Meridian Capital
     'd0e00200-0000-4000-8000-000000000200'::uuid,  -- Céline Dupont
     'd0e00020-0000-4000-8000-000000000020'::uuid,  -- Sophie Leclerc (HR)
-    'FR', 'GB', 'London', 'FR-GB',
+    'FR', 'GB', 'London',
     'work', '2026-10-15',
-    'active', 'immigration',
+    'active', 'in_progress',
     70, 'low', 0,
     38000, 'EUR',
-    'Demo scenario: Long-term assignment — Paris → London. UK Skilled Worker Visa (post-Brexit).',
+    'Demo scenario: Long-term assignment — Paris to London. UK Skilled Worker Visa (post-Brexit).',
     NOW(), NOW()
   ),
   -- Scenario 3: Carlos Rivera — Barcelona → Amsterdam — EEA Registration
@@ -146,7 +146,7 @@ VALUES
     'd0e00003-0000-4000-8000-000000000003'::uuid,  -- Nexora Labs
     'd0e00300-0000-4000-8000-000000000300'::uuid,  -- Carlos Rivera
     'd0e00030-0000-4000-8000-000000000030'::uuid,  -- Marta García (HR)
-    'ES', 'NL', 'Amsterdam', 'ES-NL',
+    'ES', 'NL', 'Amsterdam',
     'work', '2026-08-01',
     'active', 'dossier',
     30, 'low', 0,
@@ -159,7 +159,6 @@ ON CONFLICT (id) DO UPDATE SET
   employee_id          = EXCLUDED.employee_id,
   hr_owner_id          = EXCLUDED.hr_owner_id,
   dest_city            = EXCLUDED.dest_city,
-  corridor             = EXCLUDED.corridor,
   purpose              = EXCLUDED.purpose,
   target_move_date     = EXCLUDED.target_move_date,
   status               = EXCLUDED.status,
