@@ -2,7 +2,8 @@ import { hrAPI } from '../../../api/client';
 import type { CompanyProfilePayload } from '../../../types';
 import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
 import { CompanyProfileForm } from './CompanyProfileForm';
-import { PlatformSidebar } from '../sidebar';
+import { PlatformShellSidebar } from '../../../components/PlatformShellSidebar';
+import { CompanyBrand } from '../../../components/CompanyBrand';
 
 /**
  * HR's own-company profile page. Data comes from useHrCompanyContext
@@ -10,9 +11,9 @@ import { PlatformSidebar } from '../sidebar';
  * hrAPI.{upload,remove}CompanyLogo. The shared CompanyProfileForm handles
  * everything else (sections, dirty tracking, sticky save bar).
  *
- * Layout uses the V2 collapsible PlatformSidebar (state persists via
- * localStorage), not the legacy AppShell, so the page matches the new
- * platform chrome direction.
+ * Layout uses PlatformShellSidebar (the canonical sidebar) with role='HR'
+ * so the nav items, badges, and labels are always in sync with the rest of
+ * the HR shell. The old PlatformSidebar (v2-preview) has been retired here.
  */
 export function CompanyProfileV2Page() {
   const { company, loading, error, refresh } = useHrCompanyContext();
@@ -34,7 +35,7 @@ export function CompanyProfileV2Page() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
-      <PlatformSidebar />
+      <PlatformShellSidebar role="HR" companySlot={<CompanyBrand />} />
       <main className="flex-1 overflow-y-auto">
         <CompanyProfileForm
           company={company}
