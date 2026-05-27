@@ -183,7 +183,7 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
             row = conn.execute(
                 _sql_text(
                     f"SELECT id, company_id, employee_id, hr_owner_id "
-                    f"FROM {_pg_table('cases')} WHERE id::text = :id"
+                    f"FROM {_pg_table('cases')} WHERE CAST(id AS TEXT) = :id"
                 ),
                 {"id": case_id},
             ).mappings().first()
@@ -201,8 +201,8 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
                         f"SELECT ca.employee_user_id, ca.hr_user_id, rc.company_id "
                         f"FROM {_pg_table('case_assignments')} ca "
                         f"LEFT JOIN {_pg_table('relocation_cases')} rc "
-                        f"  ON rc.id::text = ca.canonical_case_id::text "
-                        f"WHERE ca.id::text = :id"
+                        f"  ON CAST(rc.id AS TEXT) = CAST(ca.canonical_case_id AS TEXT) "
+                        f"WHERE CAST(ca.id AS TEXT) = :id"
                     ),
                     {"id": case_id},
                 ).mappings().first()
@@ -226,7 +226,7 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
                     with main_db.engine.connect() as conn:
                         prof = conn.execute(
                             _sql_text(
-                                f"SELECT company_id FROM {_pg_table('profiles')} WHERE id::text = :id"
+                                f"SELECT company_id FROM {_pg_table('profiles')} WHERE CAST(id AS TEXT) = :id"
                             ),
                             {"id": str(user_id) if user_id else ""},
                         ).mappings().first()
