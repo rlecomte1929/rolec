@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -855,6 +856,11 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
     )
 
 
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+
 def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     """
     Verify the caller can read the given case.
@@ -872,10 +878,21 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     Employees: must own the assignment (employee_user_id == auth uid).
     HR / Admin: sufficient to belong to the same company as the case.
     Raises 404 (case missing) or 403 (no access).
+
+    B24-REGRESSION fail-safe: never returns 500. Malformed case_ids → 404.
+    DB exceptions are logged and the affected query is treated as "no match"
+    so a transient/lookup error can't cascade into a 500 on every cases.py
+    endpoint downstream of this guard.
     """
     user_id = user.get("id")
     role = (user.get("role") or "").upper()
     is_admin = user.get("is_admin") or role == "ADMIN"
+
+    # Reject malformed IDs up-front: on Postgres a non-UUID string makes the
+    # ``WHERE id = :id`` cast raise ``invalid input syntax for type uuid``,
+    # which previously bubbled up as a 500.
+    if not case_id or not _UUID_RE.match(case_id):
+        raise HTTPException(status_code=404, detail="Case not found")
 
     row = None
     try:
@@ -883,25 +900,26 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
             row = conn.execute(
                 _sql_text(
                     f"SELECT id, company_id, employee_id, hr_owner_id "
-                    f"FROM {_pg_table('cases')} WHERE id = :id"
+                    f"FROM {_pg_table('cases')} WHERE id::text = :id"
                 ),
                 {"id": case_id},
             ).mappings().first()
     except Exception:
         logger.exception("dossier: failed to query cases for access check id=%s", case_id)
-        raise HTTPException(status_code=500, detail="Failed to verify case access")
+        row = None  # fall through to assignment lookup rather than 500
 
     # --- fallback: resolve assignment_id → relocation_cases ---
     if not row:
+        asgn = None
         try:
             with main_db.engine.connect() as conn:
                 asgn = conn.execute(
                     _sql_text(
-                        "SELECT ca.employee_user_id, ca.hr_user_id, rc.company_id "
-                        "FROM public.case_assignments ca "
-                        "LEFT JOIN public.relocation_cases rc "
-                        "  ON rc.id::text = ca.canonical_case_id::text "
-                        "WHERE ca.id::text = :id"
+                        f"SELECT ca.employee_user_id, ca.hr_user_id, rc.company_id "
+                        f"FROM {_pg_table('case_assignments')} ca "
+                        f"LEFT JOIN {_pg_table('relocation_cases')} rc "
+                        f"  ON rc.id::text = ca.canonical_case_id::text "
+                        f"WHERE ca.id::text = :id"
                     ),
                     {"id": case_id},
                 ).mappings().first()
@@ -925,9 +943,9 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
                     with main_db.engine.connect() as conn:
                         prof = conn.execute(
                             _sql_text(
-                                f"SELECT company_id FROM {_pg_table('profiles')} WHERE id = :id"
+                                f"SELECT company_id FROM {_pg_table('profiles')} WHERE id::text = :id"
                             ),
-                            {"id": user_id},
+                            {"id": str(user_id) if user_id else ""},
                         ).mappings().first()
                     if prof and str(prof.get("company_id") or "") == str(asgn.get("company_id") or ""):
                         return
@@ -3609,5 +3627,107 @@ def list_case_messages(
             "sender_role": d["sender_role"],
             "content": d["content"],
             "created_at": d["created_at"],
+        })
+    return result
+
+
+# ---------------------------------------------------------------------------
+# T11 – Vendor Display (MVP-7)
+# ---------------------------------------------------------------------------
+
+@router.get("/{case_id}/vendors")
+def list_case_vendors(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
+    """
+    Return vendors assigned to the case from case_vendor_shortlist joined with
+    the vendors table.  Available to HR and ADMIN roles.
+    """
+    _assert_case_access(user, case_id)
+    try:
+        with main_db.engine.begin() as conn:
+            rows = conn.execute(
+                _sql_text(
+                    """
+                    SELECT
+                        cvs.id            AS shortlist_id,
+                        cvs.service_key   AS category,
+                        cvs.status,
+                        cvs.contact_name,
+                        cvs.contact_email,
+                        v.name            AS vendor_name,
+                        v.website         AS vendor_website
+                    FROM public.case_vendor_shortlist cvs
+                    LEFT JOIN public.vendors v ON v.id = cvs.vendor_id
+                    WHERE cvs.case_id = :case_id
+                    ORDER BY cvs.service_key, v.name
+                    """
+                ),
+                {"case_id": case_id},
+            ).mappings().all()
+    except Exception:
+        logger.exception("vendors: list failed case_id=%s", case_id)
+        raise HTTPException(status_code=500, detail="Failed to list vendors")
+
+    result = []
+    for row in rows:
+        d = dict(row)
+        result.append({
+            "shortlist_id": str(d["shortlist_id"]) if d.get("shortlist_id") else None,
+            "category": d.get("category"),
+            "status": d.get("status", "Assigned"),
+            "contact_name": d.get("contact_name"),
+            "contact_email": d.get("contact_email"),
+            "vendor_name": d.get("vendor_name"),
+            "vendor_website": d.get("vendor_website"),
+        })
+    return result
+
+
+# ---------------------------------------------------------------------------
+# T12 – Budget View (MVP-7)
+# ---------------------------------------------------------------------------
+
+@router.get("/{case_id}/budget-lines")
+def list_case_budget_lines(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
+    """
+    Return budget line items for the case.  Available to HR and ADMIN roles.
+    """
+    _assert_case_access(user, case_id)
+    try:
+        with main_db.engine.begin() as conn:
+            rows = conn.execute(
+                _sql_text(
+                    """
+                    SELECT
+                        id,
+                        case_id,
+                        category,
+                        estimated_eur,
+                        created_at
+                    FROM public.case_budget_lines
+                    WHERE case_id = :case_id
+                    ORDER BY category
+                    """
+                ),
+                {"case_id": case_id},
+            ).mappings().all()
+    except Exception:
+        logger.exception("budget-lines: list failed case_id=%s", case_id)
+        raise HTTPException(status_code=500, detail="Failed to list budget lines")
+
+    result = []
+    for row in rows:
+        d = dict(row)
+        result.append({
+            "id": str(d["id"]),
+            "case_id": str(d["case_id"]),
+            "category": d.get("category"),
+            "estimated_eur": float(d["estimated_eur"]) if d.get("estimated_eur") is not None else 0.0,
+            "created_at": d["created_at"].isoformat() if hasattr(d.get("created_at"), "isoformat") else str(d.get("created_at", "")),
         })
     return result
