@@ -170,7 +170,12 @@ from .app.routers import providers as providers_router
 from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import hr_vendors as hr_vendors_router
 from .app.routers import hr_rfq as hr_rfq_router
-from .app.routers import immigration as immigration_router
+from .app.routers import immigration as immigration_router  # noqa: F401 — kept for backwards-compat; router no longer wired (AUDIT-B9-imm-6)
+from .app.routers import immigration_intake_consent as immigration_intake_consent_router
+from .app.routers import immigration_intake_profile as immigration_intake_profile_router
+from .app.routers import immigration_intake_interview as immigration_intake_interview_router
+from .app.routers import immigration_status as immigration_status_router
+from .app.routers import immigration_gdpr as immigration_gdpr_router
 from .app.routers import analytics as analytics_router
 from .app.routers import analytics_query as analytics_query_router  # FOUNDATION-1E
 # GAP analysis new routers (May 2026)
@@ -587,7 +592,11 @@ app.include_router(providers_router.router)
 app.include_router(employee_quotes_router.router)
 app.include_router(hr_vendors_router.router)
 app.include_router(hr_rfq_router.router)
-app.include_router(immigration_router.router)  # [MVG-6] re-wired — app/main.py create_app() is not called by this entrypoint
+app.include_router(immigration_intake_consent_router.router)  # [AUDIT-B9-imm-6] 1/5 — consent + immigration-requirements (3 handlers)
+app.include_router(immigration_intake_profile_router.router)  # [AUDIT-B9-imm-6] 2/5 — HR/employee profile + OCR passport (5 handlers)
+app.include_router(immigration_intake_interview_router.router)  # [AUDIT-B9-imm-6] 3/5 — interview next/answer (2 handlers)
+app.include_router(immigration_status_router.router)  # [AUDIT-B9-imm-6] 4/5 — milestones, interview-status, immigration cases (8 handlers)
+app.include_router(immigration_gdpr_router.router)  # [AUDIT-B9-imm-6] 5/5 — GDPR subject-rights stubs (2 handlers)
 app.include_router(analytics_router.router)
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 # [AUDIT-C2.3 Month-1] mobility_context_router → moved to backend/app/main.py
