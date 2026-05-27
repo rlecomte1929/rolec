@@ -82,6 +82,10 @@ backend/main.py:debug_kv_get
 backend/main.py:debug_supabase
 # TODO:SEC Unauthenticated Supabase debug probe. Same remediation as debug_db.
 
+backend/app/routers/cases_read.py:get_research_status
+# Dormant copy retained in cases.py as a support-module page-of-record after
+# the AUDIT-B9-cases-6 split. The router is no longer wired but the
+# @router.get decorator is still scanned by this audit job.
 backend/app/routers/cases.py:get_research_status
 # TODO:SEC GAP-9 research status endpoint has no auth — case data exposed by ID.
 # Tracked: add Depends(get_current_user) and enforce case ownership check.
