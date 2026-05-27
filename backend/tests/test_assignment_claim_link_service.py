@@ -15,8 +15,8 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.assignment_claim_link_service import reconcile_pending_assignment_claims
-from backend.services.unified_assignment_creation import create_assignment_with_contact_and_invites
+from backend.app.services.assignment_claim_link_service import reconcile_pending_assignment_claims
+from backend.app.services.unified_assignment_creation import create_assignment_with_contact_and_invites
 
 
 def _seed_company(db: Database, company_id: str, name: str = "Test Co") -> None:
@@ -174,7 +174,7 @@ class AssignmentClaimLinkServiceTests(unittest.TestCase):
         db.attach_employee_to_assignment(r.assignment_id, owner, request_id=None)
         stale = dict(db.get_assignment_by_id(r.assignment_id) or {})
         stale["employee_user_id"] = None
-        from backend.services.assignment_claim_link_service import ClaimLinkResult, _try_attach_assignment
+        from backend.app.services.assignment_claim_link_service import ClaimLinkResult, _try_attach_assignment
 
         res = ClaimLinkResult()
         _try_attach_assignment(

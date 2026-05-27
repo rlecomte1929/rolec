@@ -23,8 +23,8 @@ from backend.identity_observability import (
     principal_fingerprint,
     principal_fingerprint_from_login_identifier,
 )
-from backend.services.assignment_claim_link_service import reconcile_pending_assignment_claims
-from backend.services.unified_assignment_creation import create_assignment_with_contact_and_invites
+from backend.app.services.assignment_claim_link_service import reconcile_pending_assignment_claims
+from backend.app.services.unified_assignment_creation import create_assignment_with_contact_and_invites
 
 
 def _seed_company(db: Database, company_id: str, name: str = "Test Co") -> None:

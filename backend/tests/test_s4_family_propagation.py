@@ -13,7 +13,7 @@ Run with:
     pytest backend/tests/test_s4_family_propagation.py -v
 """
 import pytest
-from backend.services.family_propagation import FamilyPropagator, WorkstreamRequirement
+from backend.app.services.family_propagation import FamilyPropagator, WorkstreamRequirement
 from backend.agents.orchestrator import IntakeOrchestrator
 from backend.question_bank import get_question_by_id
 

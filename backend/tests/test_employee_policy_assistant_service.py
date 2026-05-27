@@ -8,12 +8,12 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.employee_policy_assistant_service import (
+from backend.app.services.employee_policy_assistant_service import (
     build_resolved_policy_context_from_employee_resolution,
     employee_policy_assistant_query_response_dict,
     execute_employee_policy_assistant_query,
 )
-from backend.services.policy_assistant_contract import (
+from backend.app.services.policy_assistant_contract import (
     PolicyAssistantAnswerType,
     PolicyAssistantCanonicalTopic,
     PolicyAssistantComparisonReadiness,

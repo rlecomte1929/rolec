@@ -21,12 +21,12 @@ if _REPO_ROOT not in sys.path:
 os.environ["POLICY_ASSISTANT_LLM"] = "mock"
 os.environ["POLICY_ASSISTANT_EMBEDDER"] = "hash"
 
-from backend.services import (  # noqa: E402
+from backend.app.services import (  # noqa: E402
     policy_assistant_rag_engine as rag,
     policy_assistant_session_memory as session_memory,
     policy_chunk_retriever,
 )
-from backend.services.policy_assistant_llm_client import (  # noqa: E402
+from backend.app.services.policy_assistant_llm_client import (  # noqa: E402
     LlmRequest,
     MockClient,
     estimate_cost_usd,

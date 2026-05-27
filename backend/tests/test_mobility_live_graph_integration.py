@@ -22,10 +22,10 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.admin_assignment_evaluation_trigger import run_evaluation_for_assignment
-from backend.services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
-from backend.services.employee_case_person_service import ensure_employee_case_person_for_assignment
-from backend.services.passport_case_document_sync_service import (
+from backend.app.services.admin_assignment_evaluation_trigger import run_evaluation_for_assignment
+from backend.app.services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
+from backend.app.services.employee_case_person_service import ensure_employee_case_person_for_assignment
+from backend.app.services.passport_case_document_sync_service import (
     GRAPH_PASSPORT_DOCUMENT_KEY,
     ensure_passport_case_document_for_assignment,
 )

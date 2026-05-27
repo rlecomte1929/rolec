@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from backend.app.routers import auth as auth_router  # noqa: E402
 from backend.main import app  # noqa: E402
-from backend.services.assignment_claim_link_service import ClaimLinkResult  # noqa: E402
+from backend.app.services.assignment_claim_link_service import ClaimLinkResult  # noqa: E402
 
 client = TestClient(app)
 

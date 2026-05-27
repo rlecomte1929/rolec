@@ -10,15 +10,15 @@ if _REPO_ROOT not in sys.path:
 
 import unittest
 
-from backend.services.policy_lta_grouping_heuristics import (
+from backend.app.services.policy_lta_grouping_heuristics import (
     analyze_external_reference,
     analyze_lta_grouping_patterns,
     extract_governance_conditions,
     parse_allowance_value_structure,
     parse_travel_leave_variants,
 )
-from backend.services.policy_row_to_template_mapper import map_single_row_candidate
-from backend.services.policy_summary_row_parser import PolicyRowCandidate
+from backend.app.services.policy_row_to_template_mapper import map_single_row_candidate
+from backend.app.services.policy_summary_row_parser import PolicyRowCandidate
 
 
 def _rc(summary: str, label: str | None = None, section: str | None = None) -> PolicyRowCandidate:

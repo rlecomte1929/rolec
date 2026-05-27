@@ -25,7 +25,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.ai_trace_logger import TraceSession, TraceStep  # noqa: E402
+from backend.app.services.ai_trace_logger import TraceSession, TraceStep  # noqa: E402
 
 
 # --------------------------------------------------------------------------- #
@@ -140,7 +140,7 @@ def test_flush_never_raises_on_broken_db(caplog):
     )
 
     # Patch the DB write to explode.
-    with patch("backend.services.ai_trace_logger._write_to_db", side_effect=RuntimeError("db down")):
+    with patch("backend.app.services.ai_trace_logger._write_to_db", side_effect=RuntimeError("db down")):
         # Should not raise.
         tracer.flush()
 
@@ -152,9 +152,9 @@ def test_flush_emits_structured_log(caplog):
         model="claude-haiku-4-5-20251001", input_tokens=800, output_tokens=120, latency_ms=600
     )
 
-    with caplog.at_level(logging.INFO, logger="backend.services.ai_trace_logger"):
-        with patch("backend.services.ai_trace_logger._write_to_db"):
-            with patch("backend.services.ai_trace_logger._forward_to_langsmith"):
+    with caplog.at_level(logging.INFO, logger="backend.app.services.ai_trace_logger"):
+        with patch("backend.app.services.ai_trace_logger._write_to_db"):
+            with patch("backend.app.services.ai_trace_logger._forward_to_langsmith"):
                 tracer.flush()
 
     # At least one log record should contain "ai_trace"
@@ -166,9 +166,9 @@ def test_flush_log_does_not_contain_raw_query(caplog):
     tracer = TraceSession(session_id=None, query=query, company_id=COMPANY_ID)
     tracer.record_step("validation", latency_ms=5, passed=True)
 
-    with caplog.at_level(logging.INFO, logger="backend.services.ai_trace_logger"):
-        with patch("backend.services.ai_trace_logger._write_to_db"):
-            with patch("backend.services.ai_trace_logger._forward_to_langsmith"):
+    with caplog.at_level(logging.INFO, logger="backend.app.services.ai_trace_logger"):
+        with patch("backend.app.services.ai_trace_logger._write_to_db"):
+            with patch("backend.app.services.ai_trace_logger._forward_to_langsmith"):
                 tracer.flush()
 
     log_text = " ".join(r.message for r in caplog.records)
@@ -183,9 +183,9 @@ def test_flush_payload_structure(caplog):
     )
     tracer.record_step("validation", latency_ms=5, passed=True, answer_kind="answer")
 
-    with caplog.at_level(logging.INFO, logger="backend.services.ai_trace_logger"):
-        with patch("backend.services.ai_trace_logger._write_to_db"):
-            with patch("backend.services.ai_trace_logger._forward_to_langsmith"):
+    with caplog.at_level(logging.INFO, logger="backend.app.services.ai_trace_logger"):
+        with patch("backend.app.services.ai_trace_logger._write_to_db"):
+            with patch("backend.app.services.ai_trace_logger._forward_to_langsmith"):
                 tracer.flush()
 
     ai_trace_log = next(r.message for r in caplog.records if "ai_trace" in r.message)
@@ -212,6 +212,6 @@ def test_langsmith_forward_skips_when_no_key():
     import os
     os.environ.pop("LANGSMITH_API_KEY", None)
 
-    from backend.services.ai_trace_logger import _forward_to_langsmith
+    from backend.app.services.ai_trace_logger import _forward_to_langsmith
     # Should not raise even if langsmith is not installed.
     _forward_to_langsmith({"trace_id": "abc", "steps": [], "fallback_triggered": False})

@@ -41,8 +41,8 @@ if _REPO_ROOT not in sys.path:
 _TEST_DB_FILE = os.path.join(tempfile.gettempdir(), "test_p3_exception_wiring.db")
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{_TEST_DB_FILE}")
 
-from backend.services.immigration_regime import ImmigrationRegimeRouter
-from backend.services.exception_request_service import ExceptionRequestService, ExceptionFlag
+from backend.app.services.immigration_regime import ImmigrationRegimeRouter
+from backend.app.services.exception_request_service import ExceptionRequestService, ExceptionFlag
 
 
 # ─────────────────────────────────────────────────────────────────────────────

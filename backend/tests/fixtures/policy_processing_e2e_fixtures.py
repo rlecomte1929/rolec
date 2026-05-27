@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from backend.services.policy_document_intake import (
+from backend.app.services.policy_document_intake import (
     DOC_TYPE_ASSIGNMENT_POLICY,
     DOC_TYPE_POLICY_SUMMARY,
     SCOPE_LONG_TERM,

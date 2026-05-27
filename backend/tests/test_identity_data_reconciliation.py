@@ -15,7 +15,7 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.identity_data_reconciliation import (
+from backend.app.services.identity_data_reconciliation import (
     _group_duplicate_contacts_by_email,
     _pick_canonical_contact,
     apply_safe_fixes,

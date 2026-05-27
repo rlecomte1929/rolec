@@ -41,15 +41,15 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.immigration_regime import (
+from backend.app.services.immigration_regime import (
     ImmigrationRegimeRouter,
     ImmigrationRegimeResult,
 )
-from backend.services.exception_request_service import (
+from backend.app.services.exception_request_service import (
     ExceptionRequestService,
     ExceptionFlag,
 )
-from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft
+from backend.app.services.wizard_draft_mapper import extract_profile_from_wizard_draft
 
 
 # ─────────────────────────────────────────────────────────────────────────────

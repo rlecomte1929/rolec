@@ -8,7 +8,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_config_cap_compare import (
+from backend.app.services.policy_config_cap_compare import (
     compare_provider_estimate_to_normalized_cap,
     evaluate_estimates_against_caps,
     normalized_cap_record_from_benefit_row,

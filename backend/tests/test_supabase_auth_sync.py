@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from gotrue.errors import AuthApiError
 
-from backend.services.supabase_auth_sync import _duplicate_user_error, sync_relopass_user_to_supabase_auth
+from backend.app.services.supabase_auth_sync import _duplicate_user_error, sync_relopass_user_to_supabase_auth
 
 
 class TestSupabaseAuthSync(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestSupabaseAuthSync(unittest.TestCase):
     def test_sync_returns_true_without_email(self) -> None:
         self.assertTrue(sync_relopass_user_to_supabase_auth("", "secret123", relopass_user_id="u1"))
 
-    @patch("backend.services.supabase_auth_sync.get_supabase_admin_client")
+    @patch("backend.app.services.supabase_auth_sync.get_supabase_admin_client")
     def test_sync_creates_user(self, mock_get: MagicMock) -> None:
         client = MagicMock()
         mock_get.return_value = client
@@ -34,7 +34,7 @@ class TestSupabaseAuthSync(unittest.TestCase):
         self.assertTrue(args["email_confirm"])
         self.assertEqual(args["user_metadata"]["relopass_user_id"], "user-uuid-1")
 
-    @patch("backend.services.supabase_auth_sync.get_supabase_admin_client")
+    @patch("backend.app.services.supabase_auth_sync.get_supabase_admin_client")
     def test_sync_treats_duplicate_as_ok(self, mock_get: MagicMock) -> None:
         client = MagicMock()
         client.auth.admin.create_user.side_effect = AuthApiError("exists", 400, "email_exists")

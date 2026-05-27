@@ -13,7 +13,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.case_context_service import CaseContextService  # noqa: E402
+from backend.app.services.case_context_service import CaseContextService  # noqa: E402
 
 
 def _fk_pragma(dbapi_connection, _connection_record) -> None:

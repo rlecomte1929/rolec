@@ -21,8 +21,8 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_config_matrix_service import compute_targeting_signature
-from backend.services.policy_config_targeting import (
+from backend.app.services.policy_config_matrix_service import compute_targeting_signature
+from backend.app.services.policy_config_targeting import (
     EMPLOYEE_LEVELS,
     normalize_employee_level,
     row_matches_targeting,

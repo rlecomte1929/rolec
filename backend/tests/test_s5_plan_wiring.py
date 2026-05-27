@@ -13,7 +13,7 @@ Run with:
 """
 import pytest
 from backend.app.services.timeline_service import compute_default_milestones
-from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _profile_from_wizard_draft
+from backend.app.services.wizard_draft_mapper import extract_profile_from_wizard_draft as _profile_from_wizard_draft
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────

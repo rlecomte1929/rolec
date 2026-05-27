@@ -1,12 +1,12 @@
 """Tests for summary row -> canonical LTA template mapping and deduplication."""
 from __future__ import annotations
 
-from backend.services.policy_row_to_template_mapper import (
+from backend.app.services.policy_row_to_template_mapper import (
     map_and_deduplicate_row_candidates,
     map_single_row_candidate,
     normalize_row_text_for_dedup,
 )
-from backend.services.policy_summary_row_parser import (
+from backend.app.services.policy_summary_row_parser import (
     PolicyRowCandidate,
     summary_row_candidates_to_clause_dicts,
 )

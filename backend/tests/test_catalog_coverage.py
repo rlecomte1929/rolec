@@ -15,7 +15,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.catalog_coverage import (  # noqa: E402
+from backend.app.services.catalog_coverage import (  # noqa: E402
     MAX_ITEMS_PER_DESTINATION,
     categories_with_gaps,
     ensure_destination_catalog,
@@ -74,7 +74,7 @@ class CatalogCoverageTests(unittest.TestCase):
 
     def test_ensure_destination_catalog_logs_on_gap(self) -> None:
         with self.assertLogs(
-            "backend.services.catalog_coverage", level="INFO"
+            "backend.app.services.catalog_coverage", level="INFO"
         ) as cm:
             result = ensure_destination_catalog("schools", "Tokyo", country="Japan")
         self.assertEqual(result["category"], "schools")
@@ -88,14 +88,14 @@ class CatalogCoverageTests(unittest.TestCase):
 
     def test_ensure_destination_catalog_silent_when_full(self) -> None:
         # banks is geo-agnostic with 10 items, so any city is "full".
-        logger = logging.getLogger("backend.services.catalog_coverage")
+        logger = logging.getLogger("backend.app.services.catalog_coverage")
         before = logger.getEffectiveLevel()
         try:
             with self.assertLogs(
-                "backend.services.catalog_coverage", level="INFO"
+                "backend.app.services.catalog_coverage", level="INFO"
             ) as cm:
                 # Trigger SOMETHING so assertLogs doesn't itself raise.
-                logging.getLogger("backend.services.catalog_coverage").info("noop")
+                logging.getLogger("backend.app.services.catalog_coverage").info("noop")
                 result = ensure_destination_catalog("banks", "Tokyo")
             self.assertGreaterEqual(result["have"], MAX_ITEMS_PER_DESTINATION)
             self.assertEqual(result["needed"], 0)

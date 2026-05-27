@@ -9,12 +9,12 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_canonical_key_matcher import (
+from backend.app.services.policy_canonical_key_matcher import (
     resolve_primary_canonical_lta_key,
     score_canonical_lta_keys_for_debug,
 )
-from backend.services.policy_row_to_template_mapper import map_single_row_candidate
-from backend.services.policy_summary_row_parser import PolicyRowCandidate
+from backend.app.services.policy_row_to_template_mapper import map_single_row_candidate
+from backend.app.services.policy_summary_row_parser import PolicyRowCandidate
 
 
 def _rc(

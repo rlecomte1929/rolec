@@ -11,8 +11,8 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.employee_entitlement_read_model import build_employee_entitlement_read_model
-from backend.services.employee_entitlement_serializer import (
+from backend.app.services.employee_entitlement_read_model import build_employee_entitlement_read_model
+from backend.app.services.employee_entitlement_serializer import (
     EMPLOYEE_ENTITLEMENT_SCHEMA_VERSION,
     serialize_employee_entitlement_payload,
 )

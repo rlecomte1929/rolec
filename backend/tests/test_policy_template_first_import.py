@@ -8,11 +8,11 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_summary_row_parser import (
+from backend.app.services.policy_summary_row_parser import (
     PolicyRowCandidate,
     summary_row_candidates_to_clause_dicts,
 )
-from backend.services.policy_template_first_import import build_template_first_import_payload
+from backend.app.services.policy_template_first_import import build_template_first_import_payload
 
 
 def _row(

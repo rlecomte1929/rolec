@@ -20,7 +20,7 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from backend.database import Database
-from backend.services.policy_config_matrix_service import (
+from backend.app.services.policy_config_matrix_service import (
     PolicyConfigMatrixService,
     compute_targeting_signature,
 )

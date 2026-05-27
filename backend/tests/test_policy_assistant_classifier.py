@@ -9,8 +9,8 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_assistant_classifier import classify_policy_chat_message
-from backend.services.policy_assistant_contract import (
+from backend.app.services.policy_assistant_classifier import classify_policy_chat_message
+from backend.app.services.policy_assistant_contract import (
     PolicyAssistantCanonicalTopic,
     PolicyAssistantIntent,
     PolicyAssistantRefusalCode,

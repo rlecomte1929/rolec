@@ -10,7 +10,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_assistant_analytics import (
+from backend.app.services.policy_assistant_analytics import (
     EVENT_ASSISTANT_ANSWER_GENERATED,
     EVENT_ASSISTANT_ANSWER_READINESS,
     EVENT_ASSISTANT_ANSWER_RECEIVED,
@@ -30,9 +30,9 @@ from backend.services.policy_assistant_analytics import (
     emit_assistant_question_submitted,
     record_policy_assistant_turn,
 )
-from backend.services.policy_assistant_answer_engine import ResolvedPolicyContext
-from backend.services.policy_assistant_classifier import PolicyAssistantClassificationResult
-from backend.services.policy_assistant_contract import (
+from backend.app.services.policy_assistant_answer_engine import ResolvedPolicyContext
+from backend.app.services.policy_assistant_classifier import PolicyAssistantClassificationResult
+from backend.app.services.policy_assistant_contract import (
     PolicyAssistantAnswer,
     PolicyAssistantAnswerType,
     PolicyAssistantCanonicalTopic,
@@ -45,7 +45,7 @@ from backend.services.policy_assistant_contract import (
 
 
 class PolicyAssistantAnalyticsTests(unittest.TestCase):
-    @patch("backend.services.policy_assistant_analytics.emit_event")
+    @patch("backend.app.services.policy_assistant_analytics.emit_event")
     def test_supported_entitlement_emits_core_events(self, mock_emit) -> None:
         ctx = ResolvedPolicyContext(
             has_published_benefits=True,
@@ -97,7 +97,7 @@ class PolicyAssistantAnalyticsTests(unittest.TestCase):
         asked_kw = next(c.kwargs for c in mock_emit.call_args_list if c.args[0] == EVENT_ASSISTANT_QUESTION_ASKED)
         self.assertEqual((asked_kw.get("extra") or {}).get("canonical_topic"), "shipment")
 
-    @patch("backend.services.policy_assistant_analytics.emit_event")
+    @patch("backend.app.services.policy_assistant_analytics.emit_event")
     def test_refusal_emits_refusal_shown(self, mock_emit) -> None:
         ctx = ResolvedPolicyContext(has_published_benefits=False)
         cls = PolicyAssistantClassificationResult(
@@ -106,7 +106,7 @@ class PolicyAssistantAnalyticsTests(unittest.TestCase):
             refusal_code=PolicyAssistantRefusalCode.OUT_OF_SCOPE_TRAVEL_OR_LIFESTYLE,
             normalized_question="x",
         )
-        from backend.services.policy_assistant_answer_engine import generate_policy_assistant_answer
+        from backend.app.services.policy_assistant_answer_engine import generate_policy_assistant_answer
 
         ans = generate_policy_assistant_answer(cls, ctx, PolicyAssistantRoleScope.EMPLOYEE)
         record_policy_assistant_turn(
@@ -122,7 +122,7 @@ class PolicyAssistantAnalyticsTests(unittest.TestCase):
         self.assertIn(EVENT_ASSISTANT_QUESTION_UNSUPPORTED, names)
         self.assertIn(EVENT_ASSISTANT_REFUSAL_SHOWN, names)
 
-    @patch("backend.services.policy_assistant_analytics.emit_event")
+    @patch("backend.app.services.policy_assistant_analytics.emit_event")
     def test_follow_up_beacon_extra_includes_turn_correlation(self, mock_emit) -> None:
         emit_assistant_follow_up_clicked(
             role=PolicyAssistantRoleScope.HR,
@@ -144,7 +144,7 @@ class Sprint15BeaconEmittersTests(unittest.TestCase):
     events. Each one writes through the shared analytics_service emit
     pathway with surface + small enums + booleans only — no PII."""
 
-    @patch("backend.services.policy_assistant_analytics.emit_event")
+    @patch("backend.app.services.policy_assistant_analytics.emit_event")
     def test_opened_emits_with_surface(self, mock_emit) -> None:
         emit_assistant_opened(
             role=PolicyAssistantRoleScope.EMPLOYEE,
@@ -158,7 +158,7 @@ class Sprint15BeaconEmittersTests(unittest.TestCase):
         self.assertEqual(kwargs.get("request_id"), "rid-1")
         self.assertEqual((kwargs.get("extra") or {}).get("surface"), "employee_fab")
 
-    @patch("backend.services.policy_assistant_analytics.emit_event")
+    @patch("backend.app.services.policy_assistant_analytics.emit_event")
     def test_question_submitted_records_source(self, mock_emit) -> None:
         emit_assistant_question_submitted(
             role=PolicyAssistantRoleScope.HR,
@@ -172,7 +172,7 @@ class Sprint15BeaconEmittersTests(unittest.TestCase):
         self.assertEqual(ex.get("surface"), "hr_sidesheet")
         self.assertEqual(ex.get("source"), "shortcut")
 
-    @patch("backend.services.policy_assistant_analytics.emit_event")
+    @patch("backend.app.services.policy_assistant_analytics.emit_event")
     def test_answer_received_carries_status_and_turn_id(self, mock_emit) -> None:
         emit_assistant_answer_received(
             role=PolicyAssistantRoleScope.EMPLOYEE,
@@ -189,7 +189,7 @@ class Sprint15BeaconEmittersTests(unittest.TestCase):
         self.assertEqual(ex.get("answer_type"), "entitlement_summary")
         self.assertEqual(ex.get("assistant_turn_request_id"), "turn-id-3")
 
-    @patch("backend.services.policy_assistant_analytics.emit_event")
+    @patch("backend.app.services.policy_assistant_analytics.emit_event")
     def test_dismissed_carries_engagement_booleans(self, mock_emit) -> None:
         emit_assistant_dismissed(
             role=PolicyAssistantRoleScope.EMPLOYEE,
@@ -204,7 +204,7 @@ class Sprint15BeaconEmittersTests(unittest.TestCase):
         self.assertEqual(ex.get("had_question"), True)
         self.assertEqual(ex.get("had_answer"), False)
 
-    @patch("backend.services.policy_assistant_analytics.emit_event")
+    @patch("backend.app.services.policy_assistant_analytics.emit_event")
     def test_dismissed_with_no_engagement(self, mock_emit) -> None:
         """User opened then closed without typing — both booleans False."""
         emit_assistant_dismissed(

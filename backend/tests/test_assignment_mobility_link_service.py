@@ -15,7 +15,7 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
+from backend.app.services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
 
 
 def _seed_company(db: Database, company_id: str) -> None:
@@ -113,7 +113,7 @@ class AssignmentMobilityLinkServiceTests(unittest.TestCase):
     def test_overview_flow_unbroken(self) -> None:
         """Existing assignment listing inputs still work after mobility link ensure."""
         db = self.db
-        from backend.services.employee_assignment_overview import (
+        from backend.app.services.employee_assignment_overview import (
             build_employee_assignment_overview,
         )
 

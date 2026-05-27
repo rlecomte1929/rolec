@@ -28,9 +28,9 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 import backend.database as dbmod
-import backend.services.unified_assignment_creation as uac
+import backend.app.services.unified_assignment_creation as uac
 from backend.database import Database
-from backend.services.unified_assignment_creation import (
+from backend.app.services.unified_assignment_creation import (
     create_assignment_with_contact_and_invites,
     run_assignment_post_creation_hooks,
 )

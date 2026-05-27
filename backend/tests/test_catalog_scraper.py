@@ -19,7 +19,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services import catalog_scraper, service_catalog  # noqa: E402
+from backend.app.services import catalog_scraper, service_catalog  # noqa: E402
 
 
 SCHEMA = """
@@ -218,7 +218,7 @@ class CatalogScraperTests(unittest.TestCase):
         # the seed JSON dataset: schools is geo-bound, and there are no
         # Tokyo entries — so report_coverage returns have=0 and needed=10,
         # which lets the scraper dispatch fire end-to-end.
-        from backend.services import catalog_coverage
+        from backend.app.services import catalog_coverage
         client = _fake_client({
             "vendors": [
                 {"name": "Tokyo International School", "summary": "Big in TY",

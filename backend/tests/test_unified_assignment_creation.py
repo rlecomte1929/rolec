@@ -16,7 +16,7 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.unified_assignment_creation import create_assignment_with_contact_and_invites
+from backend.app.services.unified_assignment_creation import create_assignment_with_contact_and_invites
 
 
 def _seed_company(db: Database, company_id: str, name: str = "Test Co") -> None:

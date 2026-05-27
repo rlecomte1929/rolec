@@ -52,7 +52,7 @@ def test_login_returns_when_supabase_sync_hangs(monkeypatch):
         return True
 
     # Patch the symbol the dispatcher imports lazily.
-    import backend.services.supabase_auth_sync as sync_mod
+    import backend.app.services.supabase_auth_sync as sync_mod
 
     monkeypatch.setattr(sync_mod, "sync_relopass_user_to_supabase_auth", _hanging_sync)
 
@@ -85,7 +85,7 @@ def test_register_returns_when_supabase_sync_hangs(monkeypatch):
         release.wait(timeout=60)
         return True
 
-    import backend.services.supabase_auth_sync as sync_mod
+    import backend.app.services.supabase_auth_sync as sync_mod
 
     monkeypatch.setattr(sync_mod, "sync_relopass_user_to_supabase_auth", _hanging_sync)
 
@@ -107,7 +107,7 @@ def test_supabase_call_timeout_returns_false(monkeypatch):
     """A hung admin call must time out and return False rather than block."""
     from unittest.mock import MagicMock
 
-    import backend.services.supabase_auth_sync as sync_mod
+    import backend.app.services.supabase_auth_sync as sync_mod
 
     # Force a short timeout so the test runs fast.
     monkeypatch.setattr(sync_mod, "_SUPABASE_CALL_TIMEOUT_S", 0.5)

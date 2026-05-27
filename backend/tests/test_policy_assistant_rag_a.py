@@ -32,14 +32,14 @@ if _REPO_ROOT not in sys.path:
 # Force the hash embedder so the test never tries to call OpenAI.
 os.environ["POLICY_ASSISTANT_EMBEDDER"] = "hash"
 
-from backend.services import policy_chunk_indexer  # noqa: E402
-from backend.services import policy_chunk_retriever  # noqa: E402
-from backend.services.policy_assistant_embedder import (  # noqa: E402
+from backend.app.services import policy_chunk_indexer  # noqa: E402
+from backend.app.services import policy_chunk_retriever  # noqa: E402
+from backend.app.services.policy_assistant_embedder import (  # noqa: E402
     HashEmbedder,
     cosine_similarity,
     get_default_embedder,
 )
-from backend.services.policy_chunk_indexer import (  # noqa: E402
+from backend.app.services.policy_chunk_indexer import (  # noqa: E402
     format_benefit_chunk,
     format_override_chunk,
     index_company_policy,

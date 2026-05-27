@@ -22,7 +22,7 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from backend.app.routers import admin as admin_router  # noqa: E402
-from backend.services.audit_log_service import ACTION_UPDATE  # noqa: E402
+from backend.app.services.audit_log_service import ACTION_UPDATE  # noqa: E402
 
 
 AUDIT_SCHEMA = """

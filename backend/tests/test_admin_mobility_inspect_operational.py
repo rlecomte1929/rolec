@@ -14,8 +14,8 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 import backend.database as dbmod
-from backend.services.case_context_service import CaseContextService
-from backend.services.mobility_inspect_service import build_mobility_operational_inspect
+from backend.app.services.case_context_service import CaseContextService
+from backend.app.services.mobility_inspect_service import build_mobility_operational_inspect
 from backend.tests.test_requirement_evaluation_service import (  # noqa: E402
     MOBILITY_SCHEMA,
     _fk_pragma,

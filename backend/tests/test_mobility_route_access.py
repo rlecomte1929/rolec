@@ -15,7 +15,7 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.mobility_route_access import enforce_mobility_graph_read_access
+from backend.app.services.mobility_route_access import enforce_mobility_graph_read_access
 from sqlalchemy import create_engine, text
 
 
@@ -34,7 +34,7 @@ class MobilityRouteAccessEnforceTests(unittest.TestCase):
             enforce_mobility_graph_read_access(db, "  ", {"is_admin": False})
         self.assertEqual(ctx.exception.status_code, 400)
 
-    @patch("backend.services.mobility_route_access._load_assignment_visibility_check")
+    @patch("backend.app.services.mobility_route_access._load_assignment_visibility_check")
     def test_non_admin_with_bridge_calls_assignment_visibility(self, mock_ld: MagicMock) -> None:
         fn = MagicMock()
         mock_ld.return_value = fn

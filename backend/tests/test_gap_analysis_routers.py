@@ -35,7 +35,7 @@ _MOCK_USER = {
     "is_admin": False,
 }
 
-_SUPABASE_CLIENT_PATH = "backend.services.supabase_client.get_supabase_admin_client"
+_SUPABASE_CLIENT_PATH = "backend.app.services.supabase_client.get_supabase_admin_client"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

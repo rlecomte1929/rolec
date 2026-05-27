@@ -10,14 +10,14 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_assistant_case_context_service import (  # noqa: E402
+from backend.app.services.policy_assistant_case_context_service import (  # noqa: E402
     build_policy_assistant_context,
     fact_applies_to_case_profile,
     get_source_chunks_for_fact_ids,
 )
-from backend.services.policy_fact_extraction_service import extract_minimal_policy_facts  # noqa: E402
-from backend.services.policy_knowledge_snapshot_service import PolicyKnowledgeSnapshotService  # noqa: E402
-from backend.services.policy_text_extraction_service import build_chunks  # noqa: E402
+from backend.app.services.policy_fact_extraction_service import extract_minimal_policy_facts  # noqa: E402
+from backend.app.services.policy_knowledge_snapshot_service import PolicyKnowledgeSnapshotService  # noqa: E402
+from backend.app.services.policy_text_extraction_service import build_chunks  # noqa: E402
 
 
 class PolicyAssistantImportTests(unittest.TestCase):

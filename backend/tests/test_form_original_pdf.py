@@ -160,7 +160,7 @@ class OriginalPdfEndpointTests(unittest.TestCase):
             {"signedURL": "https://storage.supabase.co/signed/UTL-2011/1.0.0.pdf?token=abc"}
         )
         with mock.patch(
-            "backend.services.supabase_client.get_supabase_admin_client",
+            "backend.app.services.supabase_client.get_supabase_admin_client",
             return_value=sb,
         ):
             res = get_form_original_pdf(case_id, cf_id, DUMMY_USER)
@@ -191,7 +191,7 @@ class OriginalPdfEndpointTests(unittest.TestCase):
             {"signedUrl": "https://signed.example/x"}  # different casing
         )
         with mock.patch(
-            "backend.services.supabase_client.get_supabase_admin_client",
+            "backend.app.services.supabase_client.get_supabase_admin_client",
             return_value=sb,
         ):
             res = get_form_original_pdf(case_id, cf_id, DUMMY_USER)
@@ -208,7 +208,7 @@ class OriginalPdfEndpointTests(unittest.TestCase):
 
         # Supabase shouldn't even be called when there's no path
         with mock.patch(
-            "backend.services.supabase_client.get_supabase_admin_client"
+            "backend.app.services.supabase_client.get_supabase_admin_client"
         ) as mock_client:
             res = get_form_original_pdf(case_id, cf_id, DUMMY_USER)
 
@@ -229,7 +229,7 @@ class OriginalPdfEndpointTests(unittest.TestCase):
 
         sb, _bucket = _make_storage_stub(RuntimeError("storage down"))
         with mock.patch(
-            "backend.services.supabase_client.get_supabase_admin_client",
+            "backend.app.services.supabase_client.get_supabase_admin_client",
             return_value=sb,
         ):
             res = get_form_original_pdf(case_id, cf_id, DUMMY_USER)
@@ -275,7 +275,7 @@ class OriginalPdfEndpointTests(unittest.TestCase):
 
         sb, bucket = _make_storage_stub({"signedURL": "https://signed/x"})
         with mock.patch(
-            "backend.services.supabase_client.get_supabase_admin_client",
+            "backend.app.services.supabase_client.get_supabase_admin_client",
             return_value=sb,
         ):
             res = get_form_original_pdf(case_id, cf_id, DUMMY_USER)

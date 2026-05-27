@@ -12,8 +12,8 @@ Run with:
 No database connections required — all pure unit tests.
 """
 import pytest
-from backend.services.relocation_classifier import classify_case, CaseClassification
-from backend.services.plan_scope import (
+from backend.app.services.relocation_classifier import classify_case, CaseClassification
+from backend.app.services.plan_scope import (
     active_phases_for_case_type,
     active_phases_for_classification,
     immigration_required,
