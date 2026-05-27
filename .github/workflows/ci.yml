@@ -91,7 +91,11 @@ jobs:
     # Requires DATABASE_URL secret pointing at the live/staging Supabase (read-only).
     name: RLS coverage check
     runs-on: ubuntu-latest
-    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' || secrets.RLS_COVERAGE_DATABASE_URL != '' }}
+    # GitHub Actions does not allow `secrets.*` in a job-level `if:` — referencing
+    # one here makes the whole workflow fail at parse time with the unhelpful
+    # "workflow file issue" error (0s run, no log). Gate on a repo variable instead:
+    # set `vars.RLS_COVERAGE_DATABASE_URL_SET=true` when the secret is configured.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
