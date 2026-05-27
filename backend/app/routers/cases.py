@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -21,11 +20,21 @@ from ..services.roadmap_builder import derive_roadmap
 from ..services.trigger_engine import fire_roadmap_events
 from ..services.prefill_engine import run_prefill_for_dependents
 from ..services.audit_log_service import (
-    insert_audit_log,
     ACTION_INSERT,
     ACTION_UPDATE,
     ACTOR_HUMAN,
-    ACTOR_SYSTEM,
+)
+from ..services.case_service import (
+    _assert_case_access,
+    _audit_case,
+    _case_dto,
+    _deep_merge_case_drafts,
+    _detect_sender_role,
+    _dossier_is_stale,
+    _pg_conn,
+    _pg_table,
+    _sql_now,
+    _sql_uuid_gen,
 )
 from sqlalchemy import text as _sql_text
 import io
@@ -35,65 +44,6 @@ import requests as _requests
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 logger = logging.getLogger(__name__)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Dialect helper for the Supabase-backed endpoints below.
-# Postgres prod uses `public.X` schema-qualified names; SQLite tests use bare.
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _pg_table(name: str) -> str:
-    try:
-        dialect_name = main_db.engine.dialect.name
-    except Exception:
-        dialect_name = "postgresql"
-    return f"public.{name}" if dialect_name == "postgresql" else name
-
-
-def _sql_now() -> str:
-    """Returns the SQL expression for current timestamp, dialect-aware."""
-    try:
-        dialect_name = main_db.engine.dialect.name
-    except Exception:
-        dialect_name = "postgresql"
-    return "now()" if dialect_name == "postgresql" else "datetime('now')"
-
-
-def _sql_uuid_gen() -> str:
-    """Returns a SQL expression that generates a new UUID, dialect-aware."""
-    try:
-        dialect_name = main_db.engine.dialect.name
-    except Exception:
-        dialect_name = "postgresql"
-    return "gen_random_uuid()" if dialect_name == "postgresql" else "lower(hex(randomblob(16)))"
-
-
-def _audit_case(
-    *,
-    entity_type: str,
-    entity_id: str,
-    action_type: str,
-    actor_type: str = ACTOR_SYSTEM,
-    actor_id: Optional[str] = None,
-    new_value: Optional[Dict[str, Any]] = None,
-) -> None:
-    """Write one audit_logs row; never raises so callers need no try/except."""
-    try:
-        with main_db.engine.begin() as conn:
-            insert_audit_log(
-                conn,
-                entity_type=entity_type,
-                entity_id=entity_id,
-                action_type=action_type,
-                actor_type=actor_type,
-                actor_id=actor_id,
-                new_value=new_value,
-            )
-    except Exception:
-        logger.exception(
-            "audit: failed to log %s %s entity_id=%s",
-            action_type, entity_type, entity_id,
-        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -121,17 +71,6 @@ class PetInput(BaseModel):
 class HouseholdPayload(BaseModel):
     family_members: Optional[List[FamilyMemberInput]] = None
     pets: Optional[List[PetInput]] = None
-
-
-def _deep_merge_case_drafts(base: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge PATCH payload into stored draft so partial saves never wipe other wizard sections."""
-    out = dict(base)
-    for key, val in update.items():
-        if key in out and isinstance(out[key], dict) and isinstance(val, dict):
-            out[key] = _deep_merge_case_drafts(out[key], val)
-        else:
-            out[key] = val
-    return out
 
 
 @router.get("", tags=["cases"])
@@ -367,18 +306,6 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
 # ─────────────────────────────────────────────────────────────────────────────
 # [P1-6] Roadmap tracks V2 — with embedded CaseForm doc counts per step
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _pg_conn():
-    """Context manager that yields a raw engine connection (dialect-agnostic helper)."""
-    from contextlib import contextmanager
-
-    @contextmanager
-    def _ctx():
-        with main_db.engine.connect() as conn:
-            yield conn
-
-    return _ctx()
-
 
 class RoadmapDocChip(BaseModel):
     doc_count: int
@@ -675,24 +602,6 @@ def update_household(
     }
 
 
-def _case_dto(case: Any, draft: Dict[str, Any]) -> schemas.CaseDTO:
-    return schemas.CaseDTO(
-        id=case.id,
-        status=case.status,
-        draft=draft,
-        createdAt=case.created_at,
-        updatedAt=case.updated_at,
-        originCountry=case.origin_country,
-        originCity=case.origin_city,
-        destCountry=case.dest_country,
-        destCity=case.dest_city,
-        purpose=case.purpose,
-        targetMoveDate=case.target_move_date,
-        flags=json.loads(case.flags_json or "{}"),
-        requirementsSnapshotId=case.requirements_snapshot_id,
-    )
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # [P1-5] Dossier & Forms list
 # Returns all case_forms (created by the Trigger Engine in P1-3) for a case,
@@ -856,133 +765,6 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
     )
 
 
-_UUID_RE = re.compile(
-    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-)
-
-
-def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
-    """
-    Verify the caller can read the given case.
-
-    The ``case_id`` param may be either:
-    - A UUID from ``public.cases`` (legacy seed data), or
-    - An ``assignment_id`` from ``public.case_assignments`` (all real HR-created
-      cases go through case_assignments; the canonical case lives in
-      ``public.relocation_cases``).
-
-    Resolution order:
-    1. Try ``public.cases`` (legacy path).
-    2. Try ``public.case_assignments`` → ``public.relocation_cases`` (real cases).
-
-    Employees: must own the assignment (employee_user_id == auth uid).
-    HR / Admin: sufficient to belong to the same company as the case.
-    Raises 404 (case missing) or 403 (no access).
-
-    B24-REGRESSION fail-safe: never returns 500. Malformed case_ids → 404.
-    DB exceptions are logged and the affected query is treated as "no match"
-    so a transient/lookup error can't cascade into a 500 on every cases.py
-    endpoint downstream of this guard.
-    """
-    user_id = user.get("id")
-    role = (user.get("role") or "").upper()
-    is_admin = user.get("is_admin") or role == "ADMIN"
-
-    # Reject malformed IDs up-front: on Postgres a non-UUID string makes the
-    # ``WHERE id = :id`` cast raise ``invalid input syntax for type uuid``,
-    # which previously bubbled up as a 500.
-    if not case_id or not _UUID_RE.match(case_id):
-        raise HTTPException(status_code=404, detail="Case not found")
-
-    row = None
-    try:
-        with main_db.engine.connect() as conn:
-            row = conn.execute(
-                _sql_text(
-                    f"SELECT id, company_id, employee_id, hr_owner_id "
-                    f"FROM {_pg_table('cases')} WHERE id::text = :id"
-                ),
-                {"id": case_id},
-            ).mappings().first()
-    except Exception:
-        logger.exception("dossier: failed to query cases for access check id=%s", case_id)
-        row = None  # fall through to assignment lookup rather than 500
-
-    # --- fallback: resolve assignment_id → relocation_cases ---
-    if not row:
-        asgn = None
-        try:
-            with main_db.engine.connect() as conn:
-                asgn = conn.execute(
-                    _sql_text(
-                        f"SELECT ca.employee_user_id, ca.hr_user_id, rc.company_id "
-                        f"FROM {_pg_table('case_assignments')} ca "
-                        f"LEFT JOIN {_pg_table('relocation_cases')} rc "
-                        f"  ON rc.id::text = ca.canonical_case_id::text "
-                        f"WHERE ca.id::text = :id"
-                    ),
-                    {"id": case_id},
-                ).mappings().first()
-        except Exception:
-            logger.exception("dossier: failed to resolve assignment_id id=%s", case_id)
-            asgn = None
-
-        if asgn is not None:
-            # Employee owns the assignment
-            if user_id and str(asgn.get("employee_user_id") or "") == str(user_id):
-                return
-            # HR owns the assignment
-            if user_id and str(asgn.get("hr_user_id") or "") == str(user_id):
-                return
-            # Admin always allowed
-            if is_admin:
-                return
-            # HR company match
-            if role == "HR":
-                try:
-                    with main_db.engine.connect() as conn:
-                        prof = conn.execute(
-                            _sql_text(
-                                f"SELECT company_id FROM {_pg_table('profiles')} WHERE id::text = :id"
-                            ),
-                            {"id": str(user_id) if user_id else ""},
-                        ).mappings().first()
-                    if prof and str(prof.get("company_id") or "") == str(asgn.get("company_id") or ""):
-                        return
-                except Exception:
-                    logger.exception("dossier: HR profile lookup failed id=%s", user_id)
-            raise HTTPException(status_code=403, detail="Not authorised for this case")
-
-        raise HTTPException(status_code=404, detail="Case not found")
-
-    # Employee owns the case
-    if user_id and str(row.get("employee_id") or "") == str(user_id):
-        return
-    # HR owns the case
-    if user_id and str(row.get("hr_owner_id") or "") == str(user_id):
-        return
-    # Admin always allowed
-    if is_admin:
-        return
-    # HR users with company match — read user's company from profiles
-    if role == "HR":
-        try:
-            with main_db.engine.connect() as conn:
-                prof = conn.execute(
-                    _sql_text(
-                        f"SELECT company_id FROM {_pg_table('profiles')} "
-                        f"WHERE id = :id"
-                    ),
-                    {"id": user_id},
-                ).mappings().first()
-            if prof and str(prof.get("company_id") or "") == str(row.get("company_id") or ""):
-                return
-        except Exception:
-            logger.exception("dossier: failed to look up HR profile company_id id=%s", user_id)
-
-    raise HTTPException(status_code=403, detail="Not authorised for this case")
-
-
 @router.get("/{case_id}/forms", response_model=List[CaseFormSummary])
 def list_case_forms(
     case_id: str,
@@ -1062,7 +844,7 @@ def list_case_forms(
         FROM {_pg_table('case_forms')} cf
         JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
-        LEFT JOIN {_pg_table('profiles')} p ON p.id = cf.person_id
+        LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = cf.person_id
         WHERE cf.case_id = :case_id{where_status}
         ORDER BY
           -- Forms with an unresolved blocker (UI-blocked) come first so the
@@ -1745,7 +1527,7 @@ def _fetch_single_form_summary(case_id: str, form_id: str) -> CaseFormSummary:
         FROM {_pg_table('case_forms')} cf
         JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
-        LEFT JOIN {_pg_table('profiles')} p ON p.id = cf.person_id
+        LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = cf.person_id
         WHERE cf.id = :form_id AND cf.case_id = :case_id
     """
     try:
@@ -2935,37 +2717,6 @@ def get_dossier_zip(
 
 # ── [P3-6] Staleness helper ───────────────────────────────────────────────────
 
-def _dossier_is_stale(conn: Any, form_ids: List[str], generated_at: Optional[str]) -> bool:
-    """
-    Returns True if any FieldValue in the dossier's forms was updated after
-    the dossier was last generated (generated_at).  Safe-fails to False.
-    """
-    if not generated_at or not form_ids:
-        return False
-    try:
-        placeholders = ", ".join(f":fid_{i}" for i in range(len(form_ids)))
-        params: Dict[str, Any] = {f"fid_{i}": fid for i, fid in enumerate(form_ids)}
-        row = conn.execute(
-            _sql_text(
-                f"""
-                SELECT updated_at
-                FROM {_pg_table('case_form_field_values')}
-                WHERE case_form_id IN ({placeholders})
-                ORDER BY updated_at DESC
-                LIMIT 1
-                """
-            ),
-            params,
-        ).mappings().first()
-        if not row or row["updated_at"] is None:
-            return False
-        last_ts = str(row["updated_at"])
-        return last_ts > str(generated_at)
-    except Exception:
-        logger.debug("dossier: staleness check failed, treating as not stale")
-        return False
-
-
 class DossierPackageDetailResponse(BaseModel):
     id: str
     case_id: str
@@ -3512,13 +3263,6 @@ def create_case_quote_request(
 
 class _MessageBody(BaseModel):
     content: str
-
-
-def _detect_sender_role(user: Dict[str, Any]) -> str:
-    role = (user.get("role") or "").upper()
-    if role in ("HR", "ADMIN"):
-        return role.lower()
-    return "employee"
 
 
 @router.post("/{case_id}/messages", status_code=201)
