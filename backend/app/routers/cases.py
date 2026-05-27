@@ -422,14 +422,33 @@ def get_case_roadmap_tracks(
     from case_forms. Used by the employee RoadmapScreen chip.
     """
     _assert_case_access(user, case_id)
+
+    # Resolve assignment_id → canonical_case_id so roadmap_tracks queries
+    # use the correct FK. The URL param is always an assignment_id for real
+    # cases; roadmap_tracks.case_id references relocation_cases.id.
+    tracks_case_id = case_id
+    try:
+        with _pg_conn() as conn:
+            asgn_row = conn.execute(
+                _sql_text(
+                    "SELECT canonical_case_id FROM public.case_assignments "
+                    "WHERE id::text = :id AND canonical_case_id IS NOT NULL"
+                ),
+                {"id": case_id},
+            ).mappings().first()
+        if asgn_row and asgn_row.get("canonical_case_id"):
+            tracks_case_id = str(asgn_row["canonical_case_id"])
+    except Exception:
+        logger.warning("roadmap/tracks: could not resolve canonical_case_id for %s", case_id)
+
     with _pg_conn() as conn:
         sql = f"""
             SELECT
-              rt.id          AS track_id,
-              rt.name        AS track_name,
-              rt.icon        AS track_icon,
-              rt.sort_order  AS track_sort_order,
-              rt.progress_pct,
+              rt.id             AS track_id,
+              rt.name           AS track_name,
+              rt.icon           AS track_icon,
+              rt.sort_order     AS track_sort_order,
+              rt.completion_pct AS progress_pct,
               rs.id          AS step_id,
               rs.title       AS step_title,
               rs.description AS step_description,
@@ -460,13 +479,13 @@ def get_case_roadmap_tracks(
             LEFT JOIN {_pg_table('case_forms')} cf
               ON cf.roadmap_step_id = rs.id AND cf.case_id = :case_id
             WHERE rt.case_id = :case_id
-            GROUP BY rt.id, rt.name, rt.icon, rt.sort_order, rt.progress_pct,
+            GROUP BY rt.id, rt.name, rt.icon, rt.sort_order, rt.completion_pct,
                      rs.id, rs.title, rs.description, rs.status, rs.owner,
                      rs.due_date, rs.sort_order, rs.ai_suggestion,
                      rs.dependency_ids, rs.vendor_id
             ORDER BY rt.sort_order, rs.sort_order
         """
-        rows = conn.execute(_sql_text(sql), {"case_id": case_id}).mappings().all()
+        rows = conn.execute(_sql_text(sql), {"case_id": tracks_case_id}).mappings().all()
 
     # Assemble into tracks -> steps hierarchy
     tracks_map: Dict[str, RoadmapTrackV2] = {}
@@ -840,7 +859,18 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
 def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     """
     Verify the caller can read the given case.
-    Employees: must own the case (cases.employee_id == auth uid).
+
+    The ``case_id`` param may be either:
+    - A UUID from ``public.cases`` (legacy seed data), or
+    - An ``assignment_id`` from ``public.case_assignments`` (all real HR-created
+      cases go through case_assignments; the canonical case lives in
+      ``public.relocation_cases``).
+
+    Resolution order:
+    1. Try ``public.cases`` (legacy path).
+    2. Try ``public.case_assignments`` → ``public.relocation_cases`` (real cases).
+
+    Employees: must own the assignment (employee_user_id == auth uid).
     HR / Admin: sufficient to belong to the same company as the case.
     Raises 404 (case missing) or 403 (no access).
     """
@@ -848,6 +878,7 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     role = (user.get("role") or "").upper()
     is_admin = user.get("is_admin") or role == "ADMIN"
 
+    row = None
     try:
         with main_db.engine.connect() as conn:
             row = conn.execute(
@@ -861,7 +892,50 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
         logger.exception("dossier: failed to query cases for access check id=%s", case_id)
         raise HTTPException(status_code=500, detail="Failed to verify case access")
 
+    # --- fallback: resolve assignment_id → relocation_cases ---
     if not row:
+        try:
+            with main_db.engine.connect() as conn:
+                asgn = conn.execute(
+                    _sql_text(
+                        "SELECT ca.employee_user_id, ca.hr_user_id, rc.company_id "
+                        "FROM public.case_assignments ca "
+                        "LEFT JOIN public.relocation_cases rc "
+                        "  ON rc.id::text = ca.canonical_case_id::text "
+                        "WHERE ca.id::text = :id"
+                    ),
+                    {"id": case_id},
+                ).mappings().first()
+        except Exception:
+            logger.exception("dossier: failed to resolve assignment_id id=%s", case_id)
+            asgn = None
+
+        if asgn is not None:
+            # Employee owns the assignment
+            if user_id and str(asgn.get("employee_user_id") or "") == str(user_id):
+                return
+            # HR owns the assignment
+            if user_id and str(asgn.get("hr_user_id") or "") == str(user_id):
+                return
+            # Admin always allowed
+            if is_admin:
+                return
+            # HR company match
+            if role == "HR":
+                try:
+                    with main_db.engine.connect() as conn:
+                        prof = conn.execute(
+                            _sql_text(
+                                f"SELECT company_id FROM {_pg_table('profiles')} WHERE id = :id"
+                            ),
+                            {"id": user_id},
+                        ).mappings().first()
+                    if prof and str(prof.get("company_id") or "") == str(asgn.get("company_id") or ""):
+                        return
+                except Exception:
+                    logger.exception("dossier: HR profile lookup failed id=%s", user_id)
+            raise HTTPException(status_code=403, detail="Not authorised for this case")
+
         raise HTTPException(status_code=404, detail="Case not found")
 
     # Employee owns the case
