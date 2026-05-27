@@ -2004,6 +2004,28 @@ def create_person(
     return {"person": profile, "invite_sent": invite_sent}
 
 
+def _retry_on_operational_error(fn, max_attempts: int = 3):
+    """
+    Call fn() up to max_attempts times, retrying on SQLAlchemy OperationalError
+    (covers ECIRCUITBREAKER, connection reset, pool timeout).
+    Exponential backoff: 1s after attempt 1, 2s after attempt 2.
+    """
+    import time as _time
+    from sqlalchemy.exc import OperationalError as _OpErr
+    for _attempt in range(1, max_attempts + 1):
+        try:
+            return fn()
+        except _OpErr as _e:
+            if _attempt == max_attempts:
+                raise
+            _wait = 2 ** (_attempt - 1)  # 1s, 2s
+            log.warning(
+                "seed_test_personas attempt %d/%d OperationalError=%r — retrying in %ds",
+                _attempt, max_attempts, _e, _wait,
+            )
+            _time.sleep(_wait)
+
+
 @app.post("/api/admin/seed-test-personas", status_code=200)
 def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
     """
@@ -2017,7 +2039,7 @@ def seed_test_personas(user: Dict[str, Any] = Depends(require_admin)):
     EMP  : romain+emp_seed@hotmail.com  / Passw0rd!  — same company as HR1
     """
     try:
-        return _seed_test_personas_impl(user)
+        return _retry_on_operational_error(lambda: _seed_test_personas_impl(user))
     except Exception as _exc:
         log.error("seed_test_personas FAILED error=%r", _exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Seed failed: {_exc}")
@@ -2045,8 +2067,11 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
     db.create_company(OTHERCO_CID, "Other Corp (Seed)",  plan_tier="starter")
     created.append("companies")
 
-    # ── 2. Users (UPSERT — ON CONFLICT(id) update pw hash so password is always fresh) ──
+    # ── 2+3. Users + Profiles in a SINGLE connection (reduces Supabase pooler churn) ──
+    # Previously two separate with db.engine.begin() blocks; consolidated to halve
+    # pool checkouts and avoid amplifying the bad-auth counter on cold starts.
     log.info("seed_test_personas step 2: users")
+    log.info("seed_test_personas step 3: profiles")
     with db.engine.begin() as conn:
         # Detect which columns exist in users table
         users_cols_q = conn.execute(text(
@@ -2082,11 +2107,9 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
                 f"INSERT INTO users ({u_col_clause}) VALUES ({u_val_clause}) "
                 f"ON CONFLICT (id) DO UPDATE SET {u_upd_clause}"
             ), u_vals)
-    created.append("users")
+        created.append("users")
 
-    # ── 3. Profiles (direct UPSERT — profiles_id_fkey dropped via migration so no auth.users FK) ──
-    log.info("seed_test_personas step 3: profiles")
-    with db.engine.begin() as conn:
+        # Profiles (direct UPSERT — profiles_id_fkey dropped via migration so no auth.users FK)
         profile_cols_q = conn.execute(text(
             "SELECT column_name FROM information_schema.columns "
             "WHERE table_schema='public' AND table_name='profiles'"
@@ -2123,7 +2146,7 @@ def _seed_test_personas_impl(user: Dict[str, Any]) -> Dict[str, Any]:
                 f"INSERT INTO profiles ({col_clause}) VALUES ({val_clause}) "
                 f"ON CONFLICT (id) DO UPDATE SET {upd_clause}"
             ), p_vals)
-    created.append("profiles")
+        created.append("profiles")
 
     # ── 4. hr_users rows ────────────────────────────────────────────────────
     log.info("seed_test_personas step 4: hr_users")

@@ -48,6 +48,29 @@ if (
 ):
     _raw_url = _raw_url + ("&" if "?" in _raw_url else "?") + "sslmode=require"
 
+# Supabase transaction-mode pooler (port 6543) requires username postgres.PROJECT_REF.
+# A bare "postgres" username causes FATAL: password authentication failed, which
+# increments the pooler's bad-auth counter and trips ECIRCUITBREAKER, blocking ALL
+# subsequent connections.  Auto-correct by extracting the project ref from SUPABASE_URL.
+import re as _re_pooler
+_parsed_pooler = urlparse(_raw_url)
+if (
+    _raw_url.startswith("postgresql://")
+    and "pooler.supabase.com" in _raw_url
+    and ":6543" in _raw_url
+    and (_parsed_pooler.username or "") == "postgres"
+):
+    _supa_url = os.getenv("SUPABASE_URL", "")
+    _m_proj = _re_pooler.match(r"https?://([^.]+)\.supabase\.co", _supa_url)
+    if _m_proj:
+        _proj_ref = _m_proj.group(1)
+        _pw_raw = _parsed_pooler.password or ""
+        _raw_url = _raw_url.replace(
+            f"postgresql://postgres:{_pw_raw}@",
+            f"postgresql://postgres.{_proj_ref}:{_pw_raw}@",
+            1,
+        )
+
 DATABASE_URL: str = _raw_url
 
 
