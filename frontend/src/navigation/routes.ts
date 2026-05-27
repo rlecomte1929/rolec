@@ -85,6 +85,8 @@ export const ROUTE_DEFS = {
   hrPolicyBuilderDocuments: { path: '/hr/policy-builder/documents', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy exceptions inbox — HR review + approve/reject flow. */
   hrExceptions: { path: '/hr/exceptions', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  /** AI decisions audit (AI-002) — EU AI Act Art. 14(4)(c) human oversight log. */
+  hrAiDecisions: { path: '/hr/ai-decisions', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** Policy vs. Reality compliance heatmap + per-case analysis. */
   hrPolicyReality: { path: '/hr/policy-vs-reality', roles: ['HR', 'ADMIN'] as RouteRole[] },
   /** AI Requirements Discovery Engine — corridor requirement graph + timeline + source audit. */
