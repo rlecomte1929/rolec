@@ -999,7 +999,7 @@ export function EmployeeIntakePage() {
           <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-1">Employee · Intake Wizard</div>
           <h1 className="text-2xl font-bold text-gray-900">Detailed intake</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Tell us about your relocation so we can prepare the right recommendations. Each step takes a couple of minutes.
+            This is where most of your relocation information lives. Work through the steps below — your answers help us build your personalised case, match the right services, and flag what needs attention before your move.
           </p>
         </div>
 

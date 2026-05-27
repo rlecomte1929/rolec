@@ -20,6 +20,8 @@ type BadgeSpec =
 interface SectionItem {
   id: string;
   label: string;
+  /** Optional one-line hint shown below the label (not shown when collapsed). */
+  hint?: string;
   to: string;
   /** Optional override per role (e.g. employee Inbox vs HR Inbox). */
   toByRole?: Partial<Record<SidebarRole, string>>;
@@ -50,7 +52,12 @@ const SECTIONS: NavSection[] = [
     minRole: 'EMPLOYEE',
     items: [
       { id: 'intake', label: 'Intake', to: ROUTE_DEFS.employeeDashboard.path, exact: true },
-      { id: 'detailed-intake', label: 'Detailed intake', to: ROUTE_DEFS.employeeDashboard.path },
+      {
+        id: 'detailed-intake',
+        label: 'Detailed intake',
+        hint: 'Answer questions that shape your relocation case',
+        to: ROUTE_DEFS.employeeIntake.path,
+      },
       { id: 'roadmap', label: 'Roadmap', to: ROUTE_DEFS.employeeDashboard.path, badge: { kind: 'static-count', count: 3 } },
       { id: 'documents', label: 'Documents', to: ROUTE_DEFS.employeeTaskPage.path },
       { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
@@ -359,7 +366,14 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
                   />
                   {!collapsed && (
                     <>
-                      <span className="flex-1 truncate">{item.label}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block truncate">{item.label}</span>
+                        {item.hint && (
+                          <span className="block truncate text-[10px] leading-tight mt-0.5 font-normal text-slate-400 group-hover:text-slate-500">
+                            {item.hint}
+                          </span>
+                        )}
+                      </span>
                       <Badge count={badgeCount} variant={badgeVariant} />
                     </>
                   )}

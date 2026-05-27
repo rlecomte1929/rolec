@@ -731,10 +731,16 @@ export function InboxV2Page() {
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center bg-slate-50 px-8 text-center">
                 <Users className="h-10 w-10 text-slate-300" />
-                <p className="mt-4 text-sm font-medium text-slate-700">No conversation selected</p>
-                <p className="mt-1 max-w-xs text-xs text-slate-400">
-                  Pick a thread on the left. Threads appear once HR opens a case or a vendor sends a quote.
-                </p>
+                {listError ? (
+                  <p className="mt-4 text-sm text-slate-500">Messages could not be loaded.</p>
+                ) : (
+                  <>
+                    <p className="mt-4 text-sm font-medium text-slate-700">No conversation selected</p>
+                    <p className="mt-1 max-w-xs text-xs text-slate-400">
+                      Pick a thread on the left. Threads appear once HR opens a case or a vendor sends a quote.
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </section>
