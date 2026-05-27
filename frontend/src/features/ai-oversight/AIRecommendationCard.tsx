@@ -75,12 +75,22 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<AIDecisionRecord | null>(null);
+  const [priorDecision, setPriorDecision] = useState<AIDecisionRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reasonRequired = pendingAction !== null && REASON_REQUIRED.includes(pendingAction);
   const reasonMissing = reasonRequired && !reason.trim();
 
   const reset = () => {
+    setPendingAction(null);
+    setReason('');
+    setError(null);
+  };
+
+  const changeDecision = () => {
+    if (!submitted) return;
+    setPriorDecision(submitted);
+    setSubmitted(null);
     setPendingAction(null);
     setReason('');
     setError(null);
@@ -95,10 +105,19 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
     setSubmitting(true);
     setError(null);
     try {
+      const payload: Record<string, unknown> = { ...aiOutput };
+      if (priorDecision) {
+        payload.prior_decision = {
+          id: priorDecision.id,
+          decision: priorDecision.decision,
+          reason: priorDecision.reason,
+          created_at: priorDecision.created_at,
+        };
+      }
       const record = await createAIDecision({
         feature,
         recommendation_id: recommendationId,
-        ai_output: aiOutput,
+        ai_output: payload,
         decision: pendingAction,
         reason: reason.trim() || undefined,
       });
@@ -120,12 +139,21 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
           <svg className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <div className="text-sm text-slate-700">
+          <div className="flex-1 text-sm text-slate-700">
             <strong>AI recommendation {action === 'accept' ? 'accepted' : action === 'override' ? 'overridden' : 'rejected'}.</strong>
             {submitted.reason && (
               <p className="text-xs text-slate-500 italic mt-1">Reason: "{submitted.reason}"</p>
             )}
-            <p className="text-[11px] text-slate-400 mt-1">Logged for human oversight audit · EU AI Act Art. 14</p>
+            <div className="mt-1 flex items-center gap-3">
+              <p className="text-[11px] text-slate-400">Logged for human oversight audit · EU AI Act Art. 14</p>
+              <button
+                type="button"
+                onClick={changeDecision}
+                className="text-[11px] font-medium text-violet-600 hover:text-violet-800 underline-offset-2 hover:underline"
+              >
+                Change decision
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -147,6 +175,17 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
           </div>
           <div className="text-sm text-violet-800 leading-relaxed">{rationale}</div>
           <p className="text-[11px] text-violet-500 mt-1">AI-generated · your decision is required and will be logged</p>
+
+          {priorDecision && (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <strong>Changing previous decision.</strong>
+              <span className="ml-1">
+                You previously {priorDecision.decision === 'accept' ? 'accepted' : priorDecision.decision === 'override' ? 'overrode' : 'rejected'} this recommendation
+                {priorDecision.reason ? <> with reason <span className="italic">"{priorDecision.reason}"</span></> : null}.
+              </span>
+              <p className="text-[11px] text-amber-700 mt-1">The previous decision stays in the audit log; the new decision is recorded as a separate row referencing it.</p>
+            </div>
+          )}
 
           <div className="mt-3 flex flex-wrap gap-2">
             {(Object.keys(ACTION_CONFIG) as AIDecisionAction[]).map((action) => (
