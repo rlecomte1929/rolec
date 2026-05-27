@@ -10,7 +10,7 @@ if _REPO_ROOT not in sys.path:
 
 import unittest
 
-from backend.services.policy_grouped_policy_model import (
+from backend.app.services.policy_grouped_policy_model import (
     build_grouped_policy_items,
     build_grouped_policy_review_view,
     derive_comparison_subrules_from_grouped_item,

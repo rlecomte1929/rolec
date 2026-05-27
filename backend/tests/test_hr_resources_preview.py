@@ -6,7 +6,7 @@ get_resources_page_data_for_preview, and the route is a thin wrapper.
 """
 from __future__ import annotations
 
-from backend.services.resources.public_service import (
+from backend.app.services.resources.public_service import (
     build_preview_context,
     get_resources_page_data_for_preview,
 )

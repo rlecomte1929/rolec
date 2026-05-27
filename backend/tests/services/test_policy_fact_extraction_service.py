@@ -1,5 +1,5 @@
 """
-Tests for backend.services.policy_fact_extraction_service.
+Tests for backend.app.services.policy_fact_extraction_service.
 
 Covers the EXTRACT-BUG-1 regression (audit Prompt A): the deterministic
 currency regex must match €- and £-denominated amounts, not just USD/EUR/$/GBP
@@ -16,7 +16,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_fact_extraction_service import (  # noqa: E402
+from backend.app.services.policy_fact_extraction_service import (  # noqa: E402
     _CURRENCY_RE,
     extract_minimal_policy_facts,
 )

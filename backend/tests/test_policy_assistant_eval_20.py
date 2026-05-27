@@ -53,14 +53,14 @@ if _REPO_ROOT not in sys.path:
 os.environ["POLICY_ASSISTANT_LLM"] = "mock"
 os.environ["POLICY_ASSISTANT_EMBEDDER"] = "hash"
 
-from backend.services import (  # noqa: E402
+from backend.app.services import (  # noqa: E402
     policy_assistant_rag_engine as rag,
     policy_assistant_session_memory as session_memory,
     policy_chunk_indexer,
     policy_chunk_retriever,
 )
-from backend.services.policy_assistant_llm_client import LlmRequest, MockClient  # noqa: E402
-from backend.services.policy_chunk_indexer import index_company_policy  # noqa: E402
+from backend.app.services.policy_assistant_llm_client import LlmRequest, MockClient  # noqa: E402
+from backend.app.services.policy_chunk_indexer import index_company_policy  # noqa: E402
 
 
 # Schema mirrors the Supabase migration but stripped to what SQLite needs.

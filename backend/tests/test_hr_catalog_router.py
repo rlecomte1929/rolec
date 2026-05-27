@@ -20,7 +20,7 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from backend.app.routers import hr_catalog as hr_catalog_router  # noqa: E402
-from backend.services import service_catalog, vendor_curation  # noqa: E402
+from backend.app.services import service_catalog, vendor_curation  # noqa: E402
 
 
 SCHEMA = """

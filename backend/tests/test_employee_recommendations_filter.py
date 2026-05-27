@@ -24,8 +24,8 @@ from backend.app.recommendations.types import (  # noqa: E402
     RecommendationItem,
     RecommendationTier,
 )
-from backend.services import employee_recommendations_filter as flt  # noqa: E402
-from backend.services import service_catalog, vendor_curation  # noqa: E402
+from backend.app.services import employee_recommendations_filter as flt  # noqa: E402
+from backend.app.services import service_catalog, vendor_curation  # noqa: E402
 
 
 SCHEMA = """

@@ -22,13 +22,13 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_document_intake import process_uploaded_document  # noqa: E402
-from backend.services.policy_filetype import (  # noqa: E402
+from backend.app.services.policy_document_intake import process_uploaded_document  # noqa: E402
+from backend.app.services.policy_filetype import (  # noqa: E402
     SniffResult,
     sniff_file_kind,
     validate_upload_bytes,
 )
-from backend.services.policy_intake_errors import (  # noqa: E402
+from backend.app.services.policy_intake_errors import (  # noqa: E402
     DocumentSizeError,
     EncryptedDocumentError,
     IntakePipelineUnavailableError,

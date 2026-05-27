@@ -15,7 +15,7 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.employee_assignment_overview import (
+from backend.app.services.employee_assignment_overview import (
     build_employee_assignment_overview,
     _claim_summary,
 )

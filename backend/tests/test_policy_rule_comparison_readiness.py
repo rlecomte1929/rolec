@@ -9,7 +9,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_rule_comparison_readiness import (  # noqa: E402
+from backend.app.services.policy_rule_comparison_readiness import (  # noqa: E402
     RULE_COMPARISON_FULL,
     RULE_COMPARISON_NOT_READY,
     RULE_COMPARISON_PARTIAL,

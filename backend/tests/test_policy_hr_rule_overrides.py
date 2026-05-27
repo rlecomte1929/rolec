@@ -10,12 +10,12 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_hr_rule_override_layer import (  # noqa: E402
+from backend.app.services.policy_hr_rule_override_layer import (  # noqa: E402
     compute_entitlement_value_trace,
     merge_benefit_rule_for_effective_layer,
     merge_benefit_rules_for_comparison_engine,
 )
-from backend.services.policy_rule_comparison_readiness import (  # noqa: E402
+from backend.app.services.policy_rule_comparison_readiness import (  # noqa: E402
     evaluate_policy_comparison_readiness,
     evaluate_rule_comparison_readiness,
 )

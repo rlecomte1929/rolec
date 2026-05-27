@@ -17,7 +17,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services import service_catalog  # noqa: E402
+from backend.app.services import service_catalog  # noqa: E402
 
 
 SCHEMA = """

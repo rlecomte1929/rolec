@@ -9,7 +9,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_canonical_lta_template import (
+from backend.app.services.policy_canonical_lta_template import (
     CANONICAL_LTA_TEMPLATE_FIELDS,
     LTA_DOMAIN_IDS,
     LTA_POLICY_DOMAIN_ORDER,

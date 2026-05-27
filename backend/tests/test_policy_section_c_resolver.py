@@ -14,7 +14,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_section_c_resolver import (  # noqa: E402
+from backend.app.services.policy_section_c_resolver import (  # noqa: E402
     _coerce_countries,
     resolve_effective_benefit,
     resolve_many,

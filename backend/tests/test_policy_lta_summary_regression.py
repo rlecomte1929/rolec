@@ -13,10 +13,10 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_canonical_lta_template import get_canonical_lta_field
-from backend.services.policy_grouped_policy_model import build_grouped_policy_review_view
-from backend.services.policy_normalization import normalize_clauses_to_objects
-from backend.services.policy_summary_row_parser import try_build_clauses_via_summary_rows
+from backend.app.services.policy_canonical_lta_template import get_canonical_lta_field
+from backend.app.services.policy_grouped_policy_model import build_grouped_policy_review_view
+from backend.app.services.policy_normalization import normalize_clauses_to_objects
+from backend.app.services.policy_summary_row_parser import try_build_clauses_via_summary_rows
 from backend.tests.lta_summary_regression_utils import (
     assert_section_refs_not_in_amount_tier_text,
     assert_section_refs_not_in_policy_text_bodies,

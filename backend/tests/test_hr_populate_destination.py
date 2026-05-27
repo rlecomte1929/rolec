@@ -26,7 +26,7 @@ from backend.app.routers.hr_catalog import (  # noqa: E402
     PopulateDestinationBody,
     populate_destination_with_ai,
 )
-from backend.services import (  # noqa: E402
+from backend.app.services import (  # noqa: E402
     catalog_scraper,
     scrape_safety,
     service_catalog,

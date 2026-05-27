@@ -16,8 +16,8 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
-from backend.services.employee_case_person_service import ensure_employee_case_person_for_assignment
+from backend.app.services.assignment_mobility_link_service import ensure_mobility_case_link_for_assignment
+from backend.app.services.employee_case_person_service import ensure_employee_case_person_for_assignment
 
 
 def _seed_company(db: Database, company_id: str) -> None:

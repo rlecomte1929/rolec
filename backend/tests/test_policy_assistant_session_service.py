@@ -9,8 +9,8 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_assistant_classifier import PolicyAssistantClassificationResult
-from backend.services.policy_assistant_contract import (
+from backend.app.services.policy_assistant_classifier import PolicyAssistantClassificationResult
+from backend.app.services.policy_assistant_contract import (
     PolicyAssistantAnswer,
     PolicyAssistantAnswerType,
     PolicyAssistantCanonicalTopic,
@@ -21,9 +21,9 @@ from backend.services.policy_assistant_contract import (
     PolicyAssistantRefusalCode,
     PolicyAssistantRoleScope,
 )
-from backend.services.policy_assistant_answer_engine import ResolvedPolicyContext, generate_policy_assistant_answer
-from backend.services.employee_policy_assistant_service import execute_employee_policy_assistant_query
-from backend.services.policy_assistant_session_service import (
+from backend.app.services.policy_assistant_answer_engine import ResolvedPolicyContext, generate_policy_assistant_answer
+from backend.app.services.employee_policy_assistant_service import execute_employee_policy_assistant_query
+from backend.app.services.policy_assistant_session_service import (
     SESSION_TOPIC_MENU_MARKER,
     PolicyAssistantSessionState,
     apply_bounded_session_memory,

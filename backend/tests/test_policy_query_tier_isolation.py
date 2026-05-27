@@ -36,7 +36,7 @@ if _REPO_ROOT not in sys.path:
 # `answer_company_scoped_policy_query` path requires the LLM client and
 # is covered by other tests; here we focus on the tier-isolation
 # contract specifically.
-from backend.services.policy_query_answering import (  # noqa: E402
+from backend.app.services.policy_query_answering import (  # noqa: E402
     _resolve_caller_tier,
 )
 

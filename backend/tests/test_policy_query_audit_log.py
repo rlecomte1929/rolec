@@ -28,7 +28,7 @@ if _REPO_ROOT not in sys.path:
 # Force the deterministic fallback path — answer() needs no LLM client.
 os.environ.pop("OPENAI_API_KEY", None)
 
-from backend.services.policy_query_answering import (  # noqa: E402
+from backend.app.services.policy_query_answering import (  # noqa: E402
     answer_company_scoped_policy_query,
     _hash_question,
 )

@@ -45,14 +45,14 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_document_intake import (  # noqa: E402
+from backend.app.services.policy_document_intake import (  # noqa: E402
     DOC_TYPE_ASSIGNMENT_POLICY,
     DOC_TYPE_UNKNOWN,
     STATUS_CLASSIFIED,
     STATUS_REVIEW_REQUIRED,
     process_uploaded_document,
 )
-from backend.services.policy_fact_extraction_service import (  # noqa: E402
+from backend.app.services.policy_fact_extraction_service import (  # noqa: E402
     _CURRENCY_RE,
 )
 

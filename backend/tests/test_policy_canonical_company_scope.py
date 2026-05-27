@@ -7,8 +7,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.app.routers import policy_canonical as policy_canonical_router
-from backend.services.policy_query_answering import answer_company_scoped_policy_query
-from backend.services.policy_rendering import render_canonical_policy_markdown
+from backend.app.services.policy_query_answering import answer_company_scoped_policy_query
+from backend.app.services.policy_rendering import render_canonical_policy_markdown
 
 
 class _TenantDb:

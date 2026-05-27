@@ -15,7 +15,7 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.explicit_pending_link_service import (
+from backend.app.services.explicit_pending_link_service import (
     evaluate_pending_explicit_link_eligibility,
     execute_pending_explicit_link,
     PENDING_LINK_COMPANY_MISMATCH,

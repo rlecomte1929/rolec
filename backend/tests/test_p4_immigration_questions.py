@@ -53,9 +53,9 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 from backend.question_bank import QUESTION_BANK, P4_QUESTIONS, get_question_by_id
-from backend.services.wizard_draft_mapper import extract_profile_from_wizard_draft
-from backend.services.immigration_regime import ImmigrationRegimeRouter
-from backend.services.exception_request_service import ExceptionRequestService, ExceptionFlag
+from backend.app.services.wizard_draft_mapper import extract_profile_from_wizard_draft
+from backend.app.services.immigration_regime import ImmigrationRegimeRouter
+from backend.app.services.exception_request_service import ExceptionRequestService, ExceptionFlag
 
 router = ImmigrationRegimeRouter()
 svc = ExceptionRequestService()

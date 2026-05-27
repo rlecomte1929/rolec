@@ -27,16 +27,16 @@ from backend.app.models import (
     ValueType,
 )
 from backend.app.routers import policy_canonical as policy_canonical_router
-from backend.services.policy_canonical_chunking import (
+from backend.app.services.policy_canonical_chunking import (
     build_canonical_chunks_from_elements,
     canonical_chunks_to_assistant_chunks,
 )
-from backend.services.policy_canonical_extraction import (
+from backend.app.services.policy_canonical_extraction import (
     OpenAIPolicyCanonicalExtractor,
     extract_canonical_policy_facts,
     project_canonical_fact_to_legacy_fact,
 )
-from backend.services.policy_canonical_ingestion import ingest_canonical_policy_document
+from backend.app.services.policy_canonical_ingestion import ingest_canonical_policy_document
 
 
 def _minimal_docx_bytes() -> bytes:

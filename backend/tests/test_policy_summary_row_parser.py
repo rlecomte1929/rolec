@@ -9,15 +9,15 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_document_intake import DOC_TYPE_POLICY_SUMMARY
-from backend.services.policy_summary_row_parser import (
+from backend.app.services.policy_document_intake import DOC_TYPE_POLICY_SUMMARY
+from backend.app.services.policy_summary_row_parser import (
     parse_items_into_summary_row_candidates,
     should_use_summary_row_parser,
     summary_row_candidates_to_clause_dicts,
     try_build_clauses_via_summary_rows,
 )
-from backend.services.policy_document_clauses import segment_document_from_raw_text
-from backend.services.policy_normalization import normalize_clauses_to_objects
+from backend.app.services.policy_document_clauses import segment_document_from_raw_text
+from backend.app.services.policy_normalization import normalize_clauses_to_objects
 
 
 def _ctx(**kwargs):

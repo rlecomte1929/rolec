@@ -10,8 +10,8 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_normalization import normalize_clauses_to_objects
-from backend.services.policy_pipeline_diagnostics import (
+from backend.app.services.policy_normalization import normalize_clauses_to_objects
+from backend.app.services.policy_pipeline_diagnostics import (
     build_per_clause_pipeline_table,
     raw_text_diagnostic_flags,
 )

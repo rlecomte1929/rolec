@@ -14,7 +14,7 @@ if _REPO_ROOT not in sys.path:
 
 import backend.database as dbmod
 from backend.database import Database
-from backend.services.admin_assignment_evaluation_trigger import run_evaluation_for_assignment
+from backend.app.services.admin_assignment_evaluation_trigger import run_evaluation_for_assignment
 from backend.tests.test_requirement_evaluation_service import (  # noqa: E402
     MOBILITY_SCHEMA,
     _fk_pragma,

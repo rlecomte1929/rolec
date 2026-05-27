@@ -60,7 +60,7 @@ for _mod in [
     "backend.app.services.roadmap_builder",
     "backend.app.services.trigger_engine",
     "backend.app.services.prefill_engine",
-    "backend.services.supabase_client",
+    "backend.app.services.supabase_client",
 ]:
     if _mod not in sys.modules:
         sys.modules[_mod] = _umock.MagicMock()

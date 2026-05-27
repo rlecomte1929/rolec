@@ -99,7 +99,7 @@ class TestExtractorShortCircuit:
             os.environ["RELOPASS_POLICY_LLM_DISABLED"] = self._saved
 
     def test_extract_returns_empty_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from backend.services.policy_canonical_extraction import (
+        from backend.app.services.policy_canonical_extraction import (
             OpenAIPolicyCanonicalExtractor,
             PolicyFactExtractionLLMInput,
         )
@@ -132,7 +132,7 @@ class TestAnswererShortCircuit:
             os.environ["RELOPASS_POLICY_LLM_DISABLED"] = self._saved
 
     def test_answer_returns_empty_when_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from backend.services.policy_query_answering import CanonicalPolicyQueryLLM
+        from backend.app.services.policy_query_answering import CanonicalPolicyQueryLLM
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         call_count = {"n": 0}
 
@@ -178,7 +178,7 @@ class TestTemperaturePassthrough:
         return fake
 
     def test_extractor_forwards_temperature(self) -> None:
-        from backend.services.policy_canonical_extraction import (
+        from backend.app.services.policy_canonical_extraction import (
             OpenAIPolicyCanonicalExtractor,
             PolicyFactExtractionLLMInput,
         )
@@ -189,7 +189,7 @@ class TestTemperaturePassthrough:
         assert fake.chat.completions.create.call_args.kwargs["temperature"] == 0.3
 
     def test_answerer_forwards_temperature(self) -> None:
-        from backend.services.policy_query_answering import CanonicalPolicyQueryLLM
+        from backend.app.services.policy_query_answering import CanonicalPolicyQueryLLM
         fake = self._fake_client(json_payload="template answer")
         fake.chat.completions.create.return_value.choices[0].message.content = "template"
         llm = CanonicalPolicyQueryLLM(client=fake)

@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 
 from backend.relocation_plan_view_schemas import RelocationPlanViewRole
-from backend.services.relocation_plan_view_service import build_relocation_plan_view_response
+from backend.app.services.relocation_plan_view_service import build_relocation_plan_view_response
 from backend.database import db
 
 

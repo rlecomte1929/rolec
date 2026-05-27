@@ -15,7 +15,7 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services import employee_demand  # noqa: E402
+from backend.app.services import employee_demand  # noqa: E402
 
 
 SCHEMA = """
@@ -125,7 +125,7 @@ class EmployeeDemandTests(unittest.TestCase):
             return []
 
         with mock.patch(
-            "backend.services.vendor_curation.list_curation",
+            "backend.app.services.vendor_curation.list_curation",
             side_effect=fake_list_curation,
         ):
             rows = employee_demand.list_demand_for_company(company)
@@ -154,7 +154,7 @@ class EmployeeDemandTests(unittest.TestCase):
                      "custom_item_json": {"name": "ABC Movers Berlin"}}]
 
         with mock.patch(
-            "backend.services.vendor_curation.list_curation",
+            "backend.app.services.vendor_curation.list_curation",
             side_effect=fake_list_curation,
         ):
             rows = employee_demand.list_demand_for_company(company)
@@ -171,7 +171,7 @@ class EmployeeDemandTests(unittest.TestCase):
             company_id=company, category="schools", destination_city="Tokyo",
         )
         with mock.patch(
-            "backend.services.vendor_curation.list_curation",
+            "backend.app.services.vendor_curation.list_curation",
             side_effect=RuntimeError("table not found"),
         ):
             rows = employee_demand.list_demand_for_company(company)

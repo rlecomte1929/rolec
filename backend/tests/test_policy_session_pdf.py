@@ -42,7 +42,7 @@ pytestmark = pytest.mark.skipif(
 # Tests
 # ---------------------------------------------------------------------------
 
-from backend.services.policy_session_pdf import build_policy_session_pdf  # noqa: E402
+from backend.app.services.policy_session_pdf import build_policy_session_pdf  # noqa: E402
 
 
 class TestBuildPolicySessionPdf:

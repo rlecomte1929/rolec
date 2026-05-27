@@ -27,7 +27,7 @@ from backend.relocation_plan_view_schemas import (  # noqa: E402
     RelocationPlanViewRole,
 )
 from backend.schemas import UserRole  # noqa: E402
-from backend.services.relocation_plan_view_service import build_relocation_plan_view_response  # noqa: E402
+from backend.app.services.relocation_plan_view_service import build_relocation_plan_view_response  # noqa: E402
 
 def _mt_row(
     milestone_type: str,

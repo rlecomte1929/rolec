@@ -25,10 +25,10 @@ if _REPO_ROOT not in sys.path:
 
 from backend.dev_seed_auth import ensure_dev_seed_auth_user  # noqa: E402
 from backend.main import app, db  # noqa: E402
-from backend.services.policy_comparison_readiness import (  # noqa: E402
+from backend.app.services.policy_comparison_readiness import (  # noqa: E402
     invalidate_comparison_readiness_cache,
 )
-from backend.services.policy_rule_comparison_readiness import (  # noqa: E402
+from backend.app.services.policy_rule_comparison_readiness import (  # noqa: E402
     evaluate_rule_comparison_readiness,
 )
 from backend.tests.fixtures.policy_processing_e2e_fixtures import (  # noqa: E402

@@ -9,11 +9,11 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_hr_grouped_review import build_grouped_hr_review
-from backend.services.policy_grouped_policy_model import build_grouped_policy_review_view
-from backend.services.policy_normalization import normalize_clauses_to_objects
-from backend.services.policy_summary_row_parser import PolicyRowCandidate, summary_row_candidates_to_clause_dicts
-from backend.services.policy_template_first_import import build_template_first_import_payload
+from backend.app.services.policy_hr_grouped_review import build_grouped_hr_review
+from backend.app.services.policy_grouped_policy_model import build_grouped_policy_review_view
+from backend.app.services.policy_normalization import normalize_clauses_to_objects
+from backend.app.services.policy_summary_row_parser import PolicyRowCandidate, summary_row_candidates_to_clause_dicts
+from backend.app.services.policy_template_first_import import build_template_first_import_payload
 from backend.tests.test_policy_grouped_policy_model import _clause, _draft
 
 

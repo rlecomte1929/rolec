@@ -10,8 +10,8 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_document_clauses import extract_lines_with_pages
-from backend.services.policy_structural_parse import (
+from backend.app.services.policy_document_clauses import extract_lines_with_pages
+from backend.app.services.policy_structural_parse import (
     StructuralParseBackend,
     parse_policy_document_to_elements,
 )

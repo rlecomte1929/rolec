@@ -9,15 +9,15 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_document_intake import DOC_TYPE_POLICY_SUMMARY, SCOPE_LONG_TERM
-from backend.services.policy_processing_readiness import (
+from backend.app.services.policy_document_intake import DOC_TYPE_POLICY_SUMMARY, SCOPE_LONG_TERM
+from backend.app.services.policy_processing_readiness import (
     NO_CLAUSE_CANDIDATES,
     READY_FOR_COMPARISON,
     READY_FOR_PUBLISH,
     build_processing_readiness_envelope,
     evaluate_stored_policy_readiness,
 )
-from backend.services.policy_normalization_validate import (
+from backend.app.services.policy_normalization_validate import (
     NormalizationReadinessResult,
     evaluate_normalization_readiness,
 )

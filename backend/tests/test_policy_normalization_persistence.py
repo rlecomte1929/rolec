@@ -14,15 +14,15 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_document_intake import DOC_TYPE_POLICY_SUMMARY, SCOPE_LONG_TERM
-from backend.services.policy_normalization import run_normalization
-from backend.services.policy_normalization_errors import PolicyNormalizationPayloadInvalid
-from backend.services.policy_normalization_states import (
+from backend.app.services.policy_document_intake import DOC_TYPE_POLICY_SUMMARY, SCOPE_LONG_TERM
+from backend.app.services.policy_normalization import run_normalization
+from backend.app.services.policy_normalization_errors import PolicyNormalizationPayloadInvalid
+from backend.app.services.policy_normalization_states import (
     NORMALIZATION_STATE_COMPLETE,
     NORMALIZATION_STATE_DRAFT,
     NORMALIZATION_STATE_IN_PROGRESS,
 )
-from backend.services.policy_publish_gate import (
+from backend.app.services.policy_publish_gate import (
     PUBLISH_BLOCKED_NORMALIZATION_INCOMPLETE,
     PUBLISH_BLOCKED_SOURCE_DOCUMENT_FAILED,
     evaluate_employee_publish_blockers,

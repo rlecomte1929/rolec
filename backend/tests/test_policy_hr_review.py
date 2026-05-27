@@ -11,9 +11,9 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from backend.services.policy_document_intake import DOC_TYPE_POLICY_SUMMARY, SCOPE_LONG_TERM
-from backend.services.policy_hr_review_service import build_hr_policy_review_payload
-from backend.services.policy_hr_review_serializer import (
+from backend.app.services.policy_document_intake import DOC_TYPE_POLICY_SUMMARY, SCOPE_LONG_TERM
+from backend.app.services.policy_hr_review_service import build_hr_policy_review_payload
+from backend.app.services.policy_hr_review_serializer import (
     HR_POLICY_REVIEW_SCHEMA_VERSION,
     serialize_hr_policy_review_payload,
 )

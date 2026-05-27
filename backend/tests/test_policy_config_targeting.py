@@ -16,7 +16,7 @@ from backend.schemas_compensation_allowance import (
     PolicyConfigUnitFrequency,
     PolicyConfigValueType,
 )
-from backend.services.policy_config_targeting import (
+from backend.app.services.policy_config_targeting import (
     normalize_assignment_type,
     normalize_family_status,
     row_matches_targeting,
