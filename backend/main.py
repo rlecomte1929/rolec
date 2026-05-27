@@ -3408,6 +3408,13 @@ def list_cases(
 
 @app.post("/api/hr/cases", response_model=CreateCaseResponse)
 def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
+    """
+    Create a relocation_cases row owned by the calling HR user.
+
+    B24-REGRESSION: company lookup + DB insert are wrapped so any DB-layer
+    error returns a logged 502 instead of an opaque 500 (T14_CREATE E2E
+    persona scenario).
+    """
     _deny_if_impersonating(user)
     effective = _effective_user(user, UserRole.HR)
     company_id = _get_hr_company_id(effective)
@@ -3419,11 +3426,25 @@ def create_case(user: Dict[str, Any] = Depends(require_role(UserRole.HR))):
     case_id = str(uuid.uuid4())
     profile = RelocationProfile(userId=effective["id"]).model_dump()
     # Resolve company name from DB so employer.name is never hardcoded or null
-    company = db.get_company(company_id)
+    try:
+        company = db.get_company(company_id)
+    except Exception:
+        log.exception("create_case: get_company failed company_id=%s", company_id)
+        company = None
     company_name = (company or {}).get("name")
     if company_name:
         profile["primaryApplicant"]["employer"]["name"] = company_name
-    db.create_case(case_id, effective["id"], profile, company_id=company_id)
+    try:
+        db.create_case(case_id, effective["id"], profile, company_id=company_id)
+    except Exception:
+        log.exception(
+            "create_case: db.create_case failed hr_user_id=%s company_id=%s",
+            effective.get("id"), company_id,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to create case. Please retry.",
+        )
     return CreateCaseResponse(caseId=case_id)
 
 

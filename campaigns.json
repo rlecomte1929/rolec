@@ -1,0 +1,18 @@
+[
+  {
+    "id": 3,
+    "label": "C3",
+    "date": "2026-05-27",
+    "run_by": "auto",
+    "results_file": "results/test_results_2026-05-26T22-30.json",
+    "report_file": "results/campaign_report_2026-05-27.json",
+    "overall_score": 97,
+    "health_band": "GREEN",
+    "delta": 0,
+    "regressions": 0,
+    "fixed": 0,
+    "new_failures": 0,
+    "notion_synced": false,
+    "notes": "Post-sprint campaign. No regressions. 2 previously-skipped tests now covered. Platform stable at 97%."
+  }
+]

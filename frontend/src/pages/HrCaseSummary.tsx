@@ -23,6 +23,8 @@ import { CaseOperationalSection } from '../features/cases/CaseOperationalSection
 import { deriveCaseEssentials } from '../features/cases/caseEssentials';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
 import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptionsPanel';
+import { CaseVendorsPanel } from '../components/case/CaseVendorsPanel';
+import { CaseBudgetPanel } from '../components/case/CaseBudgetPanel';
 
 const statusBadge = (status?: AssignmentStatus) => {
   if (!status) return <Badge variant="neutral">Unknown</Badge>;
@@ -362,6 +364,32 @@ export const HrCaseSummary: React.FC = () => {
               fell back to Singapore). The destination-template feature
               comes back as part of step 2 once per-country templates
               exist for more than one destination. */}
+
+          {/* ── T11 Vendor Display + T12 Budget View (MVP-7) ─────────────── */}
+          {assignment.caseId && (
+            <section id="op-step-vendors-budget" className="scroll-mt-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-4 mb-3">
+                <div
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0b2b43] text-sm font-bold text-white shadow-sm"
+                  aria-hidden
+                >
+                  4
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-[#0b2b43]">
+                    Suppliers &amp; budget
+                  </h2>
+                  <p className="text-xs text-[#64748b] mt-0.5 max-w-3xl leading-relaxed">
+                    Vendors assigned to this case and the estimated cost breakdown in EUR.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <CaseVendorsPanel caseId={assignment.caseId} />
+                <CaseBudgetPanel caseId={assignment.caseId} />
+              </div>
+            </section>
+          )}
 
           {canReopen && isReopenOpen && (
             <Card padding="lg">
