@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { createAIDecision } from '../../api/aiDecisions';
 import type { AIDecisionAction, AIDecisionRecord } from '../../api/aiDecisions';
 
@@ -144,7 +145,7 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
             {submitted.reason && (
               <p className="text-xs text-slate-500 italic mt-1">Reason: "{submitted.reason}"</p>
             )}
-            <div className="mt-1 flex items-center gap-3">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
               <p className="text-[11px] text-slate-400">Logged for human oversight audit · EU AI Act Art. 14</p>
               <button
                 type="button"
@@ -153,6 +154,12 @@ export const AIRecommendationCard: React.FC<AIRecommendationCardProps> = ({
               >
                 Change decision
               </button>
+              <Link
+                to={`/hr/ai-decisions?recommendation_id=${encodeURIComponent(recommendationId)}`}
+                className="text-[11px] font-medium text-violet-600 hover:text-violet-800 underline-offset-2 hover:underline"
+              >
+                View in audit
+              </Link>
             </div>
           </div>
         </div>
