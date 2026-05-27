@@ -13,6 +13,11 @@ from .routers import (
     hr_catalog,
     hr_coordination,
     immigration,
+    immigration_gdpr,
+    immigration_intake_consent,
+    immigration_intake_interview,
+    immigration_intake_profile,
+    immigration_status,
     marketplace,
     mobility_context,
     pets,
@@ -68,7 +73,13 @@ def create_app() -> FastAPI:
     app.include_router(hr_analytics.router)
 
     # ── Month-1 migration: Employee cluster ───────────────────────────────────
-    app.include_router(immigration.router)
+    # [AUDIT-B9-imm-6] immigration.router replaced by 5 modular sub-routers.
+    # Original immigration.py is retained but its router is no longer wired.
+    app.include_router(immigration_intake_consent.router)
+    app.include_router(immigration_intake_profile.router)
+    app.include_router(immigration_intake_interview.router)
+    app.include_router(immigration_status.router)
+    app.include_router(immigration_gdpr.router)
     app.include_router(exception_requests.router)
     app.include_router(relocation_profile.router)
     app.include_router(marketplace.router)
