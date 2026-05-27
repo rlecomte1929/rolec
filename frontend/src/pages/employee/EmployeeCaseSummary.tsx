@@ -142,11 +142,7 @@ export const EmployeeCaseSummary: React.FC = () => {
             setWizardNavLoading(true);
             try {
               await new Promise((r) => setTimeout(r, 120));
-              if (assignmentId) {
-                navigate(`/employee/case/${assignmentId}/wizard/1`);
-              } else {
-                navigate('/employee/journey');
-              }
+              navigate(buildRoute('employeeIntake'));
             } finally {
               setWizardNavLoading(false);
             }
@@ -306,10 +302,10 @@ export const EmployeeCaseSummary: React.FC = () => {
           primaryHref={
             hasAnyData
               ? planHref
-              : `/employee/case/${assignmentId}/wizard/1`
+              : buildRoute('employeeIntake')
           }
           secondaryLabel={hasAnyData ? 'Continue editing intake' : undefined}
-          secondaryHref={hasAnyData ? `/employee/case/${assignmentId}/wizard/1` : undefined}
+          secondaryHref={hasAnyData ? buildRoute('employeeIntake') : undefined}
         />
       )}
     </AppShell>

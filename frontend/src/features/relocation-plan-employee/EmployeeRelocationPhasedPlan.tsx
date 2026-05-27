@@ -15,7 +15,7 @@ export interface EmployeeRelocationPhasedPlanProps {
 export const EmployeeRelocationPhasedPlan: React.FC<EmployeeRelocationPhasedPlanProps> = ({
   routeCaseId,
 }) => {
-  const { data, loading, error, refetch, ensureDefaultsAndReload } =
+  const { data, loading, error, ensureDefaultsAndReload } =
     useEmployeeRelocationPlanPageData(routeCaseId);
   const runCta = useRelocationPlanCtaHandler(routeCaseId, { resourceCaseId: data?.case_id });
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({});
@@ -56,13 +56,16 @@ export const EmployeeRelocationPhasedPlan: React.FC<EmployeeRelocationPhasedPlan
     return (
       <main aria-label="Relocation plan" className="min-w-0">
         <RelocationPlanPageHeader backToSummaryHref={backToSummaryHref} />
-        <Card padding="lg" className="border-red-200 bg-red-50/50">
-          <p className="text-sm text-[#7a2a2a]" role="alert">
-            {error}
-          </p>
-          <Button variant="outline" size="sm" className="mt-3" onClick={() => void refetch()}>
-            Try again
-          </Button>
+        <Card padding="lg" className="border-slate-200 bg-slate-50/50">
+          <div className="flex flex-col items-center py-8 text-center">
+            <svg className="h-10 w-10 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p className="text-sm font-medium text-slate-700">Your plan is being prepared</p>
+            <p className="mt-1 text-xs text-slate-400 max-w-xs">
+              Your relocation plan will appear here once your HR team has set up your roadmap.
+            </p>
+          </div>
         </Card>
       </main>
     );

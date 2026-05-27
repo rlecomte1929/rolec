@@ -32,7 +32,7 @@ import { getLastVisited } from '../utils/employeeCaseProgress';
  */
 function openCaseHref(assignmentId: string, status?: string | null): string {
   if (status === 'awaiting_intake' || status === 'assigned') {
-    return `/employee/case/${assignmentId}/wizard/1`;
+    return buildRoute('employeeIntake');
   }
   return getLastVisited(assignmentId) || `/employee/case/${assignmentId}/summary`;
 }

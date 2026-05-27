@@ -1062,7 +1062,7 @@ def list_case_forms(
         FROM {_pg_table('case_forms')} cf
         JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
-        LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = cf.person_id
+        LEFT JOIN {_pg_table('profiles')} p ON p.id = cf.person_id
         WHERE cf.case_id = :case_id{where_status}
         ORDER BY
           -- Forms with an unresolved blocker (UI-blocked) come first so the
@@ -1745,7 +1745,7 @@ def _fetch_single_form_summary(case_id: str, form_id: str) -> CaseFormSummary:
         FROM {_pg_table('case_forms')} cf
         JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
-        LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = cf.person_id
+        LEFT JOIN {_pg_table('profiles')} p ON p.id = cf.person_id
         WHERE cf.id = :form_id AND cf.case_id = :case_id
     """
     try:

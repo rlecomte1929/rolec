@@ -88,7 +88,17 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   if (error) {
     return (
       <AppShell>
-        <div style={{ padding: '24px', color: 'var(--danger)' }}>{error}</div>
+        <div className="px-6 py-8 max-w-xl mx-auto">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 px-6 py-10 text-center">
+            <svg className="mx-auto h-10 w-10 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            </svg>
+            <p className="text-sm font-medium text-slate-700">Your roadmap is being set up</p>
+            <p className="mt-1 text-xs text-slate-400 max-w-xs mx-auto">
+              Your relocation roadmap will appear here once your HR team has configured the milestones for this assignment.
+            </p>
+          </div>
+        </div>
       </AppShell>
     );
   }
