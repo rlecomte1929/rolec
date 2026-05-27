@@ -11,6 +11,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  actionlint:
+    # Catches workflow YAML errors (bad `uses:` refs, secrets.* in job-level
+    # `if:`, broken matrix syntax, etc.) on PRs — before they reach main and
+    # cause the 0-second "workflow file issue" parse failure that blocks every
+    # subsequent push. Background: PR #134.
+    name: Actionlint (workflow YAML)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        uses: raven-actions/actionlint@v2
+        with:
+          files: ".github/workflows/*.yml"
+
   frontend-build:
     name: Frontend build
     runs-on: ubuntu-latest
