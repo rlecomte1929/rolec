@@ -323,22 +323,48 @@ def submit_destination_request(
     Deduplication: if a pending request already exists for the same
     (city, country, company), the existing ticket is returned instead of
     creating a duplicate.
+
+    B24-REGRESSION: profile-lookup and the scrape_safety insert are wrapped so
+    a transient DB error produces a logged traceback + 502 instead of an opaque
+    500 (T6/T15/T16 E2E persona scenarios).
     """
     from ..services import scrape_safety
 
-    profile = db.get_profile_record(user.get("id"))
+    user_id = user.get("id")
+    try:
+        profile = db.get_profile_record(user_id)
+    except Exception:
+        logger.exception("destination-request: profile lookup failed user_id=%s", user_id)
+        raise HTTPException(
+            status_code=502,
+            detail="Profile lookup failed while creating destination request.",
+        )
+
     company_id = (profile or {}).get("company_id") or user.get("company")
     if not company_id:
         raise HTTPException(status_code=403, detail="No company linked to this account.")
 
-    ticket = scrape_safety.open_destination_request(
-        city=body.city,
-        country=body.country,
-        category="Relocation destination",
-        requested_by_user_id=str(user["id"]),
-        company_id=str(company_id),
-        notes=body.notes,
-    )
+    try:
+        ticket = scrape_safety.open_destination_request(
+            city=body.city,
+            country=body.country,
+            category="Relocation destination",
+            requested_by_user_id=str(user_id),
+            company_id=str(company_id),
+            notes=body.notes,
+        )
+    except ValueError as ve:
+        # open_destination_request raises ValueError on bad input
+        raise HTTPException(status_code=422, detail=str(ve))
+    except Exception:
+        logger.exception(
+            "destination-request: open_destination_request failed user_id=%s city=%s country=%s",
+            user_id, body.city, body.country,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to record destination request.",
+        )
     return ticket
 
 
