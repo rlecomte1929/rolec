@@ -20,6 +20,7 @@ import { CaseTimeline } from '../features/timeline/CaseTimeline';
 import { CaseEssentialsCard } from '../features/cases/CaseEssentialsCard';
 import { ReadinessAndActionsBlock } from '../features/cases/ReadinessAndActionsBlock';
 import { CaseOperationalSection } from '../features/cases/CaseOperationalSection';
+import { AIRecommendationCard } from '../features/ai-oversight/AIRecommendationCard';
 import { deriveCaseEssentials } from '../features/cases/caseEssentials';
 import { ExceptionFlagsPanel } from '../components/case/ExceptionFlagsPanel';
 import { AssignmentExceptionsPanel } from '../components/case/AssignmentExceptionsPanel';
@@ -336,6 +337,45 @@ export const HrCaseSummary: React.FC = () => {
             title="Readiness & actions"
             subtitle="What is missing, what needs review, and suggested moves. Intake gaps link to concrete plan tasks in step 3 (owner + due date). Human-review labels preserve when official verification is not available."
           >
+            {/* AI-004: EU AI Act Art. 14 oversight wrapper on the AI-generated
+                readiness assessment. The card renders only while the assessment
+                is non-trivially load-bearing (overall_status != 'ready') and
+                forces HR to record an accept / override / reject on the AI's
+                verdict before the detailed actions below it. */}
+            {assignment.caseReadinessUi && assignment.caseReadinessUi.overall_status !== 'ready' && (
+              <div className="mb-4">
+                <AIRecommendationCard
+                  recommendationId={`case_readiness_v1:${assignment.id}`}
+                  feature="case_readiness"
+                  title="AI case readiness assessment"
+                  confidence={
+                    assignment.caseReadinessUi.intake_total > 0
+                      ? assignment.caseReadinessUi.intake_satisfied / assignment.caseReadinessUi.intake_total
+                      : undefined
+                  }
+                  rationale={
+                    <>
+                      <strong>{assignment.caseReadinessUi.overall_label}</strong>
+                      {' — '}
+                      {assignment.caseReadinessUi.completion_basis}
+                    </>
+                  }
+                  aiOutput={{
+                    assignment_id: assignment.id,
+                    overall_status: assignment.caseReadinessUi.overall_status,
+                    overall_label: assignment.caseReadinessUi.overall_label,
+                    completion_basis: assignment.caseReadinessUi.completion_basis,
+                    intake_satisfied: assignment.caseReadinessUi.intake_satisfied,
+                    intake_total: assignment.caseReadinessUi.intake_total,
+                    checklist_satisfied: assignment.caseReadinessUi.checklist_satisfied ?? null,
+                    checklist_total: assignment.caseReadinessUi.checklist_total ?? null,
+                    blocking_items_count: assignment.caseReadinessUi.blocking_items?.length ?? 0,
+                    next_actions_count: assignment.caseReadinessUi.next_actions?.length ?? 0,
+                    source_version: 'case_readiness_v1',
+                  }}
+                />
+              </div>
+            )}
             <ReadinessAndActionsBlock assignment={assignment} embedInOperationalFlow />
           </CaseOperationalSection>
 
