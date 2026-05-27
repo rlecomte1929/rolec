@@ -449,16 +449,16 @@ def get_case_roadmap_tracks(
               rt.icon           AS track_icon,
               rt.sort_order     AS track_sort_order,
               rt.completion_pct AS progress_pct,
-              rs.id          AS step_id,
-              rs.title       AS step_title,
-              rs.description AS step_description,
-              rs.status      AS step_status,
-              rs.owner       AS step_owner,
-              rs.due_date    AS step_due_date,
-              rs.sort_order  AS step_sort_order,
-              rs.ai_suggestion,
-              rs.dependency_ids,
-              rs.vendor_id,
+              rs.id                          AS step_id,
+              rs.title                       AS step_title,
+              rs.description                 AS step_description,
+              rs.status                      AS step_status,
+              rs.owner_type                  AS step_owner,
+              rs.due_date                    AS step_due_date,
+              rs.sort_order                  AS step_sort_order,
+              NULL::text                     AS ai_suggestion,
+              ARRAY[]::text[]                AS dependency_ids,
+              NULL::uuid                     AS vendor_id,
               COUNT(cf.id) AS doc_count,
               CASE
                 WHEN COUNT(cf.id) = 0 THEN NULL
@@ -480,9 +480,8 @@ def get_case_roadmap_tracks(
               ON cf.roadmap_step_id = rs.id AND cf.case_id = :case_id
             WHERE rt.case_id = :case_id
             GROUP BY rt.id, rt.name, rt.icon, rt.sort_order, rt.completion_pct,
-                     rs.id, rs.title, rs.description, rs.status, rs.owner,
-                     rs.due_date, rs.sort_order, rs.ai_suggestion,
-                     rs.dependency_ids, rs.vendor_id
+                     rs.id, rs.title, rs.description, rs.status, rs.owner_type,
+                     rs.due_date, rs.sort_order
             ORDER BY rt.sort_order, rs.sort_order
         """
         rows = conn.execute(_sql_text(sql), {"case_id": tracks_case_id}).mappings().all()
