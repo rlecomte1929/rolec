@@ -29,12 +29,7 @@ from .recommendations.admin_debug import router as admin_recommendations_debug_r
 from ..routes import relocation as relocation_routes
 from ..routes import relocation_classify as relocation_classify_routes
 from .seed import seed_demo_cases
-<<<<<<< feat/migration-month1
-# TODO [AUDIT-A9.3]: change to `.services.pii_log_filter` once A9.3 lands on this branch
-from ..services.pii_log_filter import install_pii_log_filter  # noqa: E402
-=======
 from .services.pii_log_filter import install_pii_log_filter
->>>>>>> main
 
 
 def create_app() -> FastAPI:
