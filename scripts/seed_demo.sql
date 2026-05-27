@@ -239,7 +239,74 @@ ON CONFLICT (id) DO UPDATE SET
 
 
 -- =============================================================================
--- 7. BACKEND USERS  (public.users — the ReloPass backend auth table)
+-- 7. BACKEND RELOCATION_CASES  (backend's own case table, queried by GET /api/hr/cases)
+-- This table is separate from public.cases — the HR dashboard reads from here.
+-- profile_json encodes the RelocationProfile (primaryApplicant, locations, visa type).
+-- =============================================================================
+INSERT INTO relocation_cases (id, hr_user_id, profile_json, company_id, employee_id, status, stage, home_country, host_country, created_at, updated_at)
+VALUES
+  (
+    '5b16522e-e899-4db2-bc8d-95af00af8c79',
+    'd0e00010-0000-4000-8000-000000000010',
+    '{"primaryApplicant":{"firstName":"Adrien","lastName":"Martin","email":"adrien.martin@globaltech-demo.com","nationality":"FR","employer":{"name":"GlobalTech SAS"}},"currentLocation":{"country":"FR","city":"Lyon"},"destinationLocation":{"country":"DE","city":"Berlin"},"moveType":"work","visaType":"eu_blue_card","targetMoveDate":"2026-09-01","budgetCap":22400}',
+    'd0e00001-0000-4000-8000-000000000001',
+    'd0e00100-0000-4000-8000-000000000100',
+    'active', 'in_progress', 'FR', 'DE',
+    NOW()::text, NOW()::text
+  ),
+  (
+    '1cbc563e-b984-44b5-adb3-74912d79a84d',
+    'd0e00020-0000-4000-8000-000000000020',
+    '{"primaryApplicant":{"firstName":"Celine","lastName":"Dupont","email":"celine.dupont@meridian-demo.com","nationality":"FR","employer":{"name":"Meridian Capital"}},"currentLocation":{"country":"FR","city":"Paris"},"destinationLocation":{"country":"GB","city":"London"},"moveType":"work","visaType":"work_permit","targetMoveDate":"2026-10-15","budgetCap":38000}',
+    'd0e00002-0000-4000-8000-000000000002',
+    'd0e00200-0000-4000-8000-000000000200',
+    'active', 'in_progress', 'FR', 'GB',
+    NOW()::text, NOW()::text
+  ),
+  (
+    '65d7aea8-bc11-413a-8d28-8b9818190a2a',
+    'd0e00030-0000-4000-8000-000000000030',
+    '{"primaryApplicant":{"firstName":"Carlos","lastName":"Rivera","email":"carlos.rivera@nexora-demo.com","nationality":"ES","employer":{"name":"Nexora Labs"}},"currentLocation":{"country":"ES","city":"Barcelona"},"destinationLocation":{"country":"NL","city":"Amsterdam"},"moveType":"work","visaType":"eea_registration","targetMoveDate":"2026-08-01","budgetCap":19500}',
+    'd0e00003-0000-4000-8000-000000000003',
+    'd0e00300-0000-4000-8000-000000000300',
+    'active', 'dossier', 'ES', 'NL',
+    NOW()::text, NOW()::text
+  )
+ON CONFLICT (id) DO UPDATE SET
+  company_id   = EXCLUDED.company_id,
+  employee_id  = EXCLUDED.employee_id,
+  status       = EXCLUDED.status,
+  stage        = EXCLUDED.stage,
+  home_country = EXCLUDED.home_country,
+  host_country = EXCLUDED.host_country,
+  updated_at   = EXCLUDED.updated_at;
+
+
+-- =============================================================================
+-- 8. BACKEND CASE_ASSIGNMENTS  (backend's own assignments table)
+-- Links HR user to case for the employee portal assignment flow.
+-- =============================================================================
+INSERT INTO case_assignments (id, case_id, canonical_case_id, hr_user_id, employee_user_id, employee_identifier, status, employee_first_name, employee_last_name, created_at, updated_at)
+VALUES
+  ('demo-bca-001', '5b16522e-e899-4db2-bc8d-95af00af8c79', '5b16522e-e899-4db2-bc8d-95af00af8c79',
+   'd0e00010-0000-4000-8000-000000000010', 'd0e00100-0000-4000-8000-000000000100',
+   'adrien.martin@globaltech-demo.com', 'approved', 'Adrien', 'Martin',
+   NOW()::text, NOW()::text),
+  ('demo-bca-002', '1cbc563e-b984-44b5-adb3-74912d79a84d', '1cbc563e-b984-44b5-adb3-74912d79a84d',
+   'd0e00020-0000-4000-8000-000000000020', 'd0e00200-0000-4000-8000-000000000200',
+   'celine.dupont@meridian-demo.com', 'submitted', 'Celine', 'Dupont',
+   NOW()::text, NOW()::text),
+  ('demo-bca-003', '65d7aea8-bc11-413a-8d28-8b9818190a2a', '65d7aea8-bc11-413a-8d28-8b9818190a2a',
+   'd0e00030-0000-4000-8000-000000000030', 'd0e00300-0000-4000-8000-000000000300',
+   'carlos.rivera@nexora-demo.com', 'assigned', 'Carlos', 'Rivera',
+   NOW()::text, NOW()::text)
+ON CONFLICT (id) DO UPDATE SET
+  status     = EXCLUDED.status,
+  updated_at = EXCLUDED.updated_at;
+
+
+-- =============================================================================
+-- 9. BACKEND USERS  (public.users — the ReloPass backend auth table)
 -- pbkdf2_sha256 hash of "Demo2026!" — regenerate with:
 --   python3 -c "from passlib.context import CryptContext; ctx = CryptContext(schemes=['pbkdf2_sha256']); print(ctx.hash('Demo2026!'))"
 -- Roles MUST be uppercase to match backend/schemas.py UserRole enum (HR, EMPLOYEE, ADMIN).
