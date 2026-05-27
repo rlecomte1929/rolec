@@ -5,6 +5,7 @@ import { NavIcon } from '../features/platform-v2/sidebar/navIcons';
 import { ROUTE_DEFS, buildRoute } from '../navigation/routes';
 import { getHrNotificationCounts, type HrNotificationCounts } from '../api/hrCatalog';
 import { getAdminNotificationCounts, type AdminNotificationCounts } from '../api/adminCatalog';
+import { useSelectedCase } from '../contexts/SelectedCaseContext';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -230,13 +231,18 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
   // e.g. /employee/case/43556892-2f33-4ab1-8533-9c11095e5565/wizard/1 → caseId
   const urlCaseId = location.pathname.match(/\/employee\/case\/([^/]+)/)?.[1] ?? null;
 
+  // Fall back to the last-known caseId (from SelectedCaseContext / localStorage)
+  // so sidebar links work even from /employee/dashboard where there is no case in the URL.
+  const { selectedCaseId } = useSelectedCase();
+  const effectiveCaseId = urlCaseId ?? selectedCaseId;
+
   // Resolve the effective `to` for an item, allowing case-scoped overrides
   const resolveItemTo = (item: SectionItem): string => {
-    if (item.id === 'roadmap' && urlCaseId) {
-      return buildRoute('employeeCaseRoadmap', { caseId: urlCaseId });
+    if (item.id === 'roadmap' && effectiveCaseId) {
+      return buildRoute('employeeCaseRoadmap', { caseId: effectiveCaseId });
     }
-    if (item.id === 'dossier' && urlCaseId) {
-      return buildRoute('employeeCaseDossier', { caseId: urlCaseId });
+    if (item.id === 'dossier' && effectiveCaseId) {
+      return buildRoute('employeeCaseDossier', { caseId: effectiveCaseId });
     }
     return item.toByRole?.[role] ?? item.to;
   };
