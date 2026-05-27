@@ -36,7 +36,7 @@ from pydantic import BaseModel
 from sqlalchemy import text as _sql_text
 
 from .. import crud, schemas
-from ..auth_deps import get_current_user
+from ..auth_deps import get_current_user, require_case_access
 from ..db import SessionLocal
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
@@ -903,12 +903,21 @@ def get_case_roadmap_tracks(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/{case_id}/research/status")
-def get_research_status(case_id: str):
+def get_research_status(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     """
     GAP 9: Poll-based research progress for the S2 discovery log.
     Returns {status, progress_pct, events[{ts, msg}]}.
     Client polls every 2s; no SSE infrastructure required.
+
+    SEC fix (GAP-9): require an authenticated session and case-level access.
+    Employees can poll only their own cases; HR / admins can poll any case in
+    their company. Previously this endpoint was unauthenticated and any
+    case_id known to the caller leaked the discovery event log.
     """
+    require_case_access(case_id, user)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
