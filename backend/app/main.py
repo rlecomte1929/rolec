@@ -6,6 +6,7 @@ from .routers import (
     ab_tests,
     admin,
     advisors,
+    ai_decisions,
     cases,
     employee_quotes,
     exception_requests,
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(relocation_profile.router)
     app.include_router(marketplace.router)
     app.include_router(advisors.router)
+    app.include_router(ai_decisions.router)
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(relocation_routes.router)
