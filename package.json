@@ -6,7 +6,8 @@
     "build": "npm --prefix frontend ci && npm --prefix frontend run build",
     "dev": "npm --prefix frontend run dev",
     "preview": "npm --prefix frontend run preview",
-    "verify-build": "bash scripts/verify-build.sh"
+    "verify-build": "bash scripts/verify-build.sh",
+    "seed:demo": "bash scripts/reset_demo.sh"
   },
   "engines": {
     "node": ">=20.18.1"
