@@ -35,6 +35,10 @@ from ..services.audit_log_service import (
     ACTOR_HUMAN,
     insert_audit_log,
 )
+from ..services.precedent_insight_service import (
+    compute_precedent_insight,
+    insight_recommendation_id,
+)
 
 router = APIRouter(tags=["exception_requests"])
 logger = logging.getLogger(__name__)
@@ -67,6 +71,18 @@ class ExceptionRequestPatch(BaseModel):
     ai_insight: Optional[str] = Field(None, max_length=2000)
 
 
+class PrecedentInsight(BaseModel):
+    """Structured precedent insight (AI-005). See precedent_insight_service.py."""
+    rationale: str
+    confidence: float
+    historical_approval_rate: float
+    sample_size: int
+    similar_case_ids: List[str]
+    generated_at: str
+    source_version: str
+    recommendation_id: str  # for ai_decisions correlation
+
+
 class ExceptionRequestRead(BaseModel):
     id: str
     case_id: str
@@ -84,6 +100,9 @@ class ExceptionRequestRead(BaseModel):
     current_value: Optional[Dict[str, Any]] = None
     requested_value: Optional[Dict[str, Any]] = None
     ai_insight: Optional[str] = None
+    # AI-005: structured precedent payload (replaces the plain `ai_insight` string
+    # for new callers; old callers can keep reading `ai_insight` for back-compat).
+    precedent_insight: Optional[PrecedentInsight] = None
     audit_events: Optional[List[Dict[str, Any]]] = None
     requested_by_user_id: str
     resolved_by_user_id: Optional[str]
@@ -119,6 +138,29 @@ def _row_to_dict(row: Any) -> Dict[str, Any]:
             except Exception:
                 d[k] = str(v)
     return d
+
+
+def _attach_precedent_insight(conn, row: Dict[str, Any]) -> Dict[str, Any]:
+    """Compute and attach a structured precedent insight (AI-005) to a row.
+    Only pending rows get insights — decided rows are already resolved, so the
+    insight is no longer load-bearing for an oversight decision. Failures are
+    swallowed so the audit pipeline never breaks the user-facing request.
+    """
+    if row.get("status") != "pending":
+        return row
+    try:
+        insight = compute_precedent_insight(
+            conn,
+            category=str(row.get("category") or ""),
+            benefit_key=row.get("benefit_key"),
+            organization_id=str(row.get("organization_id") or ""),
+            exclude_request_id=str(row.get("id") or ""),
+        )
+        insight["recommendation_id"] = insight_recommendation_id(str(row["id"]))
+        row["precedent_insight"] = insight
+    except Exception:
+        logger.exception("precedent_insight compute failed for id=%s", row.get("id"))
+    return row
 
 
 def _audit(
@@ -247,7 +289,35 @@ def list_exception_requests_for_case(
             ),
             {"case_id": case_id, "org": organization_id},
         ).mappings().all()
-    return [_row_to_dict(r) for r in rows]
+        dicts = [_attach_precedent_insight(conn, _row_to_dict(r)) for r in rows]
+    return dicts
+
+
+@router.get(
+    "/api/exception-requests/{request_id}",
+    response_model=ExceptionRequestRead,
+)
+def get_exception_request(
+    request_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """HR / Admin: fetch one exception request with the AI-005 structured
+    `precedent_insight` attached when the row is still pending."""
+    role = (user.get("role") or "").upper()
+    if role not in ("HR", "ADMIN") and not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="HR or Admin only")
+    organization_id = _caller_company_id(user)
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT * FROM policy_cap_requests "
+                "WHERE id = :id AND organization_id = :org"
+            ),
+            {"id": request_id, "org": organization_id},
+        ).mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Exception request not found")
+        return _attach_precedent_insight(conn, _row_to_dict(row))
 
 
 @router.get(
@@ -288,7 +358,8 @@ def list_exception_requests_for_company(
                 ),
                 {"org": organization_id},
             ).mappings().all()
-    return [_row_to_dict(r) for r in rows]
+        dicts = [_attach_precedent_insight(conn, _row_to_dict(r)) for r in rows]
+    return dicts
 
 
 @router.patch(
