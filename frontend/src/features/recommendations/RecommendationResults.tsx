@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Card, Badge, Button } from '../../components/antigravity';
+import { Card, Badge, Button, Alert } from '../../components/antigravity';
 import type { RecommendationItem, RecommendationResponse } from './types';
 import { formatEstimationFromUsd } from '../services/servicesCurrency';
+import { createAIDecision } from '../../api/aiDecisions';
 
 const TIER_LABELS: Record<string, string> = {
   best_match: 'Best match',
@@ -131,6 +132,11 @@ function RecCard({
   isInPackage,
   onTogglePackage,
   displayCurrency,
+  pendingConfirmActive,
+  pendingConfirmSubmitting,
+  topMatchName,
+  onConfirmPick,
+  onCancelPick,
 }: {
   item: RecommendationItem;
   category: string;
@@ -139,7 +145,21 @@ function RecCard({
   isInPackage: boolean;
   onTogglePackage: () => void;
   displayCurrency: string;
+  /** When true, render the inline reason-capture for an AI-002 override pick. */
+  pendingConfirmActive: boolean;
+  /** Submit in flight — disables buttons, swaps Confirm label. */
+  pendingConfirmSubmitting: boolean;
+  /** Name of the rank-1 recommendation in this category (used in the prompt copy). */
+  topMatchName?: string;
+  onConfirmPick: (reason: string) => void;
+  onCancelPick: () => void;
 }) {
+  const [overrideReason, setOverrideReason] = useState('');
+  // Clear local reason text whenever this card stops being the active confirm target.
+  React.useEffect(() => {
+    if (!pendingConfirmActive) setOverrideReason('');
+  }, [pendingConfirmActive]);
+  const reasonMissing = !overrideReason.trim();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const tier = item.tier || 'ok';
   const avail = item.metadata?.availability_level || 'high';
@@ -254,6 +274,48 @@ function RecCard({
           {isInPackage ? '✓ In package' : 'Add to package'}
         </Button>
       </div>
+      {/* AI-003: inline override-reason capture when HR/employee picks a lower-ranked
+          vendor. The confirm flow appears here (not via modal) so the user can keep
+          the other recommendations visible while writing their reason. Submitting
+          writes an ai_decisions row with decision='override' for EU AI Act Art. 14. */}
+      {pendingConfirmActive && (
+        <div className="mt-3 pt-3 border-t border-violet-200 bg-violet-50/50 -mx-6 -mb-6 px-6 pb-4 rounded-b-xl">
+          <p className="text-xs font-semibold text-violet-800">
+            Why this one
+            {topMatchName ? <> over our top match <span className="font-normal italic">{topMatchName}</span></> : ' instead of the top match'}?
+            <span className="text-rose-500 ml-1">*</span>
+          </p>
+          <textarea
+            value={overrideReason}
+            onChange={(e) => setOverrideReason(e.target.value)}
+            rows={2}
+            placeholder="Explain why this option fits this case better."
+            className="mt-2 w-full rounded-md border border-violet-200 px-2.5 py-1.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-200 resize-none bg-white"
+            autoFocus
+          />
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="text-[11px] text-violet-500">Logged for human oversight audit · EU AI Act Art. 14</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onCancelPick}
+                disabled={pendingConfirmSubmitting}
+                className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => onConfirmPick(overrideReason.trim())}
+                disabled={pendingConfirmSubmitting || reasonMissing}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {pendingConfirmSubmitting ? 'Recording…' : 'Confirm pick'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {expanded && (
         <div className="mt-3 pt-3 border-t border-[#e2e8f0] space-y-3">
           <p className="text-sm text-[#4b5563]">{item.rationale}</p>
@@ -320,6 +382,16 @@ export const RecommendationResults: React.FC<Props> = ({
   const entries = Object.entries(results);
   const [activeTab, setActiveTab] = useState(entries[0]?.[0] ?? '');
 
+  // AI-003 — pending override-pick state. When set, the matching RecCard
+  // renders its inline reason-capture; submitting writes an ai_decisions row.
+  const [pendingPick, setPendingPick] = useState<{
+    category: string;
+    item: RecommendationItem;
+    rank: number; // 0-indexed; rank 0 == top match (never triggers this UI)
+  } | null>(null);
+  const [pendingSubmitting, setPendingSubmitting] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
+
   if (entries.length === 0) return null;
 
   const togglePackage = (category: string, itemId: string) => {
@@ -332,10 +404,89 @@ export const RecommendationResults: React.FC<Props> = ({
     onSelectedPackageChange(next);
   };
 
+  /**
+   * Fire-and-forget POST to /api/ai/decisions. Never blocks the selection —
+   * if the log fails, the user's pick still goes through and a non-blocking
+   * error Alert appears at the top of the page. Per AI-002 / Art. 14:
+   * accept = picked the top-ranked item, override = picked a lower rank.
+   */
+  const logDecision = (
+    category: string,
+    item: RecommendationItem,
+    rank: number,
+    reason: string | null
+  ): void => {
+    const decision = rank === 0 ? 'accept' : 'override';
+    createAIDecision({
+      feature: `service_recommendation_${category}`,
+      recommendation_id: item.item_id,
+      ai_output: {
+        item_id: item.item_id,
+        name: item.name,
+        score: item.score,
+        tier: item.tier,
+        rank: rank + 1, // 1-indexed in audit payload for human-readability
+        explanation: item.explanation,
+      },
+      decision,
+      reason: reason ?? undefined,
+    }).catch((e) => {
+      const msg = e instanceof Error ? e.message : 'Failed to log AI decision';
+      setLogError(`${msg} — your selection was saved, but the audit log entry could not be written.`);
+      window.setTimeout(() => setLogError(null), 8000);
+    });
+  };
+
+  /**
+   * Single entry point for a vendor pick from the card's "Add to package" button.
+   * Branches on:
+   *   - already-in-package (deselection): toggle off, no log (append-only — the
+   *     original "pick" event remains in the audit; removal is local state).
+   *   - rank 0 (top match): commit + fire 'accept' log in background.
+   *   - rank > 0: open the inline reason-capture; commit happens on Confirm.
+   */
+  const handleCardToggle = (category: string, item: RecommendationItem, rank: number) => {
+    const currentlyInPackage = selectedPackage.get(category) === item.item_id;
+    if (currentlyInPackage) {
+      togglePackage(category, item.item_id);
+      return;
+    }
+    if (rank === 0) {
+      togglePackage(category, item.item_id);
+      logDecision(category, item, 0, null);
+      return;
+    }
+    setPendingPick({ category, item, rank });
+  };
+
+  const confirmPendingPick = async (reason: string) => {
+    if (!pendingPick || !reason) return;
+    setPendingSubmitting(true);
+    try {
+      // Commit the selection first (local + debounced server sync) so the user's
+      // intent is reflected immediately even if the audit log POST is slow.
+      togglePackage(pendingPick.category, pendingPick.item.item_id);
+      logDecision(pendingPick.category, pendingPick.item, pendingPick.rank, reason);
+      setPendingPick(null);
+    } finally {
+      setPendingSubmitting(false);
+    }
+  };
+
+  const cancelPendingPick = () => {
+    if (pendingSubmitting) return;
+    setPendingPick(null);
+  };
+
   const packageCount = selectedPackage.size;
 
   return (
     <div className="space-y-6">
+      {logError && (
+        <Alert variant="error">
+          <p>{logError}</p>
+        </Alert>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-xl font-semibold text-[#0b2b43]">Your recommendations</h2>
         <div className="flex items-center gap-3">
@@ -388,18 +539,27 @@ export const RecommendationResults: React.FC<Props> = ({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {res.recommendations.map((item, idx) => (
-                  <RecCard
-                    key={item.item_id}
-                    item={item}
-                    category={category}
-                    criteriaEcho={res.criteria_echo}
-                    defaultExpanded={idx === 0}
-                    isInPackage={selectedPackage.get(category) === item.item_id}
-                    onTogglePackage={() => togglePackage(category, item.item_id)}
-                    displayCurrency={displayCurrency}
-                  />
-                ))}
+                {res.recommendations.map((item, idx) => {
+                  const isPendingThisCard =
+                    pendingPick?.category === category && pendingPick.item.item_id === item.item_id;
+                  return (
+                    <RecCard
+                      key={item.item_id}
+                      item={item}
+                      category={category}
+                      criteriaEcho={res.criteria_echo}
+                      defaultExpanded={idx === 0}
+                      isInPackage={selectedPackage.get(category) === item.item_id}
+                      onTogglePackage={() => handleCardToggle(category, item, idx)}
+                      displayCurrency={displayCurrency}
+                      pendingConfirmActive={isPendingThisCard}
+                      pendingConfirmSubmitting={isPendingThisCard && pendingSubmitting}
+                      topMatchName={res.recommendations[0]?.name}
+                      onConfirmPick={confirmPendingPick}
+                      onCancelPick={cancelPendingPick}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
