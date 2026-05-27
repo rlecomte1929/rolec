@@ -7,6 +7,9 @@ from .routers import (
     admin,
     advisors,
     cases,
+    cases_admin,
+    cases_read,
+    cases_write,
     employee_quotes,
     exception_requests,
     hr_analytics,
@@ -50,7 +53,12 @@ def create_app() -> FastAPI:
     )
 
     # ── Pre-existing routers ──────────────────────────────────────────────────
-    app.include_router(cases.router)
+    # [AUDIT-B9-cases-6] cases.router replaced by 3 modular routers (read/write/admin).
+    # Original cases.py is retained as a support module for Pydantic models + private
+    # helpers that cases_write.py still imports from. Its router is no longer wired.
+    app.include_router(cases_read.router)
+    app.include_router(cases_write.router)
+    app.include_router(cases_admin.router)
     app.include_router(admin.router)
     app.include_router(employee_quotes.router)
     app.include_router(pets.router)
