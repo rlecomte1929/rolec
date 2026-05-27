@@ -67,6 +67,22 @@ from ..services.immigration_requirement_service import (
     get_requirements,
     get_timeline_days,
 )
+from ..services.immigration_service import (
+    _apply_vault_updates,
+    _check_consent,
+    _get_case_details,
+    _get_encryption_key,
+    _load_or_create_session,
+    _load_profile_for_case,
+    _load_profile_for_case_employee,
+    _load_session,
+    _load_session_for_update,
+    _log_access,
+    _now_iso,
+    _save_session,
+    _serialize_imm_case,
+    _ts,
+)
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["immigration"])
@@ -151,86 +167,6 @@ class MilestoneUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _check_consent(case_id: str, employee_id: str) -> bool:
-    """Return True if a valid immigration_processing consent exists for this case+employee."""
-    with db.engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT id FROM public.consent_records
-                WHERE case_id    = :case_id
-                  AND employee_id = :employee_id
-                  AND purpose     = 'immigration_processing'
-                  AND consented   = TRUE
-                  AND withdrawn_at IS NULL
-                ORDER BY created_at DESC
-                LIMIT 1
-            """),
-            {"case_id": case_id, "employee_id": employee_id},
-        ).mappings().first()
-    return row is not None
-
-
-def _log_access(
-    case_id: str,
-    profile_id: Optional[str],
-    user_id: str,
-    role: str,
-    action: str,
-    fields: List[str],
-    purpose: str = "immigration_processing",
-) -> None:
-    """Write an entry to data_access_log. Silently ignores errors (never block the main request)."""
-    try:
-        with db.engine.begin() as conn:
-            conn.execute(
-                text("""
-                    INSERT INTO public.data_access_log
-                        (case_id, profile_id, accessed_by_user_id, accessed_by_role,
-                         action, fields_accessed, purpose, accessed_at)
-                    VALUES
-                        (:case_id, :profile_id, :user_id, :role,
-                         :action, :fields, :purpose, NOW())
-                """),
-                {
-                    "case_id": case_id,
-                    "profile_id": profile_id,
-                    "user_id": user_id,
-                    "role": role,
-                    "action": action,
-                    "fields": fields,
-                    "purpose": purpose,
-                },
-            )
-    except Exception as exc:
-        log.warning("Failed to write data_access_log: %s", exc)
-
-
-def _get_case_details(case_id: str, org_id: str) -> Optional[Dict[str, Any]]:
-    """Fetch basic case details (corridor) from the assignment record.
-
-    The route parameter is the case_assignments.id (PK), not case_id (FK).
-    We try by PK first, then fall back to FK so the helper works in both call sites.
-    """
-    with db.engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT ca.id, ca.case_id, ca.employee_user_id,
-                       mc.destination_country AS dest_country,
-                       mc.origin_country
-                FROM public.case_assignments ca
-                LEFT JOIN public.mobility_cases mc ON mc.id::text = ca.case_id
-                WHERE ca.id = :case_id OR ca.case_id = :case_id
-                LIMIT 1
-            """),
-            {"case_id": case_id},
-        ).mappings().first()
-    return dict(row) if row else None
-
 
 # ---------------------------------------------------------------------------
 # HR: GET /api/hr/cases/{case_id}/immigration-requirements
@@ -1317,21 +1253,6 @@ class ImmigrationCaseCreate(BaseModel):
     expected_grant_date: Optional[str] = None        # ISO date string yyyy-mm-dd
 
 
-def _serialize_imm_case(row: Any) -> Dict[str, Any]:
-    """Convert a DB row from immigration_cases to a JSON-safe dict."""
-    r = dict(row)
-    for col in ("created_at", "updated_at", "expected_submission_date",
-                "expected_grant_date", "permit_expiry_date"):
-        v = r.get(col)
-        if hasattr(v, "isoformat"):
-            r[col] = v.isoformat()
-    # Ensure UUIDs are strings
-    for col in ("id", "case_id", "created_by_hr_id"):
-        if r.get(col) is not None:
-            r[col] = str(r[col])
-    return r
-
-
 @router.post("/hr/immigration/cases", status_code=status.HTTP_201_CREATED)
 def create_immigration_case(
     body: ImmigrationCaseCreate,
@@ -1490,243 +1411,3 @@ def get_immigration_case_employee(
 # Private DB helpers
 # ---------------------------------------------------------------------------
 
-def _load_profile_for_case(case_id: str) -> Optional[Dict[str, Any]]:
-    with db.engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT * FROM public.imm_employee_profiles
-                WHERE case_id = :case_id
-                ORDER BY created_at DESC
-                LIMIT 1
-            """),
-            {"case_id": case_id},
-        ).mappings().first()
-    if not row:
-        return None
-    result = dict(row)
-    for col in ("created_at", "updated_at", "passport_expiry", "date_of_birth",
-                "employment_start_date", "retention_expires_at"):
-        v = result.get(col)
-        if hasattr(v, "isoformat"):
-            result[col] = v.isoformat()
-    return result
-
-
-def _load_profile_for_case_employee(case_id: str, employee_id: str) -> Optional[Dict[str, Any]]:
-    with db.engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT * FROM public.imm_employee_profiles
-                WHERE case_id = :case_id AND employee_id = :employee_id
-                LIMIT 1
-            """),
-            {"case_id": case_id, "employee_id": employee_id},
-        ).mappings().first()
-    if not row:
-        return None
-    result = dict(row)
-    for col in ("created_at", "updated_at", "passport_expiry", "date_of_birth",
-                "employment_start_date", "retention_expires_at"):
-        v = result.get(col)
-        if hasattr(v, "isoformat"):
-            result[col] = v.isoformat()
-    return result
-
-
-def _ts(v: Any) -> Optional[str]:
-    """Coerce a datetime/string to ISO string, or None."""
-    if v is None:
-        return None
-    if hasattr(v, "isoformat"):
-        return v.isoformat()
-    return str(v)
-
-
-# ---------------------------------------------------------------------------
-# Interview session DB helpers
-# ---------------------------------------------------------------------------
-
-def _load_session(case_id: str, employee_id: str) -> Optional[Dict[str, Any]]:
-    with db.engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT id, answers, skipped_fields, prefilled_fields,
-                       completed_sections, completion_pct, current_section,
-                       current_question_id, consent_record_id,
-                       started_at, last_active_at, completed_at
-                FROM public.interview_sessions
-                WHERE case_id = :case_id AND employee_id = :employee_id
-                ORDER BY started_at DESC
-                LIMIT 1
-            """),
-            {"case_id": case_id, "employee_id": employee_id},
-        ).mappings().first()
-    return dict(row) if row else None
-
-
-def _load_session_for_update(case_id: str, employee_id: str) -> Optional[Dict[str, Any]]:
-    """Load session with row-level lock (FOR UPDATE) to prevent concurrent corruption."""
-    with db.engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT id, answers, skipped_fields, prefilled_fields,
-                       completed_sections, completion_pct, current_section,
-                       current_question_id, started_at, last_active_at, completed_at
-                FROM public.interview_sessions
-                WHERE case_id = :case_id AND employee_id = :employee_id
-                ORDER BY started_at DESC
-                LIMIT 1
-                FOR UPDATE
-            """),
-            {"case_id": case_id, "employee_id": employee_id},
-        ).mappings().first()
-    return dict(row) if row else None
-
-
-def _load_or_create_session(case_id: str, employee_id: str, org_id: str) -> Dict[str, Any]:
-    """Load existing session or create a fresh one."""
-    session = _load_session(case_id, employee_id)
-    if session:
-        return session
-
-    session_id = str(uuid.uuid4())
-    now = _now_iso()
-    with db.engine.begin() as conn:
-        conn.execute(
-            text("""
-                INSERT INTO public.interview_sessions
-                    (id, case_id, employee_id, org_id,
-                     answers, skipped_fields, prefilled_fields, completed_sections,
-                     completion_pct, started_at, last_active_at, created_at, updated_at)
-                VALUES
-                    (:id, :case_id, :employee_id, :org_id,
-                     '{}', '{}', '{}', '{}',
-                     0, :now, :now, :now, :now)
-            """),
-            {
-                "id": session_id,
-                "case_id": case_id,
-                "employee_id": employee_id,
-                "org_id": org_id,
-                "now": now,
-            },
-        )
-    return _load_session(case_id, employee_id) or {}
-
-
-def _save_session(
-    session_id: str,
-    answers: Dict[str, Any],
-    skipped_fields: List[str],
-    prefilled_fields: List[str],
-    current_section: Optional[str],
-    current_question_id: Optional[str],
-    completed_sections: List[str],
-    completion_pct: int,
-    completed_at: Optional[str],
-) -> None:
-    import json as _json
-    now = _now_iso()
-    with db.engine.begin() as conn:
-        conn.execute(
-            text("""
-                UPDATE public.interview_sessions
-                SET answers              = :answers,
-                    skipped_fields       = :skipped,
-                    prefilled_fields     = :prefilled,
-                    current_section      = :section,
-                    current_question_id  = :question_id,
-                    completed_sections   = :completed,
-                    completion_pct       = :pct,
-                    completed_at         = :completed_at,
-                    last_active_at       = :now,
-                    updated_at           = :now
-                WHERE id = :session_id
-            """),
-            {
-                "session_id": session_id,
-                "answers": _json.dumps(answers),
-                "skipped": skipped_fields,
-                "prefilled": prefilled_fields,
-                "section": current_section,
-                "question_id": current_question_id,
-                "completed": completed_sections,
-                "pct": completion_pct,
-                "completed_at": completed_at,
-                "now": now,
-            },
-        )
-
-
-def _apply_vault_updates(
-    case_id: str,
-    employee_id: str,
-    vault_updates: Dict[str, Any],
-    org_id: str = "",
-) -> None:
-    """
-    Apply a dict of vault column → value updates to imm_employee_profiles.
-    Creates the profile row if it doesn't exist.
-    Fields already marked 'hr_provided' in field_sources are never overwritten.
-    """
-    now = _now_iso()
-    profile = _load_profile_for_case_employee(case_id, employee_id)
-
-    if profile:
-        existing_sources: Dict[str, str] = dict(profile.get("field_sources") or {})
-        set_clauses = []
-        params: Dict[str, Any] = {"case_id": case_id, "employee_id": employee_id, "now": now}
-        for col, val in vault_updates.items():
-            if existing_sources.get(col) == "hr_provided":
-                continue
-            set_clauses.append(f"{col} = :{col}")
-            params[col] = val
-            existing_sources[col] = "interview"
-
-        if not set_clauses:
-            return
-
-        params["field_sources"] = existing_sources
-        set_clauses += ["field_sources = :field_sources", "updated_at = :now"]
-        with db.engine.begin() as conn:
-            conn.execute(
-                text(
-                    f"UPDATE public.imm_employee_profiles "
-                    f"SET {', '.join(set_clauses)} "
-                    f"WHERE case_id = :case_id AND employee_id = :employee_id"
-                ),
-                params,
-            )
-    else:
-        profile_id = str(uuid.uuid4())
-        field_sources = {col: "interview" for col in vault_updates}
-        params = {
-            "id": profile_id,
-            "case_id": case_id,
-            "employee_id": employee_id,
-            "org_id": org_id,
-            "field_sources": field_sources,
-            "created_at": now,
-            "updated_at": now,
-            **vault_updates,
-        }
-        cols = list(params.keys())
-        with db.engine.begin() as conn:
-            conn.execute(
-                text(
-                    f"INSERT INTO public.imm_employee_profiles ({', '.join(cols)}) "
-                    f"VALUES ({', '.join(f':{c}' for c in cols)})"
-                ),
-                params,
-            )
-
-
-def _get_encryption_key() -> str:
-    import os
-    key = os.environ.get("IMMIGRATION_ENCRYPTION_KEY", "")
-    if not key:
-        raise HTTPException(
-            status_code=500,
-            detail="IMMIGRATION_ENCRYPTION_KEY environment variable not set.",
-        )
-    return key
