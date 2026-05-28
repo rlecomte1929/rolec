@@ -53,6 +53,7 @@ from ..services.immigration_interview_engine import (
 from ..services.ocr_passport_extractor import (
     ConflictRecord,
     MrzValidationResult,
+    OcrExtractionError,
     PassportExtractionResult,
     detect_conflicts,
     extract_passport,
@@ -900,8 +901,18 @@ async def ocr_passport(
     # --- OCR extraction via GPT-4o ---
     try:
         extraction: PassportExtractionResult = await extract_passport(image_bytes, content_type)
+    except OcrExtractionError as exc:
+        # Structured, user-facing error with code + hint
+        raise HTTPException(
+            status_code=422,
+            detail={"code": exc.code, "message": exc.message, "hint": exc.hint},
+        )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        # Fallback for unexpected ValueError from extractor
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "extraction_failed", "message": str(exc), "hint": ""},
+        )
     except RuntimeError as exc:
         log.error("OCR runtime error for case %s: %s", case_id, exc)
         raise HTTPException(status_code=503, detail="OCR service temporarily unavailable.")
@@ -953,16 +964,17 @@ async def ocr_passport(
         "profile_id": profile_id,
         "storage_path": storage_path,
         "extracted_fields": {
-            "surname": extraction.surname,
-            "given_names": extraction.given_names,
+            # Field names match the frontend OcrExtractedFields interface
+            "legal_last_name": extraction.surname,
+            "legal_first_name": extraction.given_names,
             "date_of_birth": extraction.date_of_birth,
             "gender": extraction.gender,
             "place_of_birth": extraction.place_of_birth,
             "nationality": extraction.nationality,
-            "issuing_country": extraction.issuing_country,
+            "passport_country": extraction.issuing_country,
             "passport_number": extraction.passport_number,
-            "issue_date": extraction.issue_date,
-            "expiry_date": extraction.expiry_date,
+            "passport_issue_date": extraction.issue_date,
+            "passport_expiry": extraction.expiry_date,
             "mrz_line1": extraction.mrz_line1,
             "mrz_line2": extraction.mrz_line2,
         },

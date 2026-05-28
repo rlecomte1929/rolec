@@ -57,6 +57,18 @@ class PassportExtractionResult:
     low_quality_reason: Optional[str] = None
 
 
+class OcrExtractionError(Exception):
+    """
+    Raised when passport extraction fails for a known, user-facing reason.
+    Carries a machine-readable code, a user-friendly message, and an optional hint.
+    """
+    def __init__(self, code: str, message: str, hint: str = ""):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.hint = hint
+
+
 @dataclass
 class MrzValidationResult:
     is_valid: bool
@@ -275,16 +287,30 @@ Return ONLY valid JSON matching this exact schema — no markdown, no explanatio
     "expiry_date": 0.99,
     "mrz_line1": 0.95,
     "mrz_line2": 0.95
-  }
+  },
+  "error_type": null,
+  "error_detail": null
 }
 
 Rules:
 - Dates must be in YYYY-MM-DD format.
 - nationality and issuing_country must be ISO 3-letter codes (e.g. GBR, FRA, DEU).
+  For non-standard or unrecognised country codes (e.g. RSL, XKX), use your best guess at the
+  ISO 3166-1 alpha-3 equivalent or keep as-is — do NOT set error_type for this alone.
 - For any field you cannot read clearly, set value to null and confidence to 0.0.
 - MRZ lines must be exactly 44 uppercase characters (pad with < if needed).
-- If the image is not a passport, set all fields to null and add "not_a_passport": true.
-- If image quality prevents reliable extraction, add "low_quality": true and "low_quality_reason": "<reason>".
+- If no MRZ is visible at all (e.g. older passport without machine-readable zone), set
+  mrz_line1 and mrz_line2 to null and set "error_type": "no_mrz".
+- If the image is not a passport at all, set all fields to null and set "error_type": "not_a_passport".
+- If the document has the word "SPECIMEN", "SAMPLE", or "SPÉCIMEN" printed on it, set
+  "error_type": "specimen_document".
+- If image quality prevents reliable extraction (blurry, too dark, cropped), set
+  "low_quality": true, "error_type": "low_quality", and "error_detail": "<short reason>".
+- If the passport is partially visible or cut off, set "error_type": "partial_image".
+- error_type must be one of: null | "no_mrz" | "not_a_passport" | "specimen_document" |
+  "low_quality" | "partial_image".
+- IMPORTANT: A "no_mrz" error does NOT prevent extraction of all other fields. Continue to
+  extract all visible text fields normally even if no MRZ is present.
 """
 
 _MIN_CONFIDENCE = 0.70   # Below this, fields are treated as unreadable
@@ -318,9 +344,44 @@ async def extract_passport(image_bytes: bytes, mime_type: str = "image/jpeg") ->
         model="gpt-4o",
     )
 
-    # Check for non-passport or low-quality flags
-    if data.get("not_a_passport"):
-        raise ValueError("The uploaded image does not appear to be a passport.")
+    # --- Map error_type to specific, user-facing OcrExtractionError ---
+    error_type = data.get("error_type")
+
+    if error_type == "not_a_passport" or data.get("not_a_passport"):
+        raise OcrExtractionError(
+            code="not_a_passport",
+            message="This doesn't look like a passport data page.",
+            hint="Please upload a photo of the biographical page — the one with your photo and "
+                 "personal details. Make sure the full page is visible.",
+        )
+
+    if error_type == "specimen_document":
+        raise OcrExtractionError(
+            code="specimen_document",
+            message="This appears to be a specimen or sample passport.",
+            hint="Specimen documents cannot be processed. Please upload your actual passport.",
+        )
+
+    if error_type == "partial_image":
+        raise OcrExtractionError(
+            code="partial_image",
+            message="The passport page isn't fully visible in the photo.",
+            hint="Make sure the entire biographical page fits within the frame — "
+                 "include all four corners and the MRZ lines at the bottom.",
+        )
+
+    if error_type == "low_quality":
+        detail = data.get("error_detail", "")
+        hint_parts = [
+            "Retake the photo in good lighting.",
+            "Lay the passport flat and hold the camera directly above it.",
+            "Make sure the text is sharp and there's no glare.",
+        ]
+        raise OcrExtractionError(
+            code="low_quality",
+            message=f"The image quality is too low to read the passport reliably.{' (' + detail + ')' if detail else ''}",
+            hint=" ".join(hint_parts),
+        )
 
     confidence = data.get("confidence", {})
 
@@ -353,10 +414,17 @@ async def extract_passport(image_bytes: bytes, mime_type: str = "image/jpeg") ->
         if confidence.get(f, 0.0) < _CRITICAL_MIN_CONFIDENCE and getattr(result, f) is None
     ]
     if critical_failures or result.low_quality:
-        reason = result.low_quality_reason or f"Low confidence on: {', '.join(critical_failures)}"
-        raise ValueError(
-            f"Could not extract passport data with sufficient confidence — please enter manually. ({reason})"
-        )
+        # "no_mrz" is a soft warning — don't block if other fields were extracted
+        if error_type == "no_mrz" and not critical_failures:
+            pass  # Allow through — MRZ-less passports are valid (older formats)
+        else:
+            reason = result.low_quality_reason or ", ".join(critical_failures)
+            raise OcrExtractionError(
+                code="low_confidence",
+                message="We couldn't read some required fields from this passport.",
+                hint=f"Fields that couldn't be read clearly: {reason}. "
+                     "Try uploading a clearer photo, or skip this step and enter your details manually.",
+            )
 
     return result
 

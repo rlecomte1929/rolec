@@ -47,6 +47,13 @@ interface OcrExtractedFields {
   [key: string]: string | undefined;
 }
 
+// Structured error detail returned by the backend on 422
+interface OcrErrorDetail {
+  code: string;
+  message: string;
+  hint: string;
+}
+
 interface ConflictRecord {
   field_name: string;
   ocr_value: string;
@@ -88,6 +95,124 @@ const FIELD_LABELS: Record<string, string> = {
 const DISPLAY_FIELDS = Object.keys(FIELD_LABELS);
 
 // ---------------------------------------------------------------------------
+// OCR error card — shown when the backend returns a 422 with a known error code
+// ---------------------------------------------------------------------------
+
+const OCR_ERROR_CONFIG: Record<
+  string,
+  { icon: string; title: string; tips: string[] }
+> = {
+  specimen_document: {
+    icon: '🚫',
+    title: 'Specimen document detected',
+    tips: [
+      'Specimen and sample passports cannot be processed.',
+      'Please upload your actual, issued passport.',
+    ],
+  },
+  no_mrz: {
+    icon: '📄',
+    title: 'No machine-readable zone found',
+    tips: [
+      'Your passport doesn\'t have the two lines of characters at the bottom (MRZ). This is normal for older passports.',
+      'You can still skip this step and enter your details manually — it only takes a minute.',
+    ],
+  },
+  not_a_passport: {
+    icon: '🪪',
+    title: 'This doesn\'t look like a passport',
+    tips: [
+      'Upload a photo of the biographical page — the page with your photo and personal details.',
+      'Make sure all four corners of the page are visible.',
+    ],
+  },
+  low_quality: {
+    icon: '📷',
+    title: 'Image quality too low',
+    tips: [
+      'Lay the passport flat on a table and take the photo directly above it.',
+      'Use good lighting and avoid shadows or flash glare on the page.',
+      'Make sure the text is in focus and all four corners are visible.',
+    ],
+  },
+  partial_image: {
+    icon: '✂️',
+    title: 'Passport not fully visible',
+    tips: [
+      'The full biographical page must be visible, including the MRZ lines at the bottom.',
+      'Move the camera further back so all four corners fit in the frame.',
+    ],
+  },
+  low_confidence: {
+    icon: '🔍',
+    title: 'Couldn\'t read required fields',
+    tips: [
+      'Make sure the passport is flat and the image is sharp.',
+      'Avoid shadows across the text and ensure good lighting.',
+    ],
+  },
+};
+
+const FALLBACK_ERROR_CONFIG = {
+  icon: '⚠️',
+  title: 'Scan failed',
+  tips: ['Check your connection and try again, or skip this step and enter your details manually.'],
+};
+
+interface OcrErrorCardProps {
+  error: OcrErrorDetail | string;
+  onSkip: () => void;
+}
+
+const OcrErrorCard: React.FC<OcrErrorCardProps> = ({ error, onSkip }) => {
+  const isStructured = typeof error === 'object' && error !== null;
+  const code = isStructured ? (error as OcrErrorDetail).code : 'unknown';
+  const message = isStructured ? (error as OcrErrorDetail).message : String(error);
+  const hint = isStructured ? (error as OcrErrorDetail).hint : '';
+
+  const config = OCR_ERROR_CONFIG[code] ?? FALLBACK_ERROR_CONFIG;
+
+  return (
+    <div className="rounded-xl border border-[#fecaca] bg-[#fff5f5] p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <span className="text-2xl leading-none shrink-0">{config.icon}</span>
+        <div>
+          <p className="text-sm font-semibold text-[#7a2a2a]">{config.title}</p>
+          <p className="text-sm text-[#991b1b] mt-0.5">{message}</p>
+        </div>
+      </div>
+
+      {/* Tips */}
+      {(config.tips.length > 0 || hint) && (
+        <div className="pl-9 space-y-1.5">
+          {hint && (
+            <p className="text-xs text-[#7a2a2a]">{hint}</p>
+          )}
+          {config.tips.map((tip, i) => (
+            <div key={i} className="flex items-start gap-1.5">
+              <span className="text-[#f87171] text-xs mt-0.5 shrink-0">•</span>
+              <p className="text-xs text-[#7a2a2a]">{tip}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Skip action */}
+      <div className="pl-9 pt-1">
+        <button
+          type="button"
+          onClick={onSkip}
+          className="text-xs font-medium text-[#0b2b43] underline underline-offset-2 hover:no-underline"
+        >
+          Skip scan — I'll enter my details manually →
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Confidence indicator
 // ---------------------------------------------------------------------------
 
@@ -109,16 +234,17 @@ function ConfidenceDot({ score }: { score: number | undefined }) {
 
 interface UploadStepProps {
   onUploaded: (result: OcrResponse) => void;
+  onSkip: () => void;
   caseId: string;
 }
 
-const UploadStep: React.FC<UploadStepProps> = ({ caseId, onUploaded }) => {
+const UploadStep: React.FC<UploadStepProps> = ({ caseId, onUploaded, onSkip }) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<OcrErrorDetail | string | null>(null);
 
   const ALLOWED = ['image/jpeg', 'image/png', 'image/webp'];
   const MAX_MB = 10;
@@ -158,10 +284,18 @@ const UploadStep: React.FC<UploadStepProps> = ({ caseId, onUploaded }) => {
       );
       onUploaded(resp.data);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'Upload failed. Please check your connection and try again.';
-      setError(msg);
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      if (detail && typeof detail === 'object' && 'code' in detail) {
+        // Structured error from the backend
+        setError(detail as OcrErrorDetail);
+      } else {
+        // Plain string or unknown error
+        setError({
+          code: 'extraction_failed',
+          message: typeof detail === 'string' ? detail : 'Upload failed. Please check your connection and try again.',
+          hint: '',
+        });
+      }
       setUploading(false);
     }
   };
@@ -210,7 +344,7 @@ const UploadStep: React.FC<UploadStepProps> = ({ caseId, onUploaded }) => {
         )}
       </div>
 
-      {error && <Alert variant="error">{error}</Alert>}
+      {error && <OcrErrorCard error={error} onSkip={onSkip} />}
 
       <div className="rounded-lg border border-[#fef3c7] bg-[#fffbeb] px-3 py-2.5 text-xs text-[#92400e]">
         <strong>Privacy note:</strong> The passport image is transmitted securely, processed for
@@ -391,7 +525,7 @@ export const PassportOCRFlow: React.FC<PassportOCRFlowProps> = ({ caseId, onComp
 
         {step === 'upload' && (
           <>
-            <UploadStep caseId={caseId} onUploaded={handleUploaded} />
+            <UploadStep caseId={caseId} onUploaded={handleUploaded} onSkip={onSkip} />
             <div className="mt-4 border-t border-[#e2e8f0] pt-4 flex justify-center">
               <button
                 type="button"
