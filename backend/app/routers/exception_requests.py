@@ -592,9 +592,20 @@ def get_exception_audit_trail(
 # ─────────────────────────────────────────────────────────────────────────────
 
 class AssignmentExceptionCreate(BaseModel):
-    """Body for creating an exception request scoped to an assignment (not a case draft)."""
+    """Body for creating an exception request scoped to an assignment (not a case draft).
+
+    Writes to `public.exception_requests` (separate from `policy_cap_requests`
+    which the case-scoped endpoint uses). That table already has
+    `exception_type TEXT NOT NULL` from its original schema, so the field is
+    required here — same 4-value axis as the case-scoped endpoint.
+    """
     benefit_key: str = Field(..., min_length=1, max_length=100)
     type_label: str = Field(..., min_length=1, max_length=200)
+    # Q3-A follow-up: aligns with ExceptionRequestCreate.exception_type on the
+    # case-scoped endpoint. The DB column is already NOT NULL, so existing
+    # writes that didn't pass this field were always failing — see FIXME at
+    # the INSERT site below.
+    exception_type: ExceptionTypeLiteral
     current_value: Dict[str, Any]
     requested_value: Dict[str, Any]
     reason: str = Field(..., min_length=1, max_length=2000)
@@ -605,6 +616,7 @@ class AssignmentExceptionRead(BaseModel):
     assignment_id: str
     benefit_key: str
     type_label: Optional[str] = None
+    exception_type: Optional[str] = None  # NOT NULL in DB but Optional on read for forward-compat
     current_value: Optional[Dict[str, Any]] = None
     requested_value: Optional[Dict[str, Any]] = None
     reason: str
@@ -675,6 +687,7 @@ def create_assignment_exception(
         "assignment_id": assignment_id,
         "benefit_key": body.benefit_key,
         "type_label": body.type_label,
+        "exception_type": body.exception_type,
         "current_value": body.current_value,
         "requested_value": body.requested_value,
         "reason": body.reason,
@@ -686,6 +699,14 @@ def create_assignment_exception(
         "created_at": now,
         "updated_at": now,
     }
+    # FIXME: public.exception_requests has `case_id text NOT NULL` and
+    # `severity text NOT NULL` in the schema, but this INSERT doesn't pass
+    # either. That means every prior call to this endpoint would have failed
+    # at the DB layer with a NOT NULL violation — and the table has 0 rows,
+    # which is consistent with that. The endpoint is effectively dead today.
+    # Out of scope for this Q3-A follow-up; a dedicated ticket should either
+    # (a) populate case_id from the assignment and pick a severity default,
+    # or (b) remove the endpoint if no consumer is planned.
 
     try:
         sb = _get_supabase()
