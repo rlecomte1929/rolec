@@ -591,7 +591,13 @@ function roleSubtitle(req: ExceptionRequest): string {
  * inbox UI expects. Mock-only fields (justification, audit array, aiInsight
  * mock string) are filled with sensible derivations or left empty. */
 function mapServerToUi(req: ExceptionRequest): ExcRequest {
-  const type: ExcType = (CATEGORY_TO_TYPE[req.category] as ExcType | undefined) ?? 'cap_override';
+  // Q3-A: prefer the dedicated `exception_type` column when present. Falls back
+  // to the legacy client-side category→type mapping for rows written before the
+  // 20260528 migration landed (these have exception_type=NULL).
+  const fromServer =
+    req.exception_type && (CATEGORY_TO_TYPE[req.exception_type] as ExcType | undefined);
+  const type: ExcType =
+    fromServer ?? (CATEGORY_TO_TYPE[req.category] as ExcType | undefined) ?? 'cap_override';
   return {
     id: req.id,
     type,
