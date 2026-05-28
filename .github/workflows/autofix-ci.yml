@@ -133,11 +133,17 @@ jobs:
 
       - name: Check changed files are not in blocked paths
         run: |
-          # Get list of changed files in this PR vs main
+          # Get list of changed files in this PR vs main.
+          # Bug fix (actionlint #138): the env: block below previously read from
+          # `steps.changed-files.outputs.all`, but no step with that id exists in
+          # this workflow — CHANGED_FILES was always empty and the blocklist
+          # check passed trivially regardless of which files actually changed.
+          # Switched to exporting CHANGED_FILES from this step inline.
           git fetch origin main --depth=1
-          CHANGED=$(git diff --name-only origin/main HEAD)
+          CHANGED_FILES=$(git diff --name-only origin/main HEAD)
+          export CHANGED_FILES
           echo "Changed files:"
-          echo "$CHANGED"
+          echo "$CHANGED_FILES"
 
           # Run blocklist check via Node inline script
           node --input-type=module << 'EOF'
@@ -151,8 +157,6 @@ jobs:
           }
           console.log('✅ All changed files passed blocklist check');
           EOF
-        env:
-          CHANGED_FILES: ${{ steps.changed-files.outputs.all }}
 
   # ── Status summary ──────────────────────────────────────────────────────────
   ci-status:

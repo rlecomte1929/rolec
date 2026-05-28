@@ -93,7 +93,7 @@ jobs:
             --project=chromium \
             --reporter=html \
             2>&1 | tee e2e-output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
         working-directory: frontend
         env:
           BASE_URL: ${{ vars.RELOPASS_STAGING_URL || 'https://app.relopass.com' }}
@@ -132,21 +132,28 @@ jobs:
             core.info(`Found PR #${pr.number}: ${pr.title}`);
 
       # Extract Notion URL and task ID from the PR body (set by autofix-pipeline)
+      # Safety: PR title / body are attacker-controlled inputs. Use env: bindings
+      # rather than ${{ ... }} expansion inside the shell script to defuse
+      # injection (e.g. a PR titled `fix: '$(rm -rf /)'` would otherwise execute).
+      # See: https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
       - name: Extract Notion metadata from PR
         id: extract_notion
+        env:
+          PR_BODY: ${{ steps.find_pr.outputs.pr_body }}
+          PR_TITLE: ${{ steps.find_pr.outputs.pr_title }}
+          BRANCH: ${{ github.ref }}
         run: |
-          PR_BODY='${{ steps.find_pr.outputs.pr_body }}'
           # Notion URL appears as: **Notion:** https://www.notion.so/...
           NOTION_URL=$(echo "$PR_BODY" | grep -oP 'https://www\.notion\.so/\S+' | head -1 | tr -d "'")
           # Bug title from PR title: "fix: My Bug Title"
-          PR_TITLE='${{ steps.find_pr.outputs.pr_title }}'
-          BUG_TITLE=$(echo "$PR_TITLE" | sed 's/^fix: //')
+          BUG_TITLE="${PR_TITLE#fix: }"
           # Notion page ID from branch name: autofix/bug-{16-char-id}
-          BRANCH='${{ github.ref }}'
           NOTION_BRANCH_ID=$(echo "$BRANCH" | grep -oP '(?<=autofix/bug-)[a-f0-9]+' | head -1)
-          echo "notion_url=$NOTION_URL" >> $GITHUB_OUTPUT
-          echo "notion_id=$NOTION_BRANCH_ID" >> $GITHUB_OUTPUT
-          echo "bug_title=$BUG_TITLE" >> $GITHUB_OUTPUT
+          {
+            echo "notion_url=$NOTION_URL"
+            echo "notion_id=$NOTION_BRANCH_ID"
+            echo "bug_title=$BUG_TITLE"
+          } >> "$GITHUB_OUTPUT"
           echo "Notion URL: $NOTION_URL"
           echo "Notion branch ID: $NOTION_BRANCH_ID"
           echo "Bug title: $BUG_TITLE"
@@ -229,7 +236,7 @@ jobs:
           npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
           npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
           DEPLOY_URL=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | grep -oP 'https://[^\s]+\.vercel\.app' | tail -1)
-          echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
           echo "Deployed to: $DEPLOY_URL"
         env:
           VERCEL_ORG_ID:     ${{ vars.VERCEL_ORG_ID }}
