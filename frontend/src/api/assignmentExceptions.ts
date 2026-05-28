@@ -9,30 +9,15 @@
  *
  * Separate from the legacy case-scoped exceptions at /api/cases/{id}/exception-requests.
  */
-import { apiGet, apiPost, apiPatch } from './client';
+import { apiGet, apiPatch } from './client';
 
 /** Q3-A: HR-inbox exception-type axis. Same 4-value set used by the
- * case-scoped /api/cases/:case_id/exception-requests endpoint. Required
- * here too — the public.exception_requests DB column is NOT NULL. */
+ * case-scoped /api/cases/:case_id/exception-requests endpoint. */
 export type AssignmentExceptionType =
   | 'new_category'
   | 'cap_override'
   | 'timeline_extension'
   | 'additional_coverage';
-
-export interface AssignmentExceptionCreate {
-  /** Benefit key from BENEFIT_COLUMNS, e.g. "temporary_housing", "schooling" */
-  benefit_key: string;
-  /** Human-readable label, e.g. "Temporary housing cap override" */
-  type_label: string;
-  /** Q3-A: required. Picks which display tile the HR inbox shows for this row. */
-  exception_type: AssignmentExceptionType;
-  /** Current policy value, e.g. { amount: 1500, currency: "EUR" } */
-  current_value: Record<string, unknown>;
-  /** What the employee is requesting, e.g. { amount: 2200, currency: "EUR" } */
-  requested_value: Record<string, unknown>;
-  reason: string;
-}
 
 export interface AssignmentExceptionRead {
   id: string;
@@ -71,19 +56,6 @@ export async function listAssignmentExceptions(
   const qs = status ? `?status=${encodeURIComponent(status)}` : '';
   return apiGet<AssignmentExceptionRead[]>(
     `/api/assignments/${assignmentId}/exceptions${qs}`,
-  );
-}
-
-/**
- * GAP 7: Create an exception request for a benefit on an assignment.
- */
-export async function createAssignmentException(
-  assignmentId: string,
-  body: AssignmentExceptionCreate,
-): Promise<AssignmentExceptionRead> {
-  return apiPost<AssignmentExceptionRead>(
-    `/api/assignments/${assignmentId}/exceptions`,
-    body,
   );
 }
 

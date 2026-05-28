@@ -591,26 +591,6 @@ def get_exception_audit_trail(
 # GAP 7: Assignment-scoped exception endpoints (Supabase-backed)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class AssignmentExceptionCreate(BaseModel):
-    """Body for creating an exception request scoped to an assignment (not a case draft).
-
-    Writes to `public.exception_requests` (separate from `policy_cap_requests`
-    which the case-scoped endpoint uses). That table already has
-    `exception_type TEXT NOT NULL` from its original schema, so the field is
-    required here — same 4-value axis as the case-scoped endpoint.
-    """
-    benefit_key: str = Field(..., min_length=1, max_length=100)
-    type_label: str = Field(..., min_length=1, max_length=200)
-    # Q3-A follow-up: aligns with ExceptionRequestCreate.exception_type on the
-    # case-scoped endpoint. The DB column is already NOT NULL, so existing
-    # writes that didn't pass this field were always failing — see FIXME at
-    # the INSERT site below.
-    exception_type: ExceptionTypeLiteral
-    current_value: Dict[str, Any]
-    requested_value: Dict[str, Any]
-    reason: str = Field(..., min_length=1, max_length=2000)
-
-
 class AssignmentExceptionRead(BaseModel):
     id: str
     assignment_id: str
@@ -662,62 +642,6 @@ def list_assignment_exceptions(
     except Exception:
         logger.exception("list_assignment_exceptions failed assignment_id=%s", assignment_id)
         return []
-
-
-@router.post(
-    "/api/assignments/{assignment_id}/exceptions",
-    response_model=AssignmentExceptionRead,
-    status_code=201,
-)
-def create_assignment_exception(
-    assignment_id: str,
-    body: AssignmentExceptionCreate,
-    user: Dict[str, Any] = Depends(get_current_user),
-) -> Dict[str, Any]:
-    """
-    GAP 7: Employee requests an exception for a specific benefit on their assignment.
-    Saves to `exception_requests` table with enriched fields.
-    """
-    from datetime import timezone
-    now = datetime.now(timezone.utc).isoformat()
-    actor_id = user.get("id", "")
-
-    row = {
-        "id": str(uuid.uuid4()),
-        "assignment_id": assignment_id,
-        "benefit_key": body.benefit_key,
-        "type_label": body.type_label,
-        "exception_type": body.exception_type,
-        "current_value": body.current_value,
-        "requested_value": body.requested_value,
-        "reason": body.reason,
-        "status": "pending",
-        "requested_by_user_id": actor_id,
-        "audit_events": [
-            {"ts": now, "actor": actor_id, "action": "created", "note": "Exception request submitted"}
-        ],
-        "created_at": now,
-        "updated_at": now,
-    }
-    # FIXME: public.exception_requests has `case_id text NOT NULL` and
-    # `severity text NOT NULL` in the schema, but this INSERT doesn't pass
-    # either. That means every prior call to this endpoint would have failed
-    # at the DB layer with a NOT NULL violation — and the table has 0 rows,
-    # which is consistent with that. The endpoint is effectively dead today.
-    # Out of scope for this Q3-A follow-up; a dedicated ticket should either
-    # (a) populate case_id from the assignment and pick a severity default,
-    # or (b) remove the endpoint if no consumer is planned.
-
-    try:
-        sb = _get_supabase()
-        result = sb.table("exception_requests").insert(row).execute()
-        if result and result.data:
-            return result.data[0]
-    except Exception:
-        logger.exception("create_assignment_exception failed assignment_id=%s", assignment_id)
-        raise HTTPException(status_code=500, detail="Failed to create exception request")
-
-    return row
 
 
 @router.patch(
