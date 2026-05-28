@@ -329,12 +329,20 @@ function ExcDetail({
           </div>
         </section>
 
-        {/* AI precedent insight (AI-002) — Art. 14 oversight wrapper.
-            HR must accept / override / reject the AI recommendation before deciding
-            on the exception itself. The action is logged to public.ai_decisions. */}
+        {/* AI precedent insight (AI-002 wire-in, AI-005 payload upgrade) — Art. 14
+            oversight wrapper. The backend `precedent_insight_service` produces a
+            structured payload (rationale, approval rate, sample size, similar
+            case ids) when this page is wired to real /api/exception-requests
+            data. Today the page still ships mock requests for demo purposes, so
+            the rationale below comes from `r.aiInsight` (mock string); when the
+            swap to live data lands, the backend response's `precedent_insight`
+            field flows through here as `aiOutput`. The recommendation_id uses the
+            deterministic `precedent_v1:<id>` form so re-running the same insight
+            against the same DB state produces the same id — `ai_decisions` can
+            then dedupe / replay against a stable source version. */}
         {r.aiInsight && !decided && !submitted && (
           <AIRecommendationCard
-            recommendationId={`${r.id}-precedent`}
+            recommendationId={`precedent_v1:${r.id}`}
             feature="exception_insight"
             title="AI precedent insight"
             rationale={<><strong>Precedent · </strong>{r.aiInsight}</>}
@@ -343,7 +351,7 @@ function ExcDetail({
               exception_type: r.type,
               benefit: r.benefit,
               insight: r.aiInsight,
-              source: 'historical_precedent_v1',
+              source_version: 'precedent_v1',
             }}
           />
         )}

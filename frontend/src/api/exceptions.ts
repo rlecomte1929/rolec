@@ -9,6 +9,24 @@ import { apiGet, apiPatch, apiPost } from './client';
 
 export type ExceptionStatus = 'pending' | 'approved' | 'rejected';
 
+/**
+ * Structured precedent insight (AI-005). Computed by the backend from
+ * historical decisions on similar exceptions, deterministic per call.
+ * Used as the `aiOutput` payload for the AIRecommendationCard in the
+ * exceptions inbox so the human's accept/override/reject can be replayed
+ * against the same insight version.
+ */
+export interface PrecedentInsight {
+  rationale: string;
+  confidence: number;
+  historical_approval_rate: number;
+  sample_size: number;
+  similar_case_ids: string[];
+  generated_at: string;
+  source_version: string;
+  recommendation_id: string;
+}
+
 export interface ExceptionRequest {
   id: string;
   case_id: string;
@@ -20,6 +38,9 @@ export interface ExceptionRequest {
   reason: string;
   status: ExceptionStatus;
   hr_note: string | null;
+  benefit_key?: string | null;
+  ai_insight?: string | null;
+  precedent_insight?: PrecedentInsight | null;
   requested_by_user_id: string;
   resolved_by_user_id: string | null;
   created_at: string;
