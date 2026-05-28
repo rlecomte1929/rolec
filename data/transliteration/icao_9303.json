@@ -1,0 +1,30 @@
+{
+  "_meta": {
+    "source": "ICAO Doc 9303 Part 3 §6 (consolidated) — transliteration tables",
+    "version": "1.0.0",
+    "created": "2026-05-28",
+    "scope": "German + Scandinavian alphabets (DEU, AUT, CHE, NOR, SWE, DNK, ISL, FIN). General Latin diacritic stripping. Devanagari → Latin (ISO 15919) deferred to a follow-up.",
+    "notes": "MRZ → display direction is the inverse of these mappings. Apply the table for an issuing_state in the listed set; otherwise apply the general Latin fold."
+  },
+  "german_scandinavian": {
+    "AE": "Ä",
+    "OE": "Ö",
+    "UE": "Ü",
+    "SS": "ß"
+  },
+  "scandinavian_extras": {
+    "AA": "Å",
+    "AE_scn": "Æ",
+    "OE_scn": "Ø"
+  },
+  "issuing_states_using_german_scandinavian": [
+    "DEU", "AUT", "CHE"
+  ],
+  "issuing_states_using_scandinavian_extras": [
+    "NOR", "SWE", "DNK", "ISL", "FIN"
+  ],
+  "general_latin_diacritic_fold": {
+    "_doc": "When the issuing state is not in either set above, MRZ encodes diacritics by stripping them (NFD + Mn category removal). Round-trip cannot be guaranteed for these states.",
+    "example": "É → E, ñ → N, ç → C, î → I"
+  }
+}
