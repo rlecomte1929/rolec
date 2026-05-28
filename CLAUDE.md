@@ -117,6 +117,31 @@ Backend:
 - **Database changes**: Apply Supabase migrations via `supabase db push` or the MCP (`apply_migration`). Never alter schema through the Supabase dashboard SQL editor directly — always commit migration files.
 - **Deploy trigger**: Push to `main` on GitHub → Render auto-deploys both services. Health check endpoint: `GET /health`.
 
+## Database Migrations — Security Rules (Hard Gates)
+
+Every migration that creates a new table in the `public` schema **must** include all three of the following, or it fails review and must not be merged:
+
+1. **Enable RLS**
+   ```sql
+   ALTER TABLE public.<table_name> ENABLE ROW LEVEL SECURITY;
+   ```
+
+2. **At least one policy** (read + write, scoped to the correct tenant boundary)
+   ```sql
+   CREATE POLICY "<descriptive name>" ON public.<table_name>
+     FOR SELECT USING (/* tenant-scoping expression */);
+   ```
+   Use the existing `case_milestones` RLS policies as the canonical pattern reference. The `support_tickets` and `ai_decisions` migrations are also recent in-repo references.
+
+3. **Revoke anon access** (defense-in-depth)
+   ```sql
+   REVOKE ALL ON public.<table_name> FROM anon;
+   ```
+
+> **Why this matters:** Supabase exposes the `public` schema via PostgREST and the anon key is shipped in the frontend bundle. A table without RLS is readable by any unauthenticated visitor. This caused SEC-002 (8 tables, GDPR-scope PII exposure). Don't repeat it.
+
+**If you are writing or reviewing a migration and a new table is missing any of the above, stop and add it before proceeding.** This is a hard review gate, not a soft suggestion.
+
 ## Build hygiene (pre-push hook + CI)
 
 Render auto-deploys `main` on every push, so **every commit on `main` must build cleanly** — a broken build is a user-visible deploy failure.
