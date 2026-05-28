@@ -75,9 +75,11 @@ ExceptionTypeLiteral = Literal[
 
 class ExceptionRequestCreate(BaseModel):
     category: str = Field(..., min_length=1, max_length=100)
-    # Q3-A: optional during the transition window. Once every caller of this
-    # endpoint sets it, we can tighten to non-optional in a follow-up.
-    exception_type: Optional[ExceptionTypeLiteral] = None
+    # Q3-A: required as of migration 20260528010000_..._backfill — every
+    # known caller (RequestExceptionModal) now sets it. Legacy DB rows can
+    # still have NULL `exception_type` (column stays nullable for back-compat
+    # on read); only new writes through this endpoint must specify it.
+    exception_type: ExceptionTypeLiteral
     requested_amount: float = Field(..., ge=0)
     cap_amount: float = Field(..., ge=0)
     currency: str = Field(..., min_length=3, max_length=3)
