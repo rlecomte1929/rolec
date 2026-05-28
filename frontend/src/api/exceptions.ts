@@ -27,11 +27,22 @@ export interface PrecedentInsight {
   recommendation_id: string;
 }
 
+/** UI-known category enum used by the HR exceptions inbox to map a server-side
+ * free-form `category` string to one of four display tiles. The backend itself
+ * keeps the column permissive (existing flows use it for service categories
+ * like 'housing'); the inbox does the mapping client-side. See PR #157 body
+ * for the data-model question still open. */
+export type ExceptionCategory =
+  | 'new_category'
+  | 'cap_override'
+  | 'timeline_extension'
+  | 'additional_coverage';
+
 export interface ExceptionRequest {
   id: string;
   case_id: string;
   organization_id: string;
-  category: string;
+  category: string; // permissive read-side; UI mapping handles unknown values
   requested_amount: number;
   cap_amount: number;
   currency: string;
@@ -46,9 +57,33 @@ export interface ExceptionRequest {
   created_at: string;
   resolved_at: string | null;
   updated_at: string;
+  // Joined fields (AI-005 follow-up). All optional — empty when the join
+  // returns NULL (legacy rows or missing profile / mobility_cases record).
+  requested_by_name?: string | null;
+  requested_by_role?: string | null;
+  resolved_by_name?: string | null;
+  origin_country?: string | null;
+  destination_country?: string | null;
+}
+
+/** One row from public.audit_logs surfaced through the audit-trail endpoint. */
+export interface ExceptionAuditEvent {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  action_type: string;
+  actor_type?: string | null;
+  actor_id?: string | null;
+  actor_name?: string | null;
+  old_value?: Record<string, unknown> | null;
+  new_value?: Record<string, unknown> | null;
+  created_at?: string | null;
 }
 
 export interface CreateExceptionRequestBody {
+  /** Backend treats this as free-form text (existing flows pass service
+   * categories like 'housing'; the inbox UI uses a separate 4-value
+   * exception-type axis client-side). */
   category: string;
   requested_amount: number;
   cap_amount: number;
@@ -86,3 +121,12 @@ export const resolveExceptionRequest = (
   body: ResolveExceptionRequestBody,
 ): Promise<ExceptionRequest> =>
   apiPatch<ExceptionRequest>(`/api/exception-requests/${encodeURIComponent(requestId)}`, body);
+
+/** Fetch the audit trail (joined audit_logs) for a single exception request.
+ * HR / admin only; tenant-scoped server-side. Returns rows oldest-first. */
+export const getExceptionAuditTrail = (
+  requestId: string,
+): Promise<ExceptionAuditEvent[]> =>
+  apiGet<ExceptionAuditEvent[]>(
+    `/api/exception-requests/${encodeURIComponent(requestId)}/audit-trail`,
+  );
