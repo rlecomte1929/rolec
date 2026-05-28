@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -46,6 +46,18 @@ logger = logging.getLogger(__name__)
 VALID_STATUSES = ("pending", "approved", "rejected")
 RESOLVABLE_STATUSES = ("approved", "rejected")
 
+# Q3-A (migration 20260528000000): the HR-inbox exception-type axis lives in a
+# dedicated NULLABLE `exception_type` column. `category` keeps its existing
+# service-category meaning (housing, schools, ...). New surfaces should set
+# `exception_type`; legacy rows have NULL and the inbox client-side mapping
+# handles the fallback. CHECK enforced at the DB layer.
+ExceptionTypeLiteral = Literal[
+    "new_category",
+    "cap_override",
+    "timeline_extension",
+    "additional_coverage",
+]
+
 # NOTE on `category`: existing flows (RequestExceptionModal) use this column
 # to store the *service category* (housing, schools, movers, ...) while the
 # mock HR exceptions inbox UI uses a separate axis of 4 *exception types*
@@ -63,6 +75,9 @@ RESOLVABLE_STATUSES = ("approved", "rejected")
 
 class ExceptionRequestCreate(BaseModel):
     category: str = Field(..., min_length=1, max_length=100)
+    # Q3-A: optional during the transition window. Once every caller of this
+    # endpoint sets it, we can tighten to non-optional in a follow-up.
+    exception_type: Optional[ExceptionTypeLiteral] = None
     requested_amount: float = Field(..., ge=0)
     cap_amount: float = Field(..., ge=0)
     currency: str = Field(..., min_length=3, max_length=3)
@@ -97,6 +112,9 @@ class ExceptionRequestRead(BaseModel):
     case_id: str
     organization_id: str
     category: str  # read-side stays permissive — legacy rows may have older values
+    # Q3-A: distinct axis from `category`. NULL on legacy rows; populated on
+    # new writes that come through the HR inbox surfaces.
+    exception_type: Optional[str] = None
     requested_amount: float
     cap_amount: float
     currency: str
@@ -271,11 +289,11 @@ def create_exception_request(
             text(
                 """
                 INSERT INTO policy_cap_requests (
-                    id, case_id, organization_id, category,
+                    id, case_id, organization_id, category, exception_type,
                     requested_amount, cap_amount, currency, reason,
                     status, requested_by_user_id, created_at, updated_at
                 ) VALUES (
-                    :id, :case_id, :org, :cat,
+                    :id, :case_id, :org, :cat, :exc_type,
                     :req_amt, :cap_amt, :cur, :reason,
                     'pending', :actor, :now, :now
                 )
@@ -286,6 +304,7 @@ def create_exception_request(
                 "case_id": case_id,
                 "org": organization_id,
                 "cat": body.category,
+                "exc_type": body.exception_type,
                 "req_amt": body.requested_amount,
                 "cap_amt": body.cap_amount,
                 "cur": body.currency.upper(),

@@ -42,7 +42,10 @@ export interface ExceptionRequest {
   id: string;
   case_id: string;
   organization_id: string;
-  category: string; // permissive read-side; UI mapping handles unknown values
+  category: string; // service-category axis (housing, schools, ...)
+  /** Q3-A: HR-inbox exception-type axis. NULL on legacy rows (the inbox
+   * client-side mapping handles the fallback in that case). */
+  exception_type: ExceptionCategory | null;
   requested_amount: number;
   cap_amount: number;
   currency: string;
@@ -81,10 +84,13 @@ export interface ExceptionAuditEvent {
 }
 
 export interface CreateExceptionRequestBody {
-  /** Backend treats this as free-form text (existing flows pass service
-   * categories like 'housing'; the inbox UI uses a separate 4-value
-   * exception-type axis client-side). */
+  /** Service-category axis (housing, schools, movers, ...). Free-form on the
+   * backend; existing flows write this from RequestExceptionModal. */
   category: string;
+  /** Q3-A: HR-inbox exception-type axis. Optional during the transition
+   * window; surfaces that know it (the HR inbox) should set it so the
+   * column is populated for new rows. */
+  exception_type?: ExceptionCategory;
   requested_amount: number;
   cap_amount: number;
   currency: string;
