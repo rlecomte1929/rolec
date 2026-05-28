@@ -82,11 +82,8 @@ backend/main.py:debug_kv_get
 backend/main.py:debug_supabase
 # TODO:SEC Unauthenticated Supabase debug probe. Same remediation as debug_db.
 
-backend/app/routers/cases_read.py:get_research_status
-# Dormant copy retained in cases.py as a support-module page-of-record after
-# the AUDIT-B9-cases-6 split. The router is no longer wired but the
-# @router.get decorator is still scanned by this audit job.
-backend/app/routers/cases.py:get_research_status
-# TODO:SEC GAP-9 research status endpoint has no auth — case data exposed by ID.
-# Tracked: add Depends(get_current_user) and enforce case ownership check.
-# Low-urgency (research progress only, no PII), but must be fixed pre-launch.
+# SEC GAP-9 closed (2026-05-28): get_research_status now requires an
+# authenticated session and a case-access check via require_case_access().
+# Both the live copy in cases_read.py and the dormant cases.py copy were
+# fixed in the same commit so the route-auth audit stays green and no
+# allowlist entry is needed.

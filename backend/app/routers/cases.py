@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from ..db import SessionLocal
 from .. import crud, schemas
-from ..auth_deps import get_current_user
+from ..auth_deps import get_current_user, require_case_access
 from ...database import db as main_db
 from ..services.relocation_plan_view_service import invalidate_relocation_plan_cache
 from ..services.research import run_country_research
@@ -452,12 +452,22 @@ def get_case_roadmap_tracks(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/{case_id}/research/status")
-def get_research_status(case_id: str):
+def get_research_status(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     """
     GAP 9: Poll-based research progress for the S2 discovery log.
     Returns {status, progress_pct, events[{ts, msg}]}.
     Client polls every 2s; no SSE infrastructure required.
+
+    SEC fix (GAP-9): require an authenticated session and case-level access.
+    NB: this router is dormant (retired by AUDIT-B9-cases-6). The live copy
+    lives in cases_read.py; this one stays in sync so the route-auth audit
+    job remains green and any future re-wiring can't accidentally ship a
+    regressed handler.
     """
+    require_case_access(case_id, user)
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
