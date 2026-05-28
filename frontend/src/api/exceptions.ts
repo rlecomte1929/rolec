@@ -87,10 +87,10 @@ export interface CreateExceptionRequestBody {
   /** Service-category axis (housing, schools, movers, ...). Free-form on the
    * backend; existing flows write this from RequestExceptionModal. */
   category: string;
-  /** Q3-A: HR-inbox exception-type axis. Optional during the transition
-   * window; surfaces that know it (the HR inbox) should set it so the
-   * column is populated for new rows. */
-  exception_type?: ExceptionCategory;
+  /** Q3-A: HR-inbox exception-type axis. Required as of the field tightening —
+   * every caller of POST /api/cases/:case_id/exception-requests must set it.
+   * Backend Pydantic rejects (422) if missing. */
+  exception_type: ExceptionCategory;
   requested_amount: number;
   cap_amount: number;
   currency: string;

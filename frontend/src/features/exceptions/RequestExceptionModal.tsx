@@ -52,8 +52,17 @@ export const RequestExceptionModal: React.FC<Props> = ({
     setSubmitting(true);
     setError(null);
     try {
+      // Q3-A: derive the exception-type axis from the cap shape:
+      //   cap = 0 → benefit not in the package, so this is a 'new_category' request
+      //   cap > 0 → asking to exceed an existing cap → 'cap_override'
+      // RequestExceptionModal only opens for over-cap or new-benefit service
+      // estimates; timeline_extension / additional_coverage flow through other
+      // surfaces (assignment-scoped, not this case-scoped endpoint).
+      const exceptionType: 'new_category' | 'cap_override' =
+        capAmountUsd === 0 ? 'new_category' : 'cap_override';
       const created = await createExceptionRequest(caseId, {
         category,
+        exception_type: exceptionType,
         requested_amount: requestedAmountUsd,
         cap_amount: capAmountUsd,
         currency: 'USD',
