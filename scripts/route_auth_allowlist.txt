@@ -71,19 +71,14 @@ backend/routes/relocation_classify.py:get_relocation_classification
 # TODO:SEC — these routes expose sensitive data without enforced auth.
 # Remove from this allowlist once the fix is deployed.
 
-backend/main.py:debug_db
-# TODO:SEC Remove unauthenticated debug endpoint before production launch.
-# Tracked: AUDIT — backend/main.py debug endpoints need auth guard or removal.
-# Exposes DB connectivity info; low-risk but non-zero.
-
-backend/main.py:debug_kv_get
-# TODO:SEC Same as debug_db. KV store key lookups should require admin auth.
-
-backend/main.py:debug_supabase
-# TODO:SEC Unauthenticated Supabase debug probe. Same remediation as debug_db.
+# (no open entries)
 
 # SEC GAP-9 closed (2026-05-28): get_research_status now requires an
 # authenticated session and a case-access check via require_case_access().
 # Both the live copy in cases_read.py and the dormant cases.py copy were
 # fixed in the same commit so the route-auth audit stays green and no
 # allowlist entry is needed.
+
+# SEC debug endpoints closed (2026-05-28): debug_db, debug_kv_set, debug_kv_get,
+# debug_supabase now require an admin session via Depends(require_admin) from
+# backend/app/auth_deps.py. No allowlist entries needed.

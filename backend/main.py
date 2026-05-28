@@ -742,9 +742,17 @@ def supabase_health(probe: int = 0):
 # ---------------------------------------------------------------------------
 # Debug / diagnostics endpoints
 # ---------------------------------------------------------------------------
+# All four routes below were unauthenticated and listed as TODO:SEC in
+# scripts/route_auth_allowlist.txt as "must be fixed pre-launch". They now
+# require an admin session via the canonical require_admin dependency from
+# backend/app/auth_deps.py. Imported as `_require_admin_v2` to avoid shadowing
+# the legacy `require_admin` defined later in this file.
+from .app.auth_deps import require_admin as _require_admin_v2  # noqa: E402
+
+
 @app.get("/debug/db")
-def debug_db():
-    """Return non-secret database connectivity info."""
+def debug_db(user: Dict[str, Any] = Depends(_require_admin_v2)):
+    """Return non-secret database connectivity info. Admin only."""
     return Database.get_db_info()
 
 
@@ -754,13 +762,21 @@ class _DebugKVBody(_BaseModel):
 
 
 @app.post("/debug/kv")
-def debug_kv_set(body: _DebugKVBody):
+def debug_kv_set(
+    body: _DebugKVBody,
+    user: Dict[str, Any] = Depends(_require_admin_v2),
+):
+    """Set a KV store entry. Admin only."""
     db.debug_kv_set(body.key, body.value)
     return {"ok": True, "key": body.key}
 
 
 @app.get("/debug/kv/{key}")
-def debug_kv_get(key: str):
+def debug_kv_get(
+    key: str,
+    user: Dict[str, Any] = Depends(_require_admin_v2),
+):
+    """Read a KV store entry. Admin only."""
     result = db.debug_kv_get(key)
     if not result:
         raise HTTPException(status_code=404, detail=f"Key '{key}' not found")
@@ -5575,9 +5591,9 @@ def list_hr_assignments(
 
 
 @app.get("/api/debug/supabase")
-def debug_supabase():
+def debug_supabase(user: Dict[str, Any] = Depends(_require_admin_v2)):
     """
-    Lightweight Supabase admin connectivity check.
+    Lightweight Supabase admin connectivity check. Admin only.
     - Verifies SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are present.
     - Runs a small SELECT via service-role client.
     """
