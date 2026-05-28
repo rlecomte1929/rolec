@@ -11,11 +11,22 @@
  */
 import { apiGet, apiPost, apiPatch } from './client';
 
+/** Q3-A: HR-inbox exception-type axis. Same 4-value set used by the
+ * case-scoped /api/cases/:case_id/exception-requests endpoint. Required
+ * here too — the public.exception_requests DB column is NOT NULL. */
+export type AssignmentExceptionType =
+  | 'new_category'
+  | 'cap_override'
+  | 'timeline_extension'
+  | 'additional_coverage';
+
 export interface AssignmentExceptionCreate {
   /** Benefit key from BENEFIT_COLUMNS, e.g. "temporary_housing", "schooling" */
   benefit_key: string;
   /** Human-readable label, e.g. "Temporary housing cap override" */
   type_label: string;
+  /** Q3-A: required. Picks which display tile the HR inbox shows for this row. */
+  exception_type: AssignmentExceptionType;
   /** Current policy value, e.g. { amount: 1500, currency: "EUR" } */
   current_value: Record<string, unknown>;
   /** What the employee is requesting, e.g. { amount: 2200, currency: "EUR" } */
@@ -28,6 +39,8 @@ export interface AssignmentExceptionRead {
   assignment_id: string;
   benefit_key: string;
   type_label: string | null;
+  /** Q3-A: distinct from `benefit_key`. One of the 4 HR-inbox axis values. */
+  exception_type: AssignmentExceptionType | null;
   current_value: Record<string, unknown> | null;
   requested_value: Record<string, unknown> | null;
   reason: string;
