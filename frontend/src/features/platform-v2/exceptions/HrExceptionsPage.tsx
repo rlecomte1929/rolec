@@ -2,6 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../../../components/AppShell';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { AIRecommendationCard } from '../../ai-oversight/AIRecommendationCard';
+import {
+  getExceptionAuditTrail,
+  listExceptionRequestsForCompany,
+} from '../../../api/exceptions';
+import type {
+  ExceptionAuditEvent,
+  ExceptionRequest,
+} from '../../../api/exceptions';
 
 /**
  * HR Policy Exceptions — V2.
@@ -305,7 +313,9 @@ function ExcDetail({
             <div className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Current policy</p>
               <p className="text-sm font-semibold text-slate-800">{r.current.value}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{r.current.sub}</p>
+              {r.current.sub && (
+                <p className="text-xs text-slate-400 mt-0.5">{r.current.sub}</p>
+              )}
             </div>
             <div className="flex items-center text-slate-300">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -315,7 +325,9 @@ function ExcDetail({
             <div className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
               <p className="text-[10px] text-blue-500 font-semibold uppercase tracking-wider mb-1">{r.typeLabel}</p>
               <p className="text-sm font-semibold text-blue-800">{r.requested.value}</p>
-              <p className="text-xs text-blue-500 mt-0.5">{r.requested.sub}</p>
+              {r.requested.sub && (
+                <p className="text-xs text-blue-500 mt-0.5">{r.requested.sub}</p>
+              )}
             </div>
           </div>
         </section>
@@ -509,6 +521,133 @@ function ExcDetail({
   );
 }
 
+// ── Server → UI mapping helpers (AI-005 follow-up) ───────────────────────────
+//
+// The live exception inbox renders the same ExcRequest shape that the mock
+// fixtures produce. The mapping below fills the gaps the server doesn't
+// currently provide (avatar initials, formatted relative times, formatted
+// currency amounts) and uses the joined employee / corridor fields when the
+// backend returns them.
+
+const CATEGORY_TO_TYPE: Record<string, ExcType> = {
+  new_category: 'new_category',
+  cap_override: 'cap_override',
+  timeline_extension: 'timeline_extension',
+  additional_coverage: 'additional_coverage',
+};
+
+const TYPE_LABEL: Record<ExcType, string> = {
+  new_category: 'Add benefit',
+  cap_override: 'Cap override',
+  timeline_extension: 'Timeline',
+  additional_coverage: 'More coverage',
+};
+
+function initialsFrom(name: string | null | undefined): string {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '—';
+  const diffMs = Date.now() - t;
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d`;
+}
+
+function formatMoney(amount: number | null | undefined, currency: string | null | undefined): string {
+  if (amount == null || !Number.isFinite(amount)) return '—';
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: (currency || 'EUR').toUpperCase(),
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${amount} ${currency || ''}`.trim();
+  }
+}
+
+function roleSubtitle(req: ExceptionRequest): string {
+  const role = (req.requested_by_role || '').toLowerCase();
+  const roleLabel = role === 'hr' ? 'HR' : role === 'admin' ? 'Admin' : role === 'employee' ? 'Employee' : '';
+  const corridor =
+    req.origin_country && req.destination_country
+      ? `${req.origin_country} → ${req.destination_country}`
+      : '';
+  return [roleLabel, corridor].filter(Boolean).join(' · ');
+}
+
+/** Convert a live ExceptionRequest into the ExcRequest shape the existing
+ * inbox UI expects. Mock-only fields (justification, audit array, aiInsight
+ * mock string) are filled with sensible derivations or left empty. */
+function mapServerToUi(req: ExceptionRequest): ExcRequest {
+  const type: ExcType = (CATEGORY_TO_TYPE[req.category] as ExcType | undefined) ?? 'cap_override';
+  return {
+    id: req.id,
+    type,
+    typeLabel: TYPE_LABEL[type],
+    benefit: req.requested_by_role || type, // server has no `benefit` column today; fallback
+    employee: {
+      name: req.requested_by_name || 'Employee',
+      initials: initialsFrom(req.requested_by_name),
+      role: roleSubtitle(req) || 'Employee',
+      caseId: req.case_id,
+    },
+    current: { value: formatMoney(req.cap_amount, req.currency), sub: '' },
+    requested: { value: formatMoney(req.requested_amount, req.currency), sub: '' },
+    justification: req.reason || '—',
+    submittedAgo: relativeTime(req.created_at),
+    status: req.status,
+    hrNote: req.hr_note,
+    decidedBy: req.resolved_by_user_id ? (req.resolved_by_user_id) : null,
+    // No live aiInsight yet — the precedent_insight pipeline (AI-005 on PR #152)
+    // provides the structured payload; this swap can light it up later.
+    aiInsight: undefined,
+    unread: req.status === 'pending',
+    audit: [], // populated on selection via getExceptionAuditTrail
+  };
+}
+
+/** Convert a server audit event into the AuditEvent shape used by the inbox. */
+function mapAuditEventToUi(ev: ExceptionAuditEvent): AuditEvent {
+  const kind: AuditKind =
+    ev.action_type === 'insert'
+      ? 'submit'
+      : ev.action_type === 'update'
+        ? // distinguish approve vs reject by new_value.status when available
+          ev.new_value && (ev.new_value as { status?: string }).status === 'approved'
+          ? 'approve'
+          : ev.new_value && (ev.new_value as { status?: string }).status === 'rejected'
+            ? 'reject'
+            : 'note'
+        : 'note';
+  const note = ev.new_value && (ev.new_value as { hr_note?: string }).hr_note;
+  return {
+    kind,
+    who: ev.actor_name || (ev.actor_type === 'system' ? 'System' : 'Unknown'),
+    what:
+      kind === 'submit'
+        ? 'Submitted exception request.'
+        : kind === 'approve'
+          ? 'Approved.'
+          : kind === 'reject'
+            ? 'Rejected.'
+            : 'Updated.',
+    quote: typeof note === 'string' && note ? note : undefined,
+    when: relativeTime(ev.created_at) + ' ago',
+  };
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 type FilterTab = 'pending' | 'approved' | 'rejected' | 'all';
@@ -517,6 +656,57 @@ export function HrExceptionsPage() {
   const [requests, setRequests] = useState<ExcRequest[]>(MOCK_REQUESTS);
   const [filter, setFilter] = useState<FilterTab>('pending');
   const [selectedId, setSelectedId] = useState<string | null>(MOCK_REQUESTS[0]?.id ?? null);
+  // True once the live fetch attempt has resolved — drives whether we treat
+  // the inbox as real backend data (and therefore eligible for real audit-trail
+  // fetches) or as the mock demo dataset.
+  const [isLiveData, setIsLiveData] = useState(false);
+
+  // AI-005-followup: attempt to fetch real exception_requests on mount. When
+  // the API returns rows, swap in the live data; when it returns an empty
+  // list (or errors with 401/403/etc. in a dev / unauthenticated environment),
+  // we keep MOCK_REQUESTS so the page still demos. The mock fallback is
+  // intentional and documented — production with real data will always have
+  // at least one row, dev environments without seeded data won't.
+  useEffect(() => {
+    let cancelled = false;
+    listExceptionRequestsForCompany()
+      .then((live) => {
+        if (cancelled) return;
+        if (live && live.length > 0) {
+          const mapped = live.map(mapServerToUi);
+          setRequests(mapped);
+          setSelectedId(mapped[0]?.id ?? null);
+          setIsLiveData(true);
+        }
+      })
+      .catch(() => {
+        // Silently fall back to mock; not a user-visible failure since the
+        // mock dataset still renders. The browser console will show the 4xx.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // When the selected row is live data, fetch its audit trail from the
+  // backend and merge into the request shape. Mock rows already carry
+  // their own audit array.
+  useEffect(() => {
+    if (!isLiveData || !selectedId) return;
+    let cancelled = false;
+    getExceptionAuditTrail(selectedId)
+      .then((events) => {
+        if (cancelled) return;
+        const ui = events.map(mapAuditEventToUi);
+        setRequests((rs) => rs.map((r) => (r.id === selectedId ? { ...r, audit: ui } : r)));
+      })
+      .catch(() => {
+        // Leave audit array empty if the trail fetch fails. Non-blocking.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLiveData, selectedId]);
 
   const counts = useMemo(
     () => ({

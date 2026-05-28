@@ -46,6 +46,15 @@ logger = logging.getLogger(__name__)
 VALID_STATUSES = ("pending", "approved", "rejected")
 RESOLVABLE_STATUSES = ("approved", "rejected")
 
+# NOTE on `category`: existing flows (RequestExceptionModal) use this column
+# to store the *service category* (housing, schools, movers, ...) while the
+# mock HR exceptions inbox UI uses a separate axis of 4 *exception types*
+# (new_category, cap_override, timeline_extension, additional_coverage).
+# Until that data-model question is resolved at the product level, the
+# backend keeps `category` permissive (free-form text) and the inbox UI
+# maps server values to the 4 display types client-side. See the open
+# question logged in the AI-005 follow-up PR.
+
 
 # ---------------------------------------------------------------------------
 # Schemas
@@ -87,7 +96,7 @@ class ExceptionRequestRead(BaseModel):
     id: str
     case_id: str
     organization_id: str
-    category: str
+    category: str  # read-side stays permissive — legacy rows may have older values
     requested_amount: float
     cap_amount: float
     currency: str
@@ -109,6 +118,28 @@ class ExceptionRequestRead(BaseModel):
     created_at: str
     resolved_at: Optional[str]
     updated_at: str
+    # AI-005-followup: joined fields so the HR exceptions inbox can render
+    # avatars / role subtitles / corridor without a second round-trip.
+    # All optional — render gracefully if the join returns NULL.
+    requested_by_name: Optional[str] = None
+    requested_by_role: Optional[str] = None
+    resolved_by_name: Optional[str] = None
+    origin_country: Optional[str] = None
+    destination_country: Optional[str] = None
+
+
+class AuditEventRead(BaseModel):
+    """One row from public.audit_logs surfaced through the audit-trail endpoint."""
+    id: str
+    entity_type: str
+    entity_id: str
+    action_type: str
+    actor_type: Optional[str] = None
+    actor_id: Optional[str] = None
+    actor_name: Optional[str] = None
+    old_value: Optional[Dict[str, Any]] = None
+    new_value: Optional[Dict[str, Any]] = None
+    created_at: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +192,25 @@ def _attach_precedent_insight(conn, row: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         logger.exception("precedent_insight compute failed for id=%s", row.get("id"))
     return row
+
+
+# AI-005-followup: shared SELECT projection that joins profiles + mobility_cases
+# so the HR exceptions inbox can render avatars / role subtitles / corridor in a
+# single round-trip. LEFT JOINs throughout — a missing profile or case row must
+# not drop the exception from the list.
+_EXCEPTION_SELECT_WITH_JOINS = """
+SELECT
+    pcr.*,
+    rp.full_name  AS requested_by_name,
+    rp.role       AS requested_by_role,
+    rsp.full_name AS resolved_by_name,
+    mc.origin_country,
+    mc.destination_country
+FROM policy_cap_requests pcr
+LEFT JOIN profiles       rp  ON rp.id  = pcr.requested_by_user_id
+LEFT JOIN profiles       rsp ON rsp.id = pcr.resolved_by_user_id
+LEFT JOIN mobility_cases mc  ON mc.id  = pcr.case_id
+"""
 
 
 def _audit(
@@ -245,7 +295,7 @@ def create_exception_request(
             },
         )
         row = conn.execute(
-            text("SELECT * FROM policy_cap_requests WHERE id = :id"),
+            text(_EXCEPTION_SELECT_WITH_JOINS + " WHERE pcr.id = :id"),
             {"id": new_id},
         ).mappings().first()
 
@@ -281,11 +331,9 @@ def list_exception_requests_for_case(
     with db.engine.begin() as conn:
         rows = conn.execute(
             text(
-                """
-                SELECT * FROM policy_cap_requests
-                WHERE case_id = :case_id AND organization_id = :org
-                ORDER BY created_at DESC
-                """
+                _EXCEPTION_SELECT_WITH_JOINS
+                + " WHERE pcr.case_id = :case_id AND pcr.organization_id = :org"
+                " ORDER BY pcr.created_at DESC"
             ),
             {"case_id": case_id, "org": organization_id},
         ).mappings().all()
@@ -343,18 +391,18 @@ def list_exception_requests_for_company(
         if status:
             rows = conn.execute(
                 text(
-                    "SELECT * FROM policy_cap_requests "
-                    "WHERE organization_id = :org AND status = :status "
-                    "ORDER BY created_at DESC"
+                    _EXCEPTION_SELECT_WITH_JOINS
+                    + " WHERE pcr.organization_id = :org AND pcr.status = :status"
+                    " ORDER BY pcr.created_at DESC"
                 ),
                 {"org": organization_id, "status": status},
             ).mappings().all()
         else:
             rows = conn.execute(
                 text(
-                    "SELECT * FROM policy_cap_requests "
-                    "WHERE organization_id = :org "
-                    "ORDER BY created_at DESC"
+                    _EXCEPTION_SELECT_WITH_JOINS
+                    + " WHERE pcr.organization_id = :org"
+                    " ORDER BY pcr.created_at DESC"
                 ),
                 {"org": organization_id},
             ).mappings().all()
@@ -386,7 +434,7 @@ def resolve_exception_request(
                 "SELECT * FROM policy_cap_requests WHERE id = :id AND organization_id = :org"
             ),
             {"id": request_id, "org": organization_id},
-        ).mappings().first()
+        ).mappings().first()  # plain SELECT here — only need raw fields for the status check
         if not existing:
             raise HTTPException(status_code=404, detail="Exception request not found")
         if existing["status"] != "pending":
@@ -416,7 +464,7 @@ def resolve_exception_request(
             },
         )
         row = conn.execute(
-            text("SELECT * FROM policy_cap_requests WHERE id = :id"),
+            text(_EXCEPTION_SELECT_WITH_JOINS + " WHERE pcr.id = :id"),
             {"id": request_id},
         ).mappings().first()
 
@@ -432,6 +480,90 @@ def resolve_exception_request(
         },
     )
     return _row_to_dict(row)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI-005-followup: joined audit-trail for an exception request
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/api/exception-requests/{request_id}/audit-trail",
+    response_model=List[AuditEventRead],
+)
+def get_exception_audit_trail(
+    request_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[Dict[str, Any]]:
+    """Return the audit_logs trail for this exception request, with actor names
+    resolved via a LEFT JOIN to profiles. HR / admin only and tenant-scoped:
+    we first confirm the request belongs to the caller's company, then return
+    the audit rows in chronological order (oldest first — the inbox renders
+    them as a timeline).
+
+    `entity_type` is matched against both 'exception_requests' and
+    'policy_cap_requests' so older audit rows written before the table rename
+    are still surfaced.
+    """
+    role = (user.get("role") or "").upper()
+    if role not in ("HR", "ADMIN") and not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="HR or Admin only")
+    organization_id = _caller_company_id(user)
+
+    with db.engine.begin() as conn:
+        # Tenant gate: the audit trail leaks the actor and timestamps; refuse if
+        # the request isn't in the caller's company.
+        owner = conn.execute(
+            text(
+                "SELECT organization_id FROM policy_cap_requests WHERE id = :id"
+            ),
+            {"id": request_id},
+        ).mappings().first()
+        if not owner:
+            raise HTTPException(status_code=404, detail="Exception request not found")
+        if str(owner["organization_id"]) != str(organization_id) and not user.get("is_admin"):
+            raise HTTPException(status_code=403, detail="Exception request not in your company")
+
+        rows = conn.execute(
+            text(
+                """
+                SELECT
+                    al.id,
+                    al.entity_type,
+                    al.entity_id,
+                    al.action_type,
+                    al.actor_type,
+                    al.actor_id,
+                    al.old_value_json AS old_value,
+                    al.new_value_json AS new_value,
+                    al.created_at,
+                    ap.full_name AS actor_name
+                FROM audit_logs al
+                LEFT JOIN profiles ap ON ap.id = al.actor_id
+                WHERE al.entity_id = :id
+                  AND al.entity_type IN ('exception_requests', 'policy_cap_requests')
+                ORDER BY al.created_at ASC, al.id ASC
+                """
+            ),
+            {"id": request_id},
+        ).mappings().all()
+
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        d = _row_to_dict(r)
+        # old_value / new_value may come back as either JSON-encoded strings
+        # (Postgres jsonb deserializes to dict; SQLite tier stores a string).
+        # Normalize to dict | None.
+        for k in ("old_value", "new_value"):
+            v = d.get(k)
+            if isinstance(v, str):
+                import json as _json
+                try:
+                    d[k] = _json.loads(v) if v else None
+                except Exception:
+                    d[k] = None
+        out.append(d)
+    return out
 
 
 # ─────────────────────────────────────────────────────────────────────────────
