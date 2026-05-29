@@ -20,8 +20,8 @@ create policy cdr_insert_hr_or_employee
   to authenticated
   with check (
     company_id in (
-      select company_id from public.profiles
-      where id = auth.uid() and role in ('HR', 'ADMIN', 'EMPLOYEE')
+      select company_id::uuid from public.profiles
+      where id::uuid = auth.uid() and role in ('HR', 'ADMIN', 'EMPLOYEE')
     )
   );
 
@@ -35,17 +35,17 @@ create policy cdr_update_hr_or_admin
   for update
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
     or company_id in (
-      select company_id from public.profiles
-      where id = auth.uid() and role = 'HR'
+      select company_id::uuid from public.profiles
+      where id::uuid = auth.uid() and role = 'HR'
     )
   )
   with check (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
     or company_id in (
-      select company_id from public.profiles
-      where id = auth.uid() and role = 'HR'
+      select company_id::uuid from public.profiles
+      where id::uuid = auth.uid() and role = 'HR'
     )
   );
 
@@ -60,7 +60,7 @@ create policy cda_insert_hr
   with check (
     exists (
       select 1 from public.profiles
-      where id = auth.uid() and role in ('HR', 'ADMIN')
+      where id::uuid = auth.uid() and role in ('HR', 'ADMIN')
     )
   );
 
