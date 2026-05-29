@@ -27,9 +27,16 @@ def _json_scalar(v: Any) -> Any:
     return v
 
 
-def _destination_payload(host: Optional[str], home: Optional[str]) -> Dict[str, Any]:
+def _destination_payload(
+    host: Optional[str],
+    home: Optional[str],
+    host_city: Optional[str] = None,
+    home_city: Optional[str] = None,
+) -> Dict[str, Any]:
     h = (host or "").strip()
     o = (home or "").strip()
+    hc = (host_city or "").strip()
+    oc = (home_city or "").strip()
     if h and o:
         label = f"{o} → {h}"
     else:
@@ -38,6 +45,9 @@ def _destination_payload(host: Optional[str], home: Optional[str]) -> Dict[str, 
         "label": label,
         "host_country": h or None,
         "home_country": o or None,
+        # Optional cities (migration 20260529150000).
+        "host_city": hc or None,
+        "home_city": oc or None,
     }
 
 
