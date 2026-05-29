@@ -8,6 +8,9 @@ export type EmployeeOverviewDestination = {
   label?: string | null;
   host_country?: string | null;
   home_country?: string | null;
+  // Optional cities (migration 20260529150000). Null until HR sets.
+  host_city?: string | null;
+  home_city?: string | null;
 };
 
 export type EmployeeLinkedOverviewRow = {
