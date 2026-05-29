@@ -1,7 +1,7 @@
 -- Exception requests: employee asks HR to allow a service estimate that exceeds policy cap.
 -- T1.3 from the Sprint 2 execution plan.
 --
--- 2026-05-29: retroactive cast added to the four subqueries against public.profiles
+-- 2026-05-29: retroactive cast added to ALL FOUR subqueries against public.profiles
 -- (company_id::uuid, id::uuid) so this migration is replayable on a clean-slate
 -- database. Prior to this edit, Supabase preview branches failed at the first
 -- CREATE POLICY with `operator does not exist: text = uuid` because
@@ -83,7 +83,7 @@ create policy exception_requests_insert_employee
   with check (
     requested_by_user_id = auth.uid()
     and organization_id in (
-      select company_id from public.profiles where id = auth.uid()
+      select company_id::uuid from public.profiles where id::uuid = auth.uid()
     )
   );
 
