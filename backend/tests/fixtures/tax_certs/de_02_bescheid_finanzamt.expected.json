@@ -1,0 +1,42 @@
+{
+  "_fixture_metadata": {
+    "stem": "de_02_bescheid_finanzamt",
+    "country": "DEU",
+    "subtype": "einkommensteuerbescheid",
+    "scenario": "Finanzamt München I issued Einkommensteuerbescheid; subtype-info finding fires",
+    "reference_date": "2026-05-29",
+    "authored_by": "C2-02b (notion-task-executor, Cowork, 2026-05-29)",
+    "notes": "Mirrors DE Exemplar 2 in tax_cert_de_v1.txt"
+  },
+  "is_tax_document": true,
+  "is_tax_document_reason": null,
+  "document_subtype": "EINKOMMENSTEUERBESCHEID",
+  "issuing_country_iso3": "DEU",
+  "issuing_authority": "Finanzamt München I",
+  "issuing_authority_normalized": "DE_FINANZAMT",
+  "issuing_office": "Finanzamt München I",
+  "is_employer_issued": false,
+  "employer_normalized_name": null,
+  "tax_year": 2024,
+  "bescheinigungszeitraum_start": null,
+  "bescheinigungszeitraum_end": null,
+  "tax_id": "98765432109",
+  "tax_id_etin": null,
+  "holder_name": "Anna Maria KOWALSKI",
+  "holder_dob": "1991-09-22",
+  "holder_address": "Implerstr. 8, 81371 München",
+  "residence_country_iso3": "DEU",
+  "gross_income_annual": "84620.00",
+  "gross_income_annual_confidence": "high",
+  "net_taxable_income_annual": "75340.00",
+  "total_tax_annual": "18730.00",
+  "wage_tax_paid": null,
+  "solidarity_surcharge": null,
+  "church_tax_paid": null,
+  "social_security_contributions": null,
+  "currency_iso3": "EUR",
+  "findings": [
+    { "severity": "INFO", "code": "DOCUMENT_SUBTYPE_BESCHEID" }
+  ],
+  "agent_confidence": "high"
+}
