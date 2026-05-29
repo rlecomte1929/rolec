@@ -1,0 +1,272 @@
+# C1-10 · Corridor Agent FR_NO_EEA_2026
+#
+# Architecture Report §4.3 direct implementation. FR national → Norway,
+# under EEA free-movement rules (EØS-utlendingsloven implementing
+# Directive 2004/38/EC). Fundamentally different from C1-09 (IN→DE Blue
+# Card): no third-country permit is needed for Marc himself, but the
+# pathway branches based on spouse nationality.
+#
+# Three branches per §4.3:
+#   BRANCH_1_MARC_SOLO     — Marc himself, no family, 5-step graph
+#   BRANCH_2_NON_EEA_SPOUSE — Marc + non-EEA spouse, adds Directive
+#                            2004/38/EC Art. 10 residence-card step
+#   BRANCH_3_EEA_FAMILY     — Marc + EEA spouse, parallel EEA registrations
+#
+# NOK skilled-worker salary thresholds appear as `reference_values` only;
+# Marc as EEA national is NOT bound by them. They're surfaced for context
+# and for downstream UI display (Resolution panel shows them).
+#
+# 2025 thresholds verified in R-02 (UDI Important Messages 1 September 2025).
+
+corridor_agent:
+  corridor_id: FR_NO_EEA_2026
+  version: "2026.01"
+  petitioning_party: EMPLOYEE  # Marc is the petitioner
+  origin_country_iso3: FRA
+  destination_country_iso3: NOR
+  description: >
+    French national → Norway, EEA free-movement pathway. Three branches
+    depending on family composition (Marc solo / non-EEA spouse / EEA
+    spouse). No third-country residence permit required for Marc himself.
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Applicable rules
+  # ─────────────────────────────────────────────────────────────────────
+  applicable_rules:
+    - legal_reference: "EØS-utlendingsloven §111"
+      rule_id: NO_EOS_UTL_111
+      summary: "Right of residence for EU/EEA nationals — police registration within 90 days."
+    - legal_reference: "EØS-utlendingsloven §113"
+      rule_id: NO_EOS_UTL_113
+      summary: "Right of residence for EU/EEA family members of EEA nationals."
+    - legal_reference: "EØS-utlendingsloven §114"
+      rule_id: NO_EOS_UTL_114
+      summary: "Right of residence for non-EEA family members of EEA nationals — residence card issuance."
+    - legal_reference: "Directive 2004/38/EC Art. 10"
+      rule_id: EU_2004_38_ART_10
+      summary: "Issue of residence card to non-EU family members of EU citizens (six-month deadline)."
+    - legal_reference: "Directive 2004/38/EC Art. 7"
+      rule_id: EU_2004_38_ART_7
+      summary: "Conditions for residence beyond three months (worker / self-sufficient / family)."
+    - legal_reference: "Folkeregisterloven §4-1"
+      rule_id: NO_FOLKEREG_4_1
+      summary: "Folkeregister registration after Anmeldung — eligibility for fødselsnummer."
+    - legal_reference: "Skatteforvaltningsloven §3-1"
+      rule_id: NO_SKATT_3_1
+      summary: "D-number assignment by the Norwegian Tax Administration."
+    - legal_reference: "Folketrygdloven §2-1"
+      rule_id: NO_FOLKETRYGD_2_1
+      summary: "Mandatory NAV (National Insurance) enrolment for residents performing work in Norway."
+    - legal_reference: "Hvitvaskingsloven §10"
+      rule_id: NO_HVITVASK_10
+      summary: "AML customer-due-diligence — bank account opening requires valid ID + Folkeregister status."
+    - legal_reference: "UDI Important Messages 1 September 2025"
+      rule_id: NO_UDI_2025_THRESHOLDS
+      summary: "2025 skilled-worker salary thresholds (reference only for EEA nationals)."
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Required documents per branch
+  # ─────────────────────────────────────────────────────────────────────
+  required_documents:
+    - PASSPORT_TD3:employee
+    - EU_NATIONAL_ID:employee?
+    - PASSPORT_TD3:family.spouse?
+    - PASSPORT_TD3:family.children.*
+    - EMPLOYMENT_CONTRACT
+    - MARRIAGE_CERT?
+    - BIRTH_CERT:family.children.*
+    - HEALTH_INSURANCE_PROOF
+    - HOUSING_LEASE?
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Required data points
+  # ─────────────────────────────────────────────────────────────────────
+  required_data_points:
+    - key: employee_nationality_iso3
+      type: enum_iso3
+      source: USER_INPUT
+      validations:
+        - "in EEA_SET"
+    - key: has_family_relocating
+      type: bool
+      source: USER_INPUT
+    - key: family_members
+      type: list_of_persons
+      source: USER_INPUT
+    - key: spouse_nationality_iso3
+      type: enum_iso3
+      source: USER_INPUT
+    - key: residence_intent_days
+      type: int
+      source: USER_INPUT
+      validations:
+        - "> 90"
+    - key: has_employment_contract
+      type: bool
+      source: USER_INPUT
+
+  # ─────────────────────────────────────────────────────────────────────
+  # EEA country set (lives in the YAML rather than the eligibility DSL so
+  # it can be amended without a rule_id change when accession/Brexit-style
+  # transitions happen)
+  # ─────────────────────────────────────────────────────────────────────
+  eea_set:
+    - AUT
+    - BEL
+    - BGR
+    - HRV
+    - CYP
+    - CZE
+    - DNK
+    - EST
+    - FIN
+    - FRA
+    - DEU
+    - GRC
+    - HUN
+    - IRL
+    - ISL
+    - ITA
+    - LVA
+    - LIE
+    - LTU
+    - LUX
+    - MLT
+    - NLD
+    - NOR
+    - POL
+    - PRT
+    - ROU
+    - SVK
+    - SVN
+    - ESP
+    - SWE
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Reference-only NOK thresholds (Marc is EEA — NOT enforced for him)
+  # ─────────────────────────────────────────────────────────────────────
+  reference_values:
+    no_skilled_worker_threshold_master_nok: 599200
+    no_skilled_worker_threshold_bachelor_nok: 522600
+    effective_from: "2025-09-01"
+    source: "UDI Important Messages 1 September 2025"
+    note: "Surfaced for downstream UI context only. Marc as EEA national is not bound by these thresholds; UDI does not apply them to EEA Art. 7 cases."
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Eligibility / branch selection
+  # ─────────────────────────────────────────────────────────────────────
+  eligibility_logic:
+    branches:
+      - id: BRANCH_1_MARC_SOLO
+        label: "EEA national, no family relocating — police registration only"
+        cite: NO_EOS_UTL_111
+        requires_all:
+          - employee_nationality_iso3 in eea_set
+          - has_family_relocating == false
+          - residence_intent_days > 90
+        verdict_on_pass: ELIGIBLE
+        annotation: "5-step pathway: Police registration → Tax D-number → Folkeregister → NAV → BankID."
+      - id: BRANCH_2_NON_EEA_SPOUSE
+        label: "EEA national + non-EEA spouse — Art. 10 residence card for spouse"
+        cite: EU_2004_38_ART_10
+        requires_all:
+          - employee_nationality_iso3 in eea_set
+          - has_family_relocating == true
+          - spouse_nationality_iso3 not in eea_set
+        verdict_on_pass: ELIGIBLE
+        annotation: "Marc follows Branch 1; spouse adds Art. 10 residence-card step (six-month UDI deadline)."
+      - id: BRANCH_3_EEA_FAMILY
+        label: "EEA national + EEA spouse — parallel EEA registrations"
+        cite: NO_EOS_UTL_113
+        requires_all:
+          - employee_nationality_iso3 in eea_set
+          - has_family_relocating == true
+          - spouse_nationality_iso3 in eea_set
+        verdict_on_pass: ELIGIBLE
+        annotation: "Two independent EEA registrations at the same address. Each spouse registers independently."
+    no_branch_verdict: NOT_ELIGIBLE
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Exception cases
+  # ─────────────────────────────────────────────────────────────────────
+  exception_cases:
+    - id: NON_EEA_EMPLOYEE_NOT_SUPPORTED
+      condition: "employee_nationality_iso3 not in eea_set"
+      cite: EU_2004_38_ART_7
+      action: ROUTE_TO_DIFFERENT_CORRIDOR
+      hint: "Non-EEA employee falls under a different residence pathway (skilled worker / family reunification). Not handled by this corridor."
+    - id: SHORT_STAY_NO_REGISTRATION_NEEDED
+      condition: "residence_intent_days <= 90"
+      cite: EU_2004_38_ART_7
+      action: SURFACE_AS_NO_REGISTRATION_NEEDED
+      hint: "Stays under 3 months don't require police registration. Document for the case file but skip the 5-step graph."
+    - id: CHILD_INDIAN_BORN
+      condition: "case.has_indian_born_child == true"
+      cite: NO_EOS_UTL_114
+      action: SPAWN_CHILD_CASE
+      hint: "Apostilled Indian birth cert + spouse linkage establishes EEA-family-member status."
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Step graph — Branch 1 base (5 steps)
+  # Branch 2 prepends/appends the SPOUSE_RESIDENCE_CARD step.
+  # Branch 3 forks the registrations into two independent chains.
+  # ─────────────────────────────────────────────────────────────────────
+  step_graph:
+    - step_id: POLICE_REGISTRATION
+      name: "Politiet — EEA registration appointment (within 90 days of arrival)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 30
+      prerequisite_step_ids: []
+      time_window_relative_to: null
+      time_window_min_days: 0
+      time_window_max_days: 90
+      cite: NO_EOS_UTL_111
+
+    - step_id: TAX_ADMIN_D_NUMBER
+      name: "Skatteetaten — D-number assignment (interim ID pre-fødselsnummer)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 21
+      prerequisite_step_ids: [POLICE_REGISTRATION]
+      cite: NO_SKATT_3_1
+
+    - step_id: FOLKEREGISTER_REGISTRATION
+      name: "Folkeregister — national population register, eligibility for fødselsnummer"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [TAX_ADMIN_D_NUMBER]
+      cite: NO_FOLKEREG_4_1
+
+    - step_id: NAV_ENROLMENT
+      name: "NAV — National Insurance enrolment"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 7
+      prerequisite_step_ids: [FOLKEREGISTER_REGISTRATION]
+      cite: NO_FOLKETRYGD_2_1
+
+    - step_id: BANK_BANKID
+      name: "Bank account + BankID issuance"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 14
+      prerequisite_step_ids: [FOLKEREGISTER_REGISTRATION]
+      cite: NO_HVITVASK_10
+
+    # ─── Branch 2 only ───
+    - step_id: SPOUSE_RESIDENCE_CARD
+      name: "UDI — non-EEA spouse residence card (Directive 2004/38/EC Art. 10, six-month deadline)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 180
+      prerequisite_step_ids: [POLICE_REGISTRATION]
+      time_window_relative_to: POLICE_REGISTRATION
+      time_window_min_days: 0
+      time_window_max_days: 180
+      conditional_on: "branch == 'BRANCH_2_NON_EEA_SPOUSE'"
+      cite: EU_2004_38_ART_10
+
+    # ─── Branch 3 only — parallel registration for EEA spouse ───
+    - step_id: SPOUSE_POLICE_REGISTRATION
+      name: "Politiet — EEA spouse registration (parallel to employee)"
+      responsible_party: EMPLOYEE
+      expected_duration_days: 30
+      prerequisite_step_ids: []
+      conditional_on: "branch == 'BRANCH_3_EEA_FAMILY'"
+      cite: NO_EOS_UTL_111
