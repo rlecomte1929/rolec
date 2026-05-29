@@ -12,6 +12,9 @@
     "lint": "eslint src --ext .ts,.tsx"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.62.7",
+    "@tanstack/react-table": "^8.20.5",
+    "@tanstack/react-virtual": "^3.10.9",
     "axios": "^1.6.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
