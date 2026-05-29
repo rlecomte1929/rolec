@@ -13,6 +13,7 @@ openai==1.51.2
 # Migrating to argon2-cffi with a PBKDF2 compat shim is tracked separately.
 passlib==1.7.4
 python-dateutil==2.8.2
+dateparser==1.2.0  # C1-06: locale-aware date parsing for relopass.normalize.dates
 PyYAML>=6.0
 supabase==2.5.1
 requests
