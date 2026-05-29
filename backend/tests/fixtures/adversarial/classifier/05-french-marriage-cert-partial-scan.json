@@ -1,0 +1,18 @@
+{
+  "fixture_id": "ADV-CLS-05",
+  "fixture_name": "french-marriage-certificate-partial-scan",
+  "adversarial_category": "truncated_input_missing_header",
+  "expected_label": "MARRIAGE_CERTIFICATE",
+  "expected_confidence_band": [0.50, 0.79],
+  "escalation_to_gpt4o_expected": true,
+  "document_text": "[PAGE 1 MISSING — scan starts at page 2 of a 2-page document]\n[Top 40% of visible page cut off by flatbed scanner misalignment]\n\n...conformément aux dispositions du Code Civil,\nLe mariage a été célébré le vingt-trois avril deux mille vingt-deux\nentre:\nMonsieur Jean-Baptiste MOREAU,\nné le 04 février 1990 à Lyon (Rhône),\nde nationalité française, célibataire,\nfils de Pierre MOREAU et de Marie-Hélène DUPONT,\n\net Madame Fatima EL-AMRANI,\nnée le 17 septembre 1992 à Casablanca (Maroc),\nde nationalité marocaine, célibataire,\nfille de Khalid EL-AMRANI et de Nadia BENZEKRI,\n\nLes époux ont déclaré vouloir se prendre mutuellement pour mari et femme\net ont échangé leur consentement en présence de leurs témoins.\n\nL'officier d'état civil a prononcé l'union.\n\nSigné: [SIGNATURE ILLEGIBLE — scan cut-off]\nLe Maire / The Mayor: [SIGNATURE PARTIALLY VISIBLE]\nTémoins / Witnesses: [NAMES CROPPED]\n\nApposé le cachet de la mairie de Lyon, 2ème arrondissement\n[MAIRIE STAMP PARTIALLY VISIBLE — top half cut off]\n\nActe n°: 2022/LY02/M/[REMAINDER CROPPED]\nTranscrit le: [DATE CROPPED]",
+  "why_adversarial": "This French marriage certificate has two compounding adversarial properties: (a) the first page is entirely missing — the document title 'ACTE DE MARIAGE' and the mairie header are not present; (b) the scan starts mid-page 2, cutting off the top 40%, which removes the mayor's full signature, the witnesses' names, and the acte number suffix. A classifier must infer MARRIAGE_CERTIFICATE from the remaining mid-document text alone — specifically the civil ceremony language ('Le mariage a été célébré'), the two-party 'entre: ... et ...' structure, the célibataire status declarations, and the Code Civil reference. A weak classifier may emit BIRTH_CERTIFICATE (confused by birth dates and parental names) or UNKNOWN (due to the missing header).",
+  "classifier_failure_mode": "Classifier emits BIRTH_CERTIFICATE because the text contains multiple 'né le' (born on) entries, parental names, and place-of-birth references — all of which also appear in birth certificates. Missing document header eliminates the easiest classification signal. Secondary failure: UNKNOWN due to truncated scan.",
+  "gold_signals_expected": [
+    "Le mariage a été célébré — explicit marriage ceremony language",
+    "Two-party structure: Monsieur X ... et Madame Y ... (bride and groom)",
+    "Célibataire status for both parties — pre-marriage civil status",
+    "Officier d'état civil / Le Maire references — French civil registry authority"
+  ],
+  "notes": "The né le entries refer to the spouses' birth dates (biographical fields within the marriage act), NOT birth certificates. The two-person 'entre... et...' ceremony structure is the strongest discriminating signal for MARRIAGE_CERTIFICATE vs BIRTH_CERTIFICATE. The Code Civil reference and mairie cachet are secondary confirmatory signals. Confidence below 0.80 is correct given the missing page-1 header — escalation is the right path. The cross-national element (French husband, Moroccan wife) is incidental but realistic."
+}

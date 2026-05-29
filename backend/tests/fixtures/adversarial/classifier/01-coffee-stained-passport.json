@@ -1,0 +1,18 @@
+{
+  "fixture_id": "ADV-CLS-01",
+  "fixture_name": "coffee-stained-passport-scan",
+  "adversarial_category": "low_quality_scan",
+  "expected_label": "PASSPORT_TD3",
+  "expected_confidence_band": [0.50, 0.79],
+  "escalation_to_gpt4o_expected": true,
+  "document_text": "REPUBLIC OF FRANCE\nPASSEPORT / PASSPORT\n[STAIN OCCLUSION: ~30% of MRZ line 1 illegible]\nNom / Surname: MAR[STAIN]IN\nPrénoms / Given Names: PIERRE [STAIN]QUES\nNationalité / Nationality: FRANÇAISE / FRENCH\nDate de naissance / Date of birth: [ILLEGIBLE]\nSexe / Sex: M\nLieu de naissance / Place of birth: PARIS\nDate de délivrance / Date of issue: 15.03.2022\nDate d'expiration / Date of expiry: 14.03.2032\nAutorité / Authority: PRÉFECTURE DE PARIS\n\nMRZ LINE 1: P<FRAMAR[STAIN]IN<<PIERRE<<[STAIN]ES<<<<<<<<<<<<<<\nMRZ LINE 2: AB12345[STAIN]6FRA8[STAIN]01[STAIN]5M320314[STAIN]<<<<<<<<<<<<<4",
+  "why_adversarial": "A coffee or liquid stain occludes approximately 30% of both MRZ lines and obscures the holder's surname and date of birth. The classifier must still identify this as PASSPORT_TD3 from the visible layout cues (P< prefix fragment, booklet structure, issuing authority format, PASSEPORT header) despite MRZ check-digit corruption and partial name loss. A weak classifier will fall back to UNKNOWN because of low MRZ confidence. The confidence band should be moderate (0.50-0.79) triggering GPT-4o escalation per the threshold rule.",
+  "classifier_failure_mode": "Classifier assigns UNKNOWN due to corrupted MRZ rather than using visual-side layout cues. Or classifier over-confidently assigns PASSPORT_TD3 at high confidence (≥0.80) despite signal loss — both are wrong.",
+  "gold_signals_expected": [
+    "PASSEPORT/PASSPORT bilingual header consistent with TD3 booklet",
+    "P< prefix visible in corrupted MRZ line 1",
+    "Issuing authority format matches French préfecture pattern",
+    "Nom/Prénoms label structure matches French passport visual side"
+  ],
+  "notes": "Confidence MUST be below 0.80 to trigger escalation. The agent MUST NOT emit surname or DOB fields — those come from the MRZ parser (C1-02) and are corrupted here. The signals array must cite the surviving layout cues, not the occluded MRZ data."
+}
