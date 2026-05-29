@@ -79,7 +79,7 @@ CREATE POLICY "hr_read_own_company_refusal_logs"
     USING (
         EXISTS (
             SELECT 1 FROM profiles p
-            WHERE p.id = auth.uid()
+            WHERE p.id::uuid = auth.uid()
               AND p.company_id = ai_refusal_logs.company_id
               AND p.role IN ('hr', 'admin')
         )

@@ -64,7 +64,7 @@ create policy "events_select_admin"
   using (
     exists (
       select 1 from public.profiles
-      where profiles.id = auth.uid()
+      where profiles.id::uuid = auth.uid()
         and profiles.role = 'ADMIN'
     )
   );
@@ -113,7 +113,7 @@ create policy "daily_summaries_select_admin"
   using (
     exists (
       select 1 from public.profiles
-      where profiles.id = auth.uid()
+      where profiles.id::uuid = auth.uid()
         and profiles.role = 'ADMIN'
     )
   );
