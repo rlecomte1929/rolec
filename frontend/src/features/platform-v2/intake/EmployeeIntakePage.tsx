@@ -208,24 +208,24 @@ function FieldWrap({
         {required && <span className="text-red-500" title="Required">*</span>}
         {optional && <span className="text-gray-400 font-normal">(optional)</span>}
         {prefill && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-medium">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#dbeafe] text-[#0b2b43] text-[10px] font-medium">
             🔒 HR pre-filled
             {onUnlock && (
-              <button type="button" onClick={onUnlock} className="underline text-violet-500 hover:text-violet-700 ml-0.5">
+              <button type="button" onClick={onUnlock} className="underline text-[#475569] hover:text-[#0b2b43] ml-0.5">
                 Edit
               </button>
             )}
           </span>
         )}
         {why && (
-          <button type="button" onClick={() => setWhyOpen((o) => !o)} className="text-violet-500 text-[10px] font-medium hover:text-violet-700">
+          <button type="button" onClick={() => setWhyOpen((o) => !o)} className="text-[#475569] text-[10px] font-medium hover:text-[#0b2b43]">
             Why?
           </button>
         )}
       </label>
       {children}
       {whyOpen && why && (
-        <div className="text-xs text-gray-500 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">{why}</div>
+        <div className="text-xs text-gray-500 bg-[#eff6ff] border border-[#bfdbfe] rounded-lg px-3 py-2">{why}</div>
       )}
       {hint && <div className="text-xs text-gray-400">{hint}</div>}
     </div>
@@ -233,12 +233,12 @@ function FieldWrap({
 }
 
 const inputCls = (locked?: boolean) =>
-  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 ${
+  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/30 ${
     locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
   }`;
 
 const selectCls = (locked?: boolean) =>
-  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300 ${
+  `w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/30 ${
     locked ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'border-gray-200 bg-white'
   }`;
 
@@ -286,7 +286,7 @@ function CountryCombo({ value, onChange, placeholder = 'Select a country', disab
             ? <div className="px-4 py-3 text-xs text-gray-400">No match</div>
             : filtered.map((c) => (
               <div key={c.code} onClick={() => { onChange(c.code); setOpen(false); setQuery(''); }}
-                className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-violet-50 text-violet-700' : ''}`}>
+                className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm hover:bg-gray-50 ${value === c.code ? 'bg-[#eff6ff] text-[#0b2b43]' : ''}`}>
                 <span className="text-base">{c.flag}</span>
                 <span className="flex-1">{c.name}</span>
                 <span className="text-xs text-gray-400">{c.code}</span>
@@ -343,7 +343,7 @@ function MultiChip({ value, onChange, options }: {
         return (
           <button key={val} type="button" onClick={() => toggle(val)}
             className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-              value.includes(val) ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+              value.includes(val) ? 'bg-[#0b2b43] text-white border-[#0b2b43]' : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
             }`}>{lbl}</button>
         );
       })}
@@ -370,7 +370,7 @@ function CommuteMap({ maxMins, mode }: { maxMins: number; mode: string[] }) {
   const inCount = NEIGHBORHOODS.filter((n) => n.t_min <= maxMins).length;
   return (
     <div className="relative rounded-xl overflow-hidden border border-gray-100 bg-gray-950">
-      <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-medium">
+      <span className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0b2b43] text-white text-[10px] font-medium">
         <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" /> live
       </span>
       <svg viewBox="0 0 100 100" className="w-full h-48" preserveAspectRatio="xMidYMid meet" aria-hidden>
@@ -396,7 +396,7 @@ function CommuteMap({ maxMins, mode }: { maxMins: number; mode: string[] }) {
         <text x={cx} y={cy - 5} textAnchor="middle" fontSize="3" fill="#a78bfa">Office</text>
       </svg>
       <div className="absolute bottom-2 left-0 right-0 text-center text-[10px] text-gray-400">
-        <strong className="text-violet-400">{inCount} neighborhoods</strong> within {maxMins}min
+        <strong className="text-[#64748b]">{inCount} neighborhoods</strong> within {maxMins}min
         {mode.length > 0 ? ` by ${mode.slice(0, 2).map((m) => m === 'public_transit' ? 'transit' : m).join('/')}` : ''}
       </div>
     </div>
@@ -492,7 +492,7 @@ function ChildCard({ m, onChange, onRemove, index, expanded, onToggle }: {
           <input type="date" className={inputCls()} value={m.dob ?? ''}
             onChange={(e) => onChange({ ...m, dob: e.target.value })} />
           {age != null && (
-            <div className="text-[10px] text-violet-600 mt-0.5">✦ {age} years old · {schoolLvl}</div>
+            <div className="text-[10px] text-[#0b2b43] mt-0.5">✦ {age} years old · {schoolLvl}</div>
           )}
         </FieldWrap>
         <FieldWrap label="School type preference" className="sm:col-span-2">
@@ -592,7 +592,7 @@ function PetCard({ m, onChange, onRemove, index, expanded, onToggle }: {
           </div>
         )}
         <button type="button" onClick={addVax}
-          className="text-xs text-violet-600 hover:text-violet-800 font-semibold">
+          className="text-xs text-[#0b2b43] hover:text-[#0f3858] font-semibold">
           + Add vaccination
         </button>
       </div>
@@ -677,19 +677,19 @@ function QuoteRequestPanel({ caseId, services }: { caseId: string; services: str
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-600">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
-          <textarea rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none"
+          <textarea rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/30 resize-none"
             placeholder="Any specific requirements or context for the vendor…"
             value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-gray-600">Budget range <span className="text-gray-400 font-normal">(optional)</span></label>
-          <input type="text" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
+          <input type="text" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/30"
             placeholder="e.g. 5 000–10 000 €"
             value={budgetRange} onChange={(e) => setBudgetRange(e.target.value)} />
         </div>
         {error && <p className="text-xs text-red-500">{error}</p>}
         <button type="button" onClick={handleSend} disabled={sending}
-          className="self-start px-4 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
+          className="self-start px-4 py-2 text-xs font-semibold rounded-lg bg-[#0b2b43] text-white hover:bg-[#0f3858] disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
           {sending ? 'Sending…' : 'Send quote request'}
         </button>
       </div>
@@ -753,7 +753,7 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
     role === 'hr' ? 'HR' : role === 'admin' ? 'Admin' : 'You';
 
   const roleColor = (role: string) =>
-    role === 'employee' ? 'bg-violet-100 text-violet-800' : 'bg-blue-100 text-blue-800';
+    role === 'employee' ? 'bg-[#dbeafe] text-[#0f3858]' : 'bg-blue-100 text-blue-800';
 
   return (
     <div className="mt-4 border border-gray-100 rounded-xl bg-white overflow-hidden">
@@ -773,7 +773,7 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
             </span>
             <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${
               msg.sender_role === 'employee'
-                ? 'bg-violet-600 text-white rounded-br-none'
+                ? 'bg-[#0b2b43] text-white rounded-br-none'
                 : 'bg-gray-100 text-gray-800 rounded-bl-none'
             }`}>
               {msg.content}
@@ -788,7 +788,7 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
       <div className="px-4 py-3 border-t border-gray-100 flex gap-2">
         <input
           type="text"
-          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-300"
+          className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/30"
           placeholder="Write a message…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -796,7 +796,7 @@ function CaseMessagesPanel({ caseId }: { caseId: string }) {
           disabled={sending}
         />
         <button type="button" onClick={handleSend} disabled={!input.trim() || sending}
-          className="px-3 py-2 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
+          className="px-3 py-2 text-xs font-semibold rounded-lg bg-[#0b2b43] text-white hover:bg-[#0f3858] disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
           {sending ? '…' : 'Send'}
         </button>
       </div>
@@ -832,13 +832,13 @@ function BudgetSummaryPanel({ caseId, services }: { caseId: string; services: st
     : services.map((s) => ({ name: s, cap_amount: null, cap_currency: 'EUR', status: 'no_cap' }));
 
   return (
-    <div className="mt-4 border border-violet-100 rounded-xl p-4 bg-violet-50">
+    <div className="mt-4 border border-[#bfdbfe] rounded-xl p-4 bg-[#eff6ff]">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-bold text-violet-700 uppercase tracking-wide">Budget caps</span>
-        <span className="text-xs text-violet-400">(from your HR policy)</span>
+        <span className="text-xs font-bold text-[#0b2b43] uppercase tracking-wide">Budget caps</span>
+        <span className="text-xs text-[#64748b]">(from your HR policy)</span>
       </div>
       {loading ? (
-        <p className="text-xs text-violet-400">Loading budget information…</p>
+        <p className="text-xs text-[#64748b]">Loading budget information…</p>
       ) : (
         <div className="flex flex-col gap-1.5">
           {displayCats.map((cat) => (
@@ -852,7 +852,7 @@ function BudgetSummaryPanel({ caseId, services }: { caseId: string; services: st
             </div>
           ))}
           {displayCats.length === 0 && (
-            <p className="text-xs text-violet-400">No services selected.</p>
+            <p className="text-xs text-[#64748b]">No services selected.</p>
           )}
         </div>
       )}
@@ -872,7 +872,7 @@ function ReviewSummary({ data, goTo }: { data: IntakeData; goTo: (s: number) => 
     <div className="border border-gray-100 rounded-xl p-4 bg-white">
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{label}</span>
-        <button type="button" onClick={() => goTo(step)} className="text-xs text-violet-600 font-medium hover:text-violet-800">Edit →</button>
+        <button type="button" onClick={() => goTo(step)} className="text-xs text-[#0b2b43] font-medium hover:text-[#0f3858]">Edit →</button>
       </div>
       <div className="flex flex-col gap-1.5">
         {rows.map(([k, v]) => (
@@ -1036,7 +1036,7 @@ export function EmployeeIntakePage() {
       <div className="mx-auto max-w-4xl px-4 py-8">
         {/* Header */}
         <div className="mb-6">
-          <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-1">Employee · Intake Wizard</div>
+          <div className="text-xs font-semibold text-[#0b2b43] uppercase tracking-widest mb-1">Employee · Intake Wizard</div>
           <h1 className="text-2xl font-bold text-gray-900">Detailed intake</h1>
           <p className="mt-1 text-sm text-gray-500">
             This is where most of your relocation information lives. Work through the steps below — your answers help us build your personalised case, match the right services, and flag what needs attention before your move.
@@ -1076,13 +1076,13 @@ export function EmployeeIntakePage() {
                     title={onHold ? 'On hold — coming soon' : undefined}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-semibold flex-shrink-0 transition-colors ${
                       onHold && !isActive ? 'text-gray-400 opacity-60' :
-                      isActive ? 'bg-violet-100 text-violet-700' :
+                      isActive ? 'bg-[#dbeafe] text-[#0b2b43]' :
                       isDone ? 'text-green-600 cursor-pointer hover:bg-green-50' :
                       'text-gray-300'
                     }`}>
                     <span className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center flex-shrink-0 ${
                       onHold && !isActive ? 'bg-gray-100 text-gray-400' :
-                      isActive ? 'bg-violet-600 text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
+                      isActive ? 'bg-[#0b2b43] text-white' : isDone ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'
                     }`}>{isDone ? '✓' : n}</span>
                     <span className="hidden sm:inline">{STEP_ICONS[i]} {lbl}</span>
                     {onHold && (
@@ -1158,7 +1158,7 @@ export function EmployeeIntakePage() {
                       onChange={(e) => setField('passport_expiry', e.target.value)} />
                   </FieldWrap>
                   <FieldWrap label="Passport upload" optional hint="Drop a PDF or photo — we'll OCR name, country, and expiry." className="sm:col-span-2">
-                    <div className="flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-5 text-sm text-gray-400 cursor-pointer hover:border-violet-300 hover:text-violet-500 transition-colors">
+                    <div className="flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl p-5 text-sm text-gray-400 cursor-pointer hover:border-[#0b2b43] hover:text-[#475569] transition-colors">
                       ↑ Drop your passport or click to browse
                     </div>
                   </FieldWrap>
@@ -1239,7 +1239,7 @@ export function EmployeeIntakePage() {
 
                 <button type="button"
                   onClick={() => addMember('pet', { pet_type: '' })}
-                  className="mt-3 w-full py-3 text-sm font-semibold text-violet-600 border-2 border-dashed border-violet-200 rounded-xl hover:bg-violet-50 transition-colors">
+                  className="mt-3 w-full py-3 text-sm font-semibold text-[#0b2b43] border-2 border-dashed border-[#93c5fd] rounded-xl hover:bg-[#eff6ff] transition-colors">
                   🐾 Add a pet
                 </button>
 
@@ -1299,8 +1299,8 @@ export function EmployeeIntakePage() {
                         <div className="flex items-center gap-3">
                           <input type="range" min={15} max={75} step={5} value={data.commute_mins}
                             onChange={(e) => setField('commute_mins', Number(e.target.value))}
-                            className="flex-1 accent-violet-600" />
-                          <span className="text-sm font-bold text-violet-700 w-12 text-right">{data.commute_mins}min</span>
+                            className="flex-1 accent-[#0b2b43]" />
+                          <span className="text-sm font-bold text-[#0b2b43] w-12 text-right">{data.commute_mins}min</span>
                         </div>
                         <div className="text-xs text-gray-400">Shorter = fewer neighborhoods but better matches.</div>
                       </FieldWrap>
@@ -1341,13 +1341,13 @@ export function EmployeeIntakePage() {
                         : [...data.services, svc.id])}
                       className={`flex flex-col gap-1 p-3 rounded-xl border text-left transition-all ${
                         svc.soon ? 'opacity-40 cursor-not-allowed border-gray-100 bg-gray-50' :
-                        data.services.includes(svc.id) ? 'border-violet-300 bg-violet-50 ring-1 ring-violet-300' :
+                        data.services.includes(svc.id) ? 'border-[#0b2b43] bg-[#eff6ff] ring-1 ring-[#0b2b43]/30' :
                         'border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50'
                       }`}>
                       <span className="text-lg">{svc.ico}</span>
                       <span className="text-xs font-semibold text-gray-900">{svc.t}{svc.soon && <span className="ml-1 text-[9px] text-gray-400">soon</span>}</span>
                       <span className="text-[10px] text-gray-400 leading-tight">{svc.s}</span>
-                      {data.services.includes(svc.id) && <span className="text-[9px] font-bold text-violet-600 mt-0.5">✓ Selected</span>}
+                      {data.services.includes(svc.id) && <span className="text-[9px] font-bold text-[#0b2b43] mt-0.5">✓ Selected</span>}
                     </button>
                   ))}
                 </div>
@@ -1421,7 +1421,7 @@ export function EmployeeIntakePage() {
                 <div className="flex items-start gap-3 mt-5 p-4 border border-gray-100 rounded-xl bg-gray-50">
                   <input type="checkbox" checked={data.consent} id="consent-cb"
                     onChange={(e) => setField('consent', e.target.checked)}
-                    className="mt-0.5 accent-violet-600" />
+                    className="mt-0.5 accent-[#0b2b43]" />
                   <label htmlFor="consent-cb" className="cursor-pointer">
                     <div className="text-sm font-semibold text-gray-900">I agree to ReloPass storing this information to generate my relocation roadmap.</div>
                     <div className="text-xs text-gray-400 mt-0.5">
@@ -1447,7 +1447,7 @@ export function EmployeeIntakePage() {
             {step < TOTAL_STEPS ? (
               <button type="button" onClick={() => goTo(step + 1)} disabled={!stepValid(step)}
                 className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  stepValid(step) ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                  stepValid(step) ? 'bg-[#0b2b43] text-white hover:bg-[#0f3858]' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
                 }`}>
                 Continue →
               </button>
@@ -1479,7 +1479,7 @@ export function EmployeeIntakePage() {
                     }
                   }}
                   className={`px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                    data.consent && !submitting ? 'bg-violet-600 text-white hover:bg-violet-700' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                    data.consent && !submitting ? 'bg-[#0b2b43] text-white hover:bg-[#0f3858]' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
                   }`}>
                   {submitting ? 'Submitting…' : '✦ Generate my roadmap'}
                 </button>
