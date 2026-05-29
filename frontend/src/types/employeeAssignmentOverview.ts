@@ -20,6 +20,12 @@ export type EmployeeLinkedOverviewRow = {
   updated_at?: string | null;
   current_stage?: string | null;
   relocation_case_status?: string | null;
+  // Intake wizard progress (per-assignment step counter). 0 means
+  // the wizard has never been opened. Backed by Postgres migration
+  // 20260529130000_case_assignments_intake_progress.sql.
+  intake_step?: number | null;
+  intake_total_steps?: number | null;
+  intake_updated_at?: string | null;
 };
 
 export type EmployeePendingClaimInfo = {

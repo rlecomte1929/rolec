@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { patchCase } from '../../../api/cases';
-import { apiGet, apiPost } from '../../../api/client';
+import { apiGet, apiPost, employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS } from '../../../navigation/routes';
+import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -988,12 +989,51 @@ export function EmployeeIntakePage() {
   const STEP_ON_HOLD: Record<number, boolean> = {};  // AIQ-160-C: step 4 (Pets) is now active
   const TOTAL_STEPS = STEP_LABELS.length;
 
+  // ── Per-assignment step persistence ────────────────────────────────────
+  // The wizard runs against an in-memory `caseIdRef` for its data, but we
+  // persist the *step counter* against the user's linked assignment so the
+  // hub can show "N / TOTAL steps" on the active case row. The form data
+  // itself is still ephemeral until final submit — only the counter survives.
+  const { assignmentId, linkedSummaries } = useEmployeeAssignment();
+  const hydratedStepRef = useRef(false);
+  const lastPersistedStepRef = useRef<number | null>(null);
+
+  // Hydrate `step` from the linked overview row once on first render where
+  // the row is available. If the wizard was previously left at step 4, the
+  // user re-enters at step 4 (data is empty — see note above).
+  useEffect(() => {
+    if (hydratedStepRef.current || !assignmentId) return;
+    const row = linkedSummaries.find((r) => r.assignment_id === assignmentId);
+    const saved = row?.intake_step;
+    if (typeof saved === 'number' && saved > 0) {
+      const clamped = Math.min(Math.max(saved, 1), TOTAL_STEPS);
+      setStep(clamped);
+      lastPersistedStepRef.current = clamped;
+    } else if (typeof saved === 'number') {
+      // saved === 0: never opened. Mark as hydrated so we don't keep checking.
+      lastPersistedStepRef.current = 0;
+    }
+    hydratedStepRef.current = true;
+  }, [assignmentId, linkedSummaries, TOTAL_STEPS]);
+
+  // Persist step on every change once hydrated. Fire-and-forget — failures
+  // shouldn't block navigation in the wizard.
+  useEffect(() => {
+    if (!hydratedStepRef.current || !assignmentId) return;
+    if (lastPersistedStepRef.current === step) return;
+    lastPersistedStepRef.current = step;
+    void employeeAPI.updateIntakeProgress(assignmentId, step, TOTAL_STEPS).catch(() => {
+      // Allow a retry on the next step change by clearing the last-persisted ref.
+      lastPersistedStepRef.current = null;
+    });
+  }, [step, assignmentId, TOTAL_STEPS]);
+
   const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
   const savedLabel = elapsedSecs < 60 ? 'just now' : 'a moment ago';
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-2xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8">
         {/* Header */}
         <div className="mb-6">
           <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-1">Employee · Intake Wizard</div>
@@ -1019,7 +1059,11 @@ export function EmployeeIntakePage() {
               <span>Auto-saved {savedLabel}</span>
               <span>Step {step} / {TOTAL_STEPS}</span>
             </div>
-            <div className="flex items-center gap-1 overflow-x-auto">
+            {/* Stepper: all 7 steps must be visible without horizontal scroll
+                at the wizard's max-w-4xl width. flex-wrap is a safety net for
+                narrow viewports — preferred over overflow-x-auto because
+                scrolling steps offscreen hides the user's progress map. */}
+            <div className="flex flex-wrap items-center gap-1">
               {STEP_LABELS.map((lbl, i) => {
                 const n = i + 1;
                 const onHold = !!STEP_ON_HOLD[n];
@@ -1418,6 +1462,16 @@ export function EmployeeIntakePage() {
                     setSubmitError(null);
                     try {
                       await patchCase(caseIdRef.current, { services: data.services });
+                      // Mark intake as fully completed against the linked
+                      // assignment so the hub row flips to "Submitted".
+                      // Fire-and-forget — patchCase already succeeded.
+                      if (assignmentId) {
+                        void employeeAPI.updateIntakeProgress(
+                          assignmentId,
+                          TOTAL_STEPS,
+                          TOTAL_STEPS,
+                        ).catch(() => undefined);
+                      }
                       navigate(ROUTE_DEFS.employeeDashboard.path);
                     } catch (e) {
                       setSubmitError((e as Error).message ?? 'Submission failed. Please try again.');
