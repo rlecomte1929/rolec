@@ -1,0 +1,26 @@
+# C1-13 · LLM cost table
+#
+# USD per 1,000,000 input/output tokens. Source: provider pricing pages as of
+# 2026-05-29. Update this file (and bump the comment) when prices change —
+# every per-call cost calc in router.py reads from here.
+#
+# If a model appears in router.RoutingTable but is not present here, the
+# router emits a LLMRoutingError so the missing price is surfaced fast.
+
+claude-3-7-sonnet:
+  in_per_million: 3.00
+  out_per_million: 15.00
+
+gpt-4o:
+  in_per_million: 2.50
+  out_per_million: 10.00
+
+gpt-4o-mini:
+  in_per_million: 0.15
+  out_per_million: 0.60
+
+# Reserved placeholder — Mistral is wired into the routing table but no
+# task class defaults to it today. Pricing kept for forward-compatibility.
+mistral-large-2:
+  in_per_million: 2.00
+  out_per_million: 6.00
