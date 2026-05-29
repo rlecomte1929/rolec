@@ -73,7 +73,7 @@ create policy cvs_select_tenant
   to authenticated
   using (
     company_id in (
-      select company_id from public.profiles where id = auth.uid()
+      select company_id::uuid from public.profiles where id::uuid = auth.uid()
     )
   );
 
@@ -84,8 +84,8 @@ create policy cvs_insert_hr
   to authenticated
   with check (
     company_id in (
-      select company_id from public.profiles
-      where id = auth.uid() and role in ('HR', 'ADMIN')
+      select company_id::uuid from public.profiles
+      where id::uuid = auth.uid() and role in ('HR', 'ADMIN')
     )
   );
 
@@ -95,14 +95,14 @@ create policy cvs_update_hr
   to authenticated
   using (
     company_id in (
-      select company_id from public.profiles
-      where id = auth.uid() and role in ('HR', 'ADMIN')
+      select company_id::uuid from public.profiles
+      where id::uuid = auth.uid() and role in ('HR', 'ADMIN')
     )
   )
   with check (
     company_id in (
-      select company_id from public.profiles
-      where id = auth.uid() and role in ('HR', 'ADMIN')
+      select company_id::uuid from public.profiles
+      where id::uuid = auth.uid() and role in ('HR', 'ADMIN')
     )
   );
 
@@ -112,8 +112,8 @@ create policy cvs_delete_hr
   to authenticated
   using (
     company_id in (
-      select company_id from public.profiles
-      where id = auth.uid() and role in ('HR', 'ADMIN')
+      select company_id::uuid from public.profiles
+      where id::uuid = auth.uid() and role in ('HR', 'ADMIN')
     )
   );
 

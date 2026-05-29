@@ -100,7 +100,7 @@ create policy cda_insert_admin
   for insert
   to authenticated
   with check (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
   );
 
 create policy cda_update_admin
@@ -108,10 +108,10 @@ create policy cda_update_admin
   for update
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
   )
   with check (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
   );
 
 create policy cda_delete_admin
@@ -119,7 +119,7 @@ create policy cda_delete_admin
   for delete
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
   );
 
 -- Quota: tenant-scoped read; backend service writes via the FastAPI tier
@@ -130,7 +130,7 @@ create policy csq_select_tenant
   to authenticated
   using (
     company_id in (
-      select company_id from public.profiles where id = auth.uid()
+      select company_id::uuid from public.profiles where id::uuid = auth.uid()
     )
   );
 
@@ -141,9 +141,9 @@ create policy cdr_select_tenant_or_admin
   for select
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
     or company_id in (
-      select company_id from public.profiles where id = auth.uid()
+      select company_id::uuid from public.profiles where id::uuid = auth.uid()
     )
   );
 
@@ -153,8 +153,8 @@ create policy cdr_insert_hr
   to authenticated
   with check (
     company_id in (
-      select company_id from public.profiles
-      where id = auth.uid() and role in ('HR', 'ADMIN')
+      select company_id::uuid from public.profiles
+      where id::uuid = auth.uid() and role in ('HR', 'ADMIN')
     )
   );
 
@@ -163,10 +163,10 @@ create policy cdr_update_admin
   for update
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
   )
   with check (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
   );
 
 commit;
