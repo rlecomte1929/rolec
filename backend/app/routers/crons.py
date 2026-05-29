@@ -11,6 +11,10 @@ POST /api/crons/deadline-reminder
     Runs the 7-day deadline reminder job.
     Designed to be called daily at 08:00 CET.
 
+POST /api/crons/task-reminders
+    Runs the employee-task D-7 / D-3 / D-0 reminder job (AIQ-76).
+    Designed to be called daily at 08:00 UTC.
+
 Example Supabase pg_cron setup (run once after deployment):
     SELECT cron.schedule(
       'deadline-reminder',
@@ -33,6 +37,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, HTTPException, Request
 
 from ..services.dossier_notifications import run_deadline_reminder_cron
+from ..services.employee_task_reminders import run_task_reminder_cron
 
 log = logging.getLogger(__name__)
 
@@ -63,4 +68,18 @@ def deadline_reminder(request: Request) -> Dict[str, Any]:
     _verify_cron_secret(request)
     log.info("deadline_reminder cron triggered")
     result = run_deadline_reminder_cron()
+    return {"ok": True, **result}
+
+
+@router.post("/task-reminders")
+def task_reminders(request: Request) -> Dict[str, Any]:
+    """
+    Daily employee-task reminder cron (AIQ-76).
+    Sends D-7 / D-3 / D-0 reminders for employee_tasks with a due_date in those
+    windows, one consolidated email per employee per window. D-0 also notifies
+    the case HR owner. Stamps reminded_d{7,3,0}_at to prevent duplicates.
+    """
+    _verify_cron_secret(request)
+    log.info("task_reminders cron triggered")
+    result = run_task_reminder_cron()
     return {"ok": True, **result}
