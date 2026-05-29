@@ -57,7 +57,7 @@ export function CorrectionHistory({
       >
         Prior corrections on this entity ({corrections.length})
       </h3>
-      <ul role="list" className="mt-3 flex flex-col gap-3">
+      <ul className="mt-3 flex flex-col gap-3">
         {corrections.map((c) => (
           <li
             key={c.correction_id}
