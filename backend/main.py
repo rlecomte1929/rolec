@@ -2014,26 +2014,37 @@ def create_person(
     )
     db.log_audit(user["id"], "CREATE", "profile", person_id, None, {"email": email})
 
-    # B2 fix: send Supabase Auth invite email so the created user can log in.
-    # Previously the profile was created silently with no way to set a password.
-    # invite_admin_created_user is best-effort and never raises.
-    from .app.services.supabase_auth_sync import invite_admin_created_user as _invite
+    # B2 fix: send a Supabase Auth invite email so the created user can log in.
+    # B7 fix: bulk HR onboarding trips Supabase's email rate limit after ~12
+    # invites — provision_admin_created_user falls back to admin.create_user
+    # (no email) so onboarding never stalls. Best-effort, never raises.
+    from .app.services.supabase_auth_sync import provision_admin_created_user as _provision
     _app_url = os.environ.get("APP_URL", "https://relopass.com")
-    invite_sent = _invite(
+    provision = _provision(
         email,
         full_name=body.full_name,
         role=role,
         redirect_to=f"{_app_url}/auth?mode=login",
     )
-    if not invite_sent:
+    invite_status = provision["status"]
+    invite_sent = provision["invite_sent"]
+    if invite_status in ("error", "noop"):
         log.warning(
-            "admin_create_person invite_not_sent request_id=%s email=%s "
-            "(Supabase not configured or invite_user_by_email unavailable)",
+            "admin_create_person invite_not_sent request_id=%s email=%s status=%s "
+            "(Supabase not configured or provisioning failed)",
+            request_id,
+            email,
+            invite_status,
+        )
+    elif invite_status == "created_pending_invite":
+        log.info(
+            "admin_create_person rate_limited_fallback request_id=%s email=%s "
+            "(account created without email; user sets password via reset)",
             request_id,
             email,
         )
 
-    return {"person": profile, "invite_sent": invite_sent}
+    return {"person": profile, "invite_sent": invite_sent, "invite_status": invite_status}
 
 
 def _retry_on_operational_error(fn, max_attempts: int = 3):

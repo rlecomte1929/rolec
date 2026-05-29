@@ -10,6 +10,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import os
+import secrets
 from typing import Any, Optional
 
 log = logging.getLogger(__name__)
@@ -60,6 +61,124 @@ def _duplicate_user_error(exc: BaseException) -> bool:
             "duplicate",
         )
     )
+
+
+def _rate_limited_error(exc: BaseException) -> bool:
+    """True when Supabase rejected an email-sending call for rate-limit reasons.
+
+    Bulk HR onboarding (B7) trips Supabase's built-in SMTP cap after ~12 invite
+    emails. admin.create_user (no email) is exempt, so callers fall back to it.
+    """
+    code = getattr(exc, "code", None)
+    if code in ("over_email_send_rate_limit", "over_request_rate_limit"):
+        return True
+    msg = str(exc).lower()
+    return "rate limit" in msg or "rate_limit" in msg
+
+
+def _temp_password() -> str:
+    """A strong random password for fallback-created accounts.
+
+    The account is created already-confirmed; the user sets their own password
+    later via the password-reset flow, so this value is never surfaced.
+    """
+    return secrets.token_urlsafe(24) + "9Az"
+
+
+def provision_admin_created_user(
+    email: str,
+    *,
+    full_name: Optional[str] = None,
+    role: Optional[str] = None,
+    redirect_to: Optional[str] = None,
+) -> dict[str, Any]:
+    """B7 fix: provision an HR-created account with a rate-limit-safe fallback.
+
+    Hybrid strategy so bulk onboarding never stalls on Supabase's email cap:
+      1. Try invite_user_by_email (preserves the B2 self-set-password UX).
+      2. On over_email_send_rate_limit, fall back to admin.create_user
+         (email_confirm=True, random password) — no email, no rate limit. The
+         account is immediately usable; the user sets a password via reset.
+      3. Duplicates are treated as success (account already exists).
+
+    Returns ``{"status": ..., "invite_sent": bool}`` where status is one of
+    ``invited`` | ``created_pending_invite`` | ``exists`` | ``error`` | ``noop``.
+    Never raises.
+    """
+    if os.getenv("DISABLE_SUPABASE_AUTH_SYNC", "").lower() in ("1", "true", "yes"):
+        return {"status": "noop", "invite_sent": False}
+    e = (email or "").strip().lower()
+    if not e:
+        return {"status": "noop", "invite_sent": False}
+    if get_supabase_admin_client is None:
+        return {"status": "noop", "invite_sent": False}
+
+    try:
+        client = get_supabase_admin_client()
+    except Exception as ex:
+        log.debug("provision_admin_created_user: no admin client: %s", ex)
+        return {"status": "noop", "invite_sent": False}
+
+    admin = getattr(getattr(client, "auth", None), "admin", None)
+    if admin is None:
+        log.warning("provision_admin_created_user: no admin interface on supabase client")
+        return {"status": "error", "invite_sent": False}
+
+    meta: dict[str, Any] = {}
+    if full_name and str(full_name).strip():
+        meta["full_name"] = str(full_name).strip()
+    if role:
+        meta["role"] = role
+
+    # 1. Preferred path: invite email (user picks their own password).
+    invite_fn = getattr(admin, "invite_user_by_email", None)
+    if invite_fn is not None:
+        options: dict[str, Any] = {}
+        if meta:
+            options["data"] = meta
+        if redirect_to:
+            options["redirect_to"] = redirect_to
+        try:
+            _call_with_timeout(invite_fn, e, options)
+            log.info("provision_admin_created_user: invite sent email=%s", e[:3] + "***")
+            return {"status": "invited", "invite_sent": True}
+        except concurrent.futures.TimeoutError:
+            log.warning("provision_admin_created_user: invite timed_out email=%s", e[:3] + "***")
+            return {"status": "error", "invite_sent": False}
+        except Exception as ex:
+            if _duplicate_user_error(ex):
+                log.debug("provision_admin_created_user: already present email=%s", e[:3] + "***")
+                return {"status": "exists", "invite_sent": False}
+            if not _rate_limited_error(ex):
+                log.warning("provision_admin_created_user: invite failed email=%s error=%s", e[:3] + "***", ex)
+                return {"status": "error", "invite_sent": False}
+            log.info(
+                "provision_admin_created_user: invite rate-limited, falling back to admin.create_user email=%s",
+                e[:3] + "***",
+            )
+
+    # 2. Fallback (rate-limited or no invite API): create a confirmed account
+    #    with no email. The user sets a password via the reset flow later.
+    attrs: dict[str, Any] = {
+        "email": e,
+        "password": _temp_password(),
+        "email_confirm": True,
+    }
+    if meta:
+        attrs["user_metadata"] = meta
+    try:
+        _call_with_timeout(client.auth.admin.create_user, attrs)  # type: ignore[union-attr]
+        log.info("provision_admin_created_user: created via fallback (no email) email=%s", e[:3] + "***")
+        return {"status": "created_pending_invite", "invite_sent": False}
+    except concurrent.futures.TimeoutError:
+        log.warning("provision_admin_created_user: fallback timed_out email=%s", e[:3] + "***")
+        return {"status": "error", "invite_sent": False}
+    except Exception as ex:
+        if _duplicate_user_error(ex):
+            log.debug("provision_admin_created_user: fallback found existing user email=%s", e[:3] + "***")
+            return {"status": "exists", "invite_sent": False}
+        log.warning("provision_admin_created_user: fallback failed email=%s error=%s", e[:3] + "***", ex)
+        return {"status": "error", "invite_sent": False}
 
 
 def sync_relopass_user_to_supabase_auth(
