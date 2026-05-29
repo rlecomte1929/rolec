@@ -305,6 +305,23 @@ async function suiteEmployee() {
   section('Employee Portal');
   const r = await req('GET', '/api/employee/dashboard', null, tokens.hr);
   record('EP1','Employee API rejects HR token (B15)','Employee','403/401',`${r.status}`, [401,403].includes(r.status) ? 'PASS':'WARN', r.ms, `HR used on employee endpoint`);
+
+  // ── EP_MESSAGES_200 (AIQ-461): employee Inbox endpoints must return 200, never 500 ──
+  // Production regression: the platform-redesign migration recreated public.messages
+  // with a thread schema, dropping the assignment-based columns the legacy handlers
+  // query → both endpoints 500'd. Assert a fresh employee gets a well-formed 200.
+  const empT = tokens.newEmp_fresh || tokens.emp;
+  if (!empT) {
+    record('EP_MESSAGES_200','Employee Inbox endpoints return 200 (AIQ-461)','Employee','200 + arrays','SKIP — no employee token', 'SKIP', 0);
+  } else {
+    const mr = await req('GET', '/api/employee/messages', null, empT);
+    const msgsOk = mr.status === 200 && Array.isArray(mr.data?.messages);
+    record('EP_MESSAGES_200','GET /api/employee/messages 200 + messages array (AIQ-461)','Employee','200 + messages:Array',`${mr.status}/messages=${Array.isArray(mr.data?.messages)?'array':typeof mr.data?.messages}`, msgsOk ? 'PASS':'FAIL', mr.ms, mr.error||'');
+
+    const ur = await req('GET', '/api/messages/unread-count', null, empT);
+    const cntOk = ur.status === 200 && typeof ur.data?.count === 'number';
+    record('EP_UNREAD_200','GET /api/messages/unread-count 200 + count number (AIQ-461)','Employee','200 + count:Number',`${ur.status}/count=${ur.data?.count}`, cntOk ? 'PASS':'FAIL', ur.ms, ur.error||'');
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
