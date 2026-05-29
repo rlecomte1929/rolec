@@ -113,7 +113,12 @@ def build_employee_assignment_overview(
                     "id": _json_scalar(r.get("company_id")),
                     "name": _json_scalar(r.get("company_name")),
                 },
-                "destination": _destination_payload(r.get("host_country"), r.get("home_country")),
+                "destination": _destination_payload(
+                    r.get("host_country"),
+                    r.get("home_country"),
+                    r.get("host_city"),
+                    r.get("home_city"),
+                ),
                 "status": normalize_assignment_status(r.get("assignment_status")),
                 "created_at": _json_scalar(r.get("assignment_created_at")),
                 "updated_at": _json_scalar(r.get("assignment_updated_at")),

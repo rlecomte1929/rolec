@@ -6086,6 +6086,8 @@ class Database:
                 a.intake_updated_at AS intake_updated_at,
                 rc.host_country AS host_country,
                 rc.home_country AS home_country,
+                rc.host_city AS host_city,
+                rc.home_city AS home_city,
                 rc.stage AS relocation_stage,
                 rc.status AS relocation_case_status,
                 COALESCE(rc.company_id, hu.company_id) AS company_id,
