@@ -54,6 +54,44 @@ jobs:
             exit 1
           fi
 
+  hr-dashboard-build:
+    # C1-11a: separate Vite app at apps/hr-dashboard/. Mirrors the
+    # frontend-build job's shape (npm ci → build → typecheck → lint) so a
+    # regression in either app surfaces in the same CI lane.
+    name: HR Dashboard build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/hr-dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/hr-dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Confirm dist/ was produced
+        run: |
+          if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
+            echo "::error::apps/hr-dashboard/dist was not produced by the build"
+            exit 1
+          fi
+
   backend-tests:
     name: Backend tests (deterministic P1 suite)
     runs-on: ubuntu-latest
