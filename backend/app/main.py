@@ -14,6 +14,7 @@ from .routers import (
     employee_quotes,
     exception_requests,
     hr_analytics,
+    hr_case_audit,
     hr_case_detail,
     hr_catalog,
     hr_coordination,
@@ -28,6 +29,7 @@ from .routers import (
     pets,
     policy_canonical,
     policy_feedback,
+    policy_gaps,
     policy_publish,
     policy_summary,
     policy_templates,
@@ -83,6 +85,8 @@ def create_app() -> FastAPI:
     app.include_router(hr_analytics.router)
     # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
     app.include_router(hr_case_detail.router)
+    # C1-16: GET /api/hr/cases/{id}/audit — chronological event timeline.
+    app.include_router(hr_case_audit.router)
 
     # ── Month-1 migration: Employee cluster ───────────────────────────────────
     # [AUDIT-B9-imm-6] immigration.router replaced by 5 modular sub-routers.
@@ -106,6 +110,7 @@ def create_app() -> FastAPI:
 
     # ── Month-1 migration: HR Policy cluster ──────────────────────────────────
     app.include_router(policy_publish.router)
+    app.include_router(policy_gaps.router)
     app.include_router(policy_summary.router)
     app.include_router(policy_feedback.router)
     app.include_router(policy_canonical.admin_router, prefix="/api/admin")
