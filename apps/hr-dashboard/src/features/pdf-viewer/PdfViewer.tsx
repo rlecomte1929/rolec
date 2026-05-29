@@ -161,16 +161,6 @@ export function PdfViewer({
     viewerHandleRef ?? { current: null },
     (): PdfViewerHandle => ({
       goToPage,
-      scrollToBbox: (highlightId: string) => {
-        // C1-11d emits the handle shape; C1-11e overrides the impl by
-        // wrapping the viewer and feeding scrollToBbox through its
-        // own highlight registry. The default impl below is a safe
-        // fallback so the handle type doesn't lie.
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[PdfViewer] scrollToBbox(${highlightId}) called without an overlay layer — wire BboxOverlay or wrap with useBboxScroll.`,
-        );
-      },
     }),
     [goToPage],
   );
