@@ -946,13 +946,32 @@ export function EmployeeIntakePage() {
   const [savedAt, setSavedAt] = useState(Date.now());
   // Stable case ID for the duration of this intake session.
   const caseIdRef = useRef<string>(crypto.randomUUID());
+  // Latest assignment id captured in a ref so the debounced autosave
+  // (set up inside `setField`'s closure) always posts to the *current*
+  // linked assignment, even if it resolves after the wizard mounts.
+  // We can't depend on `assignmentId` directly because setField is
+  // stable and its closure would otherwise capture the initial null.
+  const assignmentIdRef = useRef<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const setField = useCallback(<K extends keyof IntakeData>(k: K, v: IntakeData[K]) => {
-    setData((d) => ({ ...d, [k]: v }));
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => setSavedAt(Date.now()), 700);
+    setData((d) => {
+      const next = { ...d, [k]: v };
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        setSavedAt(Date.now());
+        const aid = assignmentIdRef.current;
+        if (aid) {
+          void employeeAPI
+            .updateIntakeDraft(aid, next as unknown as Record<string, unknown>)
+            .catch(() => {
+              /* swallow — next edit will retry, wizard stays usable */
+            });
+        }
+      }, 700);
+      return next;
+    });
   }, []);
 
   const unlock = (key: keyof typeof locks) => setLocks((l) => ({ ...l, [key]: false }));
@@ -1064,6 +1083,52 @@ export function EmployeeIntakePage() {
     }
     hydratedStepRef.current = true;
   }, [assignmentId, linkedSummaries, TOTAL_STEPS]);
+
+  // Keep the autosave closure pointing at the current assignment id.
+  useEffect(() => {
+    assignmentIdRef.current = assignmentId;
+  }, [assignmentId]);
+
+  // ── Form-draft hydration ──────────────────────────────────────
+  // One-shot fetch of the saved draft from
+  // GET /api/employee/assignments/{id}/intake. Merges into local
+  // state only over empty fields so a user typing during the
+  // load doesn't get their work overwritten. Failure is soft —
+  // the wizard still runs against the in-memory defaults.
+  const draftHydratedRef = useRef(false);
+  useEffect(() => {
+    if (draftHydratedRef.current || !assignmentId) return;
+    let cancelled = false;
+    void employeeAPI
+      .getIntake(assignmentId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.intakeDraft && typeof res.intakeDraft === 'object') {
+          setData((d) => {
+            const merged = { ...d };
+            for (const [k, v] of Object.entries(res.intakeDraft as Record<string, unknown>)) {
+              const key = k as keyof IntakeData;
+              // Only fill if current value is empty/falsy — user-
+              // entered changes during the load take priority.
+              const cur = merged[key] as unknown;
+              const isEmpty = cur === '' || cur === null || cur === undefined
+                || (Array.isArray(cur) && cur.length === 0);
+              if (isEmpty) (merged as Record<string, unknown>)[key as string] = v;
+            }
+            return merged;
+          });
+        }
+      })
+      .catch(() => {
+        /* fall through to in-memory defaults */
+      })
+      .finally(() => {
+        if (!cancelled) draftHydratedRef.current = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId]);
 
   // Persist step on every change once hydrated. Fire-and-forget — failures
   // shouldn't block navigation in the wizard.

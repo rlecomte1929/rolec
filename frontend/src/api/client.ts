@@ -2136,6 +2136,38 @@ export const employeeAPI = {
     invalidateApiCache('employee:assignments-overview');
     return response.data;
   },
+  /**
+   * Fetch the persisted intake state (step counter + form draft) for an
+   * assignment. Called once on wizard mount to hydrate `data` and `step`
+   * from the last session.
+   */
+  getIntake: async (
+    assignmentId: string,
+  ): Promise<{
+    assignmentId: string;
+    intakeStep: number;
+    intakeTotalSteps: number;
+    intakeUpdatedAt: string | null;
+    intakeDraft: Record<string, unknown> | null;
+  }> => {
+    const response = await api.get(`/api/employee/assignments/${assignmentId}/intake`);
+    return response.data;
+  },
+  /**
+   * Persist the wizard form draft. Fire-and-forget from the wizard's
+   * debounced autosave (~700ms after the last edit). The wizard owns
+   * the draft schema; the backend treats it opaquely.
+   */
+  updateIntakeDraft: async (
+    assignmentId: string,
+    data: Record<string, unknown>,
+  ): Promise<{ assignmentId: string; intakeUpdatedAt: string | null }> => {
+    const response = await api.patch(
+      `/api/employee/assignments/${assignmentId}/intake-draft`,
+      { data },
+    );
+    return response.data;
+  },
   /** Hub pending rows only: strict eligibility (pending_claim + contact linked + company + invites). */
   linkPendingAssignment: async (
     assignmentId: string,
