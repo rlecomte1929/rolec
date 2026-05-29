@@ -10,10 +10,10 @@ BEGIN
     SELECT 1 FROM dossier_questions WHERE question_key = 'de.visa_type_confirmed'
   ) THEN
     INSERT INTO dossier_questions
-      (id, destination, category, question_key, question_text,
-       answer_type, options_json, required, applies_if_json, sort_order)
+      (destination_country, domain, question_key, question_text,
+       answer_type, options, is_mandatory, applies_if, sort_order)
     VALUES
-      (gen_random_uuid(), 'DE', 'immigration', 'de.visa_type_confirmed',
+      ('DE', 'immigration', 'de.visa_type_confirmed',
        'Has the work visa type been confirmed by your employer? (EU Blue Card or Skilled Worker Visa)',
        'boolean', NULL, TRUE,
        '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 10);
@@ -24,10 +24,10 @@ BEGIN
     SELECT 1 FROM dossier_questions WHERE question_key = 'de.qualifications_recognized'
   ) THEN
     INSERT INTO dossier_questions
-      (id, destination, category, question_key, question_text,
-       answer_type, options_json, required, applies_if_json, sort_order)
+      (destination_country, domain, question_key, question_text,
+       answer_type, options, is_mandatory, applies_if, sort_order)
     VALUES
-      (gen_random_uuid(), 'DE', 'immigration', 'de.qualifications_recognized',
+      ('DE', 'immigration', 'de.qualifications_recognized',
        'Have your foreign professional qualifications been formally recognised by the relevant German authority?',
        'boolean', NULL, TRUE,
        '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 20);
@@ -38,10 +38,10 @@ BEGIN
     SELECT 1 FROM dossier_questions WHERE question_key = 'de.consulate_appointment'
   ) THEN
     INSERT INTO dossier_questions
-      (id, destination, category, question_key, question_text,
-       answer_type, options_json, required, applies_if_json, sort_order)
+      (destination_country, domain, question_key, question_text,
+       answer_type, options, is_mandatory, applies_if, sort_order)
     VALUES
-      (gen_random_uuid(), 'DE', 'immigration', 'de.consulate_appointment',
+      ('DE', 'immigration', 'de.consulate_appointment',
        'Has your appointment at the German consulate been booked for the visa application?',
        'boolean', NULL, TRUE,
        '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 30);
@@ -52,10 +52,10 @@ BEGIN
     SELECT 1 FROM dossier_questions WHERE question_key = 'de.visa_submitted'
   ) THEN
     INSERT INTO dossier_questions
-      (id, destination, category, question_key, question_text,
-       answer_type, options_json, required, applies_if_json, sort_order)
+      (destination_country, domain, question_key, question_text,
+       answer_type, options, is_mandatory, applies_if, sort_order)
     VALUES
-      (gen_random_uuid(), 'DE', 'immigration', 'de.visa_submitted',
+      ('DE', 'immigration', 'de.visa_submitted',
        'Has your visa application been submitted to the German consulate?',
        'boolean', NULL, TRUE,
        '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 40);
@@ -66,10 +66,10 @@ BEGIN
     SELECT 1 FROM dossier_questions WHERE question_key = 'de.anmeldung_completed'
   ) THEN
     INSERT INTO dossier_questions
-      (id, destination, category, question_key, question_text,
-       answer_type, options_json, required, applies_if_json, sort_order)
+      (destination_country, domain, question_key, question_text,
+       answer_type, options, is_mandatory, applies_if, sort_order)
     VALUES
-      (gen_random_uuid(), 'DE', 'registration', 'de.anmeldung_completed',
+      ('DE', 'registration', 'de.anmeldung_completed',
        'Have you registered your address (Anmeldung) at the local Einwohnermeldeamt within 14 days of arrival?',
        'boolean', NULL, TRUE,
        '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 50);
@@ -80,10 +80,10 @@ BEGIN
     SELECT 1 FROM dossier_questions WHERE question_key = 'de.aufenthaltstitel_submitted'
   ) THEN
     INSERT INTO dossier_questions
-      (id, destination, category, question_key, question_text,
-       answer_type, options_json, required, applies_if_json, sort_order)
+      (destination_country, domain, question_key, question_text,
+       answer_type, options, is_mandatory, applies_if, sort_order)
     VALUES
-      (gen_random_uuid(), 'DE', 'immigration', 'de.aufenthaltstitel_submitted',
+      ('DE', 'immigration', 'de.aufenthaltstitel_submitted',
        'Has your residence permit (Aufenthaltstitel) application been submitted to the Ausländerbehörde?',
        'boolean', NULL, TRUE,
        '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 60);
@@ -94,10 +94,10 @@ BEGIN
     SELECT 1 FROM dossier_questions WHERE question_key = 'de.health_insurance'
   ) THEN
     INSERT INTO dossier_questions
-      (id, destination, category, question_key, question_text,
-       answer_type, options_json, required, applies_if_json, sort_order)
+      (destination_country, domain, question_key, question_text,
+       answer_type, options, is_mandatory, applies_if, sort_order)
     VALUES
-      (gen_random_uuid(), 'DE', 'insurance', 'de.health_insurance',
+      ('DE', 'insurance', 'de.health_insurance',
        'Do you have statutory or private health insurance in place? (Required for the residence permit application)',
        'boolean', NULL, FALSE,
        '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 70);
@@ -108,10 +108,10 @@ BEGIN
     SELECT 1 FROM dossier_questions WHERE question_key = 'de.dependents'
   ) THEN
     INSERT INTO dossier_questions
-      (id, destination, category, question_key, question_text,
-       answer_type, options_json, required, applies_if_json, sort_order)
+      (destination_country, domain, question_key, question_text,
+       answer_type, options, is_mandatory, applies_if, sort_order)
     VALUES
-      (gen_random_uuid(), 'DE', 'immigration', 'de.dependents',
+      ('DE', 'immigration', 'de.dependents',
        'Will any dependents (spouse, children) accompany you and require German visas or residence permits?',
        'boolean', NULL, FALSE,
        '{"field":"relocationBasics.destCountry","op":"in","value":["Germany","DE"]}', 80);
@@ -122,10 +122,10 @@ BEGIN
     SELECT 1 FROM dossier_questions WHERE question_key = 'de.dependent_details'
   ) THEN
     INSERT INTO dossier_questions
-      (id, destination, category, question_key, question_text,
-       answer_type, options_json, required, applies_if_json, sort_order)
+      (destination_country, domain, question_key, question_text,
+       answer_type, options, is_mandatory, applies_if, sort_order)
     VALUES
-      (gen_random_uuid(), 'DE', 'immigration', 'de.dependent_details',
+      ('DE', 'immigration', 'de.dependent_details',
        'If yes, how many dependents will apply for German residence permits?',
        'text', NULL, FALSE,
        '{"field":"relocationBasics.hasDependents","op":"==","value":true}', 90);
