@@ -49,19 +49,21 @@ function fmtTs(iso: string): string {
 export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => {
   const [rows, setRows] = useState<AssignmentExceptionRead[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [longWait, setLongWait] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [activeNote, setActiveNote] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [expandedAudit, setExpandedAudit] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       const data = await listAssignmentExceptions(assignmentId);
       setRows(data);
     } catch {
-      setError('Could not load exceptions.');
+      setLoadError("We can't load exceptions right now. Hit refresh, or try again in a moment.");
     } finally {
       setLoading(false);
     }
@@ -69,8 +71,16 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
 
   useEffect(() => { void load(); }, [load]);
 
+  // Surface a softer "still checking" state if a load runs past 3s.
+  useEffect(() => {
+    if (!loading) { setLongWait(false); return; }
+    const t = window.setTimeout(() => setLongWait(true), 3000);
+    return () => window.clearTimeout(t);
+  }, [loading]);
+
   const resolve = async (row: AssignmentExceptionRead, status: 'approved' | 'rejected') => {
     setSavingId(row.id);
+    setActionError(null);
     try {
       await resolveAssignmentException(assignmentId, row.id, {
         status,
@@ -83,13 +93,11 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
         return next;
       });
     } catch {
-      setError('Could not save decision.');
+      setActionError('Could not save decision.');
     } finally {
       setSavingId(null);
     }
   };
-
-  if (!loading && !error && rows.length === 0) return null;
 
   return (
     <div className="rounded-xl border border-[#e2e8f0] bg-white overflow-hidden">
@@ -117,18 +125,40 @@ export const AssignmentExceptionsPanel: React.FC<Props> = ({ assignmentId }) => 
         </button>
       </div>
 
-      {error && (
-        <div className="px-5 py-3 text-sm text-[#991b1b] bg-[#fef2f2]">{error}</div>
+      {/* Action-level error (e.g. a failed Approve/Reject) — shown above the list, never replaces it. */}
+      {actionError && rows.length > 0 && (
+        <div className="px-5 py-3 text-sm text-[#991b1b] bg-[#fef2f2]">{actionError}</div>
       )}
 
-      {loading && rows.length === 0 ? (
-        <div className="divide-y divide-[#f1f5f9]">
-          {[1, 2].map((i) => (
-            <div key={i} className="px-5 py-4 animate-pulse">
-              <div className="h-3 bg-[#f1f5f9] rounded w-40 mb-2" />
-              <div className="h-3 bg-[#f1f5f9] rounded w-72" />
-            </div>
-          ))}
+      {loadError ? (
+        <div className="px-5 py-8 text-center">
+          <p className="text-sm text-[#475569]">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="mt-3 rounded-lg bg-[#0b2b43] px-4 py-2 text-xs font-medium text-white hover:bg-[#0f3858] transition-colors"
+          >
+            Refresh exceptions
+          </button>
+        </div>
+      ) : loading && rows.length === 0 ? (
+        longWait ? (
+          <div className="px-5 py-8 text-center">
+            <p className="text-sm text-[#475569]">Still checking — this case has a lot of policy rules.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#f1f5f9]" aria-busy="true" aria-label="Loading policy exceptions">
+            {[1, 2].map((i) => (
+              <div key={i} className="px-5 py-4 animate-pulse">
+                <div className="h-3 bg-[#f1f5f9] rounded w-40 mb-2" />
+                <div className="h-3 bg-[#f1f5f9] rounded w-72" />
+              </div>
+            ))}
+          </div>
+        )
+      ) : rows.length === 0 ? (
+        <div className="px-5 py-8 text-center">
+          <p className="text-sm text-[#475569]">No exceptions flagged for this assignment.</p>
         </div>
       ) : (
         <ul className="divide-y divide-[#f1f5f9]">

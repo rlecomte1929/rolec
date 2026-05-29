@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppShell } from '../../../components/AppShell';
 import { patchCase } from '../../../api/cases';
-import { apiGet, apiPost } from '../../../api/client';
+import { apiGet, apiPost, employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS } from '../../../navigation/routes';
+import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
+import { getAuthItem } from '../../../utils/demo';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,37 +137,54 @@ const SERVICES = [
   { id: 'culture',     ico: '🎭', t: 'Culture & community',  s: 'Expat groups, orientation', soon: true },
 ];
 
+// Empty defaults. The wizard previously shipped a hardcoded demo persona
+// (Marc Bouchard, France → Norway, fake family + address). That diverged
+// from the case row on the hub (which reads `relocation_cases.host_country`
+// — e.g. "Germany"), and rendered every field with a misleading
+// "🔒 HR pre-filled" badge. Real values now come from three places, in
+// priority order: the user's persisted draft (if any), the case row's
+// destination + origin via `linkedSummaries`, and the user's login email.
 const INITIAL_DATA: IntakeData = {
-  origin_country: 'FR',
-  origin_city: 'Paris',
-  dest_country: 'NO',
-  dest_city: 'Stavanger',
-  target_date: '2026-09-01',
+  origin_country: '',
+  origin_city: '',
+  dest_country: '',
+  dest_city: '',
+  target_date: '',
   purpose: 'Employment',
-  full_name: 'Marc Bouchard',
-  email: 'marc.bouchard@aurora-energy.com',
-  nationality: 'FR',
-  passport_country: 'FR',
-  passport_expiry: '2030-04-12',
-  members: [
-    { id: 'self', kind: 'self' },
-    { id: 'p1', kind: 'partner', name: 'Camille Bouchard', employment: 'Working', needs_work_permit: 'Yes', lang_level: 'Beginner' },
-    { id: 'c1', kind: 'child', name: 'Léo', dob: '2017-04-12', school: 'International' },
-    { id: 'c2', kind: 'child', name: 'Élise', dob: '2019-09-30', school: 'International' },
-  ],
-  job_title: 'Senior Engineer',
-  contract_type: 'Permanent',
-  contract_start: '2026-09-15',
-  salary_band: '100–150k€',
-  office_address: 'Forusparken 2, 4031 Stavanger, Norway',
-  work_pattern: 'Hybrid',
+  full_name: '',
+  email: '',
+  nationality: '',
+  passport_country: '',
+  passport_expiry: '',
+  // The employee themselves is always in the household — partner / kids /
+  // pets are added via the "Add member" controls on step 3.
+  members: [{ id: 'self', kind: 'self' }],
+  job_title: '',
+  contract_type: '',
+  contract_start: '',
+  salary_band: '',
+  office_address: '',
+  work_pattern: '',
   commute_mins: 30,
-  commute_mode: ['public_transit', 'walking'],
-  services: ['housing', 'immigration', 'schools', 'spouse'],
+  commute_mode: [],
+  services: [],
   service_notes: {},
   housing_prefs: {},
   consent: false,
 };
+
+// Normalise a country reference from the case row (which may be stored as
+// "Germany" or "DE" depending on the HR input path) to the 2-letter code
+// the wizard's CountryCombo expects. Falls back to the input as-is when
+// no match — better to surface an unknown value than silently swallow it.
+function countryNameToCode(input: string | null | undefined): string {
+  if (!input) return '';
+  const s = input.trim();
+  if (s.length === 2) return s.toUpperCase();
+  const lower = s.toLowerCase();
+  const match = COUNTRIES.find((c) => c.name.toLowerCase() === lower);
+  return match ? match.code : s;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -918,7 +937,11 @@ export function EmployeeIntakePage() {
   const [data, setData] = useState<IntakeData>(INITIAL_DATA);
   const [step, setStep] = useState(1);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [locks, setLocks] = useState({ dest: true, destCity: true, email: true, job: true, contractType: true, contractStart: true, salary: true, office: true });
+  // Locks default to false. A field is only badged "🔒 HR pre-filled" once
+  // the hydration effect below has actually populated it from the case
+  // row. Previously every lock started true, falsely claiming the wizard's
+  // hardcoded demo values were HR-controlled.
+  const [locks, setLocks] = useState({ dest: false, destCity: false, email: false, job: false, contractType: false, contractStart: false, salary: false, office: false });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [savedAt, setSavedAt] = useState(Date.now());
   // Stable case ID for the duration of this intake session.
@@ -988,12 +1011,78 @@ export function EmployeeIntakePage() {
   const STEP_ON_HOLD: Record<number, boolean> = {};  // AIQ-160-C: step 4 (Pets) is now active
   const TOTAL_STEPS = STEP_LABELS.length;
 
+  // ── Per-assignment hydration ──────────────────────────────────────────
+  // The wizard is tied to the user's linked assignment_id. Three things
+  // get pulled from the linked overview row on first render:
+  //   1. The step counter (intake_step) — to put the user back where they
+  //      left off; persisted independently below on every step change.
+  //   2. dest_country + origin_country from the case's host_country /
+  //      home_country — these are HR-entered values and the field gets
+  //      badged "🔒 HR pre-filled" so the user knows where they came from.
+  //   3. The user's login email — pre-filled into `email` if missing, but
+  //      NOT locked (it's the user's data, not HR's).
+  // Form data itself (other fields) is still ephemeral and lives in
+  // component state until final submit — the step counter is the only
+  // value persisted server-side today.
+  const { assignmentId, linkedSummaries } = useEmployeeAssignment();
+  const hydratedStepRef = useRef(false);
+  const lastPersistedStepRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (hydratedStepRef.current || !assignmentId) return;
+    const row = linkedSummaries.find((r) => r.assignment_id === assignmentId);
+
+    // Destination + origin from the case row. host_country may be a name
+    // ("Germany") or a code ("DE") — countryNameToCode normalises both.
+    const destCode = countryNameToCode(row?.destination?.host_country);
+    const originCode = countryNameToCode(row?.destination?.home_country);
+    const userEmail = (getAuthItem('relopass_email') || '').trim();
+    if (destCode || originCode || userEmail) {
+      setData((d) => {
+        const next = { ...d };
+        // Only fill if empty — user-entered data is never overwritten.
+        if (!next.dest_country && destCode) next.dest_country = destCode;
+        if (!next.origin_country && originCode) next.origin_country = originCode;
+        if (!next.email && userEmail) next.email = userEmail;
+        return next;
+      });
+    }
+    // Lock destination only if we actually pre-filled it from the case
+    // row — that's the "🔒 HR pre-filled" signal users see.
+    if (destCode) {
+      setLocks((l) => ({ ...l, dest: true }));
+    }
+
+    const saved = row?.intake_step;
+    if (typeof saved === 'number' && saved > 0) {
+      const clamped = Math.min(Math.max(saved, 1), TOTAL_STEPS);
+      setStep(clamped);
+      lastPersistedStepRef.current = clamped;
+    } else if (typeof saved === 'number') {
+      // saved === 0: never opened. Mark as hydrated so we don't keep checking.
+      lastPersistedStepRef.current = 0;
+    }
+    hydratedStepRef.current = true;
+  }, [assignmentId, linkedSummaries, TOTAL_STEPS]);
+
+  // Persist step on every change once hydrated. Fire-and-forget — failures
+  // shouldn't block navigation in the wizard.
+  useEffect(() => {
+    if (!hydratedStepRef.current || !assignmentId) return;
+    if (lastPersistedStepRef.current === step) return;
+    lastPersistedStepRef.current = step;
+    void employeeAPI.updateIntakeProgress(assignmentId, step, TOTAL_STEPS).catch(() => {
+      // Allow a retry on the next step change by clearing the last-persisted ref.
+      lastPersistedStepRef.current = null;
+    });
+  }, [step, assignmentId, TOTAL_STEPS]);
+
   const elapsedSecs = Math.floor((Date.now() - savedAt) / 1000);
   const savedLabel = elapsedSecs < 60 ? 'just now' : 'a moment ago';
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-2xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8">
         {/* Header */}
         <div className="mb-6">
           <div className="text-xs font-semibold text-violet-600 uppercase tracking-widest mb-1">Employee · Intake Wizard</div>
@@ -1019,7 +1108,11 @@ export function EmployeeIntakePage() {
               <span>Auto-saved {savedLabel}</span>
               <span>Step {step} / {TOTAL_STEPS}</span>
             </div>
-            <div className="flex items-center gap-1 overflow-x-auto">
+            {/* Stepper: all 7 steps must be visible without horizontal scroll
+                at the wizard's max-w-4xl width. flex-wrap is a safety net for
+                narrow viewports — preferred over overflow-x-auto because
+                scrolling steps offscreen hides the user's progress map. */}
+            <div className="flex flex-wrap items-center gap-1">
               {STEP_LABELS.map((lbl, i) => {
                 const n = i + 1;
                 const onHold = !!STEP_ON_HOLD[n];
@@ -1418,6 +1511,16 @@ export function EmployeeIntakePage() {
                     setSubmitError(null);
                     try {
                       await patchCase(caseIdRef.current, { services: data.services });
+                      // Mark intake as fully completed against the linked
+                      // assignment so the hub row flips to "Submitted".
+                      // Fire-and-forget — patchCase already succeeded.
+                      if (assignmentId) {
+                        void employeeAPI.updateIntakeProgress(
+                          assignmentId,
+                          TOTAL_STEPS,
+                          TOTAL_STEPS,
+                        ).catch(() => undefined);
+                      }
                       navigate(ROUTE_DEFS.employeeDashboard.path);
                     } catch (e) {
                       setSubmitError((e as Error).message ?? 'Submission failed. Please try again.');

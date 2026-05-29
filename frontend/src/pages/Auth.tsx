@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Alert, Input, Select, LoadingButton } from '../components/antigravity';
 import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
@@ -124,9 +124,11 @@ export const Auth: React.FC = () => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('EMPLOYEE');
   const [name, setName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { login, register } = useAuth();
   const authInFlight = useRef(false);
 
@@ -135,22 +137,63 @@ export const Auth: React.FC = () => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePassword, setInvitePassword] = useState('');
   const [inviteConfirm, setInviteConfirm] = useState('');
+  const [showInvitePassword, setShowInvitePassword] = useState(false);
   const [inviteDone, setInviteDone] = useState(false);
+  // Friendly banner for an expired / already-used / malformed auth link.
+  const [linkError, setLinkError] = useState('');
 
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash) return;
     const params = new URLSearchParams(hash.slice(1));
-    if (params.get('type') !== 'invite') return;
+
+    // Reused / expired / malformed link: Supabase has already consumed the OTP and
+    // bounces back with an error fragment instead of tokens. Surface a friendly
+    // banner above the sign-in form rather than the bare login screen.
+    if (params.get('error')) {
+      const code = params.get('error_code');
+      setLinkError(
+        code === 'otp_expired'
+          ? 'This invite link has expired or has already been used. Ask your admin to send a new invite, or contact support if you keep seeing this.'
+          : 'This sign-in link is invalid or has already been used. Ask your admin to send a new invite, or contact support if you keep seeing this.'
+      );
+      window.history.replaceState(null, '', '/auth?mode=login');
+      return;
+    }
+
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token');
-    if (!accessToken) return;
-    setInviteMode(true);
-    supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken ?? '' })
-      .then(({ data }) => { if (data.user?.email) setInviteEmail(data.user.email); })
-      .catch(() => {});
-    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    const type = params.get('type');
+    if (!accessToken || !refreshToken) return;
+
+    // Only invite/recovery land in the set-password flow. Switch UI state up front
+    // so the existing-session redirect (below) is suppressed before setSession resolves.
+    if (type === 'invite' || type === 'recovery') setInviteMode(true);
+
+    void supabase.auth
+      .setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ data, error }) => {
+        if (error) {
+          setInviteMode(false);
+          setLinkError(
+            'We could not validate your link — it may have expired. Ask your admin to send a new invite.'
+          );
+          return;
+        }
+        if (data.user?.email) setInviteEmail(data.user.email);
+      })
+      .catch(() => {
+        setInviteMode(false);
+        setLinkError('We could not validate your link. Ask your admin to send a new invite.');
+      });
+    window.history.replaceState(null, '', '/auth?mode=login');
   }, []);
+
+  // Suppress the existing-session redirect while an auth link is being processed.
+  // Read live each render: the effect clears the hash, but inviteMode/linkError then
+  // carry the suppression so a pre-existing session can't hijack the invite flow.
+  const hashHasAuthPayload =
+    typeof window !== 'undefined' && /[#&](access_token|error)=/.test(window.location.hash);
 
   const sessionExpired = searchParams.get('reason') === 'session_expired';
 
@@ -164,7 +207,10 @@ export const Auth: React.FC = () => {
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (authInFlight.current || isLoading) return;
-    if (invitePassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    if (invitePassword.length < 8 || !/[A-Za-z]/.test(invitePassword) || !/[0-9]/.test(invitePassword)) {
+      setError('Password must be at least 8 characters and include a letter and a number.');
+      return;
+    }
     if (invitePassword !== inviteConfirm) { setError('Passwords do not match.'); return; }
     setError('');
     authInFlight.current = true;
@@ -174,12 +220,21 @@ export const Auth: React.FC = () => {
       if (supaErr) throw new Error(supaErr.message);
       await login({ identifier: inviteEmail, password: invitePassword });
       setInviteDone(true);
+      const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
+      navigate(buildRoute(key), { replace: true });
     } catch (err: any) {
       setError(err?.message ?? 'Failed to set password. The invite link may have expired.');
     } finally {
       authInFlight.current = false;
       setIsLoading(false);
     }
+  };
+
+  const exitInviteMode = () => {
+    setInviteMode(false);
+    setError('');
+    setInvitePassword('');
+    setInviteConfirm('');
   };
 
   const doLogin = async (id: string, pw: string) => {
@@ -224,6 +279,7 @@ export const Auth: React.FC = () => {
         email: hasEmail ? email.trim() : undefined,
         password, role,
         name: name.trim() || undefined,
+        company_name: role !== 'EMPLOYEE' ? (companyName.trim() || undefined) : undefined,
       });
     } catch (err: any) {
       const transport = getClientTransportErrorMessage(err);
@@ -274,7 +330,11 @@ export const Auth: React.FC = () => {
   };
 
   // ── Redirect if already logged in ───────────────────────────────────────────
-  if (getAuthItem('relopass_token')) {
+  // Skip while an invite/recovery link is being processed (inviteMode), while an
+  // expired-link banner is showing (linkError), or before the mount effect has run
+  // on a hash-bearing URL (hashHasAuthPayload) — otherwise a pre-existing session
+  // would hijack the invite acceptance flow.
+  if (getAuthItem('relopass_token') && !inviteMode && !linkError && !hashHasAuthPayload) {
     const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
     if (key !== 'landing') return <Navigate to={buildRoute(key)} replace />;
   }
@@ -295,20 +355,44 @@ export const Auth: React.FC = () => {
               <div>
                 <h2 className="text-lg font-semibold text-[#0b2b43]">Set your password</h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  Welcome to ReloPass{inviteEmail ? ` — ${inviteEmail}` : ''}. Choose a password to activate your account.
+                  Welcome to ReloPass. Choose a password to activate your account.
                 </p>
               </div>
               {error && <Alert variant="error">{error}</Alert>}
-              <Input type="password" value={invitePassword} onChange={setInvitePassword}
-                label="New password" placeholder="At least 6 characters"
-                autoComplete="new-password" fullWidth />
-              <Input type="password" value={inviteConfirm} onChange={setInviteConfirm}
+              {inviteEmail && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Your email</label>
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                    <span className="text-sm text-slate-700 truncate">{inviteEmail}</span>
+                    <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                      ✓ Verified
+                    </span>
+                  </div>
+                </div>
+              )}
+              <div className="relative">
+                <Input type={showInvitePassword ? 'text' : 'password'} value={invitePassword}
+                  onChange={setInvitePassword}
+                  label="New password" placeholder="At least 8 characters, with a letter and a number"
+                  autoComplete="new-password" fullWidth />
+                <button type="button" onClick={() => setShowInvitePassword((p) => !p)}
+                  aria-label={showInvitePassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-8 text-slate-400 hover:text-slate-600 transition-colors">
+                  <EyeIcon open={showInvitePassword} />
+                </button>
+              </div>
+              <Input type={showInvitePassword ? 'text' : 'password'} value={inviteConfirm}
+                onChange={setInviteConfirm}
                 label="Confirm password" placeholder="Repeat your password"
                 autoComplete="new-password" fullWidth />
               <LoadingButton type="submit" fullWidth loading={isLoading}
                 loadingLabel="Setting password…" disabled={!invitePassword || !inviteConfirm}>
-                Activate account
+                Set password and sign in
               </LoadingButton>
+              <button type="button" onClick={exitInviteMode}
+                className="block w-full text-center text-sm text-slate-500 hover:text-slate-700 transition-colors">
+                Sign in with existing account
+              </button>
             </form>
           )}
         </div>
@@ -386,6 +470,19 @@ export const Auth: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {/* Expired / already-used invite link banner (dismissable) */}
+          {linkError && (
+            <Alert variant="warning" className="mb-5">
+              <div className="flex items-start gap-2">
+                <span className="flex-1">{linkError}</span>
+                <button type="button" onClick={() => setLinkError('')}
+                  aria-label="Dismiss" className="shrink-0 text-current opacity-60 hover:opacity-100">
+                  ✕
+                </button>
+              </div>
+            </Alert>
+          )}
 
           {/* Session expired banner */}
           {sessionExpired && (
@@ -490,6 +587,10 @@ export const Auth: React.FC = () => {
                     { value: 'EMPLOYEE', label: 'Employee' },
                     { value: 'ADMIN', label: 'Admin (full access)' },
                   ]} fullWidth />
+                {role !== 'EMPLOYEE' && (
+                  <Input value={companyName} onChange={setCompanyName} label="Company"
+                    placeholder="Your company name" fullWidth />
+                )}
                 <LoadingButton type="submit" fullWidth loading={isLoading}
                   loadingLabel="Creating account…"
                   disabled={!password.trim() || (!username.trim() && !email.trim())}>

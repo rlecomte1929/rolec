@@ -119,6 +119,12 @@ def build_employee_assignment_overview(
                 "updated_at": _json_scalar(r.get("assignment_updated_at")),
                 "current_stage": _json_scalar(r.get("relocation_stage")),
                 "relocation_case_status": _json_scalar(r.get("relocation_case_status")),
+                # Intake wizard progress (per-assignment step counter). 0 means
+                # the wizard has never been opened. See migration
+                # 20260529130000_case_assignments_intake_progress.sql.
+                "intake_step": _json_scalar(r.get("intake_step")),
+                "intake_total_steps": _json_scalar(r.get("intake_total_steps")),
+                "intake_updated_at": _json_scalar(r.get("intake_updated_at")),
             }
         )
 

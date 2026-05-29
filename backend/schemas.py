@@ -200,9 +200,10 @@ class RegisterRequest(BaseModel):
     password: str
     role: UserRole
     name: Optional[str] = None
+    company_name: Optional[str] = None
 
     # XSS defence: strip HTML from user-supplied text before storage
-    @field_validator("name", mode="before")
+    @field_validator("name", "company_name", mode="before")
     @classmethod
     def _sanitize_name(cls, v: Optional[str]) -> Optional[str]:
         return _escape_html(v)

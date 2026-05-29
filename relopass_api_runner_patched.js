@@ -215,6 +215,31 @@ async function suiteAuth() {
   tokens.newHR = freshHrR.data?.token || null;
   record('AT2_FRESH','Fresh HR registration smoke test','Auth','200 + token',`${freshHrR.status}/token=${!!tokens.newHR}`, freshHrR.ok && tokens.newHR ? 'PASS':'FAIL', freshHrR.ms, freshHrR.error||`email=${CONFIG.CREDS.newHR.email}`);
 
+  // ── AT2c: B18b — fresh HR with a NEW company_name can immediately create a case ──
+  // Regression guard for AIQ-542: register with company_name must create-or-link the
+  // company so the very next /api/hr/cases call succeeds (was 400 "No company linked").
+  {
+    const ts = Date.now();
+    const b18bHR = {
+      email: `sprint_b18b_${ts}@brandnewco_${ts}.com`,
+      password: 'Passw0rd!',
+      name: 'Sprint B18b',
+      role: 'HR',
+      company_name: `Brand New Co ${ts}`,
+    };
+    const regR = await req('POST', '/api/auth/register', b18bHR);
+    const b18bTok = regR.data?.token || null;
+    const b18bCompany = regR.data?.user?.company || null;
+    let caseR = { status: 0, ok: false, ms: 0, error: 'no token' };
+    let caseId = null;
+    if (b18bTok) {
+      caseR = await req('POST', '/api/hr/cases', { first_name:'X', last_name:`Y_${ts}`, email:`b18b_case_${ts}@example.com` }, b18bTok);
+      caseId = caseR.data?.id || caseR.data?.caseId || null;
+    }
+    const pass = !!b18bTok && !!b18bCompany && caseR.ok && !!caseId;
+    record('AT2c','Fresh HR + new company_name can create a case (B18b)','Auth','register 200+company, then /hr/cases 200+id',`reg=${regR.status}/company=${!!b18bCompany}, case=${caseR.status}/id=${caseId||'null'}`, pass ? 'PASS':'FAIL', regR.ms + caseR.ms, caseR.error||'');
+  }
+
   // ── AT3: Seeded employee login ────────────────────────────────────────────
   r = await req('POST', '/api/auth/login', CONFIG.CREDS.seedEmp);
   tokens.emp    = r.data?.token || null;
@@ -305,6 +330,23 @@ async function suiteEmployee() {
   section('Employee Portal');
   const r = await req('GET', '/api/employee/dashboard', null, tokens.hr);
   record('EP1','Employee API rejects HR token (B15)','Employee','403/401',`${r.status}`, [401,403].includes(r.status) ? 'PASS':'WARN', r.ms, `HR used on employee endpoint`);
+
+  // ── EP_MESSAGES_200 (AIQ-461): employee Inbox endpoints must return 200, never 500 ──
+  // Production regression: the platform-redesign migration recreated public.messages
+  // with a thread schema, dropping the assignment-based columns the legacy handlers
+  // query → both endpoints 500'd. Assert a fresh employee gets a well-formed 200.
+  const empT = tokens.newEmp_fresh || tokens.emp;
+  if (!empT) {
+    record('EP_MESSAGES_200','Employee Inbox endpoints return 200 (AIQ-461)','Employee','200 + arrays','SKIP — no employee token', 'SKIP', 0);
+  } else {
+    const mr = await req('GET', '/api/employee/messages', null, empT);
+    const msgsOk = mr.status === 200 && Array.isArray(mr.data?.messages);
+    record('EP_MESSAGES_200','GET /api/employee/messages 200 + messages array (AIQ-461)','Employee','200 + messages:Array',`${mr.status}/messages=${Array.isArray(mr.data?.messages)?'array':typeof mr.data?.messages}`, msgsOk ? 'PASS':'FAIL', mr.ms, mr.error||'');
+
+    const ur = await req('GET', '/api/messages/unread-count', null, empT);
+    const cntOk = ur.status === 200 && typeof ur.data?.count === 'number';
+    record('EP_UNREAD_200','GET /api/messages/unread-count 200 + count number (AIQ-461)','Employee','200 + count:Number',`${ur.status}/count=${ur.data?.count}`, cntOk ? 'PASS':'FAIL', ur.ms, ur.error||'');
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

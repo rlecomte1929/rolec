@@ -437,8 +437,14 @@ export const EmployeeJourney: React.FC = () => {
   );
   const flowSteps: FlowStep[] = useMemo(
     () => [
-      // Step 1: handled by the per-row "Open case" button on the cases below.
-      { label: '1. Fill your case' },
+      // Step 1: when the user has a linked case, surface a direct link to the
+      // detailed intake wizard. Without a linked case there is nothing to fill
+      // yet, so the pill stays decorative — the per-row "Open case" button on
+      // the cases list is the canonical entry point in that scenario.
+      {
+        label: '1. Fill your case',
+        href: hasLinked ? buildRoute('employeeIntake') : undefined,
+      },
       { label: '2. Choose services', href: buildRoute('services') },
       {
         label: '3. Review budget vs policy',
@@ -451,7 +457,7 @@ export const EmployeeJourney: React.FC = () => {
       },
       { label: '5. Exchange with HR' },
     ],
-    [hasRecommendations],
+    [hasRecommendations, hasLinked],
   );
 
   // Pill base style is shared so clickable + decorative steps line up visually.
@@ -581,7 +587,7 @@ export const EmployeeJourney: React.FC = () => {
         : 'Enter the case code from HR to link your case, or wait for HR to match your email.';
 
   return (
-    <AppShell title={shellTitle} subtitle={shellSubtitle}>
+    <AppShell title={shellTitle} subtitle={shellSubtitle} wide>
       {linkAlerts}
       {tokenClaimInProgress ? (
         <EmployeeAssignmentBootstrapCard
@@ -651,30 +657,71 @@ export const EmployeeJourney: React.FC = () => {
             <p className="text-sm text-[#4b5563] py-2">No linked assignments yet.</p>
           ) : (
             <ul className="divide-y divide-[#e2e8f0] border border-[#e2e8f0] rounded-lg overflow-hidden bg-white">
-              {linkedSummaries.map((row) => (
-                <li
-                  key={row.assignment_id}
-                  className="p-4 flex flex-col sm:flex-row sm:items-stretch sm:justify-between gap-4"
-                >
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="font-semibold text-[#0b2b43]">{row.company?.name || 'Company'}</div>
-                    <div className="text-sm text-[#64748b]">{row.destination?.label || 'Destination TBD'}</div>
-                    <div className="text-sm text-[#334155]">
-                      <span className="text-[#64748b]">Status</span>{' '}
-                      <span className="font-medium text-[#0b2b43]">{linkedStatusLabel(row)}</span>
+              {linkedSummaries.map((row) => {
+                // Intake form progress is persisted per-assignment by the
+                // wizard (POST /api/employee/assignments/{id}/intake-progress).
+                // The wizard is the only writer of intake_step, so it's the
+                // single source of truth — case.status is NOT a reliable
+                // proxy because many statuses (`created`, `linked`, etc.)
+                // sit between "fresh" and "submitted" without indicating
+                // wizard progress either way.
+                const totalSteps = row.intake_total_steps ?? 7;
+                const currentStep = row.intake_step ?? 0;
+                const intakeSubmitted = totalSteps > 0 && currentStep >= totalSteps;
+                const intakeStarted = currentStep > 0 && !intakeSubmitted;
+                return (
+                  <li
+                    key={row.assignment_id}
+                    className="p-4 flex flex-col sm:flex-row sm:items-stretch sm:justify-between gap-4"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="font-semibold text-[#0b2b43]">{row.company?.name || 'Company'}</div>
+                      <div className="text-sm text-[#64748b]">{row.destination?.label || 'Destination TBD'}</div>
+                      <div className="text-sm text-[#334155]">
+                        <span className="text-[#64748b]">Status</span>{' '}
+                        <span className="font-medium text-[#0b2b43]">{linkedStatusLabel(row)}</span>
+                      </div>
+                      <div className="text-sm text-[#334155] flex flex-wrap items-center gap-2">
+                        <span className="text-[#64748b]">Intake form</span>{' '}
+                        {intakeSubmitted ? (
+                          <Badge variant="success" size="sm">Submitted</Badge>
+                        ) : intakeStarted ? (
+                          <>
+                            <Badge variant="info" size="sm">
+                              {currentStep} / {totalSteps} steps
+                            </Badge>
+                            <Link
+                              to={buildRoute('employeeIntake')}
+                              className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
+                            >
+                              Continue
+                            </Link>
+                          </>
+                        ) : (
+                          <>
+                            <Badge variant="warning" size="sm">Not started</Badge>
+                            <Link
+                              to={buildRoute('employeeIntake')}
+                              className="text-[#2563eb] underline underline-offset-2 font-medium hover:text-[#1d4ed8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb] rounded-sm"
+                            >
+                              Start
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                      <div className="text-sm text-[#334155]">
+                        <span className="text-[#64748b]">Last updated</span>{' '}
+                        <span className="font-medium text-[#0b2b43]">
+                          {formatOverviewDate(row.updated_at || row.created_at)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-sm text-[#334155]">
-                      <span className="text-[#64748b]">Last updated</span>{' '}
-                      <span className="font-medium text-[#0b2b43]">
-                        {formatOverviewDate(row.updated_at || row.created_at)}
-                      </span>
+                    <div className="flex sm:flex-col sm:justify-center shrink-0">
+                      <Button onClick={() => navigate(openCaseHref(row.assignment_id, row.status))}>Open case</Button>
                     </div>
-                  </div>
-                  <div className="flex sm:flex-col sm:justify-center shrink-0">
-                    <Button onClick={() => navigate(openCaseHref(row.assignment_id, row.status))}>Open case</Button>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>

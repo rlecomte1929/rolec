@@ -1238,7 +1238,12 @@ class Database:
                     submitted_at TEXT,
                     hr_notes TEXT,
                     decision TEXT,
-                    archived_at TEXT
+                    archived_at TEXT,
+                    -- Intake wizard progress. Mirrors Postgres migration
+                    -- 20260529130000_case_assignments_intake_progress.sql.
+                    intake_step INTEGER NOT NULL DEFAULT 0,
+                    intake_total_steps INTEGER NOT NULL DEFAULT 7,
+                    intake_updated_at TEXT
                 )
             """))
 
@@ -4610,6 +4615,59 @@ class Database:
             except Exception as ex:
                 log.warning("backfill employee_contact for assignment %s: %s", aid, ex)
 
+    def update_assignment_intake_progress(
+        self,
+        assignment_id: str,
+        employee_user_id: str,
+        step: int,
+        total_steps: int,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Bump the intake wizard step counter for an assignment, scoped by
+        employee ownership. Returns the new {intake_step, intake_total_steps,
+        intake_updated_at} on success, or None if no row matched (caller maps
+        that to a 404).
+
+        Bounds are enforced by the case_assignments_intake_progress_bounds
+        check constraint added in migration 20260529130000.
+        """
+        aid = (assignment_id or "").strip()
+        uid = (employee_user_id or "").strip()
+        if not aid or not uid:
+            return None
+        # Clamp at the python edge too so a constraint violation can't fire on
+        # bad client input — this is a hot path called on every "Continue" click.
+        step_i = max(0, int(step))
+        total_i = max(1, int(total_steps))
+        if step_i > total_i:
+            step_i = total_i
+        now = datetime.utcnow().isoformat()
+        with self.engine.begin() as conn:
+            row = self._exec(
+                conn,
+                "UPDATE case_assignments "
+                "SET intake_step = :step, intake_total_steps = :total, "
+                "    intake_updated_at = :now, updated_at = :now "
+                "WHERE id = :id AND employee_user_id = :uid "
+                "RETURNING intake_step, intake_total_steps, intake_updated_at",
+                {"step": step_i, "total": total_i, "now": now, "id": aid, "uid": uid},
+                op_name="update_assignment_intake_progress",
+                request_id=request_id,
+            ).fetchone()
+        if not row:
+            return None
+        m = row._mapping if hasattr(row, "_mapping") else dict(row)
+        return {
+            "intake_step": m["intake_step"],
+            "intake_total_steps": m["intake_total_steps"],
+            "intake_updated_at": (
+                m["intake_updated_at"].isoformat()
+                if hasattr(m["intake_updated_at"], "isoformat") and m["intake_updated_at"] is not None
+                else m["intake_updated_at"]
+            ),
+        }
+
     def set_assignment_submitted(self, assignment_id: str, request_id: Optional[str] = None) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
@@ -6023,6 +6081,9 @@ class Database:
                 a.status AS assignment_status,
                 a.created_at AS assignment_created_at,
                 a.updated_at AS assignment_updated_at,
+                a.intake_step AS intake_step,
+                a.intake_total_steps AS intake_total_steps,
+                a.intake_updated_at AS intake_updated_at,
                 rc.host_country AS host_country,
                 rc.home_country AS home_country,
                 rc.stage AS relocation_stage,
@@ -9763,6 +9824,27 @@ class Database:
                 {"name": (name or "").strip()},
             ).fetchone()
         return self._row_to_dict(row)
+
+    def find_or_create_company_by_name(self, name: str) -> Optional[str]:
+        """Return the company_id for ``name``, creating the company if none exists.
+
+        Match is case-insensitive on the trimmed name so self-serve HR signups
+        reuse an existing workspace instead of spawning duplicates (the "17 Test
+        company" problem). Returns None when ``name`` is blank.
+        """
+        cleaned = (name or "").strip()
+        if not cleaned:
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id FROM companies WHERE LOWER(TRIM(name)) = LOWER(:name) LIMIT 1"),
+                {"name": cleaned},
+            ).fetchone()
+        if row is not None:
+            return self._row_to_dict(row)["id"]
+        company_id = str(uuid.uuid4())
+        self.create_company(company_id=company_id, name=cleaned, status="active", plan_tier="starter")
+        return company_id
 
     TEST_COMPANY_FIXED_ID = "110854ad-3c85-4291-a484-0b43effb680e"
 
