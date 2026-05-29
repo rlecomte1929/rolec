@@ -4668,6 +4668,111 @@ class Database:
             ),
         }
 
+    def get_assignment_intake(
+        self,
+        assignment_id: str,
+        employee_user_id: str,
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Read step counter + form draft for one assignment. Scoped by
+        employee ownership; returns None if the assignment isn't
+        owned by this user. The draft is decoded to a dict
+        regardless of backend — Postgres delivers jsonb pre-parsed,
+        SQLite stores TEXT we json.loads here so the API contract
+        stays stable across both.
+        """
+        aid = (assignment_id or "").strip()
+        uid = (employee_user_id or "").strip()
+        if not aid or not uid:
+            return None
+        with self.engine.connect() as conn:
+            row = self._exec(
+                conn,
+                "SELECT intake_step, intake_total_steps, intake_updated_at, intake_draft "
+                "FROM case_assignments WHERE id = :id AND employee_user_id = :uid",
+                {"id": aid, "uid": uid},
+                op_name="get_assignment_intake",
+                request_id=request_id,
+            ).fetchone()
+        if not row:
+            return None
+        m = row._mapping if hasattr(row, "_mapping") else dict(row)
+        raw = m["intake_draft"]
+        if isinstance(raw, str):
+            try:
+                draft: Optional[Dict[str, Any]] = json.loads(raw) if raw else None
+            except (ValueError, TypeError):
+                draft = None
+        else:
+            # psycopg returns jsonb already-parsed
+            draft = raw
+        return {
+            "intake_step": m["intake_step"],
+            "intake_total_steps": m["intake_total_steps"],
+            "intake_updated_at": (
+                m["intake_updated_at"].isoformat()
+                if hasattr(m["intake_updated_at"], "isoformat") and m["intake_updated_at"] is not None
+                else m["intake_updated_at"]
+            ),
+            "intake_draft": draft,
+        }
+
+    def update_assignment_intake_draft(
+        self,
+        assignment_id: str,
+        employee_user_id: str,
+        draft: Dict[str, Any],
+        request_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Upsert the wizard form draft for one assignment. Scoped by
+        employee ownership. Postgres CASTs the JSON text to jsonb
+        so the column type stays correct end-to-end; SQLite stores
+        the same TEXT verbatim. Returns None when the assignment
+        isn't owned by this user (caller maps to 404).
+        """
+        aid = (assignment_id or "").strip()
+        uid = (employee_user_id or "").strip()
+        if not aid or not uid:
+            return None
+        now = datetime.utcnow().isoformat()
+        payload = json.dumps(draft) if draft is not None else None
+        if _is_sqlite:
+            sql = (
+                "UPDATE case_assignments "
+                "SET intake_draft = :draft, intake_updated_at = :now, updated_at = :now "
+                "WHERE id = :id AND employee_user_id = :uid "
+                "RETURNING intake_updated_at"
+            )
+        else:
+            sql = (
+                "UPDATE case_assignments "
+                "SET intake_draft = CAST(:draft AS jsonb), "
+                "    intake_updated_at = :now, updated_at = :now "
+                "WHERE id = :id AND employee_user_id = :uid "
+                "RETURNING intake_updated_at"
+            )
+        with self.engine.begin() as conn:
+            row = self._exec(
+                conn,
+                sql,
+                {"draft": payload, "now": now, "id": aid, "uid": uid},
+                op_name="update_assignment_intake_draft",
+                request_id=request_id,
+            ).fetchone()
+        if not row:
+            return None
+        m = row._mapping if hasattr(row, "_mapping") else dict(row)
+        return {
+            "intake_updated_at": (
+                m["intake_updated_at"].isoformat()
+                if hasattr(m["intake_updated_at"], "isoformat") and m["intake_updated_at"] is not None
+                else m["intake_updated_at"]
+            ),
+            "intake_draft": draft,
+        }
+
     def set_assignment_submitted(self, assignment_id: str, request_id: Optional[str] = None) -> None:
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:

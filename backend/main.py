@@ -4473,6 +4473,78 @@ def update_employee_assignment_intake_progress(
     }
 
 
+@app.get("/api/employee/assignments/{assignment_id}/intake")
+def get_employee_assignment_intake(
+    request: Request,
+    assignment_id: str,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Read the full intake state (step counter + form draft) for an
+    assignment. Called on wizard mount to hydrate the form from
+    the last session. EMPLOYEE-scoped: 404 when not owned.
+    intakeDraft is null when the wizard has never been saved.
+    """
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    rid = getattr(request.state, "request_id", None)
+    result = db.get_assignment_intake(
+        assignment_id=assignment_id,
+        employee_user_id=effective["id"],
+        request_id=rid,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Assignment not found or not owned by this employee.",
+        )
+    return {
+        "assignmentId": assignment_id,
+        "intakeStep": result["intake_step"],
+        "intakeTotalSteps": result["intake_total_steps"],
+        "intakeUpdatedAt": result["intake_updated_at"],
+        "intakeDraft": result["intake_draft"],
+    }
+
+
+class _IntakeDraftBody(BaseModel):
+    """Body for PATCH /api/employee/assignments/{id}/intake-draft."""
+
+    # The wizard owns the draft schema; treat opaquely on the backend.
+    # Pydantic's `dict` validates it's a JSON object (not scalar/array).
+    data: Dict[str, Any] = Field(default_factory=dict)
+
+
+@app.patch("/api/employee/assignments/{assignment_id}/intake-draft")
+def update_employee_assignment_intake_draft(
+    request: Request,
+    assignment_id: str,
+    body: _IntakeDraftBody,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Upsert the wizard form draft. Called by the wizard's debounced
+    autosave (~700ms after the last edit); must stay cheap and
+    side-effect free beyond the column write. EMPLOYEE-scoped.
+    """
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    rid = getattr(request.state, "request_id", None)
+    result = db.update_assignment_intake_draft(
+        assignment_id=assignment_id,
+        employee_user_id=effective["id"],
+        draft=body.data,
+        request_id=rid,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Assignment not found or not owned by this employee.",
+        )
+    return {
+        "assignmentId": assignment_id,
+        "intakeUpdatedAt": result["intake_updated_at"],
+    }
+
+
 @app.get("/api/employee/me/assignment-package-policy")
 def get_employee_me_assignment_package_policy(
     request: Request,
