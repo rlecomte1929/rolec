@@ -58,6 +58,7 @@ export interface RegisterRequest {
   password: string;
   role: UserRole;
   name?: string;
+  company_name?: string;
 }
 
 export type UserRole = 'HR' | 'EMPLOYEE' | 'ADMIN';

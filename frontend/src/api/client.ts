@@ -2118,6 +2118,24 @@ export const employeeAPI = {
     invalidateApiCache('employee:assignments-overview');
     return response.data;
   },
+  /**
+   * Persist the intake wizard step counter for an assignment.
+   * Fire-and-forget from the wizard on every `goTo` so the hub row can show
+   * "N / TOTAL steps" without refresh. Invalidates the overview cache so the
+   * next bootstrap returns the new count.
+   */
+  updateIntakeProgress: async (
+    assignmentId: string,
+    step: number,
+    totalSteps: number,
+  ): Promise<{ assignmentId: string; intakeStep: number; intakeTotalSteps: number; intakeUpdatedAt: string | null }> => {
+    const response = await api.post(
+      `/api/employee/assignments/${assignmentId}/intake-progress`,
+      { step, total_steps: totalSteps },
+    );
+    invalidateApiCache('employee:assignments-overview');
+    return response.data;
+  },
   /** Hub pending rows only: strict eligibility (pending_claim + contact linked + company + invites). */
   linkPendingAssignment: async (
     assignmentId: string,

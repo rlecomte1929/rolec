@@ -6,6 +6,7 @@ import { ROUTE_DEFS, buildRoute } from '../navigation/routes';
 import { getHrNotificationCounts, type HrNotificationCounts } from '../api/hrCatalog';
 import { getAdminNotificationCounts, type AdminNotificationCounts } from '../api/adminCatalog';
 import { useSelectedCase } from '../contexts/SelectedCaseContext';
+import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,11 @@ type BadgeSpec =
   | { kind: 'static'; variant: 'new' | 'live' }
   | { kind: 'static-count'; count: number }
   | { kind: 'dynamic'; getCount: (ctx: NotifContext) => number };
+
+interface SidebarVisibilityCtx {
+  role: SidebarRole;
+  linkedCount: number;
+}
 
 interface SectionItem {
   id: string;
@@ -28,6 +34,8 @@ interface SectionItem {
   /** Exact route match — useful when path is the index of a section. */
   exact?: boolean;
   badge?: BadgeSpec;
+  /** Hide this item conditionally (e.g. wizard tab is meaningless without a case). */
+  hidden?: (ctx: SidebarVisibilityCtx) => boolean;
 }
 
 interface NavSection {
@@ -51,12 +59,15 @@ const SECTIONS: NavSection[] = [
     label: 'Employee',
     minRole: 'EMPLOYEE',
     items: [
-      { id: 'intake', label: 'Intake', to: ROUTE_DEFS.employeeDashboard.path, exact: true },
+      { id: 'intake', label: 'My cases', to: ROUTE_DEFS.employeeDashboard.path, exact: true },
       {
         id: 'detailed-intake',
-        label: 'Detailed intake',
+        label: 'Intake form',
         hint: 'Answer questions that shape your relocation case',
         to: ROUTE_DEFS.employeeIntake.path,
+        // Wizard is meaningless without a linked case — hide until the user has one.
+        // Admins keep it visible so they can preview the form.
+        hidden: ({ linkedCount, role }) => role !== 'ADMIN' && linkedCount === 0,
       },
       { id: 'roadmap', label: 'Roadmap', to: ROUTE_DEFS.employeeDashboard.path, badge: { kind: 'static-count', count: 3 } },
       { id: 'documents', label: 'Documents', to: ROUTE_DEFS.employeeTaskPage.path },
@@ -91,6 +102,7 @@ const SECTIONS: NavSection[] = [
       { id: 'policy-benefits', label: 'Policy', to: ROUTE_DEFS.hrPolicy.path },
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
       { id: 'exceptions', label: 'Exceptions', to: ROUTE_DEFS.hrExceptions.path },
+      { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },
     ],
   },
   {
@@ -260,7 +272,15 @@ export const PlatformShellSidebar: React.FC<PlatformShellSidebarProps> = ({ role
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
-  const visibleSections = SECTIONS.filter((s) => ROLE_RANK[s.minRole] <= rank);
+  const { linkedCount } = useEmployeeAssignment();
+  const visibilityCtx: SidebarVisibilityCtx = { role, linkedCount };
+  const visibleSections = SECTIONS
+    .filter((s) => ROLE_RANK[s.minRole] <= rank)
+    .map((s) => ({
+      ...s,
+      items: s.items.filter((item) => !item.hidden?.(visibilityCtx)),
+    }))
+    .filter((s) => s.items.length > 0);
 
   return (
     <aside

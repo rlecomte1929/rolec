@@ -133,6 +133,7 @@ from .app.routers import cases_write as cases_write_router
 from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import employee_tiers as employee_tiers_router  # [P1-6]
+from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
 from .app.routers import policy_publish as policy_publish_router  # [P1-4]
 from .app.routers import policy_summary as policy_summary_router  # [P1-5 backend]
 from .app.routers import policy_feedback as policy_feedback_router  # [P5-5]
@@ -585,6 +586,7 @@ app.include_router(cases_write_router.router)  # [AUDIT-B9-cases-6] split 2/3 �
 app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 — 1 DELETE (delete_dossier) — re-scoped from empty admin bucket
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
+app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
 # [AUDIT-C2.3 Month-1] policy_publish_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_summary_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_feedback_router → moved to backend/app/main.py
@@ -4420,6 +4422,55 @@ def dismiss_pending_claim_assignment(
             detail="Pending assignment not found or not dismissible for this account.",
         )
     return {"ok": True}
+
+
+class _IntakeProgressBody(BaseModel):
+    """Body for POST /api/employee/assignments/{id}/intake-progress."""
+
+    step: int = Field(ge=0, le=64)
+    # Total is sent on every call so the frontend can grow STEP_LABELS without
+    # a coupled migration. Default mirrors today's wizard.
+    total_steps: int = Field(default=7, ge=1, le=64)
+
+
+@app.post("/api/employee/assignments/{assignment_id}/intake-progress")
+def update_employee_assignment_intake_progress(
+    request: Request,
+    assignment_id: str,
+    body: _IntakeProgressBody,
+    user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
+):
+    """
+    Persist the wizard step counter for an assignment. Scoped to the
+    authenticated employee — a 404 fires if the assignment isn't owned by
+    this user. The wizard fires this fire-and-forget on every step change,
+    so it must stay cheap and side-effect free beyond the column bump.
+
+    Note: only the step counter is persisted here. The wizard's form data
+    still lives in component state until final submit (legacy patchCase
+    path). When per-step draft persistence is added it should reuse this
+    endpoint or the same scoping pattern.
+    """
+    effective = _effective_user(user, UserRole.EMPLOYEE)
+    rid = getattr(request.state, "request_id", None)
+    result = db.update_assignment_intake_progress(
+        assignment_id=assignment_id,
+        employee_user_id=effective["id"],
+        step=body.step,
+        total_steps=body.total_steps,
+        request_id=rid,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Assignment not found or not owned by this employee.",
+        )
+    return {
+        "assignmentId": assignment_id,
+        "intakeStep": result["intake_step"],
+        "intakeTotalSteps": result["intake_total_steps"],
+        "intakeUpdatedAt": result["intake_updated_at"],
+    }
 
 
 @app.get("/api/employee/me/assignment-package-policy")

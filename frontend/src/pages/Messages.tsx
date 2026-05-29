@@ -29,6 +29,12 @@ export const Messages: React.FC = () => {
   const [typingFrom, setTypingFrom] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
 
+  /** Employee inbox: exclusive render states. HR keeps using `loading`/`listError`. */
+  const [employeeLoadState, setEmployeeLoadState] =
+    useState<'loading' | 'offline' | 'server-error' | 'ready'>('loading');
+  const [employeeReloadKey, setEmployeeReloadKey] = useState(0);
+  const [employeeStale, setEmployeeStale] = useState(false);
+
   /** HR: filters & edit mode */
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -54,12 +60,16 @@ export const Messages: React.FC = () => {
   /** Employee: HR threads per linked assignment + provider quote threads */
   useEffect(() => {
     if (isHrLike) return;
+    let cancelled = false;
+    const hadData = conversationsRef.current.length > 0;
     const load = async () => {
+      if (!hadData) setEmployeeLoadState('loading');
       try {
         const [res, overview] = await Promise.all([
           employeeAPI.listMessages(),
           employeeAPI.getAssignmentsOverview().catch(() => ({ linked: [] as { assignment_id?: string; company?: { name?: string } }[] })),
         ]);
+        if (cancelled) return;
         const raw = (res.messages || []) as Record<string, unknown>[];
         const quoteRaw = (res.quote_threads || []) as Record<string, unknown>[];
         const labels = new Map<string, string>();
@@ -98,16 +108,30 @@ export const Messages: React.FC = () => {
           setActiveId(built[0].id);
         }
         setListError(null);
-      } catch {
-        setConversations(import.meta.env.DEV ? MOCK_CONVERSATIONS : []);
-        if (import.meta.env.DEV) setActiveId(MOCK_CONVERSATIONS[0]?.id ?? null);
-        setListError('Could not load messages.');
+        setEmployeeStale(false);
+        setEmployeeLoadState('ready');
+      } catch (err) {
+        if (cancelled) return;
+        const offline =
+          (typeof navigator !== 'undefined' && navigator.onLine === false) ||
+          (axios.isAxiosError(err) && !err.response);
+        // A refresh failed but we still have a list on screen: keep it, flag stale.
+        if (conversationsRef.current.length > 0) {
+          setEmployeeStale(true);
+          setEmployeeLoadState('ready');
+        } else {
+          setEmployeeLoadState(offline ? 'offline' : 'server-error');
+        }
+        setListError(offline ? 'You appear to be offline.' : 'Could not load messages.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     load();
-  }, [isHrLike, role, userId, userName, searchParams, setSearchParams]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isHrLike, role, userId, userName, searchParams, setSearchParams, employeeReloadKey]);
 
   /** HR: conversation summaries only (no message bodies until thread open). */
   useEffect(() => {
@@ -335,6 +359,75 @@ export const Messages: React.FC = () => {
     setSelectedAssignmentIds(new Set());
   }, []);
 
+  const reloadEmployeeInbox = useCallback(() => {
+    setEmployeeLoadState('loading');
+    setEmployeeReloadKey((k) => k + 1);
+  }, []);
+
+  const inboxSkeleton = (
+    <div className="flex-1 p-4 space-y-3" aria-busy="true" aria-label="Loading messages">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-[#eef2f7] animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-1/3 rounded bg-[#eef2f7] animate-pulse" />
+            <div className="h-3 w-2/3 rounded bg-[#f1f5f9] animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const employeeErrorPanel = (kind: 'offline' | 'server-error') => (
+    <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
+      <div className="w-12 h-12 rounded-full bg-[#fef2f2] flex items-center justify-center mb-4">
+        <svg className="w-6 h-6 text-[#dc2626]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d={
+              kind === 'offline'
+                ? 'M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m9.9 2.829a5 5 0 010 7.07m-7.07 0a5 5 0 010-7.07M12 12h.01'
+                : 'M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 001.74-3l-7.07-12a2 2 0 00-3.48 0l-7.07 12a2 2 0 001.74 3z'
+            }
+          />
+        </svg>
+      </div>
+      <h3 className="text-base font-semibold text-[#1A1A1A]">
+        {kind === 'offline' ? 'No connection.' : 'We can’t load your messages right now.'}
+      </h3>
+      <p className="mt-1 max-w-sm text-sm text-[#64748b]">
+        {kind === 'offline'
+          ? 'Check your internet and try again.'
+          : 'This is on our side, not yours. Hit refresh, or try again in a moment.'}
+      </p>
+      <button
+        type="button"
+        onClick={reloadEmployeeInbox}
+        className="mt-5 rounded-lg bg-[#0f172a] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e293b]"
+      >
+        {kind === 'offline' ? 'Try again' : 'Refresh inbox'}
+      </button>
+    </div>
+  );
+
+  const employeeStaleBanner = !isHrLike && employeeStale && (
+    <div className="flex items-center gap-2 border-b border-[#fde68a] bg-[#fffbeb] px-4 py-2 text-xs text-[#92400e] shrink-0">
+      <span>
+        <strong className="font-semibold">Your unread count looks out of sync.</strong>{' '}
+        Reload to refresh — if it keeps happening, let us know.
+      </span>
+      <button
+        type="button"
+        onClick={reloadEmployeeInbox}
+        className="ml-auto font-medium underline hover:no-underline"
+      >
+        Reload
+      </button>
+    </div>
+  );
+
   const hrListHeader = isHrLike && (
     <div className="border-b border-[#e2e8f0] p-3 space-y-2 bg-[#fafbfc] shrink-0">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
@@ -405,11 +498,19 @@ export const Messages: React.FC = () => {
   return (
     <AppShell title="Messages" subtitle="Case threads and invites">
       <div className="flex flex-col h-[calc(100vh-12rem)] md:h-[calc(100vh-10rem)] min-h-[400px] bg-white rounded-xl border border-[#e2e8f0] overflow-hidden shadow-sm">
-        {loading ? (
+        {!isHrLike && employeeLoadState === 'loading' ? (
+          inboxSkeleton
+        ) : !isHrLike && employeeLoadState === 'offline' ? (
+          employeeErrorPanel('offline')
+        ) : !isHrLike && employeeLoadState === 'server-error' ? (
+          employeeErrorPanel('server-error')
+        ) : isHrLike && loading ? (
           <div className="flex-1 flex items-center justify-center text-sm text-[#6b7280]">
             Loading messages…
           </div>
         ) : (
+          <>
+          {employeeStaleBanner}
           <div className="flex flex-1 min-h-0">
             {/* Desktop: two-column */}
             <div className="hidden md:flex md:w-[30%] md:min-w-[280px] md:max-w-[380px] flex-col min-h-0">
@@ -494,6 +595,7 @@ export const Messages: React.FC = () => {
               )}
             </div>
           </div>
+          </>
         )}
       </div>
     </AppShell>

@@ -79,7 +79,11 @@ def _caller_company_id(user: Dict[str, Any]) -> Optional[str]:
 def _row_to_dict(row: Any) -> Dict[str, Any]:
     d = dict(row)
     for k, v in list(d.items()):
-        if hasattr(v, "isoformat"):
+        if v is None:
+            continue
+        if isinstance(v, uuid.UUID):
+            d[k] = str(v)
+        elif hasattr(v, "isoformat"):
             try:
                 d[k] = v.isoformat()
             except Exception:
@@ -114,16 +118,22 @@ def create_ai_decision(
     now = datetime.utcnow().isoformat()
 
     with db.engine.begin() as conn:
-        conn.execute(
+        # AI-002 fix: combine INSERT + readback into one statement via RETURNING *.
+        # The previous "INSERT then SELECT * WHERE id = :id" failed because :id
+        # was bound as TEXT and Postgres has no implicit text=uuid comparison
+        # operator → "operator does not exist: text = uuid" → 500 + rollback.
+        # Casting actor_id defensively as well in case user["id"] arrives as text.
+        row = conn.execute(
             text(
                 """
                 INSERT INTO ai_decisions (
                     id, created_at, updated_at, actor_id, company_id,
                     feature, recommendation_id, ai_output, decision, reason
                 ) VALUES (
-                    :id, :now, :now, :actor, :company,
+                    CAST(:id AS uuid), :now, :now, CAST(:actor AS uuid), :company,
                     :feature, :rec_id, CAST(:ai_output AS jsonb), :decision, :reason
                 )
+                RETURNING *
                 """
             ),
             {
@@ -137,10 +147,6 @@ def create_ai_decision(
                 "decision": body.decision,
                 "reason": (body.reason or "").strip() or None,
             },
-        )
-        row = conn.execute(
-            text("SELECT * FROM ai_decisions WHERE id = :id"),
-            {"id": new_id},
         ).mappings().first()
 
         try:
