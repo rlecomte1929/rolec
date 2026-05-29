@@ -91,6 +91,7 @@ const SECTIONS: NavSection[] = [
       { id: 'policy-benefits', label: 'Policy', to: ROUTE_DEFS.hrPolicy.path },
       { id: 'provider-status', label: 'Provider status', to: ROUTE_DEFS.hrProviderGrid.path },
       { id: 'exceptions', label: 'Exceptions', to: ROUTE_DEFS.hrExceptions.path },
+      { id: 'ai-decisions', label: 'AI decisions', to: ROUTE_DEFS.hrAiDecisions.path },
     ],
   },
   {
