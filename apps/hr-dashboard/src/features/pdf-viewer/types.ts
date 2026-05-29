@@ -85,9 +85,15 @@ export interface PdfViewerProps {
   ariaLabel?: string;
 }
 
+/**
+ * Imperative handle the parent gets when it passes `viewerHandleRef`.
+ *
+ * `goToPage` is the primitive — it mounts neighbours so the j/k flow
+ * stays smooth and scrolls the destination into view. The C1-11e
+ * `useBboxScroll` hook wraps this with `scrollToBbox(highlightId)`
+ * that drives the flash animation as well.
+ */
 export interface PdfViewerHandle {
-  /** Scrolls to the given page, flashes the bbox, and updates currentPage. */
-  scrollToBbox: (highlightId: string) => void;
   /** Programmatic page change. 1-indexed; clamped. */
   goToPage: (page: number) => void;
 }
