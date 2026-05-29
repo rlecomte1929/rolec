@@ -215,6 +215,31 @@ async function suiteAuth() {
   tokens.newHR = freshHrR.data?.token || null;
   record('AT2_FRESH','Fresh HR registration smoke test','Auth','200 + token',`${freshHrR.status}/token=${!!tokens.newHR}`, freshHrR.ok && tokens.newHR ? 'PASS':'FAIL', freshHrR.ms, freshHrR.error||`email=${CONFIG.CREDS.newHR.email}`);
 
+  // ── AT2c: B18b — fresh HR with a NEW company_name can immediately create a case ──
+  // Regression guard for AIQ-542: register with company_name must create-or-link the
+  // company so the very next /api/hr/cases call succeeds (was 400 "No company linked").
+  {
+    const ts = Date.now();
+    const b18bHR = {
+      email: `sprint_b18b_${ts}@brandnewco_${ts}.com`,
+      password: 'Passw0rd!',
+      name: 'Sprint B18b',
+      role: 'HR',
+      company_name: `Brand New Co ${ts}`,
+    };
+    const regR = await req('POST', '/api/auth/register', b18bHR);
+    const b18bTok = regR.data?.token || null;
+    const b18bCompany = regR.data?.user?.company || null;
+    let caseR = { status: 0, ok: false, ms: 0, error: 'no token' };
+    let caseId = null;
+    if (b18bTok) {
+      caseR = await req('POST', '/api/hr/cases', { first_name:'X', last_name:`Y_${ts}`, email:`b18b_case_${ts}@example.com` }, b18bTok);
+      caseId = caseR.data?.id || caseR.data?.caseId || null;
+    }
+    const pass = !!b18bTok && !!b18bCompany && caseR.ok && !!caseId;
+    record('AT2c','Fresh HR + new company_name can create a case (B18b)','Auth','register 200+company, then /hr/cases 200+id',`reg=${regR.status}/company=${!!b18bCompany}, case=${caseR.status}/id=${caseId||'null'}`, pass ? 'PASS':'FAIL', regR.ms + caseR.ms, caseR.error||'');
+  }
+
   // ── AT3: Seeded employee login ────────────────────────────────────────────
   r = await req('POST', '/api/auth/login', CONFIG.CREDS.seedEmp);
   tokens.emp    = r.data?.token || null;

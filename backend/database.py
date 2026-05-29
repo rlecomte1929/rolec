@@ -9764,6 +9764,27 @@ class Database:
             ).fetchone()
         return self._row_to_dict(row)
 
+    def find_or_create_company_by_name(self, name: str) -> Optional[str]:
+        """Return the company_id for ``name``, creating the company if none exists.
+
+        Match is case-insensitive on the trimmed name so self-serve HR signups
+        reuse an existing workspace instead of spawning duplicates (the "17 Test
+        company" problem). Returns None when ``name`` is blank.
+        """
+        cleaned = (name or "").strip()
+        if not cleaned:
+            return None
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT id FROM companies WHERE LOWER(TRIM(name)) = LOWER(:name) LIMIT 1"),
+                {"name": cleaned},
+            ).fetchone()
+        if row is not None:
+            return self._row_to_dict(row)["id"]
+        company_id = str(uuid.uuid4())
+        self.create_company(company_id=company_id, name=cleaned, status="active", plan_tier="starter")
+        return company_id
+
     TEST_COMPANY_FIXED_ID = "110854ad-3c85-4291-a484-0b43effb680e"
 
     def run_admin_reconciliation_backfill_test_company(

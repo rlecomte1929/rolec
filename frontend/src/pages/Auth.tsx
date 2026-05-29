@@ -124,6 +124,7 @@ export const Auth: React.FC = () => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('EMPLOYEE');
   const [name, setName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
@@ -278,6 +279,7 @@ export const Auth: React.FC = () => {
         email: hasEmail ? email.trim() : undefined,
         password, role,
         name: name.trim() || undefined,
+        company_name: role !== 'EMPLOYEE' ? (companyName.trim() || undefined) : undefined,
       });
     } catch (err: any) {
       const transport = getClientTransportErrorMessage(err);
@@ -585,6 +587,10 @@ export const Auth: React.FC = () => {
                     { value: 'EMPLOYEE', label: 'Employee' },
                     { value: 'ADMIN', label: 'Admin (full access)' },
                   ]} fullWidth />
+                {role !== 'EMPLOYEE' && (
+                  <Input value={companyName} onChange={setCompanyName} label="Company"
+                    placeholder="Your company name" fullWidth />
+                )}
                 <LoadingButton type="submit" fullWidth loading={isLoading}
                   loadingLabel="Creating account…"
                   disabled={!password.trim() || (!username.trim() && !email.trim())}>

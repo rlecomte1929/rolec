@@ -269,6 +269,17 @@ def register(body: RegisterRequest, request: Request):
             company_id=None,
         )
 
+        # B18b (AIQ-542): a self-serve signup that supplies a company_name must end
+        # up with a linked company — otherwise the user gets a token but every HR
+        # API call fails with "No company linked to your profile". Create-or-link
+        # the company (case-insensitive dedupe) and sync it onto the profile.
+        company_id: Optional[str] = None
+        company_name = (body.company_name or "").strip()
+        if company_name:
+            company_id = db.find_or_create_company_by_name(company_name)
+            if company_id:
+                db.set_profile_company(user_id, company_id)
+
         reconciliation_payload = None
         if role == UserRole.EMPLOYEE and (email or username):
             try:
@@ -338,7 +349,7 @@ def register(body: RegisterRequest, request: Request):
                 email=email,
                 role=role,
                 name=body.name,
-                company=None,
+                company=company_id,
             ),
             reconciliation=reconciliation_payload,
         )
