@@ -1,0 +1,71 @@
+feat(intake): persist wizard form data — refresh-safe wizard
+
+Addresses the "Known limitation" called out in the previous commit on
+this branch: form data was ephemeral (local component state only), so a
+refresh mid-wizard sent the user back to the same step (good) but with
+empty fields (bad). The wizard also issued a random UUID via caseIdRef
+for its data writes, never tied to the real assignment.
+
+This commit ties the wizard's form data to the user's linked
+assignment_id and persists it on every edit so the wizard is now
+refresh-safe end to end. The step counter (from the previous commit)
+already worked; this completes the loop.
+
+Schema
+- New jsonb column on case_assignments via migration
+  20260529140000_case_assignments_intake_draft.sql.
+- Stored on case_assignments (not relocation_cases) so employee-owned
+  draft data stays separate from HR-owned case data, and so existing
+  RLS policies on case_assignments cover it without a new policy.
+- SQLite test schema mirror added.
+- Decision rationale documented in the migration header — no index
+  (single PK lookup), JSONB over normalized columns (frontend owns the
+  schema, no query-side benefit).
+
+Backend
+- New helpers in database.py:
+    db.get_assignment_intake(assignment_id, employee_user_id)
+        Returns step counter + draft together, scoped by employee
+        ownership. Handles psycopg's pre-parsed jsonb and SQLite's TEXT
+        transparently — the API receives a dict either way.
+    db.update_assignment_intake_draft(assignment_id, employee_user_id,
+                                      draft)
+        Upserts the draft. Postgres path uses CAST(:draft AS jsonb);
+        SQLite path stores it as JSON-text. Same WHERE scoping as the
+        progress helper.
+- New endpoints in main.py:
+    GET   /api/employee/assignments/{id}/intake
+        Read step + draft. Wizard mount hydration.
+    PATCH /api/employee/assignments/{id}/intake-draft
+        Upsert the draft blob. Wizard autosave (debounced).
+  Both EMPLOYEE-only, owner-scoped, 404 on miss.
+
+Frontend
+- New api helpers employeeAPI.getIntake() + .updateIntakeDraft().
+- Wizard (EmployeeIntakePage.tsx) hydration switched from the linked
+  overview row to GET /intake — one call hydrates both step and data.
+  Hydration failure is soft: the wizard still runs against in-memory
+  defaults so the user is never stranded by a backend outage.
+- Autosave wired into the existing 700ms debounce timer in setField
+  via assignmentIdRef so the closure stays current as the linked
+  assignment resolves on mount.
+- Step persistence (POST /intake-progress on step change) and final-
+  submit completion (step = TOTAL_STEPS) carry over unchanged from
+  the previous commit.
+
+Smoke
+- DB round-trip verified end-to-end on SQLite: initial state → upsert
+  draft → read back identical → ownership check (wrong employee_user_id
+  returns None on both read and write).
+- tsc --noEmit clean.
+
+Caveats / out of scope
+- The wizard's side panels (QuoteRequestPanel, BudgetSummaryPanel,
+  CaseMessagesPanel) still use the local crypto.randomUUID() caseIdRef
+  for their own server calls. They were broken before this commit and
+  remain so — separate refactor.
+- Final "Generate my roadmap" submit still calls
+  patchCase(caseIdRef.current). Same story.
+- Race: a user who starts typing before hydration completes (~few
+  hundred ms) can have their first keystroke overwritten when the
+  server draft arrives. Edge case; accepted for now.
