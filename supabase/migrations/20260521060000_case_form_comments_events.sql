@@ -32,11 +32,11 @@ CREATE POLICY "case_form_comments_access"
       SELECT 1
       FROM public.case_forms cf
       JOIN public.cases c ON c.id = cf.case_id
-      JOIN public.profiles p ON p.id = auth.uid()
+      JOIN public.profiles p ON p.id::uuid = auth.uid()
       WHERE cf.id = case_form_comments.case_form_id
         AND (
           p.role = 'ADMIN'
-          OR c.employee_id = auth.uid()
+          OR c.employee_id = auth.uid()::text
           OR (p.role = 'HR' AND p.company_id = c.company_id)
         )
     )
@@ -67,11 +67,11 @@ CREATE POLICY "case_form_events_access"
       SELECT 1
       FROM public.case_forms cf
       JOIN public.cases c ON c.id = cf.case_id
-      JOIN public.profiles p ON p.id = auth.uid()
+      JOIN public.profiles p ON p.id::uuid = auth.uid()
       WHERE cf.id = case_form_events.case_form_id
         AND (
           p.role = 'ADMIN'
-          OR c.employee_id = auth.uid()
+          OR c.employee_id = auth.uid()::text
           OR (p.role = 'HR' AND p.company_id = c.company_id)
         )
     )
