@@ -1,0 +1,255 @@
+/* =============================================================================
+ * ReloPass Design Tokens — v1 (C1-11D seed)
+ * =============================================================================
+ *
+ * Source of truth for the HR Dashboard (Cohort 1) and all downstream surfaces
+ * that don't have a separate token family (marketing pages keep their own
+ * --marketing-* namespace in frontend/src/index.css).
+ *
+ * Naming convention: --rp-<family>-<scale-or-semantic>
+ *   --rp-color-* / --rp-text-*  (color is implicit when prefixed with a known
+ *                                family like primary/success, otherwise --rp-color-*)
+ *   --rp-space-<N>              (4px base scale; N = multiples)
+ *   --rp-radius-<size>
+ *   --rp-shadow-<elevation>
+ *   --rp-duration-<speed>
+ *   --rp-easing-<curve>
+ *
+ * Coexistence rule: the existing --rp-primary / --rp-secondary / --rp-accent /
+ * --rp-bg / --rp-text / --rp-muted / --rp-border vars in frontend/src/index.css
+ * are PRESERVED as semantic aliases (re-exported below). Tailwind config and
+ * shadcn/ui theme.json both consume this file as their source.
+ *
+ * Aesthetic register per Architecture Report §12.1: Linear / Stripe / Ramp.
+ * Calm, precise, generous whitespace, subtle motion, no glass-morphism, no
+ * gradients in surfaces (gradients only on illustrative accents).
+ * ============================================================================= */
+
+:root {
+  /* =========================================================================
+   * COLOR — Primary scale (navy, ReloPass identity)
+   * ========================================================================= */
+  --rp-color-primary-50:   #f0f5fa;
+  --rp-color-primary-100:  #d6e4f0;
+  --rp-color-primary-200:  #adc9e1;
+  --rp-color-primary-300:  #7fa5c8;
+  --rp-color-primary-400:  #4d7fac;
+  --rp-color-primary-500:  #2d5f8e;  /* hover/active default */
+  --rp-color-primary-600:  #1f4870;  /* default primary action */
+  --rp-color-primary-700:  #133456;
+  --rp-color-primary-800:  #0b2b43;  /* matches existing --rp-primary */
+  --rp-color-primary-900:  #061a2a;
+
+  /* COLOR — Secondary scale (teal, supporting actions, brand accent) */
+  --rp-color-secondary-50:  #ebf7f6;
+  --rp-color-secondary-100: #d2eceb;
+  --rp-color-secondary-200: #a4d8d6;
+  --rp-color-secondary-300: #6ec0bd;
+  --rp-color-secondary-400: #3aa6a3;
+  --rp-color-secondary-500: #1f8e8b;  /* matches existing --rp-secondary */
+  --rp-color-secondary-600: #167572;
+  --rp-color-secondary-700: #105d5b;
+  --rp-color-secondary-800: #0b4543;
+  --rp-color-secondary-900: #062d2c;
+
+  /* COLOR — Neutral scale (text, surfaces, borders) */
+  --rp-color-neutral-0:    #ffffff;
+  --rp-color-neutral-50:   #f8fafb;
+  --rp-color-neutral-100:  #f1f5f7;
+  --rp-color-neutral-200:  #e4eaef;
+  --rp-color-neutral-300:  #cbd5dc;
+  --rp-color-neutral-400:  #94a3ad;
+  --rp-color-neutral-500:  #6b7c8f;
+  --rp-color-neutral-600:  #4a5f73;
+  --rp-color-neutral-700:  #324558;
+  --rp-color-neutral-800:  #1f2937;  /* matches existing --rp-text */
+  --rp-color-neutral-900:  #0f172a;
+
+  /* COLOR — Status (semantic) */
+  --rp-color-success-50:   #ecfdf5;
+  --rp-color-success-500:  #10b981;
+  --rp-color-success-700:  #047857;
+
+  --rp-color-warning-50:   #fffbeb;
+  --rp-color-warning-500:  #f59e0b;
+  --rp-color-warning-700:  #b45309;
+
+  --rp-color-danger-50:    #fef2f2;
+  --rp-color-danger-500:   #ef4444;
+  --rp-color-danger-700:   #b91c1c;
+
+  --rp-color-info-50:      #eff6ff;
+  --rp-color-info-500:     #3b82f6;
+  --rp-color-info-700:     #1d4ed8;
+
+  /* =========================================================================
+   * SEMANTIC COLOR ALIASES — these are what components SHOULD reference.
+   * Aliasing keeps light/dark theme swaps possible by changing only this layer.
+   * Where they overlap with the legacy --rp-* vars in frontend/src/index.css,
+   * the legacy var REMAINS the canonical name (don't break existing code).
+   * ========================================================================= */
+
+  /* Surfaces */
+  --rp-surface:                var(--rp-color-neutral-0);          /* page background */
+  --rp-surface-subtle:         var(--rp-color-neutral-50);         /* alt rows, subtle fills */
+  --rp-surface-muted:          var(--rp-color-neutral-100);        /* disabled, raised */
+  --rp-surface-inverse:        var(--rp-color-primary-800);        /* dark inverted strips */
+
+  /* Borders */
+  --rp-border-default:         var(--rp-color-neutral-200);        /* matches existing --rp-border */
+  --rp-border-subtle:          var(--rp-color-neutral-100);
+  --rp-border-strong:          var(--rp-color-neutral-300);
+  --rp-border-focus:           var(--rp-color-primary-500);
+
+  /* Text */
+  --rp-text-primary:           var(--rp-color-neutral-800);        /* matches existing --rp-text */
+  --rp-text-secondary:         var(--rp-color-neutral-600);
+  --rp-text-tertiary:          var(--rp-color-neutral-500);        /* matches existing --rp-muted */
+  --rp-text-inverse:           var(--rp-color-neutral-0);
+  --rp-text-link:              var(--rp-color-secondary-600);
+  --rp-text-link-hover:        var(--rp-color-secondary-700);
+
+  /* Status surfaces (subtle backgrounds for Badges, Alerts) */
+  --rp-status-success-bg:      var(--rp-color-success-50);
+  --rp-status-success-fg:      var(--rp-color-success-700);
+  --rp-status-warning-bg:      var(--rp-color-warning-50);
+  --rp-status-warning-fg:      var(--rp-color-warning-700);
+  --rp-status-danger-bg:       var(--rp-color-danger-50);
+  --rp-status-danger-fg:       var(--rp-color-danger-700);
+  --rp-status-info-bg:         var(--rp-color-info-50);
+  --rp-status-info-fg:         var(--rp-color-info-700);
+
+  /* Accent (for hover states on neutral surfaces) — matches existing --rp-accent */
+  --rp-accent:                 var(--rp-color-secondary-50);
+
+  /* =========================================================================
+   * SPACING — 4px base scale
+   * ========================================================================= */
+  --rp-space-0:    0;
+  --rp-space-1:    4px;
+  --rp-space-2:    8px;
+  --rp-space-3:    12px;
+  --rp-space-4:    16px;
+  --rp-space-5:    20px;
+  --rp-space-6:    24px;
+  --rp-space-8:    32px;
+  --rp-space-10:   40px;
+  --rp-space-12:   48px;
+  --rp-space-16:   64px;
+  --rp-space-20:   80px;
+  --rp-space-24:   96px;
+
+  /* =========================================================================
+   * TYPE — Family
+   * ========================================================================= */
+  --rp-font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                  Inter, "Helvetica Neue", Arial, sans-serif;
+  --rp-font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas,
+                  "Liberation Mono", monospace;
+  --rp-font-display: var(--rp-font-sans);
+
+  /* TYPE — Size scale (modular, base = 16px) */
+  --rp-text-xs:    12px;     /* metadata, table-cell-secondary */
+  --rp-text-sm:    14px;     /* form labels, secondary body */
+  --rp-text-base:  16px;     /* default body */
+  --rp-text-md:    18px;     /* card titles, emphasized body */
+  --rp-text-lg:    20px;     /* H4 / section headers within a page */
+  --rp-text-xl:    24px;     /* H3 / dialog titles */
+  --rp-text-2xl:   30px;     /* H2 / page sub-headers */
+  --rp-text-3xl:   36px;     /* H1 / page titles */
+  --rp-text-4xl:   48px;     /* hero (rare in HR Dashboard) */
+
+  /* TYPE — Line heights */
+  --rp-leading-tight:   1.25;   /* headings */
+  --rp-leading-snug:    1.4;    /* card content, dense layouts */
+  --rp-leading-normal:  1.5;    /* body */
+  --rp-leading-relaxed: 1.625;  /* longform reading */
+
+  /* TYPE — Weights */
+  --rp-weight-regular:  400;
+  --rp-weight-medium:   500;
+  --rp-weight-semibold: 600;
+  --rp-weight-bold:     700;
+
+  /* TYPE — Letter spacing */
+  --rp-tracking-tight:  -0.01em;   /* large display headings only */
+  --rp-tracking-normal: 0;
+  --rp-tracking-wide:   0.02em;    /* uppercase eyebrows, badge labels */
+
+  /* =========================================================================
+   * RADIUS
+   * ========================================================================= */
+  --rp-radius-none:  0;
+  --rp-radius-sm:    4px;     /* tags, badges, inline chips */
+  --rp-radius-md:    8px;     /* buttons, inputs, cards */
+  --rp-radius-lg:    12px;    /* dialogs, sheets, large cards */
+  --rp-radius-xl:    16px;    /* hero cards, illustrative panels */
+  --rp-radius-full:  9999px;  /* avatars, pill buttons */
+
+  /* =========================================================================
+   * SHADOW — Elevation
+   * ========================================================================= */
+  --rp-shadow-none: none;
+  --rp-shadow-sm:   0 1px 2px 0 rgb(15 23 42 / 0.04),
+                    0 1px 1px 0 rgb(15 23 42 / 0.06);     /* cards at rest */
+  --rp-shadow-md:   0 4px 6px -1px rgb(15 23 42 / 0.08),
+                    0 2px 4px -2px rgb(15 23 42 / 0.05);  /* hover, dropdowns */
+  --rp-shadow-lg:   0 10px 15px -3px rgb(15 23 42 / 0.10),
+                    0 4px 6px -4px rgb(15 23 42 / 0.05);  /* dialogs */
+  --rp-shadow-xl:   0 20px 25px -5px rgb(15 23 42 / 0.10),
+                    0 8px 10px -6px rgb(15 23 42 / 0.04); /* command palette */
+
+  /* Focus ring — single canonical shadow for keyboard focus */
+  --rp-shadow-focus: 0 0 0 3px rgb(45 95 142 / 0.35);     /* primary-500 @ 35% */
+
+  /* =========================================================================
+   * MOTION
+   * ========================================================================= */
+  --rp-duration-instant: 0ms;
+  --rp-duration-fast:    100ms;   /* color/opacity micro-interactions */
+  --rp-duration-base:    200ms;   /* default — hover, focus, panel transitions */
+  --rp-duration-slow:    400ms;   /* dialog/sheet enter/exit */
+  --rp-duration-slower:  600ms;   /* page-level transitions, rare */
+
+  --rp-easing-linear:    linear;
+  --rp-easing-in:        cubic-bezier(0.4, 0, 1, 1);
+  --rp-easing-out:       cubic-bezier(0, 0, 0.2, 1);          /* default entry */
+  --rp-easing-in-out:    cubic-bezier(0.4, 0, 0.2, 1);        /* default movement */
+  --rp-easing-spring:    cubic-bezier(0.34, 1.56, 0.64, 1);   /* rare — playful confirmations */
+
+  /* =========================================================================
+   * Z-INDEX SCALE — explicit so component layering is predictable
+   * ========================================================================= */
+  --rp-z-base:     0;
+  --rp-z-raised:   10;
+  --rp-z-sticky:   20;     /* sticky table headers, table footers */
+  --rp-z-tooltip:  30;
+  --rp-z-dropdown: 40;
+  --rp-z-overlay:  50;     /* dialog scrim */
+  --rp-z-dialog:   60;
+  --rp-z-toast:    70;     /* always above dialogs so error toasts surface */
+  --rp-z-max:      9999;
+}
+
+/* =============================================================================
+ * REDUCED MOTION — system-honoured override.
+ * Components MUST consume --rp-duration-* / --rp-easing-* via these tokens
+ * rather than hardcoding durations, so this block can neutralise motion
+ * globally for users who opt into prefers-reduced-motion.
+ * ============================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --rp-duration-fast:   0ms;
+    --rp-duration-base:   0ms;
+    --rp-duration-slow:   0ms;
+    --rp-duration-slower: 0ms;
+    --rp-easing-spring:   var(--rp-easing-linear);
+  }
+}
+
+/* =============================================================================
+ * DARK THEME — placeholder for v2. Light theme is the default per the Notion
+ * brief; dark-mode tokens land in tokens-dark.css when the dark theme work
+ * begins (separate task).
+ * ============================================================================= */
+/* [data-theme="dark"] { ...token overrides... } */
