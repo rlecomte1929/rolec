@@ -30,6 +30,7 @@ from .routers import (
     immigration_status,
     marketplace,
     mobility_context,
+    nlg,
     pets,
     policy_canonical,
     policy_feedback,
@@ -89,6 +90,7 @@ def create_app() -> FastAPI:
     app.include_router(hr_catalog.router)
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
+    app.include_router(nlg.router)
 
     # ── Month-1 migration: Employee cluster ───────────────────────────────────
     # [AUDIT-B9-imm-6] immigration.router replaced by 5 modular sub-routers.
