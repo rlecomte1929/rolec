@@ -1,15 +1,23 @@
 # supabase/rls_allowlist.txt
 # AUDIT-A3 (audit/02-expert-security.md SEC-2)
 #
-# STATUS: SEED — the 113 entries below are the policy-less tables that
-# existed in `public` schema on 2026-05-25. They are PENDING SECURITY TRIAGE.
-#
-# Each entry MUST be reviewed by a human and either:
+# STATUS: DRAINING — seeded with 113 policy-less tables that existed in the
+# `public` schema on 2026-05-25. Each entry is PENDING SECURITY TRIAGE and must
+# be reviewed by a human and either:
 #   (a) given an RLS policy via a new supabase/migrations/ file — then the
-#       entry can be removed from this list (CI will start passing without it);
+#       entry is removed from this list (CI passes without it); or
 #   (b) kept here with a per-entry comment justifying why it is intentionally
-#       server-role-only (e.g. internal audit_log written only by the backend
-#       and never exposed via the Supabase anon client).
+#       server-role-only.
+#
+# Drain log:
+#   2026-05-30  SEC-RLSd (AIQ-661) — catalog/seed domain: removed 7 entries
+#               (country_events, country_profiles, country_resource_items,
+#               country_resource_sections, requirements_catalog, requirement_items,
+#               default_policy_templates), given public-read + admin-write RLS in
+#               20260531020000_rls_catalog_seed.sql. 78 -> 71.
+#   2026-05-30  SEC-RLSb (AIQ-659) — policy/HR domain: removed 35 entries, all
+#               given company_id-scoped / shared-knowledge / server-internal RLS
+#               in 20260531010000_rls_policy_hr_domain.sql. 113 -> 78.
 #
 # Triage tracked as AUDIT-A3-followup in the Notion AI Work Queue. The list
 # should DRAIN over time, not GROW. New policy-less tables landing in main
@@ -27,11 +35,7 @@ assignment_mobility_links
 assignment_policy_service_comparisons
 audit_log
 audit_logs
-canonical_policy_document_chunks
-canonical_policy_documents
-canonical_policy_fact_validation_errors
-canonical_policy_facts
-canonical_policy_query_audit_logs
+canonical_policy_query_audit_logs   # SEC-RLSb: audit log of KG queries, not HR-owned — SEC-RLSe (audit-only)
 case_assignment_id
 case_documents
 case_evidence
@@ -43,30 +47,19 @@ case_readiness_checklist_state
 case_readiness_milestone_state
 case_requirement_evaluations
 case_requirements_snapshots
-catalog_employee_demand
-catalog_scrape_quota
-collaboration_comment_mentions
-collaboration_comments
-collaboration_notifications
-collaboration_thread_participants
-collaboration_threads
-company_policies
-company_policy_assistant_bindings
-company_preferred_suppliers
-company_vendor_selections
-compliance_actions
-compliance_reference_sources
-compliance_reports
-country_events
-country_profiles
-country_resource_items
-country_resource_sections
+catalog_employee_demand              # SEC-RLSd triage: tenant-scoped (company_id) HR demand signal, not public-read — RLS deferred to SEC-RLSe
+catalog_scrape_quota                 # SEC-RLSd triage: per-tenant/server scrape-quota counter, not public-read — RLS deferred to SEC-RLSe
+collaboration_comment_mentions   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_comments   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_notifications   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_thread_participants   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_threads   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+compliance_reference_sources         # SEC-RLSd triage: server-write only — admin/server-seeded provenance, runtime reads seed JSON (not HR-upload, not anon-read)
 crawl_job_runs
 crawl_runs
 crawl_schedules
 crawled_source_chunks
 crawled_source_documents
-default_policy_templates
 demo_request_rate_limits
 demo_requests
 document_change_events
@@ -77,34 +70,9 @@ error_tickets
 form_prefill_instances
 freshness_alerts
 freshness_snapshots
-hr_policies
 knowledge_doc_ingest_jobs
 notification_outbox
 ops_notification_events
-policy_assignment_type_applicability
-policy_assistant_answer_audits
-policy_benefit_jurisdiction_overrides
-policy_benefit_rule_hr_override_audit
-policy_benefit_rule_hr_overrides
-policy_benefit_rules
-policy_config_benefits
-policy_config_versions
-policy_configs
-policy_document_chunks
-policy_document_clauses
-policy_documents
-policy_evidence_requirements
-policy_exclusions
-policy_extraction_locks
-policy_facts
-policy_family_status_applicability
-policy_knowledge_snapshots
-policy_processing_runs
-policy_rule_conditions
-policy_rules
-policy_source_links
-policy_tier_overrides
-policy_versions
 profile_state
 prospect_candidates
 readiness_template_checklist_items
@@ -113,9 +81,7 @@ readiness_templates
 relocation_artifacts
 relocation_runs
 relocation_sources
-requirement_items
 requirement_research_jobs
-requirements_catalog
 research_source_candidates
 resolved_assignment_policies
 resolved_assignment_policy_benefits
