@@ -35,6 +35,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Parker Step E — exported DPO preference datasets (data, not code)
+preferences/
+
 # Local audit output
 audit_report.json
 # Generated PDF fixtures (GAP-011; rebuilt at test time, never committed)
