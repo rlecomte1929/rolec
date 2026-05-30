@@ -418,35 +418,110 @@ def debug_route(method: str, path: str, **kwargs):
 # Disabled when RELOPASS_DISABLE_RATE_LIMITS=1 (tests set this in conftest).
 # ---------------------------------------------------------------------------
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from .rate_limit import limiter, _real_remote_address
+from .app.rate_limits import UPLOAD_LIMIT, ADMIN_LIMIT, AI_LIMIT, user_key_func
 
 app.state.limiter = limiter
 
+# SEC-004: apply STANDARD_LIMIT (the limiter's default_limits) to every route that
+# does NOT carry an explicit @limiter.limit decorator. The middleware skips routes
+# already decorated or marked @limiter.exempt, so stricter buckets (auth/upload/
+# admin/ai) win and exempt routes (health, webhooks) stay unlimited. No-op when
+# the limiter is disabled (RELOPASS_DISABLE_RATE_LIMITS=1).
+app.add_middleware(SlowAPIMiddleware)
 
-@app.exception_handler(RateLimitExceeded)
-async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    """429 response that preserves X-Request-ID and CORS headers (matches global 500 handler)."""
+# SEC-004: exempt infrastructure / service-to-service routes from ALL rate limits.
+# These are invoked by Render (health probes), Postmark (inbound-email webhook),
+# and Supabase triggers (support triage) — never by end users — so the
+# STANDARD_LIMIT default must not throttle them. slowapi keys exemptions by the
+# endpoint's "<module>.<name>". Names verified against the live route table.
+_RATE_LIMIT_EXEMPT_ENDPOINTS = (
+    f"{__name__}.health_check",              # GET /health
+    f"{__name__}.supabase_health",           # GET /api/health/supabase
+    f"{__name__}.policy_documents_health",   # GET /api/hr/policy-documents/health
+    f"{__name__}.email_health_check",        # GET /api/internal/email/health
+    # Service-role / external-webhook routes live in the support router:
+    "backend.app.routers.support.inbound_email_webhook",  # POST /webhooks/support-email (Postmark)
+    "backend.app.routers.support.triage_ticket",          # POST /api/support/triage (Supabase trigger)
+)
+for _exempt_name in _RATE_LIMIT_EXEMPT_ENDPOINTS:
+    limiter._exempt_routes.add(_exempt_name)
+
+
+def _rate_limit_json_response(request: Request, limit: str) -> JSONResponse:
+    """
+    Build the canonical 429 response (SEC-004): documented JSON shape, Retry-After
+    header, preserved X-Request-ID + CORS headers, and a structured
+    ``rate_limit_hit`` log line for abuse monitoring. Shared by the slowapi
+    exception handler and the admin path-scoped middleware below.
+    """
     req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    ip = _real_remote_address(request)
+    path = request.url.path
+    # slowapi does not expose seconds-to-reset on this version; window is 1 minute
+    # for every named bucket, so 60s is the correct client back-off hint.
+    retry = 60
     hdrs: Dict[str, str] = {
         "X-Request-ID": req_id,
-        "Retry-After": "60",
+        "Retry-After": str(retry),
     }
     hdrs.update(cors_headers_for_request_origin(request))
     log.warning(
-        "rate_limit_exceeded request_id=%s path=%s ip=%s limit=%s",
+        "rate_limit_hit ip=%s path=%s limit=%s request_id=%s",
+        ip,
+        path,
+        str(limit),
         req_id,
-        request.url.path,
-        _real_remote_address(request),
-        str(getattr(exc, "detail", "")),
+        extra={"ip": ip, "path": path, "limit": str(limit), "request_id": req_id},
     )
     return JSONResponse(
         status_code=429,
         content={
+            "error": "rate_limit_exceeded",
+            "message": f"Too many requests. Retry after {retry}s.",
+            "retry_after": retry,
+            # Retained for backward compatibility with existing frontend consumers
+            # that read `detail` / `request_id` on error responses.
             "detail": "Too many requests. Wait a moment before trying again.",
             "request_id": req_id,
         },
         headers=hdrs,
     )
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    """429 handler for every slowapi-decorated route + the STANDARD middleware."""
+    limit = str(getattr(exc, "detail", "") or getattr(exc, "limit", ""))
+    return _rate_limit_json_response(request, limit)
+
+
+# SEC-004: admin endpoints get a stricter bucket (ADMIN_LIMIT) than the STANDARD
+# default. There are ~66 /api/admin/* routes and most lack a Request parameter, so
+# a path-scoped middleware enforces the admin bucket centrally instead of decorating
+# each route (and auto-covers future admin routes). Uses slowapi's own `limits`
+# backend with an independent in-memory store, keyed by client IP. Honors the global
+# RELOPASS_DISABLE_RATE_LIMITS kill switch via limiter.enabled (no new bypass).
+from limits import parse as _parse_rate_limit
+from limits.storage import MemoryStorage as _AdminRLStorage
+from limits.strategies import FixedWindowRateLimiter as _AdminRLStrategy
+
+_admin_rate_limit_item = _parse_rate_limit(ADMIN_LIMIT)
+_admin_rate_limiter = _AdminRLStrategy(_AdminRLStorage())
+
+
+@app.middleware("http")
+async def _admin_rate_limit_middleware(request: Request, call_next):
+    if (
+        limiter.enabled
+        and request.method != "OPTIONS"
+        and request.url.path.startswith("/api/admin/")
+    ):
+        key = _real_remote_address(request)
+        if not _admin_rate_limiter.hit(_admin_rate_limit_item, "sec004-admin", key):
+            return _rate_limit_json_response(request, str(_admin_rate_limit_item))
+    return await call_next(request)
 
 
 admin_graph_build_marker = os.getenv("ADMIN_GRAPH_BUILD_MARKER", "local-dev")
@@ -9023,6 +9098,7 @@ def get_assignment_policy_budget(
 
 
 @app.post("/api/employee/policy-assistant/query")
+@limiter.limit(AI_LIMIT, key_func=user_key_func)  # SEC-004: AI bucket, per-user
 def post_employee_policy_assistant_query(
     body: EmployeePolicyAssistantQueryRequest,
     req: Request,
@@ -9137,6 +9213,7 @@ def post_employee_policy_session_export_pdf(
 
 
 @app.post("/api/hr/policy-assistant/query")
+@limiter.limit(AI_LIMIT, key_func=user_key_func)  # SEC-004: AI bucket, per-user
 def post_hr_policy_assistant_query(
     body: HrPolicyAssistantQueryRequest,
     req: Request,
@@ -9187,6 +9264,7 @@ def post_hr_policy_assistant_query(
 
 
 @app.post("/api/policy-assistant/rag-query")
+@limiter.limit(AI_LIMIT, key_func=user_key_func)  # SEC-004: AI bucket, per-user
 def post_policy_assistant_rag_query(
     body: Dict[str, Any] = Body(...),
     req: Request = None,  # type: ignore[assignment]
@@ -10056,6 +10134,7 @@ def add_dossier_case_question(
 
 
 @app.post("/api/guidance/generate")
+@limiter.limit(AI_LIMIT, key_func=user_key_func)  # SEC-004: AI bucket, per-user
 def generate_guidance(
     request: GuidanceGenerateRequest,
     user: Dict[str, Any] = Depends(require_hr_or_employee),
@@ -10575,7 +10654,9 @@ def create_hr_policy(
 
 
 @app.post("/api/hr/policies/upload")
+@limiter.limit(UPLOAD_LIMIT)  # SEC-004: file-upload bucket (10/minute)
 async def upload_hr_policy(
+    req: Request,
     file: UploadFile = File(...),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
@@ -10797,6 +10878,7 @@ def policy_documents_health(user: Dict[str, Any] = Depends(require_role(UserRole
 
 
 @app.post("/api/hr/policy-documents/upload")
+@limiter.limit(UPLOAD_LIMIT)  # SEC-004: file-upload bucket (10/minute)
 async def upload_policy_document(
     req: Request,
     background_tasks: BackgroundTasks,
@@ -11835,6 +11917,7 @@ def normalize_policy_document(
 
 
 @app.post("/api/admin/policies/upload")
+@limiter.limit(UPLOAD_LIMIT)  # SEC-004: file-upload bucket (10/minute)
 async def admin_policy_assistant_upload(
     req: Request,
     file: Optional[UploadFile] = File(None),
@@ -11849,6 +11932,7 @@ async def admin_policy_assistant_upload(
 
 
 @app.post("/api/admin/policies/{document_id}/extract")
+@limiter.limit(AI_LIMIT, key_func=user_key_func)  # SEC-004: AI bucket, per-user
 def admin_policy_assistant_extract(
     document_id: str,
     req: Request,
@@ -12896,6 +12980,7 @@ def get_company_policy_download_url(
 
 
 @app.post("/api/company-policies/upload")
+@limiter.limit(UPLOAD_LIMIT)  # SEC-004: file-upload bucket (10/minute)
 async def upload_company_policy(
     req: Request,
     file: UploadFile = File(...),
@@ -12959,6 +13044,7 @@ def update_company_policy_benefits(
 
 
 @app.post("/api/policies/{policy_id}/extract")
+@limiter.limit(AI_LIMIT, key_func=user_key_func)  # SEC-004: AI bucket, per-user
 def extract_company_policy(
     policy_id: str,
     req: Request,
@@ -12995,6 +13081,7 @@ def extract_company_policy(
 
 
 @app.post("/api/policies/{policy_id}/extract-preview")
+@limiter.limit(AI_LIMIT, key_func=user_key_func)  # SEC-004: AI bucket, per-user
 def extract_company_policy_preview(
     policy_id: str,
     req: Request,

@@ -34,6 +34,7 @@ from ...identity_observability import (
     principal_fingerprint_from_login_identifier,
 )
 from ...rate_limit import limiter
+from ..rate_limits import AUTH_LIMIT
 from ...schemas import (
     LoginRequest,
     LoginResponse,
@@ -177,6 +178,8 @@ def _log_auth_perf(
 
 
 @router.post("/api/auth/register", response_model=LoginResponse)
+# SEC-004: registration intentionally keeps a stricter window than AUTH_LIMIT
+# (5/minute) — signup abuse is best capped per hour/day, not per minute.
 @limiter.limit("5/hour;20/day")
 def register(body: RegisterRequest, request: Request):
     """Register a new user with username or email and role."""
@@ -368,7 +371,7 @@ def register(body: RegisterRequest, request: Request):
 
 
 @router.post("/api/auth/login", response_model=LoginResponse)
-@limiter.limit("10/minute;100/hour")
+@limiter.limit(AUTH_LIMIT)  # SEC-004: 5/minute on the auth bucket
 def login(body: LoginRequest, request: Request):
     """Login with username or email + password."""
     t0 = time.perf_counter()
