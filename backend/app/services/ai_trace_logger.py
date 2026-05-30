@@ -85,8 +85,13 @@ class TraceSession:
         session_id: Optional[str],
         query: str,
         company_id: str,
+        # Combined Parker D + G params. feature_key (Step G) is required, so it must
+        # stay ahead of every defaulted param (Python forbids a non-default arg after a
+        # default). customer_id (G) and prompt_version_id/canary_arm (D) are optional.
         feature_key: str,
         customer_id: Optional[str] = None,
+        prompt_version_id: Optional[str] = None,
+        canary_arm: Optional[str] = None,
     ) -> None:
         self.trace_id: str = str(uuid.uuid4())
         self.session_id: Optional[str] = session_id
@@ -101,6 +106,17 @@ class TraceSession:
         # to company_id when the caller doesn't distinguish the two.
         self.feature_key: str = feature_key
         self.customer_id: Optional[str] = customer_id if customer_id is not None else company_id
+        # Prompt attribution (Parker Step D) — which registry version/arm served
+        # this request. Both None when the registry is absent (literal fallback).
+        self.prompt_version_id: Optional[str] = prompt_version_id
+        self.canary_arm: Optional[str] = canary_arm
+
+    def set_prompt_attribution(
+        self, prompt_version_id: Optional[str], canary_arm: Optional[str]
+    ) -> None:
+        """Record which prompt version/arm served this request (Parker Step D)."""
+        self.prompt_version_id = prompt_version_id
+        self.canary_arm = canary_arm
 
     # ── Recording helpers ── #
 
@@ -171,6 +187,8 @@ class TraceSession:
                 "fallback_triggered": self.fallback_triggered,
                 "feature_key": self.feature_key,
                 "customer_id": self.customer_id,
+                "prompt_version_id": self.prompt_version_id,
+                "canary_arm": self.canary_arm,
                 **econ,
             }
             # 1. Structured JSON log — always on, zero extra deps.
@@ -253,6 +271,8 @@ def _write_to_db(payload: Dict[str, Any], company_id: str) -> None:
                 tokens_out=payload.get("tokens_out"),
                 cost_usd_estimated=payload.get("cost_usd_estimated"),
                 co2e_grams_estimated=payload.get("co2e_grams_estimated"),
+                prompt_version_id=payload.get("prompt_version_id"),
+                canary_arm=payload.get("canary_arm"),
             )
     except Exception:
         log.debug("ai_trace db write failed", exc_info=True)

@@ -2439,6 +2439,8 @@ class Database:
                     tokens_out INTEGER,
                     customer_id TEXT,
                     feature_key TEXT,
+                    prompt_version_id TEXT,
+                    canary_arm TEXT,
                     created_at TEXT NOT NULL
                 )
             """))
@@ -2468,6 +2470,21 @@ class Database:
                     conn.execute(text(
                         f"ALTER TABLE policy_assistant_traces ADD COLUMN IF NOT EXISTS {_col} {_pg_t}"
                     ))
+            # Parker Step D: prompt attribution columns. Idempotent additive
+            # backfill for traces tables created before the registry landed.
+            if _is_sqlite:
+                try:
+                    _pat_cols = conn.execute(text("PRAGMA table_info(policy_assistant_traces)")).fetchall()
+                    _pat_names = {r[1] for r in _pat_cols}
+                    if "prompt_version_id" not in _pat_names:
+                        conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN prompt_version_id TEXT"))
+                    if "canary_arm" not in _pat_names:
+                        conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN canary_arm TEXT"))
+                except Exception:
+                    pass
+            else:
+                conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN IF NOT EXISTS prompt_version_id TEXT"))
+                conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN IF NOT EXISTS canary_arm TEXT"))
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_pa_traces_company_created
                 ON policy_assistant_traces(company_id, created_at)
@@ -14247,6 +14264,8 @@ class Database:
         tokens_out: Optional[int] = None,
         cost_usd_estimated: Optional[float] = None,
         co2e_grams_estimated: Optional[float] = None,
+        prompt_version_id: Optional[str] = None,
+        canary_arm: Optional[str] = None,
     ) -> None:
         """
         Persist one trace row. Called by ai_trace_logger._write_to_db().
@@ -14255,6 +14274,8 @@ class Database:
 
         Parker Step G: feature_key / customer_id + token / cost / CO2e estimates feed
         the per-customer unit-economics rollup.
+        Parker Step D: prompt_version_id / canary_arm attribute the trace to a registry
+        arm; both None when the registry was absent (literal fallback).
         """
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
@@ -14265,9 +14286,11 @@ class Database:
                     (id, session_id, query_hash, company_id, steps_json,
                      total_latency_ms, fallback_triggered,
                      feature_key, customer_id, tokens_in, tokens_out,
-                     cost_usd_estimated, co2e_grams_estimated, created_at)
+                     cost_usd_estimated, co2e_grams_estimated,
+                     prompt_version_id, canary_arm, created_at)
                     VALUES (:id, :sid, :qh, :cid, :sj, :lms, :fb,
-                            :fk, :cust, :tin, :tout, :cost, :co2e, :now)
+                            :fk, :cust, :tin, :tout, :cost, :co2e,
+                            :pvid, :arm, :now)
                     ON CONFLICT(id) DO NOTHING
                     """
                 ),
@@ -14285,6 +14308,8 @@ class Database:
                     "tout": int(tokens_out) if tokens_out is not None else None,
                     "cost": float(cost_usd_estimated) if cost_usd_estimated is not None else None,
                     "co2e": float(co2e_grams_estimated) if co2e_grams_estimated is not None else None,
+                    "pvid": prompt_version_id,
+                    "arm": canary_arm,
                     "now": now,
                 },
             )
