@@ -33,6 +33,7 @@ from .routers import (
     immigration_status,
     marketplace,
     mobility_context,
+    nlg,
     pets,
     policy_canonical,
     policy_feedback,
@@ -99,6 +100,8 @@ def create_app() -> FastAPI:
     app.include_router(hr_case_audit.router)
     # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
     app.include_router(hr_case_resolve.router)
+    # [Parker-J] NLG exec-summary + policy TL;DR routes
+    app.include_router(nlg.router)
 
     # ── Month-1 migration: Employee cluster ───────────────────────────────────
     # [AUDIT-B9-imm-6] immigration.router replaced by 5 modular sub-routers.
