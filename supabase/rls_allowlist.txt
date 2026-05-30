@@ -14,13 +14,10 @@
 #               (country_events, country_profiles, country_resource_items,
 #               country_resource_sections, requirements_catalog, requirement_items,
 #               default_policy_templates), given public-read + admin-write RLS in
-#               20260531020000_rls_catalog_seed.sql. 50 → 43.
-#   2026-06-01  SEC-RLSa (AIQ-658) — cases domain: removed 28 entries, all
-#               given tenant-scoped RLS in 20260601000000_rls_cases_domain.sql.
-#               113 → 85.
+#               20260531020000_rls_catalog_seed.sql. 78 -> 71.
 #   2026-05-30  SEC-RLSb (AIQ-659) — policy/HR domain: removed 35 entries, all
 #               given company_id-scoped / shared-knowledge / server-internal RLS
-#               in 20260531010000_rls_policy_hr_domain.sql. 85 → 50.
+#               in 20260531010000_rls_policy_hr_domain.sql. 113 -> 78.
 #
 # Triage tracked as AUDIT-A3-followup in the Notion AI Work Queue. The list
 # should DRAIN over time, not GROW. New policy-less tables landing in main
@@ -32,16 +29,31 @@
 admin_allowlist
 admin_sessions
 analytics_events
+answers
+assignment_audit_log
+assignment_mobility_links
+assignment_policy_service_comparisons
 audit_log
 audit_logs
-canonical_policy_query_audit_logs   # SEC-RLSb deferred: audit log of KG queries, not HR-owned — SEC-RLSe (audit-only)
+canonical_policy_query_audit_logs   # SEC-RLSb: audit log of KG queries, not HR-owned — SEC-RLSe (audit-only)
+case_assignment_id
+case_documents
+case_evidence
+case_feedback
+case_participants
+case_people
+case_readiness
+case_readiness_checklist_state
+case_readiness_milestone_state
+case_requirement_evaluations
+case_requirements_snapshots
 catalog_employee_demand              # SEC-RLSd triage: tenant-scoped (company_id) HR demand signal, not public-read — RLS deferred to SEC-RLSe
 catalog_scrape_quota                 # SEC-RLSd triage: per-tenant/server scrape-quota counter, not public-read — RLS deferred to SEC-RLSe
-collaboration_comment_mentions       # SEC-RLSb deferred: thread-target scoped, not company_id — SEC-RLSe
-collaboration_comments               # SEC-RLSb deferred: thread-target scoped, not company_id — SEC-RLSe
-collaboration_notifications          # SEC-RLSb deferred: thread-target scoped, not company_id — SEC-RLSe
-collaboration_thread_participants    # SEC-RLSb deferred: thread-target scoped, not company_id — SEC-RLSe
-collaboration_threads                # SEC-RLSb deferred: thread-target scoped, not company_id — SEC-RLSe
+collaboration_comment_mentions   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_comments   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_notifications   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_thread_participants   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_threads   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
 compliance_reference_sources         # SEC-RLSd triage: server-write only — admin/server-seeded provenance, runtime reads seed JSON (not HR-upload, not anon-read)
 crawl_job_runs
 crawl_runs
@@ -51,6 +63,8 @@ crawled_source_documents
 demo_request_rate_limits
 demo_requests
 document_change_events
+eligibility_overrides
+employee_answers
 error_logs
 error_tickets
 form_prefill_instances
@@ -59,9 +73,19 @@ freshness_snapshots
 knowledge_doc_ingest_jobs
 notification_outbox
 ops_notification_events
+profile_state
 prospect_candidates
+readiness_template_checklist_items
+readiness_template_milestones
+readiness_templates
+relocation_artifacts
+relocation_runs
+relocation_sources
 requirement_research_jobs
 research_source_candidates
+resolved_assignment_policies
+resolved_assignment_policy_benefits
+resolved_assignment_policy_exclusions
 review_queue_activity_log
 review_queue_items
 roadmap_gap_questions
@@ -72,3 +96,4 @@ staged_event_candidates
 staged_resource_candidates
 staging_review_audit_log
 support_case_notes
+wizard_cases
