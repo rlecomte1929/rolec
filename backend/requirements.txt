@@ -32,3 +32,6 @@ anthropic==0.39.0
 langsmith>=0.1.147
 PyJWT>=2.10.1,<3.0.0
 email-validator>=2.0.0
+# [Parker-I] Neural translation layer — DeepL Pro adapter (lazy-imported; NLLB-200 is
+# reached over HTTP via `requests`, no heavy local-inference dep). See ADR-002.
+deepl>=1.18
