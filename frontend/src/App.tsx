@@ -124,6 +124,7 @@ const AdminUsers = lazy(() => import('./pages/admin/AdminUsers').then((module) =
 const AdminAssignments = lazy(() => import('./pages/admin/AdminAssignments').then((module) => ({ default: module.AdminAssignments })));
 const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((module) => ({ default: module.AdminMessages })));
 const AdminErrors = lazy(() => import('./pages/admin/AdminErrors').then((module) => ({ default: module.AdminErrors })));
+const AdminCorrectionsTrends = lazy(() => import('./pages/admin/AdminCorrectionsTrends').then((module) => ({ default: module.AdminCorrectionsTrends })));
 const AdminFeedback = lazy(() => import('./pages/admin/AdminFeedback'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
 const AdminPrompts = lazy(() => import('./pages/admin/AdminPrompts').then((module) => ({ default: module.AdminPrompts })));
@@ -393,6 +394,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminResourcesEdit.path} element={<RequireAdminRoute><AdminResourceEditor /></RequireAdminRoute>} />
         {/* [PRODUCT-6E] A/B test experiment dashboard */}
         <Route path={ROUTE_DEFS.adminAbTests.path} element={<RequireAdminRoute><AdminAbTestsPage /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminCorrectionsTrends.path} element={<RequireAdminRoute><AdminCorrectionsTrends /></RequireAdminRoute>} />
         {/* [P1-2] Form Template Registry */}
         <Route path={ROUTE_DEFS.adminFormTemplates.path} element={<RequireAdminRoute><AdminFormTemplates /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFormTemplatesNew.path} element={<RequireAdminRoute><AdminFormTemplateEditor /></RequireAdminRoute>} />
