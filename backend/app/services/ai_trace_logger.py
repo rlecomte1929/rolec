@@ -15,8 +15,14 @@ PII policy:
   session_id is an opaque UUID — no user identifiers.
   company_id is stored (needed to scope dashboard views by tenant).
 
+Unit economics (Parker Step G):
+  Each trace carries a feature_key (required) + customer_id attribution and, on flush,
+  an estimated CO2e value + USD cost + token totals summed across its llm_call steps.
+  These feed the mv_ai_unit_economics rollup (cost/carbon per customer per feature).
+
 Usage (in policy_assistant_rag_engine.py):
-    tracer = TraceSession(session_id=session_id, query=question, company_id=company_id)
+    tracer = TraceSession(session_id=session_id, query=question, company_id=company_id,
+                          feature_key="policy_assistant")
     # ... run step ...
     tracer.record_retrieval(top_scores=[0.87, 0.82, ...], latency_ms=210)
     tracer.record_llm_call(model="claude-sonnet-4-6", input_tokens=2100,
@@ -79,6 +85,11 @@ class TraceSession:
         session_id: Optional[str],
         query: str,
         company_id: str,
+        # Combined Parker D + G params. feature_key (Step G) is required, so it must
+        # stay ahead of every defaulted param (Python forbids a non-default arg after a
+        # default). customer_id (G) and prompt_version_id/canary_arm (D) are optional.
+        feature_key: str,
+        customer_id: Optional[str] = None,
         prompt_version_id: Optional[str] = None,
         canary_arm: Optional[str] = None,
     ) -> None:
@@ -90,6 +101,11 @@ class TraceSession:
         self._steps: List[TraceStep] = []
         self._started_at: float = time.time()
         self.fallback_triggered: bool = False
+        # Unit-economics attribution (Parker Step G) — feature_key is the master cost/
+        # carbon dimension and is required (no bare TraceSession()). customer_id defaults
+        # to company_id when the caller doesn't distinguish the two.
+        self.feature_key: str = feature_key
+        self.customer_id: Optional[str] = customer_id if customer_id is not None else company_id
         # Prompt attribution (Parker Step D) — which registry version/arm served
         # this request. Both None when the registry is absent (literal fallback).
         self.prompt_version_id: Optional[str] = prompt_version_id
@@ -161,6 +177,7 @@ class TraceSession:
         """
         try:
             total_ms = int((time.time() - self._started_at) * 1000)
+            econ = self._compute_unit_economics()
             payload: Dict[str, Any] = {
                 "trace_id": self.trace_id,
                 "session_id": self.session_id,
@@ -168,8 +185,11 @@ class TraceSession:
                 "steps": [s.to_dict() for s in self._steps],
                 "total_latency_ms": total_ms,
                 "fallback_triggered": self.fallback_triggered,
+                "feature_key": self.feature_key,
+                "customer_id": self.customer_id,
                 "prompt_version_id": self.prompt_version_id,
                 "canary_arm": self.canary_arm,
+                **econ,
             }
             # 1. Structured JSON log — always on, zero extra deps.
             log.info("ai_trace %s", json.dumps(payload, separators=(",", ":")))
@@ -180,10 +200,55 @@ class TraceSession:
         except Exception:
             log.debug("ai_trace flush failed", exc_info=True)
 
+    def _compute_unit_economics(self) -> Dict[str, Any]:
+        """Sum tokens, USD cost and estimated CO2e across this trace's llm_call steps.
+
+        Carbon comes from ai_carbon_estimator (always available — falls back to in-code
+        defaults); cost comes from the router's costs.yaml (0.0 for models absent there).
+        Best-effort: any failure yields zeros so flush never breaks.
+        """
+        tokens_in = tokens_out = 0
+        cost_usd = 0.0
+        co2e_grams = 0.0
+        try:
+            from .ai_carbon_estimator import estimate_co2e_grams
+
+            for step in self._steps:
+                if step.step != "llm_call":
+                    continue
+                model = step.payload.get("model")
+                t_in = int(step.payload.get("input_tokens", 0) or 0)
+                t_out = int(step.payload.get("output_tokens", 0) or 0)
+                tokens_in += t_in
+                tokens_out += t_out
+                if not model:
+                    continue
+                co2e_grams += estimate_co2e_grams(model, t_in, t_out)
+                cost_usd += _safe_usd_cost(model, t_in, t_out)
+        except Exception:
+            log.debug("ai_trace unit-economics calc failed", exc_info=True)
+        return {
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "cost_usd_estimated": round(cost_usd, 6),
+            "co2e_grams_estimated": round(co2e_grams, 6),
+        }
+
 
 # --------------------------------------------------------------------------- #
 # DB write                                                                     #
 # --------------------------------------------------------------------------- #
+
+
+def _safe_usd_cost(model: str, tokens_in: int, tokens_out: int) -> float:
+    """USD cost via the router's costs.yaml; 0.0 for models with no pricing entry."""
+    try:
+        from ...relopass.llm.router import usd_cost
+
+        return float(usd_cost(model, tokens_in, tokens_out))
+    except Exception:
+        log.debug("ai_trace usd_cost lookup failed for %s", model, exc_info=True)
+        return 0.0
 
 
 def _write_to_db(payload: Dict[str, Any], company_id: str) -> None:
@@ -200,6 +265,12 @@ def _write_to_db(payload: Dict[str, Any], company_id: str) -> None:
                 steps_json=json.dumps(payload["steps"], separators=(",", ":")),
                 total_latency_ms=payload["total_latency_ms"],
                 fallback_triggered=bool(payload["fallback_triggered"]),
+                feature_key=payload.get("feature_key"),
+                customer_id=payload.get("customer_id"),
+                tokens_in=payload.get("tokens_in"),
+                tokens_out=payload.get("tokens_out"),
+                cost_usd_estimated=payload.get("cost_usd_estimated"),
+                co2e_grams_estimated=payload.get("co2e_grams_estimated"),
                 prompt_version_id=payload.get("prompt_version_id"),
                 canary_arm=payload.get("canary_arm"),
             )
