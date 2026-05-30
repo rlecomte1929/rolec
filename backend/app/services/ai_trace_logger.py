@@ -79,6 +79,8 @@ class TraceSession:
         session_id: Optional[str],
         query: str,
         company_id: str,
+        prompt_version_id: Optional[str] = None,
+        canary_arm: Optional[str] = None,
     ) -> None:
         self.trace_id: str = str(uuid.uuid4())
         self.session_id: Optional[str] = session_id
@@ -88,6 +90,17 @@ class TraceSession:
         self._steps: List[TraceStep] = []
         self._started_at: float = time.time()
         self.fallback_triggered: bool = False
+        # Prompt attribution (Parker Step D) — which registry version/arm served
+        # this request. Both None when the registry is absent (literal fallback).
+        self.prompt_version_id: Optional[str] = prompt_version_id
+        self.canary_arm: Optional[str] = canary_arm
+
+    def set_prompt_attribution(
+        self, prompt_version_id: Optional[str], canary_arm: Optional[str]
+    ) -> None:
+        """Record which prompt version/arm served this request (Parker Step D)."""
+        self.prompt_version_id = prompt_version_id
+        self.canary_arm = canary_arm
 
     # ── Recording helpers ── #
 
@@ -155,6 +168,8 @@ class TraceSession:
                 "steps": [s.to_dict() for s in self._steps],
                 "total_latency_ms": total_ms,
                 "fallback_triggered": self.fallback_triggered,
+                "prompt_version_id": self.prompt_version_id,
+                "canary_arm": self.canary_arm,
             }
             # 1. Structured JSON log — always on, zero extra deps.
             log.info("ai_trace %s", json.dumps(payload, separators=(",", ":")))
@@ -185,6 +200,8 @@ def _write_to_db(payload: Dict[str, Any], company_id: str) -> None:
                 steps_json=json.dumps(payload["steps"], separators=(",", ":")),
                 total_latency_ms=payload["total_latency_ms"],
                 fallback_triggered=bool(payload["fallback_triggered"]),
+                prompt_version_id=payload.get("prompt_version_id"),
+                canary_arm=payload.get("canary_arm"),
             )
     except Exception:
         log.debug("ai_trace db write failed", exc_info=True)

@@ -5,6 +5,7 @@ from .db import init_db
 from .routers import (
     ab_tests,
     admin,
+    admin_prompts,
     advisors,
     ai_decisions,
     cases,
@@ -96,6 +97,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_decisions.router)
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
+    app.include_router(admin_prompts.router, prefix="/api/admin")
     app.include_router(relocation_routes.router)
     app.include_router(relocation_routes.api_router)
     app.include_router(relocation_classify_routes.router)
