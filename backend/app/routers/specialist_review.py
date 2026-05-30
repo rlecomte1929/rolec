@@ -5,6 +5,7 @@ GET  /api/internal/specialist-review/{case_id}   — fetch AI roadmap steps for 
 POST /api/internal/specialist-review/submit       — write review events + flip release/regen flags
 """
 import json
+import logging
 import uuid
 from typing import Any, Dict, List, Literal, Optional
 
@@ -15,6 +16,8 @@ from sqlalchemy import func
 from ..auth_deps import require_admin
 from ..db import SessionLocal
 from ..models import RoadmapReviewStatus, SpecialistReviewEvent
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/internal/specialist-review", tags=["specialist-review"])
 
@@ -55,7 +58,8 @@ def get_roadmap(case_id: str, user: Dict[str, Any] = Depends(require_admin)):
                 "title": step.get("title", ""),
             })
     except Exception:
-        steps = []
+        log.exception("specialist-review GET: derive_roadmap failed for case_id=%s", case_id)
+        steps = []  # TODO(P1-01)
     return {"case_id": case_id, "steps": steps}
 
 

@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS public.specialist_review_events (
   reviewer_id        TEXT NOT NULL,
   action             public.specialist_review_action NOT NULL,
   reason_code        public.specialist_reason_code,
-  original_step_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-  edited_step_json   JSONB,
+  original_step_json TEXT NOT NULL DEFAULT '{}',
+  edited_step_json   TEXT,
   reviewed_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_sre_case_id ON public.specialist_review_events (case_id);
