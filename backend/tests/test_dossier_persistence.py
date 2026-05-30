@@ -56,6 +56,7 @@ if "backend.app.schemas" not in sys.modules:
     _stub_schemas.CaseDTO = _AnyModel
     _stub_schemas.CaseDraftDTO = _AnyModel
     _stub_schemas.CaseRequirementsDTO = _AnyModel
+    _stub_schemas.RelocationBasicsDTO = _AnyModel
     sys.modules["backend.app.schemas"] = _stub_schemas
 
 for _mod in [
