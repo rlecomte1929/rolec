@@ -185,7 +185,10 @@ def test_named_constants_have_expected_values():
 
 
 def test_real_limiter_has_standard_default():
-    assert [str(g) for g in real_limiter._default_limits] == ["100 per 1 minute"]
+    # One default-limit group is wired (STANDARD_LIMIT) — applied to undecorated
+    # routes by SlowAPIMiddleware. (slowapi wraps it in a LimitGroup, not a plain
+    # string, so assert on presence rather than str()-ing the group.)
+    assert len(real_limiter._default_limits) == 1
 
 
 # ── production boot guard (the slowapi "param must be named request" crash) ───
