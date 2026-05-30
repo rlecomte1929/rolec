@@ -32,3 +32,10 @@ anthropic==0.39.0
 langsmith>=0.1.147
 PyJWT>=2.10.1,<3.0.0
 email-validator>=2.0.0
+# [Parker-A] Survival analysis for case-duration prediction. lifelines is pinned
+# exactly so the pickled CoxPHFitter blob stays loadable across the local (3.9)
+# and Render production (3.11) runtimes — pickle is version-sensitive.
+lifelines==0.27.8
+scikit-learn>=1.3
+scipy>=1.11
+pandas>=2.0
