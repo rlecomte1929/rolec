@@ -5,6 +5,7 @@ from .db import init_db
 from .routers import (
     ab_tests,
     admin,
+    admin_ocr_shadow,
     admin_prompts,
     advisors,
     ai_decisions,
@@ -114,6 +115,7 @@ def create_app() -> FastAPI:
     app.include_router(benefit_optimizer.router)
     # [Parker-E] RLHF-lite human-feedback capture
     app.include_router(ai_feedback.router)
+    app.include_router(admin_ocr_shadow.router)
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")
