@@ -395,3 +395,38 @@ class QueryAuditLog(Base):
     retrieved_chunk_ids_json = Column(Text, nullable=False, default="[]")
     answer_preview = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+# ---------------------------------------------------------------------------
+# Specialist Review UI — P1-02a (AIQ-631)
+# ---------------------------------------------------------------------------
+
+class SpecialistReviewAction(str, enum.Enum):
+    APPROVE = "approve"
+    REJECT = "reject"
+    EDIT = "edit"
+
+
+class SpecialistReviewEvent(Base):
+    __tablename__ = "specialist_review_events"
+
+    id = Column(String, primary_key=True, index=True)
+    case_id = Column(String, nullable=False, index=True)
+    step_id = Column(String, nullable=False, index=True)
+    reviewer_id = Column(String, nullable=False, index=True)
+    action = Column(String, nullable=False)
+    reason_code = Column(String, nullable=True)
+    original_step_json = Column(Text, nullable=False, default="{}")
+    edited_step_json = Column(Text, nullable=True)
+    reviewed_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class RoadmapReviewStatus(Base):
+    __tablename__ = "roadmap_review_status"
+
+    case_id = Column(String, primary_key=True, index=True)
+    released_to_user = Column(Boolean, nullable=False, default=False)
+    regeneration_requested = Column(Boolean, nullable=False, default=False)
+    reviewer_id = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    updated_at = Column(DateTime, server_default=func.now(), nullable=False)
