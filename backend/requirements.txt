@@ -48,3 +48,7 @@ pandas>=2.0
 # solves trivially. Imported lazily in benefit_optimizer so the rest of the
 # backend never requires it.
 pulp>=2.7,<4
+# [Parker-H] Conjoint analysis numerical stack. statsmodels transitively pins
+# numpy/scipy/pandas; the conditional-logit fit itself uses scipy.optimize
+# (lazy-imported in conjoint_service so the module imports without these).
+statsmodels>=0.14
