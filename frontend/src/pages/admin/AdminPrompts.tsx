@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { Card, Button, Alert, Badge, Input } from '../../components/antigravity';
-import { promptsAPI, PromptVersion } from '../../api/client';
+import { promptsAPI, PromptVersion, WinRate } from '../../api/client';
 
 const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'info' | 'neutral'> = {
   prod: 'success',
@@ -14,8 +14,23 @@ function statusVariant(status: string): 'success' | 'warning' | 'info' | 'neutra
   return STATUS_VARIANT[status] || 'neutral';
 }
 
+// Parker Step E — format a version's human-feedback win rate for the table cell.
+function formatWinRate(wr: WinRate | undefined): { label: string; title: string } {
+  if (!wr || wr.total === 0) {
+    return { label: '—', title: 'No human review verdicts yet' };
+  }
+  const pct = (wr.win_rate * 100).toFixed(0);
+  const lo = (wr.ci_low * 100).toFixed(0);
+  const hi = (wr.ci_high * 100).toFixed(0);
+  return {
+    label: `${pct}% (${wr.approvals}/${wr.total})`,
+    title: `Wilson 95% CI: ${lo}–${hi}% · ${wr.approvals} approved of ${wr.total} verdicts`,
+  };
+}
+
 export const AdminPrompts: React.FC = () => {
   const [versions, setVersions] = useState<PromptVersion[]>([]);
+  const [winRates, setWinRates] = useState<Record<string, Record<string, WinRate>>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -26,6 +41,18 @@ export const AdminPrompts: React.FC = () => {
     try {
       const rows = await promptsAPI.list();
       setVersions(rows);
+      // Parker Step E — fetch win rates per task_key (best-effort; never blocks the table).
+      const taskKeys = Array.from(new Set(rows.map((r) => r.task_key)));
+      const entries = await Promise.all(
+        taskKeys.map(async (taskKey) => {
+          try {
+            return [taskKey, await promptsAPI.winRates(taskKey)] as const;
+          } catch {
+            return [taskKey, {} as Record<string, WinRate>] as const;
+          }
+        })
+      );
+      setWinRates(Object.fromEntries(entries));
     } catch (e) {
       setError('Failed to load prompts.');
     } finally {
@@ -97,6 +124,7 @@ export const AdminPrompts: React.FC = () => {
                       <th className="py-2 pr-4 font-medium">Status</th>
                       <th className="py-2 pr-4 font-medium">Model</th>
                       <th className="py-2 pr-4 font-medium">Max tokens</th>
+                      <th className="py-2 pr-4 font-medium">Win rate</th>
                       <th className="py-2 pr-4 font-medium">Notes</th>
                       <th className="py-2 pr-4 font-medium">Actions</th>
                     </tr>
@@ -110,6 +138,14 @@ export const AdminPrompts: React.FC = () => {
                         </td>
                         <td className="py-2 pr-4 font-mono text-slate-700">{v.model_name}</td>
                         <td className="py-2 pr-4 text-slate-700">{v.max_tokens}</td>
+                        {(() => {
+                          const wr = formatWinRate(winRates[taskKey]?.[v.id]);
+                          return (
+                            <td className="py-2 pr-4 text-slate-700 whitespace-nowrap" title={wr.title}>
+                              {wr.label}
+                            </td>
+                          );
+                        })()}
                         <td className="py-2 pr-4 text-slate-500 max-w-xs truncate" title={v.notes || ''}>
                           {v.notes || '—'}
                         </td>

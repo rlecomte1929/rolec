@@ -1625,6 +1625,21 @@ export const promptsAPI = {
     });
     return response.data;
   },
+  // Parker Step E — per-version win rates (approvals / verdicts) with Wilson CI.
+  winRates: async (taskKey: string): Promise<Record<string, WinRate>> => {
+    const response = await api.get(`/api/admin/prompts/${encodeURIComponent(taskKey)}/win-rates`);
+    return response.data;
+  },
+};
+
+// Parker Step E — per-version human-feedback win rate, keyed by prompt_version_id.
+export type WinRate = {
+  version_id: string;
+  approvals: number;
+  total: number;
+  win_rate: number;
+  ci_low: number;
+  ci_high: number;
 };
 
 // Admin HR Prospect Pipeline API (admin only)

@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..auth_deps import require_admin
-from ..services import prompt_registry
+from ..services import preference_dataset_builder, prompt_registry
 
 router = APIRouter(prefix="/prompts", tags=["admin-prompts"])
 logger = logging.getLogger(__name__)
@@ -101,6 +101,25 @@ def promote_prompt(
         return prompt_registry.promote(version_id, body.target_status)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/{task_key}/win-rates")
+def win_rates(
+    task_key: str, user: Dict[str, Any] = Depends(require_admin)
+) -> Dict[str, Any]:
+    """Per-version win rates (approvals / verdicts) with Wilson 95% CI (Parker Step E)."""
+    rates = preference_dataset_builder.compute_win_rates(task_key)
+    return {
+        vid: {
+            "version_id": wr.version_id,
+            "approvals": wr.approvals,
+            "total": wr.total,
+            "win_rate": wr.win_rate,
+            "ci_low": wr.ci_low,
+            "ci_high": wr.ci_high,
+        }
+        for vid, wr in rates.items()
+    }
 
 
 @router.post("/{task_key}/canary-share")
