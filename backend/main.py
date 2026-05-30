@@ -390,6 +390,27 @@ else:
 app = FastAPI(title="ReloPass API", version="1.0.0", lifespan=lifespan)
 
 # ---------------------------------------------------------------------------
+# Debug endpoint gating (SEC-001).
+# Debug/diagnostic routes are live unauthenticated attack surface in
+# production. They register ONLY when ENABLE_DEBUG_ENDPOINTS=1 — a flag that
+# must NEVER be set in any production environment (local development only).
+# When the flag is unset, the routes simply do not exist (404).
+# ---------------------------------------------------------------------------
+DEBUG_ENDPOINTS_ENABLED = os.environ.get("ENABLE_DEBUG_ENDPOINTS") == "1"
+
+
+def debug_route(method: str, path: str, **kwargs):
+    """Register a debug route only when ENABLE_DEBUG_ENDPOINTS=1; else no-op."""
+
+    def decorator(fn):
+        if DEBUG_ENDPOINTS_ENABLED:
+            getattr(app, method)(path, **kwargs)(fn)
+        return fn
+
+    return decorator
+
+
+# ---------------------------------------------------------------------------
 # Rate limiting (abuse protection on auth + claim endpoints).
 # Limiter instance lives in backend/rate_limit.py so routers can decorate
 # their endpoints without pulling main into a circular import. Main owns the
@@ -397,35 +418,97 @@ app = FastAPI(title="ReloPass API", version="1.0.0", lifespan=lifespan)
 # Disabled when RELOPASS_DISABLE_RATE_LIMITS=1 (tests set this in conftest).
 # ---------------------------------------------------------------------------
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from .rate_limit import limiter, _real_remote_address
+from .app.rate_limits import (
+    path_limit as _sec004_path_limit,
+    rate_limit_headers,
+    rate_limit_payload,
+    user_key_func,
+)
 
 app.state.limiter = limiter
+
+# SEC-004: apply STANDARD_LIMIT (the limiter's default_limits) to every route that
+# does NOT carry an explicit @limiter.limit decorator. The middleware skips routes
+# already decorated or marked @limiter.exempt, so stricter buckets (auth/upload/
+# admin/ai) win and exempt routes (health, webhooks) stay unlimited. No-op when
+# the limiter is disabled (RELOPASS_DISABLE_RATE_LIMITS=1).
+app.add_middleware(SlowAPIMiddleware)
+
+# SEC-004: exempt infrastructure / service-to-service routes from ALL rate limits.
+# These are invoked by Render (health probes), Postmark (inbound-email webhook),
+# and Supabase triggers (support triage) — never by end users — so the
+# STANDARD_LIMIT default must not throttle them. slowapi keys exemptions by the
+# endpoint's "<module>.<name>". Names verified against the live route table.
+_RATE_LIMIT_EXEMPT_ENDPOINTS = (
+    f"{__name__}.health_check",              # GET /health
+    f"{__name__}.supabase_health",           # GET /api/health/supabase
+    f"{__name__}.policy_documents_health",   # GET /api/hr/policy-documents/health
+    f"{__name__}.email_health_check",        # GET /api/internal/email/health
+    # Service-role / external-webhook routes live in the support router:
+    "backend.app.routers.support.inbound_email_webhook",  # POST /webhooks/support-email (Postmark)
+    "backend.app.routers.support.triage_ticket",          # POST /api/support/triage (Supabase trigger)
+)
+for _exempt_name in _RATE_LIMIT_EXEMPT_ENDPOINTS:
+    limiter._exempt_routes.add(_exempt_name)
+
+
+def _rate_limit_json_response(request: Request, limit: str) -> JSONResponse:
+    """
+    Build the canonical 429 response (SEC-004): documented JSON shape, Retry-After
+    header, preserved X-Request-ID + CORS headers, and a structured
+    ``rate_limit_hit`` log line for abuse monitoring. Shared by the slowapi
+    exception handler and the admin path-scoped middleware below.
+    """
+    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    ip = _real_remote_address(request)
+    path = request.url.path
+    hdrs: Dict[str, str] = {"X-Request-ID": req_id, **rate_limit_headers()}
+    hdrs.update(cors_headers_for_request_origin(request))
+    log.warning(
+        "rate_limit_hit ip=%s path=%s limit=%s request_id=%s",
+        ip,
+        path,
+        str(limit),
+        req_id,
+        extra={"ip": ip, "path": path, "limit": str(limit), "request_id": req_id},
+    )
+    # rate_limit_payload() carries error/message/retry_after (+ back-compat detail);
+    # add the per-request id alongside.
+    return JSONResponse(
+        status_code=429,
+        content={**rate_limit_payload(), "request_id": req_id},
+        headers=hdrs,
+    )
 
 
 @app.exception_handler(RateLimitExceeded)
 async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    """429 response that preserves X-Request-ID and CORS headers (matches global 500 handler)."""
-    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
-    hdrs: Dict[str, str] = {
-        "X-Request-ID": req_id,
-        "Retry-After": "60",
-    }
-    hdrs.update(cors_headers_for_request_origin(request))
-    log.warning(
-        "rate_limit_exceeded request_id=%s path=%s ip=%s limit=%s",
-        req_id,
-        request.url.path,
-        _real_remote_address(request),
-        str(getattr(exc, "detail", "")),
-    )
-    return JSONResponse(
-        status_code=429,
-        content={
-            "detail": "Too many requests. Wait a moment before trying again.",
-            "request_id": req_id,
-        },
-        headers=hdrs,
-    )
+    """429 handler for every slowapi-decorated route + the STANDARD middleware."""
+    limit = str(getattr(exc, "detail", "") or getattr(exc, "limit", ""))
+    return _rate_limit_json_response(request, limit)
+
+
+# SEC-004: stricter path-scoped buckets (UPLOAD 10/min & ADMIN 20/min per IP, AI
+# 20/min per user). The policy + counter storage live in backend.app.rate_limits
+# (imported above as _sec004_path_limit) so they stay DB-free and unit-testable;
+# here we only bind them to the request lifecycle. A middleware is used instead of
+# @limiter.limit decorators because slowapi 0.1.9 requires a parameter literally
+# named "request" (most of these routes use "req" or — for ~66 admin routes — omit
+# it). Honors RELOPASS_DISABLE_RATE_LIMITS via limiter.enabled (no new bypass) and
+# auto-covers future admin/upload/AI routes.
+@app.middleware("http")
+async def _sec004_rate_limit_middleware(request: Request, call_next):
+    if limiter.enabled and request.method != "OPTIONS":
+        exceeded = _sec004_path_limit(
+            request.url.path,
+            _real_remote_address(request),
+            user_key_func(request),
+        )
+        if exceeded is not None:
+            return _rate_limit_json_response(request, exceeded)
+    return await call_next(request)
 
 
 admin_graph_build_marker = os.getenv("ADMIN_GRAPH_BUILD_MARKER", "local-dev")
@@ -752,7 +835,7 @@ def supabase_health(probe: int = 0):
 from .app.auth_deps import require_admin as _require_admin_v2  # noqa: E402
 
 
-@app.get("/debug/db")
+@debug_route("get", "/debug/db")
 def debug_db(user: Dict[str, Any] = Depends(_require_admin_v2)):
     """Return non-secret database connectivity info. Admin only."""
     return Database.get_db_info()
@@ -763,7 +846,7 @@ class _DebugKVBody(_BaseModel):
     value: str
 
 
-@app.post("/debug/kv")
+@debug_route("post", "/debug/kv")
 def debug_kv_set(
     body: _DebugKVBody,
     user: Dict[str, Any] = Depends(_require_admin_v2),
@@ -773,7 +856,7 @@ def debug_kv_set(
     return {"ok": True, "key": body.key}
 
 
-@app.get("/debug/kv/{key}")
+@debug_route("get", "/debug/kv/{key}")
 def debug_kv_get(
     key: str,
     user: Dict[str, Any] = Depends(_require_admin_v2),
@@ -2661,7 +2744,7 @@ def reconciliation_link_policy_company(
     return {"ok": True}
 
 
-@app.get("/api/admin/debug/runtime-database")
+@debug_route("get", "/api/admin/debug/runtime-database")
 def debug_runtime_database(user: Dict[str, Any] = Depends(require_admin)):
     """
     Admin diagnostic: show current DB scheme/target and seed flags.
@@ -2687,7 +2770,7 @@ def debug_runtime_database(user: Dict[str, Any] = Depends(require_admin)):
     }
 
 
-@app.get("/api/admin/debug/test-company-graph")
+@debug_route("get", "/api/admin/debug/test-company-graph")
 def debug_test_company_graph(user: Dict[str, Any] = Depends(require_admin)):
     """
     Admin diagnostic: snapshot of Test company graph (counts + sample rows).
@@ -5713,7 +5796,7 @@ def list_hr_assignments(
         )
 
 
-@app.get("/api/debug/supabase")
+@debug_route("get", "/api/debug/supabase")
 def debug_supabase(user: Dict[str, Any] = Depends(_require_admin_v2)):
     """
     Lightweight Supabase admin connectivity check. Admin only.
@@ -10350,7 +10433,7 @@ def notify_hr_employee_saved(
     return {"ok": True}
 
 
-@app.get("/api/debug/cases/{case_id}/events")
+@debug_route("get", "/api/debug/cases/{case_id}/events")
 def debug_case_events(
     case_id: str,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
@@ -10360,7 +10443,7 @@ def debug_case_events(
     return {"case_id": case_id, "events": events, "count": len(events)}
 
 
-@app.get("/api/debug/assignment-check")
+@debug_route("get", "/api/debug/assignment-check")
 def debug_assignment_check(
     assignment_id: str = Query(...),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
@@ -10555,6 +10638,7 @@ def create_hr_policy(
 
 @app.post("/api/hr/policies/upload")
 async def upload_hr_policy(
+    req: Request,
     file: UploadFile = File(...),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
