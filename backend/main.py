@@ -145,6 +145,7 @@ from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_rout
 from .app.routers import admin_rag_eval as admin_rag_eval_router  # [P3-01e] RAG-quality dashboard (dual-layer registration)
 from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
 from .app.routers import translation as translation_router  # [Parker-I] dual-layer registration (PR #207 §9)
+from .app.routers import admin_corrections as admin_corrections_router  # [AIQ-554] correction analytics
 from .app.routers import policy_publish as policy_publish_router  # [P1-4]
 from .app.routers import policy_summary as policy_summary_router  # [P1-5 backend]
 from .app.routers import admin as admin_router
@@ -732,6 +733,7 @@ app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-la
 app.include_router(translation_router.router)  # [Parker-I] PR #207 §9 — dual-layer registration
 app.include_router(policy_publish_router.router)  # [AUDIT-C2.3 restore] app/main.py not mounted in prod — must register here
 app.include_router(policy_summary_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(admin_corrections_router.router)  # [AIQ-554] GET /api/admin/corrections/by-reason
 app.include_router(crons_router.router)  # [P4-4] cron endpoints
 app.include_router(exception_requests_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(services_state_router.router)
