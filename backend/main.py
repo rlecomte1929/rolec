@@ -135,6 +135,7 @@ from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import employee_tiers as employee_tiers_router  # [P1-6]
 from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
 from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
+from .app.routers import benefit_optimizer as benefit_optimizer_router  # [Parker-B] dual-layer registration (PR #207 §9)
 from .app.routers import policy_publish as policy_publish_router  # [P1-4]
 from .app.routers import policy_summary as policy_summary_router  # [P1-5 backend]
 from .app.routers import policy_feedback as policy_feedback_router  # [P5-5]
@@ -672,6 +673,7 @@ app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-UR
 app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
 app.include_router(predictions_router.router)  # [Parker-A] PR #207 §9 — dual-layer registration
+app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 — dual-layer registration
 # [AUDIT-C2.3 Month-1] policy_publish_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_summary_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_feedback_router → moved to backend/app/main.py

@@ -39,3 +39,9 @@ lifelines==0.27.8
 scikit-learn>=1.3
 scipy>=1.11
 pandas>=2.0
+# [Parker-B] Benefit-mix optimizer. PuLP bundles the CBC MILP backend (one small
+# native binary) — far lighter at container build time than cvxpy's scs/osqp/ecos
+# chain, and the benefit-selection problem is a small mixed-integer program CBC
+# solves trivially. Imported lazily in benefit_optimizer so the rest of the
+# backend never requires it.
+pulp>=2.7,<4
