@@ -30,6 +30,7 @@ from .routers import (
     policy_publish,
     policy_summary,
     policy_templates,
+    predictions,
     relocation_profile,
     support,
 )
@@ -94,6 +95,8 @@ def create_app() -> FastAPI:
     app.include_router(marketplace.router)
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
+    # [Parker-A] Case-duration prediction (canary: PREDICTIONS_ENABLED, default off)
+    app.include_router(predictions.router)
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(relocation_routes.router)
