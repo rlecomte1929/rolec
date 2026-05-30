@@ -8,6 +8,7 @@ from .routers import (
     admin_prompts,
     advisors,
     ai_decisions,
+    ai_feedback,
     cases,
     cases_admin,
     cases_read,
@@ -95,6 +96,7 @@ def create_app() -> FastAPI:
     app.include_router(marketplace.router)
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
+    app.include_router(ai_feedback.router)
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")
