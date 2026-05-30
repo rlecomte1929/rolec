@@ -190,6 +190,100 @@ def _merge(current: Dict[str, Any], patch: FormTemplateUpdate) -> Dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
+# PDF coordinate validation
+# ---------------------------------------------------------------------------
+#
+# Coordinates are raw PDF points, consumed verbatim by the P3-1 overlay engine
+# in cases_read.py::_generate_filled_pdf. The mapper UI in
+# frontend/src/features/platform-v2/admin/form-templates/PdfCoordinateMapper.tsx
+# is the writer.
+#
+# We do *not* fetch the original PDF here to check page-dimension bounds —
+# that would add a Supabase Storage round-trip to every template save. The
+# overlay engine already silently drops out-of-bounds fields. We only enforce
+# basic sanity: numeric, non-negative, page >= 1, and below an upper bound
+# that is generous compared to even A0 (which is ~3370 pt).
+#
+# pdf_x, pdf_y, pdf_page are all-or-nothing: presence of any one requires
+# all three (otherwise the overlay engine skips the field, silently).
+
+_PDF_COORD_UPPER = 5000.0
+_PDF_PAGE_UPPER = 200
+
+
+def _validate_pdf_coordinates(fields: List[Dict[str, Any]]) -> None:
+    """Raise HTTPException(422) if any field's PDF coordinate metadata is malformed.
+
+    Allowed: a field with none of (pdf_x, pdf_y, pdf_page) set, OR a field
+    with all three set within sane bounds.
+    """
+    for idx, f in enumerate(fields or []):
+        fid = f.get("id") or f"<index {idx}>"
+        keys_present = [k for k in ("pdf_x", "pdf_y", "pdf_page") if f.get(k) is not None]
+        if not keys_present:
+            continue
+        if len(keys_present) != 3:
+            missing = [
+                k for k in ("pdf_x", "pdf_y", "pdf_page") if f.get(k) is None
+            ]
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Field '{fid}': partial PDF coordinates "
+                    f"(missing {', '.join(missing)}). Set all of pdf_x, pdf_y, pdf_page "
+                    "together or clear them all."
+                ),
+            )
+
+        for axis in ("pdf_x", "pdf_y"):
+            v = f[axis]
+            if not isinstance(v, (int, float)) or isinstance(v, bool):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Field '{fid}': {axis} must be a number, got {type(v).__name__}",
+                )
+            if not (0 <= float(v) <= _PDF_COORD_UPPER):
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Field '{fid}': {axis}={v} out of range "
+                        f"[0, {_PDF_COORD_UPPER}] pt"
+                    ),
+                )
+
+        page = f["pdf_page"]
+        if isinstance(page, bool) or not isinstance(page, (int, float)):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Field '{fid}': pdf_page must be a number, got {type(page).__name__}",
+            )
+        if float(page) != int(page):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Field '{fid}': pdf_page must be an integer, got {page}",
+            )
+        page_int = int(page)
+        if not (1 <= page_int <= _PDF_PAGE_UPPER):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Field '{fid}': pdf_page={page_int} out of range [1, {_PDF_PAGE_UPPER}]",
+            )
+
+        font = f.get("pdf_font_size")
+        if font is not None:
+            if isinstance(font, bool) or not isinstance(font, (int, float)):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Field '{fid}': pdf_font_size must be a number",
+                )
+            if not (1 <= float(font) <= 72):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Field '{fid}': pdf_font_size={font} out of range [1, 72]",
+                )
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
@@ -342,6 +436,7 @@ def create_form_template(
     Postgres column defaults (`DEFAULT now()`) handle them. Passing a Python
     isoformat() string fails with type mismatch on Postgres timestamptz columns.
     """
+    _validate_pdf_coordinates(body.fields)
     new_id = str(uuid.uuid4())
 
     with db.engine.begin() as conn:
@@ -429,6 +524,7 @@ def update_form_template(
 
         current_dict = _row_to_dict(current)
         merged = _merge(current_dict, body)
+        _validate_pdf_coordinates(merged.get("fields") or [])
         is_version_bump = (
             body.version is not None and body.version != current_dict["version"]
         )

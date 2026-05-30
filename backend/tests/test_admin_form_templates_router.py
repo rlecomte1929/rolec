@@ -27,6 +27,7 @@ from backend.app.routers.admin_form_templates import (  # noqa: E402
     FormTemplateUpdate,
     _merge,
     _row_to_dict,
+    _validate_pdf_coordinates,
     create_form_template,
     get_form_template,
     list_form_templates,
@@ -324,6 +325,139 @@ class AdminFormTemplatesRouterTests(unittest.TestCase):
         out = _row_to_dict(row)
         self.assertEqual(out["fields"], [])
         self.assertEqual(out["trigger_rules"], {})
+
+    # ------------------------------------------------------------------
+    # PDF coordinate validation (AIQ-174)
+    # ------------------------------------------------------------------
+    def test_validate_pdf_coordinates_accepts_empty_and_missing(self) -> None:
+        # No fields, or fields without any pdf_* keys, must not raise.
+        _validate_pdf_coordinates([])
+        _validate_pdf_coordinates([{"id": "name", "label": "Name"}])
+
+    def test_validate_pdf_coordinates_accepts_full_valid_triple(self) -> None:
+        _validate_pdf_coordinates(
+            [{"id": "name", "pdf_x": 100.5, "pdf_y": 200, "pdf_page": 1}]
+        )
+
+    def test_validate_pdf_coordinates_rejects_partial_triple(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            _validate_pdf_coordinates([{"id": "name", "pdf_x": 100, "pdf_y": 200}])
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertIn("pdf_page", ctx.exception.detail)
+
+    def test_validate_pdf_coordinates_rejects_negative(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            _validate_pdf_coordinates(
+                [{"id": "name", "pdf_x": -1, "pdf_y": 0, "pdf_page": 1}]
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_validate_pdf_coordinates_rejects_oversized(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            _validate_pdf_coordinates(
+                [{"id": "name", "pdf_x": 9999, "pdf_y": 0, "pdf_page": 1}]
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_validate_pdf_coordinates_rejects_zero_page(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            _validate_pdf_coordinates(
+                [{"id": "name", "pdf_x": 1, "pdf_y": 1, "pdf_page": 0}]
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_validate_pdf_coordinates_rejects_non_integer_page(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            _validate_pdf_coordinates(
+                [{"id": "name", "pdf_x": 1, "pdf_y": 1, "pdf_page": 1.5}]
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_validate_pdf_coordinates_rejects_non_numeric_axis(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            _validate_pdf_coordinates(
+                [{"id": "name", "pdf_x": "x", "pdf_y": 0, "pdf_page": 1}]
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_validate_pdf_coordinates_rejects_bool_axis(self) -> None:
+        # Bool is a subclass of int in Python; the validator must reject it.
+        with self.assertRaises(HTTPException) as ctx:
+            _validate_pdf_coordinates(
+                [{"id": "name", "pdf_x": True, "pdf_y": 0, "pdf_page": 1}]
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_validate_pdf_coordinates_validates_font_size(self) -> None:
+        # Within bounds OK.
+        _validate_pdf_coordinates(
+            [{"id": "n", "pdf_x": 1, "pdf_y": 1, "pdf_page": 1, "pdf_font_size": 10}]
+        )
+        # Out of bounds rejected.
+        with self.assertRaises(HTTPException) as ctx:
+            _validate_pdf_coordinates(
+                [
+                    {
+                        "id": "n",
+                        "pdf_x": 1,
+                        "pdf_y": 1,
+                        "pdf_page": 1,
+                        "pdf_font_size": 200,
+                    }
+                ]
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_create_rejects_invalid_pdf_coords(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            create_form_template(
+                body=FormTemplateCreate(
+                    code="X1",
+                    name="x",
+                    country="NO",
+                    fields=[{"id": "name", "pdf_x": 100, "pdf_y": 200}],  # missing pdf_page
+                ),
+                user=self.user,
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_patch_rejects_invalid_pdf_coords(self) -> None:
+        created = create_form_template(
+            body=FormTemplateCreate(code="X2", name="x", country="NO"),
+            user=self.user,
+        )
+        with self.assertRaises(HTTPException) as ctx:
+            update_form_template(
+                template_id=created["id"],
+                body=FormTemplateUpdate(
+                    fields=[{"id": "name", "pdf_x": -1, "pdf_y": 1, "pdf_page": 1}]
+                ),
+                user=self.user,
+            )
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    def test_patch_accepts_valid_pdf_coords(self) -> None:
+        created = create_form_template(
+            body=FormTemplateCreate(code="X3", name="x", country="NO"),
+            user=self.user,
+        )
+        result = update_form_template(
+            template_id=created["id"],
+            body=FormTemplateUpdate(
+                fields=[
+                    {
+                        "id": "name",
+                        "label": "Name",
+                        "pdf_x": 100.5,
+                        "pdf_y": 200,
+                        "pdf_page": 1,
+                    }
+                ]
+            ),
+            user=self.user,
+        )
+        self.assertEqual(result["fields"][0]["pdf_x"], 100.5)
+        self.assertEqual(result["fields"][0]["pdf_page"], 1)
 
 
 if __name__ == "__main__":
