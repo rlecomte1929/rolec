@@ -8,6 +8,7 @@ from .routers import (
     admin_prompts,
     advisors,
     ai_decisions,
+    ai_feedback,
     benefit_optimizer,
     cases,
     cases_admin,
@@ -111,6 +112,8 @@ def create_app() -> FastAPI:
     app.include_router(predictions.router)
     # [Parker-B] HR benefit-mix optimizer (Markowitz-style)
     app.include_router(benefit_optimizer.router)
+    # [Parker-E] RLHF-lite human-feedback capture
+    app.include_router(ai_feedback.router)
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")
