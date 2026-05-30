@@ -31,6 +31,7 @@ from .routers import (
     policy_summary,
     policy_templates,
     relocation_profile,
+    specialist_review,
     support,
 )
 from .recommendations.router import router as recommendations_router
@@ -100,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(relocation_routes.api_router)
     app.include_router(relocation_classify_routes.router)
     app.include_router(mobility_context.router)  # P2 circular-import fixed — safe to top-level import
+    app.include_router(specialist_review.router)
 
     # ── Month-1 migration: HR Policy cluster ──────────────────────────────────
     app.include_router(policy_publish.router)
