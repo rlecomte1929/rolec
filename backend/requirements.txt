@@ -54,3 +54,6 @@ scipy>=1.11
 # numpy/scipy/pandas; the conditional-logit fit itself uses scipy.optimize
 # (lazy-imported in conjoint_service so the module imports without these).
 statsmodels>=0.14
+# [Parker-I] Neural translation layer — DeepL Pro adapter (lazy-imported; NLLB-200 is
+# reached over HTTP via `requests`, no heavy local-inference dep). See ADR-002.
+deepl>=1.18
