@@ -390,6 +390,27 @@ else:
 app = FastAPI(title="ReloPass API", version="1.0.0", lifespan=lifespan)
 
 # ---------------------------------------------------------------------------
+# Debug endpoint gating (SEC-001).
+# Debug/diagnostic routes are live unauthenticated attack surface in
+# production. They register ONLY when ENABLE_DEBUG_ENDPOINTS=1 — a flag that
+# must NEVER be set in any production environment (local development only).
+# When the flag is unset, the routes simply do not exist (404).
+# ---------------------------------------------------------------------------
+DEBUG_ENDPOINTS_ENABLED = os.environ.get("ENABLE_DEBUG_ENDPOINTS") == "1"
+
+
+def debug_route(method: str, path: str, **kwargs):
+    """Register a debug route only when ENABLE_DEBUG_ENDPOINTS=1; else no-op."""
+
+    def decorator(fn):
+        if DEBUG_ENDPOINTS_ENABLED:
+            getattr(app, method)(path, **kwargs)(fn)
+        return fn
+
+    return decorator
+
+
+# ---------------------------------------------------------------------------
 # Rate limiting (abuse protection on auth + claim endpoints).
 # Limiter instance lives in backend/rate_limit.py so routers can decorate
 # their endpoints without pulling main into a circular import. Main owns the
@@ -752,7 +773,7 @@ def supabase_health(probe: int = 0):
 from .app.auth_deps import require_admin as _require_admin_v2  # noqa: E402
 
 
-@app.get("/debug/db")
+@debug_route("get", "/debug/db")
 def debug_db(user: Dict[str, Any] = Depends(_require_admin_v2)):
     """Return non-secret database connectivity info. Admin only."""
     return Database.get_db_info()
@@ -763,7 +784,7 @@ class _DebugKVBody(_BaseModel):
     value: str
 
 
-@app.post("/debug/kv")
+@debug_route("post", "/debug/kv")
 def debug_kv_set(
     body: _DebugKVBody,
     user: Dict[str, Any] = Depends(_require_admin_v2),
@@ -773,7 +794,7 @@ def debug_kv_set(
     return {"ok": True, "key": body.key}
 
 
-@app.get("/debug/kv/{key}")
+@debug_route("get", "/debug/kv/{key}")
 def debug_kv_get(
     key: str,
     user: Dict[str, Any] = Depends(_require_admin_v2),
@@ -2661,7 +2682,7 @@ def reconciliation_link_policy_company(
     return {"ok": True}
 
 
-@app.get("/api/admin/debug/runtime-database")
+@debug_route("get", "/api/admin/debug/runtime-database")
 def debug_runtime_database(user: Dict[str, Any] = Depends(require_admin)):
     """
     Admin diagnostic: show current DB scheme/target and seed flags.
@@ -2687,7 +2708,7 @@ def debug_runtime_database(user: Dict[str, Any] = Depends(require_admin)):
     }
 
 
-@app.get("/api/admin/debug/test-company-graph")
+@debug_route("get", "/api/admin/debug/test-company-graph")
 def debug_test_company_graph(user: Dict[str, Any] = Depends(require_admin)):
     """
     Admin diagnostic: snapshot of Test company graph (counts + sample rows).
@@ -5713,7 +5734,7 @@ def list_hr_assignments(
         )
 
 
-@app.get("/api/debug/supabase")
+@debug_route("get", "/api/debug/supabase")
 def debug_supabase(user: Dict[str, Any] = Depends(_require_admin_v2)):
     """
     Lightweight Supabase admin connectivity check. Admin only.
@@ -10350,7 +10371,7 @@ def notify_hr_employee_saved(
     return {"ok": True}
 
 
-@app.get("/api/debug/cases/{case_id}/events")
+@debug_route("get", "/api/debug/cases/{case_id}/events")
 def debug_case_events(
     case_id: str,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
@@ -10360,7 +10381,7 @@ def debug_case_events(
     return {"case_id": case_id, "events": events, "count": len(events)}
 
 
-@app.get("/api/debug/assignment-check")
+@debug_route("get", "/api/debug/assignment-check")
 def debug_assignment_check(
     assignment_id: str = Query(...),
     user: Dict[str, Any] = Depends(require_hr_or_employee),

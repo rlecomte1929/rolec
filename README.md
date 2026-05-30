@@ -123,6 +123,10 @@ cp frontend/.env.development.example frontend/.env.development   # frontend
 # 4. Run backend (SQLite fallback — tables created on first boot)
 PYTHONPATH=. uvicorn backend.main:app --reload --port 8000
 
+# Optional: expose /debug/* diagnostic routes (db/KV/Supabase inspectors).
+# LOCAL DEVELOPMENT ONLY — never set this in production. Unset = routes 404.
+# ENABLE_DEBUG_ENDPOINTS=1 PYTHONPATH=. uvicorn backend.main:app --reload --port 8000
+
 # 5. Frontend (new terminal)
 cd frontend
 npm install
