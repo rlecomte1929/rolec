@@ -6,6 +6,7 @@ from .routers import (
     ab_tests,
     admin,
     admin_ai_unit_economics,
+    admin_ocr_shadow,
     admin_prompts,
     advisors,
     ai_decisions,
@@ -105,6 +106,7 @@ def create_app() -> FastAPI:
     app.include_router(benefit_optimizer.router)
     app.include_router(admin_ai_unit_economics.router)
     app.include_router(ai_feedback.router)
+    app.include_router(admin_ocr_shadow.router)
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
     app.include_router(admin_prompts.router, prefix="/api/admin")
