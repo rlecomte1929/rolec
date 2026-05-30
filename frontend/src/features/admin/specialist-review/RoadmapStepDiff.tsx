@@ -35,6 +35,7 @@ function changed(original: unknown, override: unknown): boolean {
 export function RoadmapStepDiff({ step, value, onChange }: Props) {
   const edited = value.edited ?? step;
   const showReason = value.decision === 'edit' || value.decision === 'reject';
+  const reasonSelectId = `reason-code-${step.step_id}`;
 
   const set = (patch: Partial<StepReviewValue>) => onChange({ ...value, ...patch });
   const setEdited = (patch: Partial<AiStep>) =>
@@ -123,13 +124,13 @@ export function RoadmapStepDiff({ step, value, onChange }: Props) {
         {showReason && (
           <div>
             <label
-              htmlFor="reason-code-select"
+              htmlFor={reasonSelectId}
               className="block text-sm font-medium text-[#374151] mb-1"
             >
               Reason code
             </label>
             <select
-              id="reason-code-select"
+              id={reasonSelectId}
               value={value.reason_code ?? ''}
               onChange={(e) => set({ reason_code: e.target.value as ReasonCode })}
               className="px-4 py-2 border border-[#d1d5db] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0b2b43] transition-all bg-white"
