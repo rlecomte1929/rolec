@@ -43,6 +43,7 @@ from .routers import (
     predictions,
     relocation_profile,
     support,
+    translation,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(employee_quotes.router)
     app.include_router(pets.router)
     app.include_router(support.router)
+    app.include_router(translation.router)
     app.include_router(ab_tests.router)
 
     # ── Month-1 migration: Auth ───────────────────────────────────────────────
