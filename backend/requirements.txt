@@ -45,3 +45,8 @@ pandas>=2.0
 # solves trivially. Imported lazily in benefit_optimizer so the rest of the
 # backend never requires it.
 pulp>=2.7,<4
+# [Parker-C] Cluster-relative supplier tiering. KMeans + silhouette pick K per
+# (category, country) cell; imported lazily in recommendations.tiering so importing
+# the recommendations package never requires the ML stack. Tests importorskip sklearn.
+scikit-learn>=1.3
+scipy>=1.11
