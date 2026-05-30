@@ -142,6 +142,7 @@ from .app.routers import ai_feedback as ai_feedback_router  # [Parker-E] dual-la
 from .app.routers import admin_ocr_shadow as admin_ocr_shadow_router  # [Parker-F] dual-layer registration (PR #207 §9)
 from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_router  # [Parker-G] dual-layer registration (PR #207 §9)
 from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
+from .app.routers import translation as translation_router  # [Parker-I] dual-layer registration (PR #207 §9)
 from .app.routers import policy_publish as policy_publish_router  # [P1-4]
 from .app.routers import policy_summary as policy_summary_router  # [P1-5 backend]
 from .app.routers import policy_feedback as policy_feedback_router  # [P5-5]
@@ -690,6 +691,7 @@ app.include_router(ai_feedback_router.router)  # [Parker-E] PR #207 §9 — dual
 app.include_router(admin_ocr_shadow_router.router)  # [Parker-F] PR #207 §9 — dual-layer registration
 app.include_router(admin_ai_unit_economics_router.router)  # [Parker-G] PR #207 §9 — dual-layer registration
 app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-layer registration
+app.include_router(translation_router.router)  # [Parker-I] PR #207 §9 — dual-layer registration
 # [AUDIT-C2.3 Month-1] policy_publish_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_summary_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_feedback_router → moved to backend/app/main.py
