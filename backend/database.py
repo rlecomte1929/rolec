@@ -2433,9 +2433,26 @@ class Database:
                     steps_json TEXT NOT NULL DEFAULT '[]',
                     total_latency_ms INTEGER NOT NULL DEFAULT 0,
                     fallback_triggered INTEGER NOT NULL DEFAULT 0,
+                    prompt_version_id TEXT,
+                    canary_arm TEXT,
                     created_at TEXT NOT NULL
                 )
             """))
+            # Parker Step D: prompt attribution columns. Idempotent additive
+            # backfill for traces tables created before the registry landed.
+            if _is_sqlite:
+                try:
+                    _pat_cols = conn.execute(text("PRAGMA table_info(policy_assistant_traces)")).fetchall()
+                    _pat_names = {r[1] for r in _pat_cols}
+                    if "prompt_version_id" not in _pat_names:
+                        conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN prompt_version_id TEXT"))
+                    if "canary_arm" not in _pat_names:
+                        conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN canary_arm TEXT"))
+                except Exception:
+                    pass
+            else:
+                conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN IF NOT EXISTS prompt_version_id TEXT"))
+                conn.execute(text("ALTER TABLE policy_assistant_traces ADD COLUMN IF NOT EXISTS canary_arm TEXT"))
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_pa_traces_company_created
                 ON policy_assistant_traces(company_id, created_at)
@@ -14205,11 +14222,15 @@ class Database:
         steps_json: str,
         total_latency_ms: int,
         fallback_triggered: bool,
+        prompt_version_id: Optional[str] = None,
+        canary_arm: Optional[str] = None,
     ) -> None:
         """
         Persist one trace row. Called by ai_trace_logger._write_to_db().
         Never raises — caller wraps in try/except.
         Raw query text is NOT passed here; only the anonymised query_hash.
+        prompt_version_id / canary_arm attribute the trace to a registry arm
+        (Parker Step D); both None when the registry was absent (literal fallback).
         """
         now = datetime.utcnow().isoformat()
         with self.engine.begin() as conn:
@@ -14218,8 +14239,10 @@ class Database:
                     """
                     INSERT INTO policy_assistant_traces
                     (id, session_id, query_hash, company_id, steps_json,
-                     total_latency_ms, fallback_triggered, created_at)
-                    VALUES (:id, :sid, :qh, :cid, :sj, :lms, :fb, :now)
+                     total_latency_ms, fallback_triggered,
+                     prompt_version_id, canary_arm, created_at)
+                    VALUES (:id, :sid, :qh, :cid, :sj, :lms, :fb,
+                            :pvid, :arm, :now)
                     ON CONFLICT(id) DO NOTHING
                     """
                 ),
@@ -14231,6 +14254,8 @@ class Database:
                     "sj": steps_json,
                     "lms": int(total_latency_ms),
                     "fb": 1 if fallback_triggered else 0,
+                    "pvid": prompt_version_id,
+                    "arm": canary_arm,
                     "now": now,
                 },
             )
