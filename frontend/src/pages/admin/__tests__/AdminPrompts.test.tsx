@@ -6,8 +6,8 @@
  */
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // AdminLayout pulls in nav chrome we don't need for these assertions.
 vi.mock('../AdminLayout', () => ({
@@ -19,6 +19,7 @@ vi.mock('../../../api/client', () => ({
     list: vi.fn(),
     promote: vi.fn().mockResolvedValue({ status: 'prod' }),
     setCanaryShare: vi.fn().mockResolvedValue({ canary_share: 0.1 }),
+    winRates: vi.fn().mockResolvedValue({}),
   },
 }));
 
@@ -55,7 +56,19 @@ describe('AdminPrompts', () => {
     vi.clearAllMocks();
     (promptsAPI.list as ReturnType<typeof vi.fn>).mockResolvedValue(ROWS);
     (promptsAPI.promote as ReturnType<typeof vi.fn>).mockResolvedValue({ status: 'prod' });
+    (promptsAPI.winRates as ReturnType<typeof vi.fn>).mockResolvedValue({
+      'v1-id': {
+        version_id: 'v1-id',
+        approvals: 8,
+        total: 10,
+        win_rate: 0.8,
+        ci_low: 0.49,
+        ci_high: 0.94,
+      },
+    });
   });
+
+  afterEach(() => cleanup());
 
   it('renders the task table from the API', async () => {
     render(<AdminPrompts />);
@@ -63,6 +76,12 @@ describe('AdminPrompts', () => {
     expect(await screen.findByText('policy_extraction')).toBeInTheDocument();
     expect(screen.getByText('v1')).toBeInTheDocument();
     expect(screen.getByText('v2')).toBeInTheDocument();
+  });
+
+  it('renders per-version win rates from the API', async () => {
+    render(<AdminPrompts />);
+    await waitFor(() => expect(promptsAPI.winRates).toHaveBeenCalledWith('policy_extraction'));
+    expect(await screen.findByText('80% (8/10)')).toBeInTheDocument();
   });
 
   it('promotes a non-prod version to prod on click', async () => {
