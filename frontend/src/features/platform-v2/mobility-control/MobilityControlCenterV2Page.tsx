@@ -5,6 +5,8 @@ import { Breadcrumb } from '../../../components/Breadcrumb';
 import api, { hrAPI } from '../../../api/client';
 import type { CommandCenterCaseRow } from '../../../api/client';
 import { DataTable, ResetColumnsLink, type DataTableColumn } from '../data-table';
+import { useHrCompanyContext } from '../../../contexts/HrCompanyContext';
+import { fetchExecSummary } from '../../../api/nlg';
 
 /**
  * Mobility Control Center — V2.
@@ -283,6 +285,9 @@ export function MobilityControlCenterV2Page() {
   const [approvals, setApprovals] = useState<ApprovalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [backendDegraded, setBackendDegraded] = useState(false);
+  const { companyId } = useHrCompanyContext();
+  // Parker-J: data-to-text exec summary. Null = provider deferred to LLM (env flag) or unavailable.
+  const [execSummary, setExecSummary] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -318,6 +323,16 @@ export function MobilityControlCenterV2Page() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Parker-J: classical data-to-text exec summary (LLM-free, env-flag gated server-side).
+  useEffect(() => {
+    if (!companyId) { setExecSummary(null); return; }
+    const ctrl = new AbortController();
+    fetchExecSummary(companyId, ctrl.signal)
+      .then((res) => setExecSummary(res.summary))
+      .catch(() => setExecSummary(null));
+    return () => ctrl.abort();
+  }, [companyId]);
 
   // ── Derived sidebar data ──────────────────────────────────────────────────
   // Aggregate the case list into a corridor histogram keyed by canonical
@@ -548,6 +563,13 @@ export function MobilityControlCenterV2Page() {
             progress={totalBudget.limit ? Math.min(100, (totalBudget.est / totalBudget.limit) * 100) : 0}
           />
         </div>
+
+        {execSummary && (
+          <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Executive summary</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-slate-700">{execSummary}</p>
+          </div>
+        )}
 
         {backendDegraded && (
           <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
