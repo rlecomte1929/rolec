@@ -11,6 +11,7 @@ from .routers import (
     cases_admin,
     cases_read,
     cases_write,
+    comparison,
     employee_quotes,
     exception_requests,
     hr_analytics,
@@ -108,6 +109,9 @@ def create_app() -> FastAPI:
     app.include_router(policy_canonical.admin_router, prefix="/api/admin")
     app.include_router(policy_canonical.read_router, prefix="/api")
     app.include_router(policy_templates.router)
+
+    # ── [AIQ-236 / P3-1] Benefit comparison engine ────────────────────────────
+    app.include_router(comparison.router)
 
     # ── Month-1 TODO: Tier 4 routers blocked on Month-0 P3 extraction ─────────
     # TODO [AUDIT-C2.3 / Month-0 P3]: add hr_policy_config + employee_policy_config
