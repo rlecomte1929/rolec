@@ -32,3 +32,7 @@ anthropic==0.39.0
 langsmith>=0.1.147
 PyJWT>=2.10.1,<3.0.0
 email-validator>=2.0.0
+# [Parker-H] Conjoint analysis numerical stack. statsmodels transitively pins
+# numpy/scipy/pandas; the conditional-logit fit itself uses scipy.optimize
+# (lazy-imported in conjoint_service so the module imports without these).
+statsmodels>=0.14
