@@ -36,6 +36,9 @@ email-validator>=2.0.0
 # exactly so the pickled CoxPHFitter blob stays loadable across the local (3.9)
 # and Render production (3.11) runtimes — pickle is version-sensitive.
 lifelines==0.27.8
+# [Parker-A] + [Parker-C] shared ML stack — KMeans/silhouette cluster tiering
+# (recommendations.tiering) and survival features both lazily import sklearn/scipy;
+# pinned once (deduped at cherry-pick time; pre-empts Parker integration commit e32cc3e3).
 scikit-learn>=1.3
 scipy>=1.11
 pandas>=2.0
