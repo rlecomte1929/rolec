@@ -48,8 +48,8 @@ pulp>=2.7,<4
 # [Parker-C] Cluster-relative supplier tiering. KMeans + silhouette pick K per
 # (category, country) cell; imported lazily in recommendations.tiering so importing
 # the recommendations package never requires the ML stack. Tests importorskip sklearn.
-scikit-learn>=1.3
-scipy>=1.11
+# (scikit-learn>=1.3 + scipy>=1.11 already declared by Parker-A above — deduped at
+# integration; identical pins, no contradiction.)
 # [Parker-H] Conjoint analysis numerical stack. statsmodels transitively pins
 # numpy/scipy/pandas; the conditional-logit fit itself uses scipy.optimize
 # (lazy-imported in conjoint_service so the module imports without these).
