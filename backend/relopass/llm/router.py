@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
@@ -532,3 +533,47 @@ def cast_no_model_sentinel() -> str:
 
 def is_no_model_handle(handle: LLMHandle) -> bool:
     return handle.model_name == _NO_MODEL_SENTINEL
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Passport OCR backend split (Parker Step F)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The mrz_extraction routing row above models the *MRZ-string* regex job. Passport
+# *image* OCR (the GPT-4o vision extractor vs. the self-hosted OSS path) is a
+# different axis that the cost-table ROUTING_TABLE doesn't describe, so the split
+# lives here as pure, env-driven helpers. The OSS path is dark by default
+# (PASSPORT_OCR_OSS_SHARE=0.0) — production passport traffic is unchanged until a
+# human raises the share after reviewing the shadow comparison.
+
+PassportOcrBackend = Literal["gpt4o", "oss"]
+
+
+def passport_ocr_oss_share() -> float:
+    """Fraction of passport-OCR traffic routed to the OSS path. Default 0.0.
+
+    Read from ``PASSPORT_OCR_OSS_SHARE`` and clamped to ``[0.0, 1.0]``. A
+    malformed value falls back to 0.0 (fail-safe: keep GPT-4o).
+    """
+    try:
+        share = float(os.environ.get("PASSPORT_OCR_OSS_SHARE", "0.0"))
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(1.0, share))
+
+
+def shadow_compare_enabled() -> bool:
+    """Whether SHADOW_COMPARE mode is on (run both extractors, return GPT-4o)."""
+    return os.environ.get("SHADOW_COMPARE", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def choose_passport_ocr_backend(
+    roll: float, share: Optional[float] = None
+) -> PassportOcrBackend:
+    """Pure backend choice: ``oss`` iff ``roll < share`` (default share from env).
+
+    ``roll`` is a caller-supplied uniform in ``[0, 1)`` (e.g. a hash of the case
+    id). With the default share of 0.0 this always returns ``gpt4o``.
+    """
+    s = passport_ocr_oss_share() if share is None else max(0.0, min(1.0, share))
+    return "oss" if roll < s else "gpt4o"
