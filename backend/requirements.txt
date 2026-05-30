@@ -32,3 +32,8 @@ anthropic==0.39.0
 langsmith>=0.1.147
 PyJWT>=2.10.1,<3.0.0
 email-validator>=2.0.0
+# [Parker-C] Cluster-relative supplier tiering. KMeans + silhouette pick K per
+# (category, country) cell; imported lazily in recommendations.tiering so importing
+# the recommendations package never requires the ML stack. Tests importorskip sklearn.
+scikit-learn>=1.3
+scipy>=1.11
