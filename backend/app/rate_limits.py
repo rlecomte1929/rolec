@@ -65,3 +65,93 @@ def user_key_func(request: Request) -> str:
     except Exception:  # pragma: no cover - defensive; fall back to IP
         pass
     return _client_ip(request)
+
+
+# ── Path-scoped buckets (UPLOAD / ADMIN / AI) ────────────────────────────────
+# Enforced by a middleware in backend.main rather than per-route @limiter.limit
+# decorators: slowapi 0.1.9 requires the decorated function to declare a parameter
+# literally named "request", but most of these routes name it "req" (or, for the
+# ~66 admin routes, omit it). Defining the policy here — free of any app/DB import —
+# keeps it unit-testable in isolation. Uses slowapi's own `limits` backend.
+import re as _re
+
+from limits import parse as _parse_limit
+from limits.storage import MemoryStorage as _MemoryStorage
+from limits.strategies import FixedWindowRateLimiter as _FixedWindowRateLimiter
+
+RETRY_AFTER_SECONDS = 60  # every named bucket is a 1-minute window
+
+ADMIN_RATE_LIMIT_ITEM = _parse_limit(ADMIN_LIMIT)
+UPLOAD_RATE_LIMIT_ITEM = _parse_limit(UPLOAD_LIMIT)
+AI_RATE_LIMIT_ITEM = _parse_limit(AI_LIMIT)
+
+_path_rl_storage = _MemoryStorage()
+_path_rate_limiter = _FixedWindowRateLimiter(_path_rl_storage)
+
+# Exact-match file-upload routes (UPLOAD bucket, keyed by IP).
+UPLOAD_PATHS = frozenset({
+    "/api/hr/policies/upload",
+    "/api/hr/policy-documents/upload",
+    "/api/admin/policies/upload",
+    "/api/company-policies/upload",
+})
+# LLM-backed routes (AI bucket, keyed per authenticated user via user_key_func).
+AI_PATHS = frozenset({
+    "/api/employee/policy-assistant/query",
+    "/api/hr/policy-assistant/query",
+    "/api/policy-assistant/rag-query",
+    "/api/guidance/generate",
+})
+_AI_PATH_PATTERNS = (
+    _re.compile(r"^/api/admin/policies/[^/]+/extract$"),
+    _re.compile(r"^/api/policies/[^/]+/extract$"),
+    _re.compile(r"^/api/policies/[^/]+/extract-preview$"),
+)
+
+
+def is_ai_path(path: str) -> bool:
+    return path in AI_PATHS or any(p.match(path) for p in _AI_PATH_PATTERNS)
+
+
+def path_limit(path: str, ip: str, user_key: str):
+    """
+    Apply the stricter SEC-004 buckets by path, most specific first:
+    AI (per user) > uploads (per IP) > admin (per IP). Returns the exceeded limit
+    as a string, or None when the request is allowed. Pure + synchronous so it can
+    be unit-tested directly without standing up the app.
+    """
+    if is_ai_path(path):
+        if not _path_rate_limiter.hit(AI_RATE_LIMIT_ITEM, "sec004-ai", user_key):
+            return str(AI_RATE_LIMIT_ITEM)
+        return None
+    if path in UPLOAD_PATHS:
+        if not _path_rate_limiter.hit(UPLOAD_RATE_LIMIT_ITEM, "sec004-upload", ip):
+            return str(UPLOAD_RATE_LIMIT_ITEM)
+        return None
+    if path.startswith("/api/admin/"):
+        if not _path_rate_limiter.hit(ADMIN_RATE_LIMIT_ITEM, "sec004-admin", ip):
+            return str(ADMIN_RATE_LIMIT_ITEM)
+        return None
+    return None
+
+
+def reset_path_limit_storage() -> None:
+    """Clear all path-bucket counters. For tests only."""
+    global _path_rl_storage, _path_rate_limiter
+    _path_rl_storage = _MemoryStorage()
+    _path_rate_limiter = _FixedWindowRateLimiter(_path_rl_storage)
+
+
+def rate_limit_payload(retry: int = RETRY_AFTER_SECONDS) -> dict:
+    """Canonical 429 JSON body (SEC-004). `detail`/`request_id` kept for back-compat."""
+    return {
+        "error": "rate_limit_exceeded",
+        "message": f"Too many requests. Retry after {retry}s.",
+        "retry_after": retry,
+        "detail": "Too many requests. Wait a moment before trying again.",
+    }
+
+
+def rate_limit_headers(retry: int = RETRY_AFTER_SECONDS) -> dict:
+    """Canonical 429 headers (SEC-004)."""
+    return {"Retry-After": str(retry)}
