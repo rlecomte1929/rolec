@@ -162,6 +162,8 @@ export const ROUTE_DEFS = {
   adminAbTests: { path: '/admin/ab-tests', roles: ['ADMIN'] as RouteRole[] },
   /** External provider portal — authenticated via magic-link JWT, no ReloPass account needed */
   providerPortal: { path: '/provider/portal', roles: ['PUBLIC'] as RouteRole[] },
+  /** [AIQ-633] Specialist review — admin reviews AI-generated roadmap steps per case */
+  adminSpecialistReview: { path: '/admin/specialist-review/:case_id', roles: ['ADMIN'] as RouteRole[] },
 };
 
 export type RouteKey = keyof typeof ROUTE_DEFS;

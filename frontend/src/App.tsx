@@ -160,6 +160,7 @@ const AdminOpsQueuePage = lazy(() => import('./pages/admin/ops/AdminOpsQueuePage
 const AdminOpsReviewersPage = lazy(() => import('./pages/admin/ops/AdminOpsReviewersPage').then((module) => ({ default: module.AdminOpsReviewersPage })));
 const AdminOpsDestinationsPage = lazy(() => import('./pages/admin/ops/AdminOpsDestinationsPage').then((module) => ({ default: module.AdminOpsDestinationsPage })));
 const AdminOpsNotificationsPage = lazy(() => import('./pages/admin/ops/AdminOpsNotificationsPage').then((module) => ({ default: module.AdminOpsNotificationsPage })));
+const AdminSpecialistReviewPage = lazy(() => import('./pages/admin/AdminSpecialistReviewPage').then((module) => ({ default: module.AdminSpecialistReviewPage })));
 
 function RouteFallback() {
   return (
@@ -412,6 +413,8 @@ function App() {
         <Route path={ROUTE_DEFS.adminOpsReviewers.path} element={<RequireAdminRoute><AdminOpsReviewersPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsDestinations.path} element={<RequireAdminRoute><AdminOpsDestinationsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminOpsNotifications.path} element={<RequireAdminRoute><AdminOpsNotificationsPage /></RequireAdminRoute>} />
+        {/* [AIQ-633] Specialist review — admin reviews AI-generated roadmap steps */}
+        <Route path={ROUTE_DEFS.adminSpecialistReview.path} element={<RequireAdminRoute><AdminSpecialistReviewPage /></RequireAdminRoute>} />
         {/* platform-v2: V2 inbox renders by default. Legacy Messages remains
             mounted at /messages-legacy + /hr/messages-legacy for emergency
             rollback. Sibling /messages-v2 always renders V2 for side-by-side
