@@ -13649,7 +13649,11 @@ app.include_router(hr_policy_config_router)
 app.include_router(admin_policy_config_router)
 app.include_router(employee_policy_config_router)
 app.include_router(public_policy_config_router)
-# [AUDIT-C2.3 Month-1] hr_coordination_router → moved to backend/app/main.py
+# hr_coordination restored to backend/main.py: the AUDIT-C2.3 "moved to
+# backend/app/main.py" note was wrong — backend/main.py (the prod entrypoint)
+# does not serve the modular app, so these routes 405'd in prod. See
+# audit/dual-layer-audit-followup.md. Modular cutover is a separate project.
+app.include_router(hr_coordination_router.router)
 app.include_router(prescreening_router.router)
 app.include_router(personio_webhook_router.router)
 app.include_router(personio_settings_router.router)
