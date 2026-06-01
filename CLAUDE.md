@@ -48,7 +48,14 @@ supabase migration new <name>        # Create a new migration file
 **Dual-layer pattern — this is the most important thing to understand:**
 - `backend/main.py` is the primary entry point and still owns the bulk of routes (auth, assignments, policies, HR command center, employee journey). It is large (~12k lines) and is being progressively decomposed.
 - `backend/app/` is the modular layer. New routes go here as `app/routers/<domain>.py`, registered in `app/main.py`. The `app/` app is mounted into the root `main.py`.
-- When adding a new router: create `backend/app/routers/<name>.py`, import and `include_router` it in `backend/app/main.py`. Do not add new routes directly to `backend/main.py`.
+
+**⚠️ Routers must be registered in BOTH `backend/main.py` AND `backend/app/main.py`.** Render boots `uvicorn backend.main:app`, so a router registered only in `backend/app/main.py` will return 405 in production — the modular app instance is never the one serving traffic. This has bitten us three times now (AI-002 v2 → hotfix `5d796c2`; AIQ-567 → rejected pre-merge; AIQ-568 → rejected pre-merge), so it's a hard rule until the modular cutover described in `backend/MIGRATION_PLAN.md` lands. When you add a new router:
+  1. Create `backend/app/routers/<name>.py`.
+  2. Register it in `backend/app/main.py` (the modular sub-app, where future-prod will live).
+  3. **Also** register it in `backend/main.py` alongside the existing `auth_router`, `cases_read_router`, `ai_decisions_router`, etc. block (~line 580). The import + `include_router` call belong here too.
+  4. Verify both registrations with `python3 -c "from backend.main import app; print(sorted(r.path for r in app.routes if '<your-prefix>' in r.path))"` before pushing — if the route doesn't show up here, prod is dead on arrival.
+
+  Tests that mount the prod app (`from backend.main import app`) must import auth dependencies (`get_current_user`, `require_admin_or_hr`) from `backend.app.auth_deps` — there's a second `get_current_user` in `backend/main.py` that's a different function, and `dependency_overrides` keyed to the wrong reference silently never fires. AIQ-567's tests had this bug on top of the wiring bug.
 
 **Database access:**
 - New code in `app/` uses `app/db.py` (SQLAlchemy `SessionLocal`) and `app/models.py` (ORM).
@@ -167,3 +174,67 @@ A multi-stage remediation plan lives at `audit/REMEDIATION_PLAN.md` with a rolli
 **System of record:** Each finding has a Notion AI Work Queue entry (DB id `7adc643a-c448-4a1a-ba80-e27e417f42d6`) with Priority + Complexity + Validation Criteria + Context Links back to the originating `audit/02-expert-*.md` file. Update Status as the work moves through `Ready for AI → AI in Progress → Human Review → Done`.
 
 **Gate discipline:** No stage starts until the previous stage's PR is merged + canary clean. See `audit/REMEDIATION_PLAN.md` §"Universal stage protocol" for the per-stage checklist.
+
+## Behavioral Guidelines (Karpathy)
+
+Source: https://raw.githubusercontent.com/forrestchang/andrej-karpathy-skills/main/CLAUDE.md
+
+Behavioral guidelines to reduce common LLM coding mistakes. These bias toward caution over speed — use judgment for trivial tasks.
+
+### 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
