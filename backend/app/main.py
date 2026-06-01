@@ -14,6 +14,7 @@ from .routers import (
     employee_quotes,
     exception_requests,
     hr_analytics,
+    hr_case_detail,
     hr_catalog,
     hr_coordination,
     immigration,
@@ -80,6 +81,8 @@ def create_app() -> FastAPI:
     app.include_router(hr_catalog.router)
     app.include_router(hr_coordination.router)
     app.include_router(hr_analytics.router)
+    # C1-11c-be: per-case detail reads consumed by the HR Dashboard surface.
+    app.include_router(hr_case_detail.router)
 
     # ── Month-1 migration: Employee cluster ───────────────────────────────────
     # [AUDIT-B9-imm-6] immigration.router replaced by 5 modular sub-routers.
