@@ -33,3 +33,24 @@ body {
   outline: none;
   box-shadow: var(--rp-shadow-focus);
 }
+
+/* C1-11e bbox-highlight flash. 200ms fade-in / 400ms hold / 200ms fade-out
+ * per the design brief, using the design-system motion tokens for easing. */
+@keyframes rp-bbox-flash {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-bbox-flash {
+  animation: rp-bbox-flash 800ms var(--rp-easing-out, ease-out) 1;
+}
