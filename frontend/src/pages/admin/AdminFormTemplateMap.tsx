@@ -26,20 +26,14 @@ import {
 import {
   withComputedPositions,
   type FieldDefinition,
-  type PdfCoordinates,
 } from '../../features/platform-v2/admin/form-templates/FieldDefinitionEditor';
 
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────
 
-function normalizePdfCoordinates(raw: unknown): PdfCoordinates | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const c = raw as Record<string, unknown>;
-  if (typeof c.page !== 'number' || typeof c.x !== 'number' || typeof c.y !== 'number') {
-    return undefined;
-  }
-  return { page: c.page, x: c.x, y: c.y };
+function asFiniteNumber(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
 function errorToString(err: unknown, fallback = 'An error occurred'): string {
@@ -64,7 +58,10 @@ function normalizeFields(raw: Array<Record<string, unknown>>): FieldDefinition[]
     requires_original: r.requires_original === true,
     position: typeof r.position === 'number' ? r.position : i + 1,
     options: Array.isArray(r.options) ? (r.options as string[]) : undefined,
-    pdf_coordinates: normalizePdfCoordinates(r.pdf_coordinates),
+    pdf_x: asFiniteNumber(r.pdf_x),
+    pdf_y: asFiniteNumber(r.pdf_y),
+    pdf_page: asFiniteNumber(r.pdf_page),
+    pdf_font_size: asFiniteNumber(r.pdf_font_size),
   }));
 }
 
@@ -129,7 +126,11 @@ export const AdminFormTemplateMap: React.FC = () => {
 
   const handleClear = useCallback((fieldId: string) => {
     setFields((prev) =>
-      prev.map((f) => (f.id === fieldId ? { ...f, pdf_coordinates: undefined } : f)),
+      prev.map((f) =>
+        f.id === fieldId
+          ? { ...f, pdf_x: undefined, pdf_y: undefined, pdf_page: undefined }
+          : f,
+      ),
     );
     setSaveSuccess(false);
   }, []);
@@ -176,12 +177,14 @@ export const AdminFormTemplateMap: React.FC = () => {
     ? `Map fields — ${template.code} · v${template.version}`
     : 'Map fields';
 
-  const assignedCount = fields.filter((f) => !!f.pdf_coordinates).length;
+  const assignedCount = fields.filter(
+    (f) => f.pdf_x != null && f.pdf_y != null && f.pdf_page != null,
+  ).length;
 
   return (
     <AdminLayout
       title={title}
-      subtitle="Click on the PDF to place each field. Coordinates are stored as fractions of the page size and used by the PDF fill service."
+      subtitle="Click on the PDF to place each field. Coordinates are stored as PDF points (origin at the page's bottom-left) and consumed verbatim by the overlay engine."
       headerRight={
         <Link
           to={id ? buildRoute('adminFormTemplatesEdit', { id }) : buildRoute('adminFormTemplates')}
@@ -261,9 +264,10 @@ export const AdminFormTemplateMap: React.FC = () => {
                 </Button>
 
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Coordinates are stored as fractions (0–1) of page dimensions.
-                  Y=0 is the bottom of the page (PDF space). The PDF fill service
-                  uses these to overlay field values on the printed form.
+                  Coordinates are stored as raw PDF points (1 pt ≈ 1/72 in). The
+                  Y-axis origin is at the page's bottom-left, matching the PDF
+                  spec. The overlay engine writes values directly at these
+                  coordinates on top of the original PDF.
                 </p>
               </div>
             </div>

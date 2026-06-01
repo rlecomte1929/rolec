@@ -34,13 +34,6 @@ import { Button } from '../../../../components/antigravity';
 
 export type FieldType = 'text' | 'date' | 'number' | 'boolean' | 'select';
 
-/** Fractional PDF coordinates (0–1 range, 0-based page index). */
-export type PdfCoordinates = {
-  page: number;
-  x: number;
-  y: number;
-};
-
 export interface FieldDefinition {
   id: string;
   label: string;
@@ -50,7 +43,14 @@ export interface FieldDefinition {
   requires_original?: boolean;
   position?: number;          // computed on save, not user-editable
   options?: string[];         // type='select' only
-  pdf_coordinates?: PdfCoordinates;
+  // PDF overlay coordinates — consumed by the P3-1 overlay engine
+  // (backend/app/routers/cases_read.py::_generate_filled_pdf). Raw PDF
+  // points: pdf_x from the page's left edge, pdf_y from the page's
+  // bottom edge (PDF/PostScript Y-up space). pdf_page is 1-based.
+  pdf_x?: number;
+  pdf_y?: number;
+  pdf_page?: number;
+  pdf_font_size?: number;
 }
 
 const FIELD_TYPE_OPTIONS: FieldType[] = ['text', 'date', 'number', 'boolean', 'select'];

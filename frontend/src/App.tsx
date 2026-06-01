@@ -129,6 +129,7 @@ const AdminResourceEditor = lazy(() => import('./pages/admin/AdminResourceEditor
 // [P1-2] Form Template Registry
 const AdminFormTemplates = lazy(() => import('./pages/admin/AdminFormTemplates').then((module) => ({ default: module.AdminFormTemplates })));
 const AdminFormTemplateEditor = lazy(() => import('./pages/admin/AdminFormTemplateEditor').then((module) => ({ default: module.AdminFormTemplateEditor })));
+const AdminFormTemplateMap = lazy(() => import('./pages/admin/AdminFormTemplateMap').then((module) => ({ default: module.AdminFormTemplateMap })));
 const AdminEvents = lazy(() => import('./pages/admin/AdminEvents').then((module) => ({ default: module.AdminEvents })));
 const AdminEventEditor = lazy(() => import('./pages/admin/AdminEventEditor').then((module) => ({ default: module.AdminEventEditor })));
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories').then((module) => ({ default: module.AdminCategories })));
@@ -370,6 +371,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminFormTemplates.path} element={<RequireAdminRoute><AdminFormTemplates /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFormTemplatesNew.path} element={<RequireAdminRoute><AdminFormTemplateEditor /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFormTemplatesEdit.path} element={<RequireAdminRoute><AdminFormTemplateEditor /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFormTemplatesMap.path} element={<RequireAdminRoute><AdminFormTemplateMap /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminEvents.path} element={<RequireAdminRoute><AdminEvents /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminEventsEdit.path} element={<RequireAdminRoute><AdminEventEditor /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCategories.path} element={<RequireAdminRoute><AdminCategories /></RequireAdminRoute>} />
