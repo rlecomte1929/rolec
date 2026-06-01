@@ -6,7 +6,20 @@
  * jsdom, so we test the pure helpers directly. The math is the highest-bug
  * surface area of the component; everything else is React state plumbing.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// react-pdf transitively loads pdfjs-dist@4.8.69, whose node_utils.js calls
+// Promise.withResolvers() (Node 22+) at import time — which crashes under the
+// jsdom/vitest runtime. The component imports react-pdf only for <Document>/<Page>
+// rendering; these tests exercise the pure coord-math helpers and never render it.
+// Mocking at the react-pdf boundary keeps the real module (and pdfjs-dist) out of
+// the test entirely. (vi.mock is hoisted above the imports below by vitest.)
+vi.mock('react-pdf', () => ({
+  Document: () => null,
+  Page: () => null,
+  pdfjs: { GlobalWorkerOptions: { workerSrc: '' }, version: '4.8.69' },
+}));
+
 import {
   pdfPointToScreen,
   screenToPdfPoint,
