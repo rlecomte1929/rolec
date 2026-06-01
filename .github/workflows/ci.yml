@@ -114,6 +114,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      # Catches the dual-layer 405 trap at PR time (audit/dual-layer-audit-followup.md).
+      # Pure stdlib (ast + Path), no extra deps. Reads scripts/router_registration_allowlist.txt
+      # for grandfathered modular-only routers; drains as the modular cutover progresses.
+      # Runs before pytest so a registration miss fails fast.
+      - name: Dual-layer router registration guard
+        run: python scripts/check_router_registrations.py
+
       - name: Pytest (P1 deterministic suite)
         run: |
           python -m pytest -q \
