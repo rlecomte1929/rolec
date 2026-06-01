@@ -48,7 +48,7 @@ CREATE POLICY "hr_read_calibration_alerts"
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles p
-            WHERE p.id = auth.uid()
+            WHERE p.id::uuid = auth.uid()
               AND p.company_id = organization_id
               AND p.role IN ('hr', 'admin', 'HR', 'ADMIN')
         )
@@ -61,7 +61,7 @@ CREATE POLICY "hr_dismiss_calibration_alerts"
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles p
-            WHERE p.id = auth.uid()
+            WHERE p.id::uuid = auth.uid()
               AND p.company_id = organization_id
               AND p.role IN ('hr', 'admin', 'HR', 'ADMIN')
         )

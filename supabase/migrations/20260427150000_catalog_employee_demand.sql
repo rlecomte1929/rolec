@@ -53,10 +53,10 @@ create policy ced_select_tenant_or_admin
   for select
   to authenticated
   using (
-    exists (select 1 from public.profiles where id = auth.uid() and role in ('HR', 'ADMIN'))
+    exists (select 1 from public.profiles where id::uuid = auth.uid() and role in ('HR', 'ADMIN'))
     and (
-      exists (select 1 from public.profiles where id = auth.uid() and role = 'ADMIN')
-      or company_id in (select company_id from public.profiles where id = auth.uid())
+      exists (select 1 from public.profiles where id::uuid = auth.uid() and role = 'ADMIN')
+      or company_id in (select company_id::uuid from public.profiles where id::uuid = auth.uid())
     )
   );
 

@@ -89,7 +89,7 @@ CREATE POLICY "employees_see_own_requests"
         requested_by_user_id = auth.uid()
         OR EXISTS (
             SELECT 1 FROM profiles p
-            WHERE p.id = auth.uid()
+            WHERE p.id::uuid = auth.uid()
               AND p.company_id = organization_id
               AND p.role IN ('HR', 'ADMIN')
         )
@@ -106,7 +106,7 @@ CREATE POLICY "hr_update_company_requests"
     USING (
         EXISTS (
             SELECT 1 FROM profiles p
-            WHERE p.id = auth.uid()
+            WHERE p.id::uuid = auth.uid()
               AND p.company_id = organization_id
               AND p.role IN ('HR', 'ADMIN')
         )
@@ -120,7 +120,7 @@ CREATE POLICY "employees_see_own_overrides"
         employee_id = auth.uid()
         OR EXISTS (
             SELECT 1 FROM profiles p
-            WHERE p.id = auth.uid()
+            WHERE p.id::uuid = auth.uid()
               AND p.company_id = company_id
               AND p.role IN ('HR', 'ADMIN')
         )
@@ -132,7 +132,7 @@ CREATE POLICY "hr_insert_overrides"
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM profiles p
-            WHERE p.id = auth.uid()
+            WHERE p.id::uuid = auth.uid()
               AND p.company_id = company_id
               AND p.role IN ('HR', 'ADMIN')
         )

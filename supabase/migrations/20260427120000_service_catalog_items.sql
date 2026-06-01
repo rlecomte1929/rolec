@@ -82,7 +82,7 @@ create policy service_catalog_items_insert_admin
   with check (
     exists (
       select 1 from public.profiles
-      where id = auth.uid() and role = 'ADMIN'
+      where id::uuid = auth.uid() and role = 'ADMIN'
     )
   );
 
@@ -93,13 +93,13 @@ create policy service_catalog_items_update_admin
   using (
     exists (
       select 1 from public.profiles
-      where id = auth.uid() and role = 'ADMIN'
+      where id::uuid = auth.uid() and role = 'ADMIN'
     )
   )
   with check (
     exists (
       select 1 from public.profiles
-      where id = auth.uid() and role = 'ADMIN'
+      where id::uuid = auth.uid() and role = 'ADMIN'
     )
   );
 

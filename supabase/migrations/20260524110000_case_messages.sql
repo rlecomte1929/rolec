@@ -45,7 +45,7 @@ CREATE POLICY "case_messages_select_employee"
         OR
         EXISTS (
             SELECT 1 FROM public.profiles p
-            WHERE p.id = auth.uid()
+            WHERE p.id::uuid = auth.uid()
               AND p.role IN ('HR', 'ADMIN')
         )
     );
