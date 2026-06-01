@@ -119,7 +119,11 @@ jobs:
           python -m pytest -q \
             backend/tests/test_admin_form_templates_router.py \
             backend/tests/test_trigger_engine.py \
-            backend/tests/test_case_dossier_forms.py
+            backend/tests/test_case_dossier_forms.py \
+            backend/tests/test_validators_tax_id.py \
+            backend/tests/test_validators_residency.py \
+            backend/tests/test_tax_cert_findings.py \
+            backend/tests/test_extraction_tax_cert.py
 
   route-auth-check:
     # AUDIT-B6: enumerate every GET route in the FastAPI apps (via AST, no DB
