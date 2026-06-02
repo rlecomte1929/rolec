@@ -72,9 +72,12 @@ CREATE TABLE IF NOT EXISTS public.policy_review_queue (
   -- UNIQUE constraint catches accidental dup inserts even if the app
   -- forgets to look up first.
   chunk_ids       uuid[] NOT NULL DEFAULT '{}',
-  chunk_ids_key   text GENERATED ALWAYS AS (
-    array_to_string(chunk_ids, ',')
-  ) STORED,
+  -- Materialised dedup key. Maintained by trg_policy_review_queue_chunk_ids_key
+  -- (a BEFORE INSERT/UPDATE trigger) rather than a GENERATED column, because
+  -- array_to_string() is STABLE not IMMUTABLE — Postgres rejects it in a
+  -- generated expression (SQLSTATE 42P17), which made this migration
+  -- non-replayable. The trigger is functionally equivalent. See drift entry 15-class.
+  chunk_ids_key   text NOT NULL DEFAULT '',
   -- Short snippet of the assistant's answer (HR-visible). Always
   -- truncated to a few hundred chars at the app layer.
   response_summary text,
@@ -98,7 +101,22 @@ CREATE TABLE IF NOT EXISTS public.policy_review_queue (
 COMMENT ON TABLE public.policy_review_queue IS
   '[P5-5] Aggregated HR review items derived from negative AI assistant feedback. Hard contract: HR is the only path that turns this into a policy_values change.';
 
--- One queue row per (company, question_hash, chunk_set). The generated
+-- Maintain chunk_ids_key from chunk_ids (replaces the GENERATED column above —
+-- array_to_string is not IMMUTABLE, so it can't live in a generated expression).
+CREATE OR REPLACE FUNCTION public.set_chunk_ids_key_review_queue()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.chunk_ids_key := array_to_string(NEW.chunk_ids, ',');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_policy_review_queue_chunk_ids_key ON public.policy_review_queue;
+CREATE TRIGGER trg_policy_review_queue_chunk_ids_key
+  BEFORE INSERT OR UPDATE ON public.policy_review_queue
+  FOR EACH ROW EXECUTE FUNCTION public.set_chunk_ids_key_review_queue();
+
+-- One queue row per (company, question_hash, chunk_set). The maintained
 -- chunk_ids_key keeps this constraint readable in Postgres.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_policy_review_queue_dedup
   ON public.policy_review_queue (company_id, question_hash, chunk_ids_key);
