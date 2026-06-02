@@ -25,22 +25,31 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================================
 -- REPLAY-SAFETY GUARD (drift entry 14 — baseline-collision reconciliation)
 -- ------------------------------------------------------------
--- companies / profiles / messages / policy_exceptions already exist from the
--- Feb-2026 baseline dump (20260221105601_remote_schema.sql) as TEXT-PK tables.
--- This redesign needs them as UUID-PK (its whole FK graph — 10 FKs to
--- profiles(id), 4 to companies(id), plus messages/policy_exceptions FKs —
--- depends on uuid PKs). On a fresh `supabase db reset` the old text-PK tables
--- survive to here, so the CREATE TABLE IF NOT EXISTS statements below silently
--- no-op against them and every uuid FK then fails on type mismatch.
+-- SIX tables already exist with an OLDER shape before this redesign recreates
+-- them, so its CREATE TABLE IF NOT EXISTS statements silently no-op and later
+-- references (uuid FKs / indexes on new columns) abort the whole replay (42703):
+--   * companies / profiles / messages / policy_exceptions — from the Feb-2026
+--     baseline dump (20260221105601_remote_schema.sql) as TEXT-PK tables; this
+--     redesign needs them UUID-PK (its FK graph — 10 FKs to profiles(id), 4 to
+--     companies(id), + messages/policy_exceptions FKs — depends on uuid PKs).
+--   * policy_benefits / vendors — from March migrations (20260301021000 /
+--     20260301012000) as a DIFFERENT, semantically-unrelated table sharing the
+--     name (uuid PK, but old columns). The redesign replaces them entirely.
 --
--- Fix: drop the OLD-SHAPE tables (guard keyed on id = 'text') so the CREATEs
--- below recreate them as uuid. The guard is true ONLY on a fresh replay — on
--- prod these columns are already uuid, so every DROP is skipped (verified
--- no-op; prod is never modified). Fresh-replay tables are empty (verified: no
--- inter-period or baseline INSERT into any of the four), so CASCADE loses no
--- data; it drops exactly the one inter-period FK employee_contacts.company_id
--- -> companies, which prod also lacks (it was dropped out-of-band when companies
--- went uuid). See audit/migration-drift-definitive-2026-06-02.md § entry 14.
+-- Fix: drop the OLD-SHAPE tables so the CREATEs below recreate the redesign
+-- shape. Each DROP is guarded by a discriminator that is true ONLY on a fresh
+-- replay; on prod every table is already the new shape, so every DROP is skipped
+-- (verified no-op; prod is never modified):
+--   * companies/profiles/messages/policy_exceptions — guard on id = 'text'.
+--   * policy_benefits — guard on absence of the redesign column policy_tier_id.
+--   * vendors          — guard on absence of the redesign column slug.
+-- Fresh-replay tables are empty (verified: no inter-period or baseline INSERT;
+-- vendors' May-18 March-shape seeds are superseded here exactly as on prod —
+-- prod's 8 vendor rows are an 8/8 exact match to this file's redesign seed).
+-- CASCADE blast radius at guard time is nil: the only inbound FKs (employee_
+-- contacts->companies; policy_exceptions->policy_benefits; company_vendors->
+-- vendors) are either dropped-and-recreated here too, or redesign-era and not
+-- yet created. See audit/migration-drift-definitive-2026-06-02.md § entry 14.
 -- ============================================================
 DO $$
 BEGIN
@@ -59,6 +68,19 @@ BEGIN
   IF (SELECT data_type FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = 'policy_exceptions' AND column_name = 'id') = 'text'
   THEN DROP TABLE IF EXISTS public.policy_exceptions CASCADE; END IF;
+
+  -- policy_benefits / vendors: same name, different (older) table. Discriminate
+  -- by absence of a redesign-only column; to_regclass guard avoids firing on a
+  -- fresh DB where the table does not exist yet.
+  IF to_regclass('public.policy_benefits') IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'policy_benefits' AND column_name = 'policy_tier_id')
+  THEN DROP TABLE IF EXISTS public.policy_benefits CASCADE; END IF;
+
+  IF to_regclass('public.vendors') IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'vendors' AND column_name = 'slug')
+  THEN DROP TABLE IF EXISTS public.vendors CASCADE; END IF;
 END $$;
 
 -- ============================================================
