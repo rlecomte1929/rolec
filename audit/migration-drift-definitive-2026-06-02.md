@@ -6,11 +6,13 @@
 
 | Category | Count | Severity |
 |----|----|----|
-| **Hard drift** — applied to prod, no real repo file | **6** | Action-required |
+| **Hard drift** — applied to prod, no real repo file | **3** | Action-required (was 6; entries 1/2/5 resolved by #176, merge `5a58bf0d`) |
 | **`_remote_stub` soft drift** — empty placeholder files paired by timestamp to prod migrations | **~80+** | **Structural — repo not replayable** |
 | **Reverse drift** — repo file exists, never applied to prod | **9** | Mixed (1 urgent landmine, rest cleanup) |
 
-**Headline:** The `_remote_stub` pattern means a fresh `supabase db reset` produces a schema that is **substantially different from prod**. The 6 hard-drift cases are not the main event — they are a small clean-up *of a much larger pattern*. See the structural-finding section below.
+**Headline:** The `_remote_stub` pattern means a fresh `supabase db reset` produces a schema that is **substantially different from prod**. The hard-drift cases are not the main event — they are a small clean-up *of a much larger pattern*. See the structural-finding section below.
+
+> **Update 2026-06-02:** Hard-drift entries **1, 2, and 5 are now resolved** — backfilled by PR #176 (merge `5a58bf0d78d795a3aeeefdd43d4516c5601c07a7`) via the combined idempotent migration `20260604100000_rce_policy_gaps_and_case_artefacts_with_service_role_hardening.sql`, applied to prod and verified (tables present, only `*_service_role_only` policies, no anon/authenticated grants, anon smoke = 406). Hard-drift count: **6 → 3**. Remaining: entries 3 (`public_agent_runs`), 4 (`enable_rls_tenant_tables`), 6 (`bucket_hardening_sec006`).
 
 ## Structural finding: the `_remote_stub` pattern
 
@@ -35,11 +37,11 @@ These stubs were committed as placeholders when the actual migrations were appli
 
 | # | Prod version (apply-time) | Migration name (prod) | What it does | Classification | Action |
 |---|----|----|----|----|----|
-| 1 | `20260529125415` | `rce_policy_gaps` | `CREATE TABLE rce.policy_gaps` (14 cols, 2 indexes incl. partial-unique, permissive RLS later hardened) | **C1: prod-spec adopt** | Bundle into #176 resolution PR |
-| 2 | `20260529125813` | `rce_case_artefacts` | `CREATE TABLE rce.case_artefacts` (13 cols, 2 unique constraints `*_one_per_source_doc` + `*_one_per_source_cost`, multi-condition CHECK, 2 indexes, permissive RLS later hardened) | **C1: prod-spec adopt** | Bundle into #176 resolution PR |
+| ~~1~~ | ~~`20260529125415`~~ | ~~`rce_policy_gaps`~~ | ~~`CREATE TABLE rce.policy_gaps`~~ | **✅ RESOLVED** | Backfilled by #176 (`5a58bf0d`) → `20260604100000_…service_role_hardening.sql` |
+| ~~2~~ | ~~`20260529125813`~~ | ~~`rce_case_artefacts`~~ | ~~`CREATE TABLE rce.case_artefacts`~~ | **✅ RESOLVED** | Backfilled by #176 (`5a58bf0d`) → same migration |
 | 3 | `20260529223952` | `public_agent_runs` | `CREATE TABLE IF NOT EXISTS public.agent_runs` (used by agent-run telemetry; already idempotent) | **C1: prod-spec adopt** | Standalone backfill PR (low priority — table already in use, idempotent on replay) |
 | 4 | `20260530095017` | `20260531010000_enable_rls_tenant_tables` | `ENABLE ROW LEVEL SECURITY` on 8 tenant tables (`employee_tasks`, `quote_requests`, `case_readiness*`, `readiness_templates*`) + policies | **C1: prod-spec adopt** | Standalone backfill PR (security-critical for replay correctness) |
-| 5 | `20260530111216` | `20260531020000_rce_service_role_only` | `DO $$` block — drops `<table>_permissive*` policies on every `rce.*` table, creates `<table>_service_role_only`, revokes from authenticated/public/anon, grants to service_role | **C1: prod-spec adopt** | Bundle into #176 resolution PR (this IS the root canonical policy for #176) |
+| ~~5~~ | ~~`20260530111216`~~ | ~~`20260531020000_rce_service_role_only`~~ | ~~`DO $$` block — service-role-only hardening for `rce.*`~~ | **✅ RESOLVED (for policy_gaps + case_artefacts)** | The `*_service_role_only` policies for these two tables are now in repo via #176 (`5a58bf0d`). The broader `DO $$` loop over *all* `rce.*` tables remains un-backfilled for other tables, but the canonical policy convention is now sourced in-repo. |
 | 6 | `20260530114300` | `bucket_hardening_sec006` | `UPDATE storage.buckets SET public = false, file_size_limit = 20971520, allowed_mime_types = …` for `hr-policies`, `form-templates`, etc. | **C1: prod-spec adopt** | Standalone backfill PR (security-critical) |
 
 ### Rename hypothesis (`enable_rls_tenant_tables` ↔ `rls_policy_hr_domain`) — DISPROVEN

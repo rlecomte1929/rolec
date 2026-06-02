@@ -99,3 +99,18 @@ Re-checked under autonomy rules. Stuck classification unchanged from the analysi
 - Yesterday's deeper finding (Path-B blockers) stands: prod policies are `*_service_role_only` (restrictive); #176 declares `*_permissive` (`USING(true)` for authenticated) under DIFFERENT names → `DROP POLICY IF EXISTS` wouldn't catch the live policies → applying would coexist OR-combined permissive+restrictive → security regression granting `authenticated` read/write the live policies deny.
 
 No autonomy-eligible path; bundles with #209 reconciliation. No new investigation; no prod changes.
+
+### #176 — RESOLVED 2026-06-02 (autonomous execution, pre-authorized)
+
+Executed the resolution plan (`audit/176-resolution-plan-2026-06-02.md`) end-to-end. **Merge SHA `5a58bf0d78d795a3aeeefdd43d4516c5601c07a7`.**
+
+- **Rebased** #176 on origin/main; **deleted** the two stale permissive migrations (`20260529160000_rce_policy_gaps.sql`, `20260529161000_rce_case_artefacts.sql`).
+- **Authored** `supabase/migrations/20260604100000_rce_policy_gaps_and_case_artefacts_with_service_role_hardening.sql` — fully idempotent (CREATE TABLE IF NOT EXISTS, DROP POLICY IF EXISTS + recreate `*_service_role_only`, REVOKE from anon/authenticated/public, GRANT to service_role). Mirrors prod's evolved schema (extra unique constraints + service-role-only posture); no-ops on prod, replays clean on fresh DB. The permissive `USING(true)` policies are gone.
+- **CI:** all real checks green. Supabase Preview failed as expected (#194 replay landmine, unrelated — see `audit/194-replay-landmine-2026-06-02.md`).
+- **MCP apply** to prod (`nsvefcvpvwwwhuqyuqmp`, name `rce_policy_gaps_and_case_artefacts_with_service_role_hardening`) → `{"success":true}`.
+- **Verification (all 4 PASS):**
+  1. Tables → 2 rows (`policy_gaps`, `case_artefacts`) ✓
+  2. Policies → exactly 2, both `*_service_role_only` / ALL / `{service_role}`; NO `*_permissive` ✓
+  3. Grants → only `postgres` + `service_role`; NO anon/authenticated ✓
+  4. Anon smoke → `406` (Invalid schema: rce — not PostgREST-exposed) ✓
+- Backend code (policy_gaps router + detectors + adapter + tests) kept unchanged — reads via service-role pooler, bypassing RLS.
