@@ -17,6 +17,8 @@ export interface ProfileData {
   phone: string;
   bio: string;
   avatar_url: string | null;
+  /** Parker-I: opt-in BCP-47 target language for auto-translated journey content. '' = off. */
+  preferred_language: string;
 }
 
 export type NotificationType =
@@ -51,7 +53,21 @@ const DEFAULT_PROFILE: ProfileData = {
   phone: '+33 6 00 00 00 00',
   bio: 'HR specialist with 8 years of experience in global mobility and relocation programmes.',
   avatar_url: null,
+  preferred_language: '',
 };
+
+// Parker-I: opt-in languages for auto-translated journey content (BCP-47).
+const PREFERRED_LANGUAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'Off (show original)' },
+  { value: 'en', label: 'English' },
+  { value: 'de', label: 'German' },
+  { value: 'fr', label: 'French' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'it', label: 'Italian' },
+  { value: 'pt', label: 'Portuguese' },
+  { value: 'nl', label: 'Dutch' },
+  { value: 'pl', label: 'Polish' },
+];
 
 const DEFAULT_NOTIFS: NotificationPref[] = [
   { type: 'new_case_assigned', label: 'New case assigned', description: 'When a relocation case is assigned to you.', email: true, in_app: true },
@@ -199,6 +215,17 @@ function ProfileTab({ profile: initial, onSave }: ProfileTabProps) {
         </Field>
         <Field label="Phone">
           <input style={inputStyle} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} />
+        </Field>
+        <Field label="Preferred language">
+          <select
+            style={inputStyle}
+            value={form.preferred_language}
+            onChange={e => set('preferred_language', e.target.value)}
+          >
+            {PREFERRED_LANGUAGE_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </Field>
       </div>
 

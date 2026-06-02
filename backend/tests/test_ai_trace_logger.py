@@ -38,7 +38,12 @@ SESSION_ID = "sess-123"
 
 
 def make_tracer(**kwargs) -> TraceSession:
-    defaults = dict(session_id=SESSION_ID, query=RAW_QUERY, company_id=COMPANY_ID)
+    # feature_key is a required TraceSession arg (Parker Step G); supply a default so
+    # callers that don't care about unit-economics attribution still construct cleanly.
+    defaults = dict(
+        session_id=SESSION_ID, query=RAW_QUERY, company_id=COMPANY_ID,
+        feature_key="policy_assistant",
+    )
     defaults.update(kwargs)
     return TraceSession(**defaults)
 
@@ -163,7 +168,7 @@ def test_flush_emits_structured_log(caplog):
 
 def test_flush_log_does_not_contain_raw_query(caplog):
     query = "My secret salary question £££"
-    tracer = TraceSession(session_id=None, query=query, company_id=COMPANY_ID)
+    tracer = TraceSession(session_id=None, query=query, company_id=COMPANY_ID, feature_key="policy_assistant")
     tracer.record_step("validation", latency_ms=5, passed=True)
 
     with caplog.at_level(logging.INFO, logger="backend.app.services.ai_trace_logger"):
