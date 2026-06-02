@@ -4,7 +4,10 @@ import { Card } from '../components/antigravity';
 import { getNavRegistry } from '../navigation/registry';
 import { ROUTE_DEFS, routeKeys } from '../navigation/routes';
 
+const DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true';
+
 export const NavigationAudit: React.FC = () => {
+  if (!DEV_TOOLS) return null;
   const registry = getNavRegistry();
   const usedRouteKeys = new Set(registry.flatMap((page) => page.items.map((item) => item.routeKey)));
   const missingRoutes = registry.flatMap((page) =>
