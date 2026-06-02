@@ -114,3 +114,29 @@ Executed the resolution plan (`audit/176-resolution-plan-2026-06-02.md`) end-to-
   3. Grants → only `postgres` + `service_role`; NO anon/authenticated ✓
   4. Anon smoke → `406` (Invalid schema: rce — not PostgREST-exposed) ✓
 - Backend code (policy_gaps router + detectors + adapter + tests) kept unchanged — reads via service-role pooler, bypassing RLS.
+
+### #209 → #220 — RESOLVED 2026-06-02 (path (c), multi-session, MANDATED pause-points) — RUN COMPLETE
+
+Parker pipeline steps A–J are **live on `main`**. #209 (`audit/parker-integration`) reconciled via **path (c)** from `audit/pr-209-triage.md`: clean cherry-pick of the 58 additive work commits onto a fresh branch off current main, skipping the 10 merge commits. Landed as successor **PR #220, merge SHA `63daf587`**. Queue effect: **#209 stream drains to 0 open** (full RESOLVED write-up appended to `audit/pr-209-triage.md`).
+
+- **Cherry-pick:** 58/58 commits applied, 0 skipped, 11 mechanical conflict resolutions (additive router/dep unions + 1 Parker-internal D×G union), **0 semantic conflicts** — the recon hypothesis held.
+- **Code sanity:** `from backend.main import app` → **629 routes**, all Parker prefixes registered in the **prod** entry-point (dual-layer rule PASS); frontend `tsc --noEmit` exit 0; `/health` 200×3 on the merge commit.
+- **Migrations applied one-at-a-time via MCP** (`nsvefcvpvwwwhuqyuqmp`, explicit GO per file, NO batching — same discipline that caught real divergence on #194/#176): **8 of 9 applied + verified** (`ml_models`, `benefit_optimizer`, `supplier_cluster_cache`, `prompt_registry`, `ai_human_feedback`, `ocr_shadow_comparison`, `conjoint`, `translation_cache`). All 11 Parker tables verified `rowsecurity=true` with exact declared policy counts; anon smoke 401/403 (406 for rce.*), never 200.
+
+**3 defects discovered (all one root class — Parker assumed migrations are the sole DDL authority, but a second runtime table-creation path interacts differently on Postgres):**
+1. **Mig 7 `ai_unit_economics` — DEFERRED, NOT applied.** `ALTER TABLE public.policy_assistant_traces …` against a table that **does not exist on prod and has no creation path** (`database.py:1186` returns before the SQLite-only `CREATE TABLE` scaffolding at line 2428; no migration creates it). Held as one txn → would fail `relation … does not exist`. Documented as **drift entry 11**. Only tracked open item from this run.
+2. **Mig 9 `translation_cache` — RESOLVED in-session (Option B).** Table was already present in a **degraded ORM shape** — `app/db.py:19 create_all()` won the boot race and created it from `models.py:400` before the migration ran; the migration's `IF NOT EXISTS` then no-op'd, leaving prod without RLS/CHECKs/correct types. Reconciled via atomic DROP+rebuild (0 rows, no inbound FKs verified first). Documented as **drift entry 12**.
+3. **Close-out observation:** Parker's convention is to enforce row-level invariants in the **service layer, not DB CHECK constraints** — consistent across all 8 applied migrations **except migration 9** (the only one with `domain`/`provider` CHECKs). Worth a convention-alignment note for future Parker work, not a blocker.
+
+**Queue status: 0 actionable.** The sole tracked carry-forward is the mig-7 prerequisite (author a real `policy_assistant_traces` table migration + re-apply mig 7 — ~30 min, next session). The autonomous/mandated-pause multi-session Parker run is **COMPLETE**.
+
+### Drift entry 10 (DE dossier seed) → FIX AUTHORED in #221, BLOCKED behind entry 13 — 2026-06-02
+
+Task: turn Supabase Preview GREEN by fixing the DE dossier seed (`20260507150000_de_dossier_questions.sql`), reverse-drift entry 10. Chose **Option D** (no-op broken file + replay-safe re-seed). Opened **PR #221** (`fix/de-dossier-replay`): no-op'd the broken file + new `20260604300000_de_dossier_questions_corrected.sql` (9 DE rows, real columns, `ON CONFLICT … DO NOTHING`).
+
+- **Pre-authorship verification (both clean):** category→domain is a 1:1 against prod's 9 DE rows; natural key `(destination_country, question_key, version)` confirmed for ON CONFLICT.
+- **Standard CI:** all green (Backend tests incl. dual-layer guard, FE/HR builds, TS/ESLint, route-auth audit, unit tests).
+- **Supabase Preview: still RED — but with a DIFFERENT error.** No longer the DE `column "destination" …`; now `column "case_id" does not exist` at `CREATE UNIQUE INDEX … idx_employee_profiles_case_employee` (`20260518120000`, May 18). **This is proof the DE fix WORKS** — the replay now walks past May 7 and dies at the next landmine downstream.
+- **Decision per run's tree:** "Preview RED for a DIFFERENT error → STOP, document as new drift entry, do NOT merge." → **#221 left OPEN, unmerged.** Logged the new landmine as **drift entry 13** (root cause: Feb 21 baseline `employee_profiles` has PK `assignment_id`/no `case_id`; mig A's `CREATE TABLE IF NOT EXISTS` no-ops against it then its `case_id` index fails; the fix migration B at `20260522170000` is 4 days too late in replay order). **Prod verified HEALTHY** (MCP read-only): current `employee_profiles` has `case_id` + index; `legacy_employee_profiles` exists → B's rename ran on prod. Only repo replay is broken. **NO MCP apply performed** (nothing to apply; #221 unmerged).
+- **Reframe surfaced:** Supabase Preview red is a **chain** of replay landmines (10 → 13 → …), not one bug. Each fix reveals the next. Preview goes green only when the whole chain is drained. Entry 13 (and any successors it reveals) needs separate authorization before #221 can merge.
+- **Methodology note (carried):** always verify prod schema BEFORE assuming what an out-of-band path did — and expect replay fixes to surface the *next* landmine rather than turning Preview green on the first try.
