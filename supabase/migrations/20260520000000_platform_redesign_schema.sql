@@ -830,16 +830,29 @@ ALTER TABLE public.messages          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.case_discovery_runs ENABLE ROW LEVEL SECURITY;
 
--- Helper: get current user's company_id and role
--- Use these functions in policies to avoid repeated subqueries.
-CREATE OR REPLACE FUNCTION auth.my_company_id()
-RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS $$
+-- ============================================================
+-- IMPORTANT — DO NOT REFERENCE auth.my_company_id() OR auth.my_role()
+-- IN NEW MIGRATIONS. Always use public.my_company_id() / public.my_role().
+--
+-- Why: the Supabase auth schema is managed; CREATE on auth is denied on
+-- branch/Preview DBs (SQLSTATE 42501). Prod has auth.my_* from the original
+-- out-of-band apply of this file; auth.my_* references will silently work on
+-- prod and fail every fresh replay. These helpers are defined in public so
+-- they create on any DB; prod's auth.my_* are left untouched (this migration
+-- is already applied on prod and is never re-applied). See drift inventory
+-- entry 14 + the Preview run on PR #224 (stmt 138).
+-- ============================================================
+-- Helper: get current user's company_id and role.
+-- Used in policies to avoid repeated subqueries. SECURITY DEFINER with a
+-- pinned search_path (standard hardening for SECURITY DEFINER functions).
+CREATE OR REPLACE FUNCTION public.my_company_id()
+RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT company_id FROM public.profiles
   WHERE id = (SELECT auth.uid())
 $$;
 
-CREATE OR REPLACE FUNCTION auth.my_role()
-RETURNS text LANGUAGE sql STABLE SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION public.my_role()
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT role FROM public.profiles
   WHERE id = (SELECT auth.uid())
 $$;
@@ -851,22 +864,22 @@ CREATE POLICY profiles_select_own ON public.profiles
 
 CREATE POLICY profiles_select_hr ON public.profiles
   FOR SELECT USING (
-    auth.my_role() IN ('hr', 'admin')
-    AND company_id = auth.my_company_id()
+    public.my_role() IN ('hr', 'admin')
+    AND company_id = public.my_company_id()
   );
 
 CREATE POLICY profiles_select_admin ON public.profiles
-  FOR SELECT USING (auth.my_role() = 'admin');
+  FOR SELECT USING (public.my_role() = 'admin');
 
 CREATE POLICY profiles_update_own ON public.profiles
   FOR UPDATE USING (id = (SELECT auth.uid()));
 
 -- --- COMPANIES ---
 CREATE POLICY companies_select_members ON public.companies
-  FOR SELECT USING (id = auth.my_company_id());
+  FOR SELECT USING (id = public.my_company_id());
 
 CREATE POLICY companies_all_admin ON public.companies
-  FOR ALL USING (auth.my_role() = 'admin');
+  FOR ALL USING (public.my_role() = 'admin');
 
 -- --- COUNTRIES & DISCOVERY SOURCES (public read) ---
 CREATE POLICY countries_public_read ON public.countries
@@ -876,7 +889,7 @@ CREATE POLICY discovery_sources_public_read ON public.discovery_sources
   FOR SELECT USING (is_active = true);
 
 CREATE POLICY discovery_sources_admin_write ON public.discovery_sources
-  FOR ALL USING (auth.my_role() = 'admin');
+  FOR ALL USING (public.my_role() = 'admin');
 
 -- --- CASES ---
 CREATE POLICY cases_select_employee ON public.cases
@@ -884,24 +897,24 @@ CREATE POLICY cases_select_employee ON public.cases
 
 CREATE POLICY cases_select_hr ON public.cases
   FOR SELECT USING (
-    auth.my_role() IN ('hr', 'admin')
-    AND company_id = auth.my_company_id()
+    public.my_role() IN ('hr', 'admin')
+    AND company_id = public.my_company_id()
   );
 
 CREATE POLICY cases_insert_hr ON public.cases
   FOR INSERT WITH CHECK (
-    auth.my_role() IN ('hr', 'admin')
-    AND company_id = auth.my_company_id()
+    public.my_role() IN ('hr', 'admin')
+    AND company_id = public.my_company_id()
   );
 
 CREATE POLICY cases_update_hr ON public.cases
   FOR UPDATE USING (
-    auth.my_role() IN ('hr', 'admin')
-    AND company_id = auth.my_company_id()
+    public.my_role() IN ('hr', 'admin')
+    AND company_id = public.my_company_id()
   );
 
 CREATE POLICY cases_all_admin ON public.cases
-  FOR ALL USING (auth.my_role() = 'admin');
+  FOR ALL USING (public.my_role() = 'admin');
 
 -- --- CHILD TABLES: share case-level access ---
 -- Helper macro pattern: policies on child tables join through cases.
@@ -912,14 +925,14 @@ CREATE POLICY case_dependents_via_case ON public.case_dependents FOR ALL
   USING (case_id IN (
     SELECT id FROM public.cases
     WHERE employee_id = (SELECT auth.uid())
-       OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY requirements_via_case ON public.requirements FOR ALL
   USING (case_id IN (
     SELECT id FROM public.cases
     WHERE employee_id = (SELECT auth.uid())
-       OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY requirement_deps_via_req ON public.requirement_deps FOR ALL
@@ -928,7 +941,7 @@ CREATE POLICY requirement_deps_via_req ON public.requirement_deps FOR ALL
     WHERE case_id IN (
       SELECT id FROM public.cases
       WHERE employee_id = (SELECT auth.uid())
-         OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+         OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
     )
   ));
 
@@ -936,35 +949,35 @@ CREATE POLICY roadmap_tracks_via_case ON public.roadmap_tracks FOR ALL
   USING (case_id IN (
     SELECT id FROM public.cases
     WHERE employee_id = (SELECT auth.uid())
-       OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY roadmap_steps_via_case ON public.roadmap_steps FOR ALL
   USING (case_id IN (
     SELECT id FROM public.cases
     WHERE employee_id = (SELECT auth.uid())
-       OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY documents_via_case ON public.documents FOR ALL
   USING (case_id IN (
     SELECT id FROM public.cases
     WHERE employee_id = (SELECT auth.uid())
-       OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY forms_via_case ON public.forms FOR ALL
   USING (case_id IN (
     SELECT id FROM public.cases
     WHERE employee_id = (SELECT auth.uid())
-       OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY threads_via_case ON public.threads FOR ALL
   USING (case_id IN (
     SELECT id FROM public.cases
     WHERE employee_id = (SELECT auth.uid())
-       OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY thread_participants_via_thread ON public.thread_participants FOR ALL
@@ -972,7 +985,7 @@ CREATE POLICY thread_participants_via_thread ON public.thread_participants FOR A
     SELECT t.id FROM public.threads t
     JOIN public.cases c ON c.id = t.case_id
     WHERE c.employee_id = (SELECT auth.uid())
-       OR (c.company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (c.company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY messages_via_thread ON public.messages FOR ALL
@@ -980,7 +993,7 @@ CREATE POLICY messages_via_thread ON public.messages FOR ALL
     SELECT t.id FROM public.threads t
     JOIN public.cases c ON c.id = t.case_id
     WHERE c.employee_id = (SELECT auth.uid())
-       OR (c.company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (c.company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY message_attachments_via_msg ON public.message_attachments FOR ALL
@@ -989,37 +1002,37 @@ CREATE POLICY message_attachments_via_msg ON public.message_attachments FOR ALL
     JOIN public.threads t ON t.id = m.thread_id
     JOIN public.cases c ON c.id = t.case_id
     WHERE c.employee_id = (SELECT auth.uid())
-       OR (c.company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (c.company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY case_discovery_runs_via_case ON public.case_discovery_runs FOR ALL
   USING (case_id IN (
     SELECT id FROM public.cases
     WHERE employee_id = (SELECT auth.uid())
-       OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 CREATE POLICY policy_exceptions_via_case ON public.policy_exceptions FOR ALL
   USING (case_id IN (
     SELECT id FROM public.cases
     WHERE employee_id = (SELECT auth.uid())
-       OR (company_id = auth.my_company_id() AND auth.my_role() IN ('hr','admin'))
+       OR (company_id = public.my_company_id() AND public.my_role() IN ('hr','admin'))
   ));
 
 -- --- POLICY TIERS & BENEFITS ---
 CREATE POLICY policy_tiers_read_company ON public.policy_tiers
-  FOR SELECT USING (company_id = auth.my_company_id());
+  FOR SELECT USING (company_id = public.my_company_id());
 
 CREATE POLICY policy_tiers_write_hr ON public.policy_tiers
   FOR ALL USING (
-    company_id = auth.my_company_id()
-    AND auth.my_role() IN ('hr','admin')
+    company_id = public.my_company_id()
+    AND public.my_role() IN ('hr','admin')
   );
 
 CREATE POLICY policy_benefits_via_tier ON public.policy_benefits FOR ALL
   USING (policy_tier_id IN (
     SELECT id FROM public.policy_tiers
-    WHERE company_id = auth.my_company_id()
+    WHERE company_id = public.my_company_id()
   ));
 
 -- --- VENDORS ---
@@ -1027,12 +1040,12 @@ CREATE POLICY vendors_public_read ON public.vendors
   FOR SELECT USING (is_active = true);
 
 CREATE POLICY vendors_admin_write ON public.vendors
-  FOR ALL USING (auth.my_role() = 'admin');
+  FOR ALL USING (public.my_role() = 'admin');
 
 CREATE POLICY company_vendors_hr ON public.company_vendors FOR ALL
   USING (
-    company_id = auth.my_company_id()
-    AND auth.my_role() IN ('hr','admin')
+    company_id = public.my_company_id()
+    AND public.my_role() IN ('hr','admin')
   );
 
 -- ============================================================
