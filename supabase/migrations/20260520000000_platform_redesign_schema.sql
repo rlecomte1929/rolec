@@ -23,6 +23,45 @@ CREATE EXTENSION IF NOT EXISTS moddatetime;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================
+-- REPLAY-SAFETY GUARD (drift entry 14 — baseline-collision reconciliation)
+-- ------------------------------------------------------------
+-- companies / profiles / messages / policy_exceptions already exist from the
+-- Feb-2026 baseline dump (20260221105601_remote_schema.sql) as TEXT-PK tables.
+-- This redesign needs them as UUID-PK (its whole FK graph — 10 FKs to
+-- profiles(id), 4 to companies(id), plus messages/policy_exceptions FKs —
+-- depends on uuid PKs). On a fresh `supabase db reset` the old text-PK tables
+-- survive to here, so the CREATE TABLE IF NOT EXISTS statements below silently
+-- no-op against them and every uuid FK then fails on type mismatch.
+--
+-- Fix: drop the OLD-SHAPE tables (guard keyed on id = 'text') so the CREATEs
+-- below recreate them as uuid. The guard is true ONLY on a fresh replay — on
+-- prod these columns are already uuid, so every DROP is skipped (verified
+-- no-op; prod is never modified). Fresh-replay tables are empty (verified: no
+-- inter-period or baseline INSERT into any of the four), so CASCADE loses no
+-- data; it drops exactly the one inter-period FK employee_contacts.company_id
+-- -> companies, which prod also lacks (it was dropped out-of-band when companies
+-- went uuid). See audit/migration-drift-definitive-2026-06-02.md § entry 14.
+-- ============================================================
+DO $$
+BEGIN
+  IF (SELECT data_type FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'companies' AND column_name = 'id') = 'text'
+  THEN DROP TABLE IF EXISTS public.companies CASCADE; END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'id') = 'text'
+  THEN DROP TABLE IF EXISTS public.profiles CASCADE; END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'messages' AND column_name = 'id') = 'text'
+  THEN DROP TABLE IF EXISTS public.messages CASCADE; END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'policy_exceptions' AND column_name = 'id') = 'text'
+  THEN DROP TABLE IF EXISTS public.policy_exceptions CASCADE; END IF;
+END $$;
+
+-- ============================================================
 -- SECTION 1: IDENTITY & TENANCY
 -- ============================================================
 
