@@ -674,11 +674,11 @@ app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 �
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
-# [AUDIT-C2.3 Month-1] policy_publish_router → moved to backend/app/main.py
-# [AUDIT-C2.3 Month-1] policy_summary_router → moved to backend/app/main.py
-# [AUDIT-C2.3 Month-1] policy_feedback_router → moved to backend/app/main.py
+app.include_router(policy_publish_router.router)  # [AUDIT-C2.3 restore] app/main.py not mounted in prod — must register here
+app.include_router(policy_summary_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(policy_feedback_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(crons_router.router)  # [P4-4] cron endpoints
-# [AUDIT-C2.3 Month-1] exception_requests_router → moved to backend/app/main.py
+app.include_router(exception_requests_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
 app.include_router(hr_catalog_router.router)  # [AUDIT-C2.3] re-added — vendor curation, notification-counts (B16)
@@ -697,7 +697,7 @@ app.include_router(immigration_status_router.router)  # [AUDIT-B9-imm-6] 4/5 —
 app.include_router(immigration_gdpr_router.router)  # [AUDIT-B9-imm-6] 5/5 — GDPR subject-rights stubs (2 handlers)
 app.include_router(analytics_router.router)
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
-# [AUDIT-C2.3 Month-1] mobility_context_router → moved to backend/app/main.py
+app.include_router(mobility_context_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(admin_mobility_router.router)
 app.include_router(admin_router.router)
 app.include_router(admin_resources_router.router, prefix="/api/admin")
@@ -712,17 +712,17 @@ app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_collaboration_router.router, prefix="/api/admin")
 app.include_router(admin_prospects_router.router, prefix="/api/admin")
 app.include_router(admin_form_templates_router.router, prefix="/api/admin")
-# [AUDIT-C2.3 Month-1] admin_recommendations_debug_router → moved to backend/app/main.py
-# [AUDIT-C2.3 Month-1] policy_canonical_router.admin_router → moved to backend/app/main.py
-# [AUDIT-C2.3 Month-1] policy_canonical_router.read_router → moved to backend/app/main.py
-# [AUDIT-C2.3 Month-1] policy_templates_router → moved to backend/app/main.py
+app.include_router(admin_recommendations_debug_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
+app.include_router(policy_canonical_router.admin_router, prefix="/api/admin")  # [AUDIT-C2.3 restore]
+app.include_router(policy_canonical_router.read_router, prefix="/api")  # [AUDIT-C2.3 restore]
+app.include_router(policy_templates_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(suppliers_router.router)
 app.include_router(resources_router.router)
 app.include_router(hr_resources_router.router)
-# [AUDIT-C2.3 Month-1] recommendations_router → moved to backend/app/main.py
-# [AUDIT-C2.3 Month-1] relocation_router.router → moved to backend/app/main.py
-# [AUDIT-C2.3 Month-1] relocation_router.api_router → moved to backend/app/main.py
-# [AUDIT-C2.3 Month-1] relocation_classify_router → moved to backend/app/main.py
+app.include_router(recommendations_router)  # [AUDIT-C2.3 restore]
+app.include_router(relocation_router.router)  # [AUDIT-C2.3 restore]
+app.include_router(relocation_router.api_router)  # [AUDIT-C2.3 restore]
+app.include_router(relocation_classify_router.router)  # [AUDIT-C2.3 restore]
 
 # B21-CORS: Catch-all OPTIONS handler to ensure preflight requests always return 200
 # with correct CORS headers. CORSMiddleware should intercept preflights first, but in
@@ -13665,15 +13665,15 @@ app.include_router(bamboohr_router.router)
 
 # ── Gap Analysis — new routers (May 2026 design sprint) ──────────────────────
 # GAP 1: Rich relocation preference profile (housing prefs, household, pets, FX)
-# [AUDIT-C2.3 Month-1] relocation_profile_router → moved to backend/app/main.py
+app.include_router(relocation_profile_router.router)  # [AUDIT-C2.3 restore]
 # GAP 6: Pet & breed restriction rules (server-side, replaces client hardcode)
 app.include_router(rules_router.router)
 # GAP 8: Enriched service marketplace (policy coverage + preferred flag joined)
-# [AUDIT-C2.3 Month-1] marketplace_router → moved to backend/app/main.py
+app.include_router(marketplace_router.router)  # [AUDIT-C2.3 restore]
 # GAP 3: HR policy compliance matrix (cross-case heatmap for S5c)
-# [AUDIT-C2.3 Month-1] hr_analytics_router → moved to backend/app/main.py
+app.include_router(hr_analytics_router.router)  # [AUDIT-C2.3 restore]
 # GAP 4: Immigration advisor matching
-# [AUDIT-C2.3 Month-1] advisors_router → moved to backend/app/main.py
+app.include_router(advisors_router.router)  # [AUDIT-C2.3 restore]
 # GAP 10: Company branding config
 app.include_router(branding_router.router)
 # ─────────────────────────────────────────────────────────────────────────────
