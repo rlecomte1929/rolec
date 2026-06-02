@@ -113,6 +113,7 @@ def create_app() -> FastAPI:
 
     # ── Month-1 migration: HR Policy cluster ──────────────────────────────────
     app.include_router(policy_publish.router)
+    # C2-06-FOLLOWUP: GET /api/hr/cases/{id}/policy-gaps — read-only gap surface.
     app.include_router(policy_gaps.router)
     app.include_router(policy_summary.router)
     app.include_router(policy_feedback.router)
