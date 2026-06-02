@@ -34,6 +34,15 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- RESOLVED_BY DESIGN NOTE
+-- The resolved_by column stores public.users.id (text, uuid-format) sourced from
+-- get_current_user → db.get_user_by_token (legacy ReloPass auth path). This is the
+-- SAME value rce.corrections.corrected_by stores — and that sibling has no FK to
+-- auth.users for exactly this reason (the legacy public.users.id isn't an
+-- auth.users row). Match the sibling convention: uuid type with no FK constraint.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Table
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS rce.contradictions (
@@ -70,11 +79,9 @@ CREATE TABLE IF NOT EXISTS rce.contradictions (
   -- not record a source.
   detected_by          TEXT,
   resolved_at          TIMESTAMPTZ,
-  -- resolved_by UUID FK to auth.users(id): #189 binds `:hr_user_id = hr_user.id`,
-  -- which the resolve handler derives from JWT auth (= auth.uid()). Nullable until
-  -- resolution. ⚠️ Reviewer: confirm hr_user.id is the auth.users uuid (not the
-  -- legacy public.users.id) before prod apply — if it's the legacy id, drop the FK.
-  resolved_by          UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  resolved_by          UUID,   -- matches rce.corrections.corrected_by (uuid, no FK); value is
+                               -- public.users.id (text, uuid-format) via hr_user.get('id'). No FK
+                               -- to auth.users — a legacy public.users.id isn't an auth.users row.
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
