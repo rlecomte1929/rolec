@@ -29,8 +29,20 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- ---------------------------------------------------------------------------
 -- 1. employee_profiles
 --    One record per case (not per employee — fresh consent required each time).
+--
+--    REPLAY-SAFETY NO-OP (drift entry 13) — block disabled below.
+--    On a fresh `supabase db reset` employee_profiles already exists from the
+--    Feb-2026 baseline (20260221105601_remote_schema.sql: assignment_id PK,
+--    NO case_id/employee_id), so the original CREATE TABLE IF NOT EXISTS silently
+--    no-ops and the case_id index + RLS policies abort (SQLSTATE 42703). The
+--    whole block — plus the data_access_log_employee_select policy further down
+--    that reads employee_profiles(id, employee_id) — is therefore disabled here
+--    and rebuilt, prod-faithfully and idempotently, by
+--    20260604400000_employee_profiles_replay_safe.sql. This migration already
+--    applied on prod; disabling the block changes nothing there.
 -- ---------------------------------------------------------------------------
 
+/* -- DISABLED (drift entry 13): superseded by 20260604400000_employee_profiles_replay_safe.sql
 CREATE TABLE IF NOT EXISTS public.employee_profiles (
   id                    TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   case_id               TEXT NOT NULL,
@@ -164,6 +176,7 @@ DROP POLICY IF EXISTS employee_profiles_service_role ON public.employee_profiles
 CREATE POLICY employee_profiles_service_role
   ON public.employee_profiles FOR ALL TO service_role
   USING (true) WITH CHECK (true);
+*/ -- END DISABLED employee_profiles block (drift entry 13)
 
 -- ---------------------------------------------------------------------------
 -- 2. immigration_requirements
@@ -519,7 +532,13 @@ CREATE POLICY data_access_log_insert
   ON public.data_access_log FOR INSERT TO authenticated
   WITH CHECK (true);
 
--- Employees can read their own access log (for the data export endpoint)
+-- Employees can read their own access log (for the data export endpoint).
+-- REPLAY-SAFETY NO-OP (drift entry 13): this policy reads the NEW-shape
+-- employee_profiles(id, employee_id), which does not exist on a fresh replay
+-- until 20260604400000_employee_profiles_replay_safe.sql (the Feb-2026 baseline
+-- table has neither column). Disabled here and recreated there, after the new
+-- shape lands. On prod the policy already exists; the rebuild is idempotent.
+/* -- DISABLED (drift entry 13): recreated by 20260604400000_employee_profiles_replay_safe.sql
 DROP POLICY IF EXISTS data_access_log_employee_select ON public.data_access_log;
 CREATE POLICY data_access_log_employee_select
   ON public.data_access_log FOR SELECT TO authenticated
@@ -530,6 +549,7 @@ CREATE POLICY data_access_log_employee_select
         AND ep.employee_id = auth.uid()::text
     )
   );
+*/ -- END DISABLED data_access_log_employee_select (drift entry 13)
 
 -- HR can read access log for their cases
 DROP POLICY IF EXISTS data_access_log_hr_select ON public.data_access_log;
