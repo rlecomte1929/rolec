@@ -189,6 +189,7 @@ from .app.routers import marketplace as marketplace_router
 from .app.routers import hr_analytics as hr_analytics_router
 from .app.routers import advisors as advisors_router
 from .app.routers import branding as branding_router
+from .app.routers import specialist_review as specialist_review_router  # [P1-02c] AI roadmap specialist review
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -587,6 +588,7 @@ app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 �
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
+app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 # [AUDIT-C2.3 Month-1] policy_publish_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_summary_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_feedback_router → moved to backend/app/main.py
