@@ -395,3 +395,26 @@ class QueryAuditLog(Base):
     retrieved_chunk_ids_json = Column(Text, nullable=False, default="[]")
     answer_preview = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
+class TranslationCache(Base):
+    """Parker-I neural translation cache — dedup by sha256 of (text, src, tgt, domain).
+
+    String id keeps the model portable to SQLite for tests (mirrors the rest of this
+    module). The Postgres table + RLS live in the migration; this ORM mapping is what
+    the service/repo and the test in-memory DB use.
+    """
+    __tablename__ = "translation_cache"
+
+    id = Column(String, primary_key=True, index=True)
+    source_hash = Column(String, nullable=False, unique=True, index=True)
+    source_text = Column(Text, nullable=False)
+    translated_text = Column(Text, nullable=False)
+    source_lang = Column(String, nullable=False)
+    target_lang = Column(String, nullable=False)
+    domain = Column(String, nullable=True)
+    provider = Column(String, nullable=False)
+    model_version = Column(String, nullable=True)
+    quality_score = Column(Numeric, nullable=True)
+    cost_usd = Column(Numeric, nullable=True)
+    translated_at = Column(DateTime, server_default=func.now(), nullable=False)

@@ -16,6 +16,7 @@ import { STARTER_TEMPLATE_OPTIONS, type StarterTemplateKey } from './starterPoli
 import { HrPolicyDraftReviewPanel } from './HrPolicyDraftReviewPanel';
 import { POLICY_TOPIC_LABELS, POLICY_TOPIC_ORDER } from './policyTopicLabels';
 import { formatPolicySourceCitation, getSourceProvenance } from './policySourceProvenance';
+import { fetchPolicyTldr } from '../../api/nlg';
 
 const VERSION_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
@@ -221,6 +222,17 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
 
   const sourceDocId = normalized?.version?.source_policy_document_id;
   const versionStatus = normalized?.version?.status || 'draft';
+
+  // Parker-J: extractive (TextRank) TL;DR of the source policy document. LLM-free.
+  const [policyTldr, setPolicyTldr] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sourceDocId) { setPolicyTldr(null); return; }
+    const ctrl = new AbortController();
+    fetchPolicyTldr(String(sourceDocId), ctrl.signal)
+      .then((res) => setPolicyTldr(res.summary))
+      .catch(() => setPolicyTldr(null));
+    return () => ctrl.abort();
+  }, [sourceDocId]);
 
   const getSourceLink = (objectType: string, objectId: string) => {
     const links = normalized?.source_links || [];
@@ -780,6 +792,17 @@ export const HrPolicyReviewWorkspace: React.FC<HrPolicyReviewWorkspaceProps> = (
           </div>
         )}
       </Card>
+
+      {/* Parker-J: extractive TL;DR of the uploaded source document */}
+      {policyTldr && (
+        <Card padding="lg" id="hr-policy-tldr">
+          <div className="text-sm font-semibold text-[#0b2b43] mb-1">TL;DR</div>
+          <div className="text-[11px] uppercase tracking-wide text-[#9ca3af] mb-2">
+            Extractive summary of the source document
+          </div>
+          <p className="text-sm leading-relaxed text-[#374151]">{policyTldr}</p>
+        </Card>
+      )}
 
       {/* Grouped policy matrix by topic */}
       {normalized?.version && (
