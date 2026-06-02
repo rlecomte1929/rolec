@@ -16,6 +16,7 @@ from .routers import (
     hr_analytics,
     hr_case_audit,
     hr_case_detail,
+    hr_case_resolve,
     hr_catalog,
     hr_coordination,
     immigration,
@@ -87,6 +88,8 @@ def create_app() -> FastAPI:
     app.include_router(hr_case_detail.router)
     # C1-16: GET /api/hr/cases/{id}/audit — chronological event timeline.
     app.include_router(hr_case_audit.router)
+    # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
+    app.include_router(hr_case_resolve.router)
 
     # ── Month-1 migration: Employee cluster ───────────────────────────────────
     # [AUDIT-B9-imm-6] immigration.router replaced by 5 modular sub-routers.
