@@ -8,7 +8,7 @@
 |----|----|----|
 | **Hard drift** — applied to prod, no real repo file | **3** | Action-required (was 6; entries 1/2/5 resolved by #176, merge `5a58bf0d`) |
 | **`_remote_stub` soft drift** — empty placeholder files paired by timestamp to prod migrations | **~80+** | **Structural — repo not replayable** |
-| **Reverse drift** — repo file exists, never applied to prod | **9** | Mixed (1 urgent landmine, rest cleanup) |
+| **Reverse drift** — repo file exists, never applied to prod | **10** | Mixed (entry 1 RESOLVED via #219; 1 newly-surfaced replay-blocking case — DE dossier seed, entry 10; rest cleanup) |
 
 **Headline:** The `_remote_stub` pattern means a fresh `supabase db reset` produces a schema that is **substantially different from prod**. The hard-drift cases are not the main event — they are a small clean-up *of a much larger pattern*. See the structural-finding section below.
 
@@ -59,7 +59,8 @@ The repo file `20260531010000_rls_policy_hr_domain.sql` matches the **second** p
 
 | # | Repo file | Repo timestamp | Severity | Classification | Action |
 |---|----|----|----|----|----|
-| 1 | `20260530000000_rls_error_tracking_harden.sql` | `20260530000000` | **🚨 URGENT — replay landmine** | **B-URGENT** | See `audit/194-replay-landmine-2026-06-02.md`. Fresh `supabase db reset` aborts here (`uuid = text` predicate). Prod is unaffected (fix-forward #212 already applied). |
+| ~~1~~ | ~~`20260530000000_rls_error_tracking_harden.sql`~~ | ~~`20260530000000`~~ | **✅ RESOLVED** | **B-URGENT (done)** | Replay landmine removed via #219 (merge `5e1790fbd773ea161835ece073d0fc2be58c9d81`): file no-op'd + replay-safe recreation at `20260604200000`. Preview remains red due to an earlier DE dossier seed drift (separate issue, file `20260507150000_de_dossier_questions.sql`, tracked as entry 10 below). |
+| **10** | `20260507150000_de_dossier_questions.sql` | `20260507150000` | **🚨 Replay-blocking** | **Schema drift** | New tracked item from #219 surfacing. `dossier_questions` table is created with columns (`destination_country`, `domain`, `options`, `is_mandatory`) at `20260228010000`, but the DE seed at `20260507150000` inserts using evolved columns (`destination`, `category`, `options_json`, `required`, `applies_if_json`) added to prod via out-of-band ALTER with no repo migration. Fresh replay aborts here (`column "destination" … does not exist`, SQLSTATE 42703). Same structural drift pattern as the `_remote_stub` cases. GB (`20260507120000`) + FR (`20260507130000`) seeds use the original column names and replay clean; divergence starts at DE. |
 | 2 | `20260529100000_rce_extraction_agents.sql` | `20260529100000` | Cleanup | **B1: orphan** | Verify never-applied via MCP; if orphan, drop in a cleanup PR. |
 | 3 | `*_policy_conflicts*` | — | Cleanup | **B1: orphan** | Verify, drop. |
 | 4 | `*_policy_chunks_vector_index*` | — | Cleanup | **B1: orphan** | Verify, drop. |

@@ -113,6 +113,16 @@ Replace `20260530000000_rls_error_tracking_harden.sql` content with `20260601130
 - MCP apply returns anything other than success: stop, surface. Prod is already correct so this should be a clean no-op; any error means the new migration's SQL has a real bug.
 - After apply, `SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename IN ('error_logs','error_tickets')` returns ≠ 3 (1 on error_logs admin_select, 2 on error_tickets admin_select+admin_update): stop, surface.
 
+## Status 2026-06-02 — RESOLVED (option b+), premise corrected
+
+**Resolved via PR #219, merge SHA `5e1790fbd773ea161835ece073d0fc2be58c9d81`.** Executed option (b+): no-op'd the broken `20260530000000_rls_error_tracking_harden.sql` (documentary stub) and added `20260604200000_rls_error_tracking_replay_safe.sql` recreating the 3 admin policies with the canonical `profiles.id::uuid = auth.uid()` cast, copied byte-for-byte from #212. MCP `apply_migration` (name `rls_error_tracking_replay_safe`) returned `{"success":true}` — a true no-op on prod. Verification: pg_policies count = 3; all admin-only (`profiles.role='ADMIN'`); `profiles.id` is uuid so the stored qual normalizes to `profiles.id = auth.uid()` (uuid=uuid, the `::uuid` cast is redundant and dropped — NOT the broken `auth.uid()::text` form); anon smoke on `/rest/v1/error_logs` + `/rest/v1/error_tickets` → 401.
+
+**Premise correction — Preview is NOT blocked by #194.** Evidence: PR #219 (the fix for #194) still produced a **failed** Supabase Preview because replay dies at `supabase/migrations/20260507150000_de_dossier_questions.sql` with `column "destination" of relation "dossier_questions" does not exist (SQLSTATE 42703)` — a separate, **earlier** drift case (timestamp 23 days before the #194 file). Fixing #194 removes a *later* replay landmine but does **not** green Preview by itself. The DE dossier seed drift is now tracked as a new reverse-drift entry in `audit/migration-drift-definitive-2026-06-02.md`.
+
+**Re-confirmation of original sections:**
+- "Why prod is not on fire" + "Severity: Medium" — **still accurate.** Prod was protected via #212; the landmine only ever blocked fresh replay.
+- "Why it slipped CI" — **PARTIAL.** The CI-gap framing (no job applies pending migration SQL against a real DB) is correct and current. But the "Supabase Preview is mute on this" implication was wrong: Preview *was* failing for two days straight — just on the earlier DE dossier file, not on `20260530000000`. So Preview was never silent; it was failing upstream of where we were looking.
+
 ## Open question for Romain
 
 The repo has no documented "migrations are append-only" rule (CLAUDE.md doesn't speak to it). Decide whether option (b+)'s "no-op the body of the historical broken migration" amendment is acceptable per project convention, or whether to default to (b) and live with the replay landmine until the broader `_remote_stub` backfill addresses it.
