@@ -1,0 +1,32 @@
+# router_registration_allowlist.txt
+# Grandfathered modular-only routers — registered in backend/app/main.py but NOT
+# in backend/main.py (the prod entrypoint). Each is EITHER served via an alternate
+# route in backend/main.py (functionally fine) OR a latent 405 needing triage.
+# Per audit/dual-layer-mount-check-2026-06-01.md, most are SERVED_VIA_ALTERNATE;
+# a few (policy_summary, policy_feedback, relocation_classify) look truly dead, and
+# 4 (policy_templates, relocation api_router, exception_requests, advisors) NEED-DECISION.
+# This list should DRAIN over time, not grow. The guard fails on any NEW modular-only
+# router not listed here. One identity per line; '#' comments ignored.
+#
+# Seeded 2026-06-01 from current main @ a19291d7 (post-#213). TRIAGE each before draining.
+recommendations.admin_debug.router
+recommendations.router.router
+routers.ab_tests.router
+routers.advisors.router
+routers.exception_requests.router
+routers.hr_analytics.router
+routers.marketplace.router
+routers.mobility_context.router
+routers.pets.router
+routers.policy_canonical.admin_router
+routers.policy_canonical.read_router
+routers.policy_feedback.router
+routers.policy_gaps.router
+routers.policy_publish.router
+routers.policy_summary.router
+routers.policy_templates.router
+routers.relocation_profile.router
+routers.support.router
+routes.relocation.api_router
+routes.relocation.router
+routes.relocation_classify.router
