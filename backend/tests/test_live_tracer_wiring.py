@@ -110,3 +110,90 @@ def test_answer_policy_question_trace_failure_is_swallowed(monkeypatch, _rag_har
     assert result["answer_kind"] == "answer"
     assert "USD 4,500" in result["answer_text"]
     assert fake.rows == []
+
+
+import types  # noqa: E402
+
+from backend.app.services import llm_policy_extractor  # noqa: E402
+from backend.app.services import policy_extractor  # noqa: E402
+
+
+def _fake_anthropic_module(*, tool_input, input_tokens=1200, output_tokens=300):
+    """Build a stand-in `anthropic` module whose Anthropic().messages.create()
+    returns a Message with one tool_use block and a usage object."""
+    block = types.SimpleNamespace(type="tool_use", input=tool_input)
+    message = types.SimpleNamespace(
+        content=[block],
+        usage=types.SimpleNamespace(input_tokens=input_tokens, output_tokens=output_tokens),
+    )
+
+    class _Messages:
+        def create(self, **kwargs):
+            return message
+
+    class _Anthropic:
+        def __init__(self, **kwargs):
+            self.messages = _Messages()
+
+    return types.SimpleNamespace(Anthropic=_Anthropic)
+
+
+_TOOL_INPUT = {
+    "policy_meta": {"title": "Acme Relocation Policy", "version": "2.3",
+                    "effective_date": "2026-01-01"},
+    "benefits": [
+        {"service_category": "housing", "benefit_key": "temporary_housing",
+         "benefit_label": "Temporary housing", "confidence": 0.9},
+    ],
+}
+
+
+def test_extract_policy_with_llm_writes_trace(monkeypatch):
+    fake = _FakeTraceDB()
+    monkeypatch.setattr(database, "db", fake)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-noop")
+    monkeypatch.setitem(sys.modules, "anthropic",
+                        _fake_anthropic_module(tool_input=_TOOL_INPUT,
+                                               input_tokens=1200, output_tokens=300))
+
+    result = llm_policy_extractor.extract_policy_with_llm(
+        ["Acme Corp Relocation Policy v2.3", "6.1 Temporary housing — 60 days."],
+        company_id="acme",
+    )
+
+    assert result is not None and result["extracted_by"] == "ai"
+    assert len(fake.rows) == 1
+    row = fake.rows[0]
+    assert row["feature_key"] == "policy_extraction"
+    assert row["customer_id"] == "acme"
+    assert row["tokens_in"] == 1200
+    assert row["tokens_out"] == 300
+    assert row["co2e_grams_estimated"] > 0.0
+
+
+def test_extract_policy_company_id_threads_through(monkeypatch):
+    fake = _FakeTraceDB()
+    monkeypatch.setattr(database, "db", fake)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-noop")
+    monkeypatch.setitem(sys.modules, "anthropic",
+                        _fake_anthropic_module(tool_input=_TOOL_INPUT))
+    monkeypatch.setattr(policy_extractor, "_parse_lines_from_bytes",
+                        lambda data, ftype: ["6.1 Temporary housing — 60 days."])
+
+    policy_extractor.extract_policy_with_diff(b"unused", "docx", company_id="acme-co")
+
+    assert len(fake.rows) == 1
+    assert fake.rows[0]["customer_id"] == "acme-co"
+    assert fake.rows[0]["feature_key"] == "policy_extraction"
+
+
+def test_extract_fallback_paths_emit_no_trace(monkeypatch):
+    fake = _FakeTraceDB()
+    monkeypatch.setattr(database, "db", fake)
+    # No ANTHROPIC_API_KEY → regex fallback, no LLM call, no trace.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    assert llm_policy_extractor.extract_policy_with_llm(
+        ["6.1 Temporary housing — 60 days."], company_id="acme"
+    ) is None
+    assert fake.rows == []
