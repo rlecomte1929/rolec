@@ -4,18 +4,35 @@
 -- ─── 1. Widen the summary_type CHECK constraint ───────────────────────────────
 -- The original CHECK was created inline in 20260524000001_analytics_events_and_daily_summaries.sql
 -- PostgreSQL auto-names it daily_summaries_summary_type_check.
+--
+-- REPLAY-SAFE GUARD (2026-06-03):
+-- public.daily_summaries is created by 20260524000001_analytics_events_and_daily_summaries.sql,
+-- which sorts AFTER this file (20260523020000) in migration-replay order. On a fresh
+-- `supabase db reset` the table therefore does not yet exist when this runs, and the bare
+-- ALTER aborts the whole replay with ERROR 42P01 (relation "public.daily_summaries" does not
+-- exist). Guarding on to_regclass lets a clean replay walk past this migration while still
+-- applying the widened constraint anywhere the table already exists. Prod-verified 2026-06-03:
+-- daily_summaries present with friction_analysis already in the CHECK (applied out-of-band),
+-- and this migration name is absent from supabase_migrations.schema_migrations — so the guard
+-- is a no-op on prod and an effect-preserving change. No migration inserts a friction_analysis
+-- row, so the value being absent on a throwaway shadow DB causes no downstream replay failure.
 
-ALTER TABLE public.daily_summaries
-  DROP CONSTRAINT IF EXISTS daily_summaries_summary_type_check;
+do $$
+begin
+  if to_regclass('public.daily_summaries') is not null then
+    alter table public.daily_summaries
+      drop constraint if exists daily_summaries_summary_type_check;
 
-ALTER TABLE public.daily_summaries
-  ADD CONSTRAINT daily_summaries_summary_type_check
-  CHECK (summary_type IN (
-    'user_behaviour',
-    'assignments',
-    'platform_health',
-    'friction_analysis'
-  ));
+    alter table public.daily_summaries
+      add constraint daily_summaries_summary_type_check
+      check (summary_type in (
+        'user_behaviour',
+        'assignments',
+        'platform_health',
+        'friction_analysis'
+      ));
+  end if;
+end $$;
 
 -- ─── 2. Register pg_cron job at 04:00 UTC ────────────────────────────────────
 
