@@ -4,8 +4,11 @@ import { AppShell } from '../components/AppShell';
 import { Card } from '../components/antigravity';
 import { getAuthItem } from '../utils/demo';
 
+const DEV_TOOLS = import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true';
+
 export const DebugAuth: React.FC = () => {
   const [lastError] = useState(() => localStorage.getItem('debug_last_auth_error') || 'none');
+  if (!DEV_TOOLS) return null;
   const token = getAuthItem('relopass_token');
   const userId = getAuthItem('relopass_user_id');
   const email = getAuthItem('relopass_email');
