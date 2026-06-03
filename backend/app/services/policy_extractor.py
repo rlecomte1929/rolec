@@ -350,7 +350,9 @@ def _merge_extractions(
     }
 
 
-def extract_policy_with_diff(file_bytes: bytes, file_type: str) -> Dict[str, Any]:
+def extract_policy_with_diff(
+    file_bytes: bytes, file_type: str, company_id: Optional[str] = None
+) -> Dict[str, Any]:
     """Run regex + LLM extraction over a policy document and return a 3-way diff.
 
     The shape is::
@@ -378,7 +380,7 @@ def extract_policy_with_diff(file_bytes: bytes, file_type: str) -> Dict[str, Any
         # of pulling the LLM module into modules that never need it.
         from .llm_policy_extractor import extract_policy_with_llm
 
-        llm_result = extract_policy_with_llm(lines)
+        llm_result = extract_policy_with_llm(lines, company_id=company_id)
         if llm_result is None:
             # The LLM module logs the specific reason; here we just record
             # that it was unavailable so the UI can decide whether to warn.

@@ -108,7 +108,7 @@ export const AdminOverviewPage: React.FC = () => {
         const employeesRes   = val(results[2]) as { employees?: unknown[] } | null;
         const assignmentsRes = val(results[3]) as { assignments?: unknown[] } | null;
         const policyRes      = val(results[4]) as { companies?: { policy_status?: string }[] } | null;
-        const reviewStatsRes = val(results[5]) as { by_status?: Record<string, number>; unassigned_count?: number } | null;
+        const reviewStatsRes = val(results[5]) as { open_items_count?: number; unassigned_count?: number } | null;
         const relocationsRes = val(results[6]) as { relocations?: unknown[] } | null;
         const suppliersRes   = val(results[7]) as { suppliers?: unknown[] } | null;
 
@@ -124,7 +124,12 @@ export const AdminOverviewPage: React.FC = () => {
           companiesWithPolicy: companiesWithPolicy || 38,
           activeSuppliers:    (suppliersRes?.suppliers ?? []).length || 7,
           // No `|| fallback`: 0 is a valid count and must match /admin/review-queue.
-          reviewOpen:         reviewStatsRes?.by_status?.open ?? 0,
+          // Use the aggregate `open_items_count` (whole open universe), NOT
+          // `by_status.open` — `by_status` is keyed by granular status and has
+          // no aggregate "open" bucket (it only counts literal status=="open"
+          // synthetic invites), which is why this tile disagreed with the
+          // review-queue page. `open_items_count` == that page's items.length.
+          reviewOpen:         reviewStatsRes?.open_items_count ?? 0,
           reviewUnassigned:   reviewStatsRes?.unassigned_count ?? 0,
           relocationsBlocked: (relocationsRes?.relocations ?? []).length || 0,
         });

@@ -194,7 +194,9 @@ SYSTEM_PROMPT = (
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
+def extract_policy_with_llm(
+    lines: List[str], company_id: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """Run LLM extraction over already-parsed document lines.
 
     Args:
@@ -364,6 +366,28 @@ def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
         error=None,
         benefits_count=len(result["benefits"]),
     )
+    # Unit-economics trace (Parker Step G). Only on the success path — the
+    # fallback/early-return paths above incur no LLM cost. Best-effort: never
+    # block extraction.
+    try:
+        from .ai_trace_logger import TraceSession
+
+        tracer = TraceSession(
+            session_id=None,
+            query="<policy extraction>",  # hashed to query_hash; carries no document content
+            company_id=company_id or "unknown",
+            feature_key="policy_extraction",
+        )
+        tracer.record_llm_call(
+            model=model,
+            input_tokens=int(getattr(message.usage, "input_tokens", 0) or 0),
+            output_tokens=int(getattr(message.usage, "output_tokens", 0) or 0),
+            latency_ms=call_latency_ms,
+        )
+        tracer.set_prompt_attribution(prompt_version_id, canary_arm)
+        tracer.flush()
+    except Exception:  # noqa: BLE001 — tracing must never break extraction
+        logger.debug("policy_extraction tracer flush failed", exc_info=True)
     return result
 
 

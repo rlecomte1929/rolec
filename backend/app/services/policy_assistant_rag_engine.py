@@ -30,6 +30,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from ...database import db
+from .ai_trace_logger import TraceSession
 from .policy_assistant_llm_client import (
     DEFAULT_MODEL,
     LlmClient,
@@ -213,104 +214,126 @@ def answer_policy_question(
     started = time.time()
     client = client or get_default_client()
 
-    # Prompt registry (Parker Step D). Best-effort: when the registry is absent
-    # or empty, `active` is None and we fall back to the module SYSTEM_PROMPT /
-    # DEFAULT_MODEL — behavior is identical to pre-registry.
-    active = None
+    tracer = TraceSession(
+        session_id=session_id, query=q, company_id=company_id,
+        feature_key="policy_assistant",
+    )
     try:
-        from .prompt_registry import get_active_prompt
-        active = get_active_prompt("policy_assistant_answer")
-    except Exception:  # noqa: BLE001 — registry must never block the assistant
+        # Prompt registry (Parker Step D). Best-effort: when the registry is absent
+        # or empty, `active` is None and we fall back to the module SYSTEM_PROMPT /
+        # DEFAULT_MODEL — behavior is identical to pre-registry.
         active = None
-    system_prompt = active.system_prompt if active is not None else SYSTEM_PROMPT
-    # Explicit caller model wins; else registry; else module default.
-    resolved_model = model or (active.model_name if active is not None else DEFAULT_MODEL)
-    prompt_version_id = active.id if active is not None else None
-    canary_arm = active.canary_arm if active is not None else None
+        try:
+            from .prompt_registry import get_active_prompt
+            active = get_active_prompt("policy_assistant_answer")
+        except Exception:  # noqa: BLE001 — registry must never block the assistant
+            active = None
+        system_prompt = active.system_prompt if active is not None else SYSTEM_PROMPT
+        # Explicit caller model wins; else registry; else module default.
+        resolved_model = model or (active.model_name if active is not None else DEFAULT_MODEL)
+        prompt_version_id = active.id if active is not None else None
+        canary_arm = active.canary_arm if active is not None else None
 
-    # 1. Retrieve top-K chunks for this company.
-    chunks = policy_chunk_retriever.retrieve(
-        company_id=company_id, query=q, top_k=top_k
-    )
-
-    # 2. Pull last 4 turns for this session (empty if first turn).
-    turns = session_memory.get_recent_turns(session_id) if session_id else []
-
-    # 3. Build prompt and call LLM (up to 2 attempts on validation).
-    user_message = _build_user_message(
-        company_label=company_label or "your company",
-        question=q,
-        chunks=chunks,
-        turns=turns,
-        employee_context=employee_context,
-    )
-    req = LlmRequest(system=system_prompt, user_message=user_message, model=resolved_model)
-
-    answer_text, usage, model_used, validation_error = _call_with_retry(client, req, chunks)
-
-    # 4. Determine answer kind + final text. If the second attempt still
-    # fails validation, fall back to the canonical refusal — better to
-    # surface a safe non-answer than a hallucinated or unverified one.
-    if validation_error:
-        log.warning(
-            "policy_assistant validation failed twice company=%s user=%s err=%s",
-            company_id, user_id, validation_error,
+        # 1. Retrieve top-K chunks for this company.
+        chunks = policy_chunk_retriever.retrieve(
+            company_id=company_id, query=q, top_k=top_k
         )
-        answer_text = REFUSAL_TEXT
-        answer_kind = "refusal_validation_failed"
-    elif answer_text.strip() == REFUSAL_TEXT:
-        answer_kind = "refusal_out_of_policy"
-    else:
-        answer_kind = "answer"
 
-    # 5. Resolve cited chunks back to full records so the UI can render
-    # clickable references.
-    cited_ids = extract_cited_chunk_ids(answer_text)
-    cited_chunks = [c for c in chunks if str(c.get("id")) in cited_ids]
+        # 2. Pull last 4 turns for this session (empty if first turn).
+        turns = session_memory.get_recent_turns(session_id) if session_id else []
 
-    cost = estimate_cost_usd(usage, model_used)
-    latency_ms = int((time.time() - started) * 1000)
-
-    # 6. Update session memory (only if a session_id was supplied —
-    # one-off questions don't pollute multi-turn flows).
-    if session_id:
-        session_memory.record_turn(session_id, q, answer_text)
-
-    # 7. Audit. Best-effort: never fail the call on audit failure.
-    audit_id: Optional[str] = None
-    try:
-        audit_id = _write_audit(
-            company_id=company_id,
-            user_id=user_id,
-            question_text=q,
-            answer_text=answer_text,
-            answer_kind=answer_kind,
-            cited_chunk_ids=cited_ids,
-            session_id=session_id,
+        # 3. Build prompt and call LLM (up to 2 attempts on validation).
+        user_message = _build_user_message(
+            company_label=company_label or "your company",
+            question=q,
+            chunks=chunks,
+            turns=turns,
+            employee_context=employee_context,
         )
-    except Exception:
-        log.exception("policy_assistant audit log write failed")
+        req = LlmRequest(system=system_prompt, user_message=user_message, model=resolved_model)
 
-    return {
-        "answer_text": answer_text,
-        "answer_kind": answer_kind,
-        "cited_chunks": [
-            {
-                "id": c.get("id"),
-                "source_type": c.get("source_type"),
-                "source_ref": c.get("source_ref"),
-                "chunk_text": c.get("chunk_text"),
-            }
-            for c in cited_chunks
-        ],
-        "model": model_used,
-        "usage": usage,
-        "cost_usd": round(cost, 6),
-        "latency_ms": latency_ms,
-        "audit_id": audit_id,
-        "prompt_version_id": prompt_version_id,
-        "canary_arm": canary_arm,
-    }
+        answer_text, usage, model_used, validation_error = _call_with_retry(client, req, chunks)
+
+        # 4. Determine answer kind + final text. If the second attempt still
+        # fails validation, fall back to the canonical refusal — better to
+        # surface a safe non-answer than a hallucinated or unverified one.
+        if validation_error:
+            log.warning(
+                "policy_assistant validation failed twice company=%s user=%s err=%s",
+                company_id, user_id, validation_error,
+            )
+            answer_text = REFUSAL_TEXT
+            answer_kind = "refusal_validation_failed"
+        elif answer_text.strip() == REFUSAL_TEXT:
+            answer_kind = "refusal_out_of_policy"
+        else:
+            answer_kind = "answer"
+
+        # 5. Resolve cited chunks back to full records so the UI can render
+        # clickable references.
+        cited_ids = extract_cited_chunk_ids(answer_text)
+        cited_chunks = [c for c in chunks if str(c.get("id")) in cited_ids]
+
+        cost = estimate_cost_usd(usage, model_used)
+        latency_ms = int((time.time() - started) * 1000)
+
+        # Unit-economics trace (Parker Step G). Best-effort: a recording error
+        # must never escape into the assistant return path. flush() runs in the
+        # finally below so it fires on every exit path.
+        try:
+            tracer.record_step("retrieval", latency_ms=0, chunk_count=len(chunks))
+            tracer.record_llm_call(
+                model=model_used,
+                input_tokens=int(usage.get("input_tokens") or 0),
+                output_tokens=int(usage.get("output_tokens") or 0),
+                latency_ms=latency_ms,
+            )
+            tracer.set_prompt_attribution(prompt_version_id, canary_arm)
+        except Exception:  # noqa: BLE001 — tracing must never break the assistant
+            log.debug("policy_assistant tracer record failed", exc_info=True)
+
+        # 6. Update session memory (only if a session_id was supplied —
+        # one-off questions don't pollute multi-turn flows).
+        if session_id:
+            session_memory.record_turn(session_id, q, answer_text)
+
+        # 7. Audit. Best-effort: never fail the call on audit failure.
+        audit_id: Optional[str] = None
+        try:
+            audit_id = _write_audit(
+                company_id=company_id,
+                user_id=user_id,
+                question_text=q,
+                answer_text=answer_text,
+                answer_kind=answer_kind,
+                cited_chunk_ids=cited_ids,
+                session_id=session_id,
+            )
+        except Exception:
+            log.exception("policy_assistant audit log write failed")
+
+        return {
+            "answer_text": answer_text,
+            "answer_kind": answer_kind,
+            "cited_chunks": [
+                {
+                    "id": c.get("id"),
+                    "source_type": c.get("source_type"),
+                    "source_ref": c.get("source_ref"),
+                    "chunk_text": c.get("chunk_text"),
+                }
+                for c in cited_chunks
+            ],
+            "model": model_used,
+            "usage": usage,
+            "cost_usd": round(cost, 6),
+            "latency_ms": latency_ms,
+            "audit_id": audit_id,
+            "prompt_version_id": prompt_version_id,
+            "canary_arm": canary_arm,
+        }
+    finally:
+        tracer.flush()
 
 
 # --- Internals -------------------------------------------------------------
