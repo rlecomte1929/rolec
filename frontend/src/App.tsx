@@ -118,6 +118,7 @@ const AdminMessages = lazy(() => import('./pages/admin/AdminMessages').then((mod
 const AdminErrors = lazy(() => import('./pages/admin/AdminErrors').then((module) => ({ default: module.AdminErrors })));
 const AdminFeedback = lazy(() => import('./pages/admin/AdminFeedback'));
 const AdminSuppliers = lazy(() => import('./pages/admin/AdminSuppliers').then((module) => ({ default: module.AdminSuppliers })));
+const AdminPrompts = lazy(() => import('./pages/admin/AdminPrompts').then((module) => ({ default: module.AdminPrompts })));
 const AdminProspects = lazy(() => import('./pages/admin/AdminProspects').then((module) => ({ default: module.AdminProspects })));
 const AdminSupplierNew = lazy(() => import('./pages/admin/AdminSupplierNew').then((module) => ({ default: module.AdminSupplierNew })));
 const AdminSupplierDetail = lazy(() => import('./pages/admin/AdminSupplierDetail').then((module) => ({ default: module.AdminSupplierDetail })));
@@ -129,6 +130,7 @@ const AdminResourceEditor = lazy(() => import('./pages/admin/AdminResourceEditor
 // [P1-2] Form Template Registry
 const AdminFormTemplates = lazy(() => import('./pages/admin/AdminFormTemplates').then((module) => ({ default: module.AdminFormTemplates })));
 const AdminFormTemplateEditor = lazy(() => import('./pages/admin/AdminFormTemplateEditor').then((module) => ({ default: module.AdminFormTemplateEditor })));
+const AdminFormTemplateMap = lazy(() => import('./pages/admin/AdminFormTemplateMap').then((module) => ({ default: module.AdminFormTemplateMap })));
 const AdminEvents = lazy(() => import('./pages/admin/AdminEvents').then((module) => ({ default: module.AdminEvents })));
 const AdminEventEditor = lazy(() => import('./pages/admin/AdminEventEditor').then((module) => ({ default: module.AdminEventEditor })));
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories').then((module) => ({ default: module.AdminCategories })));
@@ -359,6 +361,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminErrors.path} element={<RequireAdminRoute><AdminErrors /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFeedback.path} element={<RequireAdminRoute><AdminFeedback /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliers.path} element={<RequireAdminRoute><AdminSuppliers /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminPrompts.path} element={<RequireAdminRoute><AdminPrompts /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminProspects.path} element={<RequireAdminRoute><AdminProspects /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliersNew.path} element={<RequireAdminRoute><AdminSupplierNew /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminSuppliersDetail.path} element={<RequireAdminRoute><AdminSupplierDetail /></RequireAdminRoute>} />
@@ -371,6 +374,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminFormTemplates.path} element={<RequireAdminRoute><AdminFormTemplates /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFormTemplatesNew.path} element={<RequireAdminRoute><AdminFormTemplateEditor /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFormTemplatesEdit.path} element={<RequireAdminRoute><AdminFormTemplateEditor /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminFormTemplatesMap.path} element={<RequireAdminRoute><AdminFormTemplateMap /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminEvents.path} element={<RequireAdminRoute><AdminEvents /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminEventsEdit.path} element={<RequireAdminRoute><AdminEventEditor /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCategories.path} element={<RequireAdminRoute><AdminCategories /></RequireAdminRoute>} />

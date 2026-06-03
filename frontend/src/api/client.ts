@@ -1578,6 +1578,72 @@ export const suppliersAPI = {
   },
 };
 
+// Admin Prompt Registry API (admin only) — Parker Step D
+export type PromptVersion = {
+  id: string;
+  task_key: string;
+  version: number;
+  system_prompt: string;
+  user_template: string | null;
+  model_name: string;
+  temperature: number;
+  max_tokens: number;
+  status: string;
+  created_at?: string;
+  notes?: string | null;
+};
+
+export const promptsAPI = {
+  list: async (): Promise<PromptVersion[]> => {
+    const response = await api.get('/api/admin/prompts');
+    return response.data;
+  },
+  listForTask: async (taskKey: string): Promise<PromptVersion[]> => {
+    const response = await api.get(`/api/admin/prompts/${encodeURIComponent(taskKey)}`);
+    return response.data;
+  },
+  create: async (payload: {
+    task_key: string;
+    system_prompt: string;
+    model_name: string;
+    user_template?: string | null;
+    temperature?: number;
+    max_tokens?: number;
+    status?: string;
+    notes?: string | null;
+  }) => {
+    const response = await api.post('/api/admin/prompts', payload);
+    return response.data;
+  },
+  promote: async (versionId: string, targetStatus: string) => {
+    const response = await api.post(`/api/admin/prompts/${encodeURIComponent(versionId)}/promote`, {
+      target_status: targetStatus,
+    });
+    return response.data;
+  },
+  setCanaryShare: async (taskKey: string, canaryShare: number) => {
+    const response = await api.post(`/api/admin/prompts/${encodeURIComponent(taskKey)}/canary-share`, {
+      canary_share: canaryShare,
+    });
+    return response.data;
+  },
+  // Parker Step E — per-version win rates (approvals / verdicts) with Wilson CI.
+  winRates: async (taskKey: string): Promise<Record<string, WinRate>> => {
+    const response = await api.get(`/api/admin/prompts/${encodeURIComponent(taskKey)}/win-rates`);
+    return response.data;
+  },
+};
+
+// Parker Step E — per-version human-feedback win rate, keyed by prompt_version_id.
+export type WinRate = {
+  version_id: string;
+  approvals: number;
+  total: number;
+  win_rate: number;
+  ci_low: number;
+  ci_high: number;
+};
+
 // Admin HR Prospect Pipeline API (admin only)
 export type ProspectSeedItem = {
   company_name: string;

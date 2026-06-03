@@ -1,15 +1,27 @@
 # supabase/rls_allowlist.txt
 # AUDIT-A3 (audit/02-expert-security.md SEC-2)
 #
-# STATUS: SEED — the 113 entries below are the policy-less tables that
-# existed in `public` schema on 2026-05-25. They are PENDING SECURITY TRIAGE.
-#
-# Each entry MUST be reviewed by a human and either:
+# STATUS: DRAINING — seeded with 113 policy-less tables that existed in the
+# `public` schema on 2026-05-25. Each entry is PENDING SECURITY TRIAGE and must
+# be reviewed by a human and either:
 #   (a) given an RLS policy via a new supabase/migrations/ file — then the
-#       entry can be removed from this list (CI will start passing without it);
+#       entry is removed from this list (CI passes without it); or
 #   (b) kept here with a per-entry comment justifying why it is intentionally
-#       server-role-only (e.g. internal audit_log written only by the backend
-#       and never exposed via the Supabase anon client).
+#       server-role-only.
+#
+# Drain log:
+#   2026-05-30  SEC-RLSd (AIQ-661) — catalog/seed domain: removed 7 entries
+#               (country_events, country_profiles, country_resource_items,
+#               country_resource_sections, requirements_catalog, requirement_items,
+#               default_policy_templates), given public-read + admin-write RLS in
+#               20260531020000_rls_catalog_seed.sql. 78 -> 71.
+#   2026-05-30  SEC-RLSb (AIQ-659) — policy/HR domain: removed 35 entries, all
+#               given company_id-scoped / shared-knowledge / server-internal RLS
+#               in 20260531010000_rls_policy_hr_domain.sql. 113 -> 78.
+#   2026-06-01  SEC-RLSe (AIQ-662) — audit/system tables: error_logs + error_tickets
+#               given admin RLS + REVOKE anon in
+#               20260530000000_rls_error_tracking_harden.sql; removed below. 71 -> 69.
+#               Remaining audit/system tables annotated server-role-only (no drain).
 #
 # Triage tracked as AUDIT-A3-followup in the Notion AI Work Queue. The list
 # should DRAIN over time, not GROW. New policy-less tables landing in main
@@ -18,20 +30,16 @@
 # Format: one tablename per line. Lines starting with `#` are ignored.
 # Inline comments after a `#` on a name line are also ignored.
 
-admin_allowlist
-admin_sessions
-analytics_events
+admin_allowlist                     # server-role only — admin authorization source (email-keyed allowlist); read by backend via service-role/pooler, never anon/authenticated client
+admin_sessions                      # server-role only — admin session store, backend writes; never client-read
+analytics_events                    # server-role only — platform telemetry, backend writes (backend/database.py); dashboards read via backend service-role, never anon/authenticated client
 answers
-assignment_audit_log
+assignment_audit_log                # server-role only — assignment change history, backend writes; never client-read
 assignment_mobility_links
 assignment_policy_service_comparisons
-audit_log
-audit_logs
-canonical_policy_document_chunks
-canonical_policy_documents
-canonical_policy_fact_validation_errors
-canonical_policy_facts
-canonical_policy_query_audit_logs
+audit_log                           # server-role only — append-only audit trail, backend writes (backend/database.py); never client-read
+audit_logs                          # server-role only — append-only audit trail, backend writes; never client-read
+canonical_policy_query_audit_logs   # server-role only — canonical-policy query audit log, backend writes; never anon/authenticated client-read
 case_assignment_id
 case_documents
 case_evidence
@@ -43,91 +51,51 @@ case_readiness_checklist_state
 case_readiness_milestone_state
 case_requirement_evaluations
 case_requirements_snapshots
-catalog_employee_demand
-catalog_scrape_quota
-collaboration_comment_mentions
-collaboration_comments
-collaboration_notifications
-collaboration_thread_participants
-collaboration_threads
-company_policies
-company_policy_assistant_bindings
-company_preferred_suppliers
-company_vendor_selections
-compliance_actions
-compliance_reference_sources
-compliance_reports
-country_events
-country_profiles
-country_resource_items
-country_resource_sections
-crawl_job_runs
-crawl_runs
-crawl_schedules
-crawled_source_chunks
-crawled_source_documents
-default_policy_templates
-demo_request_rate_limits
-demo_requests
-document_change_events
+catalog_employee_demand              # SEC-RLSd triage: tenant-scoped (company_id) HR demand signal, not public-read — RLS deferred to SEC-RLSe
+catalog_scrape_quota                 # SEC-RLSd triage: per-tenant/server scrape-quota counter, not public-read — RLS deferred to SEC-RLSe
+collaboration_comment_mentions   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_comments   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_notifications         # server-role only — collaboration fan-out outbox, collaboration_service writes; delivered via backend API, never client-read
+collaboration_thread_participants   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+collaboration_threads   # SEC-RLSb: thread-target scoped, not company_id — SEC-RLSe
+compliance_reference_sources         # SEC-RLSd triage: server-write only — admin/server-seeded provenance, runtime reads seed JSON (not HR-upload, not anon-read)
+crawl_job_runs                      # server-role only — crawl job execution log, crawl_scheduler_service writes; never client-read
+crawl_runs                          # server-role only — crawler run state, change_detection_service writes; never client-read
+crawl_schedules                     # server-role only — crawl scheduler config, crawl_scheduler_service writes; never client-read
+crawled_source_chunks               # server-role only — raw crawled content chunks, crawler staging writer; never client-read
+crawled_source_documents            # server-role only — raw crawled documents, crawler/freshness services; never client-read
+demo_request_rate_limits            # server-role only — demo-request rate-limit counters, submit-demo-request Edge Function (service-role); never client-read
+demo_requests                       # server-role only — demo leads, inserted by submit-demo-request Edge Function (service-role); admin reads via backend, never anon/authenticated client
+document_change_events              # server-role only — change-detection signals, change_detection/review_queue services; backend (admin client) read only, never anon/authenticated client
 eligibility_overrides
 employee_answers
-error_logs
-error_tickets
-form_prefill_instances
-freshness_alerts
-freshness_snapshots
-hr_policies
-knowledge_doc_ingest_jobs
-notification_outbox
-ops_notification_events
-policy_assignment_type_applicability
-policy_assistant_answer_audits
-policy_benefit_jurisdiction_overrides
-policy_benefit_rule_hr_override_audit
-policy_benefit_rule_hr_overrides
-policy_benefit_rules
-policy_config_benefits
-policy_config_versions
-policy_configs
-policy_document_chunks
-policy_document_clauses
-policy_documents
-policy_evidence_requirements
-policy_exclusions
-policy_extraction_locks
-policy_facts
-policy_family_status_applicability
-policy_knowledge_snapshots
-policy_processing_runs
-policy_rule_conditions
-policy_rules
-policy_source_links
-policy_tier_overrides
-policy_versions
+form_prefill_instances              # server-role only — form pre-fill job artifacts, backend pipeline; never client-read
+freshness_alerts                    # server-role only — freshness alert state, freshness/crawl jobs; never client-read
+freshness_snapshots                 # server-role only — freshness snapshot metrics, freshness_service writes; never client-read
+knowledge_doc_ingest_jobs           # server-role only — knowledge-doc ingest job state (ORM-managed); never client-read
+notification_outbox                 # server-role only — notification outbox, drained by backend worker; never client-read
+ops_notification_events             # server-role only — ops webhook event log, ops_notification_service writes; never client-read
 profile_state
-prospect_candidates
+prospect_candidates                 # server-role only — prospect pipeline (ORM-managed); admin reads via backend, never client-read
 readiness_template_checklist_items
 readiness_template_milestones
 readiness_templates
 relocation_artifacts
-relocation_runs
+relocation_runs                     # server-role only — relocation classification run state, backend writes; never client-read
 relocation_sources
-requirement_items
-requirement_research_jobs
-requirements_catalog
-research_source_candidates
+requirement_research_jobs           # server-role only — requirement research job state, backend pipeline; never client-read
+research_source_candidates          # server-role only — research candidate queue (ORM-managed); never client-read
 resolved_assignment_policies
 resolved_assignment_policy_benefits
 resolved_assignment_policy_exclusions
-review_queue_activity_log
-review_queue_items
-roadmap_gap_questions
-roadmap_generation_jobs
-sessions
-source_records
-staged_event_candidates
-staged_resource_candidates
-staging_review_audit_log
-support_case_notes
+review_queue_activity_log           # server-role only — review-queue action log, review_queue_service writes; admin reads via backend API, never client-read
+review_queue_items                  # server-role only — review-queue items, review_queue/ops services; admin reads via backend API, never client-read
+roadmap_gap_questions               # server-role only — roadmap gap-analysis artifacts, backend pipeline; never client-read
+roadmap_generation_jobs             # server-role only — roadmap generation job state, backend pipeline; never client-read
+sessions                            # server-role only — backend session store, backend writes; never client-read
+source_records                      # server-role only — ingestion source registry (ORM-managed); never client-read
+staged_event_candidates             # server-role only — staged event candidates, admin_staging pipeline; never client-read
+staged_resource_candidates          # server-role only — staged resource candidates, admin_staging pipeline; never client-read
+staging_review_audit_log            # server-role only — staging-review action log, staging_review_service writes; never client-read
+support_case_notes                  # server-role only — internal support case notes, backend writes; never client-read
 wizard_cases

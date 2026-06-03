@@ -24,6 +24,16 @@ from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+# Default limit applied to every undecorated route via SlowAPIMiddleware (SEC-004).
+# Imported from app.rate_limits (the policy source of truth); that module imports
+# nothing from here, so there is no import cycle.
+from backend.app.rate_limits import STANDARD_LIMIT
+
+# Default limit applied to every undecorated route via SlowAPIMiddleware (SEC-004).
+# Imported from app.rate_limits (the policy source of truth); that module imports
+# nothing from here, so there is no import cycle.
+from backend.app.rate_limits import STANDARD_LIMIT
+
 
 def _real_remote_address(request: Request) -> str:
     """
@@ -41,4 +51,8 @@ def _real_remote_address(request: Request) -> str:
 
 _RATE_LIMITS_ENABLED = os.getenv("RELOPASS_DISABLE_RATE_LIMITS", "").lower() not in ("1", "true", "yes")
 
-limiter = Limiter(key_func=_real_remote_address, enabled=_RATE_LIMITS_ENABLED)
+limiter = Limiter(
+    key_func=_real_remote_address,
+    enabled=_RATE_LIMITS_ENABLED,
+    default_limits=[STANDARD_LIMIT],
+)

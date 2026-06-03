@@ -237,7 +237,31 @@ def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
         )
         return None
 
-    model = os.environ.get("RELOPASS_LLM_POLICY_MODEL", "claude-sonnet-4-6")
+    # Prompt registry (Parker Step D). Best-effort: when the registry is absent
+    # or empty, `active` is None and we fall back to the literal constants below
+    # — behavior is byte-for-byte identical to pre-registry.
+    active = None
+    try:
+        from .prompt_registry import get_active_prompt, render_user_message
+        active = get_active_prompt("policy_extraction")
+    except Exception:  # noqa: BLE001 — registry must never block extraction
+        active = None
+
+    # Model precedence: explicit env override (operator escape hatch) → registry
+    # → literal default.
+    env_model = os.environ.get("RELOPASS_LLM_POLICY_MODEL")
+    if env_model:
+        model = env_model
+    elif active is not None:
+        model = active.model_name
+    else:
+        model = "claude-sonnet-4-6"
+
+    system_prompt = active.system_prompt if active is not None else SYSTEM_PROMPT
+    max_tokens = active.max_tokens if active is not None else 4096
+    prompt_version_id = active.id if active is not None else None
+    canary_arm = active.canary_arm if active is not None else None
+
     try:
         max_chars = int(os.environ.get("RELOPASS_LLM_POLICY_MAX_INPUT_CHARS", "12000"))
     except ValueError:
@@ -250,7 +274,12 @@ def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
     else:
         truncated = False
 
-    user_prompt = (
+    rendered = (
+        render_user_message(active.user_template, {"truncated": truncated, "document_text": document_text})
+        if (active is not None and active.user_template)
+        else None
+    )
+    user_prompt = rendered if rendered is not None else (
         "Extract the relocation policy from the document below. Use the "
         "record_extracted_policy tool to record every benefit you find. If a "
         "field is not stated, set it to null. Do not invent values.\n\n"
@@ -262,8 +291,8 @@ def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
             model=model,
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
+            max_tokens=max_tokens,
+            system=system_prompt,
             tools=[EXTRACT_POLICY_TOOL],
             tool_choice={"type": "tool", "name": EXTRACT_POLICY_TOOL["name"]},
             messages=[{"role": "user", "content": user_prompt}],
@@ -323,6 +352,8 @@ def extract_policy_with_llm(lines: List[str]) -> Optional[Dict[str, Any]]:
         "extracted_by": "ai",
         "model": model,
         "truncated": truncated,
+        "prompt_version_id": prompt_version_id,
+        "canary_arm": canary_arm,
     }
     _forward_to_langsmith(
         model=model,

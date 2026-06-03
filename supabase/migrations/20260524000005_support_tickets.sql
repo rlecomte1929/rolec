@@ -65,12 +65,16 @@ CREATE TRIGGER trg_support_tickets_updated_at
 ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
 
 -- Service role has full access (for backend and Edge Functions)
-CREATE POLICY IF NOT EXISTS "service_role_all_support_tickets"
+-- NB: CREATE POLICY has no IF NOT EXISTS form in PostgreSQL; use DROP IF EXISTS
+-- + CREATE for idempotency (matches prod's live policies — see drift entry 17).
+DROP POLICY IF EXISTS "service_role_all_support_tickets" ON public.support_tickets;
+CREATE POLICY "service_role_all_support_tickets"
   ON public.support_tickets FOR ALL
   USING (auth.role() = 'service_role');
 
 -- HR users can view tickets for their company
-CREATE POLICY IF NOT EXISTS "hr_read_own_company_tickets"
+DROP POLICY IF EXISTS "hr_read_own_company_tickets" ON public.support_tickets;
+CREATE POLICY "hr_read_own_company_tickets"
   ON public.support_tickets FOR SELECT
   USING (
     auth.role() = 'authenticated'
@@ -81,7 +85,8 @@ CREATE POLICY IF NOT EXISTS "hr_read_own_company_tickets"
   );
 
 -- Users can view their own tickets
-CREATE POLICY IF NOT EXISTS "user_read_own_tickets"
+DROP POLICY IF EXISTS "user_read_own_tickets" ON public.support_tickets;
+CREATE POLICY "user_read_own_tickets"
   ON public.support_tickets FOR SELECT
   USING (
     auth.role() = 'authenticated'

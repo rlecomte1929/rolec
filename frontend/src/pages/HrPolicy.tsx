@@ -10,6 +10,7 @@ import { EmployeePolicyAssistantPanel } from '../features/policy/EmployeePolicyA
 import { PolicyAssistantDockedShell } from '../features/policy/PolicyAssistantDockedShell';
 import { useEmployeeAssignment } from '../contexts/EmployeeAssignmentContext';
 import { HrPolicyPageV2 } from '../features/policy/HrPolicyPageV2';
+import { PolicyBenefitsSummary } from '../features/policy/PolicyBenefitsSummary';
 import { HrPolicyBuilderV2Page } from '../features/platform-v2/policy-builder/HrPolicyBuilderV2Page';
 import { PolicyAssistantFab } from '../features/policy/PolicyAssistantFab';
 import { getAuthItem } from '../utils/demo';
@@ -61,8 +62,8 @@ export const HrPolicy: React.FC = () => {
   const adminCompanyId = searchParams.get('adminCompanyId') || null;
   // Tab state — driven by ?tab= search param so the URL is bookmarkable and
   // the /hr/settings/policy redirect lands on the correct tab.
-  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder';
-  const setTab = (tab: 'policy' | 'builder') => {
+  const activeTab = (searchParams.get('tab') ?? 'policy') as 'policy' | 'builder' | 'summary';
+  const setTab = (tab: 'policy' | 'builder' | 'summary') => {
     const next = new URLSearchParams(searchParams);
     next.set('tab', tab);
     setSearchParams(next, { replace: true });
@@ -140,6 +141,9 @@ export const HrPolicy: React.FC = () => {
           <PolicyTabButton active={activeTab === 'builder'} onClick={() => setTab('builder')}>
             Policy builder
           </PolicyTabButton>
+          <PolicyTabButton active={activeTab === 'summary'} onClick={() => setTab('summary')}>
+            Benefits summary
+          </PolicyTabButton>
         </div>
       )}
 
@@ -152,6 +156,8 @@ export const HrPolicy: React.FC = () => {
         )}
         {(!adminCompanyId && activeTab === 'builder')
           ? <HrPolicyBuilderV2Page embedded />
+          : (!adminCompanyId && activeTab === 'summary')
+          ? <PolicyBenefitsSummary />
           : <HrPolicyPageV2 adminCompanyId={adminCompanyId ?? null} />
         }
       </div>

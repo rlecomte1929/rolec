@@ -32,7 +32,7 @@ create policy services_state_select_tenant
   to authenticated
   using (
     organization_id in (
-      select company_id from public.profiles where id = auth.uid()
+      select company_id::uuid from public.profiles where id::uuid = auth.uid()
     )
   );
 
@@ -42,7 +42,7 @@ create policy services_state_upsert_tenant
   to authenticated
   with check (
     organization_id in (
-      select company_id from public.profiles where id = auth.uid()
+      select company_id::uuid from public.profiles where id::uuid = auth.uid()
     )
   );
 
@@ -52,12 +52,12 @@ create policy services_state_update_tenant
   to authenticated
   using (
     organization_id in (
-      select company_id from public.profiles where id = auth.uid()
+      select company_id::uuid from public.profiles where id::uuid = auth.uid()
     )
   )
   with check (
     organization_id in (
-      select company_id from public.profiles where id = auth.uid()
+      select company_id::uuid from public.profiles where id::uuid = auth.uid()
     )
   );
 

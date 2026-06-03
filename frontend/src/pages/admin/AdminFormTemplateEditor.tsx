@@ -127,6 +127,8 @@ function formToCreate(form: EditableForm): FormTemplateCreate {
  * Coerce gracefully so the editor doesn't error on legacy shapes.
  */
 function normalizeFields(raw: Array<Record<string, unknown>>): FieldDefinition[] {
+  const asFiniteNumber = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) ? v : undefined;
   return (raw || []).map((r, i) => ({
     id: typeof r.id === 'string' ? r.id : '',
     label: typeof r.label === 'string' ? r.label : '',
@@ -136,6 +138,10 @@ function normalizeFields(raw: Array<Record<string, unknown>>): FieldDefinition[]
     requires_original: r.requires_original === true,
     position: typeof r.position === 'number' ? r.position : i + 1,
     options: Array.isArray(r.options) ? (r.options as string[]) : undefined,
+    pdf_x: asFiniteNumber(r.pdf_x),
+    pdf_y: asFiniteNumber(r.pdf_y),
+    pdf_page: asFiniteNumber(r.pdf_page),
+    pdf_font_size: asFiniteNumber(r.pdf_font_size),
   }));
 }
 
@@ -426,9 +432,17 @@ export const AdminFormTemplateEditor: React.FC = () => {
                 <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
                   Fields
                 </h2>
-                <span className="text-xs text-slate-500">
-                  {fields.length} field{fields.length === 1 ? '' : 's'} · drag to reorder
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500">
+                    {fields.length} field{fields.length === 1 ? '' : 's'} · drag to reorder
+                  </span>
+                  <Link
+                    to={buildRoute('adminFormTemplatesMap', { id: id! })}
+                    className="text-xs font-medium text-[#0b2b43] hover:underline focus:outline-none focus:underline"
+                  >
+                    Map coordinates →
+                  </Link>
+                </div>
               </div>
               <FieldDefinitionEditor
                 value={fields}

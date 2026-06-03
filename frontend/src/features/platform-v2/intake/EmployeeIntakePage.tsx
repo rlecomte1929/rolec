@@ -1055,16 +1055,24 @@ export function EmployeeIntakePage() {
     // ("Germany") or a code ("DE") — countryNameToCode normalises both.
     const destCode = countryNameToCode(row?.destination?.host_country);
     const originCode = countryNameToCode(row?.destination?.home_country);
+    // host_city / home_city are free-text strings stored as-typed by HR.
+    const destCity = (row?.destination?.host_city || '').trim();
+    const originCity = (row?.destination?.home_city || '').trim();
     const userEmail = (getAuthItem('relopass_email') || '').trim();
-    if (destCode || originCode || userEmail) {
+    if (destCode || originCode || destCity || originCity || userEmail) {
       setData((d) => {
         const next = { ...d };
         // Only fill if empty — user-entered data is never overwritten.
         if (!next.dest_country && destCode) next.dest_country = destCode;
         if (!next.origin_country && originCode) next.origin_country = originCode;
+        if (!next.dest_city && destCity) next.dest_city = destCity;
+        if (!next.origin_city && originCity) next.origin_city = originCity;
         if (!next.email && userEmail) next.email = userEmail;
         return next;
       });
+    }
+    if (destCity) {
+      setLocks((l) => ({ ...l, destCity: true }));
     }
     // Lock destination only if we actually pre-filled it from the case
     // row — that's the "🔒 HR pre-filled" signal users see.

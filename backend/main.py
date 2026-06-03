@@ -134,6 +134,15 @@ from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import employee_tiers as employee_tiers_router  # [P1-6]
 from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
+from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
+from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
+from .app.routers import benefit_optimizer as benefit_optimizer_router  # [Parker-B] dual-layer registration (PR #207 §9)
+from .app.routers import admin_prompts as admin_prompts_router  # [Parker-D] dual-layer registration (PR #207 §9)
+from .app.routers import ai_feedback as ai_feedback_router  # [Parker-E] dual-layer registration (PR #207 §9)
+from .app.routers import admin_ocr_shadow as admin_ocr_shadow_router  # [Parker-F] dual-layer registration (PR #207 §9)
+from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_router  # [Parker-G] dual-layer registration (PR #207 §9)
+from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
+from .app.routers import translation as translation_router  # [Parker-I] dual-layer registration (PR #207 §9)
 from .app.routers import policy_publish as policy_publish_router  # [P1-4]
 from .app.routers import policy_summary as policy_summary_router  # [P1-5 backend]
 from .app.routers import policy_feedback as policy_feedback_router  # [P5-5]
@@ -170,6 +179,10 @@ from .app.routers import exception_requests as exception_requests_router
 from .app.routers import services_state as services_state_router
 from .app.routers import admin_catalog as admin_catalog_router
 from .app.routers import hr_catalog as hr_catalog_router
+from .app.routers import hr_case_detail as hr_case_detail_router  # C1-11c-be — per-case detail reads (dual-layer per CLAUDE.md)
+from .app.routers import hr_case_audit as hr_case_audit_router  # C1-16 — case audit endpoint (dual-layer per CLAUDE.md)
+from .app.routers import hr_case_resolve as hr_case_resolve_router  # C1-12-be — resolve+escalate POST endpoints (dual-layer per CLAUDE.md)
+from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP — policy-gap reads (dual-layer per CLAUDE.md)
 from .app.routers import providers as providers_router
 from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import hr_vendors as hr_vendors_router
@@ -391,6 +404,27 @@ else:
 app = FastAPI(title="ReloPass API", version="1.0.0", lifespan=lifespan)
 
 # ---------------------------------------------------------------------------
+# Debug endpoint gating (SEC-001).
+# Debug/diagnostic routes are live unauthenticated attack surface in
+# production. They register ONLY when ENABLE_DEBUG_ENDPOINTS=1 — a flag that
+# must NEVER be set in any production environment (local development only).
+# When the flag is unset, the routes simply do not exist (404).
+# ---------------------------------------------------------------------------
+DEBUG_ENDPOINTS_ENABLED = os.environ.get("ENABLE_DEBUG_ENDPOINTS") == "1"
+
+
+def debug_route(method: str, path: str, **kwargs):
+    """Register a debug route only when ENABLE_DEBUG_ENDPOINTS=1; else no-op."""
+
+    def decorator(fn):
+        if DEBUG_ENDPOINTS_ENABLED:
+            getattr(app, method)(path, **kwargs)(fn)
+        return fn
+
+    return decorator
+
+
+# ---------------------------------------------------------------------------
 # Rate limiting (abuse protection on auth + claim endpoints).
 # Limiter instance lives in backend/rate_limit.py so routers can decorate
 # their endpoints without pulling main into a circular import. Main owns the
@@ -398,35 +432,97 @@ app = FastAPI(title="ReloPass API", version="1.0.0", lifespan=lifespan)
 # Disabled when RELOPASS_DISABLE_RATE_LIMITS=1 (tests set this in conftest).
 # ---------------------------------------------------------------------------
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from .rate_limit import limiter, _real_remote_address
+from .app.rate_limits import (
+    path_limit as _sec004_path_limit,
+    rate_limit_headers,
+    rate_limit_payload,
+    user_key_func,
+)
 
 app.state.limiter = limiter
+
+# SEC-004: apply STANDARD_LIMIT (the limiter's default_limits) to every route that
+# does NOT carry an explicit @limiter.limit decorator. The middleware skips routes
+# already decorated or marked @limiter.exempt, so stricter buckets (auth/upload/
+# admin/ai) win and exempt routes (health, webhooks) stay unlimited. No-op when
+# the limiter is disabled (RELOPASS_DISABLE_RATE_LIMITS=1).
+app.add_middleware(SlowAPIMiddleware)
+
+# SEC-004: exempt infrastructure / service-to-service routes from ALL rate limits.
+# These are invoked by Render (health probes), Postmark (inbound-email webhook),
+# and Supabase triggers (support triage) — never by end users — so the
+# STANDARD_LIMIT default must not throttle them. slowapi keys exemptions by the
+# endpoint's "<module>.<name>". Names verified against the live route table.
+_RATE_LIMIT_EXEMPT_ENDPOINTS = (
+    f"{__name__}.health_check",              # GET /health
+    f"{__name__}.supabase_health",           # GET /api/health/supabase
+    f"{__name__}.policy_documents_health",   # GET /api/hr/policy-documents/health
+    f"{__name__}.email_health_check",        # GET /api/internal/email/health
+    # Service-role / external-webhook routes live in the support router:
+    "backend.app.routers.support.inbound_email_webhook",  # POST /webhooks/support-email (Postmark)
+    "backend.app.routers.support.triage_ticket",          # POST /api/support/triage (Supabase trigger)
+)
+for _exempt_name in _RATE_LIMIT_EXEMPT_ENDPOINTS:
+    limiter._exempt_routes.add(_exempt_name)
+
+
+def _rate_limit_json_response(request: Request, limit: str) -> JSONResponse:
+    """
+    Build the canonical 429 response (SEC-004): documented JSON shape, Retry-After
+    header, preserved X-Request-ID + CORS headers, and a structured
+    ``rate_limit_hit`` log line for abuse monitoring. Shared by the slowapi
+    exception handler and the admin path-scoped middleware below.
+    """
+    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
+    ip = _real_remote_address(request)
+    path = request.url.path
+    hdrs: Dict[str, str] = {"X-Request-ID": req_id, **rate_limit_headers()}
+    hdrs.update(cors_headers_for_request_origin(request))
+    log.warning(
+        "rate_limit_hit ip=%s path=%s limit=%s request_id=%s",
+        ip,
+        path,
+        str(limit),
+        req_id,
+        extra={"ip": ip, "path": path, "limit": str(limit), "request_id": req_id},
+    )
+    # rate_limit_payload() carries error/message/retry_after (+ back-compat detail);
+    # add the per-request id alongside.
+    return JSONResponse(
+        status_code=429,
+        content={**rate_limit_payload(), "request_id": req_id},
+        headers=hdrs,
+    )
 
 
 @app.exception_handler(RateLimitExceeded)
 async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    """429 response that preserves X-Request-ID and CORS headers (matches global 500 handler)."""
-    req_id = getattr(request.state, "request_id", None) or str(uuid.uuid4())
-    hdrs: Dict[str, str] = {
-        "X-Request-ID": req_id,
-        "Retry-After": "60",
-    }
-    hdrs.update(cors_headers_for_request_origin(request))
-    log.warning(
-        "rate_limit_exceeded request_id=%s path=%s ip=%s limit=%s",
-        req_id,
-        request.url.path,
-        _real_remote_address(request),
-        str(getattr(exc, "detail", "")),
-    )
-    return JSONResponse(
-        status_code=429,
-        content={
-            "detail": "Too many requests. Wait a moment before trying again.",
-            "request_id": req_id,
-        },
-        headers=hdrs,
-    )
+    """429 handler for every slowapi-decorated route + the STANDARD middleware."""
+    limit = str(getattr(exc, "detail", "") or getattr(exc, "limit", ""))
+    return _rate_limit_json_response(request, limit)
+
+
+# SEC-004: stricter path-scoped buckets (UPLOAD 10/min & ADMIN 20/min per IP, AI
+# 20/min per user). The policy + counter storage live in backend.app.rate_limits
+# (imported above as _sec004_path_limit) so they stay DB-free and unit-testable;
+# here we only bind them to the request lifecycle. A middleware is used instead of
+# @limiter.limit decorators because slowapi 0.1.9 requires a parameter literally
+# named "request" (most of these routes use "req" or — for ~66 admin routes — omit
+# it). Honors RELOPASS_DISABLE_RATE_LIMITS via limiter.enabled (no new bypass) and
+# auto-covers future admin/upload/AI routes.
+@app.middleware("http")
+async def _sec004_rate_limit_middleware(request: Request, call_next):
+    if limiter.enabled and request.method != "OPTIONS":
+        exceeded = _sec004_path_limit(
+            request.url.path,
+            _real_remote_address(request),
+            user_key_func(request),
+        )
+        if exceeded is not None:
+            return _rate_limit_json_response(request, exceeded)
+    return await call_next(request)
 
 
 admin_graph_build_marker = os.getenv("ADMIN_GRAPH_BUILD_MARKER", "local-dev")
@@ -589,6 +685,15 @@ app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-UR
 app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
+app.include_router(nlg_router.router)  # [Parker-J] PR #207 §9 — exec-summary + policy TL;DR (dual-layer registration)
+app.include_router(predictions_router.router)  # [Parker-A] PR #207 §9 — dual-layer registration
+app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 — dual-layer registration
+app.include_router(admin_prompts_router.router, prefix="/api/admin")  # [Parker-D] PR #207 §9 — dual-layer registration
+app.include_router(ai_feedback_router.router)  # [Parker-E] PR #207 §9 — dual-layer registration
+app.include_router(admin_ocr_shadow_router.router)  # [Parker-F] PR #207 §9 — dual-layer registration
+app.include_router(admin_ai_unit_economics_router.router)  # [Parker-G] PR #207 §9 — dual-layer registration
+app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-layer registration
+app.include_router(translation_router.router)  # [Parker-I] PR #207 §9 — dual-layer registration
 # [AUDIT-C2.3 Month-1] policy_publish_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_summary_router → moved to backend/app/main.py
 # [AUDIT-C2.3 Month-1] policy_feedback_router → moved to backend/app/main.py
@@ -597,6 +702,10 @@ app.include_router(crons_router.router)  # [P4-4] cron endpoints
 app.include_router(services_state_router.router)
 app.include_router(admin_catalog_router.router)
 app.include_router(hr_catalog_router.router)  # [AUDIT-C2.3] re-added — vendor curation, notification-counts (B16)
+app.include_router(hr_case_detail_router.router)  # C1-11c-be — 6 per-case detail reads consumed by HR Dashboard
+app.include_router(hr_case_audit_router.router)  # C1-16 — GET /api/hr/cases/{id}/audit chronological lineage
+app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoints consumed by #183 Contradiction Resolution UI
+app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
 app.include_router(employee_quotes_router.router)
 app.include_router(hr_vendors_router.router)
@@ -754,7 +863,7 @@ def supabase_health(probe: int = 0):
 from .app.auth_deps import require_admin as _require_admin_v2  # noqa: E402
 
 
-@app.get("/debug/db")
+@debug_route("get", "/debug/db")
 def debug_db(user: Dict[str, Any] = Depends(_require_admin_v2)):
     """Return non-secret database connectivity info. Admin only."""
     return Database.get_db_info()
@@ -765,7 +874,7 @@ class _DebugKVBody(_BaseModel):
     value: str
 
 
-@app.post("/debug/kv")
+@debug_route("post", "/debug/kv")
 def debug_kv_set(
     body: _DebugKVBody,
     user: Dict[str, Any] = Depends(_require_admin_v2),
@@ -775,7 +884,7 @@ def debug_kv_set(
     return {"ok": True, "key": body.key}
 
 
-@app.get("/debug/kv/{key}")
+@debug_route("get", "/debug/kv/{key}")
 def debug_kv_get(
     key: str,
     user: Dict[str, Any] = Depends(_require_admin_v2),
@@ -2663,7 +2772,7 @@ def reconciliation_link_policy_company(
     return {"ok": True}
 
 
-@app.get("/api/admin/debug/runtime-database")
+@debug_route("get", "/api/admin/debug/runtime-database")
 def debug_runtime_database(user: Dict[str, Any] = Depends(require_admin)):
     """
     Admin diagnostic: show current DB scheme/target and seed flags.
@@ -2689,7 +2798,7 @@ def debug_runtime_database(user: Dict[str, Any] = Depends(require_admin)):
     }
 
 
-@app.get("/api/admin/debug/test-company-graph")
+@debug_route("get", "/api/admin/debug/test-company-graph")
 def debug_test_company_graph(user: Dict[str, Any] = Depends(require_admin)):
     """
     Admin diagnostic: snapshot of Test company graph (counts + sample rows).
@@ -5715,7 +5824,7 @@ def list_hr_assignments(
         )
 
 
-@app.get("/api/debug/supabase")
+@debug_route("get", "/api/debug/supabase")
 def debug_supabase(user: Dict[str, Any] = Depends(_require_admin_v2)):
     """
     Lightweight Supabase admin connectivity check. Admin only.
@@ -10352,7 +10461,7 @@ def notify_hr_employee_saved(
     return {"ok": True}
 
 
-@app.get("/api/debug/cases/{case_id}/events")
+@debug_route("get", "/api/debug/cases/{case_id}/events")
 def debug_case_events(
     case_id: str,
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
@@ -10362,7 +10471,7 @@ def debug_case_events(
     return {"case_id": case_id, "events": events, "count": len(events)}
 
 
-@app.get("/api/debug/assignment-check")
+@debug_route("get", "/api/debug/assignment-check")
 def debug_assignment_check(
     assignment_id: str = Query(...),
     user: Dict[str, Any] = Depends(require_hr_or_employee),
@@ -10557,6 +10666,7 @@ def create_hr_policy(
 
 @app.post("/api/hr/policies/upload")
 async def upload_hr_policy(
+    req: Request,
     file: UploadFile = File(...),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
@@ -13563,7 +13673,11 @@ app.include_router(hr_policy_config_router)
 app.include_router(admin_policy_config_router)
 app.include_router(employee_policy_config_router)
 app.include_router(public_policy_config_router)
-# [AUDIT-C2.3 Month-1] hr_coordination_router → moved to backend/app/main.py
+# hr_coordination restored to backend/main.py: the AUDIT-C2.3 "moved to
+# backend/app/main.py" note was wrong — backend/main.py (the prod entrypoint)
+# does not serve the modular app, so these routes 405'd in prod. See
+# audit/dual-layer-audit-followup.md. Modular cutover is a separate project.
+app.include_router(hr_coordination_router.router)
 app.include_router(prescreening_router.router)
 app.include_router(personio_webhook_router.router)
 app.include_router(personio_settings_router.router)
