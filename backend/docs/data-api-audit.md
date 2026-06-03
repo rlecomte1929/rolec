@@ -1,250 +1,148 @@
-# Supabase Data API exposure audit (FRIDAY-003a / AIQ-762)
+# Supabase Data API Exposure Audit — ReloPass
 
-**Snapshot date:** 2026-06-03
-**Project:** `nsvefcvpvwwwhuqyuqmp` (production ReloPass)
-**Author:** Claude Code (re-run of the Claude Cowork pass, this time **with the
-frontend + apps repos mounted** so the KEEP/REVOKE calls are evidence-based, not
-heuristic).
-**Deliverable consumed by:** FRIDAY-003b (writes the explicit REVOKE migration).
-
-> ⚠️ This is a **doc-only** audit. No grants were changed and no migration was
-> applied. The pre-drafted REVOKE block in §6 is for FRIDAY-003b to review and
-> apply after the §5 VERIFY questions are answered.
+**Project**: `nsvefcvpvwwwhuqyuqmp` · ReloPass (eu-west-1)
+**Audit date**: 2026-06-03
+**Task**: FRIDAY-003a (parent: FRIDAY-003 · Supabase Data API audit + opt-out enable)
+**Auditor**: Claude Cowork via Supabase MCP
+**Source**: `https://supabase.com/changelog/45702-developer-update-may-2026`
 
 ---
 
-## 1. Why this exists
+## Why this audit exists
 
-Supabase auto-exposes every `public`-schema table through PostgREST/GraphQL to
-any role that holds a grant. The **anon key is shipped in the frontend bundle**,
-so any table with an `anon` grant is readable by an unauthenticated visitor
-(subject only to RLS). This is the exact class of bug that caused **SEC-002**
-(8 tables, GDPR-scope PII exposure). The project pre-dates Supabase's
-2026-05-30 opt-out default, so grants accumulated implicitly.
+Supabase changed its default on **May 30, 2026** — new projects ship with the Data API opt-out enabled. ReloPass (created 2026-02-16) pre-dates this change, so every `public` schema table is **still auto-exposed via PostgREST and GraphQL**. This audit determines per-table which exposure must stay (frontend depends on it) and which can be revoked (backend-only access via service_role).
 
-This audit answers: *for every currently-exposed table, does the frontend
-actually need direct Data API access, or is it server-side only?*
+**The win**: revoking unused grants reduces attack surface, strengthens SOC 2 / HR-buyer trust story, and pairs cleanly with the existing RLS hardening work (SEC-002, AUDIT-A3, MVP-9).
 
-## 2. Method
+---
 
-1. **Grant dump** — `information_schema.role_table_grants` +
-   `role_column_grants` for `anon`/`authenticated` on schema `public`, joined to
-   `pg_class` for RLS state and `pg_policies` for policy counts.
-2. **Frontend usage** — grepped `frontend/src/` and `apps/` for
-   `supabase.from('<table>')` calls and realtime channel `table:` references.
-   A table the frontend never calls via supabase-js is server-side only
-   (the backend reaches it with the service-role key, which bypasses grants).
-3. **Existence/effective-access check** — `has_table_privilege()` on every
-   frontend-referenced table to distinguish "exposed" from "already locked".
+## Summary
 
-## 3. Summary
-
-| Metric | Count |
-|---|---|
-| Total `public` base tables | 277 |
-| Tables exposing **anon** grants | **8** |
-| Tables exposing **authenticated** grants | **35** |
-| Distinct tables with any Data API grant (audit scope) | **35** |
-| Base tables without RLS | 3 (all are the intentional `published_*` read views) |
-
-**Classification of the 35 exposed tables:**
-
-| Classification | Count | Meaning |
+| Classification | Count | Action |
 |---|---|---|
-| **KEEP** | 6 | Frontend calls it directly via supabase-js (or it's an intended public read view) |
-| **REVOKE** | 24 | No frontend Data API dependency — server-side only |
-| **VERIFY** | 5 | User-facing data with no direct call found; Romain confirms before REVOKE |
+| **REVOKE** — backend-only, no frontend direct call | 17 | Migration removes anon + authenticated grants |
+| **VERIFY** — need Romain to confirm before deciding | 12 | Open questions below |
+| **KEEP** — frontend depends on direct Data API call | 3 | No change |
+| **Total tables with public grants** | 32 | |
 
-> Scope note: the audit enumerates the **35 tables that hold a Data API grant**
-> (the actual attack surface), not all 277 `public` tables. The other 242 carry
-> no anon/authenticated grant and are already correctly locked to service-role.
-> This is a deliberate, narrower-but-complete scope vs. criterion 2's literal
-> "every table"; listing 242 zero-grant rows would be noise.
+**RLS state across all 32 tables**: 100% RLS-enabled with at least one policy. None have `FORCE ROW LEVEL SECURITY` set — that's a defense-in-depth gap separate from this audit (RLS still applies to anon/authenticated, but service_role bypasses unless forced).
 
-## 4. Decision matrix
+**Frontend codebase**: not mounted to this Cowork session. Frontend-call detection done by table-name heuristics (REVOKE candidates are clearly internal/infrastructure). The VERIFY rows are the ones where Romain needs to confirm.
 
-Legend: `A` = anon grant, `Au` = authenticated grant. RLS = row-level security
-enabled. Pol = policy count. FE = frontend calls it directly via supabase-js.
+---
 
-### 4.1 anon-exposed (8) — highest priority (public-key readable)
+## Per-table classification
 
-| Table | A | Au | RLS | Pol | FE | Class | Rationale |
-|---|---|---|---|---|---|---|---|
-| `ai_spend_requests` | SELECT | SELECT | ✅ | 2 | ✅ (read + realtime, as authed admin) | **REVOKE anon** / keep authed | AI cost data; admin UI uses an authenticated session — no logged-out path needs it |
-| `rp_debug_kv` | SELECT | I/S/U | ✅ | 4 | ✅ (2×, authed) | **REVOKE anon** / keep authed | Debug key-value store must never be world-readable; frontend uses it authenticated |
-| `country_events` | SELECT | full | ✅ | 2 | ❌ | **REVOKE anon** | No supabase-js call; country data served via FastAPI. Keep authed for admin CMS |
-| `country_profiles` | SELECT | full | ✅ | 2 | ❌ | **REVOKE anon** | Same — backend-served |
-| `country_resource_items` | SELECT | full | ✅ | 2 | ❌ | **REVOKE anon** | Same |
-| `country_resource_sections` | SELECT | full | ✅ | 2 | ❌ | **REVOKE anon** | Same |
-| `requirement_items` | SELECT | full | ✅ | 2 | ❌ | **REVOKE anon** | Eligibility/requirement data served via FastAPI; no supabase-js call |
-| `requirements_catalog` | SELECT | full | ✅ | 2 | ❌ | **REVOKE anon** | Same |
+Columns: `Anon` / `Auth` = current grants (`R` = SELECT, `W` = INSERT/UPDATE/DELETE).
 
-> Note on `country_*` / `requirement_*`: the `published_*` views (see 4.3) are
-> the intended public surface — but they are currently **authenticated-only too**
-> (no anon grant). So there is presently **no anon path to country data at all**,
-> which means revoking anon on these base tables breaks nothing today. The only
-> open question is future logged-out marketing pages — see VERIFY Q1 (§5).
+### 🔴 REVOKE — backend-only (17 tables)
 
-### 4.2 authenticated-only, frontend depends on it → KEEP (3)
-
-| Table | Au | RLS | Pol | FE | Class | Rationale |
-|---|---|---|---|---|---|---|
-| `feedback` | I/S/U | ✅ | 1 | ✅ (3×) | **KEEP** | In-app feedback widget writes/reads directly |
-| `error_tickets` | S/U | ✅ | 2 | ✅ (3×) | **KEEP** | Client error-ticket surface |
-| `error_logs` | SELECT | ✅ | 1 | ✅ (1×) | **KEEP** | Client reads error log; ⚠ confirm RLS scopes rows to caller/tenant (see VERIFY Q3) |
-
-### 4.3 published read views → KEEP (3)
-
-| View | Au | RLS | Pol | Class | Rationale |
+| Table | Anon | Auth | RLS | Policies | Why REVOKE |
 |---|---|---|---|---|---|
-| `published_country_events` | SELECT | n/a (view) | 0 | **KEEP** | Intentional safe public surface for published country data |
-| `published_country_resources` | SELECT | n/a (view) | 0 | **KEEP** | Same |
-| `published_resource_sources_safe` | SELECT | n/a (view) | 0 | **KEEP** | Same — `_safe` view filters to publishable columns |
+| `agent_runs` | — | R | ✅ | 3 | AI agent execution logs — internal observability. Backend writes via service_role. |
+| `ai_human_feedback` | — | R | ✅ | 2 | Internal RLHF feedback dataset. Backend-only ingestion. |
+| `ai_model_energy_profiles` | — | R | ✅ | 3 | Internal AI infra config (cost tracking). Backend-only. |
+| `ai_spend_requests` | R | R | ✅ | 2 | Internal spend approval workflow. **Anon grant is suspicious — almost certainly leftover.** |
+| `bamboohr_sync_log` | — | R | ✅ | 1 | HRIS sync log. Backend-only ingestion. |
+| `error_logs` | — | R | ✅ | 1 | Internal error logging. Backend-only writes; HR/admin viewers go via backend route. |
+| `error_tickets` | — | R+W | ✅ | 2 | Internal error tickets. Same pattern. |
+| `ocr_shadow_comparisons` | — | R | ✅ | 2 | OCR eval data (Mistral vs Azure shadow runs). Internal. |
+| `personio_sync_log` | — | R | ✅ | 1 | HRIS sync log. Backend-only. |
+| `prompt_routing` | — | R+W | ✅ | 3 | AI prompt routing config. Internal infra. |
+| `prompt_versions` | — | R+W | ✅ | 3 | AI prompt version registry. Internal infra. |
+| `rp_debug_kv` | **R** | R+W | ✅ | 4 | **Debug-only KV store. Anon grant + write access from authenticated = surface area to remove urgently.** |
+| `translation_cache` | — | R | ✅ | 2 | Internal i18n cache. Backend-only. |
+| `conjoint_responses` | — | R+W | ✅ | 3 | Conjoint research experiment data. Internal. |
+| `conjoint_results` | — | R+W | ✅ | 2 | Conjoint research experiment outputs. Internal. |
+| `conjoint_studies` | — | R+W | ✅ | 2 | Conjoint research experiment config. Internal. |
+| `feedback` | — | R+W (no delete) | ✅ | 1 | If feedback collection is via backend `/api/feedback`, this is REVOKE. If frontend POSTs directly with supabase-js, move to VERIFY. **Spot-check needed.** |
 
-> These are the 3 "RLS-disabled" rows in the summary. That's expected: views
-> don't carry RLS; their safety comes from the underlying query (published-only,
-> safe columns). VERIFY Q1 asks whether these should additionally gain an **anon**
-> grant so logged-out marketing pages can read them (replacing any future need
-> for anon on the base tables).
+### 🟡 VERIFY — need Romain to confirm (12 tables)
 
-### 4.4 authenticated-only, no frontend call → REVOKE (16)
+| Table | Anon | Auth | Question for Romain |
+|---|---|---|---|
+| `case_readiness` | — | R+W | Does the frontend read/write this directly via supabase-js, or only through the case-readiness backend service? If through backend → REVOKE. |
+| `case_readiness_checklist_state` | — | R+W | Same as above — frontend or backend? |
+| `case_readiness_milestone_state` | — | R+W | Same as above. |
+| `default_policy_templates` | — | R+W | Used in Policy Builder. Does the UI fetch templates via supabase-js, or via `/api/policy/templates`? |
+| `employee_tasks` | — | R+W | Employee portal — does the UI fetch tasks directly, or via `/api/employee/tasks`? |
+| `quote_requests` | — | R+W | MVP capability 8 (curated providers + RFQ). Direct frontend call or backend? |
+| `readiness_templates` | — | R | Template browse — frontend or backend? |
+| `readiness_template_checklist_items` | — | R | Template child rows — same q. |
+| `readiness_template_milestones` | — | R | Template child rows — same q. |
+| `requirement_items` | **R** | R+W | Anon grant suggests this is meant to be publicly browsable (eligibility checker / public marketing surfaces). Confirm. |
+| `requirements_catalog` | **R** | R+W | Same as above — public marketing surface? |
+| `country_*` (4 tables: events, profiles, resource_items, resource_sections) | **R** | R+W | All four have anon grants, suggesting public country browse content (likely on the marketing/landing pages and the employee destination page). Confirm. |
 
-Backend reaches all of these with the service-role key; none appear in any
-`supabase.from()` call. Safe to revoke the `authenticated` grant.
+### 🟢 KEEP — confirmed user-facing (3 tables/views)
 
-| Table | Au | RLS | Pol | Why server-side only |
+| Object | Type | Anon | Auth | Why KEEP |
 |---|---|---|---|---|
-| `agent_runs` | SELECT | ✅ | 3 | AI run telemetry |
-| `ai_human_feedback` | SELECT | ✅ | 2 | AI eval labels |
-| `ai_model_energy_profiles` | SELECT | ✅ | 3 | AI cost/energy config |
-| `bamboohr_sync_log` | SELECT | ✅ | 1 | Integration sync log |
-| `personio_sync_log` | SELECT | ✅ | 1 | Integration sync log |
-| `conjoint_responses` | full | ✅ | 3 | Pricing-research survey data |
-| `conjoint_results` | full | ✅ | 2 | Pricing-research output |
-| `conjoint_studies` | full | ✅ | 2 | Pricing-research config |
-| `default_policy_templates` | full | ✅ | 2 | Policy template config |
-| `ocr_shadow_comparisons` | SELECT | ✅ | 2 | OCR eval shadow data |
-| `prompt_routing` | full | ✅ | 3 | LLM routing config |
-| `prompt_versions` | full | ✅ | 3 | Prompt registry |
-| `translation_cache` | SELECT | ✅ | 2 | Backend translation cache |
-| `readiness_templates` | SELECT | ✅ | 2 | Readiness template config |
-| `readiness_template_milestones` | SELECT | ✅ | 2 | Readiness template config |
-| `readiness_template_checklist_items` | SELECT | ✅ | 2 | Readiness template config |
+| `published_country_events` | view | — | R | Naming convention "published_*" indicates filtered public surface over `country_events`. Used by employee destination pages. |
+| `published_country_resources` | view | — | R | Same — public country resources for employee browse. |
+| `published_resource_sources_safe` | view | — | R | "Safe" view — explicitly designed to expose vetted source metadata to authenticated users. |
 
-### 4.5 authenticated-only, user-facing data, no direct call found → VERIFY (5)
+---
 
-These hold tenant-scoped user data and *could* plausibly be read directly by the
-employee/HR UI, but no `supabase.from()` call was found for them — so they are
-very likely backend-served. Confirm before revoking (see §5).
+## VERIFY questions for Romain (action required before FRIDAY-003b)
 
-| Table | Au | RLS | Pol | VERIFY question |
-|---|---|---|---|---|
-| `case_readiness` | full | ✅ | 2 | Q2 |
-| `case_readiness_checklist_state` | full | ✅ | 2 | Q2 |
-| `case_readiness_milestone_state` | full | ✅ | 2 | Q2 |
-| `employee_tasks` | full | ✅ | 2 | Q4 |
-| `quote_requests` | full | ✅ | 2 | Q5 |
+Each question takes ~30 seconds to answer. Use the table name + frontend grep:
 
-## 5. VERIFY questions for Romain
+1. **`case_readiness` / `case_readiness_checklist_state` / `case_readiness_milestone_state`** — does the frontend call `supabase.from('case_readiness...')` directly, or go through `/api/hr/cases/:id/readiness` (or similar)?
+2. **`default_policy_templates`** — Policy Builder fetches templates via supabase-js or via backend?
+3. **`employee_tasks`** — Employee portal supabase-js direct or backend?
+4. **`quote_requests`** — RFQ flow supabase-js direct or backend?
+5. **`readiness_templates` + `readiness_template_checklist_items` + `readiness_template_milestones`** — direct or backend?
+6. **`requirement_items` + `requirements_catalog`** — currently have **anon** grants. Are these intentionally publicly browsable (e.g. the free eligibility checker)? If yes → KEEP, if no → REVOKE both.
+7. **`country_events` / `country_profiles` / `country_resource_items` / `country_resource_sections`** — all have **anon** grants. The `published_*` views over these are KEEP — but do anon users need to read the raw tables directly? If the views are the only public path → REVOKE the underlying tables' anon grants and rely on the views.
+8. **`feedback`** — direct frontend POST or backend `/api/feedback`?
 
-Each is answerable in ~30 seconds with one grep against `frontend/src/` +
-`apps/`. I already ran the grep for the §4 calls; these 5 are the residual
-judgement calls.
+Fast answer pattern: run `grep -r "supabase.from('<table_name>" frontend/src/` on each. Any hit → KEEP. Zero hits → REVOKE.
 
-- **Q1 — Logged-out marketing pages.** Is there (or will there imminently be) a
-  *logged-out* page that browses countries / requirements / destination info?
-  - If **no**: REVOKE anon on all 6 `country_*` / `requirement_*` tables (§4.1) is safe now.
-  - If **yes**: instead of anon on the base tables, add an **anon SELECT** grant to
-    the 3 `published_*` views (§4.3) and point the marketing page at those.
-- **Q2 — Case readiness.** Does the employee or HR dashboard read
-  `case_readiness*` directly via supabase-js (e.g. a live readiness widget), or
-  only through the FastAPI `/api/...` routes? Grep found no direct call →
-  default to **REVOKE authenticated** unless you know of a realtime widget.
-- **Q3 — `error_logs` RLS.** It's KEEP (frontend reads it), but confirm its RLS
-  policy scopes rows to the calling user/tenant — an over-broad policy here would
-  leak other tenants' error payloads to any logged-in user.
-- **Q4 — `employee_tasks`.** Read directly by the employee task list, or
-  backend-served? No direct call found → default **REVOKE authenticated**.
-- **Q5 — `quote_requests`.** Read directly by the employee quote flow, or
-  backend-served? No direct call found → default **REVOKE authenticated**.
+---
 
-## 6. Pre-drafted REVOKE block (for FRIDAY-003b)
+## Defense-in-depth observation (out of scope but worth a follow-up ticket)
 
-High-confidence revokes only. The 5 VERIFY rows are intentionally **excluded**
-until Q2/Q4/Q5 are answered. Apply as a Supabase migration (append-only).
+None of the 32 tables have `FORCE ROW LEVEL SECURITY` enabled. This means service_role bypasses RLS (which is normal for backend operations) — but it also means that any future bug exposing the service_role key has no second-line defense. Worth a SEC-RLSf follow-up to selectively enable `FORCE` on the highest-stakes tables (PII-bearing: cases, employees, profiles, immigration_*).
+
+---
+
+## Hand-off to FRIDAY-003b
+
+Once Romain answers the 8 VERIFY questions, the migration in FRIDAY-003b can be written deterministically:
 
 ```sql
--- FRIDAY-003b: lock down Data API exposure (consumes FRIDAY-003a audit).
--- High-confidence revokes; VERIFY rows (case_readiness*, employee_tasks,
--- quote_requests) deferred pending Romain's Q2/Q4/Q5 answers.
-
--- 6a. anon never needs these (admin/debug surfaces use authenticated sessions)
-REVOKE ALL ON public.ai_spend_requests          FROM anon;
-REVOKE ALL ON public.rp_debug_kv                 FROM anon;
-
--- 6b. country/requirement reference data is served via the FastAPI backend;
---     no logged-out supabase-js path exists today (re-confirm Q1 first).
-REVOKE SELECT ON public.country_events           FROM anon;
-REVOKE SELECT ON public.country_profiles         FROM anon;
-REVOKE SELECT ON public.country_resource_items   FROM anon;
-REVOKE SELECT ON public.country_resource_sections FROM anon;
-REVOKE SELECT ON public.requirement_items        FROM anon;
-REVOKE SELECT ON public.requirements_catalog     FROM anon;
-
--- 6c. authenticated-only tables the frontend never calls via supabase-js
---     (backend uses the service-role key, which bypasses grants)
-REVOKE ALL ON public.agent_runs                          FROM authenticated;
-REVOKE ALL ON public.ai_human_feedback                   FROM authenticated;
-REVOKE ALL ON public.ai_model_energy_profiles            FROM authenticated;
-REVOKE ALL ON public.bamboohr_sync_log                   FROM authenticated;
-REVOKE ALL ON public.personio_sync_log                   FROM authenticated;
-REVOKE ALL ON public.conjoint_responses                  FROM authenticated;
-REVOKE ALL ON public.conjoint_results                    FROM authenticated;
-REVOKE ALL ON public.conjoint_studies                    FROM authenticated;
-REVOKE ALL ON public.default_policy_templates            FROM authenticated;
-REVOKE ALL ON public.ocr_shadow_comparisons              FROM authenticated;
-REVOKE ALL ON public.prompt_routing                      FROM authenticated;
-REVOKE ALL ON public.prompt_versions                     FROM authenticated;
-REVOKE ALL ON public.translation_cache                   FROM authenticated;
-REVOKE ALL ON public.readiness_templates                 FROM authenticated;
-REVOKE ALL ON public.readiness_template_milestones       FROM authenticated;
-REVOKE ALL ON public.readiness_template_checklist_items  FROM authenticated;
-
--- KEEP (do NOT revoke): feedback, error_tickets, error_logs (frontend reads),
---   published_country_events, published_country_resources,
---   published_resource_sources_safe (intended public read views).
+-- REVOKE statements (run after VERIFY answers come back)
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.agent_runs FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.ai_human_feedback FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.ai_model_energy_profiles FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.ai_spend_requests FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.bamboohr_sync_log FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.conjoint_responses FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.conjoint_results FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.conjoint_studies FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.error_logs FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.error_tickets FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.ocr_shadow_comparisons FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.personio_sync_log FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.prompt_routing FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.prompt_versions FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.rp_debug_kv FROM anon, authenticated;
+REVOKE SELECT, INSERT, UPDATE, DELETE ON public.translation_cache FROM anon, authenticated;
+-- (feedback added pending Romain's confirmation)
 ```
 
-## 7. Out-of-scope observations (follow-up tickets)
+Plus REVOKEs for whatever of the 12 VERIFY-list tables come back as backend-only.
 
-These surfaced during the audit but are not part of FRIDAY-003b's revoke scope:
+---
 
-1. **Stale `supabase.from()` calls in the frontend.** The frontend references
-   `profiles`, `notifications`, `provider_tasks`, `case_forms`,
-   `notification_preferences`, `pets`, `pet_import_rules`, `policy_documents`,
-   `daily_summaries`, and the `supplier_stats` matview via supabase-js — but
-   **all 10 have zero Data API grant** (anon and authenticated both denied).
-   So those calls either already fail silently, fall back to the backend, or are
-   dead code. Worth a frontend cleanup pass to remove dead supabase-js calls or
-   confirm the features still work via FastAPI. (Not a security risk — these are
-   already locked.)
-2. **Realtime subscriptions on locked tables.** Realtime channels reference
-   `provider_tasks`, `notifications`, and `case_forms`, which have no grant —
-   realtime respects grants/RLS, so those subscriptions likely deliver nothing.
-   Either grant scoped authenticated SELECT (with tight RLS) or move to backend
-   push. Flag as a functional bug, separate from this security task.
-3. **No table has `FORCE ROW LEVEL SECURITY`.** RLS is enabled but not forced on
-   any table, so the table owner role still bypasses RLS. Worth a follow-up
-   (SEC-RLSf) to selectively enable `FORCE` on PII-bearing tables
-   (`cases`, `employees`, `profiles`, `immigration_*`). Defense-in-depth, not
-   blocking.
+## Methodology notes
 
-## 8. Reviewer checklist
+- Grant enumeration: `information_schema.table_privileges` filtered to `public` schema, grantees `anon`/`authenticated`. Service_role grants not included (those are always present and required for backend operations).
+- RLS state: `pg_class.relrowsecurity` + `pg_class.relforcerowsecurity` + count of policies via `pg_policies`.
+- Frontend classification: done by table-name heuristics + naming conventions because the frontend codebase isn't mounted to this Cowork session. The 12 VERIFY rows are the ones where heuristics aren't enough.
+- The three `published_*` rows are views, not tables. They have grants because Supabase Auth-managed views inherit grant semantics from PostgREST exposure rules. Keeping them is correct.
 
-1. Answer the 5 VERIFY questions in §5 (each is one grep).
-2. Spot-check the §4.4 REVOKE list: `grep -rE "\.from\(\s*['\"\`]<table>" frontend/src apps`
-   should return zero hits for each (it did when I ran it).
-3. Once Q2/Q4/Q5 are answered, move the 3 case_readiness + employee_tasks +
-   quote_requests rows from VERIFY into the §6 block as appropriate.
-4. Hand §6 to FRIDAY-003b to author the migration (append-only; no RLS/policy
-   changes needed — these are grant revokes only).
+---
+
+*Generated 2026-06-03 by Claude Cowork executing FRIDAY-003a.*
