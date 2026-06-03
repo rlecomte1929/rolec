@@ -902,6 +902,51 @@ export const hrAPI = {
     return response.data;
   },
 
+  // ── IMM-18: GDPR erasure-request review queue ────────────────────────────
+
+  /** GET /api/hr/immigration/erasure-requests */
+  listErasureRequests: async (
+    statusFilter: 'pending' | 'completed' | 'rejected' | 'all' = 'pending',
+  ): Promise<{
+    requests: Array<{
+      id: string;
+      case_id: string;
+      employee_id: string;
+      status: string;
+      reason: string | null;
+      requested_at: string | null;
+      statutory_due_at: string | null;
+      reviewed_by: string | null;
+      reviewed_at: string | null;
+      review_notes: string | null;
+      completed_at: string | null;
+    }>;
+    pending_count: number;
+  }> => {
+    const response = await api.get('/api/hr/immigration/erasure-requests', {
+      params: { status_filter: statusFilter },
+    });
+    return response.data;
+  },
+
+  /** POST /api/hr/cases/{caseId}/immigration/process-erasure-request */
+  processErasureRequest: async (
+    caseId: string,
+    payload: { request_id: string; decision: 'approve' | 'reject'; review_notes?: string },
+  ): Promise<{
+    request_id: string;
+    status: string;
+    profiles_anonymised: number;
+    reviewed_by: string;
+    reviewed_at: string;
+  }> => {
+    const response = await api.post(
+      `/api/hr/cases/${caseId}/immigration/process-erasure-request`,
+      payload,
+    );
+    return response.data;
+  },
+
   // ── AIQ-40-C: RFQ flow ────────────────────────────────────────────────────
 
   /** POST /api/hr/rfq-requests */
