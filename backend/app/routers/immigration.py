@@ -101,6 +101,11 @@ class ConsentBody(BaseModel):
     consent_text_hash: Optional[str] = None   # SHA-256 of displayed text
 
 
+class WithdrawConsentBody(BaseModel):
+    purpose: str                 # e.g. 'vendor_sharing'
+    reason: Optional[str] = None
+
+
 class HrProfileFields(BaseModel):
     employer_name: Optional[str] = None
     employer_reg_number: Optional[str] = None
