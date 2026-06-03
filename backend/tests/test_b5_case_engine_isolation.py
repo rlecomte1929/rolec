@@ -42,6 +42,15 @@ class TestRceTenantRlsStatic:
         assert re.search(r"revoke\s+all\s+on\s+rce\.", migration_sql, re.IGNORECASE)
         assert re.search(r"to\s+service_role", migration_sql, re.IGNORECASE)
 
+    def test_safe_default_revokes_authenticated(self, migration_sql: str) -> None:
+        # C1-01 left permissive DML grants on some rce tables (extraction_agents,
+        # agent_versions). The §4a safe-default loop must revoke authenticated too,
+        # not just anon, or those tables keep stale INSERT/UPDATE/DELETE grants.
+        assert re.search(
+            r"revoke\s+all\s+on\s+rce\.[^;]*from\s+anon\s*,\s*authenticated",
+            migration_sql, re.IGNORECASE,
+        ), "safe-default loop must revoke ALL from both anon AND authenticated"
+
     def test_no_permissive_authenticated_true_on_tenant_tables(self, migration_sql: str) -> None:
         # No blanket `for all to authenticated ... using (true)` may remain.
         assert not re.search(
