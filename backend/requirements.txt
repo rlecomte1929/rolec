@@ -60,3 +60,9 @@ statsmodels>=0.14
 # [Parker-I] Neural translation layer — DeepL Pro adapter (lazy-imported; NLLB-200 is
 # reached over HTTP via `requests`, no heavy local-inference dep). See ADR-002.
 deepl>=1.18
+# SEC-006 (AIQ-478): server-side upload validation.
+# python-magic does content-based MIME detection (needs the system libmagic
+# library - Render python 3.11-slim ships it via apt; see backend/README.md).
+# Werkzeug is pulled in ONLY for secure_filename (filename sanitisation).
+python-magic==0.4.27
+Werkzeug==3.0.4

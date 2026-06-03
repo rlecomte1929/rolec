@@ -68,7 +68,24 @@ const PRIORITY_PILL: Record<string, string> = {
   low: 'bg-slate-100 text-slate-600 ring-slate-200',
 };
 
+const PRIORITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
 const OWNER_TONES = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-sky-100 text-sky-700', 'bg-rose-100 text-rose-700', 'bg-violet-100 text-violet-700'];
+
+/**
+ * The queue's "open" universe: canonical granular statuses + synthetic item
+ * statuses ('open' = provider invites, 'pending' = exception requests).
+ *
+ * Mirrors the legacy workload page's client-side filter. Passing
+ * `status: 'open'` to the API instead literal-matches status == "open", which
+ * silently drops every canonical item (they use the granular statuses) and
+ * leaves only synthetic invites — that mismatch is what made the "Open" KPI
+ * and the table row count disagree.
+ */
+const OPEN_QUEUE_STATUSES = new Set([
+  'new', 'triaged', 'assigned', 'in_progress', 'blocked', 'waiting', 'reopened',
+  'open', 'pending',
+]);
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -165,14 +182,16 @@ export function AdminReviewQueueV2Page() {
     setBackendUnavailable(false);
     const [statsRes, listRes] = await Promise.allSettled([
       adminReviewQueueAPI.getStats(),
-      adminReviewQueueAPI.list({ status: 'open', limit: 200, sort: 'priority' }),
+      adminReviewQueueAPI.list({ limit: 200, sort: 'priority' }),
     ]);
     if (statsRes.status === 'fulfilled') {
       setStats(statsRes.value as Record<string, unknown>);
     }
     if (listRes.status === 'fulfilled') {
       const data = listRes.value as { items?: QueueItem[] };
-      setItems(data.items ?? []);
+      // status filtering happens client-side: the API returns every status
+      // when unfiltered, so keep only the open universe (see OPEN_QUEUE_STATUSES).
+      setItems((data.items ?? []).filter((it) => OPEN_QUEUE_STATUSES.has(it.status)));
     } else {
       // 500s, network errors, missing tables — all degrade to "no data" with
       // a soft banner. Avoids the red "Request failed with status code 500"
@@ -189,8 +208,10 @@ export function AdminReviewQueueV2Page() {
 
   // KPIs: derived from items + stats where available.
   const kpis = useMemo(() => {
-    const open = (stats as { by_status?: Record<string, number> })?.by_status?.open
-      ?? items.length;
+    // "Open" counts exactly the rows the table renders. (The old code read
+    // stats.by_status.open, which is keyed by granular status and has no
+    // aggregate "open" bucket — it was effectively undefined.)
+    const open = items.length;
     const highPriority = items.filter((it) => it.priority_band === 'high').length;
     const unassigned = items.filter((it) => !it.assigned_to_user_id).length;
     const closedTodayRaw = (stats as { closed_today?: number })?.closed_today;
@@ -216,6 +237,7 @@ export function AdminReviewQueueV2Page() {
         header: 'ID',
         defaultWidth: 85,
         minWidth: 70,
+        sortValue: (it) => it.id ?? '',
         cell: (it) => <span className="font-mono text-[11.5px] text-slate-500">{shortId(it.id)}</span>,
       },
       {
@@ -223,6 +245,7 @@ export function AdminReviewQueueV2Page() {
         header: 'Type',
         defaultWidth: 150,
         minWidth: 110,
+        sortValue: (it) => QUEUE_TYPE_LABELS[it.queue_item_type] ?? it.queue_item_type ?? '',
         cell: (it) => (
           <Pill className="bg-slate-100 text-slate-700 ring-slate-200">
             {QUEUE_TYPE_LABELS[it.queue_item_type] ?? it.queue_item_type}
@@ -234,6 +257,7 @@ export function AdminReviewQueueV2Page() {
         header: 'Item',
         defaultWidth: 280,
         minWidth: 180,
+        sortValue: (it) => it.title?.toLowerCase() ?? '',
         cell: (it) => <span className="text-slate-900">{it.title}</span>,
       },
       {
@@ -241,6 +265,7 @@ export function AdminReviewQueueV2Page() {
         header: 'Tenant',
         defaultWidth: 140,
         minWidth: 100,
+        sortValue: (it) => (it.country_code ? it.country_code.toUpperCase() : 'Internal'),
         cell: (it) => {
           // No tenant field on QueueItem; surface country_code or "Internal".
           const label = it.country_code ? it.country_code.toUpperCase() : 'Internal';
@@ -252,6 +277,7 @@ export function AdminReviewQueueV2Page() {
         header: 'Age',
         defaultWidth: 70,
         minWidth: 50,
+        sortValue: (it) => (it.created_at ? Date.parse(it.created_at) : 0),
         cell: (it) => <span className="text-[12px] text-slate-500">{relativeAge(it.created_at)}</span>,
       },
       {
@@ -259,6 +285,7 @@ export function AdminReviewQueueV2Page() {
         header: 'Priority',
         defaultWidth: 100,
         minWidth: 80,
+        sortValue: (it) => PRIORITY_RANK[it.priority_band] ?? 0,
         cell: (it) => (
           <Pill className={PRIORITY_PILL[it.priority_band] ?? PRIORITY_PILL.low}>
             {it.priority_band || 'low'}
@@ -270,6 +297,7 @@ export function AdminReviewQueueV2Page() {
         header: 'Owner',
         defaultWidth: 150,
         minWidth: 110,
+        sortValue: (it) => (it.assigned_to_user_id ? ownerInitials(it.assigned_to_user_id) : ''),
         cell: (it) => {
           if (!it.assigned_to_user_id) {
             return <span className="text-[12px] italic text-slate-400">Unassigned</span>;

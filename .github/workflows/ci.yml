@@ -171,3 +171,26 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
         run: python scripts/check_rls_coverage.py
+
+  storage-bucket-check:
+    # SEC-006: assert no storage bucket holding case/HR/employee documents is
+    # public. A public bucket exposes every object by URL (the anon key ships in
+    # the frontend bundle). Mirrors rls-coverage: needs a read-only DATABASE_URL
+    # secret; gate on a repo variable because secrets.* is not allowed in a
+    # job-level if:.
+    name: Storage bucket visibility check
+    runs-on: ubuntu-latest
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Run storage bucket visibility check
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/storage_bucket_check.py
+
