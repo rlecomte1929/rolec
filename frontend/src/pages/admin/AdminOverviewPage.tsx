@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
-import { adminAPI, suppliersAPI } from '../../api/client';
+import { adminAPI, suppliersAPI, adminReviewQueueAPI } from '../../api/client';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
@@ -70,7 +70,8 @@ type OverviewStats = {
   assignments: number;
   companiesWithPolicy: number;
   activeSuppliers: number;
-  supportOpen: number;
+  reviewOpen: number;
+  reviewUnassigned: number;
   relocationsBlocked: number;
 };
 
@@ -78,7 +79,7 @@ export const AdminOverviewPage: React.FC = () => {
   const role = normalizeStoredRole(getAuthItem('relopass_role'));
   const [stats, setStats] = useState<OverviewStats>({
     companies: 42, hrUsers: 168, employees: 1204, assignments: 1204,
-    companiesWithPolicy: 38, activeSuppliers: 7, supportOpen: 24, relocationsBlocked: 0,
+    companiesWithPolicy: 38, activeSuppliers: 7, reviewOpen: 0, reviewUnassigned: 0, relocationsBlocked: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -93,7 +94,9 @@ export const AdminOverviewPage: React.FC = () => {
           adminAPI.listEmployees(),
           adminAPI.listAssignments(),
           adminAPI.listPolicyOverview(),
-          adminAPI.listSupportCases({ status: 'open' }),
+          // Review-queue tile must read the SAME source as /admin/review-queue
+          // (the review_queue_items table via getStats), not support cases.
+          adminReviewQueueAPI.getStats(),
           adminAPI.listRelocations({ status: 'blocked' }),
           suppliersAPI.list({ status: 'active' }),
         ]);
@@ -105,7 +108,7 @@ export const AdminOverviewPage: React.FC = () => {
         const employeesRes   = val(results[2]) as { employees?: unknown[] } | null;
         const assignmentsRes = val(results[3]) as { assignments?: unknown[] } | null;
         const policyRes      = val(results[4]) as { companies?: { policy_status?: string }[] } | null;
-        const supportRes     = val(results[5]) as { support_cases?: unknown[] } | null;
+        const reviewStatsRes = val(results[5]) as { by_status?: Record<string, number>; unassigned_count?: number } | null;
         const relocationsRes = val(results[6]) as { relocations?: unknown[] } | null;
         const suppliersRes   = val(results[7]) as { suppliers?: unknown[] } | null;
 
@@ -120,7 +123,9 @@ export const AdminOverviewPage: React.FC = () => {
           assignments:        (assignmentsRes?.assignments ?? []).length || 1204,
           companiesWithPolicy: companiesWithPolicy || 38,
           activeSuppliers:    (suppliersRes?.suppliers ?? []).length || 7,
-          supportOpen:        (supportRes?.support_cases ?? []).length || 24,
+          // No `|| fallback`: 0 is a valid count and must match /admin/review-queue.
+          reviewOpen:         reviewStatsRes?.by_status?.open ?? 0,
+          reviewUnassigned:   reviewStatsRes?.unassigned_count ?? 0,
           relocationsBlocked: (relocationsRes?.relocations ?? []).length || 0,
         });
       } catch { /* keep defaults */ }
@@ -160,7 +165,7 @@ export const AdminOverviewPage: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Active Tenants"    value={stats.companies}   sub="+3 this quarter"               loading={loading} />
         <StatCard label="Cases in Flight"   value={stats.assignments} sub="across 4 corridors top"        loading={loading} />
-        <StatCard label="Open Review Items" value={stats.supportOpen} sub="8 awaiting assignment"         loading={loading} />
+        <StatCard label="Open Review Items" value={stats.reviewOpen} sub={`${stats.reviewUnassigned} awaiting assignment`} loading={loading} />
         <StatCard label="System SLA (30D)"  value="96%"               sub="target 95%"                    loading={loading} />
       </div>
 
@@ -170,8 +175,8 @@ export const AdminOverviewPage: React.FC = () => {
           to={buildRoute('adminReviewQueue')}
           icon="🔁"
           title="Review queue"
-          subtitle={`${stats.supportOpen} items · 8 awaiting assignment`}
-          metric={stats.supportOpen}
+          subtitle={`${stats.reviewOpen} items · ${stats.reviewUnassigned} awaiting assignment`}
+          metric={stats.reviewOpen}
           loading={loading}
           rows={[
             { label: 'Vendor approvals',   value: 9 },
