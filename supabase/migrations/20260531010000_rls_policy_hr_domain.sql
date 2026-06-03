@@ -129,6 +129,185 @@ grant execute on function public.policy_version_in_company_scope(uuid) to authen
 grant execute on function public.policy_config_version_in_company_scope(uuid) to authenticated, service_role;
 
 -- ──────────────────────────────────────────────────────────────────────────
+-- Ghost-table reconstruction (prod-as-oracle, idempotent).
+-- The groups below enable RLS on compliance_*, canonical_policy_*, and
+-- hr_policies, but those tables were created out-of-band on prod by the
+-- SQLAlchemy ORM (ix_-prefixed indexes, varchar/timestamp-without-tz, text
+-- JSON columns, no CHECK constraints) and have no repo CREATE — so a fresh
+-- replay / Supabase Preview hits "relation does not exist" before the RLS loop.
+-- Recreate them here exactly as they live on prod (column types, PK/FK,
+-- indexes verified against information_schema + pg_get_constraintdef on
+-- 2026-05-31). On prod every statement is a no-op (IF NOT EXISTS). RLS,
+-- policies, and `revoke ... from anon` are applied by the groups below.
+-- FK order: documents → chunks → facts/validation_errors.
+
+create table if not exists public.canonical_policy_documents (
+  id                        varchar      not null,
+  company_id                varchar      not null,
+  source_policy_document_id varchar,
+  source_type               varchar      not null,
+  source_uri                varchar,
+  filename                  varchar,
+  mime_type                 varchar,
+  title                     varchar,
+  policy_scope              varchar,
+  document_type             varchar,
+  version_label             varchar,
+  effective_date            date,
+  default_currency          varchar,
+  assignment_types_json     text         not null,
+  raw_text                  text,
+  normalized_text           text,
+  metadata_json             text         not null,
+  ingestion_status          varchar      not null,
+  extraction_status         varchar      not null,
+  created_at                timestamp    not null default now(),
+  updated_at                timestamp    not null default now(),
+  constraint canonical_policy_documents_pkey primary key (id)
+);
+create index if not exists ix_canonical_policy_documents_company_id
+  on public.canonical_policy_documents (company_id);
+create index if not exists ix_canonical_policy_documents_id
+  on public.canonical_policy_documents (id);
+create index if not exists ix_canonical_policy_documents_source_policy_document_id
+  on public.canonical_policy_documents (source_policy_document_id);
+
+create table if not exists public.canonical_policy_document_chunks (
+  id                           varchar   not null,
+  company_id                   varchar   not null,
+  canonical_policy_document_id varchar   not null,
+  chunk_index                  integer   not null,
+  section_path                 varchar,
+  structure_type               varchar,
+  page_number                  integer,
+  char_start                   integer,
+  char_end                     integer,
+  text_content                 text      not null,
+  metadata_json                text      not null,
+  created_at                   timestamp not null default now(),
+  constraint canonical_policy_document_chunks_pkey primary key (id),
+  constraint canonical_policy_document_chu_canonical_policy_document_id_fkey
+    foreign key (canonical_policy_document_id)
+    references public.canonical_policy_documents (id) on delete cascade
+);
+create index if not exists ix_canonical_policy_document_chunks_canonical_policy_do_5f65
+  on public.canonical_policy_document_chunks (canonical_policy_document_id);
+create index if not exists ix_canonical_policy_document_chunks_company_id
+  on public.canonical_policy_document_chunks (company_id);
+create index if not exists ix_canonical_policy_document_chunks_id
+  on public.canonical_policy_document_chunks (id);
+
+create table if not exists public.canonical_policy_facts (
+  id                                 varchar          not null,
+  company_id                         varchar          not null,
+  canonical_policy_document_id       varchar          not null,
+  canonical_policy_document_chunk_id varchar          not null,
+  source_policy_document_id          varchar,
+  phase                              varchar,
+  benefit_category                   varchar,
+  value_type                         varchar          not null,
+  frequency                          varchar,
+  provider_entity                    varchar,
+  title                              varchar,
+  description                        text,
+  eligibility_json                   text             not null,
+  assignment_types_json              text             not null,
+  amount                             numeric,
+  currency                           varchar,
+  percentage                         double precision,
+  quantity                           double precision,
+  duration_value                     integer,
+  duration_unit                      varchar,
+  value_text                         text,
+  is_taxable                         boolean,
+  reimbursement_required             boolean,
+  source_quote                       text,
+  confidence_score                   double precision,
+  raw_payload_json                   text             not null,
+  created_at                         timestamp        not null default now(),
+  constraint canonical_policy_facts_pkey primary key (id),
+  constraint canonical_policy_facts_canonical_policy_document_id_fkey
+    foreign key (canonical_policy_document_id)
+    references public.canonical_policy_documents (id) on delete cascade,
+  constraint canonical_policy_facts_canonical_policy_document_chunk_id_fkey
+    foreign key (canonical_policy_document_chunk_id)
+    references public.canonical_policy_document_chunks (id) on delete cascade
+);
+create index if not exists ix_canonical_policy_facts_benefit_category
+  on public.canonical_policy_facts (benefit_category);
+create index if not exists ix_canonical_policy_facts_canonical_policy_document_chunk_id
+  on public.canonical_policy_facts (canonical_policy_document_chunk_id);
+create index if not exists ix_canonical_policy_facts_canonical_policy_document_id
+  on public.canonical_policy_facts (canonical_policy_document_id);
+create index if not exists ix_canonical_policy_facts_company_id
+  on public.canonical_policy_facts (company_id);
+create index if not exists ix_canonical_policy_facts_id
+  on public.canonical_policy_facts (id);
+create index if not exists ix_canonical_policy_facts_phase
+  on public.canonical_policy_facts (phase);
+create index if not exists ix_canonical_policy_facts_source_policy_document_id
+  on public.canonical_policy_facts (source_policy_document_id);
+create index if not exists ix_canonical_policy_facts_value_type
+  on public.canonical_policy_facts (value_type);
+
+create table if not exists public.canonical_policy_fact_validation_errors (
+  id                                 varchar   not null,
+  company_id                         varchar   not null,
+  canonical_policy_document_id       varchar   not null,
+  canonical_policy_document_chunk_id varchar   not null,
+  raw_payload_json                   text      not null,
+  errors_json                        text      not null,
+  created_at                         timestamp not null default now(),
+  constraint canonical_policy_fact_validation_errors_pkey primary key (id),
+  constraint canonical_policy_fact_validat_canonical_policy_document_id_fkey
+    foreign key (canonical_policy_document_id)
+    references public.canonical_policy_documents (id) on delete cascade,
+  constraint canonical_policy_fact_validat_canonical_policy_document_ch_fkey
+    foreign key (canonical_policy_document_chunk_id)
+    references public.canonical_policy_document_chunks (id) on delete cascade
+);
+create index if not exists ix_canonical_policy_fact_validation_errors_canonical_po_7031
+  on public.canonical_policy_fact_validation_errors (canonical_policy_document_chunk_id);
+create index if not exists ix_canonical_policy_fact_validation_errors_canonical_po_7d93
+  on public.canonical_policy_fact_validation_errors (canonical_policy_document_id);
+create index if not exists ix_canonical_policy_fact_validation_errors_company_id
+  on public.canonical_policy_fact_validation_errors (company_id);
+create index if not exists ix_canonical_policy_fact_validation_errors_id
+  on public.canonical_policy_fact_validation_errors (id);
+
+create table if not exists public.compliance_actions (
+  id            text not null,
+  assignment_id text not null,
+  check_id      text not null,
+  action_type   text not null,
+  notes         text,
+  actor_user_id text not null,
+  created_at    text not null,
+  constraint compliance_actions_pkey primary key (id)
+);
+
+create table if not exists public.compliance_reports (
+  id            text not null,
+  assignment_id text not null,
+  report_json   text not null,
+  created_at    text not null,
+  constraint compliance_reports_pkey primary key (id)
+);
+
+create table if not exists public.hr_policies (
+  id             text    not null,
+  policy_json    text    not null,
+  status         text    not null default 'draft'::text,
+  company_entity text,
+  effective_date text,
+  created_at     text    not null,
+  updated_at     text    not null,
+  created_by     text,
+  version        integer not null default 1,
+  constraint hr_policies_pkey primary key (id)
+);
+
+-- ──────────────────────────────────────────────────────────────────────────
 -- GROUP A.1 — direct company_id (text), company-scoped HR read+write
 -- ──────────────────────────────────────────────────────────────────────────
 do $$
