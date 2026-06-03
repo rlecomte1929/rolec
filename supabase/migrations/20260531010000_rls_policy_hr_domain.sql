@@ -38,6 +38,29 @@ begin;
 -- that table's own RLS; STABLE so PostgreSQL hoists them out of row loops).
 -- ──────────────────────────────────────────────────────────────────────────
 
+-- public.is_admin() is referenced by the policies below but is created out-of-band
+-- on prod (ghost function — see line 15). Define it idempotently here, prod-as-oracle
+-- (exact body from live pg_get_functiondef), so a fresh replay / Supabase Preview can
+-- build these policies. On prod this CREATE OR REPLACE is a no-op (identical
+-- definition); admin_allowlist exists from 20260221105601_remote_schema.
+-- prod's admin_allowlist also carries a user_id uuid column added out-of-band (the
+-- repo baseline lacks it); add it idempotently so is_admin() can read a.user_id =
+-- auth.uid() (uuid). On prod this ADD COLUMN IF NOT EXISTS no-ops.
+alter table public.admin_allowlist add column if not exists user_id uuid;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable security definer
+set search_path to ''
+as $is_admin$
+  select exists (
+    select 1
+    from public.admin_allowlist a
+    where a.user_id = auth.uid()
+  );
+$is_admin$;
+
 -- Company IDs (as text) the current authenticated user is an HR member of.
 create or replace function public.hr_company_ids()
 returns setof text
