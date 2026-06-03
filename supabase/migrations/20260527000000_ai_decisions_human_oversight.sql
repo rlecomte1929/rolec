@@ -56,12 +56,15 @@ CREATE TRIGGER trg_ai_decisions_updated_at
 ALTER TABLE public.ai_decisions ENABLE ROW LEVEL SECURITY;
 
 -- Service role full access (backend writes through here)
-CREATE POLICY IF NOT EXISTS "service_role_all_ai_decisions"
+-- (CREATE POLICY has no IF NOT EXISTS — use DROP+CREATE for idempotent replay.)
+DROP POLICY IF EXISTS "service_role_all_ai_decisions" ON public.ai_decisions;
+CREATE POLICY "service_role_all_ai_decisions"
   ON public.ai_decisions FOR ALL
   USING (auth.role() = 'service_role');
 
 -- HR / admin can read decisions for their own company
-CREATE POLICY IF NOT EXISTS "hr_read_own_company_ai_decisions"
+DROP POLICY IF EXISTS "hr_read_own_company_ai_decisions" ON public.ai_decisions;
+CREATE POLICY "hr_read_own_company_ai_decisions"
   ON public.ai_decisions FOR SELECT
   USING (
     auth.role() = 'authenticated'
@@ -72,7 +75,8 @@ CREATE POLICY IF NOT EXISTS "hr_read_own_company_ai_decisions"
   );
 
 -- Authenticated users can read their own decisions (covers admin and HR self-audit)
-CREATE POLICY IF NOT EXISTS "user_read_own_ai_decisions"
+DROP POLICY IF EXISTS "user_read_own_ai_decisions" ON public.ai_decisions;
+CREATE POLICY "user_read_own_ai_decisions"
   ON public.ai_decisions FOR SELECT
   USING (
     auth.role() = 'authenticated'

@@ -3,21 +3,30 @@
 
 begin;
 
+-- NOTE: these three tables exist on prod as SQLAlchemy ORM-created tables (varchar
+-- keys, untyped timestamps, text columns, no CHECK constraints, no vendors FK). The
+-- original uuid CREATE below never took effect on prod — `if not exists` no-op'd over
+-- the ORM tables. A fresh replay, however, has no pre-existing tables, so it must
+-- reproduce prod's REAL shape — otherwise downstream FKs that reference suppliers(id)
+-- with a varchar key (e.g. 20260524000002 matching_5a.assignment_outcomes.supplier_id)
+-- fail with "incompatible types: character varying and uuid" (SQLSTATE 42804).
+-- Reconstructed prod-as-oracle (live introspection 2026-06-03). Repo-only; prod no-ops.
+
 -- A. suppliers
 create table if not exists public.suppliers (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  legal_name text null,
-  status text not null default 'active' check (status in ('active', 'inactive', 'draft')),
+  id varchar primary key,
+  name varchar not null,
+  legal_name varchar null,
+  status varchar not null,
   description text null,
-  website text null,
-  contact_email text null,
-  contact_phone text null,
-  languages_supported text[] not null default '{}',
-  verified boolean not null default false,
-  vendor_id uuid null references public.vendors(id) on delete set null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  website varchar null,
+  contact_email varchar null,
+  contact_phone varchar null,
+  languages_supported text null,
+  verified boolean not null,
+  vendor_id varchar null,
+  created_at timestamp not null default now(),
+  updated_at timestamp not null default now()
 );
 
 create index if not exists idx_suppliers_status on public.suppliers(status);
@@ -25,21 +34,22 @@ create index if not exists idx_suppliers_vendor_id on public.suppliers(vendor_id
 
 -- B. supplier_service_capabilities
 create table if not exists public.supplier_service_capabilities (
-  id uuid primary key default gen_random_uuid(),
-  supplier_id uuid not null references public.suppliers(id) on delete cascade,
-  service_category text not null,
-  coverage_scope_type text not null default 'country' check (coverage_scope_type in ('global', 'country', 'city')),
-  country_code text null,
-  city_name text null,
-  specialization_tags text[] not null default '{}',
+  id varchar primary key,
+  supplier_id varchar not null references public.suppliers(id) on delete cascade,
+  service_category varchar not null,
+  coverage_scope_type varchar not null,
+  country_code varchar null,
+  city_name varchar null,
+  specialization_tags text null,
   min_budget numeric null,
   max_budget numeric null,
-  family_support boolean not null default false,
-  corporate_clients boolean not null default false,
-  remote_support boolean not null default false,
+  family_support boolean not null,
+  corporate_clients boolean not null,
+  remote_support boolean not null,
   notes text null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  created_at timestamp not null default now(),
+  updated_at timestamp not null default now(),
+  price_description text null
 );
 
 create index if not exists idx_supplier_capabilities_supplier on public.supplier_service_capabilities(supplier_id);
@@ -48,16 +58,21 @@ create index if not exists idx_supplier_capabilities_country on public.supplier_
 create index if not exists idx_supplier_capabilities_city on public.supplier_service_capabilities(city_name);
 
 -- C. supplier_scoring_metadata (1:1 with supplier)
+-- admin_score / manual_priority are added later by 20260407; price_range_* and
+-- price_display exist on prod out-of-band (no migration) and are reconstructed here.
 create table if not exists public.supplier_scoring_metadata (
-  supplier_id uuid primary key references public.suppliers(id) on delete cascade,
-  average_rating numeric null,
-  review_count int not null default 0,
-  response_sla_hours int null,
-  preferred_partner boolean not null default false,
-  premium_partner boolean not null default false,
-  last_verified_at timestamptz null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  supplier_id varchar primary key references public.suppliers(id) on delete cascade,
+  average_rating double precision null,
+  review_count integer not null,
+  response_sla_hours integer null,
+  preferred_partner boolean not null,
+  premium_partner boolean not null,
+  last_verified_at timestamp null,
+  created_at timestamp not null default now(),
+  updated_at timestamp not null default now(),
+  price_range_min_eur integer null,
+  price_range_max_eur integer null,
+  price_display text null
 );
 
 -- RLS

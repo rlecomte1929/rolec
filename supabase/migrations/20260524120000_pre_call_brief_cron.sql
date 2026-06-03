@@ -14,34 +14,41 @@
 -- Requires: pg_cron and pg_net extensions
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- Remove existing job if present (idempotent)
-select cron.unschedule('pre-call-brief-poll')
-where exists (
-  select 1 from cron.job where jobname = 'pre-call-brief-poll'
-);
+-- Replay-safe guard — skips when pg_cron/pg_net unavailable (local/Preview replay).
+-- On prod both exist, so the schedule runs unchanged. (Pattern: 20260523010000.)
+DO $outer$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
+  AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') THEN
 
--- Schedule every 15 minutes
-select cron.schedule(
-  'pre-call-brief-poll',
-  '*/15 * * * *',
-  $$
-    select net.http_post(
-      url     := current_setting('app.supabase_url') || '/functions/v1/pre-call-brief',
-      headers := jsonb_build_object(
-        'Content-Type',  'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-      ),
-      body    := '{}'::jsonb
-    )
-    as request_id;
-  $$
-);
+    -- Remove existing job if present (idempotent)
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'pre-call-brief-poll') THEN
+      PERFORM cron.unschedule('pre-call-brief-poll');
+    END IF;
 
--- Verify job was created
-do $$
-begin
-  if not exists (select 1 from cron.job where jobname = 'pre-call-brief-poll') then
-    raise exception 'Failed to schedule pre-call-brief-poll cron job';
-  end if;
-  raise notice 'pre-call-brief-poll scheduled every 15 minutes ✓';
-end $$;
+    -- Schedule every 15 minutes
+    PERFORM cron.schedule(
+      'pre-call-brief-poll',
+      '*/15 * * * *',
+      $cron$
+        select net.http_post(
+          url     := current_setting('app.supabase_url') || '/functions/v1/pre-call-brief',
+          headers := jsonb_build_object(
+            'Content-Type',  'application/json',
+            'Authorization', 'Bearer ' || current_setting('app.service_role_key')
+          ),
+          body    := '{}'::jsonb
+        )
+        as request_id;
+      $cron$
+    );
+
+    -- Verify job was created
+    IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'pre-call-brief-poll') THEN
+      RAISE EXCEPTION 'Failed to schedule pre-call-brief-poll cron job';
+    END IF;
+    RAISE NOTICE 'pre-call-brief-poll scheduled every 15 minutes ✓';
+  ELSE
+    RAISE NOTICE 'pg_cron or pg_net not available — skipping pre-call-brief cron schedule.';
+  END IF;
+END $outer$;

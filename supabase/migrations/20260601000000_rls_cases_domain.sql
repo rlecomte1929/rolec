@@ -192,6 +192,111 @@ grant execute on function public.rls_can_access_case_uuid(uuid) to authenticated
 grant execute on function public.rls_can_access_resolved_policy(uuid) to authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
+-- Ghost-table reconstruction (prod-as-oracle, idempotent).
+-- The RLS blocks below enable RLS on assignment_audit_log, eligibility_overrides,
+-- employee_answers, case_requirements_snapshots, profile_state, answers,
+-- case_assignment_id, and wizard_cases — but those tables were created out-of-band
+-- on prod by the backend (SQLAlchemy ORM / direct DDL) and have no repo CREATE,
+-- so a fresh replay / Supabase Preview hits "relation does not exist" before the
+-- RLS loop. Recreate them here exactly as they live on prod (column types,
+-- PK, indexes verified against information_schema + pg_get_constraintdef on
+-- 2026-06-01). On prod every statement is a no-op (IF NOT EXISTS); RLS, policies,
+-- and `revoke ... from anon` are applied by the blocks below. None of these tables
+-- carry FKs, so creation order is unconstrained.
+
+create table if not exists public.assignment_audit_log (
+  id            uuid        not null default gen_random_uuid(),
+  assignment_id text        not null,
+  actor_user_id uuid        not null,
+  action        text        not null,
+  from_status   text,
+  to_status     text,
+  created_at    timestamptz not null default now(),
+  metadata      jsonb       not null default '{}'::jsonb,
+  constraint assignment_audit_log_pkey primary key (id)
+);
+create index if not exists assignment_audit_log_actor_user_id_idx
+  on public.assignment_audit_log (actor_user_id);
+create index if not exists assignment_audit_log_assignment_id_idx
+  on public.assignment_audit_log (assignment_id);
+
+create table if not exists public.eligibility_overrides (
+  id                 text    not null,
+  assignment_id      text    not null,
+  category           text    not null,
+  allowed            integer not null default 1,
+  expires_at         text,
+  note               text,
+  created_by_user_id text    not null,
+  created_at         text    not null,
+  constraint eligibility_overrides_pkey primary key (id)
+);
+
+create table if not exists public.employee_answers (
+  id            serial  primary key,
+  assignment_id text    not null,
+  question_id   text    not null,
+  answer_json   text    not null,
+  created_at    text    not null
+);
+
+create table if not exists public.case_requirements_snapshots (
+  id                varchar   not null,
+  case_id           varchar,
+  dest_country      varchar   not null,
+  purpose           varchar   not null,
+  created_at        timestamp not null,
+  snapshot_json     text      not null,
+  sources_json      text      not null,
+  canonical_case_id text,
+  constraint case_requirements_snapshots_pkey primary key (id)
+);
+create index if not exists ix_case_requirements_snapshots_case_id
+  on public.case_requirements_snapshots (case_id);
+create index if not exists ix_case_requirements_snapshots_id
+  on public.case_requirements_snapshots (id);
+
+create table if not exists public.profile_state (
+  user_id      text not null,
+  profile_json text not null,
+  updated_at   text not null,
+  constraint profile_state_pkey primary key (user_id)
+);
+
+create table if not exists public.answers (
+  id          serial  primary key,
+  user_id     text    not null,
+  question_id text    not null,
+  answer_json text    not null,
+  is_unknown  integer not null default 0,
+  created_at  text    not null
+);
+
+create table if not exists public.case_assignment_id (
+  id         bigint      not null,
+  created_at timestamptz not null default now(),
+  constraint case_assignment_id_pkey primary key (id)
+);
+
+create table if not exists public.wizard_cases (
+  id                       varchar   not null,
+  draft_json               text      not null,
+  created_at               timestamp not null default now(),
+  updated_at               timestamp not null default now(),
+  origin_country           varchar,
+  origin_city              varchar,
+  dest_country             varchar,
+  dest_city                varchar,
+  purpose                  varchar,
+  target_move_date         date,
+  flags_json               text,
+  status                   varchar   not null,
+  requirements_snapshot_id varchar,
+  constraint wizard_cases_pkey primary key (id)
+);
+create index if not exists ix_wizard_cases_id on public.wizard_cases (id);
+
+-- ----------------------------------------------------------------------------
 -- uuid `cases` system tables — scoped via rls_can_access_case_uuid(case_id).
 -- ----------------------------------------------------------------------------
 
