@@ -852,9 +852,13 @@ def create_dossier(
             params.update({f"fid{i}": fid for i, fid in enumerate(payload.form_ids)})
             valid_rows = conn.execute(
                 _sql_text(
-                    f"SELECT cf.id, ft.code, ft.name, ft.authority_code, ft.authority_name "
+                    f"SELECT cf.id, COALESCE(ft.code, 'CUSTOM') AS code, "
+                    f"COALESCE(ft.name, cf.adhoc_name, 'Custom document') AS name, "
+                    f"ft.authority_code, "
+                    f"COALESCE(ft.authority_name, cf.adhoc_authority) AS authority_name "
                     f"FROM {_pg_table('case_forms')} cf "
-                    f"JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id "
+                    # [P4-3] LEFT JOIN so ad-hoc forms can be added to a package.
+                    f"LEFT JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id "
                     f"WHERE cf.case_id=:case_id AND cf.id IN ({placeholders})"
                 ),
                 params,
