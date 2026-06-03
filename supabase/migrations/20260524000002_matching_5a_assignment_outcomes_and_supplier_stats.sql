@@ -17,7 +17,7 @@ create table if not exists public.assignment_outcomes (
 
   -- Which assignment and which supplier
   assignment_id           text         not null    references public.case_assignments(id),
-  supplier_id             varchar      not null    references public.suppliers(id),
+  supplier_id             uuid         not null    references public.suppliers(id),
 
   -- Outcome quality ratings (1.00–5.00 scale, null = not yet rated)
   quality_score           numeric(3,2) check (quality_score between 1 and 5),
@@ -111,7 +111,7 @@ select
   max(ao.created_at)                                                as last_outcome_at
 
 from public.suppliers s
-left join public.assignment_outcomes ao on ao.supplier_id = s.id::varchar
+left join public.assignment_outcomes ao on ao.supplier_id = s.id
 group by s.id, s.name;
 
 -- Unique index required for CONCURRENTLY refresh
