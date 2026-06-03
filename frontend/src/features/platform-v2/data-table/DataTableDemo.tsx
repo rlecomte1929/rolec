@@ -93,6 +93,7 @@ export function DataTableDemo() {
     {
       id: 'name',
       header: 'Company',
+      sortValue: (r) => r.name.toLowerCase(),
       cell: (r) => <span className="font-medium text-slate-900">{r.name}</span>,
       defaultWidth: 220,
       minWidth: 140,
@@ -100,6 +101,7 @@ export function DataTableDemo() {
     {
       id: 'plan',
       header: 'Plan',
+      sortValue: (r) => r.plan,
       cell: (r) => <Pill className={PLAN_PILL[r.plan]}>{r.plan}</Pill>,
       defaultWidth: 100,
       minWidth: 80,
@@ -107,6 +109,7 @@ export function DataTableDemo() {
     {
       id: 'status',
       header: 'Status',
+      sortValue: (r) => r.status,
       cell: (r) => (
         <Pill className={STATUS_PILL[r.status]}>
           <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[r.status]}`} />
@@ -116,11 +119,12 @@ export function DataTableDemo() {
       defaultWidth: 120,
       minWidth: 90,
     },
-    { id: 'country', header: 'Country', cell: (r) => <span className="text-slate-700">{r.country}</span>, defaultWidth: 160 },
-    { id: 'size_band', header: 'Size', cell: (r) => <span className="text-slate-700">{r.size_band}</span>, defaultWidth: 110 },
+    { id: 'country', header: 'Country', sortValue: (r) => r.country, cell: (r) => <span className="text-slate-700">{r.country}</span>, defaultWidth: 160 },
+    { id: 'size_band', header: 'Size', sortValue: (r) => r.size_band, cell: (r) => <span className="text-slate-700">{r.size_band}</span>, defaultWidth: 110 },
     {
       id: 'hr_seats',
       header: 'HR seats',
+      sortValue: (r) => r.hr_users,
       cell: (r) => <SeatCell count={r.hr_users} limit={r.hr_limit} />,
       defaultWidth: 130,
       minWidth: 110,
@@ -128,6 +132,7 @@ export function DataTableDemo() {
     {
       id: 'employee_seats',
       header: 'Employee seats',
+      sortValue: (r) => r.employees,
       cell: (r) => <SeatCell count={r.employees} limit={r.employee_limit} />,
       defaultWidth: 150,
       minWidth: 120,
@@ -135,12 +140,13 @@ export function DataTableDemo() {
     {
       id: 'cases',
       header: 'Cases',
+      sortValue: (r) => r.cases,
       cell: (r) => <span className="font-semibold tabular-nums text-slate-700">{r.cases}</span>,
       defaultWidth: 80,
       minWidth: 60,
       cellClassName: 'text-right',
     },
-    { id: 'contact', header: 'Contact', cell: (r) => <span className="text-slate-700">{r.contact}</span>, defaultWidth: 160 },
+    { id: 'contact', header: 'Contact', sortValue: (r) => r.contact, cell: (r) => <span className="text-slate-700">{r.contact}</span>, defaultWidth: 160 },
     { id: 'created', header: 'Created', cell: (r) => <span className="text-xs text-slate-500">{r.created}</span>, defaultWidth: 110 },
   ], []);
 
