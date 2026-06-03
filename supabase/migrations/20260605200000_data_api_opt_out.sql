@@ -20,37 +20,56 @@
 -- REVOKE is idempotent: revoking a privilege that was never granted is a no-op,
 -- so this migration is safe to replay.
 
--- 6a. anon never needs these (admin/debug surfaces use authenticated sessions)
-REVOKE ALL    ON public.ai_spend_requests           FROM anon;
-REVOKE ALL    ON public.rp_debug_kv                  FROM anon;
-
--- 6b. country/requirement reference data is served via the FastAPI backend;
---     no logged-out supabase-js path exists today.
-REVOKE SELECT ON public.country_events              FROM anon;
-REVOKE SELECT ON public.country_profiles            FROM anon;
-REVOKE SELECT ON public.country_resource_items      FROM anon;
-REVOKE SELECT ON public.country_resource_sections   FROM anon;
-REVOKE SELECT ON public.requirement_items           FROM anon;
-REVOKE SELECT ON public.requirements_catalog        FROM anon;
-
--- 6c. authenticated-only tables the frontend never calls via supabase-js
---     (the backend uses the service-role key, which bypasses grants).
-REVOKE ALL    ON public.agent_runs                          FROM authenticated;
-REVOKE ALL    ON public.ai_human_feedback                   FROM authenticated;
-REVOKE ALL    ON public.ai_model_energy_profiles            FROM authenticated;
-REVOKE ALL    ON public.bamboohr_sync_log                   FROM authenticated;
-REVOKE ALL    ON public.personio_sync_log                   FROM authenticated;
-REVOKE ALL    ON public.conjoint_responses                  FROM authenticated;
-REVOKE ALL    ON public.conjoint_results                    FROM authenticated;
-REVOKE ALL    ON public.conjoint_studies                    FROM authenticated;
-REVOKE ALL    ON public.default_policy_templates            FROM authenticated;
-REVOKE ALL    ON public.ocr_shadow_comparisons              FROM authenticated;
-REVOKE ALL    ON public.prompt_routing                      FROM authenticated;
-REVOKE ALL    ON public.prompt_versions                     FROM authenticated;
-REVOKE ALL    ON public.translation_cache                   FROM authenticated;
-REVOKE ALL    ON public.readiness_templates                 FROM authenticated;
-REVOKE ALL    ON public.readiness_template_milestones       FROM authenticated;
-REVOKE ALL    ON public.readiness_template_checklist_items  FROM authenticated;
+-- Replay-safe guard. The header's "safe to replay" claim relies on every table
+-- existing, but a few of these (e.g. ai_spend_requests, rp_debug_kv, agent_runs)
+-- were created out-of-band on prod by the backend ORM and have no repo CREATE, so
+-- a fresh replay / Supabase Preview aborts on the first REVOKE against a missing
+-- relation (42P01). Guard each REVOKE with to_regclass() so a missing table is a
+-- true no-op. On prod all tables exist, so every REVOKE runs exactly as the flat
+-- statements did — identical effect, zero prod mutation. (priv/role come from the
+-- fixed list below, not user input, so the format() interpolation is safe.)
+do $$
+declare
+  r record;
+begin
+  for r in
+    select tbl, role_name, priv from (values
+      -- 6a. anon never needs these (admin/debug surfaces use authenticated sessions)
+      ('ai_spend_requests',                  'anon',          'ALL'),
+      ('rp_debug_kv',                        'anon',          'ALL'),
+      -- 6b. country/requirement reference data is served via the FastAPI backend;
+      --     no logged-out supabase-js path exists today.
+      ('country_events',                     'anon',          'SELECT'),
+      ('country_profiles',                   'anon',          'SELECT'),
+      ('country_resource_items',             'anon',          'SELECT'),
+      ('country_resource_sections',          'anon',          'SELECT'),
+      ('requirement_items',                  'anon',          'SELECT'),
+      ('requirements_catalog',               'anon',          'SELECT'),
+      -- 6c. authenticated-only tables the frontend never calls via supabase-js
+      --     (the backend uses the service-role key, which bypasses grants).
+      ('agent_runs',                         'authenticated', 'ALL'),
+      ('ai_human_feedback',                  'authenticated', 'ALL'),
+      ('ai_model_energy_profiles',           'authenticated', 'ALL'),
+      ('bamboohr_sync_log',                  'authenticated', 'ALL'),
+      ('personio_sync_log',                  'authenticated', 'ALL'),
+      ('conjoint_responses',                 'authenticated', 'ALL'),
+      ('conjoint_results',                   'authenticated', 'ALL'),
+      ('conjoint_studies',                   'authenticated', 'ALL'),
+      ('default_policy_templates',           'authenticated', 'ALL'),
+      ('ocr_shadow_comparisons',             'authenticated', 'ALL'),
+      ('prompt_routing',                     'authenticated', 'ALL'),
+      ('prompt_versions',                    'authenticated', 'ALL'),
+      ('translation_cache',                  'authenticated', 'ALL'),
+      ('readiness_templates',                'authenticated', 'ALL'),
+      ('readiness_template_milestones',      'authenticated', 'ALL'),
+      ('readiness_template_checklist_items', 'authenticated', 'ALL')
+    ) as t(tbl, role_name, priv)
+  loop
+    if to_regclass('public.' || r.tbl) is not null then
+      execute format('revoke %s on public.%I from %I', r.priv, r.tbl, r.role_name);
+    end if;
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- ROLLBACK (manual; do not uncomment in this append-only migration):
