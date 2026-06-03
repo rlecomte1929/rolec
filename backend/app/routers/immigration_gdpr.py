@@ -2,12 +2,14 @@
 immigration_gdpr.py — GDPR subject-rights routes extracted from immigration.py
 (AUDIT-B9-imm-5), implemented under IMM-17.
 
-Houses 2 endpoints:
-  GET  /api/employee/cases/{case_id}/my-data/export             (IMM-17, Art. 15)
-  POST /api/employee/cases/{case_id}/my-data/erasure-request    (IMM-17, files Art. 17 request)
+Houses 4 endpoints:
+  GET  /api/employee/cases/{case_id}/my-data/export                  (IMM-17, Art. 15)
+  POST /api/employee/cases/{case_id}/my-data/erasure-request         (IMM-17, files Art. 17 request)
+  GET  /api/hr/immigration/erasure-requests                          (IMM-18, HR review queue)
+  POST /api/hr/cases/{case_id}/immigration/process-erasure-request   (IMM-18, HR approve/reject)
 
-The erasure request only records intent — the actual deletion + retention automation
-land in IMM-18.
+The employee files an erasure request (IMM-17); HR/admin reviews it and, on approval,
+the profile is anonymised in place via fn_anonymise_imm_profile (IMM-18).
 """
 from __future__ import annotations
 
@@ -20,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from ..auth_deps import get_current_user
+from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
 from ..services.gdpr_export_service import build_data_export_pdf
 from ..services.immigration_service import (
@@ -42,6 +44,12 @@ MAX_EXPORTS_PER_24H = 3
 
 class ErasureRequestBody(BaseModel):
     reason: Optional[str] = None
+
+
+class ProcessErasureBody(BaseModel):
+    request_id: str
+    decision: str  # 'approve' | 'reject'
+    review_notes: Optional[str] = None
 
 
 def _assert_employee_owns_case(case_id: str, employee_id: str) -> None:
@@ -232,4 +240,127 @@ def request_erasure(
             "Your erasure request has been recorded and will be reviewed by your HR team. "
             f"You will receive a response within {ERASURE_RESPONSE_DAYS} days."
         ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# HR: review & action erasure requests (IMM-18)
+# ---------------------------------------------------------------------------
+
+@router.get("/hr/immigration/erasure-requests")
+def list_erasure_requests(
+    status_filter: str = "pending",
+    hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """HR review queue — erasure requests for this org, defaulting to pending ones."""
+    with db.engine.begin() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT id, case_id, employee_id, status, reason,
+                       requested_at, statutory_due_at, reviewed_by, reviewed_at,
+                       review_notes, completed_at
+                FROM public.erasure_requests
+                WHERE org_id = :org_id
+                  AND (:status_filter = 'all' OR status = :status_filter)
+                ORDER BY requested_at ASC
+            """),
+            {"org_id": org_id, "status_filter": status_filter},
+        ).mappings().all()
+
+    requests = []
+    for r in rows:
+        row = dict(r)
+        for col in ("requested_at", "statutory_due_at", "reviewed_at", "completed_at"):
+            v = row.get(col)
+            if hasattr(v, "isoformat"):
+                row[col] = v.isoformat()
+        requests.append(row)
+
+    pending_count = sum(1 for r in requests if r["status"] == "pending")
+    return {"requests": requests, "pending_count": pending_count}
+
+
+@router.post("/hr/cases/{case_id}/immigration/process-erasure-request")
+def process_erasure_request(
+    case_id: str,
+    body: ProcessErasureBody,
+    hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """HR/admin actions a pending erasure request.
+
+    On 'approve': anonymise every immigration profile on the case in place
+    (fn_anonymise_imm_profile NULLs all PII, keeps the audit skeleton) and mark
+    the request completed. On 'reject': record the decision and notes only.
+    """
+    decision = body.decision.lower().strip()
+    if decision not in ("approve", "reject"):
+        raise HTTPException(status_code=422, detail="decision must be 'approve' or 'reject'.")
+
+    reviewer_id = hr_user["id"]
+    now = datetime.now(timezone.utc)
+
+    with db.engine.begin() as conn:
+        req = conn.execute(
+            text("""
+                SELECT id, status FROM public.erasure_requests
+                WHERE id = :request_id AND case_id = :case_id AND org_id = :org_id
+                LIMIT 1
+            """),
+            {"request_id": body.request_id, "case_id": case_id, "org_id": org_id},
+        ).mappings().first()
+        if not req:
+            raise HTTPException(status_code=404, detail="Erasure request not found for this case.")
+        if req["status"] != "pending":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Request already {req['status']} — only pending requests can be actioned.",
+            )
+
+        anonymised = 0
+        if decision == "approve":
+            profile_ids = [
+                r[0] for r in conn.execute(
+                    text("SELECT id FROM public.imm_employee_profiles WHERE case_id = :case_id"),
+                    {"case_id": case_id},
+                ).all()
+            ]
+            for pid in profile_ids:
+                conn.execute(
+                    text("SELECT public.fn_anonymise_imm_profile(:pid)"),
+                    {"pid": pid},
+                )
+                anonymised += 1
+
+            conn.execute(
+                text("""
+                    UPDATE public.erasure_requests
+                    SET status = 'completed', reviewed_by = :reviewer, reviewed_at = :now,
+                        review_notes = :notes, completed_at = :now
+                    WHERE id = :request_id
+                """),
+                {"reviewer": reviewer_id, "now": now,
+                 "notes": body.review_notes, "request_id": body.request_id},
+            )
+            new_status = "completed"
+        else:
+            conn.execute(
+                text("""
+                    UPDATE public.erasure_requests
+                    SET status = 'rejected', reviewed_by = :reviewer, reviewed_at = :now,
+                        review_notes = :notes
+                    WHERE id = :request_id
+                """),
+                {"reviewer": reviewer_id, "now": now,
+                 "notes": body.review_notes, "request_id": body.request_id},
+            )
+            new_status = "rejected"
+
+    return {
+        "request_id": body.request_id,
+        "status": new_status,
+        "profiles_anonymised": anonymised,
+        "reviewed_by": reviewer_id,
+        "reviewed_at": now.isoformat(),
     }
