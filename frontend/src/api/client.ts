@@ -46,6 +46,8 @@ import type {
   DossierSearchSuggestionsResponse,
 } from '../types';
 import type { EmployeePolicyAssistantQueryResponse, HrPolicyAssistantQueryResponse } from '../types/policyAssistant';
+import type { AiStep } from '../features/admin/specialist-review/RoadmapStepDiff';
+import type { ReasonCode, ReviewDecision } from '../features/admin/specialist-review/reasonCodes';
 
 // VITE_API_URL must be set for every environment:
 //   - Development:  http://localhost:8000         (via frontend/.env.development)
@@ -3853,3 +3855,27 @@ export async function apiDelete<T>(
   });
   return data;
 }
+
+// ── Specialist review API (AIQ-633) ───────────────────────────────────────────
+
+export interface SpecialistReviewSubmitItem {
+  step_id: string;
+  decision: ReviewDecision;
+  reason_code?: ReasonCode;
+  original_step: AiStep;
+  edited_step?: AiStep;
+}
+
+export const specialistReviewAPI = {
+  getRoadmap: async (caseId: string): Promise<{ case_id: string; steps: AiStep[] }> => {
+    const res = await api.get(`/api/internal/specialist-review/${caseId}`);
+    return res.data;
+  },
+  submit: async (
+    caseId: string,
+    body: { decision: 'approved' | 'rejected'; notes?: string; items: SpecialistReviewSubmitItem[] },
+  ): Promise<{ released_to_user: boolean; regeneration_requested: boolean }> => {
+    const res = await api.post(`/api/internal/specialist-review/submit`, { case_id: caseId, ...body });
+    return res.data;
+  },
+};
