@@ -57,6 +57,7 @@ export function CompaniesV2Table({
         header: 'Company',
         defaultWidth: 220,
         minWidth: 150,
+        sortValue: (c) => c.name?.toLowerCase() ?? '',
         cell: (c) => (
           <div className="flex items-center gap-2.5">
             <CompanyLogo name={c.name} tone={c.tone} />
@@ -74,6 +75,7 @@ export function CompaniesV2Table({
         header: 'Plan',
         defaultWidth: 100,
         minWidth: 80,
+        sortValue: (c) => c.plan_tier ?? '',
         cell: (c) => <Pill className={PLAN_PILL[c.plan_tier]}>{c.plan_tier}</Pill>,
       },
       {
@@ -81,6 +83,7 @@ export function CompaniesV2Table({
         header: 'Status',
         defaultWidth: 120,
         minWidth: 90,
+        sortValue: (c) => c.status ?? '',
         cell: (c) => (
           <Pill className={STATUS_PILL[c.status]}>
             <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[c.status]}`} />
@@ -92,12 +95,14 @@ export function CompaniesV2Table({
         id: 'country',
         header: 'Country',
         defaultWidth: 130,
+        sortValue: (c) => c.country ?? '',
         cell: (c) => <span className="text-slate-700">{c.country ?? '—'}</span>,
       },
       {
         id: 'size',
         header: 'Size',
         defaultWidth: 100,
+        sortValue: (c) => c.size_band ?? '',
         cell: (c) => <span className="text-slate-700">{c.size_band ?? '—'}</span>,
       },
       {
@@ -105,6 +110,7 @@ export function CompaniesV2Table({
         header: 'HR seats',
         defaultWidth: 140,
         minWidth: 110,
+        sortValue: (c) => c.hr_users_count ?? 0,
         cell: (c) => <SeatCell count={c.hr_users_count} limit={c.hr_seat_limit} />,
       },
       {
@@ -112,6 +118,7 @@ export function CompaniesV2Table({
         header: 'Employee seats',
         defaultWidth: 160,
         minWidth: 130,
+        sortValue: (c) => c.employee_count ?? 0,
         cell: (c) => <SeatCell count={c.employee_count} limit={c.employee_seat_limit} />,
       },
       {
@@ -119,6 +126,7 @@ export function CompaniesV2Table({
         header: 'Cases',
         defaultWidth: 80,
         minWidth: 60,
+        sortValue: (c) => c.assignments_count ?? 0,
         cellClassName: 'text-right',
         cell: (c) => (
           <span className="font-semibold tabular-nums text-slate-700">{c.assignments_count}</span>
@@ -129,6 +137,7 @@ export function CompaniesV2Table({
         header: 'Contact',
         defaultWidth: 200,
         minWidth: 140,
+        sortValue: (c) => c.primary_contact_name ?? '',
         cell: (c) => (
           <ContactCell
             primaryName={c.primary_contact_name}
@@ -141,6 +150,7 @@ export function CompaniesV2Table({
         id: 'created',
         header: 'Created',
         defaultWidth: 110,
+        sortValue: (c) => c.created_at ?? '',
         cell: (c) => <span className="text-xs text-slate-500">{relativeDate(c.created_at)}</span>,
       },
       {

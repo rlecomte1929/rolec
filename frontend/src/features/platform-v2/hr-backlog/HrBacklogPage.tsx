@@ -175,6 +175,7 @@ export function HrBacklogPage() {
         header: 'ID',
         defaultWidth: 90,
         minWidth: 70,
+        sortValue: (t) => t.id ?? '',
         cell: (t) => <span className="font-mono text-[11.5px] text-slate-500">{shortId(t.id)}</span>,
       },
       {
@@ -182,6 +183,7 @@ export function HrBacklogPage() {
         header: 'Task',
         defaultWidth: 300,
         minWidth: 180,
+        sortValue: (t) => t.title?.toLowerCase() ?? '',
         cell: (t) => (
           <div>
             <div className="font-medium text-slate-900">{t.title}</div>
@@ -198,6 +200,7 @@ export function HrBacklogPage() {
         header: 'Employee',
         defaultWidth: 200,
         minWidth: 140,
+        sortValue: (t) => (t.employee_name?.trim() || t.employee_email?.trim() || '').toLowerCase(),
         cell: (t) => {
           const name = t.employee_name?.trim() || null;
           const email = t.employee_email?.trim() || null;
@@ -224,6 +227,7 @@ export function HrBacklogPage() {
         header: 'Type',
         defaultWidth: 130,
         minWidth: 100,
+        sortValue: (t) => t.type ?? '',
         cell: (t) => (
           <span className="text-[12.5px] text-slate-600">{t.type ?? '—'}</span>
         ),
@@ -233,6 +237,7 @@ export function HrBacklogPage() {
         header: 'Status',
         defaultWidth: 140,
         minWidth: 110,
+        sortValue: (t) => t.status ?? '',
         cell: (t) => (
           <Pill className={STATUS_PILL[t.status] ?? STATUS_PILL.pending}>
             {statusLabel(t.status)}
@@ -244,6 +249,7 @@ export function HrBacklogPage() {
         header: 'Due',
         defaultWidth: 130,
         minWidth: 100,
+        sortValue: (t) => (t.due_date ? Date.parse(t.due_date) : Number.MAX_SAFE_INTEGER),
         cell: (t) => {
           const { label, overdue } = formatDueDate(t.due_date);
           return (
@@ -259,6 +265,7 @@ export function HrBacklogPage() {
         header: 'Age',
         defaultWidth: 70,
         minWidth: 50,
+        sortValue: (t) => (t.created_at ? Date.parse(t.created_at) : 0),
         cell: (t) => <span className="text-[12px] text-slate-500">{relativeAge(t.created_at)}</span>,
       },
       {

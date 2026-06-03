@@ -50,6 +50,7 @@ export function ProviderGridV2Table({ rows, emptyState }: ProviderGridV2TablePro
         header: 'Employee',
         defaultWidth: 200,
         minWidth: 140,
+        sortValue: (row) => row.employee_name?.toLowerCase() ?? '',
         cell: (row) => (
           <div>
             <div className="font-medium text-slate-900">{row.employee_name}</div>
@@ -63,12 +64,14 @@ export function ProviderGridV2Table({ rows, emptyState }: ProviderGridV2TablePro
         id: 'dest_country',
         header: 'Destination',
         defaultWidth: 140,
+        sortValue: (row) => row.dest_country ?? '',
         cell: (row) => <span className="text-slate-700">{row.dest_country ?? '—'}</span>,
       },
       {
         id: 'move_date',
         header: 'Move date',
         defaultWidth: 130,
+        sortValue: (row) => (row.move_date ? Date.parse(row.move_date) : Number.MAX_SAFE_INTEGER),
         cell: (row) => (
           <span className="text-slate-700">
             {row.move_date
@@ -85,6 +88,7 @@ export function ProviderGridV2Table({ rows, emptyState }: ProviderGridV2TablePro
         id: 'coordination_status',
         header: 'Overall',
         defaultWidth: 140,
+        sortValue: (row) => row.coordination_status ?? '',
         cell: (row) => {
           const badge = COORD_BADGE[row.coordination_status] ?? COORD_BADGE['not-started'];
           return (

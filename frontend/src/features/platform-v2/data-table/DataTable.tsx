@@ -59,6 +59,13 @@ export interface DataTableColumn<T> {
   header: string | (() => React.ReactNode);
   /** Cell renderer — receives the full row object. */
   cell: (row: T) => React.ReactNode;
+  /**
+   * Value used to sort this column. Provide it to make the column sortable;
+   * omit it (or set `unsortable`) for display-only columns. Required because
+   * `cell` returns opaque ReactNode — TanStack needs a primitive accessor to
+   * sort by, otherwise the column is a non-sortable display column.
+   */
+  sortValue?: (row: T) => string | number | null | undefined;
   /** Default pixel width before the user resizes. */
   defaultWidth?: number;
   /** Minimum pixel width when resizing. */
@@ -141,16 +148,23 @@ export function DataTable<T>({
 
   // ── Build TanStack column defs from our public shape ─────────────────────
   const tanColumns = useMemo<ColumnDef<T>[]>(() => {
-    return columns.map<ColumnDef<T>>((c) => ({
-      id: c.id,
-      header: typeof c.header === 'string' ? c.header : c.header,
-      cell: (info) => c.cell(info.row.original),
-      enableSorting: !c.unsortable,
-      enableResizing: true,
-      size: c.defaultWidth ?? 160,
-      minSize: c.minWidth ?? 60,
-      maxSize: c.maxWidth ?? 800,
-    }));
+    return columns.map<ColumnDef<T>>((c) => {
+      // A column is sortable only when it exposes a primitive sort value.
+      // Without an accessor TanStack treats it as a display column and
+      // getCanSort() is false, so the header renders no sort affordance.
+      const sortable = !c.unsortable && !!c.sortValue;
+      return {
+        id: c.id,
+        header: typeof c.header === 'string' ? c.header : c.header,
+        cell: (info) => c.cell(info.row.original),
+        ...(c.sortValue ? { accessorFn: c.sortValue } : {}),
+        enableSorting: sortable,
+        enableResizing: true,
+        size: c.defaultWidth ?? 160,
+        minSize: c.minWidth ?? 60,
+        maxSize: c.maxWidth ?? 800,
+      };
+    });
   }, [columns]);
 
   const table = useReactTable<T>({

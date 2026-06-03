@@ -382,6 +382,7 @@ export function MobilityControlCenterV2Page() {
       header: 'Employee',
       defaultWidth: 220,
       minWidth: 160,
+      sortValue: (row) => (row.employeeIdentifier || '').toLowerCase(),
       cell: (row) => {
         const name = row.employeeIdentifier || '—';
         const tone = ownerTone(name);
@@ -405,6 +406,7 @@ export function MobilityControlCenterV2Page() {
       header: 'Corridor',
       defaultWidth: 160,
       minWidth: 120,
+      sortValue: (row) => `${row.originCountry ?? ''}›${row.destCountry ?? ''}`,
       cell: (row) => {
         const o = resolveISO2(row.originCountry);
         const d = resolveISO2(row.destCountry);
@@ -422,6 +424,7 @@ export function MobilityControlCenterV2Page() {
       header: 'Visa',
       defaultWidth: 150,
       minWidth: 110,
+      sortValue: (row) => row.visaLabel ?? '',
       cell: (row) => {
         // visaLabel = wizard_cases.purpose (closest first-class signal).
         // case_assignments has no dedicated visa_type column today, so the
@@ -442,6 +445,7 @@ export function MobilityControlCenterV2Page() {
       header: 'Household',
       defaultWidth: 160,
       minWidth: 120,
+      sortValue: (row) => row.household ?? '',
       cell: (row) => {
         if (!row.household) {
           return <NotLinked title="No household column — derive from employee_profiles.profile_json (spouse + children) once that schema is locked." />;
@@ -465,6 +469,7 @@ export function MobilityControlCenterV2Page() {
       header: 'Progress',
       defaultWidth: 160,
       minWidth: 130,
+      sortValue: (row) => row.tasksDonePercent ?? 0,
       cell: (row) => <ProgressBar value={row.tasksDonePercent} risk={row.riskStatus} />,
     },
     {
@@ -472,6 +477,7 @@ export function MobilityControlCenterV2Page() {
       header: 'Owner',
       defaultWidth: 140,
       minWidth: 110,
+      sortValue: (row) => row.ownerName ?? '',
       cell: (row) => {
         if (!row.ownerName) {
           return <NotLinked label="unassigned" title="No HR owner — profiles.full_name missing for ca.hr_user_id. Either backfill the profile or assign an HR user." />;
@@ -484,6 +490,7 @@ export function MobilityControlCenterV2Page() {
       header: 'Status',
       defaultWidth: 150,
       minWidth: 110,
+      sortValue: (row) => row.status ?? '',
       cell: (row) => (
         <Pill className={statusTone(row.status, row.riskStatus)}>
           <span className={`inline-block h-1.5 w-1.5 rounded-full ${row.riskStatus === 'red' ? 'bg-rose-500' : row.riskStatus === 'yellow' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
