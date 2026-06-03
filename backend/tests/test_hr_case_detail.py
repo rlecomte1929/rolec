@@ -16,7 +16,14 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from backend.main import app, get_current_user, UserRole
+from backend.main import app, UserRole
+
+# IMPORTANT: the router depends on require_admin_or_hr → get_current_user from
+# backend.app.auth_deps, NOT the same-named function in backend.main. Overriding
+# the wrong one leaves the real auth path running (and the tenant-scoping tests
+# passing for the wrong reasons). Key the override on the dependency the router
+# actually uses. (Reviewer-flagged on AIQ-567 / C1-11c-be.)
+from backend.app.auth_deps import get_current_user
 
 # ---------------------------------------------------------------------------
 # Fake users + cases
