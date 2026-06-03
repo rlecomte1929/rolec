@@ -147,6 +147,22 @@ export const ImmigrationPage: React.FC = () => {
         />
       )}
 
+      {/* GDPR data-management entry point — available throughout the journey */}
+      {stage !== 'loading' && stage !== 'error' && caseId && (
+        <div className="mt-8 border-t border-[#e2e8f0] pt-4 text-center">
+          <button
+            type="button"
+            onClick={() => navigate(buildRoute('employeeCaseMyData', { caseId }))}
+            className="text-sm font-medium text-[#0b2b43] underline hover:text-[#1f8e8b]"
+          >
+            Manage my data
+          </button>
+          <p className="text-xs text-[#94a3b8] mt-1">
+            View, download, or request deletion of the data we hold for you.
+          </p>
+        </div>
+      )}
+
       {/* Complete */}
       {stage === 'complete' && (
         <div className="max-w-lg mx-auto">

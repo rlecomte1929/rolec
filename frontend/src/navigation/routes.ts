@@ -21,6 +21,8 @@ export const ROUTE_DEFS = {
   employeeCasePlan: { path: '/employee/case/:caseId/plan', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** Immigration intake flow (consent → OCR → interview). */
   employeeCaseImmigration: { path: '/employee/case/:caseId/immigration', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
+  /** [IMM-19] GDPR data-management screen (view / export / delete). */
+  employeeCaseMyData: { path: '/employee/case/:caseId/my-data', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   // [P1-5] Dossier & Forms list view
   employeeCaseDossier: { path: '/employee/case/:caseId/dossier', roles: ['EMPLOYEE', 'ADMIN'] as RouteRole[] },
   /** [P3-4] Dossier Builder — 3-step wizard: select, arrange, download. */
