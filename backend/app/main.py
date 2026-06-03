@@ -12,6 +12,7 @@ from .routers import (
     ai_decisions,
     ai_feedback,
     benefit_optimizer,
+    case_forms_adhoc,
     cases,
     cases_admin,
     cases_read,
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(cases_read.router)
     app.include_router(cases_write.router)
     app.include_router(cases_admin.router)
+    app.include_router(case_forms_adhoc.router)  # [P4-3] ad-hoc "Add document"
     app.include_router(admin.router)
     app.include_router(employee_quotes.router)
     app.include_router(pets.router)
