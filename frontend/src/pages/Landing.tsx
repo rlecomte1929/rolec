@@ -1,5 +1,4 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
 import { PublicLayout } from '../components/public';
 import {
   Section,
@@ -11,9 +10,8 @@ import {
   TrustDifferentiation,
   FadeIn,
 } from '../components/marketing';
-import { buildRoute, homeRouteKeyForRole } from '../navigation/routes';
+import { buildRoute } from '../navigation/routes';
 import { useRegisterNav } from '../navigation/registry';
-import { getAuthItem } from '../utils/demo';
 import { useDemoBooking } from '../hooks/useDemoBooking';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { landingContent } from './landing/landingContent';
@@ -33,19 +31,12 @@ export const Landing: React.FC = () => {
   const { open: openDemoBooking } = useDemoBooking();
   const c = landingContent;
 
-  if (getAuthItem('relopass_token')) {
-    // If the SPA loaded via the 404.html → /?__redirect=<path> fallback,
-    // honour that redirect rather than sending the user to their home route.
-    const params = new URLSearchParams(window.location.search);
-    const deepRedirect = params.get('__redirect');
-    if (deepRedirect && deepRedirect.startsWith('/') && deepRedirect !== '/') {
-      return <Navigate to={deepRedirect} replace />;
-    }
-    const key = homeRouteKeyForRole(getAuthItem('relopass_role'));
-    if (key !== 'landing') {
-      return <Navigate to={buildRoute(key)} replace />;
-    }
-  }
+  // AIQ-757: `/` renders the marketing homepage for everyone — including
+  // authenticated users — to match the other public pages (/platform,
+  // /how-it-works, /get-started), which never redirect. The 404.html
+  // `?__redirect=<path>` deep-link fallback is still honoured globally by
+  // <QueryRedirect /> in App.tsx, so removing the role-home bounce here does
+  // not break deep links.
 
   return (
     <PublicLayout>
