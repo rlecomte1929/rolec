@@ -7,11 +7,12 @@
 
 export const landingContent = {
   hero: {
-    eyebrow: 'Global mobility infrastructure',
-    headline: 'The operating layer for global mobility.',
+    eyebrow: 'EU AI Act–ready mobility',
+    headline: 'Mobility AI your auditor will trust.',
     subheadline:
-      'Replace email threads, spreadsheets, and fragmented vendors with one policy-driven system of record.',
-    brandPromise: 'Every relocation case is visible, compliant, on-time.',
+      "Every step in your employee's relocation — every document, every decision — logged, cited, and EU AI Act–ready.",
+    brandPromise:
+      'The audit trail your compliance team needs — and the experience your employees actually want.',
     primaryCta: 'Book a demo',
     secondaryCta: 'See the platform',
     trustMicrocopy: '30-minute walkthrough. No commitment.',
