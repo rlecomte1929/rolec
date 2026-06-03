@@ -1,0 +1,119 @@
+## STAGE 5 — Closeout (required artifacts before you stop)
+
+When you believe the work is done, do every item below. The pipeline orchestrator
+will refuse to mark this step complete if any are missing.
+
+### 5.1 Run the full validation locally
+
+```bash
+cd backend && pytest -q 2>&1 | tee /tmp/parker-<STEP>-pytest.log
+cd ../frontend && npx tsc --noEmit 2>&1 | tee /tmp/parker-<STEP>-tsc.log
+```
+
+Both must pass. If a test fails, fix it before continuing. If type-check fails, fix it.
+"Fix it" means address the root cause — do not suppress with `// @ts-ignore` or
+`pytest.skip` unless you document why in RESULT.md.
+
+### 5.2 Diff hygiene
+
+```bash
+git diff main...HEAD --stat
+```
+
+Scan for accidental changes (debug prints, commented-out blocks, unrelated edits).
+Remove them.
+
+### 5.3 Write `RESULT.md`
+
+Write `audit/parker-pipeline/runs/<RUN_ID>/<STEP>/RESULT.md` with **every** section
+below. Downstream steps will read this — be exact and unambiguous.
+
+```markdown
+# Step <STEP> RESULT — <TITLE>
+
+_Run: <RUN_ID> | Branch: audit/parker-step-<STEP>-<SLUG>_
+
+## Summary
+<3–5 sentences. What shipped, why it matters.>
+
+## Files changed
+```
+<paste `git diff main...HEAD --stat` output>
+```
+
+## Tests added
+- `<test file path>` — <what it asserts>
+- ...
+
+## Test result
+- pytest: <pass/fail summary, e.g. "412 passed, 3 skipped, 0 failed">
+- tsc: <pass/fail>
+- <paste last ~10 lines of each log if there's anything noteworthy>
+
+## Migration applied?
+- File: `supabase/migrations/<timestamp>_<name>.sql` (or "no migration")
+- RLS posture (per new table):
+  - Table `<name>`: RLS enabled? Policies? `REVOKE ALL ... FROM anon`?
+
+## New routes
+| Method | Path | Auth gate | Router file |
+|--------|------|-----------|-------------|
+| GET    | /... | is_admin  | backend/app/routers/...py |
+
+## New tables / schema changes
+- `<table_name>` — columns, indexes, FKs.
+
+## Configuration / env vars added
+- `<VAR_NAME>` — what it controls, default, where read.
+
+## UI changes summary
+- New routes added: <list, or "none">
+- New components added: <file paths, or "none">
+- Existing antigravity components reused: <list — Romain will scan this>
+- UI-PROPOSAL.md status: <"not required" / "approved" / "deferred to follow-up prompt">
+
+## Deviations from the original audit prompt
+<List any places where your implementation differs from section 4 of
+audit/parker-framework-audit.md, and why. Often necessary; that's fine — record it.>
+
+## What downstream steps will need from this step
+<Be specific. Example: "Step E will fetch prompts via
+`prompt_registry.get_active_prompt(task_key)` where `task_key` is the canonical task
+identifier from the `prompt_versions.task_key` column. The canonical set as of this
+commit is: ['policy_classification', 'mrz_extraction', 'eligibility_reasoning'].
+New task_keys must be inserted via the admin route POST /api/admin/prompts.">
+
+## Known gaps / follow-ups
+<Things you didn't do, things that need attention but were out of scope. Each item
+should ideally map to a Notion AI Work Queue task id.>
+```
+
+### 5.4 Push and open a PR
+
+```bash
+git push -u origin audit/parker-step-<STEP>-<SLUG>
+gh pr create \
+  --title "audit(parker-<STEP>): <SLUG>" \
+  --body-file audit/parker-pipeline/runs/<RUN_ID>/<STEP>/RESULT.md \
+  --label parker-audit
+```
+
+If the `parker-audit` label doesn't exist, create it first:
+```bash
+gh label create parker-audit --color "0E8A16" --description "Parker framework audit pipeline" || true
+```
+
+**Do not merge the PR.** Romain reviews each PR before merge. Render auto-deploys
+`main`, so an unreviewed merge is a user-visible deploy.
+
+### 5.5 Stop
+
+You are done. Do not start the next step. Romain will:
+1. Read `audit/parker-pipeline/runs/<RUN_ID>/<STEP>/RESULT.md`.
+2. Review the PR.
+3. Either merge or request changes.
+4. Run `./audit/parker-pipeline/pipeline.sh next` to advance.
+
+If something prevented you from completing — even partially — write what's missing
+into RESULT.md under "Known gaps / follow-ups", do **not** mark the step done
+yourself, and stop.
