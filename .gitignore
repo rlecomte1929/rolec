@@ -14,6 +14,11 @@ frontend/dist/
 # gitlinks, which broke Cloudflare Pages clones.)
 .claude/worktrees/
 
+# Agent/tooling scratch — branch snapshots and Playwright MCP run artifacts.
+# Machine-generated, regenerated on demand; never useful to track.
+.branch-backups/
+.playwright-mcp/
+
 # OS / editor
 .DS_Store
 Thumbs.db
