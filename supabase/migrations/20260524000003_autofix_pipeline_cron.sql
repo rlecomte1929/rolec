@@ -6,34 +6,42 @@
 -- Requires: pg_cron and pg_net extensions (enabled via FOUNDATION-1A)
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- Remove existing job if present (idempotent)
-select cron.unschedule('autofix-pipeline-daily')
-where exists (
-  select 1 from cron.job where jobname = 'autofix-pipeline-daily'
-);
+-- Skips silently if pg_cron / pg_net are unavailable (e.g. local dev / Preview
+-- replay). On prod both extensions exist, so the THEN branch runs the original
+-- schedule unchanged. (Replay-safe guard — same pattern as 20260523010000.)
+DO $outer$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
+  AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') THEN
 
--- Schedule at 01:00 UTC daily
-select cron.schedule(
-  'autofix-pipeline-daily',
-  '0 1 * * *',
-  $$
-    select net.http_post(
-      url     := current_setting('app.supabase_url') || '/functions/v1/autofix-pipeline',
-      headers := jsonb_build_object(
-        'Content-Type',  'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-      ),
-      body    := '{}'::jsonb
-    )
-    as request_id;
-  $$
-);
+    -- Remove existing job if present (idempotent)
+    PERFORM cron.unschedule('autofix-pipeline-daily')
+    FROM cron.job
+    WHERE jobname = 'autofix-pipeline-daily';
 
--- Verify job was created
-do $$
-begin
-  if not exists (select 1 from cron.job where jobname = 'autofix-pipeline-daily') then
-    raise exception 'Failed to schedule autofix-pipeline-daily cron job';
-  end if;
-  raise notice 'autofix-pipeline-daily scheduled at 01:00 UTC ✓';
-end $$;
+    -- Schedule at 01:00 UTC daily
+    PERFORM cron.schedule(
+      'autofix-pipeline-daily',
+      '0 1 * * *',
+      $cron$
+        select net.http_post(
+          url     := current_setting('app.supabase_url') || '/functions/v1/autofix-pipeline',
+          headers := jsonb_build_object(
+            'Content-Type',  'application/json',
+            'Authorization', 'Bearer ' || current_setting('app.service_role_key')
+          ),
+          body    := '{}'::jsonb
+        )
+        as request_id;
+      $cron$
+    );
+
+    -- Verify job was created
+    IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'autofix-pipeline-daily') THEN
+      RAISE EXCEPTION 'Failed to schedule autofix-pipeline-daily cron job';
+    END IF;
+    RAISE NOTICE 'autofix-pipeline-daily scheduled at 01:00 UTC ✓';
+  ELSE
+    RAISE NOTICE 'pg_cron or pg_net not available — skipping autofix-pipeline cron schedule.';
+  END IF;
+END $outer$;

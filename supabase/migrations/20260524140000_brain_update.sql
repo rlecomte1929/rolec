@@ -49,57 +49,65 @@ CREATE POLICY "authenticated_read_brain_update_reviews" ON public.brain_update_r
 
 -- ─── pg_cron jobs ─────────────────────────────────────────────────────────────
 
--- Remove existing jobs if present (idempotent re-run)
-select cron.unschedule('brain-update-monthly')
-where exists (select 1 from cron.job where jobname = 'brain-update-monthly');
+-- Replay-safe guard — skips when pg_cron/pg_net unavailable (local/Preview replay).
+-- On prod both exist, so the schedules run unchanged. (Pattern: 20260523010000.)
+DO $outer$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
+  AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') THEN
 
-select cron.unschedule('brain-update-apply-approvals')
-where exists (select 1 from cron.job where jobname = 'brain-update-apply-approvals');
+    -- Remove existing jobs if present (idempotent re-run)
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'brain-update-monthly') THEN
+      PERFORM cron.unschedule('brain-update-monthly');
+    END IF;
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'brain-update-apply-approvals') THEN
+      PERFORM cron.unschedule('brain-update-apply-approvals');
+    END IF;
 
--- Monthly: 1st of each month at 08:00 UTC — generate delta from recent insights
-select cron.schedule(
-  'brain-update-monthly',
-  '0 8 1 * *',
-  $$
-    select net.http_post(
-      url     := current_setting('app.supabase_url') || '/functions/v1/brain-update',
-      headers := jsonb_build_object(
-        'Content-Type',  'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-      ),
-      body    := '{}'::jsonb
-    )
-    as request_id;
-  $$
-);
+    -- Monthly: 1st of each month at 08:00 UTC — generate delta from recent insights
+    PERFORM cron.schedule(
+      'brain-update-monthly',
+      '0 8 1 * *',
+      $cron$
+        select net.http_post(
+          url     := current_setting('app.supabase_url') || '/functions/v1/brain-update',
+          headers := jsonb_build_object(
+            'Content-Type',  'application/json',
+            'Authorization', 'Bearer ' || current_setting('app.service_role_key')
+          ),
+          body    := '{}'::jsonb
+        )
+        as request_id;
+      $cron$
+    );
 
--- Daily: every day at 09:00 UTC — check for approved review pages and apply deltas
-select cron.schedule(
-  'brain-update-apply-approvals',
-  '0 9 * * *',
-  $$
-    select net.http_post(
-      url     := current_setting('app.supabase_url') || '/functions/v1/brain-update',
-      headers := jsonb_build_object(
-        'Content-Type',  'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-      ),
-      body    := '{"check_approvals": true}'::jsonb
-    )
-    as request_id;
-  $$
-);
+    -- Daily: every day at 09:00 UTC — check for approved review pages and apply deltas
+    PERFORM cron.schedule(
+      'brain-update-apply-approvals',
+      '0 9 * * *',
+      $cron$
+        select net.http_post(
+          url     := current_setting('app.supabase_url') || '/functions/v1/brain-update',
+          headers := jsonb_build_object(
+            'Content-Type',  'application/json',
+            'Authorization', 'Bearer ' || current_setting('app.service_role_key')
+          ),
+          body    := '{"check_approvals": true}'::jsonb
+        )
+        as request_id;
+      $cron$
+    );
 
--- ─── Verify ───────────────────────────────────────────────────────────────────
-
-do $$
-begin
-  if not exists (select 1 from cron.job where jobname = 'brain-update-monthly') then
-    raise exception 'Failed to schedule brain-update-monthly cron job';
-  end if;
-  if not exists (select 1 from cron.job where jobname = 'brain-update-apply-approvals') then
-    raise exception 'Failed to schedule brain-update-apply-approvals cron job';
-  end if;
-  raise notice 'brain-update-monthly scheduled on 1st of each month at 08:00 UTC ✓';
-  raise notice 'brain-update-apply-approvals scheduled daily at 09:00 UTC ✓';
-end $$;
+    -- ─── Verify ─────────────────────────────────────────────────────────────────
+    IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'brain-update-monthly') THEN
+      RAISE EXCEPTION 'Failed to schedule brain-update-monthly cron job';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'brain-update-apply-approvals') THEN
+      RAISE EXCEPTION 'Failed to schedule brain-update-apply-approvals cron job';
+    END IF;
+    RAISE NOTICE 'brain-update-monthly scheduled on 1st of each month at 08:00 UTC ✓';
+    RAISE NOTICE 'brain-update-apply-approvals scheduled daily at 09:00 UTC ✓';
+  ELSE
+    RAISE NOTICE 'pg_cron or pg_net not available — skipping brain-update cron schedules.';
+  END IF;
+END $outer$;
