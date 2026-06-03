@@ -24,6 +24,7 @@ import { RequireAdminRoute } from './features/admin/RequireAdminRoute';
 import { AdminViewingCompanyProvider } from './features/admin/AdminViewingCompanyContext';
 // V2Gate removed — all promoted flags now render V2 unconditionally
 import { RequireEmployeeRoute } from './features/employee/RequireEmployeeRoute';
+import { RequireHrRoute } from './features/hr/RequireHrRoute';
 import { ROUTES as WIZARD_ROUTES } from './routes';
 import { NavigationAudit } from './pages/NavigationAudit';
 import { PlaceholderPage } from './pages/PlaceholderPage';
@@ -240,8 +241,8 @@ function App() {
         <Route path={ROUTE_DEFS.employeeRichProfile.path} element={<RequireEmployeeRoute><EmployeeRichProfilePage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeIntake.path} element={<RequireEmployeeRoute><EmployeeIntakePage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.EMP_DASH} element={<RequireEmployeeRoute><Navigate to={ROUTE_DEFS.employeeDashboard.path} replace /></RequireEmployeeRoute>} />
-        <Route path={ROUTE_DEFS.hrDashboard.path} element={<HrDashboard />} />
-        <Route path={ROUTE_DEFS.hrAnalytics.path} element={<HrAnalytics />} />
+        <Route path={ROUTE_DEFS.hrDashboard.path} element={<RequireHrRoute><HrDashboard /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrAnalytics.path} element={<RequireHrRoute><HrAnalytics /></RequireHrRoute>} />
         {/* /hr/command-center: gated by mobility_control flag. ON → new
             MobilityControlCenterV2Page (mock-aligned). OFF → legacy
             HrCommandCenter "Dashboard". Sibling /hr/command-center-v2
@@ -250,15 +251,15 @@ function App() {
             Legacy kept at /hr/command-center-legacy for emergency rollback. */}
         <Route
           path={ROUTE_DEFS.hrCommandCenter.path}
-          element={<MobilityControlCenterV2Page />}
+          element={<RequireHrRoute><MobilityControlCenterV2Page /></RequireHrRoute>}
         />
-        <Route path="/hr/command-center-v2" element={<MobilityControlCenterV2Page />} />
-        <Route path="/hr/command-center-legacy" element={<HrCommandCenter />} />
-        <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<HrCommandCenterCaseDetail />} />
+        <Route path="/hr/command-center-v2" element={<RequireHrRoute><MobilityControlCenterV2Page /></RequireHrRoute>} />
+        <Route path="/hr/command-center-legacy" element={<RequireHrRoute><HrCommandCenter /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrCommandCenterCase.path} element={<RequireHrRoute><HrCommandCenterCaseDetail /></RequireHrRoute>} />
         {/* [MVG-6A] HR — create immigration case */}
-        <Route path={ROUTE_DEFS.hrImmigrationCreate.path} element={<ImmigrationCaseCreatePage />} />
+        <Route path={ROUTE_DEFS.hrImmigrationCreate.path} element={<RequireHrRoute><ImmigrationCaseCreatePage /></RequireHrRoute>} />
         {/* [MVG-6A/6C] HR — immigration case status timeline */}
-        <Route path={ROUTE_DEFS.hrImmigrationCase.path} element={<ImmigrationCasePage />} />
+        <Route path={ROUTE_DEFS.hrImmigrationCase.path} element={<RequireHrRoute><ImmigrationCasePage /></RequireHrRoute>} />
         {/* platform-v2: flag-gated. Default OFF → legacy HrProviderGrid renders.
             Enable per-session: localStorage.setItem('platform_v2_mobility_control', 'on').
             Sibling /hr/provider-grid-v2 always renders V2 for side-by-side comparison. */}
@@ -266,29 +267,29 @@ function App() {
             Legacy kept at /hr/provider-grid-legacy for emergency rollback. */}
         <Route
           path={ROUTE_DEFS.hrProviderGrid.path}
-          element={<HrProviderGridV2 />}
+          element={<RequireHrRoute><HrProviderGridV2 /></RequireHrRoute>}
         />
-        <Route path="/hr/provider-grid-v2" element={<HrProviderGridV2 />} />
-        <Route path="/hr/provider-grid-legacy" element={<HrProviderGrid />} />
+        <Route path="/hr/provider-grid-v2" element={<RequireHrRoute><HrProviderGridV2 /></RequireHrRoute>} />
+        <Route path="/hr/provider-grid-legacy" element={<RequireHrRoute><HrProviderGrid /></RequireHrRoute>} />
         {/* HR Backlog (V2): pending employee tasks across the HR's company.
             HR + ADMIN access — server-side filtering by company_id. */}
-        <Route path="/hr/backlog" element={<HrBacklogPage />} />
+        <Route path="/hr/backlog" element={<RequireHrRoute><HrBacklogPage /></RequireHrRoute>} />
         {/* /hr/settings/policy → /hr/policy?tab=builder — policy builder is now
             a tab on the Policy page rather than a standalone route. */}
-        <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<Navigate to={`${ROUTE_DEFS.hrPolicy.path}?tab=builder`} replace />} />
-        <Route path={ROUTE_DEFS.hrExceptions.path} element={<HrExceptionsPage />} />
-        <Route path={ROUTE_DEFS.hrAiDecisions.path} element={<AIDecisionsAuditPage />} />
-                <Route path={ROUTE_DEFS.hrPolicyReality.path} element={<HrPolicyRealityPage />} />
-                <Route path={ROUTE_DEFS.hrDiscovery.path} element={<HrDiscoveryPage />} />
-        <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<HrAssignmentReview />} />
-        <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<HrCaseSummary />} />
-        <Route path={ROUTE_DEFS.hrCaseEstimate.path} element={<HrCaseEstimatePage />} />
-        <Route path={ROUTE_DEFS.hrReview.path} element={<Navigate to={ROUTE_DEFS.hrEmployeeDashboard.path} replace />} />
-        <Route path={ROUTE_DEFS.hrReviewCase.path} element={<ReviewToEmployeeDashboardRedirect />} />
-        <Route path={ROUTE_DEFS.hrAssignmentReview.path} element={<HrAssignmentReview />} />
-        <Route path={ROUTE_DEFS.hrComplianceIndex.path} element={<HrComplianceCheck />} />
-        <Route path={ROUTE_DEFS.hrCompliance.path} element={<HrComplianceCheck />} />
-        <Route path={ROUTE_DEFS.hrPackage.path} element={<HrAssignmentPackageReview />} />
+        <Route path={ROUTE_DEFS.hrPolicyBuilder.path} element={<RequireHrRoute><Navigate to={`${ROUTE_DEFS.hrPolicy.path}?tab=builder`} replace /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrExceptions.path} element={<RequireHrRoute><HrExceptionsPage /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrAiDecisions.path} element={<RequireHrRoute><AIDecisionsAuditPage /></RequireHrRoute>} />
+                <Route path={ROUTE_DEFS.hrPolicyReality.path} element={<RequireHrRoute><HrPolicyRealityPage /></RequireHrRoute>} />
+                <Route path={ROUTE_DEFS.hrDiscovery.path} element={<RequireHrRoute><HrDiscoveryPage /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<RequireHrRoute><HrAssignmentReview /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<RequireHrRoute><HrCaseSummary /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrCaseEstimate.path} element={<RequireHrRoute><HrCaseEstimatePage /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrReview.path} element={<RequireHrRoute><Navigate to={ROUTE_DEFS.hrEmployeeDashboard.path} replace /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrReviewCase.path} element={<RequireHrRoute><ReviewToEmployeeDashboardRedirect /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrAssignmentReview.path} element={<RequireHrRoute><HrAssignmentReview /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrComplianceIndex.path} element={<RequireHrRoute><HrComplianceCheck /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrCompliance.path} element={<RequireHrRoute><HrComplianceCheck /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrPackage.path} element={<RequireHrRoute><HrAssignmentPackageReview /></RequireHrRoute>} />
         {import.meta.env.DEV && (
           <Route path={ROUTE_DEFS.auditNavigation.path} element={<NavigationAudit />} />
         )}
@@ -309,12 +310,12 @@ function App() {
         <Route path={ROUTE_DEFS.quoteRfqDetail.path} element={<QuoteRfqDetail />} />
         <Route path={ROUTE_DEFS.vendorInbox.path} element={<VendorInbox />} />
         <Route path={ROUTE_DEFS.vendorRfq.path} element={<VendorRfq />} />
-        <Route path={ROUTE_DEFS.hrPreferredSuppliers.path} element={<HrPreferredSuppliers />} />
-        <Route path={ROUTE_DEFS.hrVendorCuration.path} element={<HrVendorCuration />} />
-        <Route path={ROUTE_DEFS.hrPolicy.path} element={<HrPolicy />} />
+        <Route path={ROUTE_DEFS.hrPreferredSuppliers.path} element={<RequireHrRoute><HrPreferredSuppliers /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrVendorCuration.path} element={<RequireHrRoute><HrVendorCuration /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrPolicy.path} element={<RequireHrRoute allowEmployee><HrPolicy /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.employeePolicy.path} element={<RequireEmployeeRoute><EmployeePolicyPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeHrPolicy.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
-        <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
+        <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<RequireHrRoute><Navigate to={ROUTE_DEFS.hrPolicy.path} replace /></RequireHrRoute>} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD_STEP} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
         <Route path={WIZARD_ROUTES.CASE_REVIEW} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />
@@ -424,10 +425,10 @@ function App() {
             rollback. Sibling /messages-v2 always renders V2 for side-by-side
             QA against the legacy paths. */}
         <Route path={ROUTE_DEFS.messages.path} element={<InboxV2Page />} />
-        <Route path={ROUTE_DEFS.hrMessages.path} element={<InboxV2Page />} />
+        <Route path={ROUTE_DEFS.hrMessages.path} element={<RequireHrRoute><InboxV2Page /></RequireHrRoute>} />
         <Route path="/messages-v2" element={<InboxV2Page />} />
         <Route path="/messages-legacy" element={<Messages />} />
-        <Route path="/hr/messages-legacy" element={<Messages />} />
+        <Route path="/hr/messages-legacy" element={<RequireHrRoute><Messages /></RequireHrRoute>} />
         <Route
           path={ROUTE_DEFS.resources.path}
           element={<Resources />}
@@ -444,15 +445,15 @@ function App() {
         */}
         <Route
           path={ROUTE_DEFS.hrResources.path}
-          element={<HrResourcesPreview />}
+          element={<RequireHrRoute><HrResourcesPreview /></RequireHrRoute>}
         />
         {/* platform-v2: V2 is now the default. Legacy HrCompanyProfile remains
             mounted at /hr/company-profile-legacy for emergency rollback. */}
-        <Route path={ROUTE_DEFS.hrCompanyProfile.path} element={<HrCompanyProfileV2 />} />
-        <Route path="/hr/company-profile-legacy" element={<HrCompanyProfile />} />
-        <Route path="/hr/company-profile-v2" element={<HrCompanyProfileV2 />} />
-        <Route path={ROUTE_DEFS.hrEmployees.path} element={<HrEmployees />} />
-        <Route path={ROUTE_DEFS.hrEmployeeDetail.path} element={<HrEmployeeDetail />} />
+        <Route path={ROUTE_DEFS.hrCompanyProfile.path} element={<RequireHrRoute><HrCompanyProfileV2 /></RequireHrRoute>} />
+        <Route path="/hr/company-profile-legacy" element={<RequireHrRoute><HrCompanyProfile /></RequireHrRoute>} />
+        <Route path="/hr/company-profile-v2" element={<RequireHrRoute><HrCompanyProfileV2 /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrEmployees.path} element={<RequireHrRoute><HrEmployees /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrEmployeeDetail.path} element={<RequireHrRoute><HrEmployeeDetail /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.notificationSettings.path} element={<NotificationSettings />} />
         {import.meta.env.DEV && (
           <Route
