@@ -134,6 +134,15 @@ from .app.routers import cases_admin as cases_admin_router
 from .app.routers import case_form_pdf as case_form_pdf_router  # [P2-4]
 from .app.routers import employee_tiers as employee_tiers_router  # [P1-6]
 from .app.routers import ai_decisions as ai_decisions_router  # [AI-002] EU AI Act Art. 14 human oversight log
+from .app.routers import nlg as nlg_router  # [Parker-J] dual-layer registration (PR #207 §9)
+from .app.routers import predictions as predictions_router  # [Parker-A] dual-layer registration (PR #207 §9)
+from .app.routers import benefit_optimizer as benefit_optimizer_router  # [Parker-B] dual-layer registration (PR #207 §9)
+from .app.routers import admin_prompts as admin_prompts_router  # [Parker-D] dual-layer registration (PR #207 §9)
+from .app.routers import ai_feedback as ai_feedback_router  # [Parker-E] dual-layer registration (PR #207 §9)
+from .app.routers import admin_ocr_shadow as admin_ocr_shadow_router  # [Parker-F] dual-layer registration (PR #207 §9)
+from .app.routers import admin_ai_unit_economics as admin_ai_unit_economics_router  # [Parker-G] dual-layer registration (PR #207 §9)
+from .app.routers import conjoint as conjoint_router  # [Parker-H] dual-layer registration (PR #207 §9)
+from .app.routers import translation as translation_router  # [Parker-I] dual-layer registration (PR #207 §9)
 from .app.routers import policy_publish as policy_publish_router  # [P1-4]
 from .app.routers import policy_summary as policy_summary_router  # [P1-5 backend]
 from .app.routers import policy_feedback as policy_feedback_router  # [P5-5]
@@ -674,6 +683,15 @@ app.include_router(cases_admin_router.router)  # [AUDIT-B9-cases-6] split 3/3 �
 app.include_router(case_form_pdf_router.router)  # [P2-4] original PDF signed-URL
 app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
+app.include_router(nlg_router.router)  # [Parker-J] PR #207 §9 — exec-summary + policy TL;DR (dual-layer registration)
+app.include_router(predictions_router.router)  # [Parker-A] PR #207 §9 — dual-layer registration
+app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 — dual-layer registration
+app.include_router(admin_prompts_router.router, prefix="/api/admin")  # [Parker-D] PR #207 §9 — dual-layer registration
+app.include_router(ai_feedback_router.router)  # [Parker-E] PR #207 §9 — dual-layer registration
+app.include_router(admin_ocr_shadow_router.router)  # [Parker-F] PR #207 §9 — dual-layer registration
+app.include_router(admin_ai_unit_economics_router.router)  # [Parker-G] PR #207 §9 — dual-layer registration
+app.include_router(conjoint_router.router)  # [Parker-H] PR #207 §9 — dual-layer registration
+app.include_router(translation_router.router)  # [Parker-I] PR #207 §9 — dual-layer registration
 app.include_router(policy_publish_router.router)  # [AUDIT-C2.3 restore] app/main.py not mounted in prod — must register here
 app.include_router(policy_summary_router.router)  # [AUDIT-C2.3 restore]
 app.include_router(policy_feedback_router.router)  # [AUDIT-C2.3 restore]

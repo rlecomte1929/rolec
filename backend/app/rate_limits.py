@@ -30,6 +30,9 @@ STANDARD_LIMIT = "100/minute"
 UPLOAD_LIMIT = "10/minute"
 ADMIN_LIMIT = "20/minute"
 AI_LIMIT = "20/minute"
+# Parker-I document translation (DeepL/NLLB-backed, per-character billed). Keyed per
+# authenticated user so one tenant can't drain a shared NAT/proxy IP bucket.
+TRANSLATE_LIMIT = "60/minute"
 
 
 def _client_ip(request: Request) -> str:
@@ -84,6 +87,7 @@ RETRY_AFTER_SECONDS = 60  # every named bucket is a 1-minute window
 ADMIN_RATE_LIMIT_ITEM = _parse_limit(ADMIN_LIMIT)
 UPLOAD_RATE_LIMIT_ITEM = _parse_limit(UPLOAD_LIMIT)
 AI_RATE_LIMIT_ITEM = _parse_limit(AI_LIMIT)
+TRANSLATE_RATE_LIMIT_ITEM = _parse_limit(TRANSLATE_LIMIT)
 
 _path_rl_storage = _MemoryStorage()
 _path_rate_limiter = _FixedWindowRateLimiter(_path_rl_storage)
@@ -123,6 +127,10 @@ def path_limit(path: str, ip: str, user_key: str):
     if is_ai_path(path):
         if not _path_rate_limiter.hit(AI_RATE_LIMIT_ITEM, "sec004-ai", user_key):
             return str(AI_RATE_LIMIT_ITEM)
+        return None
+    if path == "/api/translate":
+        if not _path_rate_limiter.hit(TRANSLATE_RATE_LIMIT_ITEM, "parker-translate", user_key):
+            return str(TRANSLATE_RATE_LIMIT_ITEM)
         return None
     if path in UPLOAD_PATHS:
         if not _path_rate_limiter.hit(UPLOAD_RATE_LIMIT_ITEM, "sec004-upload", ip):

@@ -190,7 +190,7 @@ def answer_policy_question(
     employee_context: Optional[Dict[str, Any]] = None,
     top_k: int = 8,
     client: Optional[LlmClient] = None,
-    model: str = DEFAULT_MODEL,
+    model: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Single-call entry point. Retrieves chunks, builds the prompt, calls
@@ -213,6 +213,21 @@ def answer_policy_question(
     started = time.time()
     client = client or get_default_client()
 
+    # Prompt registry (Parker Step D). Best-effort: when the registry is absent
+    # or empty, `active` is None and we fall back to the module SYSTEM_PROMPT /
+    # DEFAULT_MODEL — behavior is identical to pre-registry.
+    active = None
+    try:
+        from .prompt_registry import get_active_prompt
+        active = get_active_prompt("policy_assistant_answer")
+    except Exception:  # noqa: BLE001 — registry must never block the assistant
+        active = None
+    system_prompt = active.system_prompt if active is not None else SYSTEM_PROMPT
+    # Explicit caller model wins; else registry; else module default.
+    resolved_model = model or (active.model_name if active is not None else DEFAULT_MODEL)
+    prompt_version_id = active.id if active is not None else None
+    canary_arm = active.canary_arm if active is not None else None
+
     # 1. Retrieve top-K chunks for this company.
     chunks = policy_chunk_retriever.retrieve(
         company_id=company_id, query=q, top_k=top_k
@@ -229,7 +244,7 @@ def answer_policy_question(
         turns=turns,
         employee_context=employee_context,
     )
-    req = LlmRequest(system=SYSTEM_PROMPT, user_message=user_message, model=model)
+    req = LlmRequest(system=system_prompt, user_message=user_message, model=resolved_model)
 
     answer_text, usage, model_used, validation_error = _call_with_retry(client, req, chunks)
 
@@ -293,6 +308,8 @@ def answer_policy_question(
         "cost_usd": round(cost, 6),
         "latency_ms": latency_ms,
         "audit_id": audit_id,
+        "prompt_version_id": prompt_version_id,
+        "canary_arm": canary_arm,
     }
 
 

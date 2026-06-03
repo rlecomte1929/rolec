@@ -6,12 +6,111 @@ from typing import Any, Dict, List, Optional
 
 from .explanation import build_explanation
 from .registry import get_plugin
+from . import tiering
 from .types import (
     RecommendationExplanation,
     RecommendationItem,
     RecommendationResponse,
     RecommendationTier,
 )
+
+
+def _absolute_tier(score: float) -> RecommendationTier:
+    """Legacy absolute thresholds (85/70/50) — the cluster-tiering fallback."""
+    if score >= 85:
+        return RecommendationTier.BEST_MATCH
+    if score >= 70:
+        return RecommendationTier.GOOD_FIT
+    if score >= 50:
+        return RecommendationTier.OK
+    return RecommendationTier.WEAK
+
+
+def _country_iso2(criteria: Dict[str, Any]) -> Optional[str]:
+    cc = (criteria.get("destination_country") or "").strip().upper()[:2]
+    return cc or None
+
+
+def _load_cluster_cache(
+    category: str, country_iso2: Optional[str]
+) -> Optional[Dict[str, Any]]:
+    """Load the latest supplier_cluster_cache cell. Best-effort, never raises.
+
+    Returns ``None`` when the country is unknown, the table is absent (pre-
+    migration), or the cell has never been refreshed — callers then tier with
+    absolute thresholds.
+    """
+    if not country_iso2:
+        return None
+    try:
+        from sqlalchemy import text
+
+        from ..db import SessionLocal
+
+        sql = text(
+            """
+            select cluster_size, thresholds_json, supplier_ids_json
+            from public.supplier_cluster_cache
+            where service_category = :cat and country_iso2 = :cc
+            order by computed_at desc
+            limit 1
+            """
+        )
+        with SessionLocal() as session:
+            row = session.execute(sql, {"cat": category, "cc": country_iso2}).first()
+        if row is None:
+            return None
+        return {
+            "cluster_size": row[0] or 0,
+            "thresholds_json": row[1] or {},
+            "supplier_ids_json": row[2] or {},
+        }
+    except Exception:
+        return None
+
+
+def _cluster_tier_for(
+    score: float, supplier_id: Optional[str], cache: Optional[Dict[str, Any]]
+) -> Optional[RecommendationTier]:
+    """Cluster-relative tier for one supplier, or ``None`` if not applicable."""
+    if cache is None or not supplier_id:
+        return None
+    if (cache.get("cluster_size") or 0) < tiering.MIN_CLUSTER_CELL:
+        return None
+    ids_by_cluster = cache.get("supplier_ids_json") or {}
+    thresholds = cache.get("thresholds_json") or {}
+    for cid, ids in ids_by_cluster.items():
+        if str(supplier_id) in [str(x) for x in ids]:
+            try:
+                return tiering.tier_with_cluster_context(score, int(cid), thresholds)
+            except (KeyError, ValueError):
+                return None
+    return None
+
+
+def tier(
+    score: float,
+    *,
+    category: Optional[str] = None,
+    country_iso2: Optional[str] = None,
+    supplier_id: Optional[str] = None,
+    cache: Optional[Dict[str, Any]] = None,
+    plugin: Any = None,
+) -> RecommendationTier:
+    """Tier a normalized score, cluster-relative when a refreshed cell covers it.
+
+    Dispatches to ``tiering.tier_with_cluster_context`` when ``cache`` holds the
+    supplier's (category, country) cell with >= MIN_CLUSTER_CELL suppliers; else
+    falls back to ``plugin.tier`` (or absolute thresholds) and bumps the
+    ``cluster_tiering_fallback_total`` counter.
+    """
+    result = _cluster_tier_for(score, supplier_id, cache)
+    if result is not None:
+        return result
+    tiering.incr_fallback()
+    if plugin is not None:
+        return plugin.tier(score)
+    return _absolute_tier(score)
 
 
 def _load_dataset_with_registry(category: str, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -110,9 +209,19 @@ def recommend(
     raw_scores = [s["score_raw"] for s in scored_items]
     norm_scores = plugin.normalize(raw_scores)
 
+    cc = _country_iso2(criteria)
+    cluster_cache = _load_cluster_cache(category, cc)
+
     for i, sc in enumerate(scored_items):
         sc["norm_score"] = norm_scores[i] if i < len(norm_scores) else 0
-        sc["tier"] = plugin.tier(sc["norm_score"])
+        sc["tier"] = tier(
+            sc["norm_score"],
+            category=category,
+            country_iso2=cc,
+            supplier_id=str((sc.get("item") or {}).get("item_id") or ""),
+            cache=cluster_cache,
+            plugin=plugin,
+        )
 
     # Filter out items that don't match destination (score 0 = wrong city, etc.)
     matching = [s for s in scored_items if s["score_raw"] > 0]
@@ -135,7 +244,14 @@ def recommend(
         if _is_preferred(s):
             s["norm_score"] = (s.get("norm_score") or 0) + PREFERRED_BOOST
             s["_company_preferred"] = True
-            s["tier"] = plugin.tier(min(100, s["norm_score"]))
+            s["tier"] = tier(
+                min(100, s["norm_score"]),
+                category=category,
+                country_iso2=cc,
+                supplier_id=str((s.get("item") or {}).get("item_id") or ""),
+                cache=cluster_cache,
+                plugin=plugin,
+            )
         else:
             s["_company_preferred"] = False
 
@@ -243,9 +359,18 @@ def recommend_debug(
 
     raw_scores = [s["score_raw"] for s in scored_items]
     norm_scores = plugin.normalize(raw_scores)
+    cc = _country_iso2(criteria)
+    cluster_cache = _load_cluster_cache(category, cc)
     for i, sc in enumerate(scored_items):
         sc["norm_score"] = norm_scores[i] if i < len(norm_scores) else 0
-        sc["tier"] = plugin.tier(sc["norm_score"])
+        sc["tier"] = tier(
+            sc["norm_score"],
+            category=category,
+            country_iso2=cc,
+            supplier_id=str((sc.get("item") or {}).get("item_id") or ""),
+            cache=cluster_cache,
+            plugin=plugin,
+        )
 
     matching = [s for s in scored_items if s["score_raw"] > 0]
     preferred_ids = {str(sid) for sid in (criteria.get("_preferred_supplier_ids") or []) if sid}
@@ -260,7 +385,14 @@ def recommend_debug(
         if _is_preferred(s):
             s["norm_score"] = (s.get("norm_score") or 0) + PREFERRED_BOOST
             s["_company_preferred"] = True
-            s["tier"] = plugin.tier(min(100, s["norm_score"]))
+            s["tier"] = tier(
+                min(100, s["norm_score"]),
+                category=category,
+                country_iso2=cc,
+                supplier_id=str((s.get("item") or {}).get("item_id") or ""),
+                cache=cluster_cache,
+                plugin=plugin,
+            )
         else:
             s["_company_preferred"] = False
 

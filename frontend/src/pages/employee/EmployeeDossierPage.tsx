@@ -10,7 +10,7 @@
  * completion-% header tile and "Build dossier" CTA.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
 import { CaseFormCard } from '../../features/platform-v2/dossier/CaseFormCard';
@@ -43,6 +43,10 @@ function matchesFilter(f: CaseFormSummary, key: FilterTabKey): boolean {
 
 export const EmployeeDossierPage: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // [P1-6] When the Roadmap "Documents" chip links here it appends
+  // ?roadmap_step=<stepId>; scope the list to that step's forms until cleared.
+  const roadmapStep = searchParams.get('roadmap_step');
   const [forms, setForms] = useState<CaseFormSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,32 +81,50 @@ export const EmployeeDossierPage: React.FC = () => {
   // the joined list so the new row + its template/person/field-summary appear.
   useCaseFormsRealtime(caseId, load);
 
+  // [P1-6] Forms in scope for the current view: when a roadmap step is active,
+  // only its triggered forms; otherwise the full list. The status tabs,
+  // counts, and completion summary all derive from this scoped set so the
+  // page stays internally consistent with the banner.
+  const scopedForms = useMemo(
+    () => (roadmapStep ? forms.filter((f) => f.roadmap_step_id === roadmapStep) : forms),
+    [forms, roadmapStep],
+  );
+
+  const clearRoadmapStep = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('roadmap_step');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   // [P1-5B] Overall completion %: simple average of per-form completion_pct
   // weighted equally. If no forms exist, 0%.
   const overall = useMemo(() => {
-    if (forms.length === 0) return { pct: 0, ready: 0, total: 0 };
-    const total = forms.length;
-    const sum = forms.reduce((acc, f) => acc + (f.completion_pct || 0), 0);
+    if (scopedForms.length === 0) return { pct: 0, ready: 0, total: 0 };
+    const total = scopedForms.length;
+    const sum = scopedForms.reduce((acc, f) => acc + (f.completion_pct || 0), 0);
     const pct = Math.round(sum / total);
-    const ready = forms.filter(
+    const ready = scopedForms.filter(
       (f) => f.status === 'ready' || f.status === 'submitted' || f.status === 'approved',
     ).length;
     return { pct, ready, total };
-  }, [forms]);
+  }, [scopedForms]);
 
-  // Per-filter counts for the tab labels — computed from the full list,
+  // Per-filter counts for the tab labels — computed from the scoped list,
   // not the filtered view, so counts stay stable across tab clicks.
   const counts = useMemo(() => {
     return {
-      all:           forms.length,
-      action_needed: forms.filter((f) => matchesFilter(f, 'action_needed')).length,
-      blocked:       forms.filter((f) => matchesFilter(f, 'blocked')).length,
-      ready:         forms.filter((f) => matchesFilter(f, 'ready')).length,
-      submitted:     forms.filter((f) => matchesFilter(f, 'submitted')).length,
+      all:           scopedForms.length,
+      action_needed: scopedForms.filter((f) => matchesFilter(f, 'action_needed')).length,
+      blocked:       scopedForms.filter((f) => matchesFilter(f, 'blocked')).length,
+      ready:         scopedForms.filter((f) => matchesFilter(f, 'ready')).length,
+      submitted:     scopedForms.filter((f) => matchesFilter(f, 'submitted')).length,
     } as Record<FilterTabKey, number>;
-  }, [forms]);
+  }, [scopedForms]);
 
-  const visible = useMemo(() => forms.filter((f) => matchesFilter(f, filter)), [forms, filter]);
+  const visible = useMemo(
+    () => scopedForms.filter((f) => matchesFilter(f, filter)),
+    [scopedForms, filter],
+  );
 
   return (
     <AppShell>
@@ -141,6 +163,25 @@ export const EmployeeDossierPage: React.FC = () => {
             </button>
           </div>
         </header>
+
+        {/* [P1-6] Roadmap-step scope banner — shown when arriving from a
+            roadmap Documents chip. Explains why the list is narrowed and
+            lets the employee clear the filter. */}
+        {roadmapStep && (
+          <div
+            data-testid="roadmap-step-filter-banner"
+            className="mb-4 flex items-center justify-between gap-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          >
+            <span>Showing only documents from this roadmap step.</span>
+            <button
+              type="button"
+              onClick={clearRoadmapStep}
+              className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950"
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
 
         {/* Filter tabs */}
         <div className="flex flex-wrap items-center gap-1 mb-4 border-b border-slate-200">

@@ -5,12 +5,18 @@ from .db import init_db
 from .routers import (
     ab_tests,
     admin,
+    admin_ai_unit_economics,
+    admin_ocr_shadow,
+    admin_prompts,
     advisors,
     ai_decisions,
+    ai_feedback,
+    benefit_optimizer,
     cases,
     cases_admin,
     cases_read,
     cases_write,
+    conjoint,
     employee_quotes,
     exception_requests,
     hr_analytics,
@@ -27,6 +33,7 @@ from .routers import (
     immigration_status,
     marketplace,
     mobility_context,
+    nlg,
     pets,
     policy_canonical,
     policy_feedback,
@@ -34,8 +41,10 @@ from .routers import (
     policy_publish,
     policy_summary,
     policy_templates,
+    predictions,
     relocation_profile,
     support,
+    translation,
 )
 from .recommendations.router import router as recommendations_router
 from .recommendations.admin_debug import router as admin_recommendations_debug_router
@@ -73,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(employee_quotes.router)
     app.include_router(pets.router)
     app.include_router(support.router)
+    app.include_router(translation.router)
     app.include_router(ab_tests.router)
 
     # ── Month-1 migration: Auth ───────────────────────────────────────────────
@@ -90,6 +100,8 @@ def create_app() -> FastAPI:
     app.include_router(hr_case_audit.router)
     # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
     app.include_router(hr_case_resolve.router)
+    # [Parker-J] NLG exec-summary + policy TL;DR routes
+    app.include_router(nlg.router)
 
     # ── Month-1 migration: Employee cluster ───────────────────────────────────
     # [AUDIT-B9-imm-6] immigration.router replaced by 5 modular sub-routers.
@@ -104,8 +116,20 @@ def create_app() -> FastAPI:
     app.include_router(marketplace.router)
     app.include_router(advisors.router)
     app.include_router(ai_decisions.router)
+    # [Parker-A] Case-duration prediction (canary: PREDICTIONS_ENABLED, default off)
+    app.include_router(predictions.router)
+    # [Parker-B] HR benefit-mix optimizer (Markowitz-style)
+    app.include_router(benefit_optimizer.router)
+    # [Parker-E] RLHF-lite human-feedback capture
+    app.include_router(ai_feedback.router)
+    app.include_router(admin_ocr_shadow.router)
+    # [Parker-G] AI unit-economics admin rollup
+    app.include_router(admin_ai_unit_economics.router)
+    # [Parker-H] Conjoint (CBC) company-scoped HR/respondent API
+    app.include_router(conjoint.router)
     app.include_router(recommendations_router)
     app.include_router(admin_recommendations_debug_router, prefix="/api/admin")
+    app.include_router(admin_prompts.router, prefix="/api/admin")
     app.include_router(relocation_routes.router)
     app.include_router(relocation_routes.api_router)
     app.include_router(relocation_classify_routes.router)
