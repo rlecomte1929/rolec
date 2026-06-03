@@ -159,10 +159,13 @@ begin
   if not ok then
     raise exception 'access denied to rce.extracted_fields %', p_field_id using errcode = '42501';
   end if;
-  if rec.phi_class in ('BIOMETRIC','CRIMINAL')
-     and current_user not in ('postgres','service_role') then
+  -- NOTE: this is SECURITY DEFINER, so current_user is the owner (postgres), not
+  -- the caller. Audit on the presence of an end-user JWT instead: backend/service
+  -- connections use the postgres/service role with no request.jwt -> auth.uid() is
+  -- null and are not audited; logged-in principals have a non-null auth.uid().
+  if rec.phi_class in ('BIOMETRIC','CRIMINAL') and auth.uid() is not null then
     insert into rce.phi_access_log (principal_id, db_role, action, extracted_field_id, phi_class)
-    values (auth.uid(), current_user, 'phi.read', p_field_id, rec.phi_class);
+    values (auth.uid(), session_user, 'phi.read', p_field_id, rec.phi_class);
   end if;
   return rec;
 end
@@ -198,7 +201,11 @@ begin
        and table_name <> 'rule_change_proposals'
   loop
     execute format('alter table rce.%I enable row level security', t);
-    execute format('revoke all on rce.%I from anon', t);
+    -- Revoke BOTH anon and authenticated: C1-01 left permissive DML grants on
+    -- some rce tables (extraction_agents, agent_versions). §4b re-grants SELECT
+    -- only to the tables that get a tenant/ref policy; service-only tables end
+    -- up with no authenticated privilege at all.
+    execute format('revoke all on rce.%I from anon, authenticated', t);
     execute format('drop policy if exists %I on rce.%I', t || '_service_all', t);
     execute format(
       'create policy %I on rce.%I for all to service_role using (true) with check (true)',
