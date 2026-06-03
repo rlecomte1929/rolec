@@ -225,6 +225,8 @@ begin
       execute format(
         'create policy %I on rce.%I for select to authenticated using (rce.can_access_case(case_id))',
         t||'_tenant_select', t);
+      -- RLS is inert without a table grant; authenticated reads are RLS-filtered.
+      execute format('grant select on rce.%I to authenticated', t);
     end if;
   end loop;
 end $$;
@@ -235,6 +237,7 @@ do $$ begin
     drop policy if exists cases_tenant_select on rce.cases;
     create policy cases_tenant_select on rce.cases
       for select to authenticated using (rce.can_access_case(case_id));
+    grant select on rce.cases to authenticated;
   end if;
 end $$;
 
@@ -244,6 +247,7 @@ do $$ begin
     drop policy if exists employers_tenant_select on rce.employers;
     create policy employers_tenant_select on rce.employers
       for select to authenticated using (rce.can_access_employer(employer_id));
+    grant select on rce.employers to authenticated;
   end if;
 
   if to_regclass('rce.employees') is not null then
@@ -256,12 +260,14 @@ do $$ begin
                     where c.primary_employee_id = employees.employee_id
                       and rce.can_access_case(c.case_id))
       );
+    grant select on rce.employees to authenticated;
   end if;
 
   if to_regclass('rce.hr_policies') is not null then
     drop policy if exists hr_policies_tenant_select on rce.hr_policies;
     create policy hr_policies_tenant_select on rce.hr_policies
       for select to authenticated using (rce.can_access_employer(employer_id));
+    grant select on rce.hr_policies to authenticated;
   end if;
 
   if to_regclass('rce.policy_clauses') is not null then
@@ -272,6 +278,7 @@ do $$ begin
                  where hp.hr_policy_id = policy_clauses.hr_policy_id
                    and rce.can_access_employer(hp.employer_id))
       );
+    grant select on rce.policy_clauses to authenticated;
   end if;
 end $$;
 
@@ -285,6 +292,7 @@ do $$ begin
                  where d.document_id = extracted_fields.document_id
                    and rce.can_access_case(d.case_id))
       );
+    grant select on rce.extracted_fields to authenticated;
   end if;
 
   if to_regclass('rce.entity_links') is not null then
@@ -297,6 +305,7 @@ do $$ begin
                  where ef.extracted_field_id = entity_links.extracted_field_id
                    and rce.can_access_case(d.case_id))
       );
+    grant select on rce.entity_links to authenticated;
   end if;
 end $$;
 
@@ -316,6 +325,7 @@ begin
       execute format(
         'create policy %I on rce.%I for select to authenticated using (true)',
         t||'_ref_read', t);
+      execute format('grant select on rce.%I to authenticated', t);
     end if;
   end loop;
 end $$;
@@ -332,6 +342,7 @@ do $$ begin
   drop policy if exists phi_access_log_admin_read on rce.phi_access_log;
   create policy phi_access_log_admin_read on rce.phi_access_log
     for select to authenticated using (public.is_admin());
+  grant select on rce.phi_access_log to authenticated;
 end $$;
 
 commit;

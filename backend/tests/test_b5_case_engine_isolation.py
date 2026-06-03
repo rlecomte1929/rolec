@@ -60,6 +60,24 @@ class TestRceTenantRlsStatic:
         for fn in ("rce.current_hr_company", "rce.can_access_case", "rce.can_access_employer"):
             assert re.search(rf"function\s+{re.escape(fn)}\b", migration_sql, re.IGNORECASE), fn
 
+    def test_grants_select_to_authenticated(self, migration_sql: str) -> None:
+        # RLS policies are inert without a table grant: prior C1-01a revoked
+        # authenticated grants on rce.*, so every tenant/ref read policy must be
+        # paired with a `grant select ... to authenticated` or it filters to a
+        # permission-denied, not RLS-scoped rows.
+        assert re.search(
+            r"grant\s+select\s+on\s+rce\.[^;]*to\s+authenticated",
+            migration_sql, re.IGNORECASE,
+        ), "tenant/ref read policies must grant select to authenticated"
+
+    def test_service_only_tables_get_no_authenticated_grant(self, migration_sql: str) -> None:
+        # The deliberately service-only tables must never be granted to authenticated.
+        for t in ("addresses", "canonical_entities", "extraction_agents", "agent_versions"):
+            assert not re.search(
+                rf"grant\s+select\s+on\s+rce\.{t}\b[^;]*to\s+authenticated",
+                migration_sql, re.IGNORECASE,
+            ), f"rce.{t} must stay service-only (no authenticated grant)"
+
     @pytest.mark.parametrize("table", CASE_SCOPED)
     def test_case_scoped_select_policy(self, migration_sql: str, table: str) -> None:
         assert re.search(rf"\b{table}\b", migration_sql), table
