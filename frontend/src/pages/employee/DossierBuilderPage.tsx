@@ -109,9 +109,16 @@ function SortableFormRow({ form, index }: SortableFormRowProps) {
 
       {/* Form info */}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-slate-800 truncate">{form.template.name}</div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {form.is_adhoc && (
+            <span className="flex-none inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+              Custom
+            </span>
+          )}
+          <span className="text-sm font-medium text-slate-800 truncate">{form.template.name}</span>
+        </div>
         <div className="text-xs text-slate-500 mt-0.5">
-          {form.template.code} · {form.person.name ?? form.person.kind}
+          {(form.is_adhoc ? (form.template.authority_name ?? 'Ad-hoc document') : form.template.code)} · {form.person.name ?? form.person.kind}
         </div>
       </div>
 
@@ -239,10 +246,16 @@ function Step1({ forms, selectedIds, onToggle }: Step1Props) {
 
                 <FileText className="h-4 w-4 text-slate-400 flex-none" />
 
-                {/* Form code badge */}
-                <span className="flex-none inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                  {form.template.code}
-                </span>
+                {/* Form code badge — "Custom" for ad-hoc forms */}
+                {form.is_adhoc ? (
+                  <span className="flex-none inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                    Custom
+                  </span>
+                ) : (
+                  <span className="flex-none inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                    {form.template.code}
+                  </span>
+                )}
 
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-slate-800 truncate">{form.template.name}</div>
