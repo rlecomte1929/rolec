@@ -12965,7 +12965,8 @@ def get_company_policy_download_url(
 
     try:
         supabase = _get_supabase_admin_client()
-        signed = supabase.storage.from_(BUCKET_HR_POLICIES).create_signed_url(object_key, 3600)
+        # SEC-006: 15-minute signed URL (900s). Never persisted; minted on read.
+        signed = supabase.storage.from_(BUCKET_HR_POLICIES).create_signed_url(object_key, 900)
         url = signed.get("signedURL") or signed.get("signed_url") or ""
         if not url:
             return JSONResponse(
@@ -12986,6 +12987,42 @@ def get_company_policy_download_url(
         )
 
 
+# SEC-006: buckets a signed URL may be minted for. Server-controlled allowlist
+# so the endpoint can never be coerced into signing an arbitrary bucket.
+_SIGNED_URL_BUCKETS = {"hr-policies", "case-documents", "form-templates"}
+
+
+@app.get("/api/files/signed-url")
+def get_file_signed_url(
+    bucket: str = Query(..., description="Storage bucket id"),
+    path: str = Query(..., description="Object key within the bucket"),
+    user: Dict[str, Any] = Depends(require_role(UserRole.ADMIN)),
+):
+    """
+    SEC-006 - mint a short-lived (15 min) signed URL for a private storage
+    object. Admin-only. Never persist the returned URL beyond its TTL.
+
+    The bucket must be on the server-side allowlist and the object key must be
+    a relative path (no scheme, no traversal) so this cannot be turned into an
+    SSRF or arbitrary-bucket read.
+    """
+    if bucket not in _SIGNED_URL_BUCKETS:
+        raise HTTPException(status_code=400, detail="unsupported_bucket")
+    key = (path or "").strip()
+    if not key or key.startswith(("/", "http://", "https://")) or ".." in key:
+        raise HTTPException(status_code=400, detail="invalid_path")
+    try:
+        supabase = _get_supabase_admin_client()
+        signed = supabase.storage.from_(bucket).create_signed_url(key, 900)
+        url = signed.get("signedURL") or signed.get("signed_url") or ""
+    except Exception as exc:
+        log.warning("signed-url mint failed bucket=%s exc=%s", bucket, exc)
+        raise HTTPException(status_code=502, detail="sign_failed") from exc
+    if not url:
+        raise HTTPException(status_code=404, detail="object_not_found")
+    return {"url": url, "expires_in": 900}
+
+
 @app.post("/api/company-policies/upload")
 async def upload_company_policy(
     req: Request,
@@ -12997,20 +13034,32 @@ async def upload_company_policy(
 ):
     request_id = getattr(req.state, "request_id", None) if req else None
     profile = _require_company_for_user(user)
-    filename = file.filename or "policy"
-    ext = filename.split(".")[-1].lower()
-    if ext not in ("docx", "pdf"):
-        raise HTTPException(status_code=400, detail="Only .docx or .pdf supported")
+    # SEC-006: server-side validation - content-based MIME (never the client
+    # extension/Content-Type), 20 MiB ceiling, sanitised filename. Policy docs
+    # are PDF or DOCX only.
+    from .app.services.upload_validator import read_and_validate
+
+    _POLICY_DOC_MIME = frozenset(
+        {
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
+    )
+    content, safe_name, detected_mime = await read_and_validate(
+        file, allowed_mime=_POLICY_DOC_MIME
+    )
+    ext = "pdf" if detected_mime == "application/pdf" else "docx"
     policy_id = str(uuid.uuid4())
-    path = f"companies/{profile['company_id']}/policies/{policy_id}/{filename}"
-    content = await file.read()
+    # Path is fully server-generated (uuid + sanitised name); the client never
+    # influences the storage layout, so path traversal is impossible.
+    path = f"companies/{profile['company_id']}/policies/{policy_id}/{safe_name}"
     try:
         supabase = _get_supabase_admin_client()
         supabase.storage.from_(BUCKET_HR_POLICIES).upload(
             path,
             content,
             {
-                "content-type": file.content_type or "application/octet-stream",
+                "content-type": detected_mime,
                 "upsert": "true",
             },
         )

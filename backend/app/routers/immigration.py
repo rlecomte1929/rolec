@@ -877,25 +877,18 @@ async def ocr_passport(
                    "Please complete the consent step first.",
         )
 
-    # --- Validate file type and size ---
-    ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
-    MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+    # --- Validate file type and size (SEC-006: server-side, content-based) ---
+    # MIME is sniffed from the bytes via libmagic, never the client header.
+    # 415 on disallowed type, 413 on oversize. Images only (JPEG/PNG/WebP).
+    from ..services.upload_validator import ALLOWED_IMAGE_MIME, read_and_validate
 
-    content_type = (passport_image.content_type or "").lower()
-    if content_type not in ALLOWED_TYPES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Unsupported file type '{content_type}'. Accepted: JPEG, PNG, WebP.",
-        )
+    image_bytes, _safe_name, content_type = await read_and_validate(
+        passport_image,
+        allowed_mime=ALLOWED_IMAGE_MIME,
+        max_bytes=10 * 1024 * 1024,  # passport photos: 10 MiB
+    )
 
-    image_bytes = await passport_image.read()
-    if len(image_bytes) > MAX_BYTES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"File too large ({len(image_bytes) // 1024} KB). Maximum is 10 MB.",
-        )
-
-    # --- Upload to Supabase Storage (non-blocking — failure is logged but not surfaced) ---
+    # --- Upload to Supabase Storage (non-blocking) ---
     storage_path = _upload_passport_image(case_id, image_bytes, content_type)
 
     # --- OCR extraction via GPT-4o ---
