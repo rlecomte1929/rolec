@@ -1,0 +1,134 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "locale": "en",
+    "task": "C1-14C · Pathway production copy",
+    "voice": "Calm, direct, HR-operator facing. No hype, no apologies, no AI-marketing language. Two sentences max where possible. Concrete, not abstract.",
+    "string_count": 64,
+    "char_limit_target": 120,
+    "_notes": "FR / NO localization deferred to Cohort 4. All strings pass relopass-brand-audit conventions (no 'powerful', 'seamless', 'journey', 'all-in-one')."
+  },
+
+  "welcome": {
+    "first_time": "Hi {first_name}. I'll help you get the documents your HR team needs.",
+    "returning": "Welcome back, {first_name}. Picking up where you left off.",
+    "resumed_session": "You have {pending_count} items pending. Let's keep going.",
+    "completed_all": "All documents in. Your case is with HR."
+  },
+
+  "intake": {
+    "ask_purpose": "Quick question first — what's the purpose of your move?",
+    "ask_corridor": "Where are you moving from and to?",
+    "confirm_corridor": "{origin_country} to {destination_country}, starting {start_date}. Right?",
+    "ready_to_collect": "Got it. Here's what HR will need from you."
+  },
+
+  "upload": {
+    "ask_generic": "Upload your {document_label} when you're ready.",
+    "passport_td3": "Upload a clear photo or scan of your passport's photo page.",
+    "employment_contract": "Upload your signed employment contract — all pages.",
+    "eu_residence_permit": "Upload your EU residence permit, both sides.",
+    "eu_national_id": "Upload your national ID card, both sides.",
+    "visa_stamp": "Upload the page of your passport showing the entry visa.",
+    "offer_letter": "Upload the offer letter, signed if available.",
+    "payslip": "Upload your most recent 3 payslips.",
+    "tax_record": "Upload your most recent annual tax document.",
+    "diploma": "Upload your highest diploma.",
+    "academic_transcript": "Upload your academic transcript.",
+    "birth_certificate": "Upload your birth certificate.",
+    "marriage_certificate": "Upload your marriage certificate.",
+    "police_clearance": "Upload your police clearance (issued within the last 6 months).",
+    "proof_of_address": "Upload a utility bill or bank letter from the last 3 months.",
+    "health_insurance_proof": "Upload proof of health insurance coverage for your destination country.",
+    "bank_statement": "Upload your most recent bank statement.",
+    "cv_resume": "Upload your CV or resume.",
+    "drag_or_click": "Drag a file here, or tap to choose one.",
+    "uploading": "Uploading…",
+    "scanning": "Reading the document…",
+    "tip_quality": "Tip: good lighting, all corners visible, no glare."
+  },
+
+  "confirm": {
+    "field_generic": "Is this correct? {extracted_value}",
+    "name": "Is this your name? {extracted_value}",
+    "dob": "Date of birth: {extracted_value}. Right?",
+    "passport_number": "Passport number: {extracted_value}. Right?",
+    "expiry": "Expires: {extracted_value}. Right?",
+    "employer_name": "Employer: {extracted_value}. Right?",
+    "salary_amount": "Annual salary: {extracted_value} {currency}. Right?",
+    "start_date": "Start date: {extracted_value}. Right?",
+    "address": "Current address: {extracted_value}. Right?",
+    "yes": "Yes, that's right",
+    "no_change": "No, change it",
+    "ask_hr": "Ask HR",
+    "edit_inline": "Edit field"
+  },
+
+  "low_confidence": {
+    "ambiguous": "I'm not certain I read this correctly. Can you confirm: {extracted_value}?",
+    "field_missing": "I couldn't find this field. Can you type it in?",
+    "field_partial": "I got part of it: {partial_value}. Can you complete it?"
+  },
+
+  "escalate": {
+    "ask_send_to_hr": "Send this to HR for review?",
+    "ask_send_yes": "Yes, send to HR",
+    "ask_send_no": "Not yet — let me try again",
+    "sent_confirmation": "Sent to HR. You'll get an email when they respond.",
+    "sent_subline": "Typical response: within one business day."
+  },
+
+  "we_cannot": {
+    "contradiction_two_docs": "Two documents disagree about your {field_label}. HR needs to look at this — I've flagged it for them.",
+    "missing_required": "I need {field_label} to continue, but I can't find it on what you've uploaded. Could you upload a document that shows it, or ask HR?",
+    "out_of_scope": "This is outside what I can help with. I've flagged it for your HR contact.",
+    "policy_question": "Policy questions are for HR — I don't make those calls. I've forwarded your question.",
+    "legal_question": "Legal advice isn't something I can give. Your HR team can route you to the right person."
+  },
+
+  "error": {
+    "file_too_large": "That file is over 20MB. Try compressing or splitting it.",
+    "file_unsupported": "I can read PDFs and most image types. This one isn't supported — can you re-export?",
+    "file_corrupted": "That file didn't open cleanly. Can you re-upload it?",
+    "ocr_low_quality": "The image is too blurry to read. Try a clearer photo or scan.",
+    "ocr_no_text": "I couldn't find readable text on this. Is it the right document?",
+    "network": "Connection dropped. Try again in a moment.",
+    "session_expired": "Your session timed out. Sign in to continue where you left off.",
+    "rate_limited": "Too many uploads at once. Wait 30 seconds and try again.",
+    "unknown": "Something went wrong on my side. HR has been notified."
+  },
+
+  "success": {
+    "document_accepted": "Got it. {document_label} is logged.",
+    "field_confirmed": "Confirmed.",
+    "step_complete": "Step complete. Next: {next_step_label}.",
+    "all_complete_pending_hr": "Looks good. Your case is now ready for HR review.",
+    "all_complete_done": "Everything's in order. Your case is moving forward."
+  },
+
+  "navigation": {
+    "next": "Next",
+    "back": "Back",
+    "save_resume_later": "Save and continue later",
+    "skip_for_now": "Skip for now",
+    "view_progress": "View progress",
+    "contact_hr": "Contact HR"
+  },
+
+  "status_indicators": {
+    "pending": "Pending",
+    "in_review": "With HR",
+    "approved": "Approved",
+    "rejected_needs_redo": "Needs a redo",
+    "expired": "Expired — please re-upload"
+  },
+
+  "consent": {
+    "intro": "Before we start, a quick note on data.",
+    "purpose": "Your documents are used only for your relocation case. HR sees them. We do not sell or share them.",
+    "retention": "We keep them for the duration of your assignment plus 12 months, then delete.",
+    "rights": "You can ask to see, correct, or delete your data at any time.",
+    "agree": "I understand and agree",
+    "decline": "Not now"
+  }
+}
