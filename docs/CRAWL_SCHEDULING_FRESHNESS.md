@@ -26,8 +26,28 @@ Migration: `supabase/migrations/20260311000000_crawl_scheduling_freshness.sql`
 
 - `schedule_type`: `cron` | `interval`
 - `schedule_expression`: cron string (e.g. `0 2 * * *`) or interval hours (e.g. `24`)
-- `source_scope_type`: `source`, `country`, `city`, `domain_group`
+- `source_scope_type`: `source`, `country`, `city`, `domain_group`, `tier`
 - `source_scope_ref`, `country_code`, `city_name`, `content_domain`
+- `crawl_tier`: `tier-1-critical`, `tier-1-stable`, `tier-2` (per-tier schedules only)
+
+## Per-tier cron config (AIQ-689 / P2-02a)
+
+Tiers are the primary scheduling dimension. `backend/app/services/crawl_tier_config.py`
+defines three tiers and maps source-registry `trust_tier` values (T0–T3) onto them:
+
+| Tier | trust_tier | Cadence | Cron (UTC) |
+|------|-----------|---------|------------|
+| `tier-1-critical` | T0 | daily | `0 2 * * *` |
+| `tier-1-stable` | T1 | weekly (Mon) | `0 3 * * 1` |
+| `tier-2` | T2, T3 | monthly (1st) | `0 4 1 * *` |
+
+Unknown/missing `trust_tier` falls back to `tier-2` (slowest, but still crawled).
+
+`sync_tier_schedules()` idempotently seeds one `crawl_schedules` row per tier
+(keyed by the deterministic name `auto-tier::<tier>`) and repairs cron/tier drift.
+It is called automatically at the top of `scripts/process_crawl_schedules.py`, and is
+also exposed as `POST /api/admin/crawl/sync-tier-schedules`. A scheduled `tier` run
+crawls only the sources whose `trust_tier` maps to that tier.
 
 ## API Endpoints (Admin-only)
 
@@ -41,6 +61,7 @@ Migration: `supabase/migrations/20260311000000_crawl_scheduling_freshness.sql`
 
 ### Crawl Schedules
 
+- `POST /api/admin/crawl/sync-tier-schedules` — Seed/repair per-tier schedules (idempotent)
 - `GET /api/admin/crawl/schedules` — List schedules
 - `GET /api/admin/crawl/schedules/due` — Due schedules
 - `GET /api/admin/crawl/schedules/{id}` — Schedule detail
@@ -99,6 +120,22 @@ Or call the API:
 curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
   https://api.relopass.com/api/admin/crawl/process-due
 ```
+
+### 7-day live verification (AIQ-689 validation criterion)
+
+The validation criterion is "scheduler runs on schedule for 7 days without missed
+executions; logs verify timing." Steps for the reviewer:
+
+1. Deploy and ensure the cron (`*/15 * * * * python scripts/process_crawl_schedules.py`)
+   is registered (or schedule `POST /api/admin/crawl/process-due`).
+2. Seed the tier schedules once: `POST /api/admin/crawl/sync-tier-schedules`
+   (the cron script also calls `sync_tier_schedules()` on every tick).
+3. Over the next 7 days, confirm via `GET /api/admin/crawl/job-runs?schedule_id=<tier>`:
+   - `tier-1-critical`: ~7 succeeded runs (one per day at ~02:00 UTC)
+   - `tier-1-stable`: ~1 run (Monday ~03:00 UTC)
+   - `tier-2`: ~1 run if the 1st of a month falls in the window, else 0
+4. Verify each schedule's `last_run_at` / `next_run_at` advance by the expected
+   cadence and that no day is skipped (no gap > cadence in `started_at` timestamps).
 
 ## Assumptions
 

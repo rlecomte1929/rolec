@@ -94,6 +94,7 @@ def create_schedule(
     country_code: Optional[str] = None,
     city_name: Optional[str] = None,
     content_domain: Optional[str] = None,
+    crawl_tier: Optional[str] = None,
     priority: int = 0,
     max_runtime_seconds: Optional[int] = None,
     retry_policy: Optional[Dict] = None,
@@ -112,6 +113,7 @@ def create_schedule(
         "country_code": country_code,
         "city_name": city_name,
         "content_domain": content_domain,
+        "crawl_tier": crawl_tier,
         "priority": priority,
         "max_runtime_seconds": max_runtime_seconds,
         "retry_policy_json": retry_policy or {},
@@ -150,6 +152,62 @@ def update_schedule(
         upd["next_run_at"] = next_run.isoformat() if next_run else None
     supabase.table("crawl_schedules").update(upd).eq("id", schedule_id).execute()
     return get_schedule(schedule_id)
+
+
+def get_schedule_by_name(name: str) -> Optional[Dict[str, Any]]:
+    """Get a single schedule by its unique-ish name (used for tier upserts)."""
+    supabase = _get_supabase()
+    r = supabase.table("crawl_schedules").select("*").eq("name", name).limit(1).execute()
+    return (r.data or [None])[0]
+
+
+def sync_tier_schedules(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Idempotently seed/update one cron schedule per freshness tier.
+
+    Entry point for the per-tier cron config (AIQ-689 / P2-02a). Maps the three
+    tiers (tier-1-critical=daily, tier-1-stable=weekly, tier-2=monthly) onto
+    crawl_schedules rows keyed by a deterministic name, so calling this is safe
+    to run on every cron tick — it creates missing tier schedules and repairs
+    the cron expression / tier of existing ones without duplicating rows.
+    """
+    from .crawl_tier_config import TIER_CONFIGS, TIER_ORDER, schedule_name_for_tier
+
+    supabase = _get_supabase()
+    results: List[Dict[str, Any]] = []
+    for tier in TIER_ORDER:
+        cfg = TIER_CONFIGS[tier]
+        name = schedule_name_for_tier(tier)
+        existing = get_schedule_by_name(name)
+        if existing is None:
+            row = create_schedule(
+                name=name,
+                schedule_type="cron",
+                schedule_expression=cfg.cron_expression,
+                source_scope_type="tier",
+                source_scope_ref=tier,
+                crawl_tier=tier,
+                priority=TIER_ORDER.index(tier) * -1,  # critical first
+                user_id=user_id,
+            )
+            results.append({"tier": tier, "action": "created", "schedule_id": row.get("id")})
+            continue
+
+        # Repair drift: keep the cron expression and tier in sync with config.
+        upd: Dict[str, Any] = {"updated_by_user_id": user_id}
+        if existing.get("schedule_expression") != cfg.cron_expression:
+            upd["schedule_expression"] = cfg.cron_expression
+            next_run = _compute_next_run("cron", cfg.cron_expression)
+            upd["next_run_at"] = next_run.isoformat() if next_run else None
+        if existing.get("crawl_tier") != tier:
+            upd["crawl_tier"] = tier
+        if existing.get("schedule_type") != "cron":
+            upd["schedule_type"] = "cron"
+        if len(upd) > 1:
+            supabase.table("crawl_schedules").update(upd).eq("id", existing["id"]).execute()
+            results.append({"tier": tier, "action": "updated", "schedule_id": existing["id"]})
+        else:
+            results.append({"tier": tier, "action": "unchanged", "schedule_id": existing["id"]})
+    return results
 
 
 def pause_schedule(schedule_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -283,10 +341,14 @@ def run_crawl_for_scope(
     country_code: Optional[str] = None,
     city_name: Optional[str] = None,
     content_domain: Optional[str] = None,
+    crawl_tier: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Execute crawler pipeline for the given scope.
     Returns report dict with run_id, counts, errors.
+
+    When ``crawl_tier`` is set, sources are restricted to those whose registry
+    ``trust_tier`` maps to that scheduling tier (per crawl_tier_config).
     """
     from backend.crawler.config.models import CrawlConfig
     from backend.crawler.config.registry import load_sources
@@ -295,6 +357,13 @@ def run_crawl_for_scope(
     sources = load_sources(None)
     if not sources:
         return {"error": "No sources loaded", "run_id": None}
+
+    if crawl_tier:
+        from .crawl_tier_config import tier_for_trust_tier
+
+        sources = [s for s in sources if tier_for_trust_tier(s.trust_tier) == crawl_tier]
+        if not sources:
+            return {"error": f"No sources for tier {crawl_tier}", "run_id": None}
 
     config = CrawlConfig(sources=sources, dry_run=False, parse_only=False, extract_only=False)
     report = run_pipeline(
@@ -378,9 +447,17 @@ def process_due_schedules(user_id: Optional[str] = None) -> List[Dict[str, Any]]
             "country_code": s.get("country_code"),
             "city_name": s.get("city_name"),
             "content_domain": s.get("content_domain"),
+            "crawl_tier": s.get("crawl_tier"),
         }
+        scope_type = s.get("source_scope_type")
+        if scope_type == "source":
+            job_type = "crawl_source"
+        elif scope_type == "tier":
+            job_type = "crawl_tier_scope"
+        else:
+            job_type = "crawl_country_city_scope"
         job = create_job_run(
-            job_type="crawl_source" if s.get("source_scope_type") == "source" else "crawl_country_city_scope",
+            job_type=job_type,
             trigger_type="scheduled",
             schedule_id=schedule_id,
             scope=scope,
@@ -392,10 +469,11 @@ def process_due_schedules(user_id: Optional[str] = None) -> List[Dict[str, Any]]
 
         try:
             report = run_crawl_for_scope(
-                source_name=s.get("source_scope_ref") if s.get("source_scope_type") == "source" else None,
+                source_name=s.get("source_scope_ref") if scope_type == "source" else None,
                 country_code=s.get("country_code"),
                 city_name=s.get("city_name"),
                 content_domain=s.get("content_domain"),
+                crawl_tier=s.get("crawl_tier"),
             )
             if "error" in report:
                 complete_job_run(

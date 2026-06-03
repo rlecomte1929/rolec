@@ -26,6 +26,7 @@ from ..services.crawl_scheduler_service import (
     process_due_schedules,
     resume_schedule,
     run_crawl_for_scope,
+    sync_tier_schedules,
     trigger_schedule_now,
     update_schedule,
 )
@@ -252,6 +253,18 @@ def post_trigger_schedule(
     if not s:
         raise HTTPException(status_code=404, detail="Schedule not found")
     return s
+
+
+@crawl_router.post("/sync-tier-schedules")
+def post_sync_tier_schedules(user: Dict[str, Any] = Depends(_require_admin)):
+    """Seed/repair the per-tier cron schedules (daily / weekly / monthly).
+
+    Idempotent: safe to call repeatedly. Creates one schedule per freshness
+    tier (tier-1-critical, tier-1-stable, tier-2) if missing, otherwise repairs
+    cron expression / tier drift.
+    """
+    results = sync_tier_schedules(user_id=user.get("id"))
+    return {"results": results}
 
 
 @crawl_router.post("/process-due")
