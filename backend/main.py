@@ -13179,7 +13179,10 @@ def extract_company_policy_preview(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=_sanitize_storage_error(exc, BUCKET_HR_POLICIES))
     try:
-        preview = extract_policy_with_diff(data, policy.get("file_type") or "docx")
+        preview = extract_policy_with_diff(
+            data, policy.get("file_type") or "docx",
+            company_id=policy.get("company_id"),
+        )
     except Exception as exc:
         log.exception("request_id=%s extract-preview failed for policy_id=%s", request_id, policy_id)
         raise HTTPException(status_code=500, detail=f"Extraction preview failed: {exc}")
