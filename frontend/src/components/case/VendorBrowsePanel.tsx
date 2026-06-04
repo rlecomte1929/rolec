@@ -9,11 +9,14 @@
  *  - onClose         : close handler
  *  - destCountry     : pre-fills the destination part of the corridor filter
  *  - initialCategory : pre-selects a service category filter (e.g. "Immigration/visa")
+ *  - immigrationContext : IMM-15 — case immigration context when opened from the
+ *                         immigration panel; surfaces a hint and flows into the RFQ
  *  - onRequestQuote  : called when HR clicks "Request Quote" on a vendor card
  */
 
 import React, { useEffect, useState } from 'react';
 import { hrAPI } from '../../api/client';
+import type { ImmigrationContext } from './immigrationContext';
 
 type Vendor = {
   id: string;
@@ -39,6 +42,7 @@ interface Props {
   onClose: () => void;
   destCountry?: string;
   initialCategory?: string;
+  immigrationContext?: ImmigrationContext | null;
   onRequestQuote: (vendor: Vendor) => void;
 }
 
@@ -47,6 +51,7 @@ export const VendorBrowsePanel: React.FC<Props> = ({
   onClose,
   destCountry,
   initialCategory,
+  immigrationContext,
   onRequestQuote,
 }) => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -118,6 +123,17 @@ export const VendorBrowsePanel: React.FC<Props> = ({
             </svg>
           </button>
         </div>
+
+        {/* IMM-15: immigration case context hint */}
+        {immigrationContext?.visa_type && (
+          <div className="px-6 py-2.5 border-b border-[#bfdbfe] bg-[#eff6ff] text-xs text-[#1d4ed8]">
+            Pre-loaded from immigration case
+            {immigrationContext.corridor_from && immigrationContext.corridor_to
+              ? ` · ${immigrationContext.corridor_from}→${immigrationContext.corridor_to}`
+              : ''}
+            {' '}— the quote request will include the case context.
+          </div>
+        )}
 
         {/* Filters */}
         <div className="px-6 py-4 border-b border-[#e2e8f0] bg-[#f8fafc] space-y-3">

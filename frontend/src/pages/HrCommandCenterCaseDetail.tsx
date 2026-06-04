@@ -12,6 +12,7 @@ import { statusLabel } from '../lib/statusLabel';
 import { HrCaseTasksPanel } from '../components/case/HrCaseTasksPanel';
 import { VendorBrowsePanel } from '../components/case/VendorBrowsePanel';
 import { RfqModal } from '../components/case/RfqModal';
+import type { ImmigrationContext } from '../components/case/immigrationContext';
 import { PendingRfqsPanel } from '../components/case/PendingRfqsPanel';
 import { ImmigrationStatusPanel } from '../components/case/ImmigrationStatusPanel';
 import { AdvisorsPanel } from '../components/case/AdvisorsPanel';
@@ -65,6 +66,9 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
   // Vendor browse panel + RFQ modal
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
   const [vendorPanelInitialCategory, setVendorPanelInitialCategory] = useState('');
+  // IMM-15: immigration context captured when the vendor flow is opened from the
+  // immigration panel; flows into VendorBrowsePanel and the RFQ modal.
+  const [vendorImmigrationContext, setVendorImmigrationContext] = useState<ImmigrationContext | null>(null);
   const [rfqVendor, setRfqVendor] = useState<{ id: string; name: string; service_categories: string[]; contact_email: string } | null>(null);
   const [rfqSuccessMsg, setRfqSuccessMsg] = useState('');
   const [rfqListKey, setRfqListKey] = useState(0);
@@ -260,7 +264,9 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
           <ImmigrationStatusPanel
             caseId={detail.id}
             moveDate={detail.expectedStartDate ?? null}
-            onFindVendor={() => {
+            onFindVendor={(ctx) => {
+              // move_date isn't part of the immigration profile — source it from the case
+              setVendorImmigrationContext({ ...ctx, move_date: detail.expectedStartDate });
               setVendorPanelInitialCategory('Immigration/visa');
               setVendorPanelOpen(true);
             }}
@@ -398,9 +404,10 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       {/* ── AIQ-40-B: Vendor browse slide-over ── */}
       <VendorBrowsePanel
         isOpen={vendorPanelOpen}
-        onClose={() => { setVendorPanelOpen(false); setVendorPanelInitialCategory(''); }}
+        onClose={() => { setVendorPanelOpen(false); setVendorPanelInitialCategory(''); setVendorImmigrationContext(null); }}
         destCountry={detail.destCountry}
         initialCategory={vendorPanelInitialCategory}
+        immigrationContext={vendorImmigrationContext}
         onRequestQuote={(vendor) => {
           setVendorPanelOpen(false);
           setVendorPanelInitialCategory('');
@@ -418,9 +425,11 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
       <RfqModal
         vendor={rfqVendor}
         caseId={detail.id}
-        onClose={() => setRfqVendor(null)}
+        immigrationContext={vendorImmigrationContext}
+        onClose={() => { setRfqVendor(null); setVendorImmigrationContext(null); }}
         onSent={(vendorName) => {
           setRfqVendor(null);
+          setVendorImmigrationContext(null);
           setRfqSuccessMsg(`Quote request sent to ${vendorName}`);
           setRfqListKey((k) => k + 1);
         }}
