@@ -43,12 +43,35 @@ from ..services.immigration_service import (
     _ts,
 )
 
-# Pydantic models — imported from immigration.py until imm-6 relocates them.
-from .immigration import (
-    ImmigrationCaseCreate,
-    MilestoneCreate,
-    MilestoneUpdate,
-)
+VALID_PERMIT_TYPES = {
+    "eu_blue_card", "work_permit", "skilled_worker_visa", "eea_registration", "other"
+}
+
+
+class MilestoneCreate(BaseModel):
+    milestone_type: str
+    target_date: Optional[str] = None
+    sort_order: Optional[int] = 0
+    book_early_alert: Optional[str] = None
+
+
+class MilestoneUpdate(BaseModel):
+    status: Optional[str] = None
+    completed_date: Optional[str] = None
+    target_date: Optional[str] = None
+    notes: Optional[str] = None
+    evidence_url: Optional[str] = None
+
+
+class ImmigrationCaseCreate(BaseModel):
+    case_id: str
+    corridor_from: str
+    corridor_to: str
+    permit_type: str
+    partner_name: Optional[str] = None
+    expected_submission_date: Optional[str] = None
+    expected_grant_date: Optional[str] = None
+
 
 router = APIRouter(prefix="/api", tags=["immigration-status"])
 

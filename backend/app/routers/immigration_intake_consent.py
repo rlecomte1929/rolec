@@ -1,15 +1,10 @@
 """
-immigration_intake_consent.py — consent + corridor-requirements routes
-extracted from immigration.py (AUDIT-B9-imm-3, part 1 of 3).
+immigration_intake_consent.py — consent + corridor-requirements routes.
 
 Houses 3 endpoints:
   GET  /api/hr/cases/{case_id}/immigration-requirements   (corridor lookup)
   POST /api/hr/cases/{case_id}/immigration-consent        (HR-side consent)
   POST /api/employee/cases/{case_id}/consent              (Employee self-consent)
-
-DORMANT: this router is not yet wired into backend/app/main.py. The
-canonical registration still happens via immigration.py until imm-6
-performs the final switchover. Keep both in sync until then.
 """
 from __future__ import annotations
 
@@ -18,6 +13,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
@@ -34,9 +30,18 @@ from ..services.immigration_service import (
     _now_iso,
 )
 
-# Pydantic models — imported from immigration.py until imm-6 relocates them to
-# a shared schemas module. Keep the source of truth in immigration.py for now.
-from .immigration import ConsentBody, WithdrawConsentBody, CONSENT_TEXT_VERSION
+CONSENT_TEXT_VERSION = "v1.0-2026-05"
+
+
+class ConsentBody(BaseModel):
+    employee_id: str
+    purposes: List[str]
+    consent_text_hash: Optional[str] = None
+
+
+class WithdrawConsentBody(BaseModel):
+    purpose: str
+    reason: Optional[str] = None
 
 router = APIRouter(prefix="/api", tags=["immigration-intake-consent"])
 
