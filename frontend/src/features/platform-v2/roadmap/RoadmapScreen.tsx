@@ -10,6 +10,8 @@ import type { RoadmapTrack, RoadmapStep, StepStatus } from '../../../types/relop
 import { ProgressBar, StatusBadge, DateFormatter, EmptyState, Pill } from '../shared';
 import { AvailableNowWidget } from './AvailableNowWidget';
 import { computeAvailableNow } from '../../../utils/roadmapAvailability';
+import { SuccessProbabilityDial, FactorsPanel } from './scoring';
+import type { SuccessProbabilityResult } from './scoring';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import {
   CONFIDENCE_TOKENS,
@@ -28,6 +30,12 @@ export interface RoadmapScreenProps {
   docChips?: Record<string, { count: number; worstStatus: string | null }>;
   /** [P1-6] Called when the user clicks a doc chip; receives the step id. */
   onStepDocChipClick?: (stepId: string) => void;
+  /**
+   * [P2-05] Pre-computed probability-of-success estimate. Rendered as a dial +
+   * factors panel above the tracks. Omit/null to hide (graceful guard: shown
+   * only when per-step confidence is available to score).
+   */
+  successScore?: SuccessProbabilityResult | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -338,7 +346,7 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function RoadmapScreen({ tracks, docChips, onStepDocChipClick }: RoadmapScreenProps) {
+export function RoadmapScreen({ tracks, docChips, onStepDocChipClick, successScore }: RoadmapScreenProps) {
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(tracks[0]?.id ?? null);
   const selectedTrack = tracks.find(t => t.id === selectedTrackId) ?? null;
 
@@ -376,6 +384,18 @@ export function RoadmapScreen({ tracks, docChips, onStepDocChipClick }: RoadmapS
           Track every step of your relocation journey.
         </p>
       </div>
+
+      {/* [P2-05] Probability-of-success estimate — rendered only when available. */}
+      {successScore && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+          <SuccessProbabilityDial
+            scorePct={successScore.scorePct}
+            disclaimer={successScore.disclaimer}
+            confidenceBasis={successScore.confidenceBasis}
+          />
+          <FactorsPanel factors={successScore.factors} />
+        </div>
+      )}
 
       {tracks.length === 0 ? (
         <EmptyState
