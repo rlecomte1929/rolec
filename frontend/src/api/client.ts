@@ -3657,6 +3657,26 @@ export const policyBuilderAPI = {
 
 export default api;
 
+/**
+ * [B20] Shared 401 redirect for the native-fetch API helpers (apiGet/apiPost/
+ * apiPatch/apiPut/apiDelete). These bypass the Axios interceptor, so they each
+ * need to call this when they receive a 401. Mirrors the behaviour in the Axios
+ * response interceptor above: clear all relopass_* auth keys and hard-navigate
+ * to the login page with a session-expired reason parameter.
+ */
+function handle401Redirect(response: Response): void {
+  if (response.status !== 401) return;
+  try {
+    clearAuthItems();
+  } catch {
+    // ignore — localStorage may be unavailable
+  }
+  const path = window.location.pathname || '';
+  if (!path.startsWith('/auth') && path !== '/' && path !== '') {
+    window.location.href = '/auth?mode=login&reason=session_expired';
+  }
+}
+
 function buildApiError(response: Response, bodyText: string) {
   let detail: any = bodyText;
   let message = bodyText || `${response.status} ${response.statusText}`;
@@ -3720,6 +3740,7 @@ export async function apiGet<T>(path: string, opts?: { headers?: Record<string, 
       durationBodyMs: tBody - tStart,
       startedAt: tStart,
     });
+    handle401Redirect(response); // [B20]
     throw buildApiError(response, text);
   }
   const jsonStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -3778,6 +3799,7 @@ export async function apiPost<T>(
       durationBodyMs: tBody - tStart,
       startedAt: tStart,
     });
+    handle401Redirect(response); // [B20]
     throw buildApiError(response, text);
   }
   const jsonStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -3836,6 +3858,7 @@ export async function apiPatch<T>(
       durationBodyMs: tBody - tStart,
       startedAt: tStart,
     });
+    handle401Redirect(response); // [B20]
     throw buildApiError(response, text);
   }
   const jsonStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -3894,6 +3917,7 @@ export async function apiPut<T>(
       durationBodyMs: tBody - tStart,
       startedAt: tStart,
     });
+    handle401Redirect(response); // [B20]
     throw buildApiError(response, text);
   }
   const jsonStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -3949,6 +3973,7 @@ export async function apiDelete<T>(
       durationBodyMs: tBody - tStart,
       startedAt: tStart,
     });
+    handle401Redirect(response); // [B20]
     throw buildApiError(response, text);
   }
   const jsonStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
