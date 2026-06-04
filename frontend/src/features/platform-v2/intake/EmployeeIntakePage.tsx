@@ -6,6 +6,7 @@ import { apiGet, apiPost, employeeAPI } from '../../../api/client';
 import { ROUTE_DEFS } from '../../../navigation/routes';
 import { useEmployeeAssignment } from '../../../contexts/EmployeeAssignmentContext';
 import { getAuthItem } from '../../../utils/demo';
+import { MultiChip } from './MultiChip';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -344,27 +345,6 @@ function CityCombo({ country, value, onChange }: { country: string; value: strin
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function MultiChip({ value, onChange, options }: {
-  value: string[]; onChange: (v: string[]) => void;
-  options: Array<string | { value: string; label: string }>;
-}) {
-  const toggle = (v: string) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v]);
-  return (
-    <div className="flex flex-wrap gap-1.5 mt-1">
-      {options.map((o) => {
-        const val = typeof o === 'string' ? o : o.value;
-        const lbl = typeof o === 'string' ? o : o.label;
-        return (
-          <button key={val} type="button" onClick={() => toggle(val)}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-              value.includes(val) ? 'bg-violet-600 text-white border-violet-600' : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-            }`}>{lbl}</button>
-        );
-      })}
     </div>
   );
 }
@@ -1409,7 +1389,7 @@ export function EmployeeIntakePage() {
                     )}
                   </FieldWrap>
                   <FieldWrap label="Work pattern" required className="sm:col-span-2">
-                    <MultiChip value={[data.work_pattern]} onChange={([v]) => setField('work_pattern', v)}
+                    <MultiChip value={data.work_pattern ? [data.work_pattern] : []} onChange={(v) => setField('work_pattern', v[v.length - 1] || '')}
                       options={['Full in-office', 'Hybrid', 'Fully remote']} />
                   </FieldWrap>
                 </Grid>
