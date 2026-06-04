@@ -35,6 +35,7 @@ from ..services.immigration_service import (
     _apply_vault_updates,
     _check_consent,
     _load_or_create_session,
+    _load_profile_for_case_employee,
     _load_session_for_update,
     _save_session,
 )
