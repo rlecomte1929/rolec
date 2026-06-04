@@ -123,16 +123,26 @@ def get_case(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
 
 
 @router.patch("/{case_id}", response_model=schemas.CaseDTO)
-def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
+def patch_case(
+    case_id: str,
+    patch: schemas.CaseDraftDTO,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     with SessionLocal() as db:
         # Filter out None sections so partial payloads (e.g. from E2E runner) don't
         # overwrite existing draft sections with null.
         incoming = {k: v for k, v in patch.model_dump(mode="json").items() if v is not None}
         case = crud.get_case(db, case_id)
         if not case:
+            # SEC-CASES-1: create-on-missing path. A brand-new case can't be
+            # access-checked (it doesn't exist yet); authentication (the
+            # get_current_user dependency above) is the gate. Preserves the
+            # wizard's create-via-PATCH flow.
             case = crud.create_case(db, case_id, incoming)
             draft = incoming
         else:
+            # SEC-CASES-1: existing case — enforce ownership / tenant access.
+            _assert_case_access(user, case_id)
             try:
                 existing = json.loads(case.draft_json or "{}")
             except (json.JSONDecodeError, TypeError, ValueError):
@@ -218,11 +228,17 @@ def get_case_requirements(case_id: str, user: Dict[str, Any] = Depends(get_curre
 
 
 @router.post("/{case_id}/create")
-def create_case(case_id: str, request: Request):
+def create_case(
+    case_id: str,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
+        # SEC-CASES-1: enforce ownership / tenant access before finalising.
+        _assert_case_access(user, case_id)
 
         draft = json.loads(case.draft_json)
         basics = draft.get("relocationBasics", {})
