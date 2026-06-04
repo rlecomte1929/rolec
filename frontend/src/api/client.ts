@@ -1328,7 +1328,7 @@ export const adminAPI = {
     const response = await api.get('/api/admin/people', { params: params || {} });
     return response.data;
   },
-  createPerson: async (payload: { email: string; full_name?: string; role?: string; company_id?: string }): Promise<{ person: AdminProfile; invite_sent?: boolean }> => {
+  createPerson: async (payload: { email: string; full_name?: string; role?: string; company_id?: string }): Promise<{ person: AdminProfile; invite_sent?: boolean; invite_error?: string }> => {
     const response = await api.post('/api/admin/people', payload);
     return response.data;
   },
