@@ -42,6 +42,7 @@ from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case
+from ..services.roadmap_staleness import annotate_staleness
 from ..services.case_service import (
     _assert_case_access,
     _case_dto,
@@ -851,6 +852,8 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
         roadmap["ai_roadmap_eligible"] = True
         if is_ai_roadmap(roadmap):
             roadmap = gate_roadmap_for_case(case_id, roadmap)
+            # P2-01c: warn when a shown step's cited source is >30 days old.
+            roadmap = annotate_staleness(roadmap, now=_dt.datetime.now(_dt.timezone.utc))
     return roadmap
 
 
