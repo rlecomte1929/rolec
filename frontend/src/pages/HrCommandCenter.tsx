@@ -8,6 +8,7 @@ import { RiskBadge } from '../components/command-center/RiskBadge';
 import { hrAPI } from '../api/client';
 import { safeNavigate } from '../navigation/safeNavigate';
 import { HrExceptionsQueueCard } from '../features/exceptions/HrExceptionsQueueCard';
+import { ComplianceAlertsPanel } from '../features/hr/ComplianceAlertsPanel';
 
 type CaseRow = {
   id: string;
@@ -105,6 +106,8 @@ export const HrCommandCenter: React.FC = () => {
         </div>
 
         <HrExceptionsQueueCard />
+
+        <ComplianceAlertsPanel />
 
         {/* Cases Table: shell visible immediately */}
         <Card padding="lg">

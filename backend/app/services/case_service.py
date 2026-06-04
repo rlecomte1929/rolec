@@ -168,6 +168,17 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
     endpoint downstream of this guard.
     """
     user_id = user.get("id")
+    # AUTH-ID-2: a legacy/seed caller's id is a non-UUID text id, while case
+    # ownership columns are uuid-typed. auth_uuid (AUTH-ID-1) is the caller's
+    # canonical Supabase UUID. Match ownership against BOTH so a legacy
+    # employee isn't wrongly denied access to their own case (and UUID-native
+    # callers are unchanged, since for them auth_uuid == id).
+    auth_uuid = user.get("auth_uuid")
+    _caller_ids = {str(v) for v in (user_id, auth_uuid) if v}
+
+    def _owns(value: Any) -> bool:
+        return bool(value) and str(value) in _caller_ids
+
     role = (user.get("role") or "").upper()
     is_admin = user.get("is_admin") or role == "ADMIN"
 
@@ -212,10 +223,10 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
 
         if asgn is not None:
             # Employee owns the assignment
-            if user_id and str(asgn.get("employee_user_id") or "") == str(user_id):
+            if _owns(asgn.get("employee_user_id")):
                 return
             # HR owns the assignment
-            if user_id and str(asgn.get("hr_user_id") or "") == str(user_id):
+            if _owns(asgn.get("hr_user_id")):
                 return
             # Admin always allowed
             if is_admin:
@@ -228,7 +239,11 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
                             _sql_text(
                                 f"SELECT company_id FROM {_pg_table('profiles')} WHERE CAST(id AS TEXT) = :id"
                             ),
-                            {"id": str(user_id) if user_id else ""},
+                            # AUTH-ID-2: profiles.id is the Supabase UUID. Prefer the
+                            # canonical auth_uuid, fall back to the raw id (UUID-native
+                            # callers without auth_uuid still match; legacy text ids
+                            # simply don't match — graceful).
+                            {"id": str(auth_uuid or user_id or "")},
                         ).mappings().first()
                     if prof and str(prof.get("company_id") or "") == str(asgn.get("company_id") or ""):
                         return
@@ -239,10 +254,10 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
         raise HTTPException(status_code=404, detail="Case not found")
 
     # Employee owns the case
-    if user_id and str(row.get("employee_id") or "") == str(user_id):
+    if _owns(row.get("employee_id")):
         return
     # HR owns the case
-    if user_id and str(row.get("hr_owner_id") or "") == str(user_id):
+    if _owns(row.get("hr_owner_id")):
         return
     # Admin always allowed
     if is_admin:
@@ -256,7 +271,10 @@ def _assert_case_access(user: Dict[str, Any], case_id: str) -> None:
                         f"SELECT company_id FROM {_pg_table('profiles')} "
                         f"WHERE id = :id"
                     ),
-                    {"id": user_id},
+                    # AUTH-ID-2: prefer canonical auth_uuid, fall back to raw id.
+                    # A legacy text id here hits the uuid-cast DataError path,
+                    # which is already caught below (graceful no-match).
+                    {"id": auth_uuid or user_id},
                 ).mappings().first()
             if prof and str(prof.get("company_id") or "") == str(row.get("company_id") or ""):
                 return

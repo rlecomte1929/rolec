@@ -123,16 +123,26 @@ def get_case(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
 
 
 @router.patch("/{case_id}", response_model=schemas.CaseDTO)
-def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
+def patch_case(
+    case_id: str,
+    patch: schemas.CaseDraftDTO,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     with SessionLocal() as db:
         # Filter out None sections so partial payloads (e.g. from E2E runner) don't
         # overwrite existing draft sections with null.
         incoming = {k: v for k, v in patch.model_dump(mode="json").items() if v is not None}
         case = crud.get_case(db, case_id)
         if not case:
+            # SEC-CASES-1: create-on-missing path. A brand-new case can't be
+            # access-checked (it doesn't exist yet); authentication (the
+            # get_current_user dependency above) is the gate. Preserves the
+            # wizard's create-via-PATCH flow.
             case = crud.create_case(db, case_id, incoming)
             draft = incoming
         else:
+            # SEC-CASES-1: existing case — enforce ownership / tenant access.
+            _assert_case_access(user, case_id)
             try:
                 existing = json.loads(case.draft_json or "{}")
             except (json.JSONDecodeError, TypeError, ValueError):
@@ -218,11 +228,17 @@ def get_case_requirements(case_id: str, user: Dict[str, Any] = Depends(get_curre
 
 
 @router.post("/{case_id}/create")
-def create_case(case_id: str, request: Request):
+def create_case(
+    case_id: str,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
+        # SEC-CASES-1: enforce ownership / tenant access before finalising.
+        _assert_case_access(user, case_id)
 
         draft = json.loads(case.draft_json)
         basics = draft.get("relocationBasics", {})
@@ -630,6 +646,8 @@ class _DossierFormTemplate(BaseModel):
     category: Optional[str]
     version: str
     fields_total: int
+    # [P1-05] Official Tier-1 authority URL where this form is completed/submitted.
+    source_url: Optional[str] = None
 
 
 class _DossierFormPerson(BaseModel):
@@ -667,6 +685,7 @@ class CaseFormSummary(BaseModel):
     receipt_ref: Optional[str]
     rejection_reason: Optional[str] = None   # [P4-5] set when status='rejected'
     roadmap_step_id: Optional[str] = None   # [P1-6] step that triggered this form
+    roadmap_step_title: Optional[str] = None   # [P1-05] human-readable title of that step
     is_adhoc: bool = False   # [P4-3] true when this is an ad-hoc "Add document" entry
     notes: Optional[str] = None   # [P4-3] free-text notes from the Add-document modal
     template: _DossierFormTemplate
@@ -743,6 +762,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             category=None,
             version="—",
             fields_total=0,
+            source_url=None,
         )
     else:
         template = _DossierFormTemplate(
@@ -755,6 +775,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             category=row.get("template_category"),
             version=str(row["template_version"]),
             fields_total=fields_total,
+            source_url=row.get("template_source_url"),  # [P1-05]
         )
 
     return CaseFormSummary(
@@ -773,6 +794,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
         receipt_ref=row.get("receipt_ref"),
         rejection_reason=row.get("rejection_reason") or None,   # [P4-5]
         roadmap_step_id=(str(row["roadmap_step_id"]) if row.get("roadmap_step_id") else None),  # [P1-6]
+        roadmap_step_title=(row.get("roadmap_step_title") or None),  # [P1-05]
         is_adhoc=is_adhoc,   # [P4-3]
         notes=row.get("notes") or None,   # [P4-3]
         template=template,
@@ -861,6 +883,8 @@ def list_case_forms(
           ft.category AS template_category,
           ft.version AS template_version,
           ft.fields  AS template_fields,
+          ft.source_url AS template_source_url,
+          rs.title AS roadmap_step_title,
           cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes,
           cd.relationship AS dependent_relationship,
           cd.full_name    AS dependent_name,
@@ -877,6 +901,8 @@ def list_case_forms(
         FROM {_pg_table('case_forms')} cf
         -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
         LEFT JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
+        -- [P1-05] roadmap step title for the "which step" label on the form card.
+        LEFT JOIN {_pg_table('roadmap_steps')} rs ON rs.id = cf.roadmap_step_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
         LEFT JOIN {_pg_table('profiles')} p ON p.id = cf.person_id
         WHERE cf.case_id = :case_id{where_status}

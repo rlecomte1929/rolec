@@ -182,6 +182,7 @@ from .app.routers import admin_catalog as admin_catalog_router
 from .app.routers import hr_catalog as hr_catalog_router
 from .app.routers import hr_case_detail as hr_case_detail_router  # C1-11c-be — per-case detail reads (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_audit as hr_case_audit_router  # C1-16 — case audit endpoint (dual-layer per CLAUDE.md)
+from .app.routers import roadmap_audit as roadmap_audit_router  # P1-08c/d/e — roadmap audit trail (dual-layer per CLAUDE.md)
 from .app.routers import hr_case_resolve as hr_case_resolve_router  # C1-12-be — resolve+escalate POST endpoints (dual-layer per CLAUDE.md)
 from .app.routers import policy_gaps as policy_gaps_router  # C2-06-FOLLOWUP — policy-gap reads (dual-layer per CLAUDE.md)
 from .app.routers import providers as providers_router
@@ -206,6 +207,7 @@ from .app.routers import advisors as advisors_router
 from .app.routers import branding as branding_router
 from .app.routers import specialist_review as specialist_review_router  # [P1-02c] AI roadmap specialist review
 from .app.routers import rag_roadmap as rag_roadmap_router  # [P1-01d] RAG roadmap pipeline endpoint
+from .app.routers import compliance as compliance_router  # [BL-Compliance.4] /api/compliance
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -690,6 +692,7 @@ app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignm
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
 app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
+app.include_router(compliance_router.router)  # [BL-Compliance.4] /api/compliance (dual-layer registration)
 app.include_router(nlg_router.router)  # [Parker-J] PR #207 §9 — exec-summary + policy TL;DR (dual-layer registration)
 app.include_router(predictions_router.router)  # [Parker-A] PR #207 §9 — dual-layer registration
 app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 — dual-layer registration
@@ -709,6 +712,7 @@ app.include_router(admin_catalog_router.router)
 app.include_router(hr_catalog_router.router)  # [AUDIT-C2.3] re-added — vendor curation, notification-counts (B16)
 app.include_router(hr_case_detail_router.router)  # C1-11c-be — 6 per-case detail reads consumed by HR Dashboard
 app.include_router(hr_case_audit_router.router)  # C1-16 — GET /api/hr/cases/{id}/audit chronological lineage
+app.include_router(roadmap_audit_router.router)  # P1-08c/d/e — GET /api/cases/{id}/audit?as_of, admin export, rule-change notifier
 app.include_router(hr_case_resolve_router.router)  # C1-12-be — 2 POST endpoints consumed by #183 Contradiction Resolution UI
 app.include_router(policy_gaps_router.router)  # C2-06-FOLLOWUP — GET /api/hr/cases/{id}/policy-gaps
 app.include_router(providers_router.router)
