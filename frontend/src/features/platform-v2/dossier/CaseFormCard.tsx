@@ -380,7 +380,11 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
           {/* [P1-05c] Supporting documents upload + list (not for ad-hoc forms,
               which are themselves a single uploaded document). */}
           {!form.is_adhoc && (
-            <FormDocuments caseId={form.case_id} formId={form.id} />
+            <FormDocuments
+              caseId={form.case_id}
+              formId={form.id}
+              requiredDocuments={form.template.required_documents}
+            />
           )}
         </div>
       )}

@@ -45,7 +45,7 @@ CREATE TABLE case_form_documents (
   id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   case_form_id TEXT NOT NULL, case_id TEXT NOT NULL,
   file_name TEXT NOT NULL, storage_path TEXT NOT NULL,
-  content_type TEXT, size_bytes INTEGER, uploaded_by TEXT,
+  content_type TEXT, size_bytes INTEGER, uploaded_by TEXT, doc_key TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -97,14 +97,24 @@ class FormDocumentsTests(unittest.TestCase):
             conn.execute(text("INSERT INTO case_forms (id, case_id) VALUES (:i,:c)"),
                          {"i": self.form_id, "c": self.case_id})
 
-    def _upload(self, name="passport.pdf", data=b"hello-bytes"):
+    def _upload(self, name="passport.pdf", data=b"hello-bytes", doc_key=None):
         up = UploadFile(filename=name, file=io.BytesIO(data))
         return asyncio.run(
             upload_form_document(
                 case_id=self.case_id, form_id=self.form_id, file=up,
-                user=_emp(self.employee_id),
+                doc_key=doc_key, user=_emp(self.employee_id),
             )
         )
+
+    def test_doc_key_roundtrips_through_upload_and_list(self) -> None:
+        # [P1-05 checklist] an upload tagged with a doc_key surfaces on the list,
+        # so the form card can mark that checklist item as provided.
+        item = self._upload(doc_key="passport_number")
+        self.assertEqual(item.doc_key, "passport_number")
+        rows = list_form_documents(
+            case_id=self.case_id, form_id=self.form_id, user=_emp(self.employee_id)
+        )
+        self.assertEqual(rows[0].doc_key, "passport_number")
 
     def test_upload_inserts_scoped_row(self) -> None:
         item = self._upload()

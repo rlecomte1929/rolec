@@ -29,6 +29,8 @@ export interface DossierFormTemplate {
   source_url: string | null;
   /** [P1-05d] When the source URL was last fetched/verified (ISO), from source_pages. */
   source_last_verified: string | null;
+  /** [P1-05 checklist] Required supporting documents (derived from requires_original fields). */
+  required_documents: Array<{ key: string; label: string }>;
 }
 
 export type DossierPersonKind = 'employee' | 'spouse' | 'child' | 'other';
@@ -92,6 +94,8 @@ export interface FormDocument {
   content_type: string | null;
   size_bytes: number | null;
   uploaded_by: string | null;
+  /** [P1-05 checklist] required-document item this upload satisfies, if any. */
+  doc_key: string | null;
   created_at: string;
   /** 1-hour signed download URL; null when storage is unavailable. */
   download_url: string | null;
@@ -103,9 +107,10 @@ export const formDocumentsAPI = {
       .get(`/api/cases/${caseId}/forms/${formId}/documents`)
       .then((r: { data: FormDocument[] }) => r.data),
 
-  upload: (caseId: string, formId: string, file: File): Promise<FormDocument> => {
+  upload: (caseId: string, formId: string, file: File, docKey?: string | null): Promise<FormDocument> => {
     const form = new FormData();
     form.append('file', file);
+    if (docKey) form.append('doc_key', docKey);
     return api
       .post(`/api/cases/${caseId}/forms/${formId}/documents`, form, { timeout: 120_000 })
       .then((r: { data: FormDocument }) => r.data);

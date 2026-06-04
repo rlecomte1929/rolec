@@ -61,6 +61,7 @@ function makeForm(overrides: Partial<CaseFormSummary> = {}): CaseFormSummary {
       fields_total: 5,
       source_url: 'https://www.skatteetaten.no/en/person/foreign/norwegian-identification-number/d-number/',
       source_last_verified: '2026-06-04T10:00:00Z',
+      required_documents: [],
     },
     person: { kind: 'employee', name: 'Marc Bouchard', dependent_id: null, profile_id: 'p1' },
     fields_summary: { total: 5, filled_by_ai: 2, filled_by_human: 0, reviewed: 0, overridden: 0, missing_required: 3 },

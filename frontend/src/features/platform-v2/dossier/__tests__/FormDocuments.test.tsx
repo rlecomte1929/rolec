@@ -24,7 +24,7 @@ const { FormDocuments } = await import('../FormDocuments');
 
 const DOC = {
   id: 'doc-1', case_form_id: 'f1', case_id: 'c1', file_name: 'passport.pdf',
-  content_type: 'application/pdf', size_bytes: 2048, uploaded_by: 'u1',
+  content_type: 'application/pdf', size_bytes: 2048, uploaded_by: 'u1', doc_key: null,
   created_at: '2026-06-04T00:00:00Z', download_url: 'https://signed.example/passport',
 };
 
@@ -60,7 +60,7 @@ describe('FormDocuments', () => {
     const input = screen.getByLabelText('Upload supporting document') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
-    await waitFor(() => expect(mockUpload).toHaveBeenCalledWith('c1', 'f1', file));
+    await waitFor(() => expect(mockUpload).toHaveBeenCalledWith('c1', 'f1', file, null));
     expect(await screen.findByRole('link', { name: 'passport.pdf' })).toBeInTheDocument();
   });
 
@@ -82,5 +82,40 @@ describe('FormDocuments', () => {
     const file = new File(['x'], 'big.pdf', { type: 'application/pdf' });
     fireEvent.change(screen.getByLabelText('Upload supporting document'), { target: { files: [file] } });
     expect(await screen.findByText('File exceeds the 20 MB limit')).toBeInTheDocument();
+  });
+
+  const REQ = [
+    { key: 'passport_number', label: 'Passport number' },
+    { key: 'marriage_cert', label: 'Marriage certificate' },
+  ];
+
+  it('renders the required-document checklist with provided/missing state', async () => {
+    // One required doc satisfied by an upload tagged with its doc_key.
+    mockList.mockResolvedValueOnce([{ ...DOC, doc_key: 'passport_number' }]);
+    render(<FormDocuments caseId="c1" formId="f1" requiredDocuments={REQ} />);
+    const list = await screen.findByTestId('required-doc-checklist');
+    expect(list).toHaveTextContent('Passport number');
+    expect(list).toHaveTextContent('Marriage certificate');
+    // The satisfied item has no Upload affordance; the missing one does.
+    const items = list.querySelectorAll('li');
+    expect(items[0]).toHaveTextContent('✓');          // passport provided
+    expect(items[1]).toHaveTextContent('○');          // marriage missing
+  });
+
+  it('tags a per-item upload with the checklist doc_key', async () => {
+    mockList.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockUpload.mockResolvedValueOnce({ ...DOC, doc_key: 'marriage_cert' });
+    render(<FormDocuments caseId="c1" formId="f1" requiredDocuments={REQ} />);
+    await screen.findByTestId('required-doc-checklist');
+
+    // Click the "Upload" button on the (missing) Marriage-certificate row.
+    const uploadButtons = screen.getAllByRole('button', { name: 'Upload' });
+    fireEvent.click(uploadButtons[1]);
+    const file = new File(['x'], 'cert.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText('Upload supporting document'), { target: { files: [file] } });
+
+    await waitFor(() =>
+      expect(mockUpload).toHaveBeenCalledWith('c1', 'f1', file, 'marriage_cert'),
+    );
   });
 });

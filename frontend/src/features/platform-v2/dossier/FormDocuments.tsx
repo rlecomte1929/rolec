@@ -1,17 +1,27 @@
 /**
- * [P1-05c] FormDocuments — supporting-document upload + list for a single
- * dossier form. Rendered inside the expanded CaseFormCard.
+ * [P1-05c + checklist] FormDocuments — required-document checklist + supporting
+ * document upload/list for a single dossier form. Rendered in the expanded
+ * CaseFormCard.
  *
- * V1: upload to the case-documents bucket (scoped to case_id + form_id via the
- * backend), list uploaded files with a signed download link, and delete.
+ * - Checklist: one row per required supporting document (derived server-side
+ *   from the template fields that require an original). An item is "provided"
+ *   when an uploaded document carries its doc_key.
+ * - Upload: per-checklist-item (tags the upload with that doc_key) or general.
+ * - List: all uploaded documents with a signed download link + delete.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formDocumentsAPI, type FormDocument } from '../../../api/dossier';
 import { logger } from '../../../lib/logger';
+
+export interface RequiredDocument {
+  key: string;
+  label: string;
+}
 
 export interface FormDocumentsProps {
   caseId: string;
   formId: string;
+  requiredDocuments?: RequiredDocument[];
 }
 
 function formatSize(bytes: number | null): string {
@@ -21,12 +31,18 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export const FormDocuments: React.FC<FormDocumentsProps> = ({ caseId, formId }) => {
+export const FormDocuments: React.FC<FormDocumentsProps> = ({
+  caseId,
+  formId,
+  requiredDocuments = [],
+}) => {
   const [docs, setDocs] = useState<FormDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // doc_key to tag the next file selection with (null = general attachment).
+  const pendingDocKey = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,11 +64,13 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({ caseId, formId }) 
   const handleFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
+      const docKey = pendingDocKey.current;
+      pendingDocKey.current = null;
       if (file) {
         setBusy(true);
         setError(null);
         try {
-          await formDocumentsAPI.upload(caseId, formId, file);
+          await formDocumentsAPI.upload(caseId, formId, file, docKey);
           await load();
         } catch (err) {
           const ex = err as { response?: { data?: { detail?: string } }; message?: string };
@@ -65,6 +83,11 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({ caseId, formId }) 
     },
     [caseId, formId, load],
   );
+
+  const pickFile = useCallback((docKey: string | null) => {
+    pendingDocKey.current = docKey;
+    inputRef.current?.click();
+  }, []);
 
   const handleDelete = useCallback(
     async (documentId: string) => {
@@ -83,27 +106,40 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({ caseId, formId }) 
     [caseId, formId, load],
   );
 
+  const providedKeys = useMemo(
+    () => new Set(docs.map((d) => d.doc_key).filter((k): k is string => !!k)),
+    [docs],
+  );
+  const labelForKey = useMemo(() => {
+    const m = new Map<string, string>();
+    requiredDocuments.forEach((r) => m.set(r.key, r.label));
+    return m;
+  }, [requiredDocuments]);
+
   return (
     <div className="rounded border border-slate-200 px-3 py-2">
+      {/* Single hidden input, reused for every upload affordance. */}
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => void handleFile(e)}
+        disabled={busy}
+        aria-label="Upload supporting document"
+      />
+
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
           Supporting documents
         </span>
-        <label
-          className={`text-sm font-medium cursor-pointer text-[#0b2b43] hover:underline ${
-            busy ? 'opacity-50 pointer-events-none' : ''
-          }`}
+        <button
+          type="button"
+          onClick={() => pickFile(null)}
+          disabled={busy}
+          className={`text-sm font-medium text-[#0b2b43] hover:underline ${busy ? 'opacity-50' : ''}`}
         >
           {busy ? 'Working…' : '+ Upload'}
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            onChange={(e) => void handleFile(e)}
-            disabled={busy}
-            aria-label="Upload supporting document"
-          />
-        </label>
+        </button>
       </div>
 
       {error && (
@@ -112,6 +148,39 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({ caseId, formId }) 
         </div>
       )}
 
+      {/* Required-document checklist */}
+      {requiredDocuments.length > 0 && (
+        <ul className="mb-2 flex flex-col gap-1" data-testid="required-doc-checklist">
+          {requiredDocuments.map((req) => {
+            const provided = providedKeys.has(req.key);
+            return (
+              <li key={req.key} className="flex items-center gap-2 text-sm">
+                <span
+                  className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] ${
+                    provided ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+                  }`}
+                  aria-hidden="true"
+                >
+                  {provided ? '✓' : '○'}
+                </span>
+                <span className={provided ? 'text-slate-700' : 'text-slate-600'}>{req.label}</span>
+                {!provided && (
+                  <button
+                    type="button"
+                    onClick={() => pickFile(req.key)}
+                    disabled={busy}
+                    className="ml-auto shrink-0 text-xs text-[#0b2b43] hover:underline disabled:opacity-50"
+                  >
+                    Upload
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Uploaded documents */}
       {loading ? (
         <p className="text-xs text-slate-400">Loading documents…</p>
       ) : docs.length === 0 ? (
@@ -131,6 +200,11 @@ export const FormDocuments: React.FC<FormDocumentsProps> = ({ caseId, formId }) 
                 </a>
               ) : (
                 <span className="text-slate-700 truncate">{d.file_name}</span>
+              )}
+              {d.doc_key && labelForKey.has(d.doc_key) && (
+                <span className="shrink-0 rounded bg-emerald-50 px-1.5 text-[10px] text-emerald-700 border border-emerald-200">
+                  {labelForKey.get(d.doc_key)}
+                </span>
               )}
               {d.size_bytes != null && (
                 <span className="text-[11px] text-slate-400 shrink-0">{formatSize(d.size_bytes)}</span>
