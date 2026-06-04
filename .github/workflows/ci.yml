@@ -130,7 +130,12 @@ jobs:
             backend/tests/test_validators_tax_id.py \
             backend/tests/test_validators_residency.py \
             backend/tests/test_tax_cert_findings.py \
-            backend/tests/test_extraction_tax_cert.py
+            backend/tests/test_extraction_tax_cert.py \
+            backend/tests/test_immigration_retriever.py \
+            backend/tests/test_roadmap_generator_prompt.py \
+            backend/tests/test_factual_verifier.py \
+            backend/tests/test_rag_roadmap_pipeline.py \
+            backend/tests/test_rag_integration.py
 
   route-auth-check:
     # AUDIT-B6: enumerate every GET route in the FastAPI apps (via AST, no DB
