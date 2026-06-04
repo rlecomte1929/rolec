@@ -153,12 +153,24 @@ class LiveSourceUrlTests(unittest.TestCase):
         )
         self.assertEqual(req[0]["label"], "Passport number")
 
-    def test_null_when_absent(self) -> None:
+    def test_source_url_null_when_absent(self) -> None:
+        # source_url + last_verified are genuinely absent here.
         self._seed_form(source_url=None, step_title=None)
         rows = list_case_forms(case_id=self.case_id, status=None, user=_emp_user(self.employee_id))
         self.assertIsNone(rows[0].template.source_url)
-        self.assertIsNone(rows[0].roadmap_step_title)
         self.assertIsNone(rows[0].template.source_last_verified)
+
+    def test_step_title_falls_back_to_computed_track_label(self) -> None:
+        # [AIQ-800] Option B: with no persisted roadmap step linked, the form-card
+        # "Roadmap step" label now falls back to the computed track bucket
+        # (previously null). A persisted rs.title still wins when present —
+        # see test_source_url_and_step_title_surface.
+        from backend.app.services.roadmap_projection import track_label_for_form
+        self._seed_form(source_url=None, step_title=None)
+        rows = list_case_forms(case_id=self.case_id, status=None, user=_emp_user(self.employee_id))
+        # template seeded with code GP-7-04 and no category → default 'Settlement'.
+        self.assertEqual(rows[0].roadmap_step_title, track_label_for_form(None, "GP-7-04"))
+        self.assertEqual(rows[0].roadmap_step_title, "Settlement")
 
 
 if __name__ == "__main__":
