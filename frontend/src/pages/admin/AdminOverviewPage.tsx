@@ -247,6 +247,20 @@ export const AdminOverviewPage: React.FC = () => {
             { label: 'Won this quarter',   value: 4 },
           ]}
         />
+        <ModuleCard
+          to={buildRoute('adminRagQuality')}
+          icon="📈"
+          title="RAG quality"
+          subtitle="Retrieval & generation health over time"
+          metric="3 metrics"
+          loading={loading}
+          rows={[
+            { label: 'Context precision',   value: '≥ 85%' },
+            { label: 'Factual consistency', value: '≥ 95%' },
+            { label: 'Outcome accuracy',    value: '≥ 90%' },
+            { label: 'Alerts',              value: 'threshold + trend' },
+          ]}
+        />
       </div>
 
       {/* ── Module grid — row 2 ── */}

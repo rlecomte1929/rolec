@@ -6,6 +6,7 @@ from .routers import (
     ab_tests,
     admin,
     admin_ai_unit_economics,
+    admin_rag_eval,
     admin_ocr_shadow,
     admin_prompts,
     advisors,
@@ -132,6 +133,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_ocr_shadow.router)
     # [Parker-G] AI unit-economics admin rollup
     app.include_router(admin_ai_unit_economics.router)
+    app.include_router(admin_rag_eval.router)
     # [Parker-H] Conjoint (CBC) company-scoped HR/respondent API
     app.include_router(conjoint.router)
     app.include_router(recommendations_router)

@@ -113,6 +113,7 @@ export const ROUTE_DEFS = {
   adminPolicies: { path: '/admin/policies', roles: ['ADMIN'] as RouteRole[] },
   adminSuppliers: { path: '/admin/suppliers', roles: ['ADMIN'] as RouteRole[] },
   adminPrompts: { path: '/admin/prompts', roles: ['ADMIN'] as RouteRole[] },
+  adminRagQuality: { path: '/admin/rag-quality', roles: ['ADMIN'] as RouteRole[] },
   adminProspects: { path: '/admin/prospects', roles: ['ADMIN'] as RouteRole[] },
   adminMessages: { path: '/admin/messages', roles: ['ADMIN'] as RouteRole[] },
   adminResources: { path: '/admin/resources', roles: ['ADMIN'] as RouteRole[] },
