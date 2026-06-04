@@ -192,32 +192,36 @@ def run_evaluation(
 
 # Open = not archived. relocation_cases is the populated case system; the
 # immigration data (permit_expiry) keys to it via immigration_cases.case_id.
-_OPEN_CASES_SQL = text(
-    """
-    select
-        rc.id::text                                  as case_id,
-        ic.permit_expiry_date                        as permit_expiry_date,
-        prof.employer_reg_number                     as employer_registration_id,
-        rc.expected_start_date                       as expected_start_date
-    from public.relocation_cases rc
-    left join lateral (
-        select permit_expiry_date
-        from public.immigration_cases i
-        where i.case_id = rc.id
-        order by i.created_at desc
-        limit 1
-    ) ic on true
-    left join lateral (
-        -- imm_employee_profiles.case_id is text; relocation_cases.id is uuid.
-        select employer_reg_number
-        from public.imm_employee_profiles p
-        where p.case_id = rc.id::text
-        order by p.created_at desc
-        limit 1
-    ) prof on true
-    where rc.archived_at is null
-    """
-)
+def _open_cases_sql(company_scoped: bool):
+    where = "where rc.archived_at is null"
+    if company_scoped:
+        where += " and rc.company_id = :company_id"
+    return text(
+        f"""
+        select
+            rc.id::text              as case_id,
+            ic.permit_expiry_date    as permit_expiry_date,
+            prof.employer_reg_number as employer_registration_id,
+            rc.expected_start_date   as expected_start_date
+        from public.relocation_cases rc
+        left join lateral (
+            select permit_expiry_date
+            from public.immigration_cases i
+            where i.case_id = rc.id
+            order by i.created_at desc
+            limit 1
+        ) ic on true
+        left join lateral (
+            -- imm_employee_profiles.case_id is text; relocation_cases.id is uuid.
+            select employer_reg_number
+            from public.imm_employee_profiles p
+            where p.case_id = rc.id::text
+            order by p.created_at desc
+            limit 1
+        ) prof on true
+        {where}
+        """
+    )
 
 _ACTIVE_RULES_SQL = text(
     "select id::text, category, severity, trigger_condition, active "
@@ -238,9 +242,12 @@ _INSERT_ALERT_SQL = text(
 class SqlComplianceDataSource:
     """Reads rules + open cases from the DB via a SQLAlchemy session."""
 
-    def __init__(self, db: Any, today: Optional[date] = None) -> None:
+    def __init__(
+        self, db: Any, today: Optional[date] = None, company_id: Optional[str] = None
+    ) -> None:
         self._db = db
         self._today = today or date.today()
+        self._company_id = company_id
 
     def active_rules(self) -> Sequence[ComplianceRule]:
         rows = self._db.execute(_ACTIVE_RULES_SQL).mappings().all()
@@ -260,7 +267,9 @@ class SqlComplianceDataSource:
         ]
 
     def open_cases(self) -> Iterable[CaseComplianceData]:
-        rows = self._db.execute(_OPEN_CASES_SQL).mappings().all()
+        sql = _open_cases_sql(self._company_id is not None)
+        params = {"company_id": self._company_id} if self._company_id is not None else {}
+        rows = self._db.execute(sql, params).mappings().all()
         for r in rows:
             start = r["expected_start_date"]
             days_present = (self._today - start).days if start is not None else None
@@ -297,12 +306,15 @@ class SqlAlertStore:
         )
 
 
-def run_compliance_evaluation(db: Any, today: Optional[date] = None) -> EvaluationResult:
-    """Production entry point: evaluate all open cases and persist new alerts.
+def run_compliance_evaluation(
+    db: Any, today: Optional[date] = None, company_id: Optional[str] = None
+) -> EvaluationResult:
+    """Production entry point: evaluate open cases and persist new alerts.
 
-    The caller owns the transaction — commit after this returns. Intended to be
-    driven by a scheduled job / admin endpoint (BL-Compliance.4).
+    Pass ``company_id`` to scope the run to one company's open cases (used by the
+    HR-triggered endpoint to avoid a full-fleet run). The caller owns the
+    transaction — commit after this returns.
     """
-    source = SqlComplianceDataSource(db, today=today)
+    source = SqlComplianceDataSource(db, today=today, company_id=company_id)
     store = SqlAlertStore(db)
     return run_evaluation(source, store, today=today)
