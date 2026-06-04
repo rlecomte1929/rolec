@@ -1,0 +1,17 @@
+# deliverable_integrity_allowlist.txt
+#
+# Suppresses known-acceptable mismatches for check_deliverable_integrity.py:
+# a "Done" AI Work Queue task whose notes reference a repo path that is NOT a
+# tracked file, but where that is expected (a *suggested* path the engineer
+# renamed when committing, a spec intentionally kept in Notion, a path that
+# moved, etc.).
+#
+# One entry per line. Two accepted forms:
+#   <repo/relative/path>            — suppress this path for ALL tasks
+#   <AIQ-id>:<repo/relative/path>   — suppress only for that task
+# Inline "# comment" is allowed and required: say WHY it's allowlisted.
+#
+# This list should DRAIN over time. The guard is report-only by default; once
+# the live backlog is triaged into this file, flip the CI job to --strict.
+#
+# (empty — to be seeded on the first live run once NOTION_QUEUE_TOKEN is set)

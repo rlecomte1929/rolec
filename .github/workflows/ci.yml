@@ -200,3 +200,26 @@ jobs:
           DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
         run: python scripts/storage_bucket_check.py
 
+  deliverable-integrity:
+    # HYGIENE-1: assert that "Done" AI Work Queue tasks' claimed deliverable
+    # files actually exist in the repo. Catches the class where a Cowork task is
+    # closed Done but its file was never merged (C1-04a #290, P3-01c #289).
+    # Needs a Notion read token. secrets.* is not allowed in a job-level if:
+    # (parse-time failure), so gate on a repo variable instead — set
+    # `vars.NOTION_QUEUE_TOKEN_SET=true` once the secret is configured.
+    # Runs report-only (no --strict) until the live backlog is triaged into
+    # scripts/deliverable_integrity_allowlist.txt; then add --strict to gate.
+    name: Deliverable integrity check
+    runs-on: ubuntu-latest
+    if: ${{ vars.NOTION_QUEUE_TOKEN_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run deliverable-integrity check
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
+        run: python scripts/check_deliverable_integrity.py --root .
+
