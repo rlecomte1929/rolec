@@ -11,6 +11,8 @@ interface ButtonProps {
   className?: string;
   /** Native tooltip (e.g. disabled buttons) */
   title?: string;
+  /** Accessible name for icon-only buttons (passed through to the native element) */
+  'aria-label'?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -23,6 +25,7 @@ export const Button: React.FC<ButtonProps> = ({
   type = 'button',
   className = '',
   title,
+  'aria-label': ariaLabel,
 }) => {
   const baseStyles = 'font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
   
@@ -48,6 +51,7 @@ export const Button: React.FC<ButtonProps> = ({
       onClick={onClick}
       disabled={disabled}
       title={title}
+      aria-label={ariaLabel}
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${widthClass} ${disabledClass} ${className}`}
     >
       {children}
