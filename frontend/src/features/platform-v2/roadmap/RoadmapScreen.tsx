@@ -7,6 +7,8 @@
 import { useState } from 'react';
 import type { RoadmapTrack, RoadmapStep, StepStatus } from '../../../types/relopass-api-contracts';
 import { ProgressBar, StatusBadge, DateFormatter, EmptyState, Pill } from '../shared';
+import { AvailableNowWidget } from './AvailableNowWidget';
+import { computeAvailableNow } from '../../../utils/roadmapAvailability';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -249,6 +251,29 @@ export function RoadmapScreen({ tracks, docChips, onStepDocChipClick }: RoadmapS
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(tracks[0]?.id ?? null);
   const selectedTrack = tracks.find(t => t.id === selectedTrackId) ?? null;
 
+  // [P2-07] "What you can do now" spans every track, so it computes over the
+  // full flattened step list. Selecting an action jumps to its track + asks AI
+  // about it, mirroring StepRow's title-click behaviour.
+  const allSteps = tracks.flatMap(t => t.steps);
+
+  function focusStep(stepId: string) {
+    const owningTrack = tracks.find(t => t.steps.some(s => s.id === stepId));
+    if (owningTrack) setSelectedTrackId(owningTrack.id);
+    const step = allSteps.find(s => s.id === stepId);
+    if (step) {
+      document.dispatchEvent(new CustomEvent('rp:ai-context', { detail: step, bubbles: true }));
+    }
+  }
+
+  function handleSeeAllAvailable() {
+    try {
+      const [first] = computeAvailableNow(allSteps);
+      if (first) focusStep(first.id);
+    } catch {
+      /* circular graph — widget already surfaces the error, nothing to focus */
+    }
+  }
+
   return (
     <div style={{ padding: '24px', maxWidth: '1100px', margin: '0 auto' }}>
       {/* Header */}
@@ -268,7 +293,15 @@ export function RoadmapScreen({ tracks, docChips, onStepDocChipClick }: RoadmapS
           description="Complete the intake wizard to generate your personalised roadmap."
         />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '20px', alignItems: 'start' }}>
+        <>
+          <div style={{ marginBottom: '20px' }}>
+            <AvailableNowWidget
+              steps={allSteps}
+              onStartStep={focusStep}
+              onSeeAll={handleSeeAllAvailable}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '20px', alignItems: 'start' }}>
           {/* Left: track list */}
           <TrackList tracks={tracks} selectedId={selectedTrackId} onSelect={setSelectedTrackId} />
 
@@ -322,7 +355,8 @@ export function RoadmapScreen({ tracks, docChips, onStepDocChipClick }: RoadmapS
               />
             )}
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
