@@ -12,8 +12,9 @@ Houses 8 endpoints:
   GET   /api/hr/immigration/cases/{immigration_case_id}
   GET   /api/employee/cases/{case_id}/immigration
 
-DORMANT: this router is not yet wired into backend/app/main.py.
-Canonical registration still happens via immigration.py until imm-6.
+WIRED (AUDIT-B9-imm-6): this router is registered in both backend/main.py and
+backend/app/main.py and is the canonical handler for these routes. The original
+immigration.py router is retained but no longer wired.
 """
 from __future__ import annotations
 
@@ -33,6 +34,7 @@ from ..services.immigration_interview_engine import (
     load_questions,
 )
 from ..services.immigration_service import (
+    _check_consent,
     _get_case_details,
     _load_session,
     _log_access,
