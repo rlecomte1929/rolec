@@ -26,6 +26,7 @@ from .routers import (
     hr_catalog,
     hr_coordination,
     immigration,
+    immigration_forms,
     immigration_gdpr,
     immigration_intake_consent,
     immigration_intake_interview,
@@ -112,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(immigration_intake_interview.router)
     app.include_router(immigration_status.router)
     app.include_router(immigration_gdpr.router)
+    app.include_router(immigration_forms.router)  # IMM-11 — form library + PDF pre-fill
     app.include_router(exception_requests.router)
     app.include_router(relocation_profile.router)
     app.include_router(marketplace.router)
