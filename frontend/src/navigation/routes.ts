@@ -140,6 +140,7 @@ export const ROUTE_DEFS = {
   adminFreshnessCountries: { path: '/admin/freshness/countries', roles: ['ADMIN'] as RouteRole[] },
   adminFreshnessCities: { path: '/admin/freshness/cities', roles: ['ADMIN'] as RouteRole[] },
   adminFreshnessSources: { path: '/admin/freshness/sources', roles: ['ADMIN'] as RouteRole[] },
+  adminSourceMonitor: { path: '/admin/source-monitor', roles: ['ADMIN'] as RouteRole[] },
   adminFreshnessChanges: { path: '/admin/freshness/changes', roles: ['ADMIN'] as RouteRole[] },
   adminFreshnessStaleContent: { path: '/admin/freshness/stale-content', roles: ['ADMIN'] as RouteRole[] },
   adminCrawlSchedules: { path: '/admin/crawl/schedules', roles: ['ADMIN'] as RouteRole[] },

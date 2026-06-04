@@ -58,6 +58,16 @@ export const AdminFreshnessLayout: React.FC<Props> = ({ title, subtitle, childre
           Sources
         </Link>
         <Link
+          to={buildRoute('adminSourceMonitor')}
+          className={`rounded px-2 py-1 text-sm ${
+            isActive('/admin/source-monitor')
+              ? 'bg-[#0b2b43] text-white'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+        >
+          Source pages
+        </Link>
+        <Link
           to={buildRoute('adminFreshnessChanges')}
           className={`rounded px-2 py-1 text-sm ${
             isActive('/admin/freshness/changes')

@@ -149,6 +149,7 @@ const AdminFreshnessOverview = lazy(() => import('./pages/admin/freshness/AdminF
 const AdminFreshnessCountries = lazy(() => import('./pages/admin/freshness/AdminFreshnessCountries').then((module) => ({ default: module.AdminFreshnessCountries })));
 const AdminFreshnessCities = lazy(() => import('./pages/admin/freshness/AdminFreshnessCities').then((module) => ({ default: module.AdminFreshnessCities })));
 const AdminFreshnessSources = lazy(() => import('./pages/admin/freshness/AdminFreshnessSources').then((module) => ({ default: module.AdminFreshnessSources })));
+const AdminSourceMonitor = lazy(() => import('./pages/admin/AdminSourceMonitor').then((module) => ({ default: module.AdminSourceMonitor })));
 const AdminFreshnessChanges = lazy(() => import('./pages/admin/freshness/AdminFreshnessChanges').then((module) => ({ default: module.AdminFreshnessChanges })));
 const AdminFreshnessStaleContent = lazy(() => import('./pages/admin/freshness/AdminFreshnessStaleContent').then((module) => ({ default: module.AdminFreshnessStaleContent })));
 const AdminCrawlSchedules = lazy(() => import('./pages/admin/freshness/AdminCrawlSchedules').then((module) => ({ default: module.AdminCrawlSchedules })));
@@ -394,6 +395,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminFreshnessCountries.path} element={<RequireAdminRoute><AdminFreshnessCountries /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFreshnessCities.path} element={<RequireAdminRoute><AdminFreshnessCities /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFreshnessSources.path} element={<RequireAdminRoute><AdminFreshnessSources /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminSourceMonitor.path} element={<RequireAdminRoute><AdminSourceMonitor /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFreshnessChanges.path} element={<RequireAdminRoute><AdminFreshnessChanges /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFreshnessStaleContent.path} element={<RequireAdminRoute><AdminFreshnessStaleContent /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCrawlSchedules.path} element={<RequireAdminRoute><AdminCrawlSchedules /></RequireAdminRoute>} />
