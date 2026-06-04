@@ -5,6 +5,7 @@ import {
   buildKpis,
   outOfPocketRows,
   formatMoney,
+  isPolicyExpired,
 } from '../benefitComparisonModel';
 import type { EffectiveServiceComparisonRow } from '../../../types';
 
@@ -132,6 +133,21 @@ describe('outOfPocketRows — only Partial/Uncovered', () => {
     ]);
     const oop = outOfPocketRows(rows);
     expect(oop.map((r) => r.serviceKey).sort()).toEqual(['school_search', 'visa_support']);
+  });
+});
+
+describe('isPolicyExpired', () => {
+  const now = new Date('2026-06-04T00:00:00Z');
+  it('true when expiry is in the past', () => {
+    expect(isPolicyExpired('2026-01-01', now)).toBe(true);
+  });
+  it('false when expiry is in the future', () => {
+    expect(isPolicyExpired('2027-01-01', now)).toBe(false);
+  });
+  it('false for missing or unparseable dates (never false-fires)', () => {
+    expect(isPolicyExpired(null, now)).toBe(false);
+    expect(isPolicyExpired(undefined, now)).toBe(false);
+    expect(isPolicyExpired('not-a-date', now)).toBe(false);
   });
 });
 

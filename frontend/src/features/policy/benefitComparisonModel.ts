@@ -160,6 +160,25 @@ export function outOfPocketRows(rows: ComparisonRow[]): ComparisonRow[] {
   return rows.filter((r) => r.coverage === 'partial' || r.coverage === 'uncovered');
 }
 
+/**
+ * True when the policy's expiry date is strictly in the past.
+ *
+ * NOTE: the employee `services-policy-context` payload does not yet carry an
+ * `expiry_date` (only `effective_date`). This helper reads it defensively so the
+ * amber "expired" banner fires correctly the moment the backend surfaces it —
+ * see the follow-up note in the handoff. Returns false for missing/unparseable
+ * dates so the banner never falsely fires.
+ */
+export function isPolicyExpired(
+  expiryDate: string | null | undefined,
+  now: Date,
+): boolean {
+  if (!expiryDate) return false;
+  const t = Date.parse(expiryDate);
+  if (Number.isNaN(t)) return false;
+  return t < now.getTime();
+}
+
 /** Format a money amount with the row/KPI currency; falls back gracefully. */
 export function formatMoney(value: number | null | undefined, currency = 'USD'): string {
   if (typeof value !== 'number' || !isFinite(value)) return '—';
