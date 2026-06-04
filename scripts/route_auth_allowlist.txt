@@ -85,14 +85,20 @@ backend/routes/relocation_classify.py:get_relocation_classification
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Mutation endpoints — grandfathered by the SEC-CASES-2 guard extension
-# (2026-06-04). The route-auth guard now audits POST/PATCH/PUT/DELETE, not just
-# GET. These are the pre-existing mutation routes without a Depends() auth dep.
-# PUBLIC / WEBHOOK / CRON / DEAD / INTERNAL are intended-permanent exemptions;
-# TODO:SEC entries are real gaps to fix and DRAIN from this list.
+# Mutation endpoints — POST/PATCH/PUT/DELETE auth audit.
+# The route-auth guard now audits mutations (SEC-CASES-2 guard extension,
+# 2026-06-04) in addition to GET. SEC-MUT-DRAIN (2026-06-04) then DRAINED the
+# TODO:SEC backlog to empty by actually adding auth to the open gaps:
+#   • ab_tests.promote_variant / rollback_flag → Depends(require_admin)
+#   • support.triage_ticket / send_auto_reply / update_ticket_status
+#       → decorator dep Depends(verify_support_automation_secret)
+#   • support.inbound_email_webhook → decorator dep Depends(verify_postmark_secret)
+# Those endpoints now pass on their own merit and are NO LONGER allowlisted.
+# Remaining entries below are PERMANENT exemptions only (public / inline-auth /
+# dead code) — there are no open TODO:SEC gaps. Keep it that way.
 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── Intentionally public (auth / invite redemption) ───────────────────────────
+# ── Intentionally public (auth / invite redemption / anonymous intake) ─────────
 backend/app/routers/auth.py:register
 # PUBLIC: account registration is pre-auth by definition.
 backend/app/routers/auth.py:login
@@ -102,36 +108,30 @@ backend/app/routers/auth.py:logout
 backend/app/routers/providers.py:accept_provider_invite
 # PUBLIC: invite redemption — the invite token in the body IS the credential
 # (validated internally), mirroring providers.verify_provider_token_endpoint.
+backend/app/routers/support.py:create_in_app_ticket
+# PUBLIC: in-app Help form. Employee portal allows anonymous submission
+# (session_id falls back to "anonymous"); write-only INSERT into support_tickets,
+# exposes no data back to the caller. Intentionally unauthenticated by design.
 
-# ── Webhooks (external system; signature/secret auth, not a user token) ────────
-backend/app/routers/support.py:inbound_email_webhook
-# WEBHOOK: inbound support email. TODO:SEC verify provider-signature check exists.
+# ── Webhooks (external system; inline HMAC/signature, not a FastAPI Depends) ───
+# The signature check runs in the handler body, so the AST scanner cannot see it.
 backend/app/routers/integrations_personio_webhook.py:personio_webhook
-# WEBHOOK: Personio HRIS push. TODO:SEC verify HMAC/signature check exists.
+# WEBHOOK (PERMANENT): verifies X-Personio-Signature HMAC-SHA256 inline against
+# PERSONIO_WEBHOOK_SECRET (integrations_personio_webhook.py:_verify_signature,
+# raises 401 on mismatch) before any work.
 
-# ── Cron (invoked by the scheduler, not an end user) ──────────────────────────
+# ── Cron (invoked by the scheduler, not an end user; inline secret check) ──────
 backend/app/routers/crons.py:deadline_reminder
-# CRON: scheduler-invoked. TODO:SEC confirm it requires a cron secret/header.
+# CRON (PERMANENT): calls _verify_cron_secret(request) in the body — fail-closed
+# (503 if CRON_SECRET unset, 401 on mismatch). Inline, not a Depends().
+
+# ── Non-standard auth — manual JWT extraction via Authorization header ─────────
+backend/routes/relocation_classify.py:classify_relocation_case
+# PERMANENT: validates the Supabase JWT manually — raises 401 if Authorization
+# is missing, then _get_client(authorization) enforces the token via RLS.
+# Header-based auth the AST scanner cannot detect (mirrors get_relocation_classification).
 
 # ── Dead code (unwired router) ────────────────────────────────────────────────
 backend/app/routers/cases.py:start_research
 # DEAD: cases.py router is unwired (AUDIT-B9-cases-6). The live route is
 # cases_write.start_research, which is guarded (SEC-CASES-2 / #314).
-
-# ── Internal pipeline (server-triggered, not user-facing) ─────────────────────
-backend/app/routers/support.py:triage_ticket
-# INTERNAL: support triage pipeline. TODO:SEC confirm caller is internal/admin.
-backend/app/routers/support.py:send_auto_reply
-# INTERNAL: support auto-reply pipeline. TODO:SEC confirm caller is internal/admin.
-
-# ── TODO:SEC — real gaps to fix and DRAIN (tracked follow-up) ─────────────────
-backend/app/routers/ab_tests.py:promote_variant
-# TODO:SEC admin-only feature-flag promotion, currently unauthenticated.
-backend/app/routers/ab_tests.py:rollback_flag
-# TODO:SEC admin-only feature-flag rollback, currently unauthenticated.
-backend/app/routers/support.py:create_in_app_ticket
-# TODO:SEC should require auth (handler comment claims employee-portal optional — confirm).
-backend/app/routers/support.py:update_ticket_status
-# TODO:SEC ticket-status mutation should require auth/admin.
-backend/routes/relocation_classify.py:classify_relocation_case
-# TODO:SEC case classification endpoint — confirm + add auth requirement.
