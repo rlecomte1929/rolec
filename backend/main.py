@@ -189,7 +189,6 @@ from .app.routers import providers as providers_router
 from .app.routers import employee_quotes as employee_quotes_router
 from .app.routers import hr_vendors as hr_vendors_router
 from .app.routers import hr_rfq as hr_rfq_router
-from .app.routers import immigration as immigration_router  # noqa: F401 — kept for backwards-compat; router no longer wired (AUDIT-B9-imm-6)
 from .app.routers import immigration_intake_consent as immigration_intake_consent_router
 from .app.routers import immigration_intake_profile as immigration_intake_profile_router
 from .app.routers import immigration_intake_interview as immigration_intake_interview_router

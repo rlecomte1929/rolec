@@ -14,6 +14,8 @@ import {
   evaluateCompliance,
   listComplianceAlerts,
   resolveComplianceAlert,
+  setEmployerRegNumber,
+  setExpectedStartDate,
 } from '../../api/compliance';
 
 const SEVERITY_ORDER: AlertSeverity[] = ['critical', 'high', 'medium', 'low'];
@@ -74,6 +76,44 @@ export const ComplianceAlertsPanel: React.FC = () => {
     }
   };
 
+  // Phase B2: inline "fill compliance fields" form. PATCHes the two HR
+  // endpoints that feed the rule engine, then re-runs the evaluator.
+  const [fieldsCaseId, setFieldsCaseId] = useState('');
+  const [fieldsEmployerReg, setFieldsEmployerReg] = useState('');
+  const [fieldsExpectedStart, setFieldsExpectedStart] = useState('');
+  const [fieldsStatus, setFieldsStatus] = useState<string | null>(null);
+
+  const canSubmitFields =
+    fieldsCaseId.trim().length > 0 &&
+    (fieldsEmployerReg.trim().length > 0 || fieldsExpectedStart.trim().length > 0) &&
+    !busy;
+
+  const saveFields = async () => {
+    if (!canSubmitFields) return;
+    setBusy(true);
+    setError(null);
+    setFieldsStatus(null);
+    try {
+      const caseId = fieldsCaseId.trim();
+      if (fieldsEmployerReg.trim()) {
+        await setEmployerRegNumber(caseId, fieldsEmployerReg.trim());
+      }
+      if (fieldsExpectedStart.trim()) {
+        await setExpectedStartDate(caseId, fieldsExpectedStart.trim());
+      }
+      setFieldsEmployerReg('');
+      setFieldsExpectedStart('');
+      setFieldsStatus('Saved. Re-checking compliance…');
+      await evaluateCompliance();
+      await load();
+      setFieldsStatus('Fields saved and compliance re-checked.');
+    } catch {
+      setError('Could not save the compliance fields.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const groups = SEVERITY_ORDER.map((sev) => ({
     sev,
     items: alerts.filter((a) => a.severity === sev),
@@ -96,6 +136,59 @@ export const ComplianceAlertsPanel: React.FC = () => {
       </div>
 
       {error && <p className="text-sm text-[#b91c1c] mb-3">{error}</p>}
+
+      <div className="mb-5 rounded-lg border border-[#e2e8f0] p-3">
+        <p className="text-sm font-medium text-[#0b2b43] mb-2">
+          Fill compliance fields for a case
+        </p>
+        <p className="text-xs text-[#6b7280] mb-3">
+          Sets the values the rule engine reads. Saving re-runs the evaluator.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <label className="text-xs text-[#0b2b43]">
+            Case ID
+            <input
+              type="text"
+              value={fieldsCaseId}
+              onChange={(e) => setFieldsCaseId(e.target.value)}
+              placeholder="UUID"
+              className="mt-1 w-full rounded border border-[#cbd5e1] px-2 py-1 text-sm"
+            />
+          </label>
+          <label className="text-xs text-[#0b2b43]">
+            Employer registration number
+            <input
+              type="text"
+              value={fieldsEmployerReg}
+              onChange={(e) => setFieldsEmployerReg(e.target.value)}
+              placeholder="e.g. DE-HRB-12345"
+              className="mt-1 w-full rounded border border-[#cbd5e1] px-2 py-1 text-sm"
+            />
+          </label>
+          <label className="text-xs text-[#0b2b43]">
+            Expected start date
+            <input
+              type="date"
+              value={fieldsExpectedStart}
+              onChange={(e) => setFieldsExpectedStart(e.target.value)}
+              className="mt-1 w-full rounded border border-[#cbd5e1] px-2 py-1 text-sm"
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={saveFields}
+            disabled={!canSubmitFields}
+          >
+            Save fields
+          </Button>
+          {fieldsStatus && (
+            <span className="text-xs text-[#6b7280]">{fieldsStatus}</span>
+          )}
+        </div>
+      </div>
 
       {loading ? (
         <div className="space-y-2 py-4">

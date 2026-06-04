@@ -1,6 +1,5 @@
 """
-immigration_intake_profile.py — employee profile + OCR routes
-extracted from immigration.py (AUDIT-B9-imm-3, part 2 of 3).
+immigration_intake_profile.py — employee profile + OCR routes.
 
 Houses 5 endpoints:
   GET   /api/hr/cases/{case_id}/profile                              (HR view, masked)
@@ -8,16 +7,16 @@ Houses 5 endpoints:
   GET   /api/employee/cases/{case_id}/profile                        (employee read)
   PUT   /api/employee/cases/{case_id}/profile                        (employee upsert)
   POST  /api/employee/cases/{case_id}/profile/ocr-passport           (OCR, async)
-
-DORMANT: this router is not yet wired into backend/app/main.py.
-Canonical registration still happens via immigration.py until imm-6.
 """
 from __future__ import annotations
 
 import uuid
 from typing import Any, Dict, List, Optional
 
+from datetime import date as _date
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
@@ -43,8 +42,48 @@ from ..services.ocr_passport_extractor import (
     validate_mrz,
 )
 
-# Pydantic models — imported from immigration.py until imm-6 relocates them.
-from .immigration import EmployeeProfileUpdate, HrProfileFields
+
+class HrProfileFields(BaseModel):
+    employer_name: Optional[str] = None
+    employer_reg_number: Optional[str] = None
+    employer_address: Optional[Dict[str, Any]] = None
+    job_title: Optional[str] = None
+    job_title_local: Optional[str] = None
+    employment_start_date: Optional[str] = None
+    salary_amount: Optional[float] = None
+    salary_currency: Optional[str] = None
+    contract_type: Optional[str] = None
+
+
+class EmployeeProfileUpdate(BaseModel):
+    legal_first_name: Optional[str] = None
+    legal_last_name: Optional[str] = None
+    middle_names: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    place_of_birth: Optional[str] = None
+    nationality: Optional[str] = None
+    second_nationality: Optional[str] = None
+    gender: Optional[str] = None
+    passport_number: Optional[str] = None
+    passport_expiry: Optional[str] = None
+    passport_issue_date: Optional[str] = None
+    passport_country: Optional[str] = None
+    passport_mrz_line1: Optional[str] = None
+    passport_mrz_line2: Optional[str] = None
+    existing_visa_type: Optional[str] = None
+    existing_visa_expiry: Optional[str] = None
+    prior_visa_refusals: Optional[bool] = None
+    current_address: Optional[Dict[str, Any]] = None
+    address_history: Optional[List[Dict[str, Any]]] = None
+    marital_status: Optional[str] = None
+    spouse_name: Optional[str] = None
+    spouse_nationality: Optional[str] = None
+    spouse_dob: Optional[str] = None
+    dependents: Optional[List[Dict[str, Any]]] = None
+    highest_qualification: Optional[str] = None
+    institution: Optional[str] = None
+    graduation_year: Optional[int] = None
+    degree_anabin_status: Optional[str] = None
 
 router = APIRouter(prefix="/api", tags=["immigration-intake-profile"])
 
@@ -465,6 +504,42 @@ async def ocr_passport(
             for c in conflicts
         ],
         "fields_saved": saved_fields,
+    }
+
+
+# ---------------------------------------------------------------------------
+# HR: PATCH /api/hr/cases/{case_id}/expected-start-date  (Phase B1)
+# ---------------------------------------------------------------------------
+
+
+class ExpectedStartDateBody(BaseModel):
+    expected_start_date: _date  # Pydantic parses ISO YYYY-MM-DD; rejects others.
+
+
+@router.patch("/hr/cases/{case_id}/expected-start-date")
+def update_case_expected_start_date(
+    case_id: str,
+    body: ExpectedStartDateBody,
+    hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """HR sets the case's expected start date. Feeds the BL-Compliance
+    `tax_183_day` rule via the `days_present_in_host` derivation."""
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "UPDATE public.relocation_cases "
+                "SET expected_start_date = :d, updated_at = now() "
+                "WHERE id = :case_id AND company_id = :company_id "
+                "RETURNING id"
+            ),
+            {"d": body.expected_start_date, "case_id": case_id, "company_id": org_id},
+        ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Case not found or not in your company")
+    return {
+        "case_id": case_id,
+        "expected_start_date": body.expected_start_date.isoformat(),
     }
 
 

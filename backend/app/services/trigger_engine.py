@@ -209,22 +209,43 @@ def _build_context(
         or (row["dest_country_code"] or "").strip()
     ).upper() or None
 
-    # visa_type: map purpose values to trigger-rule vocabulary
+    basics = draft.get("relocationBasics") or {}
+    # Origin: derived (in-flight PATCH) wins over the wizard draft basics.
+    origin_country = (
+        (derived.get("origin_country") or "").strip()
+        or (basics.get("originCountry") or "").strip()
+    ).upper() or None
+
+    # visa_type: [P1-04] an EEA national relocating to another EEA country uses
+    # the registration scheme (not a work permit), regardless of work purpose.
+    # Otherwise map the relocation purpose to the trigger-rule vocabulary.
     purpose = (row["purpose"] or "").strip()
-    basics  = draft.get("relocationBasics") or {}
-    visa_type = _purpose_to_visa_type(
-        purpose or (basics.get("purpose") or "").strip()
-    )
+    if origin_country in _EEA_COUNTRIES and dest_country in _EEA_COUNTRIES:
+        visa_type = "eea_registration"
+    else:
+        visa_type = _purpose_to_visa_type(
+            purpose or (basics.get("purpose") or "").strip()
+        )
 
     return {
         "case_uuid":        case_uuid,
         "employee_id":      str(row["employee_id"]) if row["employee_id"] else None,
         "destination_country": dest_country,
+        "origin_country":   origin_country,
         "visa_type":        visa_type,
         # family flags populated later from case_dependents
         "has_spouse":       False,
         "has_children":     False,
     }
+
+
+# EU/EEA member states (ISO 3166-1 alpha-2). An EEA national relocating to
+# another EEA country follows the registration scheme rather than a work permit.
+_EEA_COUNTRIES = frozenset({
+    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR",
+    "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK",
+    "SI", "ES", "SE", "IS", "LI", "NO",
+})
 
 
 def _purpose_to_visa_type(purpose: str) -> Optional[str]:

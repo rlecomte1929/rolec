@@ -5,19 +5,22 @@ GET   /api/compliance/alerts            — open compliance alerts for the HR's
                                           company, ordered by severity.
 POST  /api/compliance/evaluate          — run the rule evaluator for the HR's
                                           company (fires new alerts on demand).
+POST  /api/compliance/evaluate-all      — admin-only fleet-wide run; dry-run
+                                          by default. Designed for the daily
+                                          scheduled cron.
 PATCH /api/compliance/alerts/{alert_id} — resolve / dismiss an alert.
 
-All endpoints are HR/Admin only and tenant-scoped to the caller's company via
-the parent relocation_case.
+HR endpoints are tenant-scoped to the caller's company via the parent
+relocation_case. The admin endpoint is fleet-wide.
 """
 import logging
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from ..auth_deps import get_org_id_for_hr_user
+from ..auth_deps import get_org_id_for_hr_user, require_admin
 from ..db import SessionLocal
 from ..services.compliance_evaluator import run_compliance_evaluation
 
@@ -139,6 +142,34 @@ def evaluate_company(company_id: str = Depends(get_org_id_for_hr_user)) -> Evalu
         cases_evaluated=result.cases_evaluated,
         alerts_created=result.alerts_created,
         alerts_skipped_existing=result.alerts_skipped_existing,
+    )
+
+
+class EvaluateAllResponse(BaseModel):
+    cases_evaluated: int
+    alerts_created: int
+    alerts_skipped_existing: int
+    dry_run: bool
+
+
+@router.post("/evaluate-all", response_model=EvaluateAllResponse)
+def evaluate_all(
+    dry_run: bool = Query(True),
+    _admin: Dict[str, Any] = Depends(require_admin),
+) -> EvaluateAllResponse:
+    """Fleet-wide compliance run (admin-only). Defaults to dry_run=True so the
+    scheduled cron is safe-by-default; pass dry_run=false explicitly to persist."""
+    with SessionLocal() as db:
+        result = run_compliance_evaluation(db, dry_run=dry_run)
+        if not dry_run:
+            db.commit()
+        else:
+            db.rollback()
+    return EvaluateAllResponse(
+        cases_evaluated=result.cases_evaluated,
+        alerts_created=result.alerts_created,
+        alerts_skipped_existing=result.alerts_skipped_existing,
+        dry_run=dry_run,
     )
 
 
