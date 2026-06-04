@@ -348,7 +348,7 @@ function CityCombo({ country, value, onChange }: { country: string; value: strin
   );
 }
 
-function MultiChip({ value, onChange, options }: {
+export function MultiChip({ value, onChange, options }: {
   value: string[]; onChange: (v: string[]) => void;
   options: Array<string | { value: string; label: string }>;
 }) {
@@ -1409,7 +1409,7 @@ export function EmployeeIntakePage() {
                     )}
                   </FieldWrap>
                   <FieldWrap label="Work pattern" required className="sm:col-span-2">
-                    <MultiChip value={[data.work_pattern]} onChange={([v]) => setField('work_pattern', v)}
+                    <MultiChip value={data.work_pattern ? [data.work_pattern] : []} onChange={(v) => setField('work_pattern', v[v.length - 1] || '')}
                       options={['Full in-office', 'Hybrid', 'Fully remote']} />
                   </FieldWrap>
                 </Grid>
