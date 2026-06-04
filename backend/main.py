@@ -205,6 +205,7 @@ from .app.routers import hr_analytics as hr_analytics_router
 from .app.routers import advisors as advisors_router
 from .app.routers import branding as branding_router
 from .app.routers import specialist_review as specialist_review_router  # [P1-02c] AI roadmap specialist review
+from .app.routers import rag_roadmap as rag_roadmap_router  # [P1-01d] RAG roadmap pipeline endpoint
 from .app.services.question_engine import generate_questions
 from pydantic import BaseModel as _BaseModel
 from contextlib import asynccontextmanager, contextmanager
@@ -688,6 +689,7 @@ app.include_router(case_forms_adhoc_router.router)  # [P4-3] ad-hoc "Add documen
 app.include_router(employee_tiers_router.router)  # [P1-6] employee tier assignment
 app.include_router(ai_decisions_router.router)  # [AI-002] EU AI Act Art. 14 — POST/GET /api/ai/decisions
 app.include_router(specialist_review_router.router)  # [P1-02c] /api/internal/specialist-review
+app.include_router(rag_roadmap_router.router)  # [P1-01d] /api/internal/rag/generate-roadmap (dual-layer registration)
 app.include_router(nlg_router.router)  # [Parker-J] PR #207 §9 — exec-summary + policy TL;DR (dual-layer registration)
 app.include_router(predictions_router.router)  # [Parker-A] PR #207 §9 — dual-layer registration
 app.include_router(benefit_optimizer_router.router)  # [Parker-B] PR #207 §9 — dual-layer registration
