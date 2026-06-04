@@ -1,0 +1,53 @@
+name: Source-monitoring scheduler
+
+# [P3-02a] Calls POST /api/crons/process-crawl-schedules once a day. Processes
+# every due crawl schedule with 3-retry exponential backoff on transient fetch
+# failures. Gated behind `vars.CRAWL_CRON_ENABLED` so this is a no-op until the
+# secrets/vars are configured.
+
+on:
+  schedule:
+    # 03:00 UTC every day.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: crawl-scheduler
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  process-schedules:
+    name: Process due crawl schedules
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # No-op unless explicitly enabled via repo vars.
+    if: ${{ vars.CRAWL_CRON_ENABLED == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      API_BASE: ${{ vars.CRAWL_API_BASE }}        # e.g. https://api.relopass.com
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: POST /api/crons/process-crawl-schedules
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "API_BASE or CRON_SECRET not configured; skipping."
+            exit 0
+          fi
+          response=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${API_BASE}/api/crons/process-crawl-schedules")
+          echo "$response"
+          # Surface counts in the workflow run summary so reviewers can see the
+          # processed / succeeded / failed distribution without an artifact.
+          {
+            echo "## Crawl scheduler run"
+            echo ''
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
