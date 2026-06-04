@@ -46,6 +46,7 @@ export const ROUTE_DEFS = {
   hrReviewCase: { path: '/hr/review/case/:caseId', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrAssignmentReview: { path: '/hr/assignments/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrComplianceIndex: { path: '/hr/compliance', roles: ['HR', 'ADMIN'] as RouteRole[] },
+  hrErasureRequests: { path: '/hr/compliance/erasure-requests', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrCompliance: { path: '/hr/compliance/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
   hrPackage: { path: '/hr/package/:id', roles: ['HR', 'ADMIN'] as RouteRole[] },
   // [MVG-6A] HR immigration case create form + timeline (added by commit 2757862;

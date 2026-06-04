@@ -57,6 +57,7 @@ const ImmigrationPage = lazy(() => import('./pages/employee/ImmigrationPage').th
 // [MVG-6] Immigration workflow screens
 const ImmigrationCaseCreatePage = lazy(() => import('./pages/hr/ImmigrationCaseCreatePage').then((module) => ({ default: module.ImmigrationCaseCreatePage })));
 const ImmigrationCasePage = lazy(() => import('./pages/hr/ImmigrationCasePage').then((module) => ({ default: module.ImmigrationCasePage })));
+const ErasureRequestsPage = lazy(() => import('./pages/hr/ErasureRequestsPage').then((module) => ({ default: module.ErasureRequestsPage })));
 const ImmigrationChecklistPage = lazy(() => import('./pages/employee/ImmigrationChecklistPage').then((module) => ({ default: module.ImmigrationChecklistPage })));
 const QuoteRequestPage = lazy(() => import('./pages/employee/QuoteRequestPage').then((module) => ({ default: module.QuoteRequestPage })));
 const ProvidersPage = lazy(() => import('./pages/ProvidersPage').then((module) => ({ default: module.ProvidersPage })));
@@ -288,6 +289,7 @@ function App() {
         <Route path={ROUTE_DEFS.hrReviewCase.path} element={<RequireHrRoute><ReviewToEmployeeDashboardRedirect /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrAssignmentReview.path} element={<RequireHrRoute><HrAssignmentReview /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrComplianceIndex.path} element={<RequireHrRoute><HrComplianceCheck /></RequireHrRoute>} />
+        <Route path={ROUTE_DEFS.hrErasureRequests.path} element={<RequireHrRoute><ErasureRequestsPage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrCompliance.path} element={<RequireHrRoute><HrComplianceCheck /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrPackage.path} element={<RequireHrRoute><HrAssignmentPackageReview /></RequireHrRoute>} />
         {import.meta.env.DEV && (
