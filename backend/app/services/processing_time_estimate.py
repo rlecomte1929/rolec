@@ -144,9 +144,11 @@ def _official_estimate(
     """
     index = load_official_ranges()
     entry = index.get((origin.upper(), dest.upper(), (pathway_type or "").upper()))
-    if entry is None and pathway_type:
-        # Pathway not matched — accept a corridor-only match if exactly one exists,
-        # so a caller that doesn't know the pathway still gets the official range.
+    if entry is None:
+        # Exact (corridor, pathway) miss — fall back to a corridor-only match when
+        # exactly one official entry exists for the corridor. This covers callers
+        # that don't know the pathway (e.g. cases that don't yet carry one) as well
+        # as a mismatched pathway, without guessing when a corridor is ambiguous.
         corridor_matches = [
             e for (f, t, _), e in index.items() if f == origin.upper() and t == dest.upper()
         ]
@@ -287,6 +289,38 @@ def processing_time_estimate(
 
     # 2. Official-source fallback.
     return _official_estimate(origin, dest, pathway_type)
+
+
+def estimate_for_case(session: Any, case_id: str) -> Optional[ProcessingTimeEstimate]:
+    """Resolve a case's corridor and return its processing-time estimate.
+
+    Loads the case's origin/destination from public.wizard_cases and delegates to
+    :func:`processing_time_estimate` (platform data with official fallback).
+    Returns ``None`` when the case does not exist, has no corridor, or no source
+    is available — the caller renders nothing in every one of those cases.
+    """
+    from sqlalchemy import text as sql_text
+
+    row = session.execute(
+        sql_text(
+            "SELECT origin_country, dest_country FROM public.wizard_cases WHERE id = :cid"
+        ),
+        {"cid": case_id},
+    ).mappings().first()
+    if not row:
+        return None
+
+    origin = (row.get("origin_country") or "").strip()
+    dest = (row.get("dest_country") or "").strip()
+    if not origin or not dest:
+        return None
+
+    # TODO [P2-04+]: pass the case's pathway/visa type once wizard_cases carries one.
+    # Today no pathway column exists, so we rely on the corridor-only official match
+    # (one seed entry per corridor) and corridor-grouped platform data.
+    return processing_time_estimate(
+        pathway_type=None, corridor=(origin, dest), session=session
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
