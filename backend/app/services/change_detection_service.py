@@ -122,10 +122,26 @@ def run_change_detection_for_crawl_run(
         except Exception as e:
             log.warning("Failed to write change event: %s", e)
 
+    significant = [c for c in changes if c.get("change_type") == "significant_change"]
+
+    # [P3-02c] Alert admins when a monitored source changes materially.
+    if significant:
+        try:
+            from .monitoring_alerts import alert_material_change
+            first = significant[0]
+            alert_material_change(
+                first.get("source_name") or "unknown source",
+                len(significant),
+                country_code=first.get("country_code"),
+                crawl_run_id=crawl_run_id,
+            )
+        except Exception as e:  # alerting must never break detection
+            log.warning("Material-change alert failed: %s", e)
+
     return {
         "documents_processed": len(docs),
         "changes_count": len([c for c in changes if c.get("change_type") not in ("unchanged",)]),
-        "significant_count": len([c for c in changes if c.get("change_type") == "significant_change"]),
+        "significant_count": len(significant),
         "changes": changes[:50],
     }
 

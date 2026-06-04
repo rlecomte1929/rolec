@@ -38,6 +38,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from ..services.crawl_scheduler_service import process_due_schedules
 from ..services.dossier_notifications import run_deadline_reminder_cron
+from ..services.monitoring_alerts import send_test_alert
 
 log = logging.getLogger(__name__)
 
@@ -92,3 +93,16 @@ def process_crawl_schedules(request: Request) -> Dict[str, Any]:
         "failed": failed,
         "results": results,
     }
+
+
+@router.post("/test-monitoring-alert")
+def test_monitoring_alert(request: Request) -> Dict[str, Any]:
+    """
+    [P3-02c] Fire a test source-monitoring alert through Slack + email.
+    Used to validate the webhook wiring in staging — a message should land in
+    the configured test channel.
+    """
+    _verify_cron_secret(request)
+    log.info("test_monitoring_alert cron triggered")
+    result = send_test_alert()
+    return {"ok": True, **result}
