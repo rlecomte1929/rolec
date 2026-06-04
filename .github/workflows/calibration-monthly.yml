@@ -1,0 +1,87 @@
+name: Monthly confidence calibration
+
+# [P1-04d / AIQ-638] Re-runs scripts/calibration_analysis.py (P1-04b) once a month
+# against the read-only Supabase replica, then uploads the dated calibration
+# report as a workflow artifact. If a Slack webhook is configured it also posts a
+# one-line summary.
+#
+# Gating: this job only runs when `vars.RLS_COVERAGE_DATABASE_URL_SET == 'true'`
+# (the same switch the rls-coverage / storage-bucket jobs use). Until the
+# read-only DATABASE_URL secret is configured the job is a safe no-op, so the
+# schedule never fails on a missing secret. Today the source table
+# (specialist_review_events) is empty, so the report reads "insufficient data"
+# until >=50 specialist reviews accumulate — at which point this same job
+# produces real calibration curves with zero manual effort.
+
+on:
+  schedule:
+    # 06:00 UTC on the 1st of every month.
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+    inputs:
+      min_sample:
+        description: "Minimum reviews per bucket before a threshold change is recommended"
+        required: false
+        default: "50"
+
+concurrency:
+  group: calibration-monthly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    name: Run calibration analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No-op unless a read-only DATABASE_URL secret is configured for the repo.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    env:
+      # Quoted env (not inlined into run:) per workflow-injection guidance.
+      # argparse type=int rejects any non-integer value, so this is doubly safe.
+      MIN_SAMPLE: ${{ github.event.inputs.min_sample || '50' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install psycopg2
+        run: pip install "psycopg2-binary>=2.9"
+
+      - name: Run calibration analysis
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          python scripts/calibration_analysis.py --min-sample "${MIN_SAMPLE}" --json | tee /tmp/calibration.json
+          echo "Calibration complete; report file(s):"
+          find audit -maxdepth 1 -name 'calibration_report_*.md' -print
+
+      - name: Upload calibration report
+        uses: actions/upload-artifact@v4
+        with:
+          name: calibration-report
+          path: audit/calibration_report_*.md
+          if-no-files-found: error
+
+      - name: Post summary to Slack (optional)
+        if: ${{ vars.CALIBRATION_SLACK_ENABLED == 'true' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "CALIBRATION_SLACK_ENABLED=true but SLACK_WEBHOOK_URL secret is empty; skipping."
+            exit 0
+          fi
+          # Values come from our own trusted report JSON (ints / bool), not from
+          # any untrusted event payload.
+          total=$(python -c "import json;print(json.load(open('/tmp/calibration.json'))['total_reviews'])")
+          sufficient=$(python -c "import json;print(json.load(open('/tmp/calibration.json'))['had_sufficient_data'])")
+          export SUMMARY="ReloPass monthly confidence calibration: total_reviews=${total}, sufficient_data=${sufficient}. Report uploaded as a workflow artifact."
+          payload=$(python -c "import json,os;print(json.dumps({'text':os.environ['SUMMARY']}))")
+          curl -sS -X POST -H 'Content-type: application/json' --data "${payload}" "${SLACK_WEBHOOK_URL}"
