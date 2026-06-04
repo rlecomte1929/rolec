@@ -2,10 +2,16 @@
 -- Stores selected_services / answers / recommendations / shortlist / display_currency
 -- as a single jsonb blob keyed on case_id, so the employee can step away and
 -- come back to the same Estimate Review without rebuilding their package.
+--
+-- AIQ-756 (2026-06-04): hardened to be replay-safe (CREATE TABLE/INDEX IF NOT
+-- EXISTS, DROP POLICY IF EXISTS before each CREATE POLICY). A fresh Supabase
+-- Preview replay was aborting here with `relation "services_state" already exists`
+-- (42P07) — the only repo migration that creates this table, so it was a dirty/
+-- re-run preview env. Idempotency makes the replay robust either way; no-op on prod.
 
 begin;
 
-create table public.services_state (
+create table if not exists public.services_state (
   case_id uuid primary key,
   organization_id uuid not null,
   state_json jsonb not null,
@@ -16,7 +22,7 @@ create table public.services_state (
 comment on table public.services_state is
   'Per-case snapshot of the employee Services-flow wizard (services + answers + shortlist). One row per case_id; upserted on save.';
 
-create index idx_services_state_org on public.services_state (organization_id);
+create index if not exists idx_services_state_org on public.services_state (organization_id);
 
 -- Audit trail via existing relopass_audit_row() trigger.
 drop trigger if exists trg_audit_services_state on public.services_state;
@@ -26,6 +32,7 @@ create trigger trg_audit_services_state
 
 alter table public.services_state enable row level security;
 
+drop policy if exists services_state_select_tenant on public.services_state;
 create policy services_state_select_tenant
   on public.services_state
   for select
@@ -36,6 +43,7 @@ create policy services_state_select_tenant
     )
   );
 
+drop policy if exists services_state_upsert_tenant on public.services_state;
 create policy services_state_upsert_tenant
   on public.services_state
   for insert
@@ -46,6 +54,7 @@ create policy services_state_upsert_tenant
     )
   );
 
+drop policy if exists services_state_update_tenant on public.services_state;
 create policy services_state_update_tenant
   on public.services_state
   for update
