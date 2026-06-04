@@ -259,6 +259,7 @@ export const HrCommandCenterCaseDetail: React.FC = () => {
           </div>
           <ImmigrationStatusPanel
             caseId={detail.id}
+            moveDate={detail.expectedStartDate ?? null}
             onFindVendor={() => {
               setVendorPanelInitialCategory('Immigration/visa');
               setVendorPanelOpen(true);
