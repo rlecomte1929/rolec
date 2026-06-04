@@ -53,3 +53,32 @@ export async function resolveComplianceAlert(
 ): Promise<void> {
   await api.patch(`/api/compliance/alerts/${id}`, { status });
 }
+
+// ─── Phase B2: feed the rules from the HR-side ────────────────────────────────
+
+/**
+ * Set the employer registration number on the case's imm_employee_profiles row.
+ * Backend: PATCH /api/hr/cases/{id}/profile/hr-fields (existing — accepts other
+ * HR-side employment fields too; we only send the one the rule reads).
+ */
+export async function setEmployerRegNumber(
+  caseId: string,
+  employer_reg_number: string,
+): Promise<void> {
+  await api.patch(`/api/hr/cases/${caseId}/profile/hr-fields`, {
+    employer_reg_number,
+  });
+}
+
+/**
+ * Set the expected_start_date on relocation_cases — feeds the tax_183_day rule.
+ * Backend: PATCH /api/hr/cases/{id}/expected-start-date (Phase B1).
+ */
+export async function setExpectedStartDate(
+  caseId: string,
+  expected_start_date: string,
+): Promise<void> {
+  await api.patch(`/api/hr/cases/${caseId}/expected-start-date`, {
+    expected_start_date,
+  });
+}
