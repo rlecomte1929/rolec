@@ -48,6 +48,7 @@ if "backend.app.schemas" not in sys.modules:
     _stub_schemas.CaseDTO = _AnyModel
     _stub_schemas.CaseDraftDTO = _AnyModel
     _stub_schemas.CaseRequirementsDTO = _AnyModel
+    _stub_schemas.RelocationBasicsDTO = _AnyModel
     sys.modules["backend.app.schemas"] = _stub_schemas
 
 for _mod in [
@@ -120,6 +121,7 @@ CREATE TABLE case_forms (
     draft_pdf_url     TEXT,
     submitted_at      TEXT,
     receipt_ref       TEXT,
+    rejection_reason  TEXT,
     flag_note         TEXT,
     flagged_at        TEXT,
     flagged_by        TEXT,
