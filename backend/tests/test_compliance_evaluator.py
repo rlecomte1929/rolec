@@ -206,3 +206,38 @@ def test_inactive_rule_is_skipped():
         permit_expiry_date=TODAY + timedelta(days=14),
     )
     assert evaluate((inactive,), case, today=TODAY) == []
+
+
+# ── Phase C1: dry_run flag on run_evaluation ─────────────────────────────────
+
+
+def test_run_evaluation_dry_run_reports_would_be_firings_without_inserting():
+    """dry_run=True must count would-be firings but skip insert."""
+    case = CaseComplianceData(
+        case_id="case-permit",
+        permit_expiry_date=TODAY + timedelta(days=14),
+        employer_registration_id="DE-HRB-1",
+        days_present_in_host=5,
+    )
+    store = FakeStore()
+    result = run_evaluation(
+        FakeSource(ALL_RULES, [case]), store, today=TODAY, dry_run=True
+    )
+    # Reported as if it would fire ...
+    assert result.alerts_created == 1
+    # ... but the store was never touched.
+    assert store.inserted == []
+
+
+def test_run_evaluation_default_still_persists():
+    """Back-compat: dry_run defaults to False; existing behaviour unchanged."""
+    case = CaseComplianceData(
+        case_id="case-permit",
+        permit_expiry_date=TODAY + timedelta(days=14),
+        employer_registration_id="DE-HRB-1",
+        days_present_in_host=5,
+    )
+    store = FakeStore()
+    result = run_evaluation(FakeSource(ALL_RULES, [case]), store, today=TODAY)
+    assert result.alerts_created == 1
+    assert store.inserted == [("case-permit", "rule-permit", "high")]

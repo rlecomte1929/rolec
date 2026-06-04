@@ -159,11 +159,17 @@ def run_evaluation(
     source: ComplianceDataSource,
     store: AlertStore,
     today: Optional[date] = None,
+    dry_run: bool = False,
 ) -> EvaluationResult:
     """Evaluate every active rule against every open case; persist new alerts.
 
     Deduped: an existing *open* alert for the same (case, rule) is not
     re-created.
+
+    ``dry_run=True`` reports would-be firings in the result without calling
+    ``store.insert_alert`` — used by the daily scheduler during its initial
+    review window so we can sanity-check the output distribution before HR
+    sees real alerts.
     """
     today = today or date.today()
     rules = list(source.active_rules())
@@ -175,12 +181,14 @@ def run_evaluation(
             if store.open_alert_exists(firing.case_id, firing.rule_id):
                 result.alerts_skipped_existing += 1
                 continue
-            store.insert_alert(firing, rule_by_id[firing.rule_id].severity)
+            if not dry_run:
+                store.insert_alert(firing, rule_by_id[firing.rule_id].severity)
             result.alerts_created += 1
     log.info(
-        "compliance_evaluator: %d cases, %d alerts created, %d skipped (existing)",
+        "compliance_evaluator: %d cases, %d alerts created (dry_run=%s), %d skipped (existing)",
         result.cases_evaluated,
         result.alerts_created,
+        dry_run,
         result.alerts_skipped_existing,
     )
     return result
@@ -307,14 +315,21 @@ class SqlAlertStore:
 
 
 def run_compliance_evaluation(
-    db: Any, today: Optional[date] = None, company_id: Optional[str] = None
+    db: Any,
+    today: Optional[date] = None,
+    company_id: Optional[str] = None,
+    dry_run: bool = False,
 ) -> EvaluationResult:
     """Production entry point: evaluate open cases and persist new alerts.
 
-    Pass ``company_id`` to scope the run to one company's open cases (used by the
-    HR-triggered endpoint to avoid a full-fleet run). The caller owns the
+    Pass ``company_id`` to scope the run to one company's open cases (used by
+    the HR-triggered endpoint to avoid a full-fleet run). The caller owns the
     transaction — commit after this returns.
+
+    Pass ``dry_run=True`` to report would-be firings without inserting any
+    ``compliance_alerts`` rows. Used by the daily scheduler during its initial
+    review window.
     """
     source = SqlComplianceDataSource(db, today=today, company_id=company_id)
     store = SqlAlertStore(db)
-    return run_evaluation(source, store, today=today)
+    return run_evaluation(source, store, today=today, dry_run=dry_run)
