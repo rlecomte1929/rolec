@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import text
+from sqlalchemy.exc import DataError
 
 from ...database import db
 
@@ -66,21 +67,32 @@ def _get_encryption_key() -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _check_consent(case_id: str, employee_id: str) -> bool:
-    """Return True if a valid immigration_processing consent exists for this case+employee."""
-    with db.engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT id FROM public.consent_records
-                WHERE case_id    = :case_id
-                  AND employee_id = :employee_id
-                  AND purpose     = 'immigration_processing'
-                  AND consented   = TRUE
-                  AND withdrawn_at IS NULL
-                ORDER BY created_at DESC
-                LIMIT 1
-            """),
-            {"case_id": case_id, "employee_id": employee_id},
-        ).mappings().first()
+    """Return True if a valid immigration_processing consent exists for this case+employee.
+
+    Degrades gracefully when ids don't parse: a legacy/seed account whose id is
+    not a UUID (e.g. ReloPass-session text ids) can hit a uuid-typed column in
+    the query path and make Postgres raise ``invalid input syntax for type uuid``.
+    That has no consent match by definition, so we treat it as "no consent"
+    (the caller surfaces the consent screen) rather than letting it 500.
+    """
+    try:
+        with db.engine.begin() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT id FROM public.consent_records
+                    WHERE case_id    = :case_id
+                      AND employee_id = :employee_id
+                      AND purpose     = 'immigration_processing'
+                      AND consented   = TRUE
+                      AND withdrawn_at IS NULL
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """),
+                {"case_id": case_id, "employee_id": employee_id},
+            ).mappings().first()
+    except DataError:
+        log.warning("immigration: consent check could not run for non-parseable id (case=%s)", case_id)
+        return False
     return row is not None
 
 
@@ -212,20 +224,27 @@ def _load_profile_for_case_employee(case_id: str, employee_id: str) -> Optional[
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _load_session(case_id: str, employee_id: str) -> Optional[Dict[str, Any]]:
-    with db.engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT id, answers, skipped_fields, prefilled_fields,
-                       completed_sections, completion_pct, current_section,
-                       current_question_id, consent_record_id,
-                       started_at, last_active_at, completed_at
-                FROM public.interview_sessions
-                WHERE case_id = :case_id AND employee_id = :employee_id
-                ORDER BY started_at DESC
-                LIMIT 1
-            """),
-            {"case_id": case_id, "employee_id": employee_id},
-        ).mappings().first()
+    # See _check_consent: a non-UUID id can raise DataError against a uuid-typed
+    # column in the query path. No session can exist for such an id, so degrade
+    # to "no session" instead of 500.
+    try:
+        with db.engine.begin() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT id, answers, skipped_fields, prefilled_fields,
+                           completed_sections, completion_pct, current_section,
+                           current_question_id, consent_record_id,
+                           started_at, last_active_at, completed_at
+                    FROM public.interview_sessions
+                    WHERE case_id = :case_id AND employee_id = :employee_id
+                    ORDER BY started_at DESC
+                    LIMIT 1
+                """),
+                {"case_id": case_id, "employee_id": employee_id},
+            ).mappings().first()
+    except DataError:
+        log.warning("immigration: session load could not run for non-parseable id (case=%s)", case_id)
+        return None
     return dict(row) if row else None
 
 
