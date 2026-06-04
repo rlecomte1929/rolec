@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MultiChip } from '../EmployeeIntakePage';
+import { MultiChip } from '../MultiChip';
 
 const OPTIONS = ['Full in-office', 'Hybrid', 'Fully remote'];
 
@@ -59,6 +59,6 @@ describe('Work pattern selector (single-select on MultiChip)', () => {
     render(<WorkPatternHarness binding="fixed" />);
     fireEvent.click(screen.getByRole('button', { name: 'Fully remote' }));
     // Step 5 validation requires a truthy work_pattern (see canContinue in source)
-    expect(Boolean(screen.getByTestId('value').textContent !== '(empty)')).toBe(true);
+    expect(screen.getByTestId('value').textContent).toBe('Fully remote');
   });
 });
