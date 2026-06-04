@@ -33,6 +33,8 @@
 begin;
 
 do $$
+declare
+  pol record;
 begin
   if (select data_type
         from information_schema.columns
@@ -40,21 +42,36 @@ begin
          and table_name   = 'relocation_cases'
          and column_name  = 'id') = 'text' then
 
-    -- 0) Drop the six policies 20260221124204 creates on the relocation_*
-    --    children. Their USING clause references relocation_cases.id
-    --    (`where c.id = <child>.case_id`), so Postgres refuses the column
-    --    type change while they exist (0A000). Prod does NOT have these
-    --    policies — 20260601000000_rls_cases_domain.sql later replaces them with
-    --    function-based (`rls_can_access_case_ref`) `_tenant_rw`/`_service`
-    --    policies — so dropping them here both unblocks the ALTER and brings a
-    --    fresh DB closer to prod. Not recreated (rls_cases_domain owns the
-    --    replacements).
-    drop policy if exists relocation_runs_select_own      on public.relocation_runs;
-    drop policy if exists relocation_runs_insert_own      on public.relocation_runs;
-    drop policy if exists relocation_sources_select_own   on public.relocation_sources;
-    drop policy if exists relocation_sources_insert_own   on public.relocation_sources;
-    drop policy if exists relocation_artifacts_select_own on public.relocation_artifacts;
-    drop policy if exists relocation_artifacts_insert_own on public.relocation_artifacts;
+    -- 0) Drop EVERY RLS policy whose definition references relocation_cases.id,
+    --    in any schema. Such a reference creates a column dependency that makes
+    --    Postgres refuse the type change (0A000). The original #323 cut dropped
+    --    only the six relocation_runs/sources/artifacts policies from
+    --    20260221124204, but a fresh replay also has baseline policies that
+    --    reference relocation_cases.id on case_messages, document_uploads,
+    --    prescreening_results and storage.objects — so the ALTER still failed
+    --    (AIQ-756 reopen, 2026-06-04: `policy case_messages_select_employee …
+    --    depends on column "id"`). Enumerate the blocking set dynamically from
+    --    pg_depend so it is always complete regardless of what exists at replay
+    --    time. Not recreated here — the later domain-RLS migrations (e.g.
+    --    20260601000000_rls_cases_domain) own the prod-correct replacements; any
+    --    policy not recreated is documented fresh-vs-prod parity debt, never a
+    --    replay error (these run only on fresh/preview DBs; on prod the column is
+    --    already uuid so this whole guarded block is skipped).
+    for pol in
+      select n.nspname, c.relname, p.polname
+        from pg_depend d
+        join pg_policy p   on p.oid = d.objid
+        join pg_class c    on c.oid = p.polrelid
+        join pg_namespace n on n.oid = c.relnamespace
+       where d.refobjid    = 'public.relocation_cases'::regclass
+         and d.refobjsubid = (select attnum
+                                from pg_attribute
+                               where attrelid = 'public.relocation_cases'::regclass
+                                 and attname  = 'id')
+    loop
+      execute format('drop policy if exists %I on %I.%I',
+                     pol.polname, pol.nspname, pol.relname);
+    end loop;
 
     -- 1) Drop the text FKs created by 20260221124204 (prod has none).
     alter table public.relocation_runs      drop constraint if exists relocation_runs_case_id_fkey;
