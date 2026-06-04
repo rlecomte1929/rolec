@@ -130,7 +130,8 @@ jobs:
             backend/tests/test_validators_tax_id.py \
             backend/tests/test_validators_residency.py \
             backend/tests/test_tax_cert_findings.py \
-            backend/tests/test_extraction_tax_cert.py
+            backend/tests/test_extraction_tax_cert.py \
+            backend/tests/test_check_deliverable_integrity.py
 
   route-auth-check:
     # AUDIT-B6: enumerate every GET route in the FastAPI apps (via AST, no DB
@@ -193,4 +194,27 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
         run: python scripts/storage_bucket_check.py
+
+  deliverable-integrity:
+    # HYGIENE-1 (AIQ-786): assert that every Done, file-producing Work Queue task
+    # claims a repo path that actually exists (catches deliverables left in Cowork
+    # outputs/ and never merged — the AI-003 EU AI Act failure mode). Needs a
+    # read-only Notion integration token to query the queue; gate on a repo
+    # variable because secrets.* is not allowed in a job-level if:. Runs in
+    # --report-only mode on day one so historical noise does not block the lane —
+    # flip off --report-only once scripts/deliverable_integrity_allowlist.txt drains.
+    # (The path-parser unit tests run unconditionally in the backend-tests job.)
+    name: Deliverable integrity check
+    runs-on: ubuntu-latest
+    if: ${{ vars.NOTION_QUEUE_TOKEN_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run deliverable integrity check (report-only)
+        env:
+          NOTION_QUEUE_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
+        run: python scripts/check_deliverable_integrity.py --report-only
 

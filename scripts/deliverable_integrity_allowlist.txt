@@ -1,0 +1,13 @@
+# scripts/deliverable_integrity_allowlist.txt
+# HYGIENE-1 (AIQ-786) — claimed deliverable paths intentionally NOT enforced.
+#
+# Consulted by scripts/check_deliverable_integrity.py. One path per line; lines
+# starting with `#` are ignored, as is any inline `#` comment. A trailing slash
+# marks a directory claim.
+#
+# Day-one posture (per the 2026-06-04 Cowork handoff): CI runs the guard in
+# --report-only mode and this allowlist stays generous so historical noise does
+# not block the lane. As phantom-deliverable debt is paid down, DRAIN this list
+# and flip CI to enforcing.
+#
+# Format: one path per line. Add a comment explaining why each entry is exempt.
