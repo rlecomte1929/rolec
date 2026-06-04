@@ -61,13 +61,13 @@ class FindFalseReadyTests(unittest.TestCase):
     def _tasks(self):
         return [
             {"tag": "P1-07", "title": "P1-07 · Outcome pipeline", "aiq": "AIQ-1",
-             "url": "u1", "status": "Ready for AI", "dependencies": "none"},
+             "url": "u1", "status": "Ready for AI", "dependencies": "none", "notes": ""},
             {"tag": "P3-01D", "title": "P3-01d · Outcome evaluator", "aiq": "AIQ-710",
-             "url": "u2", "status": "Ready for AI", "dependencies": "P1-07"},
+             "url": "u2", "status": "Ready for AI", "dependencies": "P1-07", "notes": ""},
             {"tag": "P3-01A", "title": "P3-01a · Golden set", "aiq": "AIQ-707",
-             "url": "u3", "status": "Done", "dependencies": "none"},
+             "url": "u3", "status": "Done", "dependencies": "none", "notes": ""},
             {"tag": "P3-01B", "title": "P3-01b · Precision eval", "aiq": "AIQ-708",
-             "url": "u4", "status": "Ready for AI", "dependencies": "P3-01a"},
+             "url": "u4", "status": "Ready for AI", "dependencies": "P3-01a", "notes": ""},
         ]
 
     def test_flags_ready_task_with_not_done_dependency(self):
@@ -103,11 +103,46 @@ class FindFalseReadyTests(unittest.TestCase):
     def test_non_ready_tasks_not_flagged(self):
         tasks = [
             {"tag": "P1-07", "title": "x", "aiq": "1", "url": "u",
-             "status": "Done", "dependencies": "none"},
+             "status": "Done", "dependencies": "none", "notes": ""},
             {"tag": "P3-01D", "title": "y", "aiq": "2", "url": "u",
-             "status": "Blocked", "dependencies": "P1-07"},  # already Blocked → ok
+             "status": "Blocked", "dependencies": "P1-07", "notes": ""},  # already Blocked → ok
         ]
         self.assertEqual(qsh.find_false_ready(tasks, allowlist=set()), [])
+
+    def test_notes_blocked_marker_flags_data_precondition_case(self):
+        # The flagship case: P3-01d has no unmet *task* dependency the scan can
+        # resolve (P1-07 is not in the queue), but its notes say it's blocked.
+        tasks = [
+            {"tag": "P3-01D", "title": "P3-01d · Outcome evaluator", "aiq": "AIQ-710",
+             "url": "u", "status": "Ready for AI", "dependencies": "P1-07",
+             "notes": "## Blocked — needs >=20 closed cases (2026-06-04)\nThe evaluator…"},
+        ]
+        flagged = qsh.find_false_ready(tasks, allowlist=set())
+        self.assertEqual(len(flagged), 1)
+        self.assertTrue(flagged[0]["notes_blocked"])
+
+    def test_notes_blocked_allowlist_suppresses(self):
+        tasks = [
+            {"tag": "P3-01D", "title": "y", "aiq": "2", "url": "u",
+             "status": "Ready for AI", "dependencies": "none",
+             "notes": "## Blocked — needs data"},
+        ]
+        self.assertEqual(qsh.find_false_ready(tasks, allowlist={"P3-01D"}), [])
+
+
+class HasBlockedMarkerTests(unittest.TestCase):
+    def test_markdown_heading_blocked(self):
+        self.assertTrue(qsh.has_blocked_marker("## Blocked — needs >=20 closed cases"))
+
+    def test_bullet_blocked(self):
+        self.assertTrue(qsh.has_blocked_marker("- Blocked: awaiting upstream"))
+
+    def test_midsentence_blocked_does_not_match(self):
+        self.assertFalse(qsh.has_blocked_marker("This unblocks X; no longer blocked now."))
+
+    def test_empty_is_false(self):
+        self.assertFalse(qsh.has_blocked_marker(""))
+        self.assertFalse(qsh.has_blocked_marker(None))
 
 
 class LoadAllowlistTests(unittest.TestCase):

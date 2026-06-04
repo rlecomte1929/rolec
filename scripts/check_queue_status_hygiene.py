@@ -54,6 +54,15 @@ _DONE_STATUS = "Done"
 # shape. Case-insensitive on the FU suffix; tags are normalised upper-case.
 _TAG_RE = re.compile(r"\bP\d+-\d+[a-z]?(?:-FU\d+)?\b", re.IGNORECASE)
 
+# A line in Execution Notes that declares the task blocked — the agent wrote a
+# "Blocked" marker but left Status at "Ready for AI". Matches a line that STARTS
+# (after optional markdown ``#``/``-`` and whitespace) with "Blocked", so a
+# mid-sentence "unblocks X" or "no longer blocked" prose does not false-positive.
+# This catches the data/precondition class (e.g. P3-01d "## Blocked — needs >=20
+# closed cases") that a task-dependency scan cannot, since the blocker is prose,
+# not a not-Done task tag.
+_BLOCKED_MARKER_RE = re.compile(r"(?im)^\s*#*\s*-?\s*blocked\b")
+
 
 # --------------------------------------------------------------------------- #
 # Pure helpers (unit-tested without network)                                  #
@@ -83,17 +92,26 @@ def parse_dependency_tags(dependencies: str) -> List[str]:
     return out
 
 
+def has_blocked_marker(notes: str) -> bool:
+    """True when Execution Notes declare the task blocked (a line starting with
+    "Blocked"). High-signal for the data/precondition class of false-ready."""
+    return bool(_BLOCKED_MARKER_RE.search(notes or ""))
+
+
 def find_false_ready(
     tasks: List[Dict[str, Any]],
     allowlist: Set[str],
 ) -> List[Dict[str, Any]]:
-    """Return Ready-for-AI tasks blocked by a not-Done dependency.
+    """Return Ready-for-AI tasks that should be Blocked.
 
     Each task dict has: ``tag``, ``title``, ``aiq``, ``url``, ``status``,
-    ``dependencies`` (raw text). A task is flagged when its status is
-    ``Ready for AI`` and at least one dependency tag resolves to a known task
-    whose status is not ``Done``. Allowlist keys: bare ``<TAG>`` (suppress the
-    whole task) or ``<TAG>:<DEP_TAG>`` (suppress one blocking edge).
+    ``dependencies`` (raw text), ``notes`` (Execution Notes). A Ready-for-AI task
+    is flagged when EITHER:
+      * a dependency tag resolves to a known task whose status is not ``Done``
+        (``unmet`` lists the offending edges), OR
+      * its Execution Notes contain a "Blocked" marker line (``notes_blocked``).
+    Allowlist keys: bare ``<TAG>`` (suppress the whole task) or ``<TAG>:<DEP_TAG>``
+    (suppress one blocking edge).
     """
     status_by_tag: Dict[str, str] = {}
     for t in tasks:
@@ -118,13 +136,15 @@ def find_false_ready(
             if f"{tag}:{dep}" in allowlist:
                 continue
             unmet.append(f"{dep} [{dep_status or 'unknown'}]")
-        if unmet:
+        notes_blocked = has_blocked_marker(t.get("notes") or "")
+        if unmet or notes_blocked:
             flagged.append({
                 "tag": tag,
                 "aiq": str(t.get("aiq") or ""),
                 "title": str(t.get("title") or ""),
                 "url": str(t.get("url") or ""),
                 "unmet": unmet,
+                "notes_blocked": notes_blocked,
             })
     return flagged
 
@@ -188,6 +208,7 @@ def fetch_all_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
                 "url": page.get("url", ""),
                 "status": _select(props.get("Status")),
                 "dependencies": _rich_text(props.get("Dependencies")),
+                "notes": _rich_text(props.get("Execution Notes")),
             })
 
         if not payload.get("has_more"):
@@ -238,7 +259,10 @@ def main() -> int:
           f"(allowlist in scripts/queue_status_allowlist.txt) — "
           f"set these to 'Blocked':\n")
     for f in flagged:
-        print(f"  {f['tag'] or f['aiq'] or '(no tag)'}  blocked by: {', '.join(f['unmet'])}")
+        reasons = list(f["unmet"])
+        if f.get("notes_blocked"):
+            reasons.append("notes say 'Blocked'")
+        print(f"  {f['tag'] or f['aiq'] or '(no tag)'}  {', '.join(reasons)}")
         print(f"      task: {f['title']}")
         print(f"      {f['url']}")
     print()
