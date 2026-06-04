@@ -139,7 +139,8 @@ jobs:
             backend/tests/test_eval_rag_context_precision.py \
             backend/tests/test_deliverable_integrity.py \
             backend/tests/test_queue_status_hygiene.py \
-            backend/tests/test_policy_propagation.py
+            backend/tests/test_policy_propagation.py \
+            backend/tests/test_policy_canonical_chunking.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
