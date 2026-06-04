@@ -319,6 +319,49 @@ def run_crawl_for_scope(
     }
 
 
+def count_consecutive_failures(schedule_id: str, limit: int = 10) -> int:
+    """Count leading consecutive failed job runs for a schedule (most recent first)."""
+    supabase = _get_supabase()
+    r = (
+        supabase.table("crawl_job_runs")
+        .select("status")
+        .eq("schedule_id", schedule_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    streak = 0
+    for row in (r.data or []):
+        if row.get("status") == "failed":
+            streak += 1
+        else:
+            break
+    return streak
+
+
+def _handle_schedule_failure(
+    schedule_id: str,
+    source_label: str,
+    job_run_id: Optional[str] = None,
+) -> None:
+    """[P3-02c] On the 3rd consecutive failure, raise an ops notification and
+    fire a Slack/email alert. Best-effort — never raises into the scheduler."""
+    try:
+        failures = count_consecutive_failures(schedule_id)
+        if failures < 3:
+            return
+        from .monitoring_alerts import alert_crawl_failure
+        from .ops_notification_service import evaluate_crawl_failure_notification
+        evaluate_crawl_failure_notification(
+            source_label, failures, job_run_id=job_run_id, schedule_id=schedule_id
+        )
+        alert_crawl_failure(
+            source_label, failures, schedule_id=schedule_id, job_run_id=job_run_id
+        )
+    except Exception as e:
+        log.warning("Crawl-failure alert failed for schedule %s: %s", schedule_id, e)
+
+
 def process_due_schedules(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Process all due schedules. Creates job runs, executes crawls, runs change detection.
@@ -328,6 +371,7 @@ def process_due_schedules(user_id: Optional[str] = None) -> List[Dict[str, Any]]
     results = []
     for s in due:
         schedule_id = s["id"]
+        source_label = s.get("source_scope_ref") or s.get("name") or schedule_id
         scope = {
             "source_scope_type": s.get("source_scope_type"),
             "source_scope_ref": s.get("source_scope_ref"),
@@ -360,6 +404,7 @@ def process_due_schedules(user_id: Optional[str] = None) -> List[Dict[str, Any]]
                     error_summary=report.get("error"),
                 )
                 update_schedule_after_run(schedule_id, False)
+                _handle_schedule_failure(schedule_id, source_label, job_run_id=job["id"])
                 results.append({"schedule_id": schedule_id, "status": "failed", "error": report["error"]})
                 continue
 
@@ -397,6 +442,7 @@ def process_due_schedules(user_id: Optional[str] = None) -> List[Dict[str, Any]]
             release_job_lock(job["id"])
             complete_job_run(job["id"], status="failed", error_summary=str(e))
             update_schedule_after_run(schedule_id, False)
+            _handle_schedule_failure(schedule_id, source_label, job_run_id=job["id"])
             results.append({"schedule_id": schedule_id, "status": "failed", "error": str(e)})
 
     return results
