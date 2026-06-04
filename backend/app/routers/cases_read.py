@@ -41,6 +41,7 @@ from ..db import SessionLocal
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
+from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case
 from ..services.case_service import (
     _assert_case_access,
     _case_dto,
@@ -814,12 +815,15 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
         "draft": draft,
     }
     roadmap = derive_roadmap(case_dict)
-    # P2-01a: gate the live AI EEA roadmap behind a per-account feature flag.
-    # TODO [P2-01b]: when eligible, branch here to the confidence-gated AI
-    # roadmap path. Until P1-01b lands we still serve the deterministic roadmap;
-    # the additive flag only tells the client the live path is enabled for them.
+    # P2-01a/b: the live AI EEA roadmap is gated behind a per-account feature flag
+    # and confidence-gated for specialist review. The deterministic roadmap (no
+    # `result` key) is never gated and passes through untouched — gating only
+    # applies to an AI roadmap, which today reaches this seam once P2-01e wires
+    # the pipeline in for eligible cases.
     if is_flag_enabled_for(user.get("id"), LIVE_EEA_ROADMAP_FLAG):
         roadmap["ai_roadmap_eligible"] = True
+        if is_ai_roadmap(roadmap):
+            roadmap = gate_roadmap_for_case(case_id, roadmap)
     return roadmap
 
 
