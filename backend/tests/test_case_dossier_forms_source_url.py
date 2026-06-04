@@ -101,14 +101,14 @@ class LiveSourceUrlTests(unittest.TestCase):
                 {"i": self.case_id, "c": self.company_id, "e": self.employee_id},
             )
 
-    def _seed_form(self, *, source_url, step_title) -> None:
+    def _seed_form(self, *, source_url, step_title, fields="[]") -> None:
         tid, cfid = _u(), _u()
         step_id = None
         with self.engine.begin() as conn:
             conn.execute(
                 text("INSERT INTO form_templates (id, code, name, country, fields, source_url) "
-                     "VALUES (:i,:c,:n,'NO','[]',:s)"),
-                {"i": tid, "c": "GP-7-04", "n": "D-number application", "s": source_url},
+                     "VALUES (:i,:c,:n,'NO',:f,:s)"),
+                {"i": tid, "c": "GP-7-04", "n": "D-number application", "s": source_url, "f": fields},
             )
             if source_url is not None:
                 conn.execute(
@@ -137,6 +137,21 @@ class LiveSourceUrlTests(unittest.TestCase):
         self.assertEqual(rows[0].roadmap_step_title, "Register your arrival")
         # [P1-05d] last_verified pulled from source_pages.last_fetched_at via the join.
         self.assertEqual(rows[0].template.source_last_verified, "2026-06-04T10:00:00")
+
+    def test_required_documents_derived_from_requires_original_fields(self) -> None:
+        # [P1-05 checklist] only fields with requires_original=true become items.
+        fields = json.dumps([
+            {"id": "passport_number", "label": "Passport number", "requires_original": True},
+            {"id": "dob", "label": "Date of birth", "requires_original": False},
+            {"id": "marriage_cert", "label": "Marriage certificate", "requires_original": True},
+        ])
+        self._seed_form(source_url=None, step_title=None, fields=fields)
+        rows = list_case_forms(case_id=self.case_id, status=None, user=_emp_user(self.employee_id))
+        req = rows[0].template.required_documents
+        self.assertEqual(
+            [r["key"] for r in req], ["passport_number", "marriage_cert"]
+        )
+        self.assertEqual(req[0]["label"], "Passport number")
 
     def test_null_when_absent(self) -> None:
         self._seed_form(source_url=None, step_title=None)

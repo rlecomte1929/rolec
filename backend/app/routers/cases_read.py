@@ -113,6 +113,9 @@ class _DossierFormTemplate(BaseModel):
     source_url: Optional[str] = None
     # [P1-05d] When the source URL was last fetched/verified (source_pages.last_fetched_at).
     source_last_verified: Optional[str] = None
+    # [P1-05 checklist] Required supporting documents, derived from the template
+    # fields that carry requires_original=true. Each item: {"key","label"}.
+    required_documents: List[Dict[str, str]] = []
 
 
 class _DossierFormPerson(BaseModel):
@@ -173,6 +176,8 @@ class FormDocumentItem(BaseModel):
     size_bytes: Optional[int] = None
     uploaded_by: Optional[str] = None
     created_at: str
+    # [P1-05 checklist] the required-document item this upload satisfies, if any.
+    doc_key: Optional[str] = None
     # 1-hour signed Storage URL; None when storage is unavailable (dev/test).
     download_url: Optional[str] = None
 
@@ -267,6 +272,14 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             fields = []
     fields_total = len(fields) if isinstance(fields, list) else 0
 
+    # [P1-05 checklist] Required supporting documents = template fields that
+    # must be backed by an original document (requires_original=true).
+    required_documents: List[Dict[str, str]] = [
+        {"key": str(f.get("id")), "label": str(f.get("label") or f.get("id"))}
+        for f in fields
+        if isinstance(f, dict) and f.get("requires_original") and f.get("id")
+    ] if isinstance(fields, list) else []
+
     # Person resolution: dependent wins (more specific) over employee profile.
     dep_id = row.get("dependent_id")
     if dep_id:
@@ -325,6 +338,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             fields_total=0,
             source_url=None,
             source_last_verified=None,
+            required_documents=[],
         )
     else:
         template = _DossierFormTemplate(
@@ -339,6 +353,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             fields_total=fields_total,
             source_url=row.get("template_source_url"),  # [P1-05]
             source_last_verified=_iso(row.get("source_last_verified")),  # [P1-05d]
+            required_documents=required_documents,  # [P1-05 checklist]
         )
 
     return CaseFormSummary(
@@ -1188,7 +1203,7 @@ def list_form_documents(
             _sql_text(
                 f"""
                 SELECT id, case_form_id, case_id, file_name, storage_path,
-                       content_type, size_bytes, uploaded_by, created_at
+                       content_type, size_bytes, uploaded_by, doc_key, created_at
                 FROM {_pg_table('case_form_documents')}
                 WHERE case_form_id = :form_id AND case_id = :case_id
                 ORDER BY created_at DESC
@@ -1225,6 +1240,7 @@ def list_form_documents(
                 content_type=r.get("content_type"),
                 size_bytes=(int(r["size_bytes"]) if r.get("size_bytes") is not None else None),
                 uploaded_by=(str(r["uploaded_by"]) if r.get("uploaded_by") else None),
+                doc_key=(str(r["doc_key"]) if r.get("doc_key") else None),
                 created_at=str(r["created_at"]),
                 download_url=download_url,
             )

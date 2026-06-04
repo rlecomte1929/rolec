@@ -20,9 +20,9 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from sqlalchemy import text as _sql_text
 
 from .. import crud, schemas
@@ -778,6 +778,7 @@ async def upload_form_document(
     case_id: str,
     form_id: str,
     file: UploadFile = File(...),
+    doc_key: Optional[str] = Form(None),
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> FormDocumentItem:
     """
@@ -829,14 +830,15 @@ async def upload_form_document(
             row = conn.execute(
                 _sql_text(
                     f"INSERT INTO {_pg_table('case_form_documents')} "
-                    f"(case_form_id, case_id, file_name, storage_path, content_type, size_bytes, uploaded_by) "
-                    f"VALUES (:fid, :cid, :name, :path, :ctype, :size, :uid) "
-                    f"RETURNING id, case_form_id, case_id, file_name, content_type, size_bytes, uploaded_by, created_at"
+                    f"(case_form_id, case_id, file_name, storage_path, content_type, size_bytes, uploaded_by, doc_key) "
+                    f"VALUES (:fid, :cid, :name, :path, :ctype, :size, :uid, :dkey) "
+                    f"RETURNING id, case_form_id, case_id, file_name, content_type, size_bytes, uploaded_by, doc_key, created_at"
                 ),
                 {
                     "fid": form_id, "cid": case_id, "name": file_name,
                     "path": storage_path, "ctype": content_type,
                     "size": len(contents), "uid": uploaded_by,
+                    "dkey": (doc_key or None),
                 },
             ).mappings().first()
     except Exception:
@@ -851,6 +853,7 @@ async def upload_form_document(
         content_type=row.get("content_type"),
         size_bytes=(int(row["size_bytes"]) if row.get("size_bytes") is not None else None),
         uploaded_by=(str(row["uploaded_by"]) if row.get("uploaded_by") else None),
+        doc_key=(str(row["doc_key"]) if row.get("doc_key") else None),
         created_at=str(row["created_at"]),
         download_url=None,
     )
