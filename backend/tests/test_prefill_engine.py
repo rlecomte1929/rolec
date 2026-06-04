@@ -282,6 +282,73 @@ class PreFillEngineTests(unittest.TestCase):
             ), {"id": cf_id}).scalar()
         self.assertEqual(count, 0)
 
+    def test_rerun_with_no_changes_writes_no_new_audit(self):
+        # A re-fill (e.g. run_prefill_for_dependents after a blocker is approved)
+        # that resolves the same values must NOT record a second prefill event.
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [{"id": "passport_number", "prefill_source": "profile.passport_number"}]
+        intake = {"profile": {"passport_number": "X1"}}
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, intake)
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, tmpl, "UTL-2011", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(cf_id, case_id), 1)   # first fill changes 1
+        self.assertEqual(run_prefill(cf_id, case_id), 0)   # re-run changes nothing
+
+        with self.engine.connect() as conn:
+            audit_count = conn.execute(text(
+                "SELECT COUNT(*) FROM audit_logs WHERE entity_id = :id"
+            ), {"id": cf_id}).scalar()
+            value_count = conn.execute(text(
+                "SELECT COUNT(*) FROM case_form_field_values WHERE case_form_id = :id"
+            ), {"id": cf_id}).scalar()
+        self.assertEqual(audit_count, 1)   # exactly one prefill event, not two
+        self.assertEqual(value_count, 1)
+
+    def test_rerun_after_value_change_audits_only_changed_field(self):
+        # When a re-fill genuinely changes a value, a fresh audit row is written
+        # listing only the changed field.
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [
+            {"id": "passport_number", "prefill_source": "profile.passport_number"},
+            {"id": "nationality",     "prefill_source": "profile.nationality"},
+        ]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id,
+                         {"profile": {"passport_number": "X1", "nationality": "FR"}})
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, tmpl, "UTL-2011", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(cf_id, case_id), 2)
+
+        # passport_number changes; nationality stays the same.
+        with self.engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE cases SET intake_data = :d WHERE id = :id"
+            ), {"d": json.dumps({"profile": {"passport_number": "X2", "nationality": "FR"}}),
+                "id": case_id})
+
+        self.assertEqual(run_prefill(cf_id, case_id), 1)   # only passport_number changed
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT new_value_json FROM audit_logs WHERE entity_id = :id"
+            ), {"id": cf_id}).fetchall()
+            val = conn.execute(text(
+                "SELECT value FROM case_form_field_values "
+                "WHERE case_form_id = :id AND field_id = 'passport_number'"
+            ), {"id": cf_id}).scalar()
+        payloads = [json.loads(r[0]) for r in rows]
+        self.assertEqual(len(payloads), 2)                   # two distinct events
+        # Order-independent: the initial event filled 2 fields; the re-fill 1.
+        self.assertCountEqual([p["field_count"] for p in payloads], [2, 1])
+        change_event = next(p for p in payloads if p["field_count"] == 1)
+        self.assertEqual(change_event["fields_filled"], ["passport_number"])
+        self.assertEqual(val, "X2")                          # value actually updated
+
     def test_skips_fields_without_prefill_source(self):
         case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
         fields = [

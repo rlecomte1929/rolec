@@ -102,11 +102,16 @@ def _run(case_form_id: str, case_uuid: str) -> int:
     # 2. Build the case context
     context = _build_context(case_uuid, form_row.get("person_id"), form_row.get("dependent_id"))
 
-    # 3. Load existing overridden field IDs to skip
+    # 3. Load existing field state to skip overrides and detect real changes
     overridden_ids = _load_overridden_field_ids(case_form_id)
+    existing_values = _load_existing_values(case_form_id)
 
-    # 4. Resolve + upsert each field
-    filled_field_ids: List[str] = []
+    # 4. Resolve each field. Track two sets:
+    #    - resolved: every field the engine can fill (drives completion %)
+    #    - changed:  fields whose value is genuinely new or different (drives
+    #                the audit + return value, so a no-op re-run is a no-op)
+    resolved_field_ids: List[str] = []
+    changed_field_ids: List[str] = []
     for field in fields:
         field_id = field.get("id") or field.get("field_id")
         if not field_id:
@@ -122,30 +127,35 @@ def _run(case_form_id: str, case_uuid: str) -> int:
         if value is None:
             continue
 
+        new_value = str(value)
+        resolved_field_ids.append(field_id)
+        if existing_values.get(field_id) == new_value:
+            continue  # already holds this exact value — no write, no change event
+
         _upsert_field_value(
             case_form_id=case_form_id,
             field_id=field_id,
-            value=str(value),
+            value=new_value,
             filled_by="system",
             ai_confidence=0.99,
         )
-        filled_field_ids.append(field_id)
+        changed_field_ids.append(field_id)
 
-    filled = len(filled_field_ids)
-
-    # 5. Update completion % and status
-    if filled > 0:
-        total_fields = len(fields)
-        _update_completion(case_form_id, filled, total_fields)
+    # 5. Completion % + status reflect everything the engine can fill (so a
+    #    re-run keeps the form's coverage accurate even when nothing changed).
+    if resolved_field_ids:
+        _update_completion(case_form_id, len(resolved_field_ids), len(fields))
         _update_status_to_auto_filled(case_form_id)
-        # [P2-03d] Audit every pre-fill event.
-        _insert_prefill_audit(case_form_id, filled_field_ids)
+
+    # 6. Audit only genuine changes — no phantom pre-fill events on no-op re-runs.
+    if changed_field_ids:
+        _insert_prefill_audit(case_form_id, changed_field_ids)
 
     logger.info(
-        "prefill_engine: filled %d/%d fields for case_form_id=%s",
-        filled, len(fields), case_form_id,
+        "prefill_engine: %d changed / %d fillable / %d total for case_form_id=%s",
+        len(changed_field_ids), len(resolved_field_ids), len(fields), case_form_id,
     )
-    return filled
+    return len(changed_field_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +198,24 @@ def _load_overridden_field_ids(case_form_id: str) -> set:
     except Exception:
         logger.exception("prefill_engine: failed to load overridden fields cf=%s", case_form_id)
         return set()
+
+
+def _load_existing_values(case_form_id: str) -> Dict[str, Optional[str]]:
+    """Return {field_id: stored value} for this CaseForm, used to detect whether
+    a resolved value would actually change anything before writing."""
+    try:
+        with db.engine.connect() as conn:
+            rows = conn.execute(
+                text(
+                    f"SELECT field_id, value FROM {_t('case_form_field_values')} "
+                    f"WHERE case_form_id = :cfid"
+                ),
+                {"cfid": case_form_id},
+            ).fetchall()
+        return {r[0]: r[1] for r in rows}
+    except Exception:
+        logger.exception("prefill_engine: failed to load existing values cf=%s", case_form_id)
+        return {}
 
 
 def _build_context(
@@ -511,9 +539,10 @@ def _update_status_to_auto_filled(case_form_id: str) -> None:
     Does not overwrite statuses that are further along (in_progress, ready,
     submitted, approved, rejected).
     """
+    transitioned = False
     try:
         with db.engine.begin() as conn:
-            conn.execute(
+            result = conn.execute(
                 text(
                     f"UPDATE {_t('case_forms')} "
                     f"SET status = 'auto_filled', updated_at = {_now()} "
@@ -521,11 +550,17 @@ def _update_status_to_auto_filled(case_form_id: str) -> None:
                 ),
                 {"id": case_form_id},
             )
+            transitioned = (result.rowcount or 0) > 0
     except Exception:
         logger.exception(
             "prefill_engine: failed to update status cf=%s", case_form_id
         )
-    # [P4-4] Notify employee that form is ready for review (fire-and-forget)
+        return
+    # [P4-4] Notify employee that form is ready for review (fire-and-forget).
+    # Only on the real not_started → auto_filled transition, so dependency
+    # re-fills don't re-spam the employee with "ready for review".
+    if not transitioned:
+        return
     try:
         from .dossier_notifications import notify_form_auto_filled  # lazy import
         notify_form_auto_filled(case_form_id)
