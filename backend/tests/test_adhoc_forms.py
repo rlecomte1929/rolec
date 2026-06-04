@@ -66,7 +66,13 @@ CREATE TABLE form_templates (
   category        TEXT,
   version         TEXT NOT NULL DEFAULT '1.0.0',
   fields          TEXT NOT NULL DEFAULT '[]',
-  trigger_rules   TEXT NOT NULL DEFAULT '[]'
+  trigger_rules   TEXT NOT NULL DEFAULT '[]',
+  source_url      TEXT
+);
+CREATE TABLE roadmap_steps (
+  id       TEXT PRIMARY KEY,
+  case_id  TEXT,
+  title    TEXT
 );
 CREATE TABLE case_forms (
   id                TEXT PRIMARY KEY,

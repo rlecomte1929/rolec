@@ -25,6 +25,8 @@ export interface DossierFormTemplate {
   category: string | null;
   version: string;
   fields_total: number;
+  /** [P1-05] Official Tier-1 authority URL where this form is completed/submitted. */
+  source_url: string | null;
 }
 
 export type DossierPersonKind = 'employee' | 'spouse' | 'child' | 'other';
@@ -63,6 +65,7 @@ export interface CaseFormSummary {
   receipt_ref: string | null;
   rejection_reason: string | null;  // [P4-5] set when status='rejected'
   roadmap_step_id?: string | null;  // [P1-6] step that triggered this form
+  roadmap_step_title?: string | null;  // [P1-05] human-readable title of that step
   is_adhoc?: boolean;                // [P4-3] true for ad-hoc "Add document" entries
   notes?: string | null;             // [P4-3] free-text notes from the Add-document modal
   template: DossierFormTemplate;

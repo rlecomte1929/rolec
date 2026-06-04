@@ -55,7 +55,13 @@ CREATE TABLE form_templates (
   category        TEXT,
   version         TEXT NOT NULL DEFAULT '1.0.0',
   fields          TEXT NOT NULL DEFAULT '[]',
-  trigger_rules   TEXT NOT NULL DEFAULT '[]'
+  trigger_rules   TEXT NOT NULL DEFAULT '[]',
+  source_url      TEXT
+);
+CREATE TABLE roadmap_steps (
+  id       TEXT PRIMARY KEY,
+  case_id  TEXT,
+  title    TEXT
 );
 CREATE TABLE case_forms (
   id                TEXT PRIMARY KEY,
@@ -156,16 +162,17 @@ class CaseDossierFormsTests(unittest.TestCase):
 
     def _insert_template(self, *, code: str, name: str = None, country: str = "NO",
                          authority_code: str = "UDI", category: str = "work_permit",
-                         fields: list = None) -> str:
+                         fields: list = None, source_url: str = None) -> str:
         tid = _u()
         with self.engine.begin() as conn:
             conn.execute(
                 text("INSERT INTO form_templates "
-                     "(id, code, name, country, authority_code, category, fields) "
-                     "VALUES (:id, :code, :name, :country, :ac, :cat, :fields)"),
+                     "(id, code, name, country, authority_code, category, fields, source_url) "
+                     "VALUES (:id, :code, :name, :country, :ac, :cat, :fields, :src)"),
                 {
                     "id": tid, "code": code, "name": name or code,
                     "country": country, "ac": authority_code, "cat": category,
+                    "src": source_url,
                     "fields": json.dumps(fields or [
                         {"id": "first_name", "label": "First name"},
                         {"id": "last_name",  "label": "Last name"},
@@ -175,22 +182,34 @@ class CaseDossierFormsTests(unittest.TestCase):
             )
         return tid
 
+    def _insert_roadmap_step(self, title: str) -> str:
+        step_id = _u()
+        with self.engine.begin() as conn:
+            conn.execute(
+                text("INSERT INTO roadmap_steps (id, case_id, title) "
+                     "VALUES (:id, :cid, :title)"),
+                {"id": step_id, "cid": self.case_id, "title": title},
+            )
+        return step_id
+
     def _insert_case_form(self, *, template_id: str, status: str = "not_started",
                           person_id: str = None, dependent_id: str = None,
-                          blocker_form_id: str = None, completion_pct: int = 0) -> str:
+                          blocker_form_id: str = None, completion_pct: int = 0,
+                          roadmap_step_id: str = None) -> str:
         cf_id = _u()
         with self.engine.begin() as conn:
             conn.execute(
                 text(
                     "INSERT INTO case_forms "
                     "(id, case_id, form_template_id, person_id, dependent_id, "
-                    " status, completion_pct, blocker_form_id) "
-                    "VALUES (:id, :case_id, :tid, :pid, :did, :st, :pct, :blocker)"
+                    " status, completion_pct, blocker_form_id, roadmap_step_id) "
+                    "VALUES (:id, :case_id, :tid, :pid, :did, :st, :pct, :blocker, :step)"
                 ),
                 {
                     "id": cf_id, "case_id": self.case_id, "tid": template_id,
                     "pid": person_id, "did": dependent_id,
                     "st": status, "pct": completion_pct, "blocker": blocker_form_id,
+                    "step": roadmap_step_id,
                 },
             )
         return cf_id
@@ -248,6 +267,42 @@ class CaseDossierFormsTests(unittest.TestCase):
         self.assertEqual(row.person.kind, "employee")
         self.assertEqual(row.person.name, "Employee Doe")
         self.assertEqual(row.person.profile_id, self.employee_id)
+
+    def test_source_url_and_roadmap_step_title_surface(self) -> None:
+        # [P1-05] The Dossier card needs the official Tier-1 source URL and a
+        # human-readable roadmap-step label. Both come through list_case_forms.
+        step_id = self._insert_roadmap_step("Register your arrival")
+        tid = self._insert_template(
+            code="GP-7-04",
+            name="D-number application",
+            source_url="https://www.skatteetaten.no/en/person/foreign/norwegian-identification-number/d-number/",
+        )
+        self._insert_case_form(
+            template_id=tid, person_id=self.employee_id, roadmap_step_id=step_id
+        )
+
+        result = list_case_forms(
+            case_id=self.case_id, status=None, user=_emp_user(self.employee_id)
+        )
+        self.assertEqual(len(result), 1)
+        row = result[0]
+        self.assertEqual(
+            row.template.source_url,
+            "https://www.skatteetaten.no/en/person/foreign/norwegian-identification-number/d-number/",
+        )
+        self.assertEqual(row.roadmap_step_title, "Register your arrival")
+
+    def test_source_url_and_step_title_null_when_absent(self) -> None:
+        # No source_url on the template and no roadmap step linked → both null,
+        # never raises (ad-hoc and legacy forms rely on this).
+        tid = self._insert_template(code="NAV-08", name="Bank account", source_url=None)
+        self._insert_case_form(template_id=tid, person_id=self.employee_id)
+
+        row = list_case_forms(
+            case_id=self.case_id, status=None, user=_emp_user(self.employee_id)
+        )[0]
+        self.assertIsNone(row.template.source_url)
+        self.assertIsNone(row.roadmap_step_title)
 
     def test_dependent_person_resolution_spouse(self) -> None:
         spouse_id = self._insert_dependent("spouse", "Test Spouse")

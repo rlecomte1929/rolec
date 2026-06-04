@@ -271,6 +271,37 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
       {expanded && (
         <div className="mt-4 grid gap-3">
           <div className={`rounded border px-3 py-2 text-sm ${banner.tone}`}>{banner.text}</div>
+
+          {/* [P1-05] Which roadmap step this form belongs to + the official
+              Tier-1 source URL. V1 has no submission proxy — the employee
+              clicks through to the official authority page to complete it. */}
+          {(form.roadmap_step_title || form.template.source_url) && (
+            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs">
+              {form.roadmap_step_title && (
+                <span className="inline-flex items-center gap-1 text-slate-500">
+                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  Roadmap step:{' '}
+                  <span className="font-medium text-slate-700">{form.roadmap_step_title}</span>
+                </span>
+              )}
+              {form.template.source_url && (
+                <a
+                  href={form.template.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-[#0b2b43] hover:underline"
+                >
+                  Official source
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14 5h5m0 0v5m0-5L10 14M9 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-3" />
+                  </svg>
+                </a>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-3 flex-wrap">
             {/* [P2-3] Open form editor — disabled for blocked/submitted/approved */}
             {dStatus === 'blocked' || dStatus === 'submitted' || dStatus === 'approved' ? (
