@@ -126,8 +126,40 @@ class BuildSqlTests(unittest.TestCase):
         self.assertIn("it''s fine", sql)                      # single-quote escaped
 
 
+class AnyVisaTypeFanOutTests(unittest.TestCase):
+    """A visa_type='any' common doc fans out to one row per corpus pathway."""
+
+    def _corpus(self, pathways):
+        return {
+            "corridor": {"from": "BR", "to": "PT"},
+            "fetched_at": "2026-06-04",
+            "pathways": [{"visa_type": v} for v in pathways],
+            "required_documents": [
+                {"corridor_from": "BR", "corridor_to": "PT", "visa_type": "any",
+                 "document_type": "passport", "document_name": "P"},          # common
+                {"corridor_from": "BR", "corridor_to": "PT", "visa_type": "d2_visa",
+                 "document_type": "business_plan", "document_name": "BP"},     # specific
+            ],
+        }
+
+    def test_common_doc_expands_across_pathways(self):
+        rows = map_corpus(self._corpus(["cplp_residence", "d2_visa", "d7_visa"]))
+        # 1 common × 3 pathways + 1 specific = 4
+        self.assertEqual(len(rows), 4)
+        passport_vts = sorted(r["visa_type"] for r in rows if r["document_type"] == "passport")
+        self.assertEqual(passport_vts, ["cplp_residence", "d2_visa", "d7_visa"])
+        # no 'any' leaks into the output
+        self.assertNotIn("any", [r["visa_type"] for r in rows])
+
+    def test_any_kept_when_no_pathways_declared(self):
+        c = self._corpus([])
+        rows = map_corpus(c)
+        self.assertEqual(len(rows), 2)
+        self.assertIn("any", [r["visa_type"] for r in rows])
+
+
 class RealCorpusCountTests(unittest.TestCase):
-    """Pin the row counts the task's validation SQL asserts (US→FR=12, IN→DE=11)."""
+    """Pin the row counts the validation SQL asserts across all ingested corridors."""
 
     @unittest.skipUnless((_CORPUS_DIR / "us_fr_corridor.json").exists(),
                          "us_fr corpus not present")
@@ -144,6 +176,34 @@ class RealCorpusCountTests(unittest.TestCase):
         rows = map_corpus(corpus)
         self.assertEqual(len(rows), 11)
         self.assertTrue(all(r["visa_type"] == "blue_card" for r in rows))
+
+    @unittest.skipUnless((_CORPUS_DIR / "uk_fr_corridor.json").exists(),
+                         "uk_fr corpus not present")
+    def test_uk_fr_normalized_to_uk_and_yields_12(self):
+        corpus = json.load(open(_CORPUS_DIR / "uk_fr_corridor.json", encoding="utf-8"))
+        rows = map_corpus(corpus)
+        self.assertEqual(len(rows), 12)
+        # GB→UK normalization must have been applied to the corpus
+        self.assertTrue(all(r["corridor_from"] == "UK" for r in rows))
+        self.assertNotIn("GB", [r["corridor_from"] for r in rows])
+
+    @unittest.skipUnless((_CORPUS_DIR / "ca_de_corridor.json").exists(),
+                         "ca_de corpus not present")
+    def test_ca_de_yields_11_blue_card_rows(self):
+        corpus = json.load(open(_CORPUS_DIR / "ca_de_corridor.json", encoding="utf-8"))
+        rows = map_corpus(corpus)
+        self.assertEqual(len(rows), 11)
+        self.assertTrue(all(r["visa_type"] == "blue_card" for r in rows))
+
+    @unittest.skipUnless((_CORPUS_DIR / "br_pt_corridor.json").exists(),
+                         "br_pt corpus not present")
+    def test_br_pt_fans_out_to_24_rows_no_any(self):
+        corpus = json.load(open(_CORPUS_DIR / "br_pt_corridor.json", encoding="utf-8"))
+        rows = map_corpus(corpus)
+        self.assertEqual(len(rows), 24)                 # 7 common × 3 pathways + 3 specific
+        self.assertEqual(set(r["visa_type"] for r in rows),
+                         {"cplp_residence", "d2_visa", "d7_visa"})
+        self.assertNotIn("any", [r["visa_type"] for r in rows])
 
 
 if __name__ == "__main__":
