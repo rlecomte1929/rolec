@@ -10,3 +10,4 @@ export { Badge } from './Badge';
 export { ProgressBar } from './ProgressBar';
 export { Alert } from './Alert';
 export { Container } from './Container';
+export { StalenessBadge, isSourceStale } from './StalenessBadge';

@@ -17,14 +17,11 @@ export interface RoadmapV2Step {
   vendor_id: string | null;
   doc_count: number;
   worst_doc_status: string | null;
-  /**
-   * [P2-05/P3-04] Per-step confidence. Shared contract with the P3-04 confidence
-   * display (same field name + casing as RoadmapStep.confidence_level and
-   * confidence.tokens.ts). Absent until the backend emits it (P3-04e); populated
-   * once the confidence pipeline reaches the employee feed. Drives both the
-   * ConfidenceBadge and the success-probability dial.
-   */
+  // [P3-04e] Confidence + source provenance derived from the linked requirement.
   confidence_level?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+  source_url?: string | null;
+  source_fetched_at?: string | null;
+  source_excerpt?: string | null;
 }
 
 export interface RoadmapV2Track {
