@@ -45,6 +45,22 @@ def admin_post(body: dict, user=Depends(_require_admin)):
 @router.get("/read")
 def unguarded_get():
     return {}
+
+@router.post("/webhook", dependencies=[Depends(verify_postmark_secret)])
+async def webhook_post(request):
+    return {}
+
+@router.patch("/automation/{x}", dependencies=[Depends(verify_support_automation_secret)])
+async def automation_patch(x: str):
+    return {}
+
+@router.post("/curried", dependencies=[Depends(require_role("admin"))])
+async def curried_decorator_post(body: dict):
+    return {}
+
+@router.post("/secret-param")
+async def secret_param_post(body: dict, _=Depends(verify_provider_signature)):
+    return {}
 '''
 
 
@@ -71,6 +87,32 @@ class ScanMutationsTests(unittest.TestCase):
     def test_methods_filter_includes_get_when_requested(self):
         self.assertIn("unguarded_get", self._scan({"get"}))
         self.assertNotIn("unguarded_get", self._scan({"post"}))
+
+    def test_decorator_level_dependencies_pass(self):
+        """SEC-MUT-DRAIN: dependencies=[Depends(<auth>)] on the route decorator
+        is recognised even when the handler signature has no auth param."""
+        flagged = self._scan({"post", "patch"})
+        self.assertNotIn("webhook_post", flagged)         # verify_postmark_secret
+        self.assertNotIn("automation_patch", flagged)     # verify_support_automation_secret
+        self.assertNotIn("curried_decorator_post", flagged)  # Depends(require_role(...))
+
+    def test_secret_named_param_dep_passes(self):
+        """SEC-MUT-DRAIN: verify_* prefix / _signature suffix count as auth deps."""
+        self.assertNotIn("secret_param_post", self._scan({"post"}))
+
+    def test_decorator_has_auth_dep_helper(self):
+        import ast
+        dec = ast.parse(
+            '@router.post("/x", dependencies=[Depends(verify_postmark_secret)])\n'
+            'def f(): ...'
+        ).body[0].decorator_list[0]
+        plain = ast.parse('@router.post("/x")\ndef f(): ...').body[0].decorator_list[0]
+        nonauth = ast.parse(
+            '@router.post("/x", dependencies=[Depends(rate_limiter)])\ndef f(): ...'
+        ).body[0].decorator_list[0]
+        self.assertTrue(cra._decorator_has_auth_dep(dec))
+        self.assertFalse(cra._decorator_has_auth_dep(plain))
+        self.assertFalse(cra._decorator_has_auth_dep(nonauth))
 
     def test_route_method_helper(self):
         import ast

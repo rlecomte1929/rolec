@@ -41,6 +41,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["support"])
 
 POSTMARK_WEBHOOK_SECRET = os.getenv("POSTMARK_WEBHOOK_SECRET", "")
+# SEC-MUT-DRAIN: shared secret for the internal support-automation endpoints
+# (triage / auto-reply / status update), invoked by Supabase Edge Function
+# triggers rather than end users. Enforced when configured.
+SUPPORT_AUTOMATION_SECRET = os.getenv("SUPPORT_AUTOMATION_SECRET", "")
 
 # ─── Quoted reply stripping ────────────────────────────────────────────────────
 
@@ -83,6 +87,20 @@ def verify_postmark_secret(secret: Optional[str] = Header(None, alias="X-Postmar
         return
     if secret != POSTMARK_WEBHOOK_SECRET:
         raise HTTPException(status_code=401, detail="Invalid Postmark webhook secret")
+
+
+def verify_support_automation_secret(
+    secret: Optional[str] = Header(None, alias="X-Support-Automation-Secret"),
+) -> None:
+    """Gate the internal support-automation endpoints (triage / auto-reply /
+    status update). They are invoked by Supabase Edge Function triggers, not by
+    end users, so they authenticate with a shared secret rather than a session
+    token. Enforced only when SUPPORT_AUTOMATION_SECRET is configured (so the
+    flow keeps working until the secret + trigger header are provisioned)."""
+    if not SUPPORT_AUTOMATION_SECRET:
+        return
+    if secret != SUPPORT_AUTOMATION_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid support automation secret")
 
 
 # ─── Postmark inbound email webhook ───────────────────────────────────────────
@@ -247,6 +265,7 @@ class TicketStatusUpdate(BaseModel):
 @router.patch(
     "/support/ticket/{ticket_id}",
     status_code=200,
+    dependencies=[Depends(verify_support_automation_secret)],
     summary="Update support ticket status (called by SUPPORT-4B triage)",
 )
 async def update_ticket_status(ticket_id: str, body: TicketStatusUpdate):
@@ -449,6 +468,7 @@ def _call_triage_model(content: str, subject: Optional[str], user_role: str,
     "/support/triage",
     status_code=200,
     response_model=TriageResult,
+    dependencies=[Depends(verify_support_automation_secret)],
     summary="AI triage agent — classify and route a support ticket (SUPPORT-4B)",
 )
 async def triage_ticket(body: TriageRequest):
@@ -623,6 +643,7 @@ class ReplyRequest(BaseModel):
 @router.post(
     "/support/reply",
     status_code=200,
+    dependencies=[Depends(verify_support_automation_secret)],
     summary="Send auto-reply to ticket submitter (SUPPORT-4D)",
 )
 async def send_auto_reply(body: ReplyRequest):
