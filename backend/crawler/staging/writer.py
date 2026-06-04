@@ -172,6 +172,25 @@ def write_source_page(
 
     supabase.table("source_pages").upsert(row, on_conflict="url").execute()
 
+    # [P3-02d] Dead-link detection: track consecutive HTTP 404 responses.
+    # Only 404 is counted — transient errors (502/503/network) are retried by
+    # P3-02a retry logic and do NOT increment the dead-link counter.
+    is_404 = fetch_result.http_status == 404
+    if is_404 or is_accessible:
+        try:
+            from backend.app.services.dead_link_service import (
+                DEAD_LINK_THRESHOLD,
+                handle_dead_link,
+                update_404_counter,
+            )
+            new_count = update_404_counter(url, is_404=is_404)
+            if new_count >= DEAD_LINK_THRESHOLD:
+                handle_dead_link(url)
+        except Exception:
+            log.warning(
+                "dead_link_service: update failed for %s (non-fatal)", url, exc_info=True
+            )
+
 
 def write_chunk(
     document_id: str,
