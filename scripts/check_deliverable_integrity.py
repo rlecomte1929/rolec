@@ -161,6 +161,18 @@ def _select(prop: Optional[Dict[str, Any]]) -> str:
     return (sel or {}).get("name", "") if sel else ""
 
 
+def _unique_id(prop: Optional[Dict[str, Any]]) -> str:
+    """Render a Notion unique_id property as ``<PREFIX>-<NUMBER>`` (e.g. AIQ-775)."""
+    uid = (prop or {}).get("unique_id")
+    if not uid:
+        return ""
+    prefix = uid.get("prefix") or ""
+    number = uid.get("number")
+    if number is None:
+        return ""
+    return f"{prefix}-{number}" if prefix else str(number)
+
+
 def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
     """Query the AI Work Queue for Status=Done file-producing tasks and extract
     their deliverable paths. Paginated."""
@@ -190,17 +202,17 @@ def fetch_done_tasks(token: str, database_id: str) -> List[Dict[str, Any]]:
             task_type = _select(props.get("Task Type"))
             if task_type and task_type not in _FILE_PRODUCING_TYPES:
                 continue
-            note_text = (
-                _rich_text(props.get("Execution Notes"))
-                + "\n"
-                + _rich_text(props.get("Expected Output"))
-            )
+            # Scan ONLY Execution Notes — the record of what was actually built
+            # (CREATED:/MODIFIED: claims). Expected Output is the spec and is full
+            # of *suggested* paths that get renamed on commit, which produced the
+            # bulk of false positives on the first live run.
+            note_text = _rich_text(props.get("Execution Notes"))
             paths = extract_deliverable_paths(note_text)
             if not paths:
                 continue
             tasks.append({
                 "title": _rich_text(props.get("Task Title")),
-                "aiq": _rich_text(props.get("ID")) or str(props.get("ID", "")),
+                "aiq": _unique_id(props.get("ID")) or _rich_text(props.get("ID")),
                 "url": page.get("url", ""),
                 "paths": paths,
             })

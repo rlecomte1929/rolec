@@ -145,5 +145,18 @@ class LoadAllowlistTests(unittest.TestCase):
         self.assertEqual(cdi.load_allowlist(Path("/no/such/allowlist.txt")), set())
 
 
+class UniqueIdTests(unittest.TestCase):
+    def test_renders_prefix_and_number(self):
+        prop = {"id": "zHIk", "type": "unique_id", "unique_id": {"prefix": "AIQ", "number": 775}}
+        self.assertEqual(cdi._unique_id(prop), "AIQ-775")
+
+    def test_number_only_when_no_prefix(self):
+        self.assertEqual(cdi._unique_id({"unique_id": {"prefix": None, "number": 42}}), "42")
+
+    def test_empty_when_absent(self):
+        self.assertEqual(cdi._unique_id(None), "")
+        self.assertEqual(cdi._unique_id({}), "")
+
+
 if __name__ == "__main__":
     unittest.main()
