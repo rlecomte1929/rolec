@@ -39,6 +39,7 @@ import type { CaseFormSummary } from '../../api/dossier';
 import { PdfPanel } from '../../features/platform-v2/form-editor/PdfPanel';
 import { FieldRow } from '../../features/platform-v2/form-editor/FieldRow';
 import { ActionBar } from '../../features/platform-v2/form-editor/ActionBar';
+import { PrefillConfirmation } from '../../features/platform-v2/form-editor/PrefillConfirmation';
 import { OriginalPdfDrawer } from '../../features/platform-v2/dossier/OriginalPdfDrawer';
 
 // ---------------------------------------------------------------------------
@@ -124,6 +125,13 @@ export const FormEditorPage: React.FC = () => {
 
   // ── [P2-4] Original PDF drawer state ─────────────────────────────────────
   const [showOriginal, setShowOriginal] = useState(false);
+
+  // ── [P2-03c] Pre-fill confirmation gate ──────────────────────────────────
+  /** Once the user confirms the engine's pre-filled values, the gate stays down
+   *  for this session even though a refetch may still report `filled_by='system'`
+   *  momentarily before the confirming write lands. */
+  const [prefillConfirmed, setPrefillConfirmed] = useState(false);
+  const [prefillConfirming, setPrefillConfirming] = useState(false);
 
   // ── Load ────────────────────────────────────────────────────────────────
   const load = useCallback(
@@ -327,6 +335,45 @@ export const FormEditorPage: React.FC = () => {
           ? 'Save failed'
           : null;
 
+  // ── [P2-03c] Pre-fill confirmation gate ──────────────────────────────────
+  /** Values written by the pre-fill engine (filled_by='system') awaiting the
+   *  user's review. Once confirmed they're re-saved as employee-owned. */
+  const prefilledFields = fields.filter(
+    (f) => f.filled_by === 'system' && (f.value ?? '').trim() !== '',
+  );
+  /** Required fields with nothing pre-filled — the user must complete these. */
+  const manualFields = fields.filter(
+    (f) => f.required && (f.value ?? '').trim() === '',
+  );
+  const showPrefillGate = !prefillConfirmed && prefilledFields.length > 0;
+
+  const handleConfirmPrefill = useCallback(async () => {
+    if (!caseId || !formId) return;
+    const toConfirm = fields.filter(
+      (f) => f.filled_by === 'system' && (f.value ?? '').trim() !== '',
+    );
+    if (toConfirm.length === 0) {
+      setPrefillConfirmed(true);
+      return;
+    }
+    setPrefillConfirming(true);
+    try {
+      // Re-save the pre-filled values verbatim — the server flips them to
+      // filled_by='employee', reviewed=true, persisting the user's confirmation.
+      const payload = toConfirm.map((f) => ({ field_id: f.field_id, value: f.value }));
+      const updated = await formEditorAPI.putFields(caseId, formId, payload);
+      setFormSummary(updated);
+      const refreshed = await formEditorAPI.getFields(caseId, formId);
+      setFields(refreshed);
+      setPrefillConfirmed(true);
+    } catch {
+      // Keep the gate up so the user can retry; surface via the save indicator.
+      setSaveStatus('error');
+    } finally {
+      setPrefillConfirming(false);
+    }
+  }, [caseId, formId, fields]);
+
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -516,6 +563,17 @@ export const FormEditorPage: React.FC = () => {
           formId={formId}
           formName={formSummary.template.name}
           formCode={formSummary.template.code}
+        />
+      )}
+
+      {/* [P2-03c] Pre-fill confirmation gate — blocks the editor until the user
+          reviews and confirms values populated by the pre-fill engine. */}
+      {showPrefillGate && (
+        <PrefillConfirmation
+          prefilledFields={prefilledFields}
+          manualFields={manualFields}
+          onConfirm={() => void handleConfirmPrefill()}
+          confirming={prefillConfirming}
         />
       )}
     </AppShell>
