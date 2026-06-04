@@ -40,12 +40,16 @@ class ExtractDeliverablePathsTests(unittest.TestCase):
             ["prompts/docs/classifier/v1.txt"],
         )
 
-    def test_move_into_form(self):
+    def test_move_into_prose_is_not_a_claim(self):
+        # Reviewer-steps prose ("move X into <path>") is NOT a CREATED:/MODIFIED:
+        # claim — this is the dominant false-positive class from the first live
+        # run (the file landed at a different path than the prose suggested).
         text = "Move eval_factual_consistency.py into backend/scripts/eval_factual_consistency.py in the repo."
-        self.assertIn(
-            "backend/scripts/eval_factual_consistency.py",
-            cdi.extract_deliverable_paths(text),
-        )
+        self.assertEqual(cdi.extract_deliverable_paths(text), [])
+
+    def test_modified_marker_is_a_claim(self):
+        text = "- MODIFIED: `backend/main.py` — registered the router"
+        self.assertEqual(cdi.extract_deliverable_paths(text), ["backend/main.py"])
 
     def test_multiple_paths_deduped_and_ordered(self):
         text = (
@@ -59,7 +63,7 @@ class ExtractDeliverablePathsTests(unittest.TestCase):
         )
 
     def test_trailing_punctuation_stripped(self):
-        text = "wrote audit/eu_ai_act/risk_register_v1.md, then reviewed it."
+        text = "CREATED: audit/eu_ai_act/risk_register_v1.md, then reviewed it."
         self.assertEqual(
             cdi.extract_deliverable_paths(text),
             ["audit/eu_ai_act/risk_register_v1.md"],
@@ -143,6 +147,19 @@ class LoadAllowlistTests(unittest.TestCase):
 
     def test_missing_file_is_empty(self):
         self.assertEqual(cdi.load_allowlist(Path("/no/such/allowlist.txt")), set())
+
+
+class UniqueIdTests(unittest.TestCase):
+    def test_renders_prefix_and_number(self):
+        prop = {"id": "zHIk", "type": "unique_id", "unique_id": {"prefix": "AIQ", "number": 775}}
+        self.assertEqual(cdi._unique_id(prop), "AIQ-775")
+
+    def test_number_only_when_no_prefix(self):
+        self.assertEqual(cdi._unique_id({"unique_id": {"prefix": None, "number": 42}}), "42")
+
+    def test_empty_when_absent(self):
+        self.assertEqual(cdi._unique_id(None), "")
+        self.assertEqual(cdi._unique_id({}), "")
 
 
 if __name__ == "__main__":
