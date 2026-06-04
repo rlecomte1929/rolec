@@ -43,6 +43,7 @@ from ..services.roadmap_builder import derive_roadmap
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case
 from ..services.roadmap_staleness import annotate_staleness
+from ..services.case_roadmap_profile import generate_ai_roadmap_for_case
 from ..services.case_service import (
     _assert_case_access,
     _case_dto,
@@ -842,19 +843,26 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
         "status": case.status,
         "draft": draft,
     }
-    roadmap = derive_roadmap(case_dict)
-    # P2-01a/b: the live AI EEA roadmap is gated behind a per-account feature flag
-    # and confidence-gated for specialist review. The deterministic roadmap (no
-    # `result` key) is never gated and passes through untouched — gating only
-    # applies to an AI roadmap, which today reaches this seam once P2-01e wires
-    # the pipeline in for eligible cases.
+    # P2-01e: for an allowlisted (flag-on) account, serve the live AI EEA roadmap
+    # from the RAG pipeline — confidence-gated (P2-01b) and staleness-annotated
+    # (P2-01c). Anything that doesn't generate cleanly (uncovered corridor →
+    # RULE_NOT_FOUND, unmappable case, or pipeline error) falls back to the
+    # deterministic roadmap, so a user never sees an empty/refusal roadmap.
     if is_flag_enabled_for(user.get("id"), LIVE_EEA_ROADMAP_FLAG):
-        roadmap["ai_roadmap_eligible"] = True
-        if is_ai_roadmap(roadmap):
-            roadmap = gate_roadmap_for_case(case_id, roadmap)
-            # P2-01c: warn when a shown step's cited source is >30 days old.
-            roadmap = annotate_staleness(roadmap, now=_dt.datetime.now(_dt.timezone.utc))
-    return roadmap
+        try:
+            candidate = generate_ai_roadmap_for_case(case_dict)
+        except Exception:
+            logger.exception(
+                "AI roadmap generation failed for case %s; serving deterministic roadmap",
+                case_id,
+            )
+            candidate = None
+        if is_ai_roadmap(candidate) and candidate.get("result") == "OK":
+            candidate = gate_roadmap_for_case(case_id, candidate)
+            candidate = annotate_staleness(candidate, now=_dt.datetime.now(_dt.timezone.utc))
+            candidate["ai_roadmap_eligible"] = True
+            return candidate
+    return derive_roadmap(case_dict)
 
 
 @router.get("/{case_id}/roadmap/tracks", response_model=RoadmapTracksResponse)

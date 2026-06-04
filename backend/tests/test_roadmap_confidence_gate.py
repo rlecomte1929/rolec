@@ -128,7 +128,13 @@ class ReleasedLookupTests(_DBTest):
 
 
 class RoadmapEndpointGatingTests(_DBTest):
-    def _call(self, account_id, roadmap, *, flag_enabled, allowlist=(), released=False):
+    """Endpoint wiring (P2-01e): when eligible, get_case_roadmap serves the AI
+    roadmap from the pipeline (patched here via generate_ai_roadmap_for_case),
+    gated by confidence; otherwise it serves the deterministic roadmap."""
+
+    _DET = {"steps": [{"key": "a"}], "lanes": []}
+
+    def _call(self, account_id, *, ai_roadmap=None, flag_enabled=True, allowlist=("acct",), released=False):
         with self.Session() as db:
             db.add(models.FeatureFlag(key=feature_flags.LIVE_EEA_ROADMAP_FLAG, enabled=flag_enabled))
             for a in allowlist:
@@ -139,33 +145,34 @@ class RoadmapEndpointGatingTests(_DBTest):
         with mock.patch.object(cases_read, "SessionLocal", self.Session), \
                 mock.patch.object(cases_read.crud, "get_case", return_value=case), \
                 mock.patch.object(cases_read, "_assert_case_access", lambda *a, **k: None), \
-                mock.patch.object(cases_read, "derive_roadmap", side_effect=lambda *a, **k: dict(roadmap)), \
+                mock.patch.object(cases_read, "generate_ai_roadmap_for_case",
+                                  side_effect=lambda *a, **k: (dict(ai_roadmap) if ai_roadmap is not None else None)), \
+                mock.patch.object(cases_read, "derive_roadmap", side_effect=lambda *a, **k: dict(self._DET)), \
                 mock.patch.object(feature_flags, "SessionLocal", self.Session), \
                 mock.patch.object(gate, "SessionLocal", self.Session):
             return cases_read.get_case_roadmap("case-1", user={"id": account_id})
 
-    def test_deterministic_roadmap_never_gated(self):
-        # Flag on + allowlisted, but a deterministic roadmap (no `result`) is untouched.
-        det = {"steps": [{"key": "a"}], "lanes": []}
-        res = self._call("acct", det, flag_enabled=True, allowlist=["acct"])
+    def test_falls_back_to_deterministic_when_no_ai_roadmap(self):
+        # Flag on + allowlisted, but the pipeline yields nothing → deterministic, ungated.
+        res = self._call("acct", ai_roadmap=None)
         self.assertNotIn("requires_specialist_review", res)
-        self.assertNotIn("withheld_steps", res)
-        self.assertEqual(len(res["steps"]), 1)
-        self.assertTrue(res["ai_roadmap_eligible"])
+        self.assertNotIn("ai_roadmap_eligible", res)
+        self.assertEqual(res["steps"], [{"key": "a"}])
 
     def test_ai_roadmap_gated_when_eligible_and_not_released(self):
         rm = _ai_roadmap([_step(1, "high"), _step(2, "medium")])
-        res = self._call("acct", rm, flag_enabled=True, allowlist=["acct"], released=False)
+        res = self._call("acct", ai_roadmap=rm, released=False)
         self.assertEqual([s["order"] for s in res["steps"]], [1])
         self.assertTrue(res["requires_specialist_review"])
         self.assertTrue(res["ai_roadmap_eligible"])
 
-    def test_ai_roadmap_not_gated_when_flag_off(self):
-        # Not eligible → no gating applied, raw (ungated) roadmap returned unchanged.
+    def test_flag_off_serves_deterministic(self):
+        # Not eligible → pipeline never called → deterministic roadmap served.
         rm = _ai_roadmap([_step(1, "high"), _step(2, "medium")])
-        res = self._call("acct", rm, flag_enabled=False, allowlist=["acct"])
-        self.assertEqual(len(res["steps"]), 2)
+        res = self._call("acct", ai_roadmap=rm, flag_enabled=False)
+        self.assertEqual(res["steps"], [{"key": "a"}])
         self.assertNotIn("requires_specialist_review", res)
+        self.assertNotIn("ai_roadmap_eligible", res)
 
 
 if __name__ == "__main__":
