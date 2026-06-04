@@ -14,6 +14,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { Button, Card } from '../../components/antigravity';
 import { BudgetSummaryTable } from '../../features/services/BudgetSummaryTable';
+import { ProcessingTimeCard } from '../../features/services/ProcessingTimeCard';
 import { buildRoute } from '../../navigation/routes';
 import { getAuthItem, normalizeStoredRole } from '../../utils/demo';
 
@@ -41,6 +42,8 @@ export const HrCaseEstimatePage: React.FC = () => {
         displayCurrency="USD"
         nativeCurrencyForCaps
       />
+
+      <ProcessingTimeCard caseId={caseId} />
 
       <Card padding="lg" className="mt-6">
         <p className="text-sm font-semibold text-[#0b2b43] mb-1">Need to go over a cap?</p>
