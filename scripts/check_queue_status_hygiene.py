@@ -128,6 +128,8 @@ def find_false_ready(
             continue
         unmet: List[str] = []
         for dep in parse_dependency_tags(t.get("dependencies") or ""):
+            if dep == tag:  # self-edge (e.g. a "-followup" sharing its parent's tag) — skip
+                continue
             dep_status = status_by_tag.get(dep)
             if dep_status is None:  # dependency not a known queue task — skip
                 continue

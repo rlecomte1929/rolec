@@ -100,6 +100,15 @@ class FindFalseReadyTests(unittest.TestCase):
         flagged = qsh.find_false_ready(self._tasks(), allowlist={"P3-01D:P1-07"})
         self.assertNotIn("P3-01D", {f["tag"] for f in flagged})
 
+    def test_self_dependency_edge_is_skipped(self):
+        # A "-followup" task can parse to the same tag as its parent; depending on
+        # that tag is a self-edge and must not flag the task.
+        tasks = [
+            {"tag": "P1-05D", "title": "P1-05d-followup · Schedule crawl", "aiq": "AIQ-9",
+             "url": "u", "status": "Ready for AI", "dependencies": "P1-05d", "notes": ""},
+        ]
+        self.assertEqual(qsh.find_false_ready(tasks, allowlist=set()), [])
+
     def test_non_ready_tasks_not_flagged(self):
         tasks = [
             {"tag": "P1-07", "title": "x", "aiq": "1", "url": "u",
