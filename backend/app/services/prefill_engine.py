@@ -35,6 +35,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 
 from ...database import db
+from .audit_log_service import ACTION_INSERT, ACTOR_SYSTEM, insert_audit_log
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ def _run(case_form_id: str, case_uuid: str) -> int:
     overridden_ids = _load_overridden_field_ids(case_form_id)
 
     # 4. Resolve + upsert each field
-    filled = 0
+    filled_field_ids: List[str] = []
     for field in fields:
         field_id = field.get("id") or field.get("field_id")
         if not field_id:
@@ -128,13 +129,17 @@ def _run(case_form_id: str, case_uuid: str) -> int:
             filled_by="system",
             ai_confidence=0.99,
         )
-        filled += 1
+        filled_field_ids.append(field_id)
+
+    filled = len(filled_field_ids)
 
     # 5. Update completion % and status
     if filled > 0:
         total_fields = len(fields)
         _update_completion(case_form_id, filled, total_fields)
         _update_status_to_auto_filled(case_form_id)
+        # [P2-03d] Audit every pre-fill event.
+        _insert_prefill_audit(case_form_id, filled_field_ids)
 
     logger.info(
         "prefill_engine: filled %d/%d fields for case_form_id=%s",
@@ -447,6 +452,38 @@ def _upsert_field_value(
         logger.exception(
             "prefill_engine: failed to upsert field_value cf=%s field=%s",
             case_form_id, field_id,
+        )
+
+
+def _insert_prefill_audit(case_form_id: str, field_ids: List[str]) -> None:
+    """
+    [P2-03d] Record one audit_logs row per pre-fill event.
+
+    Follows the established form-audit convention (entity_type='case_form',
+    semantic event in new_value) rather than a bespoke action_type:
+    audit_logs.action_type is CHECK-constrained to insert/update/delete, and a
+    pre-fill is the system inserting field values, so the 'prefill' semantics
+    live in new_value.event alongside form_id + fields_filled[]. Never raises —
+    an audit failure must not break the prefill.
+    """
+    try:
+        with db.engine.begin() as conn:
+            insert_audit_log(
+                conn,
+                entity_type="case_form",
+                entity_id=case_form_id,
+                action_type=ACTION_INSERT,
+                actor_type=ACTOR_SYSTEM,
+                new_value={
+                    "event": "prefill",
+                    "form_id": case_form_id,
+                    "fields_filled": field_ids,
+                    "field_count": len(field_ids),
+                },
+            )
+    except Exception:
+        logger.exception(
+            "prefill_engine: failed to write prefill audit cf=%s", case_form_id
         )
 
 

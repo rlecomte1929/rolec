@@ -83,6 +83,17 @@ CREATE TABLE case_dependents (
     nationality   TEXT,
     passport_expiry TEXT
 );
+CREATE TABLE audit_logs (
+    id             TEXT PRIMARY KEY,
+    entity_type    TEXT NOT NULL,
+    entity_id      TEXT NOT NULL,
+    action_type    TEXT NOT NULL,
+    old_value_json TEXT,
+    new_value_json TEXT,
+    actor_type     TEXT NOT NULL DEFAULT 'system',
+    actor_id       TEXT,
+    created_at     TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -209,6 +220,67 @@ class PreFillEngineTests(unittest.TestCase):
         self.assertEqual(values["employer_name"],   "Acme Norway AS")
         self.assertEqual(rows[0][2], "system")
         self.assertAlmostEqual(rows[0][3], 0.99, places=2)
+
+    # ── [P2-03d] audit logging ───────────────────────────────────────────────
+
+    def test_prefill_writes_audit_log(self):
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [
+            {"id": "passport_number", "prefill_source": "profile.passport_number"},
+            {"id": "employer_name",   "prefill_source": "contract.employer_name"},
+        ]
+        intake = {
+            "profile":  {"passport_number": "X123456"},
+            "contract": {"employer_name":   "Acme Norway AS"},
+        }
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, intake)
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, tmpl, "UTL-2011", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        run_prefill(cf_id, case_id)
+
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT entity_type, entity_id, action_type, actor_type, "
+                "       new_value_json "
+                "FROM audit_logs WHERE entity_id = :id"
+            ), {"id": cf_id}).fetchall()
+
+        # Exactly one audit row per pre-fill event.
+        self.assertEqual(len(rows), 1)
+        entity_type, entity_id, action_type, actor_type, new_json = rows[0]
+        self.assertEqual(entity_type, "case_form")
+        self.assertEqual(entity_id, cf_id)
+        self.assertEqual(action_type, "insert")   # CHECK-constrained value
+        self.assertEqual(actor_type, "system")
+
+        payload = json.loads(new_json)
+        self.assertEqual(payload["event"], "prefill")
+        self.assertEqual(payload["form_id"], cf_id)
+        self.assertEqual(payload["field_count"], 2)
+        self.assertEqual(
+            sorted(payload["fields_filled"]),
+            ["employer_name", "passport_number"],
+        )
+
+    def test_no_audit_log_when_nothing_filled(self):
+        case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
+        fields = [{"id": "salary", "prefill_source": "contract.salary_amount_nok"}]
+        with self.engine.begin() as conn:
+            _insert_case(conn, case_id, emp_id, {})
+            _insert_profile(conn, emp_id)
+            _insert_template(conn, tmpl, "GP-7-04", fields)
+            _insert_case_form(conn, cf_id, case_id, tmpl, person_id=emp_id)
+
+        self.assertEqual(run_prefill(cf_id, case_id), 0)
+
+        with self.engine.connect() as conn:
+            count = conn.execute(text(
+                "SELECT COUNT(*) FROM audit_logs WHERE entity_id = :id"
+            ), {"id": cf_id}).scalar()
+        self.assertEqual(count, 0)
 
     def test_skips_fields_without_prefill_source(self):
         case_id = _uuid();  emp_id = _uuid();  cf_id = _uuid();  tmpl = _uuid()
