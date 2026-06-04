@@ -884,6 +884,10 @@ export const hrAPI = {
       recommended_action: string;
       deadline: string | null;
     }>;
+    // IMM-15: case context for vendor RFQ pre-fill
+    employee_nationality?: string | null;
+    has_dependents?: boolean;
+    dependents_count?: number;
   }> => {
     const response = await api.get(`/api/hr/cases/${caseId}/immigration-requirements`);
     return response.data;
@@ -1012,6 +1016,13 @@ export const hrAPI = {
     move_date?: string;
     budget_range?: string;
     special_requirements?: string;
+    // IMM-15: optional immigration case context (immigration-originated RFQs)
+    visa_type?: string;
+    corridor_from?: string;
+    corridor_to?: string;
+    employee_nationality?: string;
+    has_dependents?: boolean;
+    risk_flags?: string[];
   }): Promise<{ ok: boolean; rfq_id: string; vendor_name: string; status: string; message: string }> => {
     const response = await api.post('/api/hr/rfq-requests', payload);
     return response.data;

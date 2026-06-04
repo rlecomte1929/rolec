@@ -4,8 +4,9 @@
  * Modal form HR fills out to send a structured quote request to a vendor.
  * Opens after clicking "Request quote" in VendorBrowsePanel.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { hrAPI } from '../../api/client';
+import { buildImmigrationSummary, type ImmigrationContext } from './immigrationContext';
 
 type Vendor = {
   id: string;
@@ -17,11 +18,13 @@ type Vendor = {
 interface Props {
   vendor: Vendor | null;
   caseId: string;
+  /** IMM-15: when present, pre-fills the form from the immigration case */
+  immigrationContext?: ImmigrationContext | null;
   onClose: () => void;
   onSent: (vendorName: string) => void;
 }
 
-export const RfqModal: React.FC<Props> = ({ vendor, caseId, onClose, onSent }) => {
+export const RfqModal: React.FC<Props> = ({ vendor, caseId, immigrationContext, onClose, onSent }) => {
   const [serviceCategory, setServiceCategory] = useState(
     vendor?.service_categories?.[0] ?? ''
   );
@@ -30,6 +33,17 @@ export const RfqModal: React.FC<Props> = ({ vendor, caseId, onClose, onSent }) =
   const [specialRequirements, setSpecialRequirements] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // IMM-15: seed the form when the modal opens from the immigration panel.
+  // HR can freely edit the pre-filled summary before sending.
+  useEffect(() => {
+    if (!vendor || !immigrationContext) return;
+    setSpecialRequirements(buildImmigrationSummary(immigrationContext));
+    if (immigrationContext.move_date) setMoveDate(immigrationContext.move_date);
+    if (immigrationContext.visa_type) setServiceCategory('Immigration/visa');
+    // Re-seed each time a new vendor is selected (i.e. each open).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendor, immigrationContext]);
 
   if (!vendor) return null;
 
@@ -49,6 +63,17 @@ export const RfqModal: React.FC<Props> = ({ vendor, caseId, onClose, onSent }) =
         move_date: moveDate || undefined,
         budget_range: budgetRange || undefined,
         special_requirements: specialRequirements || undefined,
+        // IMM-15: carry the structured immigration context onto the RFQ row
+        ...(immigrationContext
+          ? {
+              visa_type: immigrationContext.visa_type,
+              corridor_from: immigrationContext.corridor_from,
+              corridor_to: immigrationContext.corridor_to,
+              employee_nationality: immigrationContext.employee_nationality,
+              has_dependents: immigrationContext.has_dependents,
+              risk_flags: immigrationContext.risk_flags?.map((f) => f.flag_type),
+            }
+          : {}),
       });
       onSent(vendor.name);
     } catch (err: unknown) {

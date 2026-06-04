@@ -16,6 +16,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { hrAPI } from '../../api/client';
 import { MilestoneTracker } from '../immigration/MilestoneTracker';
+import type { ImmigrationContext } from './immigrationContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,10 @@ type ImmigrationData = {
   estimated_timeline_days: number;
   requirements: Requirement[];
   risk_flags: RiskFlag[];
+  // IMM-15: case context for vendor RFQ pre-fill
+  employee_nationality?: string | null;
+  has_dependents?: boolean;
+  dependents_count?: number;
 };
 
 type InterviewStatus = {
@@ -66,7 +71,8 @@ interface Props {
   caseId: string;
   /** Case expected move date (ISO) — drives the milestone timeline. */
   moveDate?: string | null;
-  onFindVendor: () => void;
+  /** IMM-15: receives the case's immigration context to pre-load the vendor RFQ */
+  onFindVendor: (ctx: ImmigrationContext) => void;
   onViewProfile: () => void;
 }
 
@@ -138,6 +144,18 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
     load();
   }, [load]);
 
+  // IMM-15: snapshot the case's immigration context for a vendor RFQ pre-fill.
+  // move_date is injected by the parent (sourced from the case record).
+  const buildImmigrationContext = (): ImmigrationContext => ({
+    visa_type: immData?.visa_type,
+    corridor_from: immData?.corridor_from,
+    corridor_to: immData?.corridor_to,
+    employee_nationality: immData?.employee_nationality ?? undefined,
+    has_dependents: immData?.has_dependents,
+    dependents_count: immData?.dependents_count,
+    risk_flags: immData?.risk_flags?.map((f) => ({ flag_type: f.flag_type, title: f.title })),
+  });
+
   // ── Loading / error / empty states ─────────────────────────────────────────
 
   if (loading) {
@@ -174,7 +192,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
             No immigration requirements have been generated for this case yet.
           </p>
         </div>
-        <QuickActions onFindVendor={onFindVendor} onViewProfile={onViewProfile} />
+        <QuickActions onFindVendor={() => onFindVendor(buildImmigrationContext())} onViewProfile={onViewProfile} />
       </div>
     );
   }
@@ -347,7 +365,7 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
       </section>
 
       {/* ── 4. Quick actions ────────────────────────────────────────────────── */}
-      <QuickActions onFindVendor={onFindVendor} onViewProfile={onViewProfile} />
+      <QuickActions onFindVendor={() => onFindVendor(buildImmigrationContext())} onViewProfile={onViewProfile} />
     </div>
   );
 };
