@@ -14,6 +14,7 @@ from .routers import (
     ai_feedback,
     benefit_optimizer,
     case_forms_adhoc,
+    case_rule_updates,
     cases,
     cases_admin,
     cases_read,
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(case_forms_adhoc.router)  # [P4-3] ad-hoc "Add document"
     app.include_router(admin.router)
     app.include_router(admin_source_change_review.router)  # P2-02d material-change review queue
+    app.include_router(case_rule_updates.router)  # P2-02e rule-update roadmap banner
     app.include_router(employee_quotes.router)
     app.include_router(pets.router)
     app.include_router(support.router)
