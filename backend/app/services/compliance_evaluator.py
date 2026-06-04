@@ -62,6 +62,10 @@ class CaseComplianceData:
     permit_expiry_date: Optional[date] = None
     employer_registration_id: Optional[str] = None
     days_present_in_host: Optional[int] = None
+    # Precondition flag: does the case have an imm_employee_profiles row?
+    # Used by ``missing_field`` rules to distinguish "intake never started"
+    # from "intake started but field wasn't filled" — only the latter fires.
+    profile_exists: bool = False
 
     def get(self, field_name: str) -> Any:
         return getattr(self, field_name, None)
@@ -90,6 +94,14 @@ def _evaluate_condition(
     actual = case.get(field_name)
 
     if ctype == "missing_field":
+        # Precondition guard: if the rule names a precondition_field and that
+        # field is falsy/null on this case, the rule cannot fire — we don't
+        # yet know whether the missing field applies.
+        precondition_field = cond.get("precondition_field")
+        if precondition_field is not None:
+            precondition_value = case.get(precondition_field)
+            if not precondition_value:
+                return None
         if actual is None or (isinstance(actual, str) and actual.strip() == ""):
             return {"field": field_name, "reason": "missing"}
         return None
