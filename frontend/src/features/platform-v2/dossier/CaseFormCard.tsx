@@ -15,6 +15,7 @@ import type { CaseFormStatus, CaseFormSummary } from '../../../api/dossier';
 import { buildRoute } from '../../../navigation/routes';
 import { formEditorAPI } from '../../../api/formEditor';
 import { OriginalPdfDrawer } from './OriginalPdfDrawer';
+import { FormDocuments } from './FormDocuments';
 
 // ---------------------------------------------------------------------------
 // Status → label + colour + banner copy
@@ -369,6 +370,12 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
               {form.updated_at ? new Date(form.updated_at).toLocaleDateString() : '—'}
             </span>
           </div>
+
+          {/* [P1-05c] Supporting documents upload + list (not for ad-hoc forms,
+              which are themselves a single uploaded document). */}
+          {!form.is_adhoc && (
+            <FormDocuments caseId={form.case_id} formId={form.id} />
+          )}
         </div>
       )}
 
