@@ -9,6 +9,31 @@ import RoadmapScreen from '../../features/platform-v2/roadmap/RoadmapScreen';
 import { getCaseRoadmapV2, type RoadmapV2Track } from '../../api/roadmapV2';
 import type { RoadmapTrack, RoadmapStep } from '../../types/relopass-api-contracts';
 import { buildRoute } from '../../navigation/routes';
+import {
+  successProbability,
+  type ScoringStep,
+  type SuccessProbabilityResult,
+} from '../../features/platform-v2/roadmap/scoring';
+
+/**
+ * [P2-05] Build the probability-of-success estimate from the roadmap, but only
+ * when at least one step carries a confidence score. Today the deterministic
+ * employee feed has none, so this returns null and the dial is hidden (graceful
+ * guard); it lights up automatically once per-step confidence reaches the feed.
+ */
+function computeSuccessScore(v2Tracks: RoadmapV2Track[]): SuccessProbabilityResult | null {
+  const scored: ScoringStep[] = [];
+  for (const track of v2Tracks) {
+    for (const step of track.steps) {
+      if (step.confidence) {
+        scored.push({ id: step.id, title: step.title, confidence: step.confidence });
+      }
+    }
+  }
+  if (scored.length === 0) return null;
+  // No similar-case history is available yet (P2-04) → official_only basis.
+  return successProbability({ steps: scored }, []);
+}
 
 function adaptTracks(v2Tracks: RoadmapV2Track[]): (RoadmapTrack & { steps: RoadmapStep[] })[] {
   return v2Tracks.map((t) => ({
@@ -45,6 +70,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
   const [tracks, setTracks] = useState<(RoadmapTrack & { steps: RoadmapStep[] })[]>([]);
+  const [successScore, setSuccessScore] = useState<SuccessProbabilityResult | null>(null);
   const [docChips, setDocChips] = useState<Record<string, { count: number; worstStatus: string | null }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +82,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
     getCaseRoadmapV2(caseId)
       .then((data) => {
         setTracks(adaptTracks(data.tracks));
+        setSuccessScore(computeSuccessScore(data.tracks));
         const chips: Record<string, { count: number; worstStatus: string | null }> = {};
         for (const track of data.tracks) {
           for (const step of track.steps) {
@@ -109,6 +136,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
         tracks={tracks}
         docChips={docChips}
         onStepDocChipClick={handleDocChipClick}
+        successScore={successScore}
       />
     </AppShell>
   );

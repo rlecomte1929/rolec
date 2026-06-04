@@ -17,6 +17,13 @@ export interface RoadmapV2Step {
   vendor_id: string | null;
   doc_count: number;
   worst_doc_status: string | null;
+  /**
+   * [P2-05] Per-step confidence (P2-01b taxonomy), when the backend has scored
+   * this step. Absent on the deterministic roadmap; populated once the
+   * confidence pipeline reaches the employee feed. Drives the success-probability
+   * estimate — see successProbability() in the roadmap scoring module.
+   */
+  confidence?: 'high' | 'medium' | 'low' | 'unknown';
 }
 
 export interface RoadmapV2Track {
