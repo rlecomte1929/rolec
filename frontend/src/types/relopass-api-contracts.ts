@@ -346,6 +346,12 @@ export interface RoadmapStep {
   // [P3-04] Confidence display — optional source-provenance metadata. Absent
   // until the backend emits per-step confidence; UI renders nothing when unset.
   confidence_level?: "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
+  // [P2-07e] AvailableNowWidget slots. estimated_effort is a derived rough label
+  // ("~1 hour"); confidence is the lower-cased per-step confidence the widget Pill
+  // / ConfidenceBadge consumes — null until P3-04 emits it (same source as
+  // confidence_level above; this is its widget-facing projection).
+  estimated_effort?: string | null;
+  confidence?: "high" | "medium" | "low" | null;
   source_url?: string | null;          // official source backing this step
   source_fetched_at?: string | null;   // ISO date the source was last verified
   source_excerpt?: string | null;      // one-sentence excerpt from the source

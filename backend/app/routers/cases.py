@@ -341,6 +341,10 @@ class RoadmapStepV2(BaseModel):
     vendor_id: Optional[str] = None
     doc_count: int = 0
     worst_doc_status: Optional[str] = None
+    # [P2-07e] kept in sync with the live cases_read.py RoadmapStepV2 (this router
+    # is the dormant duplicate). effort is derived; confidence is P3-04's to fill.
+    estimated_effort: Optional[str] = None
+    confidence: Optional[str] = None
 
 
 class RoadmapTrackV2(BaseModel):

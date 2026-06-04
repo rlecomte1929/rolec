@@ -343,6 +343,11 @@ export interface RoadmapStep {
   ai_suggestion: string | null;       // last AI-generated guidance text
   created_at: string;
   updated_at: string;
+  // [P2-07e] AvailableNowWidget slots. estimated_effort is a derived rough label
+  // ("~1 hour"). confidence is the per-step confidence the widget Pill consumes —
+  // null until P3-04 emits it (no honest source on the employee feed yet).
+  estimated_effort?: string | null;
+  confidence?: "high" | "medium" | "low" | null;
 }
 
 // ── 2.5 Requirements & Documents ─────────────────────────────────────────────

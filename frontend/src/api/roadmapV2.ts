@@ -17,6 +17,12 @@ export interface RoadmapV2Step {
   vendor_id: string | null;
   doc_count: number;
   worst_doc_status: string | null;
+  // [P2-07e] Rough deterministic effort estimate (e.g. "~1 hour"); rendered as a
+  // muted Pill in AvailableNowWidget. Optional — absent on older payloads.
+  estimated_effort?: string | null;
+  // [P2-07e] Per-step confidence. Null on the employee feed today (its real source
+  // is the P2-01b/P3-04 per-step confidence); the widget renders nothing when unset.
+  confidence?: 'high' | 'medium' | 'low' | null;
 }
 
 export interface RoadmapV2Track {

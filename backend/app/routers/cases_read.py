@@ -80,6 +80,16 @@ class RoadmapStepV2(BaseModel):
     vendor_id: Optional[str] = None
     doc_count: int = 0
     worst_doc_status: Optional[str] = None
+    # [P2-07e] Rough, deterministic estimate of the work this step involves,
+    # derived from the number of forms attached to it (see _derive_estimated_effort).
+    # Rendered as a muted Pill in AvailableNowWidget.
+    estimated_effort: Optional[str] = None
+    # [P2-07e] Per-step confidence ('high'|'medium'|'low'). Intentionally left None
+    # on the employee /roadmap/tracks feed: the honest source is the AI/RAG per-step
+    # confidence (P2-01b gate / P3-04), which is not emitted here yet. The field is
+    # plumbed end-to-end so it lights up the widget's ConfidenceBadge once P3-04
+    # populates it — no fabricated value in the meantime.
+    confidence: Optional[str] = None
 
 
 class RoadmapTrackV2(BaseModel):
@@ -880,6 +890,20 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
     return derive_roadmap(case_dict)
 
 
+def _derive_estimated_effort(doc_count: int) -> str:
+    """
+    [P2-07e] Deterministic, honest rough estimate of the effort a roadmap step
+    involves, keyed off the number of forms attached to it (doc_count) — the only
+    work-volume signal available on the employee roadmap feed. Not random; a pure
+    function of doc_count. Labels are intentionally coarse ("estimate").
+    """
+    if doc_count <= 0:
+        return "~15 min"
+    if doc_count <= 2:
+        return "~1 hour"
+    return "Half a day"
+
+
 @router.get("/{case_id}/roadmap/tracks", response_model=RoadmapTracksResponse)
 def get_case_roadmap_tracks(
     case_id: str,
@@ -983,6 +1007,9 @@ def get_case_roadmap_tracks(
             vendor_id=str(row["vendor_id"]) if row.get("vendor_id") else None,
             doc_count=int(row["doc_count"] or 0),
             worst_doc_status=row.get("worst_doc_status"),
+            estimated_effort=_derive_estimated_effort(int(row["doc_count"] or 0)),
+            # confidence: deferred to P3-04 (no honest per-step source on this feed yet)
+            confidence=None,
         ))
     return RoadmapTracksResponse(tracks=list(tracks_map.values()))
 
