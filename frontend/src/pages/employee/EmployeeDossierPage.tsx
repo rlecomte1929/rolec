@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
+import { isSourceStale } from '../../components/antigravity';
 import { CaseFormCard } from '../../features/platform-v2/dossier/CaseFormCard';
 import { useCaseFormsRealtime } from '../../hooks/useCaseFormsRealtime';
 
@@ -126,6 +127,14 @@ export const EmployeeDossierPage: React.FC = () => {
     [scopedForms, filter],
   );
 
+  // [P2-08d] Count forms whose official source hasn't been verified within its
+  // staleness threshold, so the user is warned at the dossier level before they
+  // hit a per-form badge. Derived from the same scoped set as the other counts.
+  const staleCount = useMemo(
+    () => scopedForms.filter((f) => isSourceStale(f.template?.source_last_verified)).length,
+    [scopedForms],
+  );
+
   return (
     <AppShell>
       <div className="max-w-5xl mx-auto px-6 py-8">
@@ -180,6 +189,25 @@ export const EmployeeDossierPage: React.FC = () => {
             >
               Clear filter
             </button>
+          </div>
+        )}
+
+        {/* [P2-08d] Dossier-level stale-source overview banner. Additive: shows
+            only when at least one in-scope form has an unverified source. */}
+        {staleCount > 0 && (
+          <div
+            data-testid="stale-sources-banner"
+            role="status"
+            className="mb-4 flex items-start gap-2 rounded border border-[#e2d6bf] bg-[#f4efe5] px-3 py-2 text-sm text-[#7a5e2a]"
+          >
+            <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <span>
+              {staleCount} form{staleCount === 1 ? '' : 's'} in your dossier{' '}
+              {staleCount === 1 ? 'has a source' : 'have sources'} we haven&apos;t recently verified.
+              Open the form to verify it directly at the official source.
+            </span>
           </div>
         )}
 
