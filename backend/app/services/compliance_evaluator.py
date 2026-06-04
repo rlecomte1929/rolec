@@ -62,6 +62,10 @@ class CaseComplianceData:
     permit_expiry_date: Optional[date] = None
     employer_registration_id: Optional[str] = None
     days_present_in_host: Optional[int] = None
+    # Precondition flag: does the case have an imm_employee_profiles row?
+    # Used by ``missing_field`` rules to distinguish "intake never started"
+    # from "intake started but field wasn't filled" — only the latter fires.
+    profile_exists: bool = False
 
     def get(self, field_name: str) -> Any:
         return getattr(self, field_name, None)
@@ -90,6 +94,14 @@ def _evaluate_condition(
     actual = case.get(field_name)
 
     if ctype == "missing_field":
+        # Precondition guard: if the rule names a precondition_field and that
+        # field is falsy/null on this case, the rule cannot fire — we don't
+        # yet know whether the missing field applies.
+        precondition_field = cond.get("precondition_field")
+        if precondition_field is not None:
+            precondition_value = case.get(precondition_field)
+            if not precondition_value:
+                return None
         if actual is None or (isinstance(actual, str) and actual.strip() == ""):
             return {"field": field_name, "reason": "missing"}
         return None
@@ -199,10 +211,11 @@ def _open_cases_sql(company_scoped: bool):
     return text(
         f"""
         select
-            rc.id::text              as case_id,
-            ic.permit_expiry_date    as permit_expiry_date,
-            prof.employer_reg_number as employer_registration_id,
-            rc.expected_start_date   as expected_start_date
+            rc.id::text                          as case_id,
+            ic.permit_expiry_date                as permit_expiry_date,
+            prof.employer_reg_number             as employer_registration_id,
+            rc.expected_start_date               as expected_start_date,
+            (prof.case_id is not null)           as profile_exists
         from public.relocation_cases rc
         left join lateral (
             select permit_expiry_date
@@ -213,7 +226,7 @@ def _open_cases_sql(company_scoped: bool):
         ) ic on true
         left join lateral (
             -- imm_employee_profiles.case_id is text; relocation_cases.id is uuid.
-            select employer_reg_number
+            select case_id, employer_reg_number
             from public.imm_employee_profiles p
             where p.case_id = rc.id::text
             order by p.created_at desc
@@ -278,6 +291,7 @@ class SqlComplianceDataSource:
                 permit_expiry_date=r["permit_expiry_date"],
                 employer_registration_id=r["employer_registration_id"],
                 days_present_in_host=days_present,
+                profile_exists=bool(r["profile_exists"]),
             )
 
 

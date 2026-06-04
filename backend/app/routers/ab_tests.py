@@ -27,8 +27,11 @@ import os
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException
+from typing import Any, Dict
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
+from ..auth_deps import require_admin
 
 router = APIRouter(prefix="/api/ab-tests", tags=["ab-tests"])
 logger = logging.getLogger(__name__)
@@ -132,7 +135,7 @@ async def _write_audit_event(event_type: str, properties: dict) -> None:
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
 @router.post("/promote")
-async def promote_variant(body: PromoteRequest):
+async def promote_variant(body: PromoteRequest, admin: Dict[str, Any] = Depends(require_admin)):
     """
     Promote a variant to 100% traffic.
 
@@ -186,7 +189,7 @@ async def promote_variant(body: PromoteRequest):
 
 
 @router.post("/rollback")
-async def rollback_flag(body: RollbackRequest):
+async def rollback_flag(body: RollbackRequest, admin: Dict[str, Any] = Depends(require_admin)):
     """
     Rollback a flag to 100% control.
 

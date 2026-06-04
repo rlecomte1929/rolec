@@ -47,6 +47,9 @@ CREATE TABLE form_templates (
 CREATE TABLE roadmap_steps (
   id TEXT PRIMARY KEY, case_id TEXT, title TEXT
 );
+CREATE TABLE source_pages (
+  id TEXT PRIMARY KEY, url TEXT NOT NULL UNIQUE, tier TEXT, last_fetched_at TEXT
+);
 CREATE TABLE case_forms (
   id TEXT PRIMARY KEY, case_id TEXT NOT NULL, form_template_id TEXT,
   person_id TEXT, dependent_id TEXT, status TEXT NOT NULL DEFAULT 'not_started',
@@ -107,6 +110,12 @@ class LiveSourceUrlTests(unittest.TestCase):
                      "VALUES (:i,:c,:n,'NO','[]',:s)"),
                 {"i": tid, "c": "GP-7-04", "n": "D-number application", "s": source_url},
             )
+            if source_url is not None:
+                conn.execute(
+                    text("INSERT INTO source_pages (id, url, tier, last_fetched_at) "
+                         "VALUES (:i,:u,'1','2026-06-04T10:00:00')"),
+                    {"i": _u(), "u": source_url},
+                )
             if step_title is not None:
                 step_id = _u()
                 conn.execute(
@@ -126,12 +135,15 @@ class LiveSourceUrlTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].template.source_url, url)
         self.assertEqual(rows[0].roadmap_step_title, "Register your arrival")
+        # [P1-05d] last_verified pulled from source_pages.last_fetched_at via the join.
+        self.assertEqual(rows[0].template.source_last_verified, "2026-06-04T10:00:00")
 
     def test_null_when_absent(self) -> None:
         self._seed_form(source_url=None, step_title=None)
         rows = list_case_forms(case_id=self.case_id, status=None, user=_emp_user(self.employee_id))
         self.assertIsNone(rows[0].template.source_url)
         self.assertIsNone(rows[0].roadmap_step_title)
+        self.assertIsNone(rows[0].template.source_last_verified)
 
 
 if __name__ == "__main__":
