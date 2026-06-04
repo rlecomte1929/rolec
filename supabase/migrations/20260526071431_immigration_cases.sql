@@ -5,8 +5,16 @@
 -- (information_schema + pg_constraint + pg_indexes + pg_policies, 2026-06-04).
 -- Idempotent: CREATE TABLE IF NOT EXISTS + IF NOT EXISTS indexes + pg_policies
 -- guards, so this is a clean no-op on prod (table already present) and a full
--- create on a fresh DB. FK parent relocation_cases is created by the Feb-21
--- baseline, well before this version.
+-- create on a fresh DB.
+--
+-- REPLAY-SAFE FK GUARD (2026-06-04): on prod public.relocation_cases.id is uuid
+-- (matching case_id), but on a fresh baseline replay it is still text — a
+-- pre-existing baseline-collision divergence (#224 class) not yet fixed for
+-- relocation_cases. A hard FK here aborts replay with 42804 ("incompatible
+-- types: uuid and text"). So the table is created WITHOUT the inline FK, and
+-- the FK is added only when relocation_cases.id is actually uuid. On prod the
+-- FK already exists (no-op); on a fresh DB it is skipped until the separate
+-- relocation_cases id→uuid baseline fix lands. Tracked as a follow-up.
 
 begin;
 
@@ -26,8 +34,6 @@ create table if not exists public.immigration_cases (
   created_at               timestamptz not null default now(),
   updated_at               timestamptz not null default now(),
   constraint immigration_cases_pkey primary key (id),
-  constraint immigration_cases_case_id_fkey
-    foreign key (case_id) references public.relocation_cases (id) on delete cascade,
   constraint immigration_cases_permit_type_check
     check (permit_type = any (array['eu_blue_card'::text, 'work_permit'::text,
       'skilled_worker_visa'::text, 'eea_registration'::text, 'other'::text])),
@@ -35,6 +41,23 @@ create table if not exists public.immigration_cases (
     check (status = any (array['initiated'::text, 'documents_collected'::text,
       'submitted'::text, 'under_review'::text, 'decision'::text, 'granted'::text]))
 );
+
+-- Replay-safe FK: only when relocation_cases.id is uuid (see header note).
+do $$
+begin
+  if not exists (
+        select 1 from pg_constraint
+        where conname = 'immigration_cases_case_id_fkey'
+          and conrelid = 'public.immigration_cases'::regclass)
+     and (select data_type from information_schema.columns
+          where table_schema = 'public' and table_name = 'relocation_cases'
+            and column_name = 'id') = 'uuid'
+  then
+    alter table public.immigration_cases
+      add constraint immigration_cases_case_id_fkey
+      foreign key (case_id) references public.relocation_cases (id) on delete cascade;
+  end if;
+end $$;
 
 create unique index if not exists immigration_cases_case_id_uidx
   on public.immigration_cases (case_id);
