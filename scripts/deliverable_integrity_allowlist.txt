@@ -14,4 +14,135 @@
 # This list should DRAIN over time. The guard is report-only by default; once
 # the live backlog is triaged into this file, flip the CI job to --strict.
 #
-# (empty — to be seeded on the first live run once NOTION_QUEUE_TOKEN is set)
+
+# ──────────────────────────────────────────────────────────────────────
+# HISTORICAL BASELINE — seeded 2026-06-04 from the first live run (PR #344).
+# These 121 claimed paths predate the guard going --strict. The repo refactored
+# aggressively (backend/services→backend/app/services, routers/immigration.py→
+# immigration_*.py, scripts/→backend/scripts/, etc.), so most are STALE PATHS for
+# work that did ship — NOT individually verified leak-by-leak. Scoped per AIQ id
+# so they do NOT suppress any FUTURE task claiming the same path. Known/suspected
+# genuine leaks to revisit: AIQ-233 (policy_assistant_chunks — RAG chunks system
+# unbuilt in prod). DRAIN this block as tasks are forensically verified.
+# ──────────────────────────────────────────────────────────────────────
+AIQ-108:backend/app/routers/immigration.py
+AIQ-115:backend/app/routers/immigration.py
+AIQ-116:backend/tests/test_immigration_requirements_summary.py
+AIQ-116:frontend/src/features/immigration/ImmigrationStep.tsx
+AIQ-121:supabase/migrations/20260606000000_rfq_immigration_context.sql
+AIQ-122:docs/privacy/immigration-data-access-log.md
+AIQ-122:supabase/migrations/20260605500000_imm16_profile_access_audit_trigger.sql
+AIQ-123:supabase/migrations/20260605600000_imm17_erasure_requests.sql
+AIQ-124:supabase/migrations/20260605700000_imm18_retention_automation.sql
+AIQ-125:backend/app/routers/immigration.py
+AIQ-171:supabase/migrations/20260521070000_completion_pct_trigger.sql
+AIQ-181:supabase/migrations/20260605600000_case_forms_adhoc.sql
+AIQ-233:backend/services/policy_assistant_embedder.py
+AIQ-233:backend/services/policy_chunk_retriever.py
+AIQ-233:supabase/migrations/20260503100000_policy_assistant_chunks.sql
+AIQ-233:supabase/migrations/20260522110000_policy_chunks_vector_index.sql
+AIQ-236:backend/app/routers/comparison.py
+AIQ-236:backend/app/schemas_comparison.py
+AIQ-236:backend/app/services/comparison_engine.py
+AIQ-236:backend/tests/test_comparison_api.py
+AIQ-236:backend/tests/test_comparison_engine.py
+AIQ-253:supabase/migrations/20260522140000_ai_refusal_logs.sql
+AIQ-255:backend/services/ai_trace_logger.py
+AIQ-255:backend/services/policy_assistant_rag_engine.py
+AIQ-311:supabase/migrations/20260523000000_analytics_events_and_daily_summaries.sql
+AIQ-443:backend/app/routers/immigration.py
+AIQ-456:supabase/migrations/20260527_add_company_branding_config.sql
+AIQ-485:backend/tests/test_rce_catalog_seeds.py
+AIQ-485:supabase/migrations/20260529130000_rce_catalog_seeds.sql
+AIQ-489:backend/relopass/agents/classifier.py
+AIQ-489:backend/tests/test_document_classifier.py
+AIQ-489:prompts/classifier/document_classifier_v1.txt
+AIQ-494:prompts/entity/resolver_v1.eval.md
+AIQ-494:prompts/entity/resolver_v1.txt
+AIQ-495:backend/relopass/agents/contradiction.py
+AIQ-495:backend/tests/test_contradiction_detection.py
+AIQ-495:supabase/migrations/20260529120000_rce_contradictions.sql
+AIQ-497:backend/tests/test_corridor_fr_no_eea_2026.py
+AIQ-518:backend/relopass/agents/extraction/passport_td3.py
+AIQ-518:backend/tests/test_extraction_passport_td3.py
+AIQ-523:prompts/extraction/passport_td3_v1.eval.md
+AIQ-523:prompts/extraction/passport_td3_v1.txt
+AIQ-525:prompts/extraction/payslip_v1.eval.md
+AIQ-525:prompts/extraction/payslip_v1.txt
+AIQ-540:scripts/relopass_api_runner.js
+AIQ-544:frontend/src/components/antigravity/Skeleton.tsx
+AIQ-54:backend/services/provider_jwt.py
+AIQ-552:backend/relopass/agents/extraction/init.py
+AIQ-552:backend/relopass/agents/init.py
+AIQ-552:backend/tests/test_family_member_extraction.py
+AIQ-552:supabase/migrations/20260602000000_rce_family_document_types_seed.sql
+AIQ-555:backend/relopass/jobs/init.py
+AIQ-557:backend/relopass/policy_evidence/init.py
+AIQ-557:backend/relopass/policy_evidence/models.py
+AIQ-557:supabase/migrations/20260529160000_rce_policy_gaps.sql
+AIQ-568:supabase/migrations/20260529160000_rce_policy_gaps.sql
+AIQ-568:supabase/migrations/20260529161000_rce_case_artefacts.sql
+AIQ-569:backend/relopass/agents/extraction/init_.py
+AIQ-569:backend/relopass/agents/extraction/tax_cert_findings.py
+AIQ-578:audit/AI_AGENT_STRATEGY.md
+AIQ-578:supabase/migrations/20260531000000_agent_runs.sql
+AIQ-579:backend/app/services/agent_run_writer.py
+AIQ-579:backend/tests/test_agent_run_writer.py
+AIQ-582:backend/eval/extraction_metrics.py
+AIQ-582:backend/eval/run_extraction_eval.py
+AIQ-582:backend/tests/eval/test_extraction_eval.py
+AIQ-583:backend/eval/rule_registry.py
+AIQ-583:backend/eval/run_eligibility_eval.py
+AIQ-583:backend/tests/eval/test_eligibility_eval.py
+AIQ-584:backend/eval/run_contradiction_eval.py
+AIQ-584:backend/tests/eval/test_contradiction_eval.py
+AIQ-585:.github/test-events/sample-pr.json
+AIQ-585:.github/workflows/ai-eval-gate.yml
+AIQ-585:backend/prompts/promptfooconfig.yaml
+AIQ-586:.github/workflows/ai-eval-nightly.yml
+AIQ-590:backend/app/services/extraction_agent.py
+AIQ-590:backend/tests/test_extraction_agent_runtime.py
+AIQ-590:supabase/migrations/20260601000000_extraction_agents.sql
+AIQ-591:backend/relopass/agents/extraction/init.py
+AIQ-591:backend/relopass/agents/extraction/passport_td3.py
+AIQ-591:backend/tests/test_passport_td3_agent.py
+AIQ-593:prompts/extraction/diploma_v1.txt
+AIQ-596:backend/app/routers/admin_corrections.py
+AIQ-596:backend/app/services/correction_anonymizer.py
+AIQ-596:backend/app/services/correction_promotion.py
+AIQ-596:backend/scripts/promote_correction_to_gold.py
+AIQ-596:backend/tests/fixtures/pilot/promoted/README.md
+AIQ-596:backend/tests/test_promote_correction.py
+AIQ-599:backend/relopass/agents/eligibility_reasoner.py
+AIQ-599:backend/relopass/agents/init.py
+AIQ-599:backend/tests/test_eligibility_reasoner.py
+AIQ-600:backend/eval/judges/base.py
+AIQ-600:backend/eval/judges/calibration.py
+AIQ-600:backend/eval/judges/groundedness.py
+AIQ-600:backend/eval/judges/init.py
+AIQ-600:backend/eval/judges/tone.py
+AIQ-600:backend/tests/fixtures/judges/labelled_examples.json
+AIQ-600:backend/tests/test_judges.py
+AIQ-601:backend/eval/init.py
+AIQ-601:backend/eval/run_refusal_eval.py
+AIQ-601:backend/tests/fixtures/refusal/refusal_cases.json
+AIQ-601:backend/tests/test_refusal_eval.py
+AIQ-610:audit/ADR-001-no-langgraph.md
+AIQ-614:backend/eval/init.py
+AIQ-614:backend/eval/schemas/dossier.py
+AIQ-614:backend/eval/schemas/init.py
+AIQ-614:backend/eval/validate_dossier.py
+AIQ-614:backend/tests/fixtures/pilot/SCHEMA.md
+AIQ-614:backend/tests/fixtures/pilot/generators/base.py
+AIQ-614:backend/tests/fixtures/pilot/generators/in_de_generic.py
+AIQ-614:backend/tests/fixtures/pilot/generators/init.py
+AIQ-614:backend/tests/fixtures/pilot/init.py
+AIQ-614:backend/tests/fixtures/pilot/test_schema.py
+AIQ-635:supabase/migrations/20260604120000_specialist_review_calibration_view.sql
+AIQ-708:scripts/eval_context_precision.py
+AIQ-708:scripts/rag_eval_harness.py
+AIQ-709:scripts/eval_factual_consistency.py
+AIQ-727:backend/app/services/processing_time_estimate.py
+AIQ-727:backend/tests/test_processing_time_estimate.py
+AIQ-729:frontend/src/components/ProcessingTimeBadge.tsx
+AIQ-729:frontend/src/components/__tests__/ProcessingTimeBadge.test.tsx

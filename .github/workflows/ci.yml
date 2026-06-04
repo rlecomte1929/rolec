@@ -225,7 +225,10 @@ jobs:
       - name: Run deliverable-integrity check
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
-        run: python scripts/check_deliverable_integrity.py --root .
+        # --strict: 121 historical findings baselined into the allowlist on
+        # 2026-06-04 (refactor-stale paths, scoped per AIQ id). The guard now
+        # fails only on NEW Done-tasks-with-missing-deliverables.
+        run: python scripts/check_deliverable_integrity.py --root . --strict
 
   queue-status-hygiene:
     # HYGIENE-2: assert that no AI Work Queue task is left "Ready for AI" while a
