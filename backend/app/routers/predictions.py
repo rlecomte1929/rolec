@@ -29,6 +29,10 @@ def _predictions_enabled() -> bool:
     return os.getenv("PREDICTIONS_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
 
 
+def _processing_time_enabled() -> bool:
+    return os.getenv("PROCESSING_TIME_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+
+
 @router.get("/{case_id}/predicted-duration")
 def get_predicted_duration(
     case_id: str,
@@ -61,3 +65,30 @@ def get_predicted_duration(
             return predict_remaining_duration(model, case_id, session)
         except InsufficientDataError:
             raise HTTPException(status_code=404, detail="Case not found")
+
+
+@router.get("/{case_id}/processing-time")
+def get_processing_time(
+    case_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Return {p50_days, p90_days, source, sample_size, last_updated, source_url}.
+
+    Corridor-level processing-time estimate for a case (P2-04). Empirical p50/p90
+    from completed platform cases once a corridor has >= 20 of them, otherwise the
+    official statutory range with a citation. 404 when the canary flag is off, the
+    case is unknown, or no source is available (the UI then renders nothing — never
+    a processing time without a source). Same ownership gate as predicted-duration.
+    """
+    if not _processing_time_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    require_case_access(case_id, user)
+
+    from ..services.processing_time_estimate import estimate_for_case
+
+    with SessionLocal() as session:
+        estimate = estimate_for_case(session, case_id)
+        if estimate is None:
+            raise HTTPException(status_code=404, detail="No processing-time estimate available")
+        return dict(estimate)

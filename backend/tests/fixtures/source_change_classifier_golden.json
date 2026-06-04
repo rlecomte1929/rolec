@@ -1,0 +1,75 @@
+{
+  "description": "Golden fixture for P2-02b material-vs-cosmetic source-change classifier (AIQ-690). Each case is a realistic relocation/immigration source-page diff, labelled material (an actual rule/fee/form/date/requirement changed) or cosmetic (markup, whitespace, navigation, styling, or footer-timestamp churn that does not change the rule). Validation criterion: classifier must match the label on >= 9 of 10.",
+  "cases": [
+    {
+      "id": "fee-amount-change",
+      "label": "material",
+      "note": "Permit fee increased.",
+      "old": "<p>The residence permit application fee is <strong>CHF 100</strong> per applicant.</p>",
+      "new": "<p>The residence permit application fee is <strong>CHF 140</strong> per applicant.</p>"
+    },
+    {
+      "id": "requirement-added",
+      "label": "material",
+      "note": "New eligibility requirement introduced.",
+      "old": "<div class=\"content\"><p>Submit your application to the cantonal migration office.</p></div>",
+      "new": "<div class=\"content\"><p>Submit your application to the cantonal migration office.</p><p>Applicants must hold a valid B permit before applying.</p></div>"
+    },
+    {
+      "id": "deadline-duration-change",
+      "label": "material",
+      "note": "Filing deadline shortened.",
+      "old": "<li>Applications must be submitted within 14 days of arrival.</li>",
+      "new": "<li>Applications must be submitted within 8 days of arrival.</li>"
+    },
+    {
+      "id": "form-reference-change",
+      "label": "material",
+      "note": "Required form number changed.",
+      "old": "<p>Complete and submit Form 11.66 to the cantonal office.</p>",
+      "new": "<p>Complete and submit Form 12.10 to the cantonal office.</p>"
+    },
+    {
+      "id": "salary-threshold-change",
+      "label": "material",
+      "note": "Minimum salary threshold raised.",
+      "old": "<td>Minimum annual salary: EUR 120,000</td>",
+      "new": "<td>Minimum annual salary: EUR 130,000</td>"
+    },
+    {
+      "id": "block-tag-wrapper-change",
+      "label": "cosmetic",
+      "note": "Same text, paragraph re-wrapped in a div — pure markup.",
+      "old": "<p>The permit fee is CHF 100 per applicant.</p>",
+      "new": "<div>The permit fee is CHF 100 per applicant.</div>"
+    },
+    {
+      "id": "whitespace-reflow",
+      "label": "cosmetic",
+      "note": "Indentation and line wrapping changed only.",
+      "old": "<p>Applicants    must hold a\n   valid B permit before applying.</p>",
+      "new": "<p>Applicants must hold a valid B permit before applying.</p>"
+    },
+    {
+      "id": "navigation-item-added",
+      "label": "cosmetic",
+      "note": "A nav menu link was added; no rule content changed.",
+      "old": "<nav><a href=\"/home\">Home</a><a href=\"/about\">About</a></nav><p>The permit fee is CHF 100.</p>",
+      "new": "<nav><a href=\"/home\">Home</a><a href=\"/about\">About</a><a href=\"/contact\">Contact us</a></nav><p>The permit fee is CHF 100.</p>"
+    },
+    {
+      "id": "css-class-restyle",
+      "label": "cosmetic",
+      "note": "Styling attributes changed; visible text identical.",
+      "old": "<div class=\"box red\" style=\"margin:0\">Eligibility: holders of a valid B permit.</div>",
+      "new": "<div class=\"box blue rounded\" style=\"margin:8px\">Eligibility: holders of a valid B permit.</div>"
+    },
+    {
+      "id": "footer-last-updated-bump",
+      "label": "cosmetic",
+      "note": "Footer 'last updated' timestamp bumped; no rule content changed.",
+      "old": "<p>The permit fee is CHF 100.</p><footer>Last updated: January 3, 2026</footer>",
+      "new": "<p>The permit fee is CHF 100.</p><footer>Last updated: January 5, 2026</footer>"
+    }
+  ]
+}

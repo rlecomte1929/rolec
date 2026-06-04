@@ -29,8 +29,13 @@ from .policy_assistant_embedder import Embedder
 log = logging.getLogger(__name__)
 
 # Synthetic corpus owner: immigration rules are corridor-scoped, not
-# company-scoped, but policy_chunk_retriever requires a company_id.
-IMMIGRATION_CORPUS_COMPANY_ID = "__immigration_corpus__"
+# company-scoped, but policy_chunk_retriever requires a company_id. The
+# policy_assistant_chunks.company_id column is `uuid`, so this must be a real
+# UUID (not a free-form string). Fixed, deterministic value derived from
+# uuid5(NAMESPACE_URL, "relopass:immigration_corpus") — used both here and by
+# the corpus indexer (backend/scripts/index_corridor_corpus_chunks.py) so the
+# rows it writes and the rows this retriever reads share the same partition.
+IMMIGRATION_CORPUS_COMPANY_ID = "c0de6492-13b0-5222-80db-9f9e2abdd913"
 IMMIGRATION_SOURCE_TYPE = "immigration_rule"
 
 # Over-fetch factor: policy_chunk_retriever can't filter by corridor, so we

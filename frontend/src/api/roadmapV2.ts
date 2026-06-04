@@ -17,6 +17,11 @@ export interface RoadmapV2Step {
   vendor_id: string | null;
   doc_count: number;
   worst_doc_status: string | null;
+  // [P3-04e] Confidence + source provenance derived from the linked requirement.
+  confidence_level?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+  source_url?: string | null;
+  source_fetched_at?: string | null;
+  source_excerpt?: string | null;
 }
 
 export interface RoadmapV2Track {

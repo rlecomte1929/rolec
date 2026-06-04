@@ -9,7 +9,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Card } from '../../../components/antigravity';
+import { Badge, Card, StalenessBadge, isSourceStale } from '../../../components/antigravity';
 import { logger } from '../../../lib/logger';
 import type { CaseFormStatus, CaseFormSummary } from '../../../api/dossier';
 import { buildRoute } from '../../../navigation/routes';
@@ -300,14 +300,25 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
                   </svg>
                 </a>
               )}
-              {/* [P1-05d] Source freshness from source_pages.last_fetched_at */}
-              {form.template.source_url && form.template.source_last_verified && (
-                <span className="text-slate-400" title="When we last checked the official source page">
-                  Last verified · {new Date(form.template.source_last_verified).toLocaleDateString()}
-                </span>
-              )}
+              {/* [P1-05d] Source freshness from source_pages.last_fetched_at.
+                  When the source is older than its tier threshold (P2-08) the
+                  passive date is replaced by the StalenessBadge advisory below. */}
+              {form.template.source_url &&
+                form.template.source_last_verified &&
+                !isSourceStale(form.template.source_last_verified) && (
+                  <span className="text-slate-400" title="When we last checked the official source page">
+                    Last verified · {new Date(form.template.source_last_verified).toLocaleDateString()}
+                  </span>
+                )}
             </div>
           )}
+
+          {/* [P2-08c] Stale-source advisory — additive, renders only when the
+              official source hasn't been verified within its tier threshold. */}
+          <StalenessBadge
+            lastVerified={form.template.source_last_verified}
+            sourceUrl={form.template.source_url}
+          />
 
           <div className="flex items-center gap-3 flex-wrap">
             {/* [P2-3] Open form editor — disabled for blocked/submitted/approved */}

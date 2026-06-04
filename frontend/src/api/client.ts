@@ -2095,6 +2095,7 @@ export const adminFreshnessAPI = {
   getCities: (params?: { country_code?: string }) =>
     api.get('/api/admin/freshness/cities', { params }).then((r) => r.data),
   getSources: () => api.get('/api/admin/freshness/sources').then((r) => r.data),
+  getSourcePages: () => api.get('/api/admin/freshness/source-pages').then((r) => r.data),
   refreshFreshness: () => api.post('/api/admin/freshness/refresh').then((r) => r.data),
   listSchedules: (params?: { is_active?: boolean; limit?: number }) =>
     api.get('/api/admin/crawl/schedules', { params }).then((r) => r.data),
