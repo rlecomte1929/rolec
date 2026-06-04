@@ -122,7 +122,8 @@ class RoadmapEndpointStalenessTests(unittest.TestCase):
         with mock.patch.object(cases_read, "SessionLocal", self.Session), \
                 mock.patch.object(cases_read.crud, "get_case", return_value=case), \
                 mock.patch.object(cases_read, "_assert_case_access", lambda *a, **k: None), \
-                mock.patch.object(cases_read, "derive_roadmap", side_effect=lambda *a, **k: dict(roadmap)), \
+                mock.patch.object(cases_read, "generate_ai_roadmap_for_case",
+                                  side_effect=lambda *a, **k: dict(roadmap)), \
                 mock.patch.object(feature_flags, "SessionLocal", self.Session), \
                 mock.patch.object(gate, "SessionLocal", self.Session):
             return cases_read.get_case_roadmap("case-1", user={"id": "acct"})
