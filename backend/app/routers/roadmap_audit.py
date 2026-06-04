@@ -133,11 +133,18 @@ def get_audit_export(
 # ---------------------------------------------------------------------------
 
 
+# MVP DECISION (2026-06-04): the rule-change notifier is MANUAL-ONLY for now —
+# an admin presses this endpoint to run it. The P1-08d acceptance criterion
+# ("notification fires within 24h of a rule change") is only met hands-off once
+# notify_superseded_rules() is called by a ≤24h scheduled job.
+# TODO [P1-08d-followup]: before a real production launch, wire
+# notify_superseded_rules() into a daily scheduler (e.g. alongside
+# backend/relopass/jobs/rule_scraper.py) so the 24h criterion holds automatically.
 @router.post("/api/admin/rule-change-notifications/run", response_model=NotifierRunResponse)
 def run_rule_change_notifications(
     _admin: Dict[str, Any] = Depends(require_admin),
 ) -> NotifierRunResponse:
-    """Trigger the rule-change notifier now. Returns the run counts."""
+    """Trigger the rule-change notifier now (manual MVP path). Returns the run counts."""
     try:
         counts = notify_superseded_rules()
     except Exception:  # noqa: BLE001 — degrade rather than 500

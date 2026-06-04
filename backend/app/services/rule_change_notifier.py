@@ -13,10 +13,12 @@ currency via ``effective_to`` (a closed validity window) and ``superseded_by``
 (a pointer to the replacing version). A version is treated as *superseded* when
 either is set. This is the correct, schema-accurate signal.
 
-Intended to run on a schedule (≤24h cadence to meet the "within 24h" criterion),
-e.g. the same daily job that runs the rule scraper. It is also exposed via an
-admin endpoint (roadmap_audit router) so it can be triggered manually for
-verification.
+MVP STATUS (2026-06-04): MANUAL-ONLY. This function is currently invoked only via
+the admin endpoint POST /api/admin/rule-change-notifications/run. It is NOT yet on
+a scheduler, so the P1-08d "within 24h" criterion is only met when an admin runs it.
+TODO [P1-08d-followup]: before a real production launch, call this from a ≤24h
+scheduled job (e.g. the same daily job that runs backend/relopass/jobs/rule_scraper.py)
+so the 24h guarantee holds automatically.
 
 Idempotency: a recipient is notified at most once per (case, prior rule_version)
 — re-running the job does not re-notify.
