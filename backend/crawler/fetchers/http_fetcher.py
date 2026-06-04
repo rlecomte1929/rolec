@@ -13,6 +13,10 @@ import requests
 
 log = logging.getLogger(__name__)
 
+# Transient HTTP statuses worth retrying. 4xx (e.g. 404) are permanent and are
+# handled by dead-link detection (P3-02d), not retried here.
+RETRYABLE_STATUS = {429, 502, 503, 504}
+
 
 @dataclass
 class FetchResult:
@@ -42,12 +46,16 @@ def fetch_page(
     *,
     user_agent: str = "ReloPassBot/1.0 (crawler-staging)",
     timeout: int = 15,
-    retry_count: int = 2,
+    retry_count: int = 3,
+    backoff_base_seconds: float = 1.0,
     max_bytes: int = 2 * 1024 * 1024,
 ) -> FetchResult:
     """
-    Fetch a single page. Retries on transient failures.
-    Returns FetchResult with content, hash, status.
+    Fetch a single page. Retries transient failures (network errors and
+    retryable HTTP statuses in ``RETRYABLE_STATUS``) up to ``retry_count`` times
+    with exponential backoff (``backoff_base_seconds * 2**attempt``). Permanent
+    HTTP errors (e.g. 404) are not retried. Never raises — exhausted retries
+    return a failed FetchResult so the caller logs the failure without crashing.
     """
     from datetime import datetime, timezone
 
@@ -60,6 +68,8 @@ def fetch_page(
 
     resp = None
     for attempt in range(retry_count + 1):
+        error_msg = None
+        retryable = False
         try:
             resp = requests.get(
                 url,
@@ -74,6 +84,10 @@ def fetch_page(
 
             if http_status >= 400:
                 error_msg = f"HTTP {http_status}"
+                retryable = http_status in RETRYABLE_STATUS
+                if retryable and attempt < retry_count:
+                    time.sleep(backoff_base_seconds * (2 ** attempt))
+                    continue
                 break
 
             if "text/html" not in content_type and "application/json" not in content_type:
@@ -98,11 +112,11 @@ def fetch_page(
         except requests.exceptions.Timeout:
             error_msg = "Timeout"
             if attempt < retry_count:
-                time.sleep(1 * (attempt + 1))
+                time.sleep(backoff_base_seconds * (2 ** attempt))
         except requests.exceptions.RequestException as e:
             error_msg = str(e)
             if attempt < retry_count:
-                time.sleep(1 * (attempt + 1))
+                time.sleep(backoff_base_seconds * (2 ** attempt))
 
     content_hash = _compute_hash(content) if content else ""
     fetched_at = datetime.now(timezone.utc).isoformat()
