@@ -63,6 +63,8 @@ export interface CaseFormSummary {
   receipt_ref: string | null;
   rejection_reason: string | null;  // [P4-5] set when status='rejected'
   roadmap_step_id?: string | null;  // [P1-6] step that triggered this form
+  is_adhoc?: boolean;                // [P4-3] true for ad-hoc "Add document" entries
+  notes?: string | null;             // [P4-3] free-text notes from the Add-document modal
   template: DossierFormTemplate;
   person: DossierFormPerson;
   fields_summary: DossierFieldsSummary;
@@ -73,6 +75,43 @@ export interface CaseFormSummary {
 export const dossierAPI = {
   list: async (caseId: string, params?: { status?: CaseFormStatus }): Promise<CaseFormSummary[]> =>
     api.get(`/api/cases/${caseId}/forms`, { params }).then((r: { data: CaseFormSummary[] }) => r.data),
+};
+
+// ── [P4-3] Ad-hoc "Add document" ─────────────────────────────────────────────
+
+export interface CreateAdhocFormPayload {
+  name: string;
+  authority?: string | null;
+  personId?: string | null;
+  deadline?: string | null;
+  notes?: string | null;
+  file?: File | null;
+}
+
+function buildAdhocFormData(payload: CreateAdhocFormPayload): FormData {
+  const fd = new FormData();
+  fd.append('name', payload.name);
+  if (payload.authority) fd.append('authority', payload.authority);
+  if (payload.personId) fd.append('person_id', payload.personId);
+  if (payload.deadline) fd.append('deadline', payload.deadline);
+  if (payload.notes) fd.append('notes', payload.notes);
+  if (payload.file) fd.append('file', payload.file);
+  return fd;
+}
+
+export const adhocFormsAPI = {
+  create: async (caseId: string, payload: CreateAdhocFormPayload): Promise<CaseFormSummary> =>
+    api
+      .post(`/api/cases/${caseId}/forms/adhoc`, buildAdhocFormData(payload))
+      .then((r: { data: CaseFormSummary }) => r.data),
+
+  replacePdf: async (caseId: string, formId: string, file: File): Promise<CaseFormSummary> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api
+      .post(`/api/cases/${caseId}/forms/${formId}/replace-pdf`, fd)
+      .then((r: { data: CaseFormSummary }) => r.data);
+  },
 };
 
 // ── [P3-4] Dossier Package ────────────────────────────────────────────────────

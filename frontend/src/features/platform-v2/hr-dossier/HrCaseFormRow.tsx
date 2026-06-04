@@ -14,7 +14,7 @@ import type {
   FormComment,
   FormEvent,
 } from '../../../api/dossier';
-import { commentsAPI, eventsAPI, flagAPI } from '../../../api/dossier';
+import { adhocFormsAPI, commentsAPI, eventsAPI, flagAPI } from '../../../api/dossier';
 
 // ── Status display helpers (shared with CaseFormCard) ────────────────────────
 
@@ -136,6 +136,11 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
   const [rejectError, setRejectError]             = useState<string | null>(null);
 
   const isFlagged = !!(form as CaseFormSummary & { flag_note?: string }).flag_note;
+  const isAdhoc = !!form.is_adhoc;
+
+  // [P4-3] Replace-PDF state for ad-hoc forms
+  const [replacingPdf, setReplacingPdf] = useState(false);
+  const [replacePdfError, setReplacePdfError] = useState<string | null>(null);
 
   const loadExpandedData = useCallback(async () => {
     setLoadingData(true);
@@ -211,6 +216,24 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
       setFlagError('Failed to update flag.');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // ── [P4-3] Replace PDF (ad-hoc forms only) ────────────────────────────────
+
+  const handleReplacePdf = async (file: File | null | undefined) => {
+    if (!file) return;
+    setReplacingPdf(true);
+    setReplacePdfError(null);
+    try {
+      await adhocFormsAPI.replacePdf(form.case_id, form.id, file);
+      onRefresh();
+      void loadExpandedData();
+    } catch (e) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      setReplacePdfError(err.response?.data?.detail || err.message || 'Failed to replace PDF.');
+    } finally {
+      setReplacingPdf(false);
     }
   };
 
@@ -318,35 +341,51 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
       >
         {/* Code + name */}
         <div className="col-span-5 flex items-start gap-2 min-w-0">
-          <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded font-mono text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-            {form.template.code}
-          </span>
+          {isAdhoc ? (
+            <span className="shrink-0">
+              <Badge variant="info" size="sm">Custom</Badge>
+            </span>
+          ) : (
+            <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded font-mono text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              {form.template.code}
+            </span>
+          )}
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-slate-900 truncate">{form.template.name}</div>
             <div className="text-xs text-slate-500 truncate">
-              {form.template.authority_code && `${form.template.authority_code} · `}v{form.template.version}
+              {isAdhoc
+                ? (form.template.authority_name || 'Ad-hoc document')
+                : <>{form.template.authority_code && `${form.template.authority_code} · `}v{form.template.version}</>}
             </div>
           </div>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar — ad-hoc forms have no fields, so show the doc state instead */}
         <div className="col-span-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-500">{filled}/{total} fields</span>
-            <span className="text-xs font-medium text-slate-700">{pct}%</span>
-          </div>
-          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${
-                dStatus === 'blocked'
-                  ? 'bg-rose-400'
-                  : dStatus === 'ready' || dStatus === 'approved'
-                    ? 'bg-emerald-500'
-                    : 'bg-blue-500'
-              }`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
+          {isAdhoc ? (
+            <span className="text-xs text-slate-500">
+              {form.original_file_url ? 'PDF attached' : 'No PDF attached'}
+            </span>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-slate-500">{filled}/{total} fields</span>
+                <span className="text-xs font-medium text-slate-700">{pct}%</span>
+              </div>
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    dStatus === 'blocked'
+                      ? 'bg-rose-400'
+                      : dStatus === 'ready' || dStatus === 'approved'
+                        ? 'bg-emerald-500'
+                        : 'bg-blue-500'
+                  }`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Status badge + flag indicator + deadline chip + chevron */}
@@ -378,6 +417,14 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
         <div className="mt-4 space-y-4">
           {/* Status banner */}
           <div className={`rounded border px-3 py-2 text-sm ${bannerTone}`}>{bannerText}</div>
+
+          {/* [P4-3] Ad-hoc notes */}
+          {isAdhoc && form.notes && (
+            <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Notes</span>
+              <p className="mt-0.5 whitespace-pre-wrap">{form.notes}</p>
+            </div>
+          )}
 
           {/* Loading indicator for comments + events */}
           {loadingData && (
@@ -467,6 +514,44 @@ export const HrCaseFormRow: React.FC<HrCaseFormRowProps> = ({ form, onRefresh })
 
           {/* ── HR Actions ───────────────────────────────────────────── */}
           <div className="border-t border-slate-100 pt-3 space-y-2">
+            {/* [P4-3] Replace PDF — ad-hoc forms only */}
+            {isAdhoc && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-slate-600 shrink-0">Document:</span>
+                {form.original_file_url ? (
+                  <a
+                    href={form.original_file_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-2.5 py-1 rounded text-xs font-medium border border-slate-200 text-slate-700 hover:bg-slate-50"
+                  >
+                    View PDF
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-400">No PDF attached</span>
+                )}
+                <label
+                  className={`px-2.5 py-1 rounded text-xs font-medium border cursor-pointer transition-colors
+                    ${replacingPdf
+                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-wait'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+                >
+                  {replacingPdf ? 'Uploading…' : 'Replace PDF'}
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    disabled={replacingPdf}
+                    onChange={(e) => {
+                      void handleReplacePdf(e.target.files?.[0]);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {replacePdfError && <span className="text-xs text-rose-600">{replacePdfError}</span>}
+              </div>
+            )}
+
             {/* Status change */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-slate-600 shrink-0">Change status:</span>

@@ -17,6 +17,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import { dossierAPI, type CaseFormSummary } from '../../api/dossier';
 import { HrCaseFormRow } from '../../features/platform-v2/hr-dossier/HrCaseFormRow';
+import {
+  AddDocumentModal,
+  type AddDocumentPersonOption,
+} from '../../features/platform-v2/hr-dossier/AddDocumentModal';
 import { buildRoute } from '../../navigation/routes';
 import { useCaseFormsRealtime } from '../../hooks/useCaseFormsRealtime';
 
@@ -52,6 +56,7 @@ export const HrCaseDossierPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [filter, setFilter]   = useState<FilterKey>('all');
+  const [showAddDocument, setShowAddDocument] = useState(false);
 
   const load = useCallback(async () => {
     if (!caseId) { setError('Missing case id.'); setLoading(false); return; }
@@ -94,6 +99,19 @@ export const HrCaseDossierPage: React.FC = () => {
     return { pct, ready, total: forms.length };
   }, [forms]);
 
+  // [P4-3] People the new document can be scoped to — derived from existing
+  // forms' person field (employee/HR profiles), deduped by profile_id.
+  const peopleOptions = useMemo<AddDocumentPersonOption[]>(() => {
+    const byId = new Map<string, AddDocumentPersonOption>();
+    for (const f of forms) {
+      const id = f.person.profile_id;
+      if (id && !byId.has(id)) {
+        byId.set(id, { id, label: f.person.name || 'Employee' });
+      }
+    }
+    return Array.from(byId.values());
+  }, [forms]);
+
   return (
     <AppShell>
       <div className="max-w-5xl mx-auto px-6 py-8">
@@ -128,9 +146,8 @@ export const HrCaseDossierPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                disabled
-                title="Add document — coming in P3-4"
-                className="px-3 py-1.5 rounded text-sm font-medium bg-[#0b2b43] text-white opacity-50 cursor-not-allowed"
+                onClick={() => setShowAddDocument(true)}
+                className="px-3 py-1.5 rounded text-sm font-medium bg-[#0b2b43] text-white hover:bg-[#0e3a5c]"
               >
                 + Add document
               </button>
@@ -182,6 +199,16 @@ export const HrCaseDossierPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* [P4-3] Add-document modal */}
+      {showAddDocument && caseId && (
+        <AddDocumentModal
+          caseId={caseId}
+          people={peopleOptions}
+          onClose={() => setShowAddDocument(false)}
+          onCreated={() => void load()}
+        />
+      )}
     </AppShell>
   );
 };
