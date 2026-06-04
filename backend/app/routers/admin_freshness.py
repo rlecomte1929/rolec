@@ -121,6 +121,22 @@ def post_refresh(user: Dict[str, Any] = Depends(_require_admin)):
     return refresh_freshness_metrics()
 
 
+# P2-08e (AIQ-706) — admin alert when >20% of active cases have stale steps.
+# MVP DECISION (2026-06-04): MANUAL-ONLY, mirroring the P1-08d rule-change
+# notifier. An admin presses this endpoint to evaluate the share of active cases
+# citing a stale source; if it crosses the threshold an ops-notification fires.
+# TODO [P2-08e-followup]: before production, call evaluate_case_staleness_alert()
+# from a daily scheduled job (e.g. alongside the source-freshness crawl) so the
+# alert fires hands-off rather than only on this manual trigger.
+@router.post("/staleness-alert/run")
+def post_staleness_alert(user: Dict[str, Any] = Depends(_require_admin)):
+    """Evaluate active-case source staleness now and raise an admin alert if it
+    breaches the threshold (manual MVP path). Returns the aggregate summary."""
+    from ..services.case_staleness_alert import evaluate_case_staleness_alert
+
+    return evaluate_case_staleness_alert()
+
+
 # --- Crawl schedules ---
 @crawl_router.get("/schedules")
 def get_schedules(
