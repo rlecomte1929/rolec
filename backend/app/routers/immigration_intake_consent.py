@@ -36,7 +36,7 @@ from ..services.immigration_service import (
 
 # Pydantic models — imported from immigration.py until imm-6 relocates them to
 # a shared schemas module. Keep the source of truth in immigration.py for now.
-from .immigration import ConsentBody, CONSENT_TEXT_VERSION
+from .immigration import ConsentBody, WithdrawConsentBody, CONSENT_TEXT_VERSION
 
 router = APIRouter(prefix="/api", tags=["immigration-intake-consent"])
 
@@ -278,6 +278,95 @@ def record_consent_employee(
         "purposes_recorded": body.purposes,
         "consent_version": CONSENT_TEXT_VERSION,
         "recorded_at": now,
+    }
+
+
+@router.get("/employee/cases/{case_id}/consent")
+def list_consent_employee(
+    case_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """List the employee's own consent records for this case (latest per purpose)."""
+    employee_id = current_user["id"]
+
+    with db.engine.begin() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT DISTINCT ON (purpose)
+                       purpose, consented, consent_version,
+                       consented_at, withdrawn_at, withdrawn_reason, created_at
+                FROM public.consent_records
+                WHERE case_id = :case_id AND employee_id = :employee_id
+                ORDER BY purpose, created_at DESC
+            """),
+            {"case_id": case_id, "employee_id": employee_id},
+        ).mappings().all()
+
+    records = []
+    for r in rows:
+        d = dict(r)
+        d["active"] = bool(d.get("consented")) and d.get("withdrawn_at") is None
+        records.append(d)
+
+    return {"consent_records": records}
+
+
+@router.post("/employee/cases/{case_id}/consent/withdraw")
+def withdraw_consent_employee(
+    case_id: str,
+    body: WithdrawConsentBody,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    GDPR Art. 7(3) — employee withdraws consent for a given purpose.
+    Marks every active consent row for that purpose as withdrawn (consented=FALSE,
+    withdrawn_at=now). Returns 404 if no active consent exists for the purpose.
+    """
+    employee_id = current_user["id"]
+    now = _now_iso()
+
+    with db.engine.begin() as conn:
+        result = conn.execute(
+            text("""
+                UPDATE public.consent_records
+                   SET consented = FALSE,
+                       withdrawn_at = :now,
+                       withdrawn_reason = :reason
+                WHERE case_id = :case_id
+                  AND employee_id = :employee_id
+                  AND purpose = :purpose
+                  AND withdrawn_at IS NULL
+            """),
+            {
+                "now": now,
+                "reason": body.reason,
+                "case_id": case_id,
+                "employee_id": employee_id,
+                "purpose": body.purpose,
+            },
+        )
+        affected = result.rowcount or 0
+
+    if affected == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No active consent on record for purpose '{body.purpose}'.",
+        )
+
+    _log_access(
+        case_id=case_id,
+        profile_id=None,
+        user_id=employee_id,
+        role="employee",
+        action="consent_withdraw",
+        fields=[body.purpose],
+    )
+
+    return {
+        "purpose": body.purpose,
+        "withdrawn": True,
+        "records_withdrawn": affected,
+        "withdrawn_at": now,
     }
 
 
