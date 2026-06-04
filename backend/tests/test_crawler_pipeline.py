@@ -131,5 +131,72 @@ class TestFetchResult(unittest.TestCase):
         self.assertFalse(r.success)
 
 
+class TestWriteSourcePage(unittest.TestCase):
+    """[P1-05d] The crawler keeps source_pages (current-state freshness) in sync."""
+
+    def _mock_supabase(self, existing_rows):
+        """A Supabase mock whose select(...).execute().data == existing_rows."""
+        sb = MagicMock()
+        sb.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = existing_rows
+        return sb
+
+    def _fetch(self, *, status=200, content_hash="h1", error=None):
+        return FetchResult(
+            url="https://www.udi.no/en/eea/",
+            final_url="https://www.udi.no/en/eea/",
+            content="<html/>",
+            content_type="text/html",
+            http_status=status,
+            content_hash=content_hash,
+            fetched_at="2026-06-04T10:00:00Z",
+            error=error,
+        )
+
+    def _upsert_payload(self, sb):
+        args, kwargs = sb.table.return_value.upsert.call_args
+        self.assertEqual(kwargs.get("on_conflict"), "url")
+        return args[0]
+
+    def test_new_url_inserts_hash_and_freshness(self):
+        sb = self._mock_supabase(existing_rows=[])
+        with patch("backend.crawler.staging.writer._get_supabase", return_value=sb):
+            from backend.crawler.staging.writer import write_source_page
+            write_source_page(self._fetch(), page_title="EEA", trust_tier="1")
+        row = self._upsert_payload(sb)
+        self.assertEqual(row["url"], "https://www.udi.no/en/eea/")
+        self.assertEqual(row["content_hash"], "h1")
+        self.assertTrue(row["is_accessible"])
+        self.assertEqual(row["last_fetched_at"], "2026-06-04T10:00:00Z")
+        self.assertNotIn("previous_hash", row)
+
+    def test_changed_hash_records_previous_and_last_changed(self):
+        sb = self._mock_supabase(existing_rows=[{"content_hash": "old"}])
+        with patch("backend.crawler.staging.writer._get_supabase", return_value=sb):
+            from backend.crawler.staging.writer import write_source_page
+            write_source_page(self._fetch(content_hash="new"), trust_tier="1")
+        row = self._upsert_payload(sb)
+        self.assertEqual(row["content_hash"], "new")
+        self.assertEqual(row["previous_hash"], "old")
+        self.assertEqual(row["last_changed_at"], "2026-06-04T10:00:00Z")
+
+    def test_unchanged_hash_no_previous(self):
+        sb = self._mock_supabase(existing_rows=[{"content_hash": "same"}])
+        with patch("backend.crawler.staging.writer._get_supabase", return_value=sb):
+            from backend.crawler.staging.writer import write_source_page
+            write_source_page(self._fetch(content_hash="same"), trust_tier="1")
+        row = self._upsert_payload(sb)
+        self.assertNotIn("previous_hash", row)
+
+    def test_404_preserves_hash_marks_inaccessible(self):
+        sb = self._mock_supabase(existing_rows=[{"content_hash": "old"}])
+        with patch("backend.crawler.staging.writer._get_supabase", return_value=sb):
+            from backend.crawler.staging.writer import write_source_page
+            write_source_page(self._fetch(status=404, content_hash="", error="Not found"))
+        row = self._upsert_payload(sb)
+        self.assertFalse(row["is_accessible"])
+        # content_hash must NOT be overwritten on an inaccessible fetch.
+        self.assertNotIn("content_hash", row)
+
+
 if __name__ == "__main__":
     unittest.main()
