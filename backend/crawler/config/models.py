@@ -62,4 +62,5 @@ class CrawlConfig:
     max_documents_per_source: int = 50
     user_agent: str = "ReloPassBot/1.0 (crawler-staging)"
     timeout_seconds: int = 15
-    retry_count: int = 2
+    retry_count: int = 3
+    retry_backoff_base_seconds: float = 1.0

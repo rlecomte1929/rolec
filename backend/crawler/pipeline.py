@@ -142,6 +142,7 @@ def _crawl_source(source: CrawlSource, config: CrawlConfig, run_id: str, report:
         user_agent=config.user_agent,
         timeout=config.timeout_seconds,
         retry_count=config.retry_count,
+        backoff_base_seconds=config.retry_backoff_base_seconds,
     )
 
     if not fetch_result.success:

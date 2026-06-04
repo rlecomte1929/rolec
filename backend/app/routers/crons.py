@@ -10,6 +10,10 @@ Endpoints
 POST /api/crons/deadline-reminder
     Runs the 7-day deadline reminder job.
     Designed to be called daily at 08:00 CET.
+POST /api/crons/process-crawl-schedules
+    [P3-02a] Runs all due source-monitoring crawl schedules with retry +
+    exponential backoff. Designed to be called daily (e.g. 03:00 UTC) by the
+    `.github/workflows/crawl-scheduler.yml` GitHub Actions cron.
 
 Example Supabase pg_cron setup (run once after deployment):
     SELECT cron.schedule(
@@ -32,6 +36,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Request
 
+from ..services.crawl_scheduler_service import process_due_schedules
 from ..services.dossier_notifications import run_deadline_reminder_cron
 
 log = logging.getLogger(__name__)
@@ -64,3 +69,26 @@ def deadline_reminder(request: Request) -> Dict[str, Any]:
     log.info("deadline_reminder cron triggered")
     result = run_deadline_reminder_cron()
     return {"ok": True, **result}
+
+
+@router.post("/process-crawl-schedules")
+def process_crawl_schedules(request: Request) -> Dict[str, Any]:
+    """
+    [P3-02a] Production source-monitoring scheduler trigger.
+    Processes every due crawl schedule (next_run_at <= now, active), each fetch
+    using 3-retry exponential backoff on transient failures. Per-schedule job
+    locks prevent concurrent runs. Never raises on individual schedule failure —
+    failures are logged on the job run so the cron stays green.
+    """
+    _verify_cron_secret(request)
+    log.info("process_crawl_schedules cron triggered")
+    results = process_due_schedules(user_id="cron")
+    succeeded = sum(1 for r in results if r.get("status") == "succeeded")
+    failed = sum(1 for r in results if r.get("status") == "failed")
+    return {
+        "ok": True,
+        "processed": len(results),
+        "succeeded": succeeded,
+        "failed": failed,
+        "results": results,
+    }
