@@ -39,6 +39,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   documents: Upload,
   dossier: Files,
   'service-providers': Briefcase,
+  'benefit-comparison': BarChart3,
   inbox: MessageSquare,
 
   // AI Engine
