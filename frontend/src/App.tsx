@@ -155,6 +155,7 @@ const AdminFreshnessSources = lazy(() => import('./pages/admin/freshness/AdminFr
 const AdminSourceMonitor = lazy(() => import('./pages/admin/AdminSourceMonitor').then((module) => ({ default: module.AdminSourceMonitor })));
 const AdminFreshnessChanges = lazy(() => import('./pages/admin/freshness/AdminFreshnessChanges').then((module) => ({ default: module.AdminFreshnessChanges })));
 const AdminFreshnessStaleContent = lazy(() => import('./pages/admin/freshness/AdminFreshnessStaleContent').then((module) => ({ default: module.AdminFreshnessStaleContent })));
+const AdminSourceChangeReviewsPage = lazy(() => import('./pages/admin/source-change-reviews/AdminSourceChangeReviewsPage').then((module) => ({ default: module.AdminSourceChangeReviewsPage })));
 const AdminCrawlSchedules = lazy(() => import('./pages/admin/freshness/AdminCrawlSchedules').then((module) => ({ default: module.AdminCrawlSchedules })));
 const AdminCrawlJobRuns = lazy(() => import('./pages/admin/freshness/AdminCrawlJobRuns').then((module) => ({ default: module.AdminCrawlJobRuns })));
 const AdminCrawlJobRunDetail = lazy(() => import('./pages/admin/freshness/AdminCrawlJobRunDetail').then((module) => ({ default: module.AdminCrawlJobRunDetail })));
@@ -404,6 +405,7 @@ function App() {
         <Route path={ROUTE_DEFS.adminSourceMonitor.path} element={<RequireAdminRoute><AdminSourceMonitor /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFreshnessChanges.path} element={<RequireAdminRoute><AdminFreshnessChanges /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminFreshnessStaleContent.path} element={<RequireAdminRoute><AdminFreshnessStaleContent /></RequireAdminRoute>} />
+        <Route path={ROUTE_DEFS.adminSourceChangeReviews.path} element={<RequireAdminRoute><AdminSourceChangeReviewsPage /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCrawlSchedules.path} element={<RequireAdminRoute><AdminCrawlSchedules /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCrawlJobRuns.path} element={<RequireAdminRoute><AdminCrawlJobRuns /></RequireAdminRoute>} />
         <Route path={ROUTE_DEFS.adminCrawlJobRunDetail.path} element={<RequireAdminRoute><AdminCrawlJobRunDetail /></RequireAdminRoute>} />

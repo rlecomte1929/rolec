@@ -148,6 +148,7 @@ export const ROUTE_DEFS = {
   adminSourceMonitor: { path: '/admin/source-monitor', roles: ['ADMIN'] as RouteRole[] },
   adminFreshnessChanges: { path: '/admin/freshness/changes', roles: ['ADMIN'] as RouteRole[] },
   adminFreshnessStaleContent: { path: '/admin/freshness/stale-content', roles: ['ADMIN'] as RouteRole[] },
+  adminSourceChangeReviews: { path: '/admin/source-change-reviews', roles: ['ADMIN'] as RouteRole[] },
   adminCrawlSchedules: { path: '/admin/crawl/schedules', roles: ['ADMIN'] as RouteRole[] },
   adminCrawlJobRuns: { path: '/admin/crawl/job-runs', roles: ['ADMIN'] as RouteRole[] },
   adminCrawlJobRunDetail: { path: '/admin/crawl/job-runs/:id', roles: ['ADMIN'] as RouteRole[] },
