@@ -58,8 +58,8 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/calibration_analysis.py --min-sample "${MIN_SAMPLE}" --json | tee /tmp/calibration.json
-          report=$(ls -t audit/calibration_report_*.md | head -1)
-          echo "Generated ${report}"
+          echo "Calibration complete; report file(s):"
+          find audit -maxdepth 1 -name 'calibration_report_*.md' -print
 
       - name: Upload calibration report
         uses: actions/upload-artifact@v4
