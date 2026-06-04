@@ -95,6 +95,7 @@ const MobilityControlCenterV2Page = lazy(() => import('./features/platform-v2/mo
 const HrExceptionsPage = lazy(() => import('./features/platform-v2/exceptions/HrExceptionsPage').then((module) => ({ default: module.HrExceptionsPage })));
 const AIDecisionsAuditPage = lazy(() => import('./features/ai-oversight/AIDecisionsAuditPage').then((module) => ({ default: module.AIDecisionsAuditPage })));
 const HrPolicyRealityPage = lazy(() => import('./features/platform-v2/policy-reality/HrPolicyRealityPage').then((module) => ({ default: module.HrPolicyRealityPage })));
+const HrPolicyDashboardPage = lazy(() => import('./features/platform-v2/policy-dashboard/HrPolicyDashboardPage').then((module) => ({ default: module.HrPolicyDashboardPage })));
 const HrDiscoveryPage = lazy(() => import('./features/platform-v2/discovery/HrDiscoveryPage').then((module) => ({ default: module.HrDiscoveryPage })));
 const EmployeeRichProfilePage = lazy(() => import('./features/platform-v2/employee-profile/EmployeeRichProfilePage').then((module) => ({ default: module.EmployeeRichProfilePage })));
 const EmployeeIntakePage = lazy(() => import('./features/platform-v2/intake/EmployeeIntakePage').then((module) => ({ default: module.EmployeeIntakePage })));
@@ -285,6 +286,7 @@ function App() {
         <Route path={ROUTE_DEFS.hrExceptions.path} element={<RequireHrRoute><HrExceptionsPage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrAiDecisions.path} element={<RequireHrRoute><AIDecisionsAuditPage /></RequireHrRoute>} />
                 <Route path={ROUTE_DEFS.hrPolicyReality.path} element={<RequireHrRoute><HrPolicyRealityPage /></RequireHrRoute>} />
+                <Route path={ROUTE_DEFS.hrPolicyDashboard.path} element={<RequireHrRoute><HrPolicyDashboardPage /></RequireHrRoute>} />
                 <Route path={ROUTE_DEFS.hrDiscovery.path} element={<RequireHrRoute><HrDiscoveryPage /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrEmployeeDashboard.path} element={<RequireHrRoute><HrAssignmentReview /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrCaseSummary.path} element={<RequireHrRoute><HrCaseSummary /></RequireHrRoute>} />
