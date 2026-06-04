@@ -343,6 +343,12 @@ export interface RoadmapStep {
   ai_suggestion: string | null;       // last AI-generated guidance text
   created_at: string;
   updated_at: string;
+  // [P3-04] Confidence display — optional source-provenance metadata. Absent
+  // until the backend emits per-step confidence; UI renders nothing when unset.
+  confidence_level?: "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
+  source_url?: string | null;          // official source backing this step
+  source_fetched_at?: string | null;   // ISO date the source was last verified
+  source_excerpt?: string | null;      // one-sentence excerpt from the source
 }
 
 // ── 2.5 Requirements & Documents ─────────────────────────────────────────────
