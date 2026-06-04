@@ -60,6 +60,19 @@ class TestInterviewStatusImportGuard(unittest.TestCase):
                 )
         self.assertEqual(ctx.exception.status_code, 403)
 
+    def test_valid_permit_types_is_resolvable_from_router_namespace(self):
+        # create_immigration_case references VALID_PERMIT_TYPES at module scope;
+        # when the constant lived in immigration.py it was never imported here,
+        # so every POST /api/hr/immigration/cases raised NameError before
+        # AUDIT-B9-imm-7 relocated it. Guard against the regression.
+        self.assertTrue(
+            hasattr(router, "VALID_PERMIT_TYPES"),
+            "immigration_status.py uses VALID_PERMIT_TYPES inside "
+            "create_immigration_case but the symbol is missing from the module "
+            "namespace — POSTs to /hr/immigration/cases will NameError at "
+            "request time.",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

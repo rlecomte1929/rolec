@@ -1,13 +1,9 @@
 """
-immigration_intake_interview.py — interview-flow routes extracted from
-immigration.py (AUDIT-B9-imm-3, part 3 of 3).
+immigration_intake_interview.py — interview-flow routes.
 
 Houses 2 endpoints:
   GET  /api/employee/cases/{case_id}/interview/next     (next question)
   POST /api/employee/cases/{case_id}/interview/answer   (submit answer)
-
-DORMANT: this router is not yet wired into backend/app/main.py.
-Canonical registration still happens via immigration.py until imm-6.
 """
 from __future__ import annotations
 
@@ -15,6 +11,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user
@@ -40,8 +37,11 @@ from ..services.immigration_service import (
     _save_session,
 )
 
-# Pydantic models — imported from immigration.py until imm-6 relocates them.
-from .immigration import InterviewAnswerBody
+
+class InterviewAnswerBody(BaseModel):
+    question_id: str
+    answer_value: Any
+    skip: Optional[bool] = False
 
 router = APIRouter(prefix="/api", tags=["immigration-intake-interview"])
 

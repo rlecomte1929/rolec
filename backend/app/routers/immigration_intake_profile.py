@@ -1,6 +1,5 @@
 """
-immigration_intake_profile.py — employee profile + OCR routes
-extracted from immigration.py (AUDIT-B9-imm-3, part 2 of 3).
+immigration_intake_profile.py — employee profile + OCR routes.
 
 Houses 5 endpoints:
   GET   /api/hr/cases/{case_id}/profile                              (HR view, masked)
@@ -8,9 +7,6 @@ Houses 5 endpoints:
   GET   /api/employee/cases/{case_id}/profile                        (employee read)
   PUT   /api/employee/cases/{case_id}/profile                        (employee upsert)
   POST  /api/employee/cases/{case_id}/profile/ocr-passport           (OCR, async)
-
-DORMANT: this router is not yet wired into backend/app/main.py.
-Canonical registration still happens via immigration.py until imm-6.
 """
 from __future__ import annotations
 
@@ -46,8 +42,48 @@ from ..services.ocr_passport_extractor import (
     validate_mrz,
 )
 
-# Pydantic models — imported from immigration.py until imm-6 relocates them.
-from .immigration import EmployeeProfileUpdate, HrProfileFields
+
+class HrProfileFields(BaseModel):
+    employer_name: Optional[str] = None
+    employer_reg_number: Optional[str] = None
+    employer_address: Optional[Dict[str, Any]] = None
+    job_title: Optional[str] = None
+    job_title_local: Optional[str] = None
+    employment_start_date: Optional[str] = None
+    salary_amount: Optional[float] = None
+    salary_currency: Optional[str] = None
+    contract_type: Optional[str] = None
+
+
+class EmployeeProfileUpdate(BaseModel):
+    legal_first_name: Optional[str] = None
+    legal_last_name: Optional[str] = None
+    middle_names: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    place_of_birth: Optional[str] = None
+    nationality: Optional[str] = None
+    second_nationality: Optional[str] = None
+    gender: Optional[str] = None
+    passport_number: Optional[str] = None
+    passport_expiry: Optional[str] = None
+    passport_issue_date: Optional[str] = None
+    passport_country: Optional[str] = None
+    passport_mrz_line1: Optional[str] = None
+    passport_mrz_line2: Optional[str] = None
+    existing_visa_type: Optional[str] = None
+    existing_visa_expiry: Optional[str] = None
+    prior_visa_refusals: Optional[bool] = None
+    current_address: Optional[Dict[str, Any]] = None
+    address_history: Optional[List[Dict[str, Any]]] = None
+    marital_status: Optional[str] = None
+    spouse_name: Optional[str] = None
+    spouse_nationality: Optional[str] = None
+    spouse_dob: Optional[str] = None
+    dependents: Optional[List[Dict[str, Any]]] = None
+    highest_qualification: Optional[str] = None
+    institution: Optional[str] = None
+    graduation_year: Optional[int] = None
+    degree_anabin_status: Optional[str] = None
 
 router = APIRouter(prefix="/api", tags=["immigration-intake-profile"])
 

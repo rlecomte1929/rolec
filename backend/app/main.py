@@ -27,7 +27,6 @@ from .routers import (
     hr_case_resolve,
     hr_catalog,
     hr_coordination,
-    immigration,
     immigration_forms,
     immigration_gdpr,
     immigration_intake_consent,
@@ -113,8 +112,6 @@ def create_app() -> FastAPI:
     app.include_router(nlg.router)
 
     # ── Month-1 migration: Employee cluster ───────────────────────────────────
-    # [AUDIT-B9-imm-6] immigration.router replaced by 5 modular sub-routers.
-    # Original immigration.py is retained but its router is no longer wired.
     app.include_router(immigration_intake_consent.router)
     app.include_router(immigration_intake_profile.router)
     app.include_router(immigration_intake_interview.router)
