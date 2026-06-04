@@ -37,6 +37,10 @@ function adaptTracks(v2Tracks: RoadmapV2Track[]): (RoadmapTrack & { steps: Roadm
       ai_suggestion: s.ai_suggestion,
       created_at: '',
       updated_at: '',
+      confidence_level: s.confidence_level,
+      source_url: s.source_url,
+      source_fetched_at: s.source_fetched_at,
+      source_excerpt: s.source_excerpt,
     })),
   }));
 }

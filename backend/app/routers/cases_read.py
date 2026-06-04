@@ -80,6 +80,13 @@ class RoadmapStepV2(BaseModel):
     vendor_id: Optional[str] = None
     doc_count: int = 0
     worst_doc_status: Optional[str] = None
+    # [P3-04e] Confidence + source provenance, derived from the step's linked
+    # requirement (requirements.confidence_pct / citations). Absent when the
+    # step has no requirement link — the employee UI then shows no badge.
+    confidence_level: Optional[str] = None   # 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN'
+    source_url: Optional[str] = None
+    source_fetched_at: Optional[str] = None
+    source_excerpt: Optional[str] = None
 
 
 class RoadmapTrackV2(BaseModel):
@@ -93,6 +100,22 @@ class RoadmapTrackV2(BaseModel):
 
 class RoadmapTracksResponse(BaseModel):
     tracks: List[RoadmapTrackV2]
+
+
+def _bucket_confidence(pct: Optional[int]) -> Optional[str]:
+    """Map a requirement's confidence_pct (0-100) to a display level.
+
+    Thresholds match the documented RequirementCard bands
+    (requirements.confidence_pct: >80 green, 50-80 yellow, <50 red).
+    Returns None when there is no linked requirement, so the step shows no badge.
+    """
+    if pct is None:
+        return None
+    if pct >= 80:
+        return "HIGH"
+    if pct >= 50:
+        return "MEDIUM"
+    return "LOW"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -927,6 +950,13 @@ def get_case_roadmap_tracks(
               NULL::text                     AS ai_suggestion,
               ARRAY[]::text[]                AS dependency_ids,
               NULL::uuid                     AS vendor_id,
+              -- [P3-04e] Confidence + source from the step's linked requirement.
+              -- MAX() is a no-op aggregate over the (≤1) joined requirement row,
+              -- letting us add these without touching the doc-count GROUP BY.
+              MAX(r.confidence_pct)                       AS req_confidence_pct,
+              MAX(COALESCE(r.citations->0->>'url', r.authority_url, rs.external_url)) AS source_url,
+              MAX(r.citations->0->>'excerpt')             AS source_excerpt,
+              MAX(r.computed_at)                          AS source_fetched_at,
               COUNT(cf.id) AS doc_count,
               CASE
                 WHEN COUNT(cf.id) = 0 THEN NULL
@@ -944,6 +974,7 @@ def get_case_roadmap_tracks(
               END AS worst_doc_status
             FROM {_pg_table('roadmap_tracks')} rt
             JOIN {_pg_table('roadmap_steps')} rs ON rs.track_id = rt.id
+            LEFT JOIN {_pg_table('requirements')} r ON r.id = rs.requirement_id
             LEFT JOIN {_pg_table('case_forms')} cf
               ON cf.roadmap_step_id = rs.id AND cf.case_id = :case_id
             WHERE rt.case_id = :case_id
@@ -983,6 +1014,12 @@ def get_case_roadmap_tracks(
             vendor_id=str(row["vendor_id"]) if row.get("vendor_id") else None,
             doc_count=int(row["doc_count"] or 0),
             worst_doc_status=row.get("worst_doc_status"),
+            confidence_level=_bucket_confidence(row.get("req_confidence_pct")),
+            source_url=row.get("source_url"),
+            source_excerpt=row.get("source_excerpt"),
+            source_fetched_at=(
+                str(row["source_fetched_at"]) if row.get("source_fetched_at") else None
+            ),
         ))
     return RoadmapTracksResponse(tracks=list(tracks_map.values()))
 
