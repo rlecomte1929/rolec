@@ -71,6 +71,10 @@ _PATH_RE = re.compile(
     r"/[A-Za-z0-9_./\-]+\.[A-Za-z0-9]+)"
 )
 
+# A line declaring a produced/changed file. Only paths on such lines are treated
+# as deliverable claims (the Execution-Notes "Files changed" convention).
+_CLAIM_MARKER_RE = re.compile(r"\b(CREATED|MODIFIED|ADDED|NEW FILE)\b", re.IGNORECASE)
+
 
 # --------------------------------------------------------------------------- #
 # Pure helpers (unit-tested without network)                                  #
@@ -78,20 +82,26 @@ _PATH_RE = re.compile(
 
 
 def extract_deliverable_paths(note_text: str) -> List[str]:
-    """Return the repo-relative deliverable paths referenced in a task's notes.
+    """Return the repo-relative deliverable paths a task CLAIMS it produced.
 
-    Matches any root-anchored, extension-bearing path token (which subsumes the
-    ``CREATED: `path` ``, backtick-wrapped, and "move … into `path`" forms —
-    backticks are stripped by Notion's plain-text rendering anyway). Order-
-    preserving and de-duplicated.
+    Only paths on a line bearing a ``CREATED:`` or ``MODIFIED:`` marker (the
+    Execution-Notes "Files changed" convention) count as deliverable claims.
+    Paths mentioned anywhere else in the notes — reviewer-steps prose like
+    "move X into `scripts/Y`", example commands, or "see also `path`" — are NOT
+    claims and were the dominant false-positive source on the first live run
+    (a file that landed at a slightly different path than the prose mentioned).
+    Order-preserving and de-duplicated.
     """
     seen: Set[str] = set()
     out: List[str] = []
-    for m in _PATH_RE.finditer(note_text or ""):
-        p = m.group(1).rstrip(".,);:")
-        if p and p not in seen:
-            seen.add(p)
-            out.append(p)
+    for line in (note_text or "").splitlines():
+        if not _CLAIM_MARKER_RE.search(line):
+            continue
+        for m in _PATH_RE.finditer(line):
+            p = m.group(1).rstrip(".,);:")
+            if p and p not in seen:
+                seen.add(p)
+                out.append(p)
     return out
 
 

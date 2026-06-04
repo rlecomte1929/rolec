@@ -40,12 +40,16 @@ class ExtractDeliverablePathsTests(unittest.TestCase):
             ["prompts/docs/classifier/v1.txt"],
         )
 
-    def test_move_into_form(self):
+    def test_move_into_prose_is_not_a_claim(self):
+        # Reviewer-steps prose ("move X into <path>") is NOT a CREATED:/MODIFIED:
+        # claim — this is the dominant false-positive class from the first live
+        # run (the file landed at a different path than the prose suggested).
         text = "Move eval_factual_consistency.py into backend/scripts/eval_factual_consistency.py in the repo."
-        self.assertIn(
-            "backend/scripts/eval_factual_consistency.py",
-            cdi.extract_deliverable_paths(text),
-        )
+        self.assertEqual(cdi.extract_deliverable_paths(text), [])
+
+    def test_modified_marker_is_a_claim(self):
+        text = "- MODIFIED: `backend/main.py` — registered the router"
+        self.assertEqual(cdi.extract_deliverable_paths(text), ["backend/main.py"])
 
     def test_multiple_paths_deduped_and_ordered(self):
         text = (
@@ -59,7 +63,7 @@ class ExtractDeliverablePathsTests(unittest.TestCase):
         )
 
     def test_trailing_punctuation_stripped(self):
-        text = "wrote audit/eu_ai_act/risk_register_v1.md, then reviewed it."
+        text = "CREATED: audit/eu_ai_act/risk_register_v1.md, then reviewed it."
         self.assertEqual(
             cdi.extract_deliverable_paths(text),
             ["audit/eu_ai_act/risk_register_v1.md"],

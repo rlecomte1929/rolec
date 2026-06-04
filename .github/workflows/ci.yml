@@ -246,5 +246,7 @@ jobs:
       - name: Run queue-status-hygiene check
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
-        run: python scripts/check_queue_status_hygiene.py --root .
+        # --strict: backlog triaged on 2026-06-04 (10 set to Blocked, 5 allowlisted),
+        # first live run is clean. Regressions now fail the build.
+        run: python scripts/check_queue_status_hygiene.py --root . --strict
 
