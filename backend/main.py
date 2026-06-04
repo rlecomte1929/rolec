@@ -193,6 +193,7 @@ from .app.routers import immigration_intake_profile as immigration_intake_profil
 from .app.routers import immigration_intake_interview as immigration_intake_interview_router
 from .app.routers import immigration_status as immigration_status_router
 from .app.routers import immigration_gdpr as immigration_gdpr_router
+from .app.routers import immigration_forms as immigration_forms_router
 from .app.routers import analytics as analytics_router
 from .app.routers import analytics_query as analytics_query_router  # FOUNDATION-1E
 # GAP analysis new routers (May 2026)
@@ -715,6 +716,7 @@ app.include_router(immigration_intake_profile_router.router)  # [AUDIT-B9-imm-6]
 app.include_router(immigration_intake_interview_router.router)  # [AUDIT-B9-imm-6] 3/5 — interview next/answer (2 handlers)
 app.include_router(immigration_status_router.router)  # [AUDIT-B9-imm-6] 4/5 — milestones, interview-status, immigration cases (8 handlers)
 app.include_router(immigration_gdpr_router.router)  # [AUDIT-B9-imm-6] 5/5 — GDPR subject-rights stubs (2 handlers)
+app.include_router(immigration_forms_router.router)  # IMM-11 — form library + PDF pre-fill (2 handlers)
 app.include_router(analytics_router.router)
 app.include_router(analytics_query_router.router)  # FOUNDATION-1E
 app.include_router(mobility_context_router.router)  # [AUDIT-C2.3 restore]
