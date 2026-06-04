@@ -15,6 +15,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { hrAPI } from '../../api/client';
+import { MilestoneTracker } from '../immigration/MilestoneTracker';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,8 @@ type InterviewStatus = {
 
 interface Props {
   caseId: string;
+  /** Case expected move date (ISO) — drives the milestone timeline. */
+  moveDate?: string | null;
   onFindVendor: () => void;
   onViewProfile: () => void;
 }
@@ -107,6 +110,7 @@ const DocStatusBadge: React.FC<{ collected: boolean }> = ({ collected }) =>
 
 export const ImmigrationStatusPanel: React.FC<Props> = ({
   caseId,
+  moveDate,
   onFindVendor,
   onViewProfile,
 }) => {
@@ -297,6 +301,14 @@ export const ImmigrationStatusPanel: React.FC<Props> = ({
           </div>
         </section>
       )}
+
+      {/* ── IMM-14: Application milestone timeline ───────────────────────────── */}
+      <MilestoneTracker
+        caseId={caseId}
+        moveDate={moveDate}
+        corridorFrom={immData.corridor_from}
+        corridorTo={immData.corridor_to}
+      />
 
       {/* ── 3. Interview progress ───────────────────────────────────────────── */}
       <section>

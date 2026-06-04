@@ -902,6 +902,61 @@ export const hrAPI = {
     return response.data;
   },
 
+  // ── IMM-14: immigration milestones ────────────────────────────────────────
+
+  /** GET /api/hr/cases/{caseId}/immigration/milestones */
+  listImmigrationMilestones: async (caseId: string): Promise<{
+    milestones: Array<{
+      id: string;
+      milestone_type: string;
+      status: string;
+      sort_order: number;
+      target_date: string | null;
+      completed_date: string | null;
+      notes: string | null;
+      evidence_url: string | null;
+      book_early_alert: string | null;
+      created_at: string | null;
+      updated_at: string | null;
+    }>;
+  }> => {
+    const response = await api.get(`/api/hr/cases/${caseId}/immigration/milestones`);
+    return response.data;
+  },
+
+  /** POST /api/hr/cases/{caseId}/immigration/milestones */
+  createImmigrationMilestone: async (
+    caseId: string,
+    payload: {
+      milestone_type: string;
+      target_date?: string | null;
+      sort_order?: number;
+      book_early_alert?: string | null;
+    },
+  ): Promise<{ id: string; milestone_type: string; status: string }> => {
+    const response = await api.post(`/api/hr/cases/${caseId}/immigration/milestones`, payload);
+    return response.data;
+  },
+
+  /** PATCH /api/hr/cases/{caseId}/immigration/milestones/{milestoneId} */
+  updateImmigrationMilestone: async (
+    caseId: string,
+    milestoneId: string,
+    patch: {
+      status?: string;
+      completed_date?: string | null;
+      target_date?: string | null;
+      notes?: string | null;
+      evidence_url?: string | null;
+    },
+  ): Promise<{ id: string; status: string; updated_at: string }> => {
+    const response = await api.patch(
+      `/api/hr/cases/${caseId}/immigration/milestones/${milestoneId}`,
+      patch,
+    );
+    return response.data;
+  },
+
   // ── AIQ-40-C: RFQ flow ────────────────────────────────────────────────────
 
   /** POST /api/hr/rfq-requests */
