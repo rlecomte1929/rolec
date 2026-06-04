@@ -46,6 +46,7 @@ const HrPreferredSuppliers = lazy(() => import('./pages/HrPreferredSuppliers').t
 const HrVendorCuration = lazy(() => import('./pages/HrVendorCuration').then((module) => ({ default: module.HrVendorCuration })));
 const HrPolicy = lazy(() => import('./pages/HrPolicy').then((module) => ({ default: module.HrPolicy })));
 const EmployeePolicyPage = lazy(() => import('./pages/employee/EmployeePolicyPage').then((module) => ({ default: module.EmployeePolicyPage })));
+const EmployeeBenefitComparisonPage = lazy(() => import('./pages/employee/EmployeeBenefitComparisonPage').then((module) => ({ default: module.EmployeeBenefitComparisonPage })));
 const CaseWizardPage = lazy(() => import('./pages/employee/CaseWizardPage').then((module) => ({ default: module.CaseWizardPage })));
 const EmployeeCaseSummary = lazy(() => import('./pages/employee/EmployeeCaseSummary').then((module) => ({ default: module.EmployeeCaseSummary })));
 const EmployeeRelocationPlanPage = lazy(() => import('./pages/employee/EmployeeRelocationPlanPage').then((module) => ({ default: module.EmployeeRelocationPlanPage })));
@@ -319,6 +320,7 @@ function App() {
         <Route path={ROUTE_DEFS.hrVendorCuration.path} element={<RequireHrRoute><HrVendorCuration /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.hrPolicy.path} element={<RequireHrRoute allowEmployee><HrPolicy /></RequireHrRoute>} />
         <Route path={ROUTE_DEFS.employeePolicy.path} element={<RequireEmployeeRoute><EmployeePolicyPage /></RequireEmployeeRoute>} />
+        <Route path={ROUTE_DEFS.employeeBenefitsComparison.path} element={<RequireEmployeeRoute><EmployeeBenefitComparisonPage /></RequireEmployeeRoute>} />
         <Route path={ROUTE_DEFS.employeeHrPolicy.path} element={<Navigate to={ROUTE_DEFS.hrPolicy.path} replace />} />
         <Route path={ROUTE_DEFS.hrPolicyManagement.path} element={<RequireHrRoute><Navigate to={ROUTE_DEFS.hrPolicy.path} replace /></RequireHrRoute>} />
         <Route path={WIZARD_ROUTES.CASE_WIZARD} element={<RequireEmployeeRoute><CaseWizardPage /></RequireEmployeeRoute>} />

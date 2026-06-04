@@ -73,6 +73,7 @@ const SECTIONS: NavSection[] = [
       { id: 'documents', label: 'Documents', to: ROUTE_DEFS.employeeTaskPage.path },
       { id: 'dossier', label: 'Dossier & forms', to: ROUTE_DEFS.employeeDashboard.path },
       { id: 'service-providers', label: 'Service providers', to: ROUTE_DEFS.services.path },
+      { id: 'benefit-comparison', label: 'Benefit comparison', to: ROUTE_DEFS.employeeBenefitsComparison.path },
       {
         id: 'inbox',
         label: 'Inbox',
