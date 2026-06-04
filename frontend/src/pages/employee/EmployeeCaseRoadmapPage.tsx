@@ -11,22 +11,32 @@ import type { RoadmapTrack, RoadmapStep } from '../../types/relopass-api-contrac
 import { buildRoute } from '../../navigation/routes';
 import {
   successProbability,
+  type ConfidenceLevel,
   type ScoringStep,
   type SuccessProbabilityResult,
 } from '../../features/platform-v2/roadmap/scoring';
 
 /**
+ * Map the wire/display confidence vocabulary (UPPER — shared with P3-04 and
+ * confidence.tokens.ts) onto the scoring module's internal lowercase enum.
+ */
+function toScoringLevel(level: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN'): ConfidenceLevel {
+  return level.toLowerCase() as ConfidenceLevel;
+}
+
+/**
  * [P2-05] Build the probability-of-success estimate from the roadmap, but only
- * when at least one step carries a confidence score. Today the deterministic
+ * when at least one step carries a confidence_level. Today the deterministic
  * employee feed has none, so this returns null and the dial is hidden (graceful
- * guard); it lights up automatically once per-step confidence reaches the feed.
+ * guard); it lights up automatically once the backend emits confidence_level
+ * (P3-04e) — the same field that drives the P3-04 ConfidenceBadge.
  */
 function computeSuccessScore(v2Tracks: RoadmapV2Track[]): SuccessProbabilityResult | null {
   const scored: ScoringStep[] = [];
   for (const track of v2Tracks) {
     for (const step of track.steps) {
-      if (step.confidence) {
-        scored.push({ id: step.id, title: step.title, confidence: step.confidence });
+      if (step.confidence_level) {
+        scored.push({ id: step.id, title: step.title, confidence: toScoringLevel(step.confidence_level) });
       }
     }
   }

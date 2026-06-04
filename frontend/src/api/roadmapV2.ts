@@ -18,12 +18,13 @@ export interface RoadmapV2Step {
   doc_count: number;
   worst_doc_status: string | null;
   /**
-   * [P2-05] Per-step confidence (P2-01b taxonomy), when the backend has scored
-   * this step. Absent on the deterministic roadmap; populated once the
-   * confidence pipeline reaches the employee feed. Drives the success-probability
-   * estimate — see successProbability() in the roadmap scoring module.
+   * [P2-05/P3-04] Per-step confidence. Shared contract with the P3-04 confidence
+   * display (same field name + casing as RoadmapStep.confidence_level and
+   * confidence.tokens.ts). Absent until the backend emits it (P3-04e); populated
+   * once the confidence pipeline reaches the employee feed. Drives both the
+   * ConfidenceBadge and the success-probability dial.
    */
-  confidence?: 'high' | 'medium' | 'low' | 'unknown';
+  confidence_level?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
 }
 
 export interface RoadmapV2Track {
