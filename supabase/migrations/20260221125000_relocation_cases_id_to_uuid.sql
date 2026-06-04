@@ -40,6 +40,22 @@ begin
          and table_name   = 'relocation_cases'
          and column_name  = 'id') = 'text' then
 
+    -- 0) Drop the six policies 20260221124204 creates on the relocation_*
+    --    children. Their USING clause references relocation_cases.id
+    --    (`where c.id = <child>.case_id`), so Postgres refuses the column
+    --    type change while they exist (0A000). Prod does NOT have these
+    --    policies — 20260601000000_rls_cases_domain.sql later replaces them with
+    --    function-based (`rls_can_access_case_ref`) `_tenant_rw`/`_service`
+    --    policies — so dropping them here both unblocks the ALTER and brings a
+    --    fresh DB closer to prod. Not recreated (rls_cases_domain owns the
+    --    replacements).
+    drop policy if exists relocation_runs_select_own      on public.relocation_runs;
+    drop policy if exists relocation_runs_insert_own      on public.relocation_runs;
+    drop policy if exists relocation_sources_select_own   on public.relocation_sources;
+    drop policy if exists relocation_sources_insert_own   on public.relocation_sources;
+    drop policy if exists relocation_artifacts_select_own on public.relocation_artifacts;
+    drop policy if exists relocation_artifacts_insert_own on public.relocation_artifacts;
+
     -- 1) Drop the text FKs created by 20260221124204 (prod has none).
     alter table public.relocation_runs      drop constraint if exists relocation_runs_case_id_fkey;
     alter table public.relocation_sources   drop constraint if exists relocation_sources_case_id_fkey;
