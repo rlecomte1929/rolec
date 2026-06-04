@@ -109,6 +109,8 @@ class _DossierFormTemplate(BaseModel):
     fields_total: int
     # [P1-05] Official Tier-1 authority URL where this form is completed/submitted.
     source_url: Optional[str] = None
+    # [P1-05d] When the source URL was last fetched/verified (source_pages.last_fetched_at).
+    source_last_verified: Optional[str] = None
 
 
 class _DossierFormPerson(BaseModel):
@@ -320,6 +322,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             version="—",
             fields_total=0,
             source_url=None,
+            source_last_verified=None,
         )
     else:
         template = _DossierFormTemplate(
@@ -333,6 +336,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             version=str(row["template_version"]),
             fields_total=fields_total,
             source_url=row.get("template_source_url"),  # [P1-05]
+            source_last_verified=_iso(row.get("source_last_verified")),  # [P1-05d]
         )
 
     return CaseFormSummary(
@@ -1095,6 +1099,7 @@ def list_case_forms(
           ft.version AS template_version,
           ft.fields  AS template_fields,
           ft.source_url AS template_source_url,
+          sp.last_fetched_at AS source_last_verified,
           rs.title AS roadmap_step_title,
           cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes,
           cd.relationship AS dependent_relationship,
@@ -1112,6 +1117,8 @@ def list_case_forms(
         FROM {_pg_table('case_forms')} cf
         -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
         LEFT JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
+        -- [P1-05d] source freshness: last_fetched_at for this form's official URL.
+        LEFT JOIN {_pg_table('source_pages')} sp ON sp.url = ft.source_url
         -- [P1-05] roadmap step title for the "which step" label on the form card.
         LEFT JOIN {_pg_table('roadmap_steps')} rs ON rs.id = cf.roadmap_step_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id

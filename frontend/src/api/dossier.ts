@@ -27,6 +27,8 @@ export interface DossierFormTemplate {
   fields_total: number;
   /** [P1-05] Official Tier-1 authority URL where this form is completed/submitted. */
   source_url: string | null;
+  /** [P1-05d] When the source URL was last fetched/verified (ISO), from source_pages. */
+  source_last_verified: string | null;
 }
 
 export type DossierPersonKind = 'employee' | 'spouse' | 'child' | 'other';
