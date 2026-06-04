@@ -1,0 +1,367 @@
+{
+  "schema_version": "1.0.0",
+  "corridor": {
+    "from": "CA",
+    "to": "DE",
+    "from_country_name": "Canada",
+    "to_country_name": "Germany",
+    "classification": "third_country_to_eu",
+    "description": "Canadian nationals are third-country nationals for German immigration. The primary route for academically qualified salaried employment is the EU Blue Card under the Skilled Immigration Act (Fachkräfteeinwanderungsgesetz). The skilled_worker visa is a secondary route for qualified professionals who do not meet the Blue Card salary threshold. Canada joined the Hague Apostille Convention on 11 January 2024, which significantly simplifies document authentication vs the pre-2024 chain-legalisation process."
+  },
+  "fetched_at": "2026-06-04",
+  "next_review_due": "2026-12-04",
+  "regulatory_notes": [
+    "Canada joined the Apostille Convention effective 11 January 2024. Documents now require a single apostille — not chain-legalisation.",
+    "Apostille issuer split: Alberta, BC, Ontario, Quebec, Saskatchewan issue provincially; other provinces, the territories, and federal government documents go through Global Affairs Canada (Ottawa). No fee for Global Affairs apostille.",
+    "Online verification tool available for apostilles issued by Global Affairs Canada, Alberta, Saskatchewan, and British Columbia."
+  ],
+  "primary_sources": [
+    {"url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card", "tier": 2, "title": "EU Blue Card — Make it in Germany"},
+    {"url": "https://www.bamf.de/EN/Themen/MigrationAufenthalt/ZuwandererDrittstaaten/Migrathek/BlaueKarteEU/blauekarteeu-node.html", "tier": 1, "title": "The EU Blue Card — BAMF"},
+    {"url": "https://www.auswaertiges-amt.de/en/visa-service/buergerservice/faq/02a-what-is-the-blue-card/606754", "tier": 1, "title": "EU Blue Card FAQ — Federal Foreign Office"},
+    {"url": "https://anabin.kmk.org/anabin/hochschulen.html", "tier": 1, "title": "Anabin — Database of recognized foreign universities (KMK)"},
+    {"url": "https://www.make-it-in-germany.com/en/working-in-germany/recognition/foreign-academic-qualifications", "tier": 2, "title": "Evaluation of foreign academic degrees — Make it in Germany"},
+    {"url": "https://www.make-it-in-germany.com/en/visa-residence/skilled-immigration-act", "tier": 2, "title": "Skilled Immigration Act (Fachkräfteeinwanderungsgesetz) — Make it in Germany"},
+    {"url": "https://www.international.gc.ca/gac-amc/about-a_propos/services/authentication-authentification/apostille-convention.aspx?lang=eng", "tier": 1, "title": "Authentication of documents — Apostille Convention — Global Affairs Canada"},
+    {"url": "https://www.international.gc.ca/gac-amc/about-a_propos/services/authentication-authentification/faq.aspx?lang=eng", "tier": 1, "title": "FAQ — Authentication of documents — Global Affairs Canada"}
+  ],
+  "pathways": [
+    {
+      "visa_type": "blue_card",
+      "scheme_name_native": "Blaue Karte EU",
+      "scheme_name_en": "EU Blue Card",
+      "employee_types": ["qualified_employee", "ict_employee"],
+      "duration_months": 48,
+      "duration_basis": "Standard 4 years; may be limited to employment contract duration + 3 months if shorter.",
+      "renewable": true,
+      "renewal_path": "settlement_permit_after_21_or_33_months",
+      "eligibility": {
+        "qualification_required": true,
+        "qualification_level_min": "bachelor_or_higher_recognized_in_anabin",
+        "qualification_recognition_path": "anabin_or_zab",
+        "qualification_recognition_note": "Most Canadian universities are listed H+ in Anabin, making degree recognition straightforward. If not H+, fall back to ZAB Statement of Comparability.",
+        "salary_min_eur_annual_general": 50700,
+        "salary_min_eur_annual_shortage_occupations": 45934.2,
+        "salary_min_eur_annual_recent_graduate": 45934.2,
+        "salary_basis": "2026 statutory thresholds per §18g AufenthG / Beschäftigungsverordnung (country-agnostic federal statute)",
+        "contract_duration_min_months": 6,
+        "shortage_occupations_examples": ["IT_specialist", "physician", "engineer_STEM", "mathematician", "scientist"]
+      },
+      "typical_processing_days_low": 28,
+      "typical_processing_days_high": 84,
+      "fast_track_available": true,
+      "fast_track_low_days": 21,
+      "fast_track_high_days": 28,
+      "fast_track_label_native": "Beschleunigtes Fachkräfteverfahren",
+      "fast_track_initiator": "employer_jointly_with_applicant",
+      "post_arrival_validation_required": true,
+      "post_arrival_validation_window_days": 90,
+      "source_url": "https://www.bamf.de/EN/Themen/MigrationAufenthalt/ZuwandererDrittstaaten/Migrathek/BlaueKarteEU/blauekarteeu-node.html",
+      "source_tier": 1
+    },
+    {
+      "visa_type": "skilled_worker",
+      "scheme_name_native": "Fachkräfte mit akademischer Ausbildung",
+      "scheme_name_en": "Skilled Worker with Academic Qualification",
+      "employee_types": ["qualified_employee"],
+      "duration_months": 48,
+      "renewable": true,
+      "eligibility": {
+        "qualification_required": true,
+        "qualification_level_min": "recognized_academic_degree_or_vocational_qualification",
+        "qualification_recognition_path": "anabin_or_zab",
+        "salary_min_eur_annual": null,
+        "salary_basis": "No statutory minimum; salary must be customary for the position",
+        "ba_zustimmung_required": true,
+        "ba_zustimmung_label_en": "Federal Employment Agency (BA) approval required for non-shortage occupations under 45 years old"
+      },
+      "typical_processing_days_low": 28,
+      "typical_processing_days_high": 90,
+      "fast_track_available": true,
+      "source_url": "https://www.make-it-in-germany.com/en/visa-residence/skilled-immigration-act",
+      "source_tier": 2
+    }
+  ],
+  "required_documents": [
+    {
+      "id": "ca_de_bc_passport",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "passport",
+      "document_name": "Valid Canadian Passport",
+      "is_required": true,
+      "validity_min_days_after_visa_expiry": 90,
+      "requires_apostille": false,
+      "requires_translation": false,
+      "can_be_prefilled": true,
+      "can_be_ocr_extracted": true,
+      "vault_field_mapping": "identity.passport.number",
+      "typical_processing_days": 0,
+      "source_url": "https://www.bamf.de/EN/Themen/MigrationAufenthalt/ZuwandererDrittstaaten/Migrathek/BlaueKarteEU/blauekarteeu-node.html",
+      "source_tier": 1
+    },
+    {
+      "id": "ca_de_bc_photos",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "biometric_photos",
+      "document_name": "Biometric passport photographs (×2)",
+      "is_required": true,
+      "freshness_days": 180,
+      "source_url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card",
+      "source_tier": 2
+    },
+    {
+      "id": "ca_de_bc_application_form",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "application_form",
+      "document_name": "National visa application form (Type D, signed)",
+      "is_required": true,
+      "form_url": "https://www.auswaertiges-amt.de/en/visa-service",
+      "source_url": "https://www.auswaertiges-amt.de/en/visa-service/buergerservice/faq/02a-what-is-the-blue-card/606754",
+      "source_tier": 1
+    },
+    {
+      "id": "ca_de_bc_degree",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "degree_certificate",
+      "document_name": "Canadian university degree certificate + transcripts (Hague apostille via Global Affairs Canada OR provincial authority + sworn German/English translation)",
+      "is_required": true,
+      "requires_apostille": true,
+      "apostille_countries": ["CA"],
+      "apostille_issuer": "Global_Affairs_Canada_OR_provincial_authority",
+      "apostille_issuer_note": "Federal docs + non-AB/BC/ON/QC/SK provinces: Global Affairs Canada (Ottawa). Provincial docs from AB, BC, ON, QC, SK: their provincial authority. No fee for Global Affairs apostille.",
+      "apostille_convention_member_since": "2024-01-11",
+      "requires_translation": true,
+      "translation_languages": ["de", "en"],
+      "form_url": "https://anabin.kmk.org/anabin/hochschulen.html",
+      "typical_processing_days": 14,
+      "book_early_flag": true,
+      "book_early_reason": "Apostille turnaround varies by issuer (Global Affairs Canada standard, provinces faster). Sworn German translation adds 1-2 weeks. Most Canadian universities are H+ in Anabin so degree recognition itself is fast.",
+      "source_url": "https://www.international.gc.ca/gac-amc/about-a_propos/services/authentication-authentification/apostille-convention.aspx?lang=eng",
+      "source_tier": 1
+    },
+    {
+      "id": "ca_de_bc_anabin_check",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "qualification_recognition",
+      "document_name": "Anabin database verification (university H+ status and degree H+/equivalent)",
+      "is_required": true,
+      "is_conditional": false,
+      "instructions_url": "https://anabin.kmk.org/anabin/hochschulen.html",
+      "typical_processing_days": 0,
+      "source_url": "https://anabin.kmk.org/anabin/hochschulen.html",
+      "source_tier": 1,
+      "fallback_if_not_listed": {
+        "type": "zab_statement_of_comparability",
+        "label": "Apply to ZAB for a Statement of Comparability if university or degree is not H+ in Anabin (uncommon for Canadian universities)",
+        "processing_days": 14,
+        "fee_eur": 200,
+        "source_url": "https://www.make-it-in-germany.com/en/working-in-germany/recognition/foreign-academic-qualifications"
+      }
+    },
+    {
+      "id": "ca_de_bc_employment_contract",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "employment_contract",
+      "document_name": "Signed employment contract or binding job offer — gross annual salary ≥ €50,700 (general) or ≥ €45,934.20 (shortage occupation or recent graduate)",
+      "is_required": true,
+      "freshness_days": 180,
+      "requires_apostille": false,
+      "requires_translation": true,
+      "translation_languages": ["de", "en"],
+      "typical_processing_days": 5,
+      "source_url": "https://www.bamf.de/EN/Themen/MigrationAufenthalt/ZuwandererDrittstaaten/Migrathek/BlaueKarteEU/blauekarteeu-node.html",
+      "source_tier": 1
+    },
+    {
+      "id": "ca_de_bc_proof_of_accommodation",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "proof_of_accommodation",
+      "document_name": "Proof of accommodation in Germany (rental contract, registration confirmation, or temporary booking)",
+      "is_required": true,
+      "is_conditional": true,
+      "condition_expression": "required_at_city_registration_within_14_days_of_arrival",
+      "freshness_days": 90,
+      "source_url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card",
+      "source_tier": 2
+    },
+    {
+      "id": "ca_de_bc_health_insurance",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "health_insurance",
+      "document_name": "Travel health insurance for the visa-entry period (statutory German health insurance through employer takes over after registration)",
+      "is_required": true,
+      "source_url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card",
+      "source_tier": 2
+    },
+    {
+      "id": "ca_de_bc_cv_motivation",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "cv",
+      "document_name": "Curriculum Vitae (Europass format preferred) + cover letter",
+      "is_required": true,
+      "freshness_days": 90,
+      "source_url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card",
+      "source_tier": 2
+    },
+    {
+      "id": "ca_de_bc_civil_status",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "civil_status_document",
+      "document_name": "Birth certificate (Hague apostille via Global Affairs Canada or provincial authority + sworn German translation); marriage certificate if accompanied by spouse",
+      "is_required": true,
+      "requires_apostille": true,
+      "apostille_countries": ["CA"],
+      "apostille_issuer": "Global_Affairs_Canada_OR_provincial_authority",
+      "requires_translation": true,
+      "translation_languages": ["de"],
+      "typical_processing_days": 14,
+      "source_url": "https://www.international.gc.ca/gac-amc/about-a_propos/services/authentication-authentification/apostille-convention.aspx?lang=eng",
+      "source_tier": 1
+    },
+    {
+      "id": "ca_de_bc_visa_fee",
+      "corridor_from": "CA",
+      "corridor_to": "DE",
+      "visa_type": "blue_card",
+      "employee_type": "any",
+      "document_type": "visa_fee",
+      "document_name": "Visa application fee — €75 (2026)",
+      "is_required": true,
+      "fee_eur": 75,
+      "source_url": "https://www.auswaertiges-amt.de/en/visa-service/buergerservice/faq/02a-what-is-the-blue-card/606754",
+      "source_tier": 1
+    }
+  ],
+  "post_arrival_steps": [
+    {
+      "id": "ca_de_anmeldung",
+      "order": 1,
+      "name": "Anmeldung — register address with local Bürgeramt",
+      "applies_to_visa_types": ["blue_card", "skilled_worker"],
+      "deadline_days_after_arrival": 14,
+      "deadline_basis": "Bundesmeldegesetz §17 — within 2 weeks of moving in.",
+      "fee_eur": 0,
+      "where": "Local city registration office (Bürgeramt / KVR / Meldeamt)",
+      "source_url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card",
+      "source_tier": 2
+    },
+    {
+      "id": "ca_de_bank_account",
+      "order": 2,
+      "name": "Open German bank account (required for salary)",
+      "applies_to_visa_types": ["blue_card", "skilled_worker"],
+      "deadline_days_after_arrival": 30,
+      "fee_eur": 0,
+      "source_url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card",
+      "source_tier": 2
+    },
+    {
+      "id": "ca_de_health_insurance_enrollment",
+      "order": 3,
+      "name": "Enroll in statutory health insurance (gesetzliche Krankenversicherung) through employer",
+      "applies_to_visa_types": ["blue_card", "skilled_worker"],
+      "deadline_days_after_arrival": 30,
+      "source_url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card",
+      "source_tier": 2
+    },
+    {
+      "id": "ca_de_residence_title_pickup",
+      "order": 4,
+      "name": "Collect electronic residence title (eAT) at Ausländerbehörde",
+      "applies_to_visa_types": ["blue_card", "skilled_worker"],
+      "deadline_days_after_arrival": 90,
+      "deadline_basis": "Visa is typically issued as a 90-day entry visa; the multi-year residence title must be issued in person.",
+      "fee_eur": 100,
+      "fee_label": "eAT card fee (typical)",
+      "source_url": "https://www.bamf.de/EN/Themen/MigrationAufenthalt/ZuwandererDrittstaaten/Migrathek/BlaueKarteEU/blauekarteeu-node.html",
+      "source_tier": 1
+    },
+    {
+      "id": "ca_de_german_language_b1",
+      "order": 5,
+      "name": "German B1 (only required for settlement permit at 33 months — not for Blue Card itself)",
+      "applies_to_visa_types": ["blue_card"],
+      "is_conditional": true,
+      "condition_expression": "applying_for_niederlassungserlaubnis",
+      "deadline_days_after_arrival": null,
+      "source_url": "https://www.bamf.de/EN/Themen/MigrationAufenthalt/ZuwandererDrittstaaten/Migrathek/BlaueKarteEU/blauekarteeu-node.html",
+      "source_tier": 1
+    }
+  ],
+  "path_classifier_rules": [
+    {
+      "rule_id": "ca_de_default_to_blue_card",
+      "if": {
+        "nationality": "CA",
+        "destination": "DE",
+        "intent": "salaried_employment",
+        "qualification": "bachelor_or_higher",
+        "salary_eur_annual": {">=": 50700}
+      },
+      "then": {"pathway": "EU_BLUE_CARD", "visa_type": "blue_card"},
+      "rationale": "Default Blue Card pathway for qualified Canadian professionals meeting the 2026 general salary threshold."
+    },
+    {
+      "rule_id": "ca_de_blue_card_shortage_occupation",
+      "if": {
+        "nationality": "CA",
+        "destination": "DE",
+        "intent": "salaried_employment",
+        "qualification": "bachelor_or_higher",
+        "occupation_category": "shortage",
+        "salary_eur_annual": {">=": 45934.2}
+      },
+      "then": {"pathway": "EU_BLUE_CARD", "visa_type": "blue_card", "sub_route": "shortage_occupation"},
+      "rationale": "Reduced salary threshold for shortage occupations (IT, STEM, medicine) requires BA approval."
+    },
+    {
+      "rule_id": "ca_de_fallback_to_skilled_worker",
+      "if": {
+        "nationality": "CA",
+        "destination": "DE",
+        "intent": "salaried_employment",
+        "qualification": "bachelor_or_higher",
+        "salary_eur_annual": {"<": 45934.2}
+      },
+      "then": {"pathway": "SKILLED_WORKER_PERMIT", "visa_type": "skilled_worker"},
+      "rationale": "Below the Blue Card threshold but academically qualified — route to skilled_worker visa (no statutory salary minimum, but BA approval required)."
+    }
+  ],
+  "known_gaps": [
+    "Salary thresholds are reviewed annually (typically end of calendar year). Re-verify at next_review_due.",
+    "Apostille issuer split between Global Affairs Canada and provincial authorities is encoded as a free-text note rather than a structured field; the ingester may want to surface this to UI as a stepwise question (Which province issued your document?).",
+    "Family reunification (spouse, children) and dependents' rights are out of scope for this corridor file — covered separately.",
+    "Settlement permit (Niederlassungserlaubnis) eligibility at 21/33 months and German B1 requirement is referenced but not fully encoded as a downstream pathway.",
+    "BA approval list for shortage occupations is referenced as an example list; full list updated quarterly by Bundesagentur für Arbeit — deferred to a registry lookup at runtime."
+  ]
+}

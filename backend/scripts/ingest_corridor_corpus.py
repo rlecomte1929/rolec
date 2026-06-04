@@ -120,10 +120,34 @@ def map_document(doc: Dict[str, Any], fetched_at: str | None) -> Dict[str, Any]:
     }
 
 
+def _pathway_visa_types(corpus: Dict[str, Any]) -> List[str]:
+    """Visa types declared by the corpus's `pathways` block, in order."""
+    return [p["visa_type"] for p in corpus.get("pathways", []) if p.get("visa_type")]
+
+
 def map_corpus(corpus: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Map a whole corridor corpus file to a list of row dicts."""
+    """
+    Map a whole corridor corpus file to a list of row dicts.
+
+    A required_document with visa_type == "any" is a *common* document required
+    by every pathway in the corridor (e.g. passport, biometric photos). The
+    requirement service queries `WHERE visa_type = :vt` exactly — there is no
+    'any' wildcard for visa_type (unlike employee_type) — so a common doc is
+    fanned out into one row per pathway visa_type declared in `pathways`. If the
+    corpus declares no pathways, the doc is kept as-is (visa_type stays "any").
+    """
     fetched_at = corpus.get("fetched_at")
-    return [map_document(d, fetched_at) for d in corpus.get("required_documents", [])]
+    pathway_vts = _pathway_visa_types(corpus)
+    rows: List[Dict[str, Any]] = []
+    for d in corpus.get("required_documents", []):
+        if d.get("visa_type") == "any" and pathway_vts:
+            for vt in pathway_vts:
+                row = map_document(d, fetched_at)
+                row["visa_type"] = vt
+                rows.append(row)
+        else:
+            rows.append(map_document(d, fetched_at))
+    return rows
 
 
 def _sql_literal(value: Any, col_type: str) -> str:
