@@ -206,3 +206,92 @@ def test_inactive_rule_is_skipped():
         permit_expiry_date=TODAY + timedelta(days=14),
     )
     assert evaluate((inactive,), case, today=TODAY) == []
+
+
+# ── Phase A1: precondition_field guard for missing_field rules ───────────────
+
+
+def test_missing_field_rule_skips_when_precondition_absent():
+    """A missing_field rule with a precondition_field must NOT fire when the
+    precondition is also null/false — i.e. intake has not started for this
+    case, so we can't claim a field is 'missing' yet."""
+    rule_with_precondition = ComplianceRule(
+        id="rule-employer-pc",
+        category="employer",
+        severity="high",
+        trigger_condition={
+            "type": "missing_field",
+            "field": "employer_registration_id",
+            "operator": "is_null",
+            "value": None,
+            "precondition_field": "profile_exists",
+        },
+    )
+    case_no_profile = CaseComplianceData(
+        case_id="case-noprofile",
+        employer_registration_id=None,
+        profile_exists=False,
+    )
+    case_started_intake = CaseComplianceData(
+        case_id="case-started",
+        employer_registration_id=None,
+        profile_exists=True,
+    )
+    firings_skip = evaluate([rule_with_precondition], case_no_profile, today=TODAY)
+    firings_fire = evaluate([rule_with_precondition], case_started_intake, today=TODAY)
+    assert firings_skip == []
+    assert len(firings_fire) == 1
+    assert firings_fire[0].rule_id == "rule-employer-pc"
+
+
+def test_sql_data_source_sets_profile_exists_from_row():
+    """SqlComplianceDataSource.open_cases() must populate profile_exists from
+    the joined imm_employee_profiles lateral row."""
+    from backend.app.services.compliance_evaluator import SqlComplianceDataSource
+
+    class FakeRowResult:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def mappings(self):
+            return self
+
+        def all(self):
+            return self._rows
+
+    class FakeSession:
+        def execute(self, sql, params=None):
+            return FakeRowResult([
+                {
+                    "case_id": "case-A",
+                    "permit_expiry_date": None,
+                    "employer_registration_id": None,
+                    "expected_start_date": None,
+                    "profile_exists": False,
+                },
+                {
+                    "case_id": "case-B",
+                    "permit_expiry_date": None,
+                    "employer_registration_id": None,
+                    "expected_start_date": None,
+                    "profile_exists": True,
+                },
+            ])
+
+    source = SqlComplianceDataSource(FakeSession(), today=TODAY)
+    cases = list(source.open_cases())
+    assert len(cases) == 2
+    assert cases[0].case_id == "case-A" and cases[0].profile_exists is False
+    assert cases[1].case_id == "case-B" and cases[1].profile_exists is True
+
+
+def test_missing_field_rule_without_precondition_still_fires():
+    """Back-compat: a missing_field rule that does NOT specify precondition_field
+    behaves exactly as before (fires when the target field is null)."""
+    case = CaseComplianceData(
+        case_id="case-no-pc",
+        employer_registration_id=None,
+        profile_exists=False,  # ignored — rule has no precondition_field
+    )
+    firings = evaluate([EMPLOYER_RULE], case, today=TODAY)
+    assert [f.rule_id for f in firings] == ["rule-employer"]
