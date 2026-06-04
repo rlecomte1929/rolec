@@ -35,6 +35,7 @@ from ..services.freshness_service import (
     get_freshness_overview,
     get_stale_live_events,
     get_stale_live_resources,
+    list_source_monitor_pages,
     refresh_freshness_metrics,
 )
 
@@ -106,6 +107,13 @@ def get_cities(
 @router.get("/sources")
 def get_sources(user: Dict[str, Any] = Depends(_require_admin)):
     return {"items": get_freshness_by_source()}
+
+
+@router.get("/source-pages")
+def get_source_pages(user: Dict[str, Any] = Depends(_require_admin)):
+    """[P3-02b] Every monitored source URL with its current monitoring state
+    (last_fetched, last_changed, hash, tier) for the source-monitor dashboard."""
+    return {"items": list_source_monitor_pages()}
 
 
 @router.post("/refresh")
