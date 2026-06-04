@@ -23,6 +23,7 @@ from .routers import (
     hr_analytics,
     hr_case_audit,
     hr_case_detail,
+    compliance,
     hr_case_resolve,
     hr_catalog,
     hr_coordination,
@@ -145,6 +146,7 @@ def create_app() -> FastAPI:
     app.include_router(mobility_context.router)  # P2 circular-import fixed — safe to top-level import
     app.include_router(specialist_review.router)
     app.include_router(rag_roadmap.router)  # [P1-01d] /api/internal/rag/generate-roadmap
+    app.include_router(compliance.router)  # [BL-Compliance.4] /api/compliance
 
     # ── Month-1 migration: HR Policy cluster ──────────────────────────────────
     app.include_router(policy_publish.router)
