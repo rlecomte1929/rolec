@@ -142,6 +142,8 @@ class CaseFormSummary(BaseModel):
     receipt_ref: Optional[str]
     rejection_reason: Optional[str] = None   # [P4-5] set when status='rejected'
     roadmap_step_id: Optional[str] = None   # [P1-6] step that triggered this form
+    is_adhoc: bool = False   # [P4-3] true when this is an ad-hoc "Add document" entry
+    notes: Optional[str] = None   # [P4-3] free-text notes from the Add-document modal
     template: _DossierFormTemplate
     person: _DossierFormPerson
     fields_summary: _DossierFieldsSummary
@@ -281,6 +283,34 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
         and blocker_status != "approved"
     )
 
+    # [P4-3] Ad-hoc forms have no form_template — synthesize a "Custom" pseudo-template
+    # so the dossier list still renders a name/authority for them.
+    is_adhoc = bool(row.get("is_adhoc")) or row.get("template_id") is None
+    if is_adhoc:
+        template = _DossierFormTemplate(
+            id="adhoc",
+            code="CUSTOM",
+            name=(row.get("adhoc_name") or "Custom document"),
+            authority_code=None,
+            authority_name=(row.get("adhoc_authority") or None),
+            country="",
+            category=None,
+            version="—",
+            fields_total=0,
+        )
+    else:
+        template = _DossierFormTemplate(
+            id=str(row["template_id"]),
+            code=str(row["template_code"]),
+            name=str(row["template_name"]),
+            authority_code=row.get("template_authority_code"),
+            authority_name=row.get("template_authority_name"),
+            country=str(row["template_country"]),
+            category=row.get("template_category"),
+            version=str(row["template_version"]),
+            fields_total=fields_total,
+        )
+
     return CaseFormSummary(
         id=str(row["id"]),
         case_id=str(row["case_id"]),
@@ -297,17 +327,9 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
         receipt_ref=row.get("receipt_ref"),
         rejection_reason=row.get("rejection_reason") or None,   # [P4-5]
         roadmap_step_id=(str(row["roadmap_step_id"]) if row.get("roadmap_step_id") else None),  # [P1-6]
-        template=_DossierFormTemplate(
-            id=str(row["template_id"]),
-            code=str(row["template_code"]),
-            name=str(row["template_name"]),
-            authority_code=row.get("template_authority_code"),
-            authority_name=row.get("template_authority_name"),
-            country=str(row["template_country"]),
-            category=row.get("template_category"),
-            version=str(row["template_version"]),
-            fields_total=fields_total,
-        ),
+        is_adhoc=is_adhoc,   # [P4-3]
+        notes=row.get("notes") or None,   # [P4-3]
+        template=template,
         person=person,
         fields_summary=_DossierFieldsSummary(
             total=fields_total,
@@ -352,9 +374,11 @@ def _load_form_with_template(
                    ft.country AS template_country,
                    ft.category AS template_category,
                    ft.version AS template_version,
-                   ft.fields  AS template_fields
+                   ft.fields  AS template_fields,
+                   cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes
             FROM {_pg_table('case_forms')} cf
-            JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
+            -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
+            LEFT JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
             WHERE cf.id = :form_id AND cf.case_id = :case_id
             """
         ),
@@ -1035,6 +1059,7 @@ def list_case_forms(
           ft.category AS template_category,
           ft.version AS template_version,
           ft.fields  AS template_fields,
+          cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes,
           cd.relationship AS dependent_relationship,
           cd.full_name    AS dependent_name,
           p.full_name     AS profile_full_name,
@@ -1048,7 +1073,8 @@ def list_case_forms(
           (SELECT COUNT(*) FROM {_pg_table('case_form_field_values')} fv
              WHERE fv.case_form_id = cf.id AND fv.overridden = TRUE) AS fv_overridden
         FROM {_pg_table('case_forms')} cf
-        JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
+        -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
+        LEFT JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
         LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = cf.person_id
         WHERE cf.case_id = :case_id{where_status}
