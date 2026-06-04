@@ -40,6 +40,7 @@ from ..auth_deps import get_current_user, require_case_access
 from ..db import SessionLocal
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
+from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.case_service import (
     _assert_case_access,
     _case_dto,
@@ -812,7 +813,14 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
         "status": case.status,
         "draft": draft,
     }
-    return derive_roadmap(case_dict)
+    roadmap = derive_roadmap(case_dict)
+    # P2-01a: gate the live AI EEA roadmap behind a per-account feature flag.
+    # TODO [P2-01b]: when eligible, branch here to the confidence-gated AI
+    # roadmap path. Until P1-01b lands we still serve the deterministic roadmap;
+    # the additive flag only tells the client the live path is enabled for them.
+    if is_flag_enabled_for(user.get("id"), LIVE_EEA_ROADMAP_FLAG):
+        roadmap["ai_roadmap_eligible"] = True
+    return roadmap
 
 
 @router.get("/{case_id}/roadmap/tracks", response_model=RoadmapTracksResponse)

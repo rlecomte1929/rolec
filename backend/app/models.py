@@ -432,6 +432,32 @@ class RoadmapReviewStatus(Base):
     updated_at = Column(DateTime, server_default=func.now(), nullable=False)
 
 
+class FeatureFlag(Base):
+    """P2-01a — backend-native feature flag. String PK keeps the model portable
+    to SQLite for tests (mirrors the rest of this module); the Postgres table +
+    RLS live in the migration. Toggled DB-side, no redeploy required."""
+
+    __tablename__ = "feature_flags"
+
+    key = Column(String, primary_key=True, index=True)
+    enabled = Column(Boolean, nullable=False, default=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class FeatureFlagAccount(Base):
+    """P2-01a — per-account allowlist for a feature flag. A flag is active for an
+    account only when the flag is enabled AND a row exists here ("selected test
+    accounts initially")."""
+
+    __tablename__ = "feature_flag_accounts"
+
+    flag_key = Column(String, primary_key=True, index=True)
+    account_id = Column(String, primary_key=True, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+
 class TranslationCache(Base):
     """Parker-I neural translation cache — dedup by sha256 of (text, src, tgt, domain).
 
