@@ -202,6 +202,31 @@ jobs:
           DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
         run: python scripts/storage_bucket_check.py
 
+  migration-drift:
+    # AIQ-756-PREVENT: fail when prod has an applied migration version with no
+    # matching repo file (`schema_migrations.version` vs supabase/migrations/*.sql).
+    # That mismatch is what makes `db push` / Supabase Preview abort with
+    # "Remote migration versions not found" and red every PR until reconciled —
+    # caused by MCP apply_migration stamping an apply-time version while the file
+    # is committed at a forward timestamp. Catches it at PR time. Mirrors
+    # rls-coverage: read-only DATABASE_URL secret, gated on a repo variable
+    # because secrets.* is not allowed in a job-level if:.
+    name: Migration ledger drift check
+    runs-on: ubuntu-latest
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install psycopg2
+        run: pip install psycopg2-binary==2.9.9
+      - name: Run migration-drift check
+        env:
+          DATABASE_URL: ${{ secrets.RLS_COVERAGE_DATABASE_URL }}
+        run: python scripts/check_migration_drift.py
+
   deliverable-integrity:
     # HYGIENE-1: assert that "Done" AI Work Queue tasks' claimed deliverable
     # files actually exist in the repo. Catches the class where a Cowork task is

@@ -149,6 +149,24 @@ Every migration that creates a new table in the `public` schema **must** include
 
 **If you are writing or reviewing a migration and a new table is missing any of the above, stop and add it before proceeding.** This is a hard review gate, not a soft suggestion.
 
+## Migration ledger discipline (AIQ-756)
+
+`supabase` tracks applied migrations by `version` in `supabase_migrations.schema_migrations`, and **records the version from how the migration was applied** — so the two apply paths drift apart:
+
+- ✅ **Commit the migration file, then let the main-push migration workflow apply it.** It records the migration at its **repo filename version**, so prod and repo agree.
+- ❌ **Do NOT pre-apply a repo-tracked migration via MCP `apply_migration`.** That stamps an **apply-time** version (e.g. `20260604153503`) which will not match your committed forward-timestamp file (e.g. `20260608100000`). Every such row makes a fresh `supabase db push` / Supabase Preview abort with `Remote migration versions not found in local migrations directory`, reddening **every** PR's Preview until someone reconciles by hand. (MCP `apply_migration` is fine for a genuine one-off — but then also commit a matching migration file at that **same** version.)
+
+CI guards this: the **Migration ledger drift check** job (`scripts/check_migration_drift.py`) fails a PR when prod has an applied version with no repo file. It is gated on `vars.RLS_COVERAGE_DATABASE_URL_SET` (reuses the read-only `RLS_COVERAGE_DATABASE_URL` secret) and is a no-op where that secret isn't configured.
+
+**Reconciliation runbook** (if drift slips through — this is what AIQ-756 did by hand). For each drifted row whose migration *name* already exists in the repo at a different version, relabel the ledger (collision-check the target version is absent first):
+
+```sql
+UPDATE supabase_migrations.schema_migrations SET version='<repo_version>'
+  WHERE version='<prod_apply_time_version>' AND name='<name>';
+```
+
+If a drifted row has **no** repo file by that name, commit a prod-as-oracle migration (real DDL, idempotent — or a stub) at the prod version so the repo reproduces prod.
+
 ## Build hygiene (pre-push hook + CI)
 
 Render auto-deploys `main` on every push, so **every commit on `main` must build cleanly** — a broken build is a user-visible deploy failure.
