@@ -88,14 +88,14 @@ AIQ-578:audit/AI_AGENT_STRATEGY.md  # UNVERIFIED (dir-exists-file-not-found): au
 AIQ-578:supabase/migrations/20260531000000_agent_runs.sql  # UNVERIFIED (dir-exists-file-not-found): supabase/migrations/
 AIQ-579:backend/app/services/agent_run_writer.py  # UNVERIFIED (dir-exists-file-not-found): backend/app/services/
 AIQ-579:backend/tests/test_agent_run_writer.py  # UNVERIFIED (dir-exists-file-not-found): backend/tests/
-AIQ-582:backend/eval/extraction_metrics.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-582:backend/eval/run_extraction_eval.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-582:backend/tests/eval/test_extraction_eval.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-583:backend/eval/rule_registry.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-583:backend/eval/run_eligibility_eval.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-583:backend/tests/eval/test_eligibility_eval.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-584:backend/eval/run_contradiction_eval.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-584:backend/tests/eval/test_contradiction_eval.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-582:backend/eval/extraction_metrics.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/extraction_metrics.py
+AIQ-582:backend/eval/run_extraction_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/run_extraction_eval.py
+AIQ-582:backend/tests/eval/test_extraction_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/eval/test_extraction_eval.py
+AIQ-583:backend/eval/rule_registry.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/rule_registry.py
+AIQ-583:backend/eval/run_eligibility_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/run_eligibility_eval.py
+AIQ-583:backend/tests/eval/test_eligibility_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/eval/test_eligibility_eval.py
+AIQ-584:backend/eval/run_contradiction_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/run_contradiction_eval.py
+AIQ-584:backend/tests/eval/test_contradiction_eval.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/eval/test_contradiction_eval.py
 AIQ-585:.github/test-events/sample-pr.json  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
 AIQ-585:.github/workflows/ai-eval-gate.yml  # UNVERIFIED (dir-exists-file-not-found): .github/workflows/
 AIQ-585:backend/prompts/promptfooconfig.yaml  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
@@ -123,23 +123,23 @@ AIQ-600:backend/eval/judges/init.py  # LEAK (verified absent): HYGIENE-3 (AI-eva
 AIQ-600:backend/eval/judges/tone.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
 AIQ-600:backend/tests/fixtures/judges/labelled_examples.json  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
 AIQ-600:backend/tests/test_judges.py  # UNVERIFIED (dir-exists-file-not-found): backend/tests/
-AIQ-601:backend/eval/init.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-601:backend/eval/init.py  # SHIPPED (landed PR #356 — init file): backend/eval/__init__.py
 AIQ-601:backend/eval/run_refusal_eval.py  # SHIPPED (verified git-history): 0573656d feat(eval): AIQ-601 — refusal-correctness eval suite
 AIQ-601:backend/tests/fixtures/refusal/refusal_cases.json  # SHIPPED (verified git-history): 0573656d feat(eval): AIQ-601 — refusal-correctness eval suite
 AIQ-601:backend/tests/test_refusal_eval.py  # SHIPPED (verified git-history): 0573656d feat(eval): AIQ-601 — refusal-correctness eval suite
 AIQ-610:audit/ADR-001-no-langgraph.md  # UNVERIFIED (dir-exists-file-not-found): audit/
-AIQ-614:backend/eval/init.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-614:backend/eval/init.py  # SHIPPED (landed PR #356 — init file): backend/eval/__init__.py
 AIQ-614:backend/eval/schemas/dossier.py  # SHIPPED (verified basename): backend/app/services/dossier.py
-AIQ-614:backend/eval/schemas/init.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-614:backend/eval/validate_dossier.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-614:backend/eval/schemas/init.py  # SHIPPED (landed PR #356 — init file): backend/eval/schemas/__init__.py
+AIQ-614:backend/eval/validate_dossier.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/eval/validate_dossier.py
 AIQ-614:backend/tests/fixtures/pilot/SCHEMA.md  # SHIPPED (verified token-in-filename): docs/RESOURCES_MODULE_SCHEMA_SUMMARY.md
-AIQ-614:backend/tests/fixtures/pilot/generators/base.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-614:backend/tests/fixtures/pilot/generators/in_de_generic.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-614:backend/tests/fixtures/pilot/generators/init.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-614:backend/tests/fixtures/pilot/init.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
-AIQ-614:backend/tests/fixtures/pilot/test_schema.py  # LEAK (verified absent): HYGIENE-3 (AI-eval harness never merged)
+AIQ-614:backend/tests/fixtures/pilot/generators/base.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/fixtures/pilot/generators/base.py
+AIQ-614:backend/tests/fixtures/pilot/generators/in_de_generic.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/fixtures/pilot/generators/in_de_generic.py
+AIQ-614:backend/tests/fixtures/pilot/generators/init.py  # SHIPPED (landed PR #356 — init file): backend/tests/fixtures/pilot/generators/__init__.py
+AIQ-614:backend/tests/fixtures/pilot/init.py  # SHIPPED (landed PR #356 — init file): backend/tests/fixtures/pilot/__init__.py
+AIQ-614:backend/tests/fixtures/pilot/test_schema.py  # SHIPPED (landed PR #356 — HYGIENE-3): backend/tests/fixtures/pilot/test_schema.py
 AIQ-635:supabase/migrations/20260604120000_specialist_review_calibration_view.sql  # SHIPPED (verified token-in-filename): supabase/migrations/20260604072026_specialist_review_calibration_view.sql
-AIQ-708:scripts/eval_context_precision.py  # UNVERIFIED (dir-exists-file-not-found): scripts/
+AIQ-708:scripts/eval_context_precision.py  # SHIPPED (verified PR #356): backend/scripts/eval_rag_context_precision.py
 AIQ-708:scripts/rag_eval_harness.py  # SHIPPED (verified basename): backend/scripts/rag_eval_harness.py
 AIQ-709:scripts/eval_factual_consistency.py  # SHIPPED (verified basename): backend/scripts/eval_factual_consistency.py
 AIQ-727:backend/app/services/processing_time_estimate.py  # SHIPPED (verified git-history): 52419e3a feat(predictions): P2-04a processingTimeEstimate() service with official fallback (AIQ-727) (#338)
