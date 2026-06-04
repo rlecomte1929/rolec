@@ -42,6 +42,7 @@ from .routers import (
     policy_summary,
     policy_templates,
     predictions,
+    rag_roadmap,
     relocation_profile,
     specialist_review,
     support,
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
     app.include_router(relocation_classify_routes.router)
     app.include_router(mobility_context.router)  # P2 circular-import fixed — safe to top-level import
     app.include_router(specialist_review.router)
+    app.include_router(rag_roadmap.router)  # [P1-01d] /api/internal/rag/generate-roadmap
 
     # ── Month-1 migration: HR Policy cluster ──────────────────────────────────
     app.include_router(policy_publish.router)
