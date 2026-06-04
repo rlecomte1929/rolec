@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from sqlalchemy import text as _sql_text
 
 from .. import crud, schemas
@@ -54,6 +54,7 @@ from ...database import db as main_db
 # Pydantic models + private helpers borrowed from cases.py.
 # cases.py remains the canonical source of these definitions until cases-6,
 # so importing keeps the two routers in lock-step instead of diverging.
+from .cases_read import FormDocumentItem
 from .cases import (
     BulkFieldUpdatePayload,
     CaseFormSummary,
@@ -732,6 +733,146 @@ def create_form_comment(
         content=str(row["content"]),
         created_at=str(row["created_at"]),
     )
+
+
+# ── [P1-05c] Per-form supporting document upload / delete ────────────────────
+
+_FORM_DOC_BUCKET = "case-documents"
+_FORM_DOC_MAX_BYTES = 20 * 1024 * 1024  # 20 MiB — matches the bucket's file_size_limit
+
+
+def _safe_filename(name: str) -> str:
+    # Map anything outside [alnum . _ -] to '_', then neutralise path-traversal
+    # sequences (leading dots, runs of dots). Slashes are already gone, so the
+    # result can never escape its storage prefix.
+    cleaned = "".join(c if (c.isalnum() or c in "._-") else "_" for c in (name or "upload"))
+    cleaned = cleaned.lstrip(".")
+    while ".." in cleaned:
+        cleaned = cleaned.replace("..", ".")
+    return cleaned[:120] or "upload"
+
+
+@router.post(
+    "/{case_id}/forms/{form_id}/documents",
+    response_model=FormDocumentItem,
+    status_code=201,
+)
+async def upload_form_document(
+    case_id: str,
+    form_id: str,
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> FormDocumentItem:
+    """
+    [P1-05c] Upload a supporting document for a single case_form. The file is
+    stored in the private `case-documents` bucket; a metadata row is written to
+    case_form_documents scoped to (case_id, case_form_id).
+    """
+    _assert_case_access(user, case_id)
+
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=422, detail="Uploaded file is empty")
+    if len(contents) > _FORM_DOC_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds the 20 MB limit")
+
+    uploaded_by = user.get("id") or user.get("sub")
+    file_name = _safe_filename(file.filename or "upload")
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+    storage_path = f"case-forms/{form_id}/uploads/{ts}_{file_name}"
+    content_type = file.content_type or "application/octet-stream"
+
+    # Confirm the form belongs to this case before touching storage.
+    with main_db.engine.connect() as conn:
+        exists = conn.execute(
+            _sql_text(
+                f"SELECT id FROM {_pg_table('case_forms')} "
+                f"WHERE id = :form_id AND case_id = :case_id"
+            ),
+            {"form_id": form_id, "case_id": case_id},
+        ).first()
+    if not exists:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    # Upload to Supabase Storage (service-role client).
+    try:
+        from ..services.supabase_client import get_supabase_admin_client  # lazy import
+        sb = get_supabase_admin_client()
+        sb.storage.from_(_FORM_DOC_BUCKET).upload(
+            storage_path,
+            contents,
+            {"content-type": content_type, "upsert": "true"},
+        )
+    except Exception as exc:
+        logger.warning("form_doc upload: storage error form_id=%s err=%s", form_id, exc)
+        raise HTTPException(status_code=502, detail="Storage unavailable — upload failed")
+
+    try:
+        with main_db.engine.begin() as conn:
+            row = conn.execute(
+                _sql_text(
+                    f"INSERT INTO {_pg_table('case_form_documents')} "
+                    f"(case_form_id, case_id, file_name, storage_path, content_type, size_bytes, uploaded_by) "
+                    f"VALUES (:fid, :cid, :name, :path, :ctype, :size, :uid) "
+                    f"RETURNING id, case_form_id, case_id, file_name, content_type, size_bytes, uploaded_by, created_at"
+                ),
+                {
+                    "fid": form_id, "cid": case_id, "name": file_name,
+                    "path": storage_path, "ctype": content_type,
+                    "size": len(contents), "uid": uploaded_by,
+                },
+            ).mappings().first()
+    except Exception:
+        logger.exception("form_doc upload: db insert failed form_id=%s", form_id)
+        raise HTTPException(status_code=500, detail="Failed to record uploaded document")
+
+    return FormDocumentItem(
+        id=str(row["id"]),
+        case_form_id=str(row["case_form_id"]),
+        case_id=str(row["case_id"]),
+        file_name=str(row["file_name"]),
+        content_type=row.get("content_type"),
+        size_bytes=(int(row["size_bytes"]) if row.get("size_bytes") is not None else None),
+        uploaded_by=(str(row["uploaded_by"]) if row.get("uploaded_by") else None),
+        created_at=str(row["created_at"]),
+        download_url=None,
+    )
+
+
+@router.delete("/{case_id}/forms/{form_id}/documents/{document_id}", status_code=204)
+def delete_form_document(
+    case_id: str,
+    form_id: str,
+    document_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Response:
+    """[P1-05c] Delete a per-form supporting document (row + storage object)."""
+    _assert_case_access(user, case_id)
+
+    with main_db.engine.begin() as conn:
+        row = conn.execute(
+            _sql_text(
+                f"SELECT storage_path FROM {_pg_table('case_form_documents')} "
+                f"WHERE id = :id AND case_form_id = :fid AND case_id = :cid"
+            ),
+            {"id": document_id, "fid": form_id, "cid": case_id},
+        ).mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Document not found")
+        conn.execute(
+            _sql_text(f"DELETE FROM {_pg_table('case_form_documents')} WHERE id = :id"),
+            {"id": document_id},
+        )
+
+    # Best-effort storage cleanup — the row is already gone, so don't fail here.
+    try:
+        from ..services.supabase_client import get_supabase_admin_client  # lazy import
+        sb = get_supabase_admin_client()
+        sb.storage.from_(_FORM_DOC_BUCKET).remove([str(row["storage_path"])])
+    except Exception as exc:
+        logger.warning("form_doc delete: storage cleanup failed doc_id=%s err=%s", document_id, exc)
+
+    return Response(status_code=204)
 
 
 @router.patch("/{case_id}/forms/{form_id}/flag", response_model=FormFlagResponse)
