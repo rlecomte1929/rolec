@@ -46,6 +46,7 @@ from .routers import (
     predictions,
     rag_roadmap,
     relocation_profile,
+    roadmap_audit,
     specialist_review,
     support,
     translation,
@@ -103,6 +104,8 @@ def create_app() -> FastAPI:
     app.include_router(hr_case_detail.router)
     # C1-16: GET /api/hr/cases/{id}/audit — chronological event timeline.
     app.include_router(hr_case_audit.router)
+    # P1-08c/d/e: roadmap as_of reconstruction + legal export + rule-change notifier.
+    app.include_router(roadmap_audit.router)
     # C1-12-be: resolve + escalate POST endpoints — closes the C1-12 deferral.
     app.include_router(hr_case_resolve.router)
     # [Parker-J] NLG exec-summary + policy TL;DR routes
