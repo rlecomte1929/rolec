@@ -12,4 +12,15 @@
 # This list should DRAIN over time. The guard is report-only by default; once
 # the live backlog is triaged into this file, flip the CI job to --strict.
 #
-# (empty — to be seeded on the first live run once NOTION_QUEUE_TOKEN is set)
+# Seeded from the first live run (2026-06-04). The 10 tasks blocked by
+# Ready-for-AI / Blocked / Archived dependencies were set to Blocked in Notion
+# directly. The 5 below are blocked ONLY by a dependency that is already in
+# "Human Review" (work effectively done, awaiting sign-off) — expected to land
+# imminently, so they are left "Ready for AI" rather than Blocked. DRAIN these
+# when the Human-Review dependency is approved→Done (then the entry is moot) or
+# rejected (then set the task to Blocked).
+P2-06F  # dep P2-06e in Human Review (re-index chunks)
+P2-07E  # dep P2-07c in Human Review (per-step effort/confidence)
+P3-02D  # deps P3-02a/P3-02b in Human Review (dead-link detection)
+P2-08E  # dep P2-08a in Human Review (stale-steps admin alert)
+P1-05B  # dep P1-05a in Human Review (FormCard component)
