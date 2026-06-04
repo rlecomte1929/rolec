@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 import RoadmapScreen from '../../features/platform-v2/roadmap/RoadmapScreen';
+import { RuleUpdateBanner } from '../../features/platform-v2/roadmap/RuleUpdateBanner';
 import { getCaseRoadmapV2, type RoadmapV2Track } from '../../api/roadmapV2';
 import type { RoadmapTrack, RoadmapStep } from '../../types/relopass-api-contracts';
 import { buildRoute } from '../../navigation/routes';
@@ -105,6 +106,7 @@ export const EmployeeCaseRoadmapPage: React.FC = () => {
 
   return (
     <AppShell>
+      {caseId && <RuleUpdateBanner caseId={caseId} />}
       <RoadmapScreen
         tracks={tracks}
         docChips={docChips}
