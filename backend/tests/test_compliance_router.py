@@ -12,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from backend.app.auth_deps import get_current_user, get_org_id_for_hr_user
+from backend.app.auth_deps import get_current_user, get_org_id_for_hr_user, require_admin
 
 
 @pytest.fixture
@@ -25,6 +25,7 @@ def _clear_overrides():
     yield
     app.dependency_overrides.pop(get_org_id_for_hr_user, None)
     app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(require_admin, None)
 
 
 def test_routes_registered():
@@ -65,3 +66,74 @@ def test_update_alert_rejects_bad_status(client: TestClient):
         "/api/compliance/alerts/some-id", json={"status": "bogus"}
     )
     assert resp.status_code == 422  # pydantic Literal rejects it before any DB work
+
+
+# ── Phase C2: admin fleet-wide evaluate-all endpoint ─────────────────────────
+
+
+def test_evaluate_all_route_registered():
+    paths = {r.path for r in app.routes}
+    assert "/api/compliance/evaluate-all" in paths
+
+
+def test_evaluate_all_rejects_non_admin(client: TestClient):
+    # An HR user (no is_admin) must be rejected by require_admin.
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "hr-1", "role": "hr", "is_admin": False,
+    }
+    resp = client.post("/api/compliance/evaluate-all?dry_run=true")
+    assert resp.status_code == 403, resp.text
+
+
+def test_evaluate_all_default_is_dry_run(client: TestClient, monkeypatch):
+    """When admin POSTs without ?dry_run=..., endpoint must default to dry-run
+    so the scheduled cron is safe-by-default."""
+    app.dependency_overrides[require_admin] = lambda: {
+        "id": "admin-1", "role": "admin", "is_admin": True,
+    }
+    captured: dict = {}
+
+    def fake_run(db, today=None, company_id=None, dry_run=False):
+        from backend.app.services.compliance_evaluator import EvaluationResult
+        captured["dry_run"] = dry_run
+        captured["company_id"] = company_id
+        return EvaluationResult(
+            cases_evaluated=0, alerts_created=0, alerts_skipped_existing=0
+        )
+
+    monkeypatch.setattr(
+        "backend.app.routers.compliance.run_compliance_evaluation", fake_run
+    )
+    resp = client.post("/api/compliance/evaluate-all")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["dry_run"] is True
+    assert captured["dry_run"] is True
+    assert captured["company_id"] is None  # fleet-wide, not company-scoped
+
+
+def test_evaluate_all_dry_run_false_persists(client: TestClient, monkeypatch):
+    app.dependency_overrides[require_admin] = lambda: {
+        "id": "admin-1", "role": "admin", "is_admin": True,
+    }
+    captured: dict = {}
+
+    def fake_run(db, today=None, company_id=None, dry_run=False):
+        from backend.app.services.compliance_evaluator import EvaluationResult
+        captured["dry_run"] = dry_run
+        return EvaluationResult(
+            cases_evaluated=3, alerts_created=2, alerts_skipped_existing=1
+        )
+
+    monkeypatch.setattr(
+        "backend.app.routers.compliance.run_compliance_evaluation", fake_run
+    )
+    resp = client.post("/api/compliance/evaluate-all?dry_run=false")
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {
+        "cases_evaluated": 3,
+        "alerts_created": 2,
+        "alerts_skipped_existing": 1,
+        "dry_run": False,
+    }
+    assert captured["dry_run"] is False
