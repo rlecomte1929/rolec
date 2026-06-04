@@ -104,7 +104,73 @@ def write_document(
     }
     r = supabase.table("crawled_source_documents").insert(row).execute()
     data = (r.data or [{}])[0]
+
+    # [P1-05d] Keep the deduplicated current-state freshness record (source_pages)
+    # in sync so the Dossier "Last verified" date reflects real fetches. Never
+    # let a source_pages failure break the crawl write.
+    try:
+        write_source_page(
+            fetch_result,
+            page_title=(parsed.page_title if parsed else None),
+            trust_tier=trust_tier,
+        )
+    except Exception:
+        log.warning("source_pages sync failed for %s", fetch_result.url, exc_info=True)
+
     return data.get("id", str(uuid.uuid4()))
+
+
+def write_source_page(
+    fetch_result: FetchResult,
+    *,
+    page_title: Optional[str] = None,
+    trust_tier: str = "",
+) -> None:
+    """
+    [P1-05d / P0-04] Upsert the current-state freshness record for one URL into
+    public.source_pages (keyed by url). Sets last_fetched_at on every fetch, and
+    records previous_hash + last_changed_at when the content hash changes.
+
+    On an inaccessible fetch (404/error) the existing record is preserved:
+    is_accessible flips to false but content_hash is NOT overwritten (so the
+    last-good hash survives), mirroring the P0-04 crawler contract.
+    """
+    url = fetch_result.url
+    if not url:
+        return
+    supabase = _get_supabase()
+    is_accessible = fetch_result.success
+
+    prev_hash: Optional[str] = None
+    try:
+        existing = (
+            supabase.table("source_pages")
+            .select("content_hash")
+            .eq("url", url)
+            .limit(1)
+            .execute()
+        )
+        rows = existing.data or []
+        if rows:
+            prev_hash = rows[0].get("content_hash")
+    except Exception:
+        prev_hash = None
+
+    row: Dict[str, Any] = {
+        "url": url,
+        "tier": trust_tier or "1",
+        "page_title": page_title,
+        "http_status": fetch_result.http_status,
+        "is_accessible": is_accessible,
+        "last_fetched_at": fetch_result.fetched_at,
+    }
+    if is_accessible:
+        row["content_hash"] = fetch_result.content_hash
+        if prev_hash and fetch_result.content_hash and fetch_result.content_hash != prev_hash:
+            row["previous_hash"] = prev_hash
+            row["last_changed_at"] = fetch_result.fetched_at
+
+    supabase.table("source_pages").upsert(row, on_conflict="url").execute()
 
 
 def write_chunk(
