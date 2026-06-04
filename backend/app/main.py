@@ -8,6 +8,7 @@ from .routers import (
     admin_ai_unit_economics,
     admin_ocr_shadow,
     admin_prompts,
+    admin_source_change_review,
     advisors,
     ai_decisions,
     ai_feedback,
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(cases_admin.router)
     app.include_router(case_forms_adhoc.router)  # [P4-3] ad-hoc "Add document"
     app.include_router(admin.router)
+    app.include_router(admin_source_change_review.router)  # P2-02d material-change review queue
     app.include_router(employee_quotes.router)
     app.include_router(pets.router)
     app.include_router(support.router)
