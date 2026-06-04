@@ -2141,21 +2141,27 @@ def create_person(
     # invite_admin_created_user is best-effort and never raises.
     from .app.services.supabase_auth_sync import invite_admin_created_user as _invite
     _app_url = os.environ.get("APP_URL", "https://relopass.com")
-    invite_sent = _invite(
+    invite = _invite(
         email,
         full_name=body.full_name,
         role=role,
         redirect_to=f"{_app_url}/auth?mode=login",
     )
-    if not invite_sent:
+    if not invite.sent:
         log.warning(
-            "admin_create_person invite_not_sent request_id=%s email=%s "
-            "(Supabase not configured or invite_user_by_email unavailable)",
+            "admin_create_person invite_not_sent request_id=%s email=%s reason=%s",
             request_id,
             email,
+            invite.error or "no-op (Supabase not configured)",
         )
 
-    return {"person": profile, "invite_sent": invite_sent}
+    # AIQ-535: relay the failure reason as invite_error so the Add Person modal
+    # can tell the admin why the invite did not go out. Only set on a genuine
+    # failure — benign no-ops report invite_sent=True with no error.
+    resp = {"person": profile, "invite_sent": invite.sent}
+    if not invite.sent and invite.error:
+        resp["invite_error"] = invite.error
+    return resp
 
 
 def _retry_on_operational_error(fn, max_attempts: int = 3):

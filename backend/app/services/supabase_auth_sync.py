@@ -10,7 +10,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import os
-from typing import Any, Optional
+from typing import Any, NamedTuple, Optional
 
 log = logging.getLogger(__name__)
 
@@ -130,13 +130,28 @@ def sync_relopass_user_to_supabase_auth(
         return False
 
 
+class InviteOutcome(NamedTuple):
+    """Result of an admin-created-user invite attempt.
+
+    `sent` is True on success or any benign no-op (Supabase not configured,
+    sync disabled, user already present) — those must NOT surface an error to
+    the admin. `error` is populated only on a genuine delivery failure and
+    carries a short, admin-safe reason (never a raw exception string, which
+    could leak SMTP URLs or keys). AIQ-535: the create-person endpoint relays
+    `error` as `invite_error` so the Add Person modal can show the cause.
+    """
+
+    sent: bool
+    error: Optional[str] = None
+
+
 def invite_admin_created_user(
     email: str,
     *,
     full_name: Optional[str] = None,
     role: Optional[str] = None,
     redirect_to: Optional[str] = None,
-) -> bool:
+) -> InviteOutcome:
     """B2 fix: send a Supabase Auth invite email for an admin-created account.
 
     Uses admin.invite_user_by_email which (a) creates the auth user if they
@@ -145,22 +160,23 @@ def invite_admin_created_user(
     the local profile row — users received a silent account they could not log
     into.
 
-    Returns True on success, or when Supabase is not configured (no-op).
-    Never raises — non-fatal if email delivery fails.
+    Returns InviteOutcome(sent=True) on success or when Supabase is not
+    configured (no-op). On a real failure returns InviteOutcome(sent=False,
+    error=<short reason>). Never raises — non-fatal if email delivery fails.
     """
     if os.getenv("DISABLE_SUPABASE_AUTH_SYNC", "").lower() in ("1", "true", "yes"):
-        return True
+        return InviteOutcome(True)
     e = (email or "").strip().lower()
     if not e:
-        return True
+        return InviteOutcome(True)
     if get_supabase_admin_client is None:
-        return True
+        return InviteOutcome(True)
 
     try:
         client = get_supabase_admin_client()
     except Exception as ex:
         log.debug("invite_admin_created_user: no admin client: %s", ex)
-        return True
+        return InviteOutcome(True)
 
     meta: dict[str, Any] = {}
     if full_name and str(full_name).strip():
@@ -178,32 +194,32 @@ def invite_admin_created_user(
         admin = getattr(getattr(client, "auth", None), "admin", None)
         if admin is None:
             log.warning("invite_admin_created_user: no admin interface on supabase client")
-            return False
+            return InviteOutcome(False, "Supabase admin interface unavailable")
         fn = getattr(admin, "invite_user_by_email", None)
         if fn is None:
             log.warning("invite_admin_created_user: invite_user_by_email not available")
-            return False
+            return InviteOutcome(False, "Invite API unavailable in this Supabase client")
         _call_with_timeout(fn, e, options)
         log.info("invite_admin_created_user: invite sent email=%s", e[:3] + "***")
-        return True
+        return InviteOutcome(True)
     except concurrent.futures.TimeoutError:
         log.warning(
             "invite_admin_created_user: timed_out email=%s timeout_s=%s",
             e[:3] + "***",
             _SUPABASE_CALL_TIMEOUT_S,
         )
-        return False
+        return InviteOutcome(False, f"Invite request timed out after {_SUPABASE_CALL_TIMEOUT_S:g}s")
     except Exception as ex:
         if _duplicate_user_error(ex):
             # User already invited / account already exists — treat as success.
             log.debug("invite_admin_created_user: user already present email=%s", e[:3] + "***")
-            return True
+            return InviteOutcome(True)
         log.warning(
             "invite_admin_created_user: failed email=%s error=%s",
             e[:3] + "***",
             ex,
         )
-        return False
+        return InviteOutcome(False, f"Invite delivery failed ({type(ex).__name__})")
 
 
 def create_auth_user_with_id(
