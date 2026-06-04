@@ -216,7 +216,11 @@ def interview_status(
     If `section_id` query param is provided, returns detailed per-question
     breakdown for that section.
     """
-    employee_id = current_user["id"]
+    # Canonical UUID (AUTH-ID-1): consent_records / interview_sessions key on a
+    # uuid employee_id. A legacy text id would never match (and used to risk a
+    # uuid-cast error); the resolved auth_uuid binds correctly or is None → no
+    # match (consent screen), never a 500.
+    employee_id = current_user.get("auth_uuid")
 
     if not _check_consent(case_id, employee_id):
         raise HTTPException(status_code=403, detail="Consent required.")
@@ -375,8 +379,11 @@ def get_immigration_case_employee(
     is_hr_or_admin = user_role in ("HR", "ADMIN")
 
     if not is_hr_or_admin:
-        # Employees must own the relocation case
-        employee_id = current_user["id"]
+        # Employees must own the relocation case. Bind the canonical UUID
+        # (AUTH-ID-1): case_assignments.employee_user_id is uuid-typed, so a
+        # legacy text id would 500 here (this path has no DataError guard).
+        # auth_uuid is a real UUID or None → no match → clean 403.
+        employee_id = current_user.get("auth_uuid")
         with db.engine.begin() as conn:
             assignment = conn.execute(
                 text("""

@@ -40,6 +40,7 @@ from ..auth_deps import get_current_user, require_case_access
 from ..db import SessionLocal
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
+from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.case_service import (
     _assert_case_access,
     _case_dto,
@@ -105,6 +106,8 @@ class _DossierFormTemplate(BaseModel):
     category: Optional[str]
     version: str
     fields_total: int
+    # [P1-05] Official Tier-1 authority URL where this form is completed/submitted.
+    source_url: Optional[str] = None
 
 
 class _DossierFormPerson(BaseModel):
@@ -142,6 +145,7 @@ class CaseFormSummary(BaseModel):
     receipt_ref: Optional[str]
     rejection_reason: Optional[str] = None   # [P4-5] set when status='rejected'
     roadmap_step_id: Optional[str] = None   # [P1-6] step that triggered this form
+    roadmap_step_title: Optional[str] = None   # [P1-05] human-readable title of that step
     is_adhoc: bool = False   # [P4-3] true when this is an ad-hoc "Add document" entry
     notes: Optional[str] = None   # [P4-3] free-text notes from the Add-document modal
     template: _DossierFormTemplate
@@ -297,6 +301,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             category=None,
             version="—",
             fields_total=0,
+            source_url=None,
         )
     else:
         template = _DossierFormTemplate(
@@ -309,6 +314,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             category=row.get("template_category"),
             version=str(row["template_version"]),
             fields_total=fields_total,
+            source_url=row.get("template_source_url"),  # [P1-05]
         )
 
     return CaseFormSummary(
@@ -327,6 +333,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
         receipt_ref=row.get("receipt_ref"),
         rejection_reason=row.get("rejection_reason") or None,   # [P4-5]
         roadmap_step_id=(str(row["roadmap_step_id"]) if row.get("roadmap_step_id") else None),  # [P1-6]
+        roadmap_step_title=(row.get("roadmap_step_title") or None),  # [P1-05]
         is_adhoc=is_adhoc,   # [P4-3]
         notes=row.get("notes") or None,   # [P4-3]
         template=template,
@@ -812,7 +819,14 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
         "status": case.status,
         "draft": draft,
     }
-    return derive_roadmap(case_dict)
+    roadmap = derive_roadmap(case_dict)
+    # P2-01a: gate the live AI EEA roadmap behind a per-account feature flag.
+    # TODO [P2-01b]: when eligible, branch here to the confidence-gated AI
+    # roadmap path. Until P1-01b lands we still serve the deterministic roadmap;
+    # the additive flag only tells the client the live path is enabled for them.
+    if is_flag_enabled_for(user.get("id"), LIVE_EEA_ROADMAP_FLAG):
+        roadmap["ai_roadmap_eligible"] = True
+    return roadmap
 
 
 @router.get("/{case_id}/roadmap/tracks", response_model=RoadmapTracksResponse)
@@ -1059,6 +1073,8 @@ def list_case_forms(
           ft.category AS template_category,
           ft.version AS template_version,
           ft.fields  AS template_fields,
+          ft.source_url AS template_source_url,
+          rs.title AS roadmap_step_title,
           cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes,
           cd.relationship AS dependent_relationship,
           cd.full_name    AS dependent_name,
@@ -1075,6 +1091,8 @@ def list_case_forms(
         FROM {_pg_table('case_forms')} cf
         -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
         LEFT JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
+        -- [P1-05] roadmap step title for the "which step" label on the form card.
+        LEFT JOIN {_pg_table('roadmap_steps')} rs ON rs.id = cf.roadmap_step_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
         LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = cf.person_id
         WHERE cf.case_id = :case_id{where_status}
