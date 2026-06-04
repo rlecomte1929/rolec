@@ -391,5 +391,52 @@ class CaseDossierFormsTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 403)
 
 
+class ProfilesJoinTypeGuardTests(unittest.TestCase):
+    """Regression guard for the prod 500 in GET /api/cases/{id}/forms.
+
+    The `profiles.id`, `case_forms.person_id`, `case_form_comments.author_id`
+    and `case_form_events.actor_id` columns are all `uuid` in Postgres. Joining
+    them with `CAST(p.id AS TEXT) = <uuid_col>` makes the `=` operator
+    `text = uuid`, which Postgres rejects at plan time:
+    `operator does not exist: text = uuid`. That 500s the whole Dossier &
+    Forms screen ("Failed to load case forms") for every case.
+
+    The CaseDossierFormsTests above cannot catch this: they run on SQLite, where
+    every column is TEXT and `text = text` is always valid. So this guard works
+    at the source level — it asserts the profiles joins in cases.py compare the
+    uuid columns directly (`p.id = <col>`) and never reintroduce the text cast.
+    """
+
+    def _cases_source(self) -> str:
+        path = os.path.join(
+            _REPO_ROOT, "backend", "app", "routers", "cases.py"
+        )
+        with open(path, "r", encoding="utf-8") as fh:
+            return fh.read()
+
+    def test_no_text_cast_on_profiles_id_join(self) -> None:
+        src = self._cases_source()
+        self.assertNotIn(
+            "CAST(p.id AS TEXT)",
+            src,
+            "cases.py joins public.profiles on a uuid column; casting p.id to "
+            "TEXT makes the comparison `text = uuid`, which 500s in Postgres. "
+            "Join the uuid columns directly, e.g. `p.id = cf.person_id`.",
+        )
+
+    def test_profiles_joined_directly_on_uuid_columns(self) -> None:
+        src = self._cases_source()
+        for expected in (
+            "p.id = cf.person_id",
+            "p.id = c.author_id",
+            "p.id = e.actor_id",
+        ):
+            self.assertIn(
+                expected,
+                src,
+                f"expected direct uuid join `{expected}` in cases.py",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
