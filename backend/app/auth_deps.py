@@ -1,12 +1,45 @@
 """Shared auth dependencies for routers (avoids circular imports with main)."""
 from __future__ import annotations
 
+import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import Depends, Header, HTTPException, Request
 
 from ..database import db
 from ..schemas import UserRole
+
+
+def _resolve_auth_uuid(user: Dict[str, Any]) -> Optional[str]:
+    """Resolve the caller to a canonical Supabase auth UUID (AUTH-ID-1).
+
+    ReloPass runs a hybrid auth model: a legacy session token yields a non-UUID
+    text ``id`` (e.g. ``seed-emp-testingapril``), while immigration/case tables
+    key on uuid columns. Binding the text id to such a column makes Postgres
+    raise ``invalid input syntax for type uuid`` and the endpoint 500s. We map
+    the caller to their UUID here so downstream handlers bind a real UUID — or
+    ``None`` (→ no match, which degrades safely) instead of crashing.
+
+    - UUID-native id (Supabase-native account) → that id, unchanged.
+    - Legacy text id with a matching profile    → ``profiles.id`` (the auth
+      UUID), bridged by email (``profiles`` is keyed by the auth uuid).
+    - Otherwise                                 → ``None``.
+    """
+    raw = user.get("id")
+    try:
+        return str(uuid.UUID(str(raw)))
+    except (ValueError, AttributeError, TypeError):
+        pass
+    email = (user.get("email") or "").strip().lower()
+    if email:
+        profile = db.get_profile_by_email(email)
+        prof_id = (profile or {}).get("id")
+        if prof_id:
+            try:
+                return str(uuid.UUID(str(prof_id)))
+            except (ValueError, AttributeError, TypeError):
+                return None
+    return None
 
 
 def _is_admin_user(user: Dict[str, Any]) -> bool:
@@ -45,6 +78,10 @@ async def get_current_user(
         user["is_admin"] = True
     else:
         user["is_admin"] = False
+    # Canonical Supabase auth UUID for uuid-keyed immigration/case queries
+    # (AUTH-ID-1). None when a legacy id can't be mapped — callers degrade
+    # gracefully rather than 500 on a uuid cast.
+    user["auth_uuid"] = _resolve_auth_uuid(user)
     if request is not None:
         try:
             request.state.user_id = user.get("id")
