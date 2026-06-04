@@ -90,16 +90,25 @@ router = APIRouter(prefix="/api/cases", tags=["cases"])
 
 
 @router.patch("/{case_id}", response_model=schemas.CaseDTO)
-def patch_case(case_id: str, patch: schemas.CaseDraftDTO):
+def patch_case(
+    case_id: str,
+    patch: schemas.CaseDraftDTO,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     with SessionLocal() as db:
         # Filter out None sections so partial payloads (e.g. from E2E runner) don't
         # overwrite existing draft sections with null.
         incoming = {k: v for k, v in patch.model_dump(mode="json").items() if v is not None}
         case = crud.get_case(db, case_id)
         if not case:
+            # SEC-CASES-2: create-on-missing path — authentication (above) is the
+            # gate; a brand-new case can't be access-checked. Preserves the
+            # wizard's create-via-PATCH flow.
             case = crud.create_case(db, case_id, incoming)
             draft = incoming
         else:
+            # SEC-CASES-2: existing case — enforce ownership / tenant access.
+            _assert_case_access(user, case_id)
             try:
                 existing = json.loads(case.draft_json or "{}")
             except (json.JSONDecodeError, TypeError, ValueError):
@@ -139,7 +148,7 @@ def patch_case_relocation_basics(
 ) -> schemas.CaseDTO:
     """Alias endpoint: wraps RelocationBasicsDTO into CaseDraftDTO (B17/WZ1a)."""
     wrapped = schemas.CaseDraftDTO(relocationBasics=basics)
-    return patch_case(case_id, wrapped)
+    return patch_case(case_id, wrapped, user)
 
 
 @router.patch("/{case_id}/serviceSelections", response_model=schemas.CaseDTO)
@@ -149,15 +158,17 @@ def patch_case_service_selections(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> schemas.CaseDTO:
     """Alias endpoint: accepts service selections payload (B19/WZ2)."""
-    return patch_case(case_id, body)
+    return patch_case(case_id, body, user)
 
 
 @router.post("/{case_id}/research/start")
-def start_research(case_id: str):
+def start_research(case_id: str, user: Dict[str, Any] = Depends(get_current_user)):
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
+        # SEC-CASES-2: enforce ownership / tenant access before kicking off research.
+        _assert_case_access(user, case_id)
         draft = json.loads(case.draft_json)
         basics = draft.get("relocationBasics", {})
         dest_country = basics.get("destCountry")
@@ -170,11 +181,17 @@ def start_research(case_id: str):
 
 
 @router.post("/{case_id}/create")
-def create_case(case_id: str, request: Request):
+def create_case(
+    case_id: str,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     with SessionLocal() as db:
         case = crud.get_case(db, case_id)
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
+        # SEC-CASES-2: enforce ownership / tenant access before finalising.
+        _assert_case_access(user, case_id)
 
         draft = json.loads(case.draft_json)
         basics = draft.get("relocationBasics", {})
