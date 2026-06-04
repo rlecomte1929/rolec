@@ -214,6 +214,13 @@ def get_immigration_requirements(
                 pass
         risk_flags = evaluate_risks(employee_profile, requirements, move_date_obj)
 
+    # IMM-15: surface a minimal slice of the employee's situation so the HR
+    # immigration panel can pre-fill a vendor RFQ (nationality + dependents).
+    # Sensitive identifiers (passport, DOB) are deliberately NOT included.
+    employee_nationality = (employee_profile or {}).get("nationality") or None
+    dependents = (employee_profile or {}).get("dependents") or []
+    dependents_count = len(dependents) if isinstance(dependents, list) else 0
+
     _log_access(
         case_id=case_id,
         profile_id=employee_profile.get("id") if employee_profile else None,
@@ -261,6 +268,10 @@ def get_immigration_requirements(
         ],
         "estimated_timeline_days": get_timeline_days(requirements),
         "document_count": len(requirements),
+        # IMM-15: case context for vendor RFQ pre-fill
+        "employee_nationality": employee_nationality,
+        "has_dependents": dependents_count > 0,
+        "dependents_count": dependents_count,
     }
 
 

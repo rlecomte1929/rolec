@@ -12,11 +12,12 @@ PATCH /api/hr/rfq-requests/{id}
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests as http_requests
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -44,6 +45,37 @@ class RfqCreateRequest(BaseModel):
     move_date: Optional[str] = None          # ISO date string YYYY-MM-DD
     budget_range: Optional[str] = None
     special_requirements: Optional[str] = None
+
+    # IMM-15: optional immigration case context. Present only when the RFQ
+    # originates from the immigration panel; stored as JSONB on rfq_requests.
+    visa_type: Optional[str] = None
+    corridor_from: Optional[str] = None
+    corridor_to: Optional[str] = None
+    employee_nationality: Optional[str] = None
+    has_dependents: Optional[bool] = None
+    risk_flags: Optional[List[str]] = None   # flag_type strings
+
+
+def _build_immigration_context(body: "RfqCreateRequest") -> Optional[Dict[str, Any]]:
+    """Assemble the immigration_context JSONB payload from the request.
+
+    Returns None when no immigration fields were supplied so non-immigration
+    RFQs leave the column NULL (backward-compatible — see migration).
+    """
+    ctx: Dict[str, Any] = {}
+    if body.visa_type:
+        ctx["visa_type"] = body.visa_type
+    if body.corridor_from:
+        ctx["corridor_from"] = body.corridor_from
+    if body.corridor_to:
+        ctx["corridor_to"] = body.corridor_to
+    if body.employee_nationality:
+        ctx["employee_nationality"] = body.employee_nationality
+    if body.has_dependents is not None:
+        ctx["has_dependents"] = body.has_dependents
+    if body.risk_flags:
+        ctx["risk_flags"] = body.risk_flags
+    return ctx or None
 
 
 class RfqStatusUpdate(BaseModel):
@@ -220,17 +252,19 @@ async def create_rfq(
     # Insert RFQ row
     rfq_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    immigration_context = _build_immigration_context(body)
     with db.engine.begin() as conn:
         from sqlalchemy import text as sql_text
         conn.execute(
             sql_text("""
                 INSERT INTO rfq_requests
                   (id, case_id, vendor_id, org_id, service_category,
-                   move_date, budget_range, special_requirements,
+                   move_date, budget_range, special_requirements, immigration_context,
                    hr_user_id, hr_email, hr_name, status, created_at, updated_at)
                 VALUES
                   (:id, :case_id, :vendor_id, :org_id, :service_category,
                    :move_date, :budget_range, :special_requirements,
+                   CAST(:immigration_context AS jsonb),
                    :hr_user_id, :hr_email, :hr_name, 'sent', :now, :now)
             """),
             {
@@ -242,6 +276,7 @@ async def create_rfq(
                 "move_date": body.move_date or None,
                 "budget_range": body.budget_range or None,
                 "special_requirements": body.special_requirements or None,
+                "immigration_context": json.dumps(immigration_context) if immigration_context else None,
                 "hr_user_id": str(user.get("id", "")),
                 "hr_email": hr_email,
                 "hr_name": hr_name,
