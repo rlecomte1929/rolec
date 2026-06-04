@@ -41,6 +41,8 @@ from ..db import SessionLocal
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
+from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case
+from ..services.roadmap_staleness import annotate_staleness
 from ..services.case_service import (
     _assert_case_access,
     _case_dto,
@@ -108,6 +110,8 @@ class _DossierFormTemplate(BaseModel):
     fields_total: int
     # [P1-05] Official Tier-1 authority URL where this form is completed/submitted.
     source_url: Optional[str] = None
+    # [P1-05d] When the source URL was last fetched/verified (source_pages.last_fetched_at).
+    source_last_verified: Optional[str] = None
 
 
 class _DossierFormPerson(BaseModel):
@@ -319,6 +323,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             version="—",
             fields_total=0,
             source_url=None,
+            source_last_verified=None,
         )
     else:
         template = _DossierFormTemplate(
@@ -332,6 +337,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             version=str(row["template_version"]),
             fields_total=fields_total,
             source_url=row.get("template_source_url"),  # [P1-05]
+            source_last_verified=_iso(row.get("source_last_verified")),  # [P1-05d]
         )
 
     return CaseFormSummary(
@@ -837,12 +843,17 @@ def get_case_roadmap(case_id: str, user: Dict[str, Any] = Depends(get_current_us
         "draft": draft,
     }
     roadmap = derive_roadmap(case_dict)
-    # P2-01a: gate the live AI EEA roadmap behind a per-account feature flag.
-    # TODO [P2-01b]: when eligible, branch here to the confidence-gated AI
-    # roadmap path. Until P1-01b lands we still serve the deterministic roadmap;
-    # the additive flag only tells the client the live path is enabled for them.
+    # P2-01a/b: the live AI EEA roadmap is gated behind a per-account feature flag
+    # and confidence-gated for specialist review. The deterministic roadmap (no
+    # `result` key) is never gated and passes through untouched — gating only
+    # applies to an AI roadmap, which today reaches this seam once P2-01e wires
+    # the pipeline in for eligible cases.
     if is_flag_enabled_for(user.get("id"), LIVE_EEA_ROADMAP_FLAG):
         roadmap["ai_roadmap_eligible"] = True
+        if is_ai_roadmap(roadmap):
+            roadmap = gate_roadmap_for_case(case_id, roadmap)
+            # P2-01c: warn when a shown step's cited source is >30 days old.
+            roadmap = annotate_staleness(roadmap, now=_dt.datetime.now(_dt.timezone.utc))
     return roadmap
 
 
@@ -1091,6 +1102,7 @@ def list_case_forms(
           ft.version AS template_version,
           ft.fields  AS template_fields,
           ft.source_url AS template_source_url,
+          sp.last_fetched_at AS source_last_verified,
           rs.title AS roadmap_step_title,
           cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes,
           cd.relationship AS dependent_relationship,
@@ -1108,6 +1120,8 @@ def list_case_forms(
         FROM {_pg_table('case_forms')} cf
         -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
         LEFT JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
+        -- [P1-05d] source freshness: last_fetched_at for this form's official URL.
+        LEFT JOIN {_pg_table('source_pages')} sp ON sp.url = ft.source_url
         -- [P1-05] roadmap step title for the "which step" label on the form card.
         LEFT JOIN {_pg_table('roadmap_steps')} rs ON rs.id = cf.roadmap_step_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id

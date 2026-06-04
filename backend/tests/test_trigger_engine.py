@@ -353,7 +353,10 @@ class TriggerEngineIntegrationTests(unittest.TestCase):
         spouse_id = self._insert_dependent(case_id=self.case_id, relationship="spouse")
         n = fire_roadmap_events(
             case_id=self.case_id,
-            draft={"relocationBasics": {"originCountry": "FR"}},
+            # Non-EEA origin → skilled_worker pathway (UTL-2011). (An EEA origin
+            # like FR would instead select the eea_registration pathway — see
+            # test_eea_origin_to_norway_triggers_eea_pathway.)
+            draft={"relocationBasics": {"originCountry": "IN"}},
             derived={"dest_country": "NO"},
         )
         # Expected: UTL-2011 + GP-7-04 (destination_confirmed)
@@ -377,6 +380,38 @@ class TriggerEngineIntegrationTests(unittest.TestCase):
         self.assertEqual(len(utl_b_forms), 2)
         dep_ids = sorted(cf["dependent_id"] for cf in utl_b_forms)
         self.assertEqual(dep_ids, sorted([c1, c2]))
+
+    def test_eea_origin_to_norway_triggers_eea_pathway(self) -> None:
+        # [P1-04] French (EEA) national → Norway (EEA): registration scheme +
+        # apostille fire on destination_confirmed; the skilled-worker permit
+        # (UTL-2011, visa_type=skilled_worker) must NOT fire.
+        self._insert_template(
+            code="POL-EEA-REG",
+            rules=[{
+                "event": "roadmap.destination_confirmed",
+                "conditions": {"destination_country": "NO", "visa_type": "eea_registration"},
+                "for_persons": ["employee"],
+                "blocked_by_template_code": None,
+            }],
+        )
+        self._insert_template(
+            code="APOSTILLE-FR",
+            rules=[{
+                "event": "roadmap.destination_confirmed",
+                "conditions": {"destination_country": "NO", "visa_type": "eea_registration"},
+                "for_persons": ["employee"],
+                "blocked_by_template_code": None,
+            }],
+        )
+        fire_roadmap_events(
+            case_id=self.case_id,
+            draft={"relocationBasics": {"originCountry": "FR"}},
+            derived={"dest_country": "NO"},
+        )
+        codes = sorted(cf["code"] for cf in self._case_forms())
+        # GP-7-04 (dest=NO, no visa_type) + the two EEA-pathway forms.
+        self.assertEqual(codes, ["APOSTILLE-FR", "GP-7-04", "POL-EEA-REG"])
+        self.assertNotIn("UTL-2011", codes)
 
     def test_arrival_confirmed_creates_helfo1_and_resolves_blocker(self) -> None:
         # Fire destination first so GP-7-04 exists to serve as a blocker

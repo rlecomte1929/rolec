@@ -17,7 +17,10 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, List, Optional
 
+from datetime import date as _date
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
@@ -465,6 +468,42 @@ async def ocr_passport(
             for c in conflicts
         ],
         "fields_saved": saved_fields,
+    }
+
+
+# ---------------------------------------------------------------------------
+# HR: PATCH /api/hr/cases/{case_id}/expected-start-date  (Phase B1)
+# ---------------------------------------------------------------------------
+
+
+class ExpectedStartDateBody(BaseModel):
+    expected_start_date: _date  # Pydantic parses ISO YYYY-MM-DD; rejects others.
+
+
+@router.patch("/hr/cases/{case_id}/expected-start-date")
+def update_case_expected_start_date(
+    case_id: str,
+    body: ExpectedStartDateBody,
+    hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
+    org_id: str = Depends(get_org_id_for_hr_user),
+) -> Dict[str, Any]:
+    """HR sets the case's expected start date. Feeds the BL-Compliance
+    `tax_183_day` rule via the `days_present_in_host` derivation."""
+    with db.engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "UPDATE public.relocation_cases "
+                "SET expected_start_date = :d, updated_at = now() "
+                "WHERE id = :case_id AND company_id = :company_id "
+                "RETURNING id"
+            ),
+            {"d": body.expected_start_date, "case_id": case_id, "company_id": org_id},
+        ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Case not found or not in your company")
+    return {
+        "case_id": case_id,
+        "expected_start_date": body.expected_start_date.isoformat(),
     }
 
 

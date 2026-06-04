@@ -60,6 +60,7 @@ function makeForm(overrides: Partial<CaseFormSummary> = {}): CaseFormSummary {
       version: '1.0.0',
       fields_total: 5,
       source_url: 'https://www.skatteetaten.no/en/person/foreign/norwegian-identification-number/d-number/',
+      source_last_verified: '2026-06-04T10:00:00Z',
     },
     person: { kind: 'employee', name: 'Marc Bouchard', dependent_id: null, profile_id: 'p1' },
     fields_summary: { total: 5, filled_by_ai: 2, filled_by_human: 0, reviewed: 0, overridden: 0, missing_required: 3 },
@@ -92,6 +93,8 @@ describe('CaseFormCard — official source link + roadmap step', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
 
     expect(screen.getByText('Register your arrival')).toBeInTheDocument();
+    // [P1-05d] last-verified date rendered alongside the source link.
+    expect(screen.getByText(/Last verified ·/)).toBeInTheDocument();
   });
 
   it('omits both the link and step label when neither is present', () => {
