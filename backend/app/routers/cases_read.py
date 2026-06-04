@@ -40,6 +40,7 @@ from ..auth_deps import get_current_user, require_case_access
 from ..db import SessionLocal
 from ..services.requirements_builder import compute_case_requirements
 from ..services.roadmap_builder import derive_roadmap
+from ..services.roadmap_projection import project_tracks, track_label_for_form
 from ..services.feature_flags import is_flag_enabled_for, LIVE_EEA_ROADMAP_FLAG
 from ..services.roadmap_confidence_gate import is_ai_roadmap, gate_roadmap_for_case
 from ..services.roadmap_staleness import annotate_staleness
@@ -395,7 +396,11 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
         receipt_ref=row.get("receipt_ref"),
         rejection_reason=row.get("rejection_reason") or None,   # [P4-5]
         roadmap_step_id=(str(row["roadmap_step_id"]) if row.get("roadmap_step_id") else None),  # [P1-6]
-        roadmap_step_title=(row.get("roadmap_step_title") or None),  # [P1-05]
+        roadmap_step_title=(
+            row.get("roadmap_step_title")
+            or (None if is_adhoc else track_label_for_form(
+                row.get("template_category"), row.get("template_code")))
+        ),  # [P1-05] persisted step title, else [AIQ-800] computed track label
         is_adhoc=is_adhoc,   # [P4-3]
         notes=row.get("notes") or None,   # [P4-3]
         template=template,
@@ -909,119 +914,49 @@ def get_case_roadmap_tracks(
     user: Dict[str, Any] = Depends(get_current_user),
 ) -> RoadmapTracksResponse:
     """
-    [P1-6] Returns roadmap_tracks + roadmap_steps with embedded doc counts
-    from case_forms. Used by the employee RoadmapScreen chip.
+    [P1-6 / AIQ-800] Returns the case roadmap as tracks → steps, projected at
+    read time from the case's real case_forms (Option B). Each form is a step in
+    its track bucket; the never-written roadmap_tracks/roadmap_steps tables are
+    no longer read. Used by the employee RoadmapScreen.
     """
     _assert_case_access(user, case_id)
 
-    # Resolve assignment_id → canonical_case_id so roadmap_tracks queries
-    # use the correct FK. The URL param is always an assignment_id for real
-    # cases; roadmap_tracks.case_id references relocation_cases.id.
-    tracks_case_id = case_id
-    try:
-        with _pg_conn() as conn:
-            asgn_row = conn.execute(
-                _sql_text(
-                    "SELECT canonical_case_id FROM public.case_assignments "
-                    "WHERE id::text = :id AND canonical_case_id IS NOT NULL"
-                ),
-                {"id": case_id},
-            ).mappings().first()
-        if asgn_row and asgn_row.get("canonical_case_id"):
-            tracks_case_id = str(asgn_row["canonical_case_id"])
-    except Exception:
-        logger.warning("roadmap/tracks: could not resolve canonical_case_id for %s", case_id)
-
-    with _pg_conn() as conn:
-        sql = f"""
-            SELECT
-              rt.id             AS track_id,
-              rt.name           AS track_name,
-              rt.icon           AS track_icon,
-              rt.sort_order     AS track_sort_order,
-              rt.completion_pct AS progress_pct,
-              rs.id                          AS step_id,
-              rs.title                       AS step_title,
-              rs.description                 AS step_description,
-              rs.status                      AS step_status,
-              rs.owner_type                  AS step_owner,
-              rs.due_date                    AS step_due_date,
-              rs.sort_order                  AS step_sort_order,
-              NULL::text                     AS ai_suggestion,
-              ARRAY[]::text[]                AS dependency_ids,
-              NULL::uuid                     AS vendor_id,
-              -- [P3-04e] Confidence + source from the step's linked requirement.
-              -- MAX() is a no-op aggregate over the (≤1) joined requirement row,
-              -- letting us add these without touching the doc-count GROUP BY.
-              MAX(r.confidence_pct)                       AS req_confidence_pct,
-              MAX(COALESCE(r.citations->0->>'url', r.authority_url, rs.external_url)) AS source_url,
-              MAX(r.citations->0->>'excerpt')             AS source_excerpt,
-              MAX(r.computed_at)                          AS source_fetched_at,
-              COUNT(cf.id) AS doc_count,
-              CASE
-                WHEN COUNT(cf.id) = 0 THEN NULL
-                WHEN SUM(CASE WHEN cf.blocker_form_id IS NOT NULL
-                              AND cf.status NOT IN ('submitted','approved','rejected')
-                              THEN 1 ELSE 0 END) > 0 THEN 'blocked'
-                WHEN SUM(CASE WHEN cf.status = 'rejected' THEN 1 ELSE 0 END) > 0 THEN 'rejected'
-                WHEN SUM(CASE WHEN cf.status = 'pending_doc' THEN 1 ELSE 0 END) > 0 THEN 'pending_doc'
-                WHEN SUM(CASE WHEN cf.status IN ('in_progress','auto_filled')
-                              THEN 1 ELSE 0 END) > 0 THEN 'in_progress'
-                WHEN SUM(CASE WHEN cf.status = 'not_started' THEN 1 ELSE 0 END) > 0 THEN 'not_started'
-                WHEN SUM(CASE WHEN cf.status = 'ready' THEN 1 ELSE 0 END) > 0 THEN 'ready'
-                WHEN SUM(CASE WHEN cf.status = 'submitted' THEN 1 ELSE 0 END) > 0 THEN 'submitted'
-                ELSE 'approved'
-              END AS worst_doc_status
-            FROM {_pg_table('roadmap_tracks')} rt
-            JOIN {_pg_table('roadmap_steps')} rs ON rs.track_id = rt.id
-            LEFT JOIN {_pg_table('requirements')} r ON r.id = rs.requirement_id
-            LEFT JOIN {_pg_table('case_forms')} cf
-              ON cf.roadmap_step_id = rs.id AND cf.case_id = :case_id
-            WHERE rt.case_id = :case_id
-            GROUP BY rt.id, rt.name, rt.icon, rt.sort_order, rt.completion_pct,
-                     rs.id, rs.title, rs.description, rs.status, rs.owner_type,
-                     rs.due_date, rs.sort_order
-            ORDER BY rt.sort_order, rs.sort_order
-        """
-        rows = conn.execute(_sql_text(sql), {"case_id": tracks_case_id}).mappings().all()
-
-    # Assemble into tracks -> steps hierarchy
-    tracks_map: Dict[str, RoadmapTrackV2] = {}
-    for row in rows:
-        tid = str(row["track_id"])
-        if tid not in tracks_map:
-            tracks_map[tid] = RoadmapTrackV2(
-                id=tid,
-                name=row["track_name"],
-                icon=row["track_icon"] or "Circle",
-                sort_order=row["track_sort_order"] or 0,
-                progress_pct=int(row["progress_pct"] or 0),
-            )
-        dep_ids = row["dependency_ids"]
-        if isinstance(dep_ids, str):
-            import json as _json
-            dep_ids = _json.loads(dep_ids) if dep_ids else []
-        tracks_map[tid].steps.append(RoadmapStepV2(
-            id=str(row["step_id"]),
-            title=row["step_title"],
-            description=row.get("step_description"),
-            status=row["step_status"] or "pending",
-            owner=row["step_owner"] or "employee",
-            due_date=str(row["step_due_date"]) if row.get("step_due_date") else None,
-            sort_order=row["step_sort_order"] or 0,
-            ai_suggestion=row.get("ai_suggestion"),
-            dependency_ids=dep_ids if isinstance(dep_ids, list) else [],
-            vendor_id=str(row["vendor_id"]) if row.get("vendor_id") else None,
-            doc_count=int(row["doc_count"] or 0),
-            worst_doc_status=row.get("worst_doc_status"),
-            confidence_level=_bucket_confidence(row.get("req_confidence_pct")),
-            source_url=row.get("source_url"),
-            source_excerpt=row.get("source_excerpt"),
-            source_fetched_at=(
-                str(row["source_fetched_at"]) if row.get("source_fetched_at") else None
-            ),
-        ))
-    return RoadmapTracksResponse(tracks=list(tracks_map.values()))
+    # [AIQ-800] Option B — project the roadmap from the case's real forms instead
+    # of reading the (never-written) roadmap_tracks/roadmap_steps tables. Reuses
+    # the Dossier's form-loading path, so it shares the same (correct) case-id
+    # handling; each form becomes a step in its track bucket.
+    summaries = _load_case_form_summaries(case_id)
+    projected = project_tracks(summaries)
+    tracks = [
+        RoadmapTrackV2(
+            id=t.key,
+            name=t.name,
+            icon=t.icon,
+            sort_order=t.sort_order,
+            progress_pct=t.progress_pct,
+            steps=[
+                RoadmapStepV2(
+                    id=s.id,
+                    title=s.title,
+                    description=None,
+                    status=s.status,
+                    owner=s.owner,
+                    due_date=s.due_date,
+                    sort_order=s.sort_order,
+                    ai_suggestion=None,
+                    dependency_ids=[],
+                    vendor_id=None,
+                    # [AIQ-800] doc chip + dossier deep-link deferred (follow-up);
+                    # the roadmap renders tracks/steps/status/progress without it.
+                    doc_count=0,
+                    worst_doc_status=None,
+                )
+                for s in t.steps
+            ],
+        )
+        for t in projected
+    ]
+    return RoadmapTracksResponse(tracks=tracks)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1113,7 +1048,18 @@ def list_case_forms(
     Optional `?roadmap_step_id=` filter narrows by roadmap step [P1-6].
     """
     _assert_case_access(user, case_id)
+    return _load_case_form_summaries(case_id, status=status, roadmap_step_id=roadmap_step_id)
 
+
+def _load_case_form_summaries(
+    case_id: str,
+    status: Optional[str] = None,
+    roadmap_step_id: Optional[str] = None,
+) -> List[CaseFormSummary]:
+    """[AIQ-800] Shared loader behind both the Dossier list (`list_case_forms`)
+    and the roadmap projection (`get_case_roadmap_tracks`). No auth check —
+    callers must `_assert_case_access` first.
+    """
     # Build the join in one statement. The aggregate over case_form_field_values
     # is done as a correlated sub-select per row — simpler than a GROUP BY and
     # cheap given typical row counts (<50 forms per case).
