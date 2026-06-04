@@ -1,0 +1,15 @@
+# queue_status_allowlist.txt
+#
+# Suppresses known-acceptable findings for check_queue_status_hygiene.py
+# (HYGIENE-2): an AI Work Queue task left "Ready for AI" while a task it depends
+# on is not yet "Done", where that is intentional.
+#
+# One entry per line. Two accepted forms:
+#   <TAG>             — suppress the whole task (e.g. P3-01d)
+#   <TAG>:<DEP_TAG>   — suppress one blocking edge (e.g. P3-01e:P3-01d)
+# Inline "# comment" is allowed and required: say WHY it's allowlisted.
+#
+# This list should DRAIN over time. The guard is report-only by default; once
+# the live backlog is triaged into this file, flip the CI job to --strict.
+#
+# (empty — to be seeded on the first live run once NOTION_QUEUE_TOKEN is set)

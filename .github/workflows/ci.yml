@@ -136,7 +136,9 @@ jobs:
             backend/tests/test_factual_verifier.py \
             backend/tests/test_rag_roadmap_pipeline.py \
             backend/tests/test_rag_integration.py \
-            backend/tests/test_eval_rag_context_precision.py
+            backend/tests/test_eval_rag_context_precision.py \
+            backend/tests/test_deliverable_integrity.py \
+            backend/tests/test_queue_status_hygiene.py
 
   route-auth-check:
     # AUDIT-B6 (+ SEC-CASES-2): enumerate every GET/POST/PATCH/PUT/DELETE route
@@ -224,4 +226,25 @@ jobs:
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
         run: python scripts/check_deliverable_integrity.py --root .
+
+  queue-status-hygiene:
+    # HYGIENE-2: assert that no AI Work Queue task is left "Ready for AI" while a
+    # task it depends on is not yet "Done" (false-ready tasks get re-picked as
+    # "next up" every queue run). Sibling of deliverable-integrity. Same Notion
+    # read token + repo-variable gate. Runs report-only (no --strict) until the
+    # live backlog is triaged into scripts/queue_status_allowlist.txt; then add
+    # --strict to gate. (The parser unit tests run in the backend-tests job.)
+    name: Queue status hygiene
+    runs-on: ubuntu-latest
+    if: ${{ vars.NOTION_QUEUE_TOKEN_SET == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run queue-status-hygiene check
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_QUEUE_TOKEN }}
+        run: python scripts/check_queue_status_hygiene.py --root .
 
