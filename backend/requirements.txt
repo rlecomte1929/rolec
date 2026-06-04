@@ -16,6 +16,17 @@ python-dateutil==2.8.2
 dateparser==1.2.0  # C1-06: locale-aware date parsing for relopass.normalize.dates
 PyYAML>=6.0
 supabase==2.5.1
+# Pin supabase's transitive deps to the exact versions its 2.5.1 resolves to.
+# Left unpinned, pip backtracks for a long time resolving `realtime`/`websockets`
+# (the resolver logs "still looking at multiple versions of realtime … this is
+# taking longer than usual"), which bloats build time and trips Render deploy
+# timeouts. These pins remove that search space and keep builds fast + reproducible.
+gotrue==2.12.4
+postgrest==0.16.11
+realtime==1.0.6
+storage3==0.7.7
+supafunc==0.4.7
+websockets==12.0
 requests
 beautifulsoup4
 croniter>=1.4.0

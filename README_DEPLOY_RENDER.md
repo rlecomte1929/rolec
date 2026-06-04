@@ -23,6 +23,10 @@
 | `AUTH_SUPABASE_SYNC_MAX_WORKERS` | Optional | Background pool size for the post-login Supabase sync (default `4`). |
 | `AUTH_PERF_DEBUG` | Optional | Set to `1` to emit structured JSON timing logs for `/api/auth/login` and `/api/auth/register` — useful when diagnosing "Request timed out" on login. |
 | `DISABLE_STARTUP_SEED` | Optional | Set to `1` to skip wizard demo cases and supplier JSON seeding entirely. |
+| `PREDICTIONS_ENABLED` | Optional (canary, default off) | Set to `1`/`true` to enable `GET /api/cases/{case_id}/predicted-duration` (Cox case-duration estimate). |
+| `PROCESSING_TIME_ENABLED` | Optional (canary, default off) | Set to `1`/`true` to enable `GET /api/cases/{case_id}/processing-time` (P2-04 corridor processing-time estimate) and the **Processing time** card on the HR Estimate page (`/hr/cases/:caseId/estimate`). Until set, the endpoint 404s and the card renders nothing (safe dark-ship). |
+
+> **Feature-flag canaries.** `PREDICTIONS_ENABLED` and `PROCESSING_TIME_ENABLED` are dark-ship flags that default **off**, so the predictive surfaces stay hidden until you flip them per-environment. To ramp processing-time estimates: set `PROCESSING_TIME_ENABLED=true` on the Render Web Service, redeploy, then open `/hr/cases/:caseId/estimate` for a case on a seeded corridor (e.g. IN→DE) and confirm the Processing-time card appears.
 
 > **Diagnosing slow logins.** Hit `GET /api/health/supabase` (add `?probe=1` to issue a live admin call bounded by `SUPABASE_AUTH_SYNC_TIMEOUT_SECONDS`). The response indicates whether the Supabase Auth admin API is reachable from the Render worker; degraded status with `reason: probe_timeout` points at network/keys before the request even reaches login.
 

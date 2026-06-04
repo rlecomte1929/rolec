@@ -37,6 +37,27 @@ def _get_supabase():
     return get_supabase_admin_client()
 
 
+def list_source_monitor_pages(limit: int = 1000) -> List[Dict[str, Any]]:
+    """[P3-02b] List every monitored source URL with its current monitoring state.
+
+    Returns the source_pages rows (url, tier, content_hash, last_fetched_at,
+    last_changed_at, http_status, is_accessible, page_title) most-recently-fetched
+    first, for the admin source-monitor dashboard.
+    """
+    supabase = _get_supabase()
+    r = (
+        supabase.table("source_pages")
+        .select(
+            "id, url, tier, content_hash, previous_hash, page_title, "
+            "http_status, is_accessible, last_fetched_at, last_changed_at"
+        )
+        .order("last_fetched_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return r.data or []
+
+
 def _cadence_days_for_domain(content_domain: Optional[str]) -> int:
     return _DEFAULT_CADENCE_DAYS.get(content_domain or "admin_essentials", 7)
 

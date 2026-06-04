@@ -5,10 +5,18 @@
  */
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { RoadmapTrack, RoadmapStep, StepStatus } from '../../../types/relopass-api-contracts';
 import { ProgressBar, StatusBadge, DateFormatter, EmptyState, Pill } from '../shared';
 import { SuccessProbabilityDial, FactorsPanel } from './scoring';
 import type { SuccessProbabilityResult } from './scoring';
+import { ConfidenceBadge } from './ConfidenceBadge';
+import {
+  CONFIDENCE_TOKENS,
+  resolveConfidenceLevel,
+  IMMIGRATION_ADVISORS_ROUTE,
+  type StepConfidence,
+} from './confidence.tokens';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -142,7 +150,20 @@ interface StepRowProps {
 
 function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const [sourceOpen, setSourceOpen] = useState(false);
   const isBlocked = step.status === 'blocked';
+
+  // [P3-04] Confidence display. Renders only when the backend supplies a level.
+  const confidence: StepConfidence | null = step.confidence_level
+    ? {
+        level: step.confidence_level,
+        sourceUrl: step.source_url,
+        sourceFetchedAt: step.source_fetched_at,
+        sourceExcerpt: step.source_excerpt,
+      }
+    : null;
+  const confLevel = confidence ? resolveConfidenceLevel(confidence) : null;
+  const confBorder = confLevel ? CONFIDENCE_TOKENS[confLevel].cardBorder : null;
 
   function handleTitleClick() {
     const event = new CustomEvent('rp:ai-context', { detail: step, bubbles: true });
@@ -155,7 +176,11 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
         padding: '14px 16px',
         borderRadius: 'var(--radius-md, 8px)',
         border: '1px solid var(--border)',
-        borderLeft: isBlocked ? '3px solid var(--danger)' : '1px solid var(--border)',
+        borderLeft: isBlocked
+          ? '3px solid var(--danger)'
+          : confBorder
+            ? `4px solid ${confBorder}`
+            : '1px solid var(--border)',
         background: 'var(--surface)',
         display: 'flex',
         flexDirection: 'column',
@@ -178,6 +203,7 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
               {step.title}
             </button>
             <StatusBadge type="step" status={step.status} size="sm" />
+            {confLevel && <ConfidenceBadge level={confLevel} size="sm" />}
             {docChip && docChip.count > 0 && (
               <button
                 type="button"
@@ -243,6 +269,71 @@ function StepRow({ step, vendorName, docChip, onDocChipClick }: StepRowProps) {
           <p style={{ margin: 0, fontSize: '13px', color: 'var(--accent-text)', lineHeight: 1.5 }}>
             {step.ai_suggestion}
           </p>
+        </div>
+      )}
+
+      {/* [P3-04] Source citation (progressive disclosure) + LOW/UNKNOWN treatments. */}
+      {confLevel && (
+        <div style={{ marginLeft: '28px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {confidence?.sourceUrl && (
+            <>
+              <button
+                type="button"
+                onClick={() => setSourceOpen(o => !o)}
+                aria-expanded={sourceOpen}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0,
+                  fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sourceOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+                {sourceOpen ? 'Hide source' : 'Show source'}
+              </button>
+              {sourceOpen && (
+                <div style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm, 6px)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <a
+                    href={confidence.sourceUrl ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={confidence.sourceUrl ?? undefined}
+                    style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {confidence.sourceUrl.length > 60 ? `${confidence.sourceUrl.slice(0, 60)}…` : confidence.sourceUrl}
+                  </a>
+                  {confidence.sourceFetchedAt && (
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      Verified <DateFormatter date={confidence.sourceFetchedAt} format="absolute" />
+                    </span>
+                  )}
+                  {confidence.sourceExcerpt && (
+                    <p style={{ margin: 0, paddingLeft: '8px', borderLeft: '2px solid var(--border-2)', fontSize: '12px', fontStyle: 'italic', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                      “{confidence.sourceExcerpt}”
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {confLevel === 'LOW' && (
+            <div style={{ padding: '8px 10px', background: 'var(--warning-soft)', borderRadius: 'var(--radius-sm, 6px)' }}>
+              <Link to={IMMIGRATION_ADVISORS_ROUTE} style={{ fontSize: '12px', fontWeight: 600, color: 'var(--warning-text)' }}>
+                Consult an immigration lawyer →
+              </Link>
+            </div>
+          )}
+
+          {confLevel === 'UNKNOWN' && (
+            <p
+              aria-label="This step requires expert review before you can rely on it."
+              style={{ margin: 0, padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm, 6px)', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}
+            >
+              Expert review required
+            </p>
+          )}
         </div>
       )}
     </div>

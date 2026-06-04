@@ -449,6 +449,39 @@ class CaseDossierFormsTests(unittest.TestCase):
             )
         self.assertEqual(ctx.exception.status_code, 403)
 
+    def test_nonuuid_caller_owner_lists_forms_not_500(self) -> None:
+        """[AUTH-ID-2 / #296 regression] A legacy/seed caller whose id is a
+        non-UUID text id (e.g. 'seed-emp-testingapril') must be able to list
+        their own case's forms — never a 500. The prod bug bound this non-UUID
+        id into a uuid comparison inside _assert_case_access; the guard now
+        matches ownership in Python via _owns().
+
+        SQLite can't reproduce the Postgres `invalid input syntax for type
+        uuid` cast, so this locks the *behavioural contract*; the cast itself
+        is guarded at the source level in CaseAccessUuidCastGuardTests below.
+        """
+        legacy_id = "seed-emp-testingapril"
+        case_id = _u()
+        # Case owned by the non-UUID caller (employee_id == legacy text id).
+        self._insert_case(case_id, self.company_id, legacy_id)
+        result = list_case_forms(
+            case_id=case_id, status=None, user=_emp_user(legacy_id)
+        )
+        self.assertEqual(result, [])
+
+    def test_nonuuid_caller_nonowner_is_403_not_500(self) -> None:
+        """A non-UUID caller who does NOT own the case is denied with 403,
+        not a 500 — the same AUTH-ID-2 contract on the deny path."""
+        legacy_id = "seed-emp-testingapril"
+        other_case = _u()
+        # Owned by a different (uuid) employee, different company.
+        self._insert_case(other_case, _u(), _u())
+        with self.assertRaises(HTTPException) as ctx:
+            list_case_forms(
+                case_id=other_case, status=None, user=_emp_user(legacy_id)
+            )
+        self.assertEqual(ctx.exception.status_code, 403)
+
 
 class ProfilesJoinTypeGuardTests(unittest.TestCase):
     """Regression guard for the prod 500 in GET /api/cases/{id}/forms.
@@ -495,6 +528,49 @@ class ProfilesJoinTypeGuardTests(unittest.TestCase):
                 src,
                 f"expected direct uuid join `{expected}` in cases.py",
             )
+
+
+class CaseAccessUuidCastGuardTests(unittest.TestCase):
+    """Regression guard for the OTHER half of the Dossier 500 (#296 / AUTH-ID-2).
+
+    The caller's id (`user.id`) can be a non-UUID legacy/seed text id like
+    'seed-emp-testingapril', while `cases.employee_id` / `hr_owner_id` are uuid
+    in Postgres. The original `_assert_case_access` compared the caller id to
+    those uuid columns in SQL, which Postgres rejects:
+    `invalid input syntax for type uuid: "seed-emp-testingapril"` — 500ing the
+    whole Dossier & Forms screen before the forms query even runs.
+
+    #296 fixed it by matching ownership in Python (`_owns()`) and looking the
+    case up via `CAST(id AS TEXT) = :id`. SQLite can't reproduce the cast, so
+    this guard asserts the safe patterns remain in the source.
+    """
+
+    def _case_service_source(self) -> str:
+        path = os.path.join(
+            _REPO_ROOT, "backend", "app", "services", "case_service.py"
+        )
+        with open(path, "r", encoding="utf-8") as fh:
+            return fh.read()
+
+    def test_access_check_matches_ownership_in_python(self) -> None:
+        src = self._case_service_source()
+        self.assertIn(
+            "_owns(",
+            src,
+            "_assert_case_access must match case ownership in Python (_owns), "
+            "not by binding the possibly-non-UUID caller id into a SQL uuid "
+            "comparison (which 500s in Postgres for legacy/seed callers).",
+        )
+
+    def test_access_check_looks_up_case_with_text_cast(self) -> None:
+        src = self._case_service_source()
+        self.assertIn(
+            "CAST(id AS TEXT) = :id",
+            src,
+            "_assert_case_access must look up cases with `CAST(id AS TEXT) = "
+            ":id` so a malformed / non-UUID case_id can't raise an uncaught "
+            "uuid-cast error.",
+        )
 
 
 if __name__ == "__main__":

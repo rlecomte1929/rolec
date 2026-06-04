@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Official (statutory / authoritative) processing-time ranges per immigration corridor. Used by processingTimeEstimate() (P2-04a) as the fallback source when platform case data is below the 20-case statistical-significance threshold. Maps low_days -> p50 and high_days -> p90 for the official_only branch.",
+  "fetched_at": "2026-05-30",
+  "stale_at": "2026-11-30",
+  "entries": [
+    {
+      "corridor": { "from": "FR", "to": "NO", "from_country_name": "France", "to_country_name": "Norway" },
+      "pathway_type": "EEA_REGISTRATION",
+      "low_days": 1,
+      "high_days": 90,
+      "source": {
+        "url": "https://www.udi.no/en/want-to-apply/registration-for-eueea-nationals/",
+        "tier": 1,
+        "title": "Registration scheme for EU/EEA nationals — UDI (Norwegian Directorate of Immigration)"
+      },
+      "notes": "EEA registration: a decision is typically issued same-day at the police station, but the legal registration window spans up to 90 days from arrival. Range covers same-day through the full legal window.",
+      "fetched_at": "2026-05-30",
+      "stale_at": "2026-11-30"
+    },
+    {
+      "corridor": { "from": "US", "to": "FR", "from_country_name": "United States", "to_country_name": "France" },
+      "pathway_type": "LONG_STAY_VISA",
+      "low_days": 30,
+      "high_days": 45,
+      "source": {
+        "url": "https://www.service-public.fr/particuliers/vosdroits/F16162",
+        "tier": 1,
+        "title": "Visa de long séjour — service-public.fr"
+      },
+      "notes": "Upper bound is the published statutory processing target (45 days). Lower bound reflects commonly observed expedited consulate processing.",
+      "fetched_at": "2026-05-30",
+      "stale_at": "2026-11-30"
+    },
+    {
+      "corridor": { "from": "IN", "to": "DE", "from_country_name": "India", "to_country_name": "Germany" },
+      "pathway_type": "EU_BLUE_CARD",
+      "low_days": 28,
+      "high_days": 84,
+      "fast_track_available": true,
+      "fast_track_low_days": 21,
+      "fast_track_high_days": 28,
+      "source": {
+        "url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card",
+        "tier": 2,
+        "title": "EU Blue Card — Make it in Germany (federal Skilled Immigration portal)"
+      },
+      "secondary_sources": [
+        { "url": "https://www.bamf.de/EN/Themen/MigrationAufenthalt/ZuwandererDrittstaaten/Arbeit/BlaueKarteEU/blauekarteeu-node.html", "tier": 1, "title": "Blaue Karte EU — BAMF" },
+        { "url": "https://www.auswaertiges-amt.de/en/visa-service/-/231148", "tier": 1, "title": "Visa for the purpose of employment — Auswärtiges Amt" }
+      ],
+      "notes": "Germany does not publish a single statutory numeric deadline for Blue Card visa processing — it is consulate-dependent. Range is the commonly cited 4–12 week consulate window (28–84 days). Fast-track (3–4 weeks) applies when the employer opts into the accelerated skilled-worker procedure.",
+      "fetched_at": "2026-05-30",
+      "stale_at": "2026-11-30"
+    },
+    {
+      "corridor": { "from": "UK", "to": "DE", "from_country_name": "United Kingdom", "to_country_name": "Germany" },
+      "pathway_type": "EU_BLUE_CARD",
+      "low_days": 28,
+      "high_days": 84,
+      "fast_track_available": true,
+      "fast_track_low_days": 21,
+      "fast_track_high_days": 28,
+      "source": {
+        "url": "https://www.make-it-in-germany.com/en/visa-residence/types/eu-blue-card",
+        "tier": 2,
+        "title": "EU Blue Card — Make it in Germany (federal Skilled Immigration portal)"
+      },
+      "secondary_sources": [
+        { "url": "https://www.bamf.de/EN/Themen/MigrationAufenthalt/ZuwandererDrittstaaten/Arbeit/BlaueKarteEU/blauekarteeu-node.html", "tier": 1, "title": "Blaue Karte EU — BAMF" },
+        { "url": "https://www.auswaertiges-amt.de/en/visa-service/-/231148", "tier": 1, "title": "Visa for the purpose of employment — Auswärtiges Amt" }
+      ],
+      "notes": "Post-Brexit UK nationals are third-country nationals for German immigration. Same consulate-dependent Blue Card window as other third-country corridors (28–84 days); fast-track when the employer opts in.",
+      "fetched_at": "2026-05-30",
+      "stale_at": "2026-11-30"
+    },
+    {
+      "corridor": { "from": "BR", "to": "PT", "from_country_name": "Brazil", "to_country_name": "Portugal" },
+      "pathway_type": "LONG_STAY_VISA",
+      "low_days": 45,
+      "high_days": 60,
+      "post_arrival_step": {
+        "name": "AIMA residence permit appointment",
+        "description": "After entering on the long-stay visa, the applicant must obtain a residence permit via AIMA; appointment waits are tracked separately and are not included in low_days/high_days."
+      },
+      "source": {
+        "url": "https://vistos.mne.gov.pt/en/national-visas/general-information/types-of-visa",
+        "tier": 1,
+        "title": "National (long-stay) visas — Portugal Ministry of Foreign Affairs (MNE)"
+      },
+      "notes": "Upper bound is the published statutory target for national visa decisions (60 days). The visa-stage range is kept honest by breaking the AIMA post-arrival residence-permit wait into post_arrival_step rather than rolling it into low/high days.",
+      "fetched_at": "2026-05-30",
+      "stale_at": "2026-11-30"
+    }
+  ]
+}
