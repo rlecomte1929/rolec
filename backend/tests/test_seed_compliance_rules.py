@@ -132,3 +132,54 @@ class TestSeedLive:
         for (cond,) in rows:
             # psycopg2 returns jsonb as a parsed dict; assert the contract keys.
             assert all(k in cond for k in CONTRACT_KEYS), f"Bad condition: {cond}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase A3: precondition_field migration for missing_employer_reg rule
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+PRECONDITION_MIGRATION_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "supabase"
+    / "migrations"
+    / "20260608000000_compliance_rules_missing_employer_precondition.sql"
+)
+
+
+@pytest.fixture(scope="module")
+def precondition_migration_sql() -> str:
+    assert PRECONDITION_MIGRATION_PATH.exists(), (
+        f"Phase A3 migration missing: {PRECONDITION_MIGRATION_PATH}"
+    )
+    return PRECONDITION_MIGRATION_PATH.read_text()
+
+
+class TestPreconditionMigrationStatic:
+    def test_sets_precondition_field(self, precondition_migration_sql: str) -> None:
+        # The migration must wire precondition_field=profile_exists onto the
+        # employer rule (id c0119a03-...).
+        assert "precondition_field" in precondition_migration_sql
+        assert "profile_exists" in precondition_migration_sql
+        assert "c0119a03-0000-4000-8000-000000000003" in precondition_migration_sql
+
+    def test_uses_jsonb_set_for_replay_safety(
+        self, precondition_migration_sql: str
+    ) -> None:
+        assert re.search(r"jsonb_set\s*\(", precondition_migration_sql, re.IGNORECASE)
+
+
+class TestPreconditionMigrationLive:
+    def test_employer_rule_has_profile_exists_precondition(self, live_db_conn) -> None:
+        with live_db_conn.cursor() as cur:
+            cur.execute(
+                "SELECT trigger_condition FROM public.compliance_rules "
+                "WHERE id = %s",
+                ("c0119a03-0000-4000-8000-000000000003",),
+            )
+            row = cur.fetchone()
+        assert row is not None, "Employer rule missing from DB"
+        (cond,) = row
+        assert cond.get("precondition_field") == "profile_exists", (
+            f"Phase A3 migration not applied yet. trigger_condition={cond}"
+        )
