@@ -107,6 +107,8 @@ class _DossierFormTemplate(BaseModel):
     category: Optional[str]
     version: str
     fields_total: int
+    # [P1-05] Official Tier-1 authority URL where this form is completed/submitted.
+    source_url: Optional[str] = None
 
 
 class _DossierFormPerson(BaseModel):
@@ -144,6 +146,7 @@ class CaseFormSummary(BaseModel):
     receipt_ref: Optional[str]
     rejection_reason: Optional[str] = None   # [P4-5] set when status='rejected'
     roadmap_step_id: Optional[str] = None   # [P1-6] step that triggered this form
+    roadmap_step_title: Optional[str] = None   # [P1-05] human-readable title of that step
     is_adhoc: bool = False   # [P4-3] true when this is an ad-hoc "Add document" entry
     notes: Optional[str] = None   # [P4-3] free-text notes from the Add-document modal
     template: _DossierFormTemplate
@@ -151,6 +154,23 @@ class CaseFormSummary(BaseModel):
     fields_summary: _DossierFieldsSummary
     created_at: str
     updated_at: str
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [P1-05c] Per-form supporting document
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FormDocumentItem(BaseModel):
+    id: str
+    case_form_id: str
+    case_id: str
+    file_name: str
+    content_type: Optional[str] = None
+    size_bytes: Optional[int] = None
+    uploaded_by: Optional[str] = None
+    created_at: str
+    # 1-hour signed Storage URL; None when storage is unavailable (dev/test).
+    download_url: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -299,6 +319,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             category=None,
             version="—",
             fields_total=0,
+            source_url=None,
         )
     else:
         template = _DossierFormTemplate(
@@ -311,6 +332,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
             category=row.get("template_category"),
             version=str(row["template_version"]),
             fields_total=fields_total,
+            source_url=row.get("template_source_url"),  # [P1-05]
         )
 
     return CaseFormSummary(
@@ -329,6 +351,7 @@ def _row_to_summary(row: Dict[str, Any]) -> CaseFormSummary:
         receipt_ref=row.get("receipt_ref"),
         rejection_reason=row.get("rejection_reason") or None,   # [P4-5]
         roadmap_step_id=(str(row["roadmap_step_id"]) if row.get("roadmap_step_id") else None),  # [P1-6]
+        roadmap_step_title=(row.get("roadmap_step_title") or None),  # [P1-05]
         is_adhoc=is_adhoc,   # [P4-3]
         notes=row.get("notes") or None,   # [P4-3]
         template=template,
@@ -1071,6 +1094,8 @@ def list_case_forms(
           ft.category AS template_category,
           ft.version AS template_version,
           ft.fields  AS template_fields,
+          ft.source_url AS template_source_url,
+          rs.title AS roadmap_step_title,
           cf.is_adhoc, cf.adhoc_name, cf.adhoc_authority, cf.notes,
           cd.relationship AS dependent_relationship,
           cd.full_name    AS dependent_name,
@@ -1087,6 +1112,8 @@ def list_case_forms(
         FROM {_pg_table('case_forms')} cf
         -- [P4-3] LEFT JOIN so ad-hoc forms (form_template_id IS NULL) still appear.
         LEFT JOIN {_pg_table('form_templates')} ft ON ft.id = cf.form_template_id
+        -- [P1-05] roadmap step title for the "which step" label on the form card.
+        LEFT JOIN {_pg_table('roadmap_steps')} rs ON rs.id = cf.roadmap_step_id
         LEFT JOIN {_pg_table('case_dependents')} cd ON cd.id = cf.dependent_id
         LEFT JOIN {_pg_table('profiles')} p ON CAST(p.id AS TEXT) = cf.person_id
         WHERE cf.case_id = :case_id{where_status}
@@ -1120,6 +1147,71 @@ def list_case_forms(
         raise HTTPException(status_code=500, detail="Failed to load case forms")
 
     return [_row_to_summary(dict(r)) for r in rows]
+
+
+@router.get(
+    "/{case_id}/forms/{form_id}/documents",
+    response_model=List[FormDocumentItem],
+)
+def list_form_documents(
+    case_id: str,
+    form_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[FormDocumentItem]:
+    """
+    [P1-05c] List the supporting documents uploaded against a single case_form.
+    Each item carries a 1-hour signed download URL (None if storage is
+    unavailable, e.g. dev/test).
+    """
+    _assert_case_access(user, case_id)
+
+    with main_db.engine.connect() as conn:
+        rows = conn.execute(
+            _sql_text(
+                f"""
+                SELECT id, case_form_id, case_id, file_name, storage_path,
+                       content_type, size_bytes, uploaded_by, created_at
+                FROM {_pg_table('case_form_documents')}
+                WHERE case_form_id = :form_id AND case_id = :case_id
+                ORDER BY created_at DESC
+                """
+            ),
+            {"form_id": form_id, "case_id": case_id},
+        ).mappings().all()
+
+    # Best-effort signing — never fail the list because storage is down.
+    sb = None
+    try:
+        from ..services.supabase_client import get_supabase_admin_client  # lazy
+        sb = get_supabase_admin_client()
+    except Exception:
+        sb = None
+
+    items: List[FormDocumentItem] = []
+    for r in rows:
+        download_url: Optional[str] = None
+        if sb is not None:
+            try:
+                signed = sb.storage.from_("case-documents").create_signed_url(
+                    str(r["storage_path"]), 3600
+                )
+                download_url = signed.get("signedURL") or signed.get("signedUrl")
+            except Exception:
+                download_url = None
+        items.append(
+            FormDocumentItem(
+                id=str(r["id"]),
+                case_form_id=str(r["case_form_id"]),
+                case_id=str(r["case_id"]),
+                file_name=str(r["file_name"]),
+                content_type=r.get("content_type"),
+                size_bytes=(int(r["size_bytes"]) if r.get("size_bytes") is not None else None),
+                uploaded_by=(str(r["uploaded_by"]) if r.get("uploaded_by") else None),
+                created_at=str(r["created_at"]),
+                download_url=download_url,
+            )
+        )
+    return items
 
 
 # ─────────────────────────────────────────────────────────────────────────────

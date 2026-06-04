@@ -25,6 +25,8 @@ export interface DossierFormTemplate {
   category: string | null;
   version: string;
   fields_total: number;
+  /** [P1-05] Official Tier-1 authority URL where this form is completed/submitted. */
+  source_url: string | null;
 }
 
 export type DossierPersonKind = 'employee' | 'spouse' | 'child' | 'other';
@@ -63,6 +65,7 @@ export interface CaseFormSummary {
   receipt_ref: string | null;
   rejection_reason: string | null;  // [P4-5] set when status='rejected'
   roadmap_step_id?: string | null;  // [P1-6] step that triggered this form
+  roadmap_step_title?: string | null;  // [P1-05] human-readable title of that step
   is_adhoc?: boolean;                // [P4-3] true for ad-hoc "Add document" entries
   notes?: string | null;             // [P4-3] free-text notes from the Add-document modal
   template: DossierFormTemplate;
@@ -75,6 +78,41 @@ export interface CaseFormSummary {
 export const dossierAPI = {
   list: async (caseId: string, params?: { status?: CaseFormStatus }): Promise<CaseFormSummary[]> =>
     api.get(`/api/cases/${caseId}/forms`, { params }).then((r: { data: CaseFormSummary[] }) => r.data),
+};
+
+// ── [P1-05c] Per-form supporting documents ───────────────────────────────────
+
+export interface FormDocument {
+  id: string;
+  case_form_id: string;
+  case_id: string;
+  file_name: string;
+  content_type: string | null;
+  size_bytes: number | null;
+  uploaded_by: string | null;
+  created_at: string;
+  /** 1-hour signed download URL; null when storage is unavailable. */
+  download_url: string | null;
+}
+
+export const formDocumentsAPI = {
+  list: (caseId: string, formId: string): Promise<FormDocument[]> =>
+    api
+      .get(`/api/cases/${caseId}/forms/${formId}/documents`)
+      .then((r: { data: FormDocument[] }) => r.data),
+
+  upload: (caseId: string, formId: string, file: File): Promise<FormDocument> => {
+    const form = new FormData();
+    form.append('file', file);
+    return api
+      .post(`/api/cases/${caseId}/forms/${formId}/documents`, form, { timeout: 120_000 })
+      .then((r: { data: FormDocument }) => r.data);
+  },
+
+  remove: (caseId: string, formId: string, documentId: string): Promise<void> =>
+    api
+      .delete(`/api/cases/${caseId}/forms/${formId}/documents/${documentId}`)
+      .then(() => undefined),
 };
 
 // ── [P4-3] Ad-hoc "Add document" ─────────────────────────────────────────────
