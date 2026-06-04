@@ -300,6 +300,12 @@ export const CaseFormCard: React.FC<CaseFormCardProps> = ({ form }) => {
                   </svg>
                 </a>
               )}
+              {/* [P1-05d] Source freshness from source_pages.last_fetched_at */}
+              {form.template.source_url && form.template.source_last_verified && (
+                <span className="text-slate-400" title="When we last checked the official source page">
+                  Last verified · {new Date(form.template.source_last_verified).toLocaleDateString()}
+                </span>
+              )}
             </div>
           )}
 
