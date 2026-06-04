@@ -92,7 +92,7 @@ export const ImmigrationConsentScreen: React.FC<ImmigrationConsentScreenProps> =
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-4 text-sm text-[#334155] space-y-3">
+        <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-4 py-4 text-sm text-[#334155] space-y-3 max-h-[45vh] overflow-y-auto">
           <p>
             <strong>What we collect:</strong> Passport details, date of birth, place of birth, address history,
             marital status, nationality, educational qualifications, and information about family members relocating
@@ -108,9 +108,8 @@ export const ImmigrationConsentScreen: React.FC<ImmigrationConsentScreenProps> =
             (passport number, date of birth) use field-level encryption. Access is logged for audit purposes.
           </p>
           <p>
-            <strong>How long we keep it:</strong> Your immigration data is retained for as long as your relocation
-            case is active, plus a maximum of 7 years for legal compliance, unless you request erasure earlier
-            (subject to legal holds).
+            <strong>How long we keep it:</strong> Your data will be deleted 36 months after your case closes,
+            or sooner on your request.
           </p>
           <p>
             <strong>Your rights:</strong> You may request access, correction, or erasure of your data at any time
