@@ -7243,6 +7243,26 @@ def _require_company_for_user(user: Dict[str, Any]) -> Dict[str, Any]:
     return profile
 
 
+def _company_or_none_for_read(
+    user: Dict[str, Any], company_id_override: Optional[str] = None
+) -> Optional[str]:
+    """Company id for a policy READ, or None if the user has no company yet.
+
+    Mirrors _resolve_company_for_policy but never raises: read endpoints degrade
+    to an empty/onboarding payload for a not-yet-onboarded HR instead of a 400
+    (a missing precondition must degrade gracefully — see SKILL.md Phase 0.5).
+    """
+    # Admin acting on another tenant via explicit override (as _resolve_company_for_policy).
+    if user.get("is_admin") and company_id_override and str(company_id_override).strip():
+        return str(company_id_override).strip()
+    # Otherwise mirror _require_company_for_user's resolution, but return None
+    # instead of raising 400 so the caller can degrade to an empty list.
+    if user.get("role") == UserRole.HR.value:
+        return _get_hr_company_id(user)
+    profile = db.get_profile_record(user.get("id")) or {}
+    return profile.get("company_id")
+
+
 def _resolve_company_for_policy(
     user: Dict[str, Any], company_id_override: Optional[str] = None
 ) -> str:
@@ -10735,7 +10755,10 @@ def list_company_policies(
     company_id: Optional[str] = Query(None, description="Admin override: scope to this company"),
     user: Dict[str, Any] = Depends(require_role(UserRole.HR)),
 ):
-    cid = _resolve_company_for_policy(user, company_id)
+    cid = _company_or_none_for_read(user, company_id)
+    if not cid:
+        # HR not yet linked to a company (onboarding) — empty list, not 400.
+        return {"policies": [], "company_setup_required": True}
     policies = db.list_company_policies(cid)
     return {"policies": policies}
 
@@ -11256,7 +11279,10 @@ def list_policy_documents(
     # Admin with no company scope: return empty list so the page loads; they can use Admin → company → Policy for scope.
     if user.get("is_admin") and not (company_id and str(company_id).strip()):
         return {"documents": []}
-    cid = _resolve_company_for_policy(user, company_id)
+    cid = _company_or_none_for_read(user, company_id)
+    if not cid:
+        # HR not yet linked to a company (onboarding) — empty list, not 400.
+        return {"documents": [], "company_setup_required": True}
     docs = db.list_policy_documents(cid, request_id=request_id)
     return {"documents": docs}
 

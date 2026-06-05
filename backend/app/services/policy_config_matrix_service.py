@@ -614,6 +614,59 @@ class PolicyConfigMatrixService:
             targeting_strict=False,
         )
 
+    def empty_onboarding_payload(
+        self,
+        *,
+        assignment_type: Optional[str] = None,
+        family_status: Optional[str] = None,
+        employee_level: Optional[str] = None,
+        effective_rows_only: bool = False,
+    ) -> Dict[str, Any]:
+        """Company-independent empty scaffold for an HR not yet linked to a company.
+
+        Mirrors the ``empty_scaffold`` branch of :meth:`get_working_payload` but
+        takes no ``company_id``, so a not-yet-onboarded HR gets a graceful
+        read-only scaffold instead of a 400. ``editable=False`` because nothing
+        can be saved until the company exists; ``company_setup_required`` signals
+        the UI to prompt company setup. See SKILL.md (relopass-e2e-test) Phase 0.5:
+        a missing precondition must degrade gracefully, never hard-fail.
+        """
+        benefits_dicts = _canonical_seed_rows("virtual")
+        virtual = {"id": None, "status": "empty_scaffold", "effective_date": date.today().isoformat(), "version_number": 0}
+        payload = self.build_payload(
+            "",
+            version=virtual,
+            benefits=benefits_dicts,
+            editable=False,
+            source="empty_scaffold",
+            assignment_type=assignment_type,
+            family_status=family_status,
+            employee_level=employee_level,
+            effective_rows_only=effective_rows_only,
+            targeting_strict=False,
+        )
+        payload["company_setup_required"] = True
+        return payload
+
+    def empty_diff(self) -> Dict[str, Any]:
+        """Company-independent empty Draft-vs-Live diff for a not-yet-onboarded HR.
+
+        Same shape as :meth:`compute_diff` with no draft and no published version,
+        so the UI's "Draft vs Live" section renders empty instead of 400ing.
+        """
+        return {
+            "live": {"version": None, "rows": []},
+            "draft": {"version": None, "rows": []},
+            "diff": {
+                "added": [],
+                "removed": [],
+                "changed": [],
+                "unchanged_count": 0,
+                "summary": {"added": 0, "removed": 0, "changed": 0, "unchanged": 0},
+            },
+            "company_setup_required": True,
+        }
+
     def get_published_payload(
         self,
         company_id: str,
