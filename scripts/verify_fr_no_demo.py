@@ -112,6 +112,42 @@ def main():
     check("immigration interview surface reachable", st in (200, 403),
           f"HTTP {st} (403 = consent not yet given, expected)")
 
+    # 6. Employee benefits / policy surface resolves real categories.
+    _, pol = _call("GET", f"/api/employee/policy-config?caseId={CASE_ID}", token=emp)
+    pol_cats = (pol or {}).get("categories", []) if isinstance(pol, dict) else []
+    check("employee benefits: policy categories resolve", len(pol_cats) >= 1, f"{len(pol_cats)} categories")
+
+    # 7. Requirements + budget surfaces render (employee dossier sidebars).
+    rs, req = _call("GET", f"/api/cases/{CASE_ID}/requirements", token=emp)
+    check("requirements surface renders", rs == 200 and isinstance(req, dict), f"HTTP {rs}")
+    bs, _ = _call("GET", f"/api/cases/{CASE_ID}/budget-summary", token=emp)
+    check("budget summary renders", bs == 200, f"HTTP {bs}")
+
+    # 8. HR command center (the real landing view) shows the case. This is a
+    #    distinct surface from /api/hr/cases and silently returned 0 when the
+    #    wizard_cases enrichment columns (s3/s4 migrations) were unapplied.
+    if hr:
+        _, ccc = _call("GET", "/api/hr/command-center/cases", token=hr)
+        cc_rows = ccc if isinstance(ccc, list) else []
+        check("HR command-center shows the case", len(cc_rows) >= 1, f"{len(cc_rows)} row(s)")
+        ps, pcfg = _call("GET", "/api/hr/policy-config", token=hr)
+        check("HR policy-config resolves (legacy-id company)", ps == 200 and isinstance(pcfg, dict), f"HTTP {ps}")
+
+    # 9. Exceptions loop: employee raises an exception, HR sees it in the inbox.
+    #    Idempotent — only creates one if the case has none yet.
+    _, exist = _call("GET", f"/api/cases/{CASE_ID}/exception-requests", token=emp)
+    exist = exist if isinstance(exist, list) else []
+    if not exist:
+        _call("POST", f"/api/cases/{CASE_ID}/exception-requests", token=emp, body={
+            "category": "housing", "exception_type": "cap_override",
+            "requested_amount": 32000, "cap_amount": 25000, "currency": "NOK",
+            "reason": "Central Oslo 3-bed for a family of 4; comparable units exceed the policy cap."})
+    if hr:
+        _, inbox = _call("GET", "/api/exception-requests", token=hr)
+        inbox = inbox if isinstance(inbox, list) else []
+        check("HR exceptions inbox shows the employee's request",
+              any(str(r.get("case_id")) == CASE_ID for r in inbox), f"{len(inbox)} in inbox")
+
     print()
     if _failures:
         print(f"{RED}  JOURNEY BROKEN — {len(_failures)} stage(s) failed: {', '.join(_failures)}{RESET}\n")
