@@ -7045,6 +7045,47 @@ class Database:
             return
         self.update_assignment_status(assignment["id"], "awaiting_intake")
 
+    def _resolve_employee_profile_id(self, assignment: Dict[str, Any]) -> Optional[str]:
+        """Resolve the employee's ``profiles.id`` for ``public.cases.employee_id``
+        (an FK to ``profiles``), from a case_assignments row.
+
+        Order: (1) ``employee_user_id`` if it is itself a profile id (uuid-native
+        employees — the common case); (2) the employee's email (``users.email`` ->
+        ``profiles.email``); (3) ``employee_contact_id`` if that happens to be a
+        profile. Returns None if no profile can be resolved (the bridge then skips).
+        """
+        uid = str(assignment.get("employee_user_id") or "").strip()
+        cid = str(assignment.get("employee_contact_id") or "").strip()
+        try:
+            with self.engine.connect() as conn:
+                if uid:
+                    r = conn.execute(
+                        text("SELECT id FROM profiles WHERE CAST(id AS TEXT) = :u LIMIT 1"),
+                        {"u": uid},
+                    ).first()
+                    if r:
+                        return uid
+                    r = conn.execute(
+                        text(
+                            "SELECT CAST(p.id AS TEXT) AS pid FROM users u "
+                            "JOIN profiles p ON lower(p.email) = lower(u.email) "
+                            "WHERE u.id = :u LIMIT 1"
+                        ),
+                        {"u": uid},
+                    ).mappings().first()
+                    if r and r.get("pid"):
+                        return r["pid"]
+                if cid:
+                    r = conn.execute(
+                        text("SELECT id FROM profiles WHERE CAST(id AS TEXT) = :c LIMIT 1"),
+                        {"c": cid},
+                    ).first()
+                    if r:
+                        return cid
+        except Exception:
+            log.exception("canonical-case bridge: employee profile resolution failed")
+        return None
+
     def _ensure_canonical_case_from_wizard(
         self, case_id: str, derived: Dict[str, Any], assignment: Dict[str, Any]
     ) -> None:
@@ -7054,18 +7095,21 @@ class Database:
         guard read ``public.cases``. Without this bridge, no wizard-created case
         ever appears to the trigger, so no CaseForms (and hence no roadmap/dossier)
         are generated. We populate the canonical row from the wizard draft + the
-        ``case_assignments`` link: ``employee_contact_id`` supplies the UUID that
-        ``public.cases.employee_id`` / ``case_forms.person_id`` require (the
-        assignment's ``employee_user_id`` may be a legacy non-UUID text id).
+        ``case_assignments`` link. ``public.cases.employee_id`` is an FK to
+        ``profiles``; we resolve it via ``_resolve_employee_profile_id`` —
+        ``employee_user_id`` when it is itself a profile (uuid-native employees),
+        else the employee's email, else ``employee_contact_id``. (The contact id
+        is an FK to ``employee_contacts``, not ``profiles``, so it is almost never
+        a valid ``employee_id`` — using it directly broke every real case.)
 
         Fail-safe: every NOT NULL column must resolve, else we skip — never insert
         a partial/invalid row. Caller (apply_wizard_patch_side_effects) is itself
         wrapped in try/except by the PATCH handler, so a failure can't break intake.
         """
         dest = (derived.get("dest_country") or "").strip()
-        employee_uuid = str(assignment.get("employee_contact_id") or "").strip()
+        employee_uuid = self._resolve_employee_profile_id(assignment)
         if not dest or not employee_uuid:
-            return  # trigger needs a destination; public.cases needs a uuid employee_id
+            return  # trigger needs a destination; public.cases needs a profile employee_id
         canonical = str(assignment.get("canonical_case_id") or case_id).strip()
         company_id = None
         try:
