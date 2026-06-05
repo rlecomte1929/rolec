@@ -72,9 +72,15 @@ export interface CaseDocument {
   page_count?: number | null;
 }
 
+/** A legal-basis citation for a step, dereferenceable to its source. */
+export interface CaseStepCitation {
+  legal_reference?: string | null;
+  source_url?: string | null;
+}
+
 /**
- * One step row in the Steps section. Cohort 1 ships a flat list; the
- * real StepGraph (DAG, dependencies, parallel arms) lands with C2-07.
+ * One step in the Steps section (C2-07 StepGraph). Sourced from
+ * rce.steps / rce.deadlines / rce.rule_citations via GET /steps.
  */
 export interface CaseStep {
   step_id: string;
@@ -82,6 +88,12 @@ export interface CaseStep {
   status: 'pending' | 'in_progress' | 'blocked' | 'done' | (string & {});
   due_date?: string | null;
   owner_label?: string | null;
+  /** UUIDs of steps that must complete first — drives the topological order. */
+  prerequisite_step_ids?: string[];
+  expected_duration_days?: number | null;
+  /** Human-readable legal derivation of the deadline, when one exists. */
+  derivation?: string | null;
+  citations?: CaseStepCitation[];
 }
 
 /**
