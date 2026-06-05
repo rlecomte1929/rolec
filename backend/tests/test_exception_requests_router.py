@@ -393,5 +393,21 @@ class CallerCompanyResolutionTests(unittest.TestCase):
             self.assertEqual(ctx.exception.status_code, 403)
 
 
+class ExceptionSelectJoinGuardTests(unittest.TestCase):
+    """policy_cap_requests stores id/case_id/*_user_id as TEXT while profiles.id
+    and mobility_cases.id are UUID. The shared SELECT projection must cast the
+    uuid side to ::text in every join, or `uuid = text` fails to plan and the
+    whole endpoint 500s for every caller (regression guard)."""
+
+    def test_joins_cast_uuid_to_text(self) -> None:
+        sql = router_module._EXCEPTION_SELECT_WITH_JOINS
+        self.assertIn("rp.id::text  = pcr.requested_by_user_id", sql)
+        self.assertIn("rsp.id::text = pcr.resolved_by_user_id", sql)
+        self.assertIn("mc.id::text  = pcr.case_id", sql)
+        # No bare uuid = text comparison left on the joined keys.
+        self.assertNotIn("rp.id  = pcr.requested_by_user_id", sql)
+        self.assertNotIn("mc.id  = pcr.case_id", sql)
+
+
 if __name__ == "__main__":
     unittest.main()

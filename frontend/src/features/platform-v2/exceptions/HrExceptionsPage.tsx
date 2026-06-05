@@ -19,11 +19,11 @@ import type {
  * Two-pane inbox: left = filterable exception request list; right = detail
  * pane with approve/reject decision flow + audit trail.
  *
- * Backend: live. On mount the page fetches `GET /api/exception-requests`
- * (listExceptionRequestsForCompany); when rows come back it swaps in the real
- * data and approve/reject decisions persist via `PATCH /api/exception-requests/:id`
- * (resolveExceptionRequest). MOCK_REQUESTS remains only as the fallback for
- * dev/unauthenticated environments with no seeded rows, so the page still demos.
+ * Backend: live, real data only. On mount the page fetches
+ * `GET /api/exception-requests` (listExceptionRequestsForCompany) and renders
+ * exactly what exists for the caller's company — no fabricated/demo rows. An
+ * honest empty state shows when there are none. Approve/reject decisions
+ * persist via `PATCH /api/exception-requests/:id` (resolveExceptionRequest).
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -68,105 +68,6 @@ interface ExcRequest {
 
 // ── Mock data (swap for API call when backend endpoint ships) ─────────────────
 
-const MOCK_REQUESTS: ExcRequest[] = [
-  {
-    id: 'exc-1041',
-    type: 'new_category',
-    typeLabel: 'Add benefit',
-    benefit: 'International school',
-    employee: { name: 'Marc Bouchard', initials: 'MB', role: 'Senior Eng · FR → NO', caseId: 'c-marc-no' },
-    current:   { value: 'Excluded',     sub: 'Not in Tier 2 package' },
-    requested: { value: '€18,000 / yr', sub: 'Up to 1 academic year for 2 kids' },
-    justification: 'Both kids are mid-school year (Grade 4 and Grade 7). Our move lands in late August — they\'ll need to start the Norwegian academic year at an international school to avoid losing a full year of progress. Lycée Français de Stavanger is the only fit; we\'ve already secured spots conditional on funding.',
-    submittedAgo: '2h',
-    status: 'pending',
-    hrNote: null,
-    decidedBy: null,
-    aiInsight: '73% of director-level requests like this were approved as exceptions at Aurora in the past 24 months.',
-    unread: true,
-    audit: [
-      { kind: 'submit', who: 'Marc Bouchard', what: 'Submitted exception request for International school.', when: '2h ago · 09:23 CET' },
-      { kind: 'ai',     who: 'System',        what: 'Classified · "Tier 2 escalation · school benefit". Precedent: 73% approved.', when: '2h ago · 09:23 CET' },
-    ],
-  },
-  {
-    id: 'exc-1040',
-    type: 'cap_override',
-    typeLabel: 'Cap override',
-    benefit: 'Spouse career coach',
-    employee: { name: 'Priya Nair', initials: 'PN', role: 'PM · IN → DE', caseId: 'c-priya-de' },
-    current:   { value: '5 sessions', sub: 'Tier 1 cap' },
-    requested: { value: '12 sessions', sub: 'Extended coaching package' },
-    justification: 'My spouse is changing industries (architecture → product). The standard 5 sessions cover CV/networking; she also needs interview prep and a German credential bridge. Quote from Berlin Career Studio for 12-session package is €2,400 (vs €1,000 currently allowed).',
-    submittedAgo: '21h',
-    status: 'pending',
-    hrNote: null,
-    decidedBy: null,
-    aiInsight: 'Cap overrides on spouse-career line items have a 58% historical approval rate. Within budget envelope.',
-    unread: true,
-    audit: [
-      { kind: 'submit', who: 'Priya Nair', what: 'Submitted cap-override request.', when: '21h ago · 14:02 CET' },
-    ],
-  },
-  {
-    id: 'exc-1038',
-    type: 'timeline_extension',
-    typeLabel: 'Timeline',
-    benefit: 'Temporary housing',
-    employee: { name: 'Lucas Reyes', initials: 'LR', role: 'Director · MX → US', caseId: 'c-lucas-us' },
-    current:   { value: '90 days',  sub: 'Standard window' },
-    requested: { value: '120 days', sub: 'Extended due to L-1A delay' },
-    justification: 'My L-1A premium processing is now at week 9 with no decision. Family relocation paused, lease starts deferred. Need an additional 30 days on the corporate apartment to avoid double-billing.',
-    submittedAgo: '3d',
-    status: 'approved',
-    hrNote: 'Approved — USCIS L-1A delays are well-documented this quarter. We\'ll cover the 30-day extension at the standard rate. Switch landlord to monthly invoicing.',
-    decidedBy: 'Helena Müller',
-    unread: false,
-    audit: [
-      { kind: 'submit',  who: 'Lucas Reyes',   what: 'Submitted timeline-extension request.', when: '3d ago · 11:10 PST' },
-      { kind: 'ai',      who: 'System',        what: 'Cross-referenced USCIS processing data. L-1A premium queue at p95 = 11 weeks.', when: '3d ago · 11:11 PST' },
-      { kind: 'approve', who: 'Helena Müller', what: 'Approved with note.', quote: 'Approved — USCIS L-1A delays are well-documented this quarter.', when: '2d ago · 08:30 CET' },
-    ],
-  },
-  {
-    id: 'exc-1036',
-    type: 'additional_coverage',
-    typeLabel: 'More coverage',
-    benefit: 'International shipping',
-    employee: { name: 'Aïcha Idrissi', initials: 'AI', role: 'Senior Designer · ES → CA', caseId: 'c-aicha-ca' },
-    current:   { value: '40ft container', sub: 'Tier 2 cap' },
-    requested: { value: '40ft + air-freight', sub: 'Add ~80kg priority air-freight' },
-    justification: 'Sea container ETA is 6 weeks. Need work-essential equipment (Cintiq, mechanical keyboard, design library) within 2 weeks of arrival to start. Quote: €1,800 air-freight via Crown Moving.',
-    submittedAgo: '5d',
-    status: 'rejected',
-    hrNote: 'Not approved — policy excludes air-freight add-ons above the standard container. We\'ll cover a 2-week loaner workstation through ReloPass IT instead. Loop in IT@ for setup.',
-    decidedBy: 'Helena Müller',
-    unread: false,
-    audit: [
-      { kind: 'submit', who: 'Aïcha Idrissi',  what: 'Submitted additional-coverage request.', when: '5d ago · 16:45 CET' },
-      { kind: 'reject', who: 'Helena Müller',  what: 'Rejected with proposed alternative.', quote: 'Not approved — policy excludes air-freight add-ons. Will provide 2-week loaner workstation via ReloPass IT instead.', when: '4d ago · 10:15 CET' },
-    ],
-  },
-  {
-    id: 'exc-1034',
-    type: 'cap_override',
-    typeLabel: 'Cap override',
-    benefit: 'Language tuition',
-    employee: { name: 'Tomás Weber', initials: 'TW', role: 'Data Scientist · BR → NL', caseId: 'c-tomas-nl' },
-    current:   { value: '€1,500', sub: 'Tier 1 cap' },
-    requested: { value: '€2,800', sub: 'Intensive Dutch program' },
-    justification: 'My employer-side role is client-facing. Standard B1 tutoring (€1,500) won\'t get me to client-readiness. Intensive 12-week B2 program from Direct Dutch is €2,800.',
-    submittedAgo: '8d',
-    status: 'pending',
-    hrNote: null,
-    decidedBy: null,
-    aiInsight: 'Client-facing roles in the Netherlands: 81% of cap-extensions for language tuition were approved.',
-    unread: false,
-    audit: [
-      { kind: 'submit', who: 'Tomás Weber', what: 'Submitted cap-override request.', when: '8d ago · 08:20 CET' },
-    ],
-  },
-];
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -658,35 +559,31 @@ function mapAuditEventToUi(ev: ExceptionAuditEvent): AuditEvent {
 type FilterTab = 'pending' | 'approved' | 'rejected' | 'all';
 
 export function HrExceptionsPage() {
-  const [requests, setRequests] = useState<ExcRequest[]>(MOCK_REQUESTS);
+  const [requests, setRequests] = useState<ExcRequest[]>([]);
   const [filter, setFilter] = useState<FilterTab>('pending');
-  const [selectedId, setSelectedId] = useState<string | null>(MOCK_REQUESTS[0]?.id ?? null);
-  // True once the live fetch attempt has resolved — drives whether we treat
-  // the inbox as real backend data (and therefore eligible for real audit-trail
-  // fetches) or as the mock demo dataset.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // True once the live fetch attempt has resolved — drives whether the
+  // selected row is eligible for a real audit-trail fetch.
   const [isLiveData, setIsLiveData] = useState(false);
+  // 'loading' until the first fetch resolves; 'error' if it failed. The inbox
+  // shows only real backend data — no fabricated rows — so HR sees exactly
+  // what exists for their company, and an honest empty state when nothing does.
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
 
-  // AI-005-followup: attempt to fetch real exception_requests on mount. When
-  // the API returns rows, swap in the live data; when it returns an empty
-  // list (or errors with 401/403/etc. in a dev / unauthenticated environment),
-  // we keep MOCK_REQUESTS so the page still demos. The mock fallback is
-  // intentional and documented — production with real data will always have
-  // at least one row, dev environments without seeded data won't.
   useEffect(() => {
     let cancelled = false;
     listExceptionRequestsForCompany()
       .then((live) => {
         if (cancelled) return;
-        if (live && live.length > 0) {
-          const mapped = live.map(mapServerToUi);
-          setRequests(mapped);
-          setSelectedId(mapped[0]?.id ?? null);
-          setIsLiveData(true);
-        }
+        const mapped = (live ?? []).map(mapServerToUi);
+        setRequests(mapped);
+        setSelectedId(mapped[0]?.id ?? null);
+        setIsLiveData(true);
+        setLoadState('ready');
       })
       .catch(() => {
-        // Silently fall back to mock; not a user-visible failure since the
-        // mock dataset still renders. The browser console will show the 4xx.
+        if (cancelled) return;
+        setLoadState('error');
       });
     return () => {
       cancelled = true;
@@ -832,7 +729,19 @@ export function HrExceptionsPage() {
 
           {/* List body */}
           <div className="flex-1 overflow-y-auto">
-            {filtered.length === 0 ? (
+            {loadState === 'loading' ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-6 py-10">
+                <p className="text-sm text-slate-400">Loading exception requests…</p>
+              </div>
+            ) : loadState === 'error' ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-6 py-10">
+                <svg className="w-8 h-8 text-amber-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-slate-500">Couldn't load exception requests.</p>
+                <p className="text-xs text-slate-400 mt-0.5">Refresh to try again.</p>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-6 py-10">
                 <svg className="w-8 h-8 text-emerald-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />

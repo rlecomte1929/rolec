@@ -250,10 +250,15 @@ SELECT
     rsp.full_name AS resolved_by_name,
     mc.origin_country,
     mc.destination_country
+-- policy_cap_requests stores id/case_id/*_user_id as TEXT (legacy non-UUID
+-- ids like "seed-emp-testingapril" live here), while profiles.id and
+-- mobility_cases.id are UUID. Comparing uuid = text fails to plan, so the
+-- whole endpoint 500'd for every caller. Cast the uuid side to text: legacy
+-- ids simply don't match (LEFT JOIN -> NULL joined fields, which is fine).
 FROM policy_cap_requests pcr
-LEFT JOIN profiles       rp  ON rp.id  = pcr.requested_by_user_id
-LEFT JOIN profiles       rsp ON rsp.id = pcr.resolved_by_user_id
-LEFT JOIN mobility_cases mc  ON mc.id  = pcr.case_id
+LEFT JOIN profiles       rp  ON rp.id::text  = pcr.requested_by_user_id
+LEFT JOIN profiles       rsp ON rsp.id::text = pcr.resolved_by_user_id
+LEFT JOIN mobility_cases mc  ON mc.id::text  = pcr.case_id
 """
 
 
