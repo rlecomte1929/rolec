@@ -495,39 +495,51 @@ class ProfilesJoinTypeGuardTests(unittest.TestCase):
 
     The CaseDossierFormsTests above cannot catch this: they run on SQLite, where
     every column is TEXT and `text = text` is always valid. So this guard works
-    at the source level — it asserts the profiles joins in cases.py compare the
-    uuid columns directly (`p.id = <col>`) and never reintroduce the text cast.
+    at the source level — it asserts the profiles joins compare the uuid columns
+    directly (`p.id = <col>`) and never reintroduce the text cast.
+
+    Both routers are scanned. `cases_read.py` is the router actually mounted for
+    `GET /api/cases/{id}/forms` in prod (`backend.main:app`); `cases.py` holds a
+    parallel copy. #269 fixed the cast in `cases.py` only, leaving the live
+    `cases_read.py` still 500ing — this guard now covers both so the regression
+    can't slip through the dead file again.
     """
 
-    def _cases_source(self) -> str:
+    # Live router first — it's the one mounted for GET /api/cases/{id}/forms.
+    _GUARDED_ROUTERS = ("cases_read.py", "cases.py")
+
+    def _router_source(self, filename: str) -> str:
         path = os.path.join(
-            _REPO_ROOT, "backend", "app", "routers", "cases.py"
+            _REPO_ROOT, "backend", "app", "routers", filename
         )
         with open(path, "r", encoding="utf-8") as fh:
             return fh.read()
 
     def test_no_text_cast_on_profiles_id_join(self) -> None:
-        src = self._cases_source()
-        self.assertNotIn(
-            "CAST(p.id AS TEXT)",
-            src,
-            "cases.py joins public.profiles on a uuid column; casting p.id to "
-            "TEXT makes the comparison `text = uuid`, which 500s in Postgres. "
-            "Join the uuid columns directly, e.g. `p.id = cf.person_id`.",
-        )
+        for filename in self._GUARDED_ROUTERS:
+            src = self._router_source(filename)
+            self.assertNotIn(
+                "CAST(p.id AS TEXT)",
+                src,
+                f"{filename} joins public.profiles on a uuid column; casting "
+                "p.id to TEXT makes the comparison `text = uuid`, which 500s in "
+                "Postgres. Join the uuid columns directly, e.g. "
+                "`p.id = cf.person_id`.",
+            )
 
     def test_profiles_joined_directly_on_uuid_columns(self) -> None:
-        src = self._cases_source()
-        for expected in (
-            "p.id = cf.person_id",
-            "p.id = c.author_id",
-            "p.id = e.actor_id",
-        ):
-            self.assertIn(
-                expected,
-                src,
-                f"expected direct uuid join `{expected}` in cases.py",
-            )
+        for filename in self._GUARDED_ROUTERS:
+            src = self._router_source(filename)
+            for expected in (
+                "p.id = cf.person_id",
+                "p.id = c.author_id",
+                "p.id = e.actor_id",
+            ):
+                self.assertIn(
+                    expected,
+                    src,
+                    f"expected direct uuid join `{expected}` in {filename}",
+                )
 
 
 class CaseAccessUuidCastGuardTests(unittest.TestCase):
