@@ -152,6 +152,21 @@ def assign_task(
     Create a new provider_task with status='pending'.
     Verifies the target provider belongs to this org.
     """
+    # Tenant scope: the case must belong to the HR's org, else an HR from another
+    # company could create tasks on it (cross-tenant write). 404 (not 403) so we
+    # don't leak case existence across tenants.
+    with db.engine.begin() as conn:
+        _case_ok = conn.execute(
+            text(
+                "SELECT 1 FROM relocation_cases WHERE CAST(id AS TEXT) = :cid AND CAST(company_id AS TEXT) = :org "
+                "UNION SELECT 1 FROM cases WHERE CAST(id AS TEXT) = :cid AND CAST(company_id AS TEXT) = :org LIMIT 1"
+            ),
+            {"cid": case_id, "org": org_id},
+        ).first()
+    if not _case_ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Case not found"
+        )
     with db.engine.begin() as conn:
         provider = conn.execute(
             text(
