@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { Alert, Input, Select, LoadingButton } from '../components/antigravity';
+import { Alert, Button, Input, Select, LoadingButton } from '../components/antigravity';
 import type { UserRole } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage, getClientTransportErrorMessage } from '../utils/apiDetail';
@@ -375,11 +375,11 @@ export const Auth: React.FC = () => {
                   onChange={setInvitePassword}
                   label="New password" placeholder="At least 8 characters, with a letter and a number"
                   autoComplete="new-password" fullWidth />
-                <button type="button" onClick={() => setShowInvitePassword((p) => !p)}
+                <Button type="button" variant="ghost" onClick={() => setShowInvitePassword((p) => !p)}
                   aria-label={showInvitePassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-8 text-slate-400 hover:text-slate-600 transition-colors">
+                  className="absolute right-3 top-8 !p-0 !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
                   <EyeIcon open={showInvitePassword} />
-                </button>
+                </Button>
               </div>
               <Input type={showInvitePassword ? 'text' : 'password'} value={inviteConfirm}
                 onChange={setInviteConfirm}
@@ -389,10 +389,10 @@ export const Auth: React.FC = () => {
                 loadingLabel="Setting password…" disabled={!invitePassword || !inviteConfirm}>
                 Set password and sign in
               </LoadingButton>
-              <button type="button" onClick={exitInviteMode}
-                className="block w-full text-center text-sm text-slate-500 hover:text-slate-700 transition-colors">
+              <Button type="button" variant="ghost" fullWidth onClick={exitInviteMode}
+                className="block text-center text-sm !p-0 !font-normal !text-slate-500 hover:!text-slate-700 hover:!bg-transparent transition-colors">
                 Sign in with existing account
-              </button>
+              </Button>
             </form>
           )}
         </div>
@@ -462,12 +462,12 @@ export const Auth: React.FC = () => {
           {/* Mode tabs */}
           <div className="flex rounded-lg bg-slate-100 p-1 mb-7">
             {(['login', 'register'] as const).map((m) => (
-              <button key={m} onClick={() => { setMode(m); setError(''); }}
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
-                  mode === m ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'
+              <Button key={m} type="button" variant="ghost" onClick={() => { setMode(m); setError(''); }}
+                className={`flex-1 !py-1.5 text-sm !rounded-md transition-all ${
+                  mode === m ? '!bg-white shadow-sm !text-slate-900' : '!text-slate-500 hover:!text-slate-700 hover:!bg-transparent'
                 }`}>
                 {m === 'login' ? 'Sign in' : 'Create account'}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -476,10 +476,10 @@ export const Auth: React.FC = () => {
             <Alert variant="warning" className="mb-5">
               <div className="flex items-start gap-2">
                 <span className="flex-1">{linkError}</span>
-                <button type="button" onClick={() => setLinkError('')}
-                  aria-label="Dismiss" className="shrink-0 text-current opacity-60 hover:opacity-100">
+                <Button type="button" variant="ghost" onClick={() => setLinkError('')}
+                  aria-label="Dismiss" className="shrink-0 !p-0 !font-normal !text-current opacity-60 hover:opacity-100 hover:!bg-transparent">
                   ✕
-                </button>
+                </Button>
               </div>
             </Alert>
           )}
@@ -527,9 +527,9 @@ export const Auth: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label htmlFor="auth-login-password" className="block text-sm font-medium text-slate-700">Password</label>
-                  <button type="button" className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                  <Button type="button" variant="ghost" className="text-xs !p-0 !font-normal !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
                     Forgot?
-                  </button>
+                  </Button>
                 </div>
                 <div className="relative">
                   <input
@@ -539,20 +539,21 @@ export const Auth: React.FC = () => {
                     placeholder="••••••••" autoComplete="current-password"
                     className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 pr-10 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b2b43]/25 focus:border-[#0b2b43] transition-colors"
                   />
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => setShowPassword((p) => !p)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                    className="absolute right-3 top-1/2 -translate-y-1/2 !p-0 !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
                     <EyeIcon open={showPassword} />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
-              <button type="submit" disabled={isLoading || !identifier || !password}
-                className="w-full py-2.5 rounded-lg bg-[#0b2b43] text-white text-sm font-semibold hover:bg-[#0d3456] disabled:opacity-50 transition-colors">
+              <Button type="submit" variant="primary" fullWidth disabled={isLoading || !identifier || !password}
+                className="!py-2.5 !text-sm !font-semibold">
                 {isLoading ? 'Signing in…' : 'Sign in'}
-              </button>
+              </Button>
             </form>
           )}
 
@@ -576,10 +577,10 @@ export const Auth: React.FC = () => {
                   <Input type={showPassword ? 'text' : 'password'} value={password}
                     onChange={setPassword} label="Password"
                     placeholder="Create a password" autoComplete="new-password" fullWidth />
-                  <button type="button" onClick={() => setShowPassword((p) => !p)}
-                    className="absolute right-3 top-8 text-slate-400 hover:text-slate-600 transition-colors">
+                  <Button type="button" variant="ghost" onClick={() => setShowPassword((p) => !p)}
+                    className="absolute right-3 top-8 !p-0 !text-slate-400 hover:!text-slate-600 hover:!bg-transparent transition-colors">
                     <EyeIcon open={showPassword} />
-                  </button>
+                  </Button>
                 </div>
                 <Select value={role} onChange={(v) => setRole(v as UserRole)} label="Role"
                   options={[
@@ -610,22 +611,22 @@ export const Auth: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={handleGoogleSSO}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                <Button type="button" variant="ghost" onClick={handleGoogleSSO}
+                  className="flex items-center justify-center gap-2 !py-2.5 border border-slate-200 text-sm !text-slate-700 hover:!bg-slate-50 transition-colors">
                   <GoogleIcon /> Google
-                </button>
-                <button
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                </Button>
+                <Button type="button" variant="ghost"
+                  className="flex items-center justify-center gap-2 !py-2.5 border border-slate-200 text-sm !text-slate-700 hover:!bg-slate-50 transition-colors">
                   <MicrosoftIcon /> Microsoft SSO
-                </button>
+                </Button>
               </div>
 
               <p className="text-center text-sm text-slate-500 mt-5">
                 New to ReloPass?{' '}
-                <button onClick={() => { setMode('register'); setError(''); }}
-                  className="text-[#0b2b43] font-medium hover:underline">
+                <Button type="button" variant="ghost" onClick={() => { setMode('register'); setError(''); }}
+                  className="!p-0 text-[#0b2b43] font-medium hover:!bg-transparent hover:underline">
                   Create an account →
-                </button>
+                </Button>
               </p>
             </>
           )}
@@ -640,10 +641,10 @@ export const Auth: React.FC = () => {
             </div>
             <div className="grid grid-cols-3 gap-2">
               {(['admin', 'hr', 'employee'] as const).map((r) => (
-                <button key={r} onClick={() => handleDemoLogin(r)} disabled={isLoading}
-                  className="py-2 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 capitalize transition-colors">
+                <Button key={r} type="button" variant="ghost" onClick={() => handleDemoLogin(r)} disabled={isLoading}
+                  className="!px-0 border border-slate-200 !text-xs !text-slate-600 hover:!bg-slate-50 hover:border-slate-300 capitalize transition-colors">
                   {r === 'admin' ? 'Admin' : r === 'hr' ? 'HR' : 'Employee'}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
