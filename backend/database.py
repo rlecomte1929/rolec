@@ -7037,6 +7037,13 @@ class Database:
         # trigger reads public.cases — without this row no CaseForms (hence no
         # roadmap/dossier) are ever generated. Fail-safe (skips on any gap).
         self._ensure_canonical_case_from_wizard(cid, derived, assignment)
+        # Sync the wizard family (spouse + children) into case_dependents — the
+        # table the trigger reads for has_spouse/has_children, which gate the
+        # family-reunion forms. The household intake writes only the draft;
+        # without this no family form is ever generated. Runs after the canonical
+        # case exists (FK case_dependents.case_id -> public.cases).
+        canonical = str(assignment.get("canonical_case_id") or cid).strip()
+        self._sync_case_dependents_from_draft(canonical, draft)
         st = (assignment.get("status") or "").strip().lower()
         if st not in ("created", "assigned"):
             return
@@ -7044,6 +7051,87 @@ class Database:
         if not any((str(basics.get(k) or "").strip()) for k in ("destCountry", "destCity", "originCountry", "originCity")):
             return
         self.update_assignment_status(assignment["id"], "awaiting_intake")
+
+    def _sync_case_dependents_from_draft(self, canonical_case_id: str, draft: Dict[str, Any]) -> None:
+        """Sync the wizard family (spouse + children) into ``case_dependents``.
+
+        The trigger engine reads ``case_dependents`` to set has_spouse /
+        has_children, which gate the family-reunion forms (NO UTL-2011F/B, GB
+        DEP-*, DE FAM-*). The household intake writes only the wizard draft, so
+        without this sync ``case_dependents`` is never populated and NO family
+        form is ever generated. Insert-if-absent keyed on
+        (case_id, relationship, full_name) so re-saves never duplicate or churn
+        ids (``case_forms.dependent_id`` stays stable). No-op when the canonical
+        ``public.cases`` row doesn't exist yet (FK) or there is no family.
+        """
+        cid = (canonical_case_id or "").strip()
+        if not cid:
+            return
+        fam = (draft or {}).get("familyMembers") or (draft or {}).get("family") or {}
+        if not isinstance(fam, dict):
+            return
+        members: List[Any] = []  # (relationship, full_name, nationality, dob)
+        sp = fam.get("spouse")
+        if isinstance(sp, dict):
+            members.append((
+                "spouse",
+                (str(sp.get("fullName") or sp.get("full_name") or "").strip() or "Spouse"),
+                sp.get("nationality"),
+                sp.get("dateOfBirth") or sp.get("date_of_birth"),
+            ))
+        kids = fam.get("children")
+        if isinstance(kids, list):
+            for i, c in enumerate(kids):
+                if not isinstance(c, dict):
+                    continue
+                members.append((
+                    "child",
+                    (str(c.get("fullName") or c.get("full_name") or "").strip() or f"Child {i + 1}"),
+                    c.get("nationality"),
+                    c.get("dateOfBirth") or c.get("date_of_birth"),
+                ))
+        if not members:
+            return
+        cases_tbl = "cases" if _is_sqlite else "public.cases"
+        dep_tbl = "case_dependents" if _is_sqlite else "public.case_dependents"
+        try:
+            with self.engine.begin() as conn:
+                exists = conn.execute(
+                    text(f"SELECT 1 FROM {cases_tbl} WHERE CAST(id AS TEXT) = :c LIMIT 1"), {"c": cid}
+                ).first()
+                if not exists:
+                    return  # canonical case not materialized yet — sync on a later patch
+                for rel, name, nat, dob in members:
+                    already = conn.execute(
+                        text(
+                            f"SELECT 1 FROM {dep_tbl} WHERE CAST(case_id AS TEXT) = :c "
+                            "AND relationship = :rel AND full_name = :name LIMIT 1"
+                        ),
+                        {"c": cid, "rel": rel, "name": name},
+                    ).first()
+                    if already:
+                        continue
+                    dep_id = str(uuid.uuid4())
+                    dob_val = (str(dob).strip() or None) if dob else None
+                    if _is_sqlite:
+                        conn.execute(
+                            text(
+                                f"INSERT INTO {dep_tbl} (id, case_id, relationship, full_name, nationality, date_of_birth, created_at) "
+                                "VALUES (:id, :c, :rel, :name, :nat, :dob, :now)"
+                            ),
+                            {"id": dep_id, "c": cid, "rel": rel, "name": name, "nat": nat,
+                             "dob": dob_val, "now": datetime.utcnow().isoformat()},
+                        )
+                    else:
+                        conn.execute(
+                            text(
+                                f"INSERT INTO {dep_tbl} (id, case_id, relationship, full_name, nationality, date_of_birth, created_at) "
+                                "VALUES (CAST(:id AS uuid), CAST(:c AS uuid), :rel, :name, :nat, CAST(NULLIF(:dob,'') AS date), now())"
+                            ),
+                            {"id": dep_id, "c": cid, "rel": rel, "name": name, "nat": nat, "dob": (dob_val or "")},
+                        )
+        except Exception:
+            log.exception("case-dependents sync: failed case=%s", cid)
 
     def _resolve_employee_profile_id(self, assignment: Dict[str, Any]) -> Optional[str]:
         """Resolve the employee's ``profiles.id`` for ``public.cases.employee_id``
