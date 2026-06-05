@@ -7086,6 +7086,54 @@ class Database:
             log.exception("canonical-case bridge: employee profile resolution failed")
         return None
 
+    def _resolve_canonical_case_company(
+        self,
+        canonical_case_id: str,
+        assignment: Dict[str, Any],
+        employee_uuid: Optional[str] = None,
+    ) -> Optional[str]:
+        """Resolve the ``company_id`` (FK to ``companies``) for the canonical case.
+
+        ``relocation_cases.company_id`` is the primary source (HR-create writes it),
+        but resolving from it alone makes the bridge a single point of failure: a
+        case whose ``relocation_cases`` row is missing or lacks a company (e.g.
+        created through a different path) never materializes a canonical case and so
+        never renders a roadmap/dossier. Fall back to the assignment's HR user
+        (``hr_users``) and then the employee profile — the same multi-path tenant
+        resolution used elsewhere. Returns None only when no source has a company.
+        """
+        cand = (canonical_case_id or "").strip()
+        # 1. relocation_cases (denormalized by HR-create).
+        if cand:
+            try:
+                with self.engine.connect() as conn:
+                    r = conn.execute(
+                        text("SELECT company_id FROM relocation_cases WHERE CAST(id AS TEXT) = :id"),
+                        {"id": cand},
+                    ).mappings().first()
+                if r and r.get("company_id"):
+                    return str(r["company_id"]).strip()
+            except Exception:
+                log.exception("canonical-case bridge: relocation_cases company lookup failed case=%s", cand)
+        # 2. The assignment's HR user -> hr_users.
+        hr_uid = str((assignment or {}).get("hr_user_id") or "").strip()
+        if hr_uid:
+            try:
+                cid = self.get_hr_company_id(hr_uid)
+                if cid:
+                    return str(cid).strip()
+            except Exception:
+                log.exception("canonical-case bridge: hr_users company lookup failed hr=%s", hr_uid)
+        # 3. The employee's own profile.
+        if employee_uuid:
+            try:
+                prof = self.get_profile_record(employee_uuid)
+                if prof and prof.get("company_id"):
+                    return str(prof["company_id"]).strip()
+            except Exception:
+                log.exception("canonical-case bridge: profile company lookup failed emp=%s", employee_uuid)
+        return None
+
     def _ensure_canonical_case_from_wizard(
         self, case_id: str, derived: Dict[str, Any], assignment: Dict[str, Any]
     ) -> None:
@@ -7111,17 +7159,7 @@ class Database:
         if not dest or not employee_uuid:
             return  # trigger needs a destination; public.cases needs a profile employee_id
         canonical = str(assignment.get("canonical_case_id") or case_id).strip()
-        company_id = None
-        try:
-            with self.engine.connect() as conn:
-                r = conn.execute(
-                    text("SELECT company_id FROM relocation_cases WHERE CAST(id AS TEXT) = :id"),
-                    {"id": canonical},
-                ).mappings().first()
-            company_id = str(r["company_id"]).strip() if r and r.get("company_id") else None
-        except Exception:
-            log.exception("canonical-case bridge: company lookup failed case=%s", case_id)
-            return
+        company_id = self._resolve_canonical_case_company(canonical, assignment, employee_uuid)
         if not company_id:
             return
         origin = (derived.get("origin_country") or "").strip()
@@ -16783,17 +16821,24 @@ class Database:
                 )
 
     def get_company_id_for_assignment_id(self, assignment_id: str) -> Optional[str]:
-        """Resolve relocation_cases.company_id linked to a case_assignments row (if bridged)."""
+        """Resolve the company_id linked to a case_assignments row.
+
+        Primary source is the joined ``relocation_cases.company_id``; falls back to
+        the assignment's HR user (``hr_users``) so an assignment whose
+        ``relocation_cases`` row is missing/lacks a company still resolves a tenant
+        (mirrors the canonical-case bridge — employee benefits/exceptions depend on
+        this and otherwise 400/403 for such cases)."""
         aid = (assignment_id or "").strip()
         if not aid:
             return None
         join_on = _relocation_cases_join_on("a", style="standard")
+        row = None
         try:
             with self.engine.connect() as conn:
                 row = conn.execute(
                     text(
                         f"""
-                        SELECT rc.company_id AS company_id
+                        SELECT rc.company_id AS company_id, a.hr_user_id AS hr_user_id
                         FROM case_assignments a
                         LEFT JOIN relocation_cases rc ON {join_on}
                         WHERE a.id = :aid
@@ -16801,13 +16846,23 @@ class Database:
                         """
                     ),
                     {"aid": aid},
-                ).fetchone()
+                ).mappings().first()
         except Exception:
             return None
         if not row:
             return None
-        cid = row._mapping.get("company_id") if hasattr(row, "_mapping") else dict(row).get("company_id")
-        return str(cid).strip() if cid else None
+        cid = row.get("company_id")
+        if cid and str(cid).strip():
+            return str(cid).strip()
+        hr_uid = str(row.get("hr_user_id") or "").strip()
+        if hr_uid:
+            try:
+                hc = self.get_hr_company_id(hr_uid)
+                if hc:
+                    return str(hc).strip()
+            except Exception:
+                log.exception("get_company_id_for_assignment_id: hr_users fallback failed hr=%s", hr_uid)
+        return None
 
     # ==================================================================
     # Debug KV operations

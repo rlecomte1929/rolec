@@ -130,5 +130,45 @@ _REPO_ROOT = __import__("os").path.dirname(
 )
 
 
+class CanonicalCaseBridgeCompanyFallbackGuardTests(unittest.TestCase):
+    """Source guard for the company-resolution fallback chain (PR #394).
+
+    The bridge (_ensure_canonical_case_from_wizard) and
+    get_company_id_for_assignment_id must not resolve company_id from
+    relocation_cases ALONE — a case whose relocation_cases row is missing/lacks a
+    company otherwise never materializes a canonical row (empty roadmap/dossier)
+    and 400/403s employee benefits/exceptions. Behavior is verified live; the
+    conftest replaces backend.database.db with a MagicMock and SQLite lacks the
+    CHECK constraints, so a functional test is impractical here — guard at source,
+    same as CanonicalCaseEnumGuardTests.
+    """
+
+    def _src(self, marker: str) -> str:
+        import os
+        path = os.path.join(_REPO_ROOT, "backend", "database.py")
+        with open(path, "r", encoding="utf-8") as fh:
+            src = fh.read()
+        start = src.index(marker)
+        end = src.index("\n    def ", start + 1)
+        return src[start:end]
+
+    def test_resolver_has_relocation_hr_and_profile_fallbacks(self) -> None:
+        body = self._src("def _resolve_canonical_case_company")
+        self.assertIn("relocation_cases", body)
+        self.assertIn("get_hr_company_id", body)
+        self.assertIn("get_profile_record", body)
+
+    def test_bridge_uses_the_multipath_resolver(self) -> None:
+        body = self._src("def _ensure_canonical_case_from_wizard")
+        self.assertIn("_resolve_canonical_case_company", body)
+        # No longer a relocation_cases-only company lookup inside the bridge.
+        self.assertNotIn("SELECT company_id FROM relocation_cases", body)
+
+    def test_assignment_company_lookup_has_hr_fallback(self) -> None:
+        body = self._src("def get_company_id_for_assignment_id")
+        self.assertIn("get_hr_company_id", body)
+        self.assertIn("hr_user_id", body)
+
+
 if __name__ == "__main__":
     unittest.main()
