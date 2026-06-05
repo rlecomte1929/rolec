@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ReloPass Pre-Campaign Check  v1.0
+ReloPass Pre-Campaign Check  v1.1
 ===================================
 Pre-flight validation before launching a test campaign. Verifies that:
   1. API endpoints are reachable (platform health check)
@@ -8,6 +8,10 @@ Pre-flight validation before launching a test campaign. Verifies that:
   3. All test IDs in scoring_map.json have a corresponding scenario step or standalone test
   4. No stale "previous campaign" lock conflict (campaigns.json integrity)
   5. Environment variables required by the E2E runner are set
+  6. Demo/seed personas are provisioned in dependency order (SKILL.md Phase 0.5)
+     — catches the class where the runner is green (fresh, company-linked accounts)
+     while the demo accounts used for sales/pilots are broken (e.g. HR with no
+     company link → policy 400). A broken HR↔company link fails the pre-flight.
 
 Run this before every campaign to catch configuration drift early.
 
@@ -306,6 +310,105 @@ def check_campaigns_registry(r):
         r.warn(f"Campaign IDs are not sequential: {ids}")
 
 
+# ── Phase 0.5: persona precondition checks ────────────────────────────────────
+# The demo/seed accounts are what real demos + pilots log in as; their health is a
+# P0 precondition. The automated runner mints fresh, perfectly-provisioned accounts,
+# so it stays green while these drift. Overridable via env for non-default envs.
+DEMO_HR_EMAIL     = os.environ.get("RELOPASS_DEMO_HR_EMAIL",     "hr@testingapril.com")
+DEMO_HR_PASSWORD  = os.environ.get("RELOPASS_DEMO_HR_PASSWORD",  "HrPass!1")
+DEMO_EMP_EMAIL    = os.environ.get("RELOPASS_DEMO_EMP_EMAIL",    "employee@testingapril.com")
+DEMO_EMP_PASSWORD = os.environ.get("RELOPASS_DEMO_EMP_PASSWORD", "EmpPass!1")
+
+
+def _http_json(method, path, token=None, body=None, timeout=10):
+    """Minimal API call. Returns (status:int, text:str); status=0 on transport error."""
+    url = path if path.startswith("http") else f"{API_BASE}{path}"
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("User-Agent", "ReloPass-PreCampaignCheck/1.1")
+    if body is not None:
+        req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        body_txt = e.read().decode("utf-8", "replace") if e.fp else ""
+        return e.code, body_txt
+    except Exception as e:  # URLError, timeout, etc.
+        return 0, str(e)
+
+
+def _login(email, password):
+    """POST /api/auth/login. Returns (token|None, detail)."""
+    status, text = _http_json("POST", "/api/auth/login",
+                              body={"identifier": email, "password": password})
+    if status == 0:
+        return None, f"transport error: {text}"
+    if status != 200:
+        return None, f"HTTP {status}"
+    try:
+        payload = json.loads(text)
+        tok = payload.get("token") or payload.get("access_token")
+    except json.JSONDecodeError:
+        tok = None
+    return (tok, "ok") if tok else (None, "no token in response")
+
+
+def check_persona_preconditions(r, skip_api):
+    """Phase 0.5 — verify demo/seed personas in dependency order.
+
+    Dependency chain: company → HR linked to company → cases → employee. We assert
+    the demo accounts (what sales/pilots log in as) are healthy at each link. The
+    HR↔company check is the one that would have caught the missing hr_users link
+    that 400'd every policy endpoint while the runner stayed green.
+    """
+    r.section("6. Persona preconditions (dependency order)")
+
+    if skip_api:
+        r.warn("Persona precondition checks skipped (--skip-api flag)")
+        return
+
+    # ── HR persona: login → company link → cases ──
+    hr_token, detail = _login(DEMO_HR_EMAIL, DEMO_HR_PASSWORD)
+    if not hr_token:
+        r.error(f"HR demo login failed ({DEMO_HR_EMAIL}): {detail} "
+                f"— set RELOPASS_DEMO_HR_EMAIL/PASSWORD if creds changed")
+    else:
+        r.ok(f"HR demo login OK ({DEMO_HR_EMAIL})")
+
+        # THE check: HR ↔ company. A missing hr_users link → 400 on every policy
+        # endpoint (the exact prod break this section exists to catch).
+        status, body = _http_json("GET", "/api/hr/policy-config", token=hr_token)
+        if status == 400 and "company association" in body.lower():
+            r.error(f"HR demo has NO company association ({DEMO_HR_EMAIL}) — hr_users "
+                    f"link missing; every HR policy endpoint 400s. Seed "
+                    f"hr_users(profile_id, company_id) before running (SKILL.md Phase 0.5).")
+        elif status == 200:
+            r.ok("HR ↔ company link OK (policy-config → 200)")
+        else:
+            r.warn(f"HR policy-config → {status} (expected 200)")
+
+        status, _ = _http_json("GET", "/api/hr/cases", token=hr_token)
+        if status == 200:
+            r.ok("HR cases endpoint OK (→ 200)")
+        else:
+            r.warn(f"HR /api/hr/cases → {status} (expected 200)")
+
+    # ── Employee persona: login → assignments overview ──
+    emp_token, detail = _login(DEMO_EMP_EMAIL, DEMO_EMP_PASSWORD)
+    if not emp_token:
+        r.error(f"Employee demo login failed ({DEMO_EMP_EMAIL}): {detail}")
+    else:
+        r.ok(f"Employee demo login OK ({DEMO_EMP_EMAIL})")
+        status, _ = _http_json("GET", "/api/employee/assignments/overview", token=emp_token)
+        if status == 200:
+            r.ok("Employee assignments overview OK (→ 200)")
+        else:
+            r.warn(f"Employee /api/employee/assignments/overview → {status} (expected 200)")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="ReloPass Pre-Campaign Check")
@@ -314,7 +417,7 @@ def main():
     args = parser.parse_args()
 
     print()
-    print(f"  {BOLD}ReloPass Pre-Campaign Check  v1.0{RESET}")
+    print(f"  {BOLD}ReloPass Pre-Campaign Check  v1.1{RESET}")
     print(f"  {GREY}Run: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}{RESET}")
 
     r = CheckResults()
@@ -324,6 +427,7 @@ def main():
     check_api(r, skip_api=args.skip_api)
     check_scoring_map_consistency(r)
     check_campaigns_registry(r)
+    check_persona_preconditions(r, skip_api=args.skip_api)
 
     r.summary()
 
