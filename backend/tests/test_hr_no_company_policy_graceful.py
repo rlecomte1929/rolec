@@ -118,5 +118,31 @@ class EmptyPayloadServiceTests(unittest.TestCase):
         )
 
 
+class EmployeeCompanyResolutionTests(unittest.TestCase):
+    """_resolve_employee_company_id falls back to the case assignment when the
+    profile isn't resolvable — a legacy/seed employee's non-UUID id can't look up
+    the uuid-keyed profiles row, so the company came back empty (400 'Employee
+    missing company' on the benefits/policy view)."""
+
+    def setUp(self) -> None:
+        from backend.app.routers import policy_config
+        self.mod = policy_config
+
+    def test_resolves_via_profile_when_present(self) -> None:
+        with patch.object(self.mod.db, "get_profile_record", return_value={"company_id": "co-x"}):
+            self.assertEqual(self.mod._resolve_employee_company_id({"id": "uuid-emp"}), "co-x")
+
+    def test_falls_back_to_assignment_for_legacy_id(self) -> None:
+        with patch.object(self.mod.db, "get_profile_record", return_value=None), \
+             patch.object(self.mod.db, "get_assignment_for_employee", return_value={"id": "asgn-1"}), \
+             patch.object(self.mod.db, "get_company_id_for_assignment_id", return_value="co-1"):
+            self.assertEqual(self.mod._resolve_employee_company_id({"id": "seed-emp-testingapril"}), "co-1")
+
+    def test_none_when_no_profile_and_no_assignment(self) -> None:
+        with patch.object(self.mod.db, "get_profile_record", return_value=None), \
+             patch.object(self.mod.db, "get_assignment_for_employee", return_value=None):
+            self.assertIsNone(self.mod._resolve_employee_company_id({"id": "ghost"}))
+
+
 if __name__ == "__main__":
     unittest.main()

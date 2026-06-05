@@ -57,6 +57,23 @@ def _get_hr_company_id(user: Dict[str, Any]) -> Optional[str]:
     return profile.get("company_id") if profile else None
 
 
+def _resolve_employee_company_id(user: Dict[str, Any]) -> Optional[str]:
+    """Resolve company_id for an employee. Profile first (uuid-native employees),
+    then via their case assignment — a legacy/seed employee's non-UUID id can't
+    look up the uuid-keyed profiles row, but case_assignments.employee_user_id
+    carries that id, so the company is recoverable from the assignment."""
+    uid = user.get("id")
+    if not uid:
+        return None
+    profile = db.get_profile_record(uid)
+    if profile and profile.get("company_id"):
+        return profile.get("company_id")
+    assignment = db.get_assignment_for_employee(uid, request_id=None)
+    if assignment:
+        return db.get_company_id_for_assignment_id(str(assignment.get("id")))
+    return None
+
+
 def _require_company_for_user(user: Dict[str, Any]) -> Dict[str, Any]:
     profile = db.get_profile_record(user.get("id")) or {}
     company_id = _get_hr_company_id(user) if user.get("role") == UserRole.HR.value else profile.get("company_id")
@@ -132,8 +149,7 @@ def _policy_matrix_resolve_company_caps(
                 raise HTTPException(status_code=403, detail="Case not in your company")
         return cid
     if role == UserRole.EMPLOYEE.value:
-        prof = db.get_profile_record(user.get("id")) or {}
-        cid = prof.get("company_id")
+        cid = _resolve_employee_company_id(user)
         if not cid:
             raise HTTPException(status_code=400, detail="Employee missing company")
         if assignment_id:
@@ -716,8 +732,7 @@ def employee_get_policy_config(
     user: Dict[str, Any] = Depends(require_role(UserRole.EMPLOYEE)),
 ):
     effective = _effective_user(user, UserRole.EMPLOYEE)
-    prof = db.get_profile_record(effective.get("id")) or {}
-    cid = prof.get("company_id")
+    cid = _resolve_employee_company_id(effective)
     if not cid:
         raise HTTPException(status_code=400, detail="Employee missing company")
     atype, fstat = assignment_type, family_status
