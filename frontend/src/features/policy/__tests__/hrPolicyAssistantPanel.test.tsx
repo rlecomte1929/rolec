@@ -9,6 +9,7 @@ import {
   HR_POLICY_ASSISTANT_TRUST_PILL,
 } from '../hrPolicyAssistantCopy';
 import type { PolicyAssistantAnswer } from '../../../types/policyAssistant';
+import { ragResponseToHrResponse } from '../../../api/policyAssistantRagAdapter';
 
 const postPolicyAssistantQuery = vi.fn();
 
@@ -165,5 +166,68 @@ describe('HrPolicyAssistantPanel', () => {
     await waitFor(() => expect(screen.getByText(/no policy answer/i)).toBeInTheDocument());
     expect(screen.getByText(/within-policy examples/i)).toBeInTheDocument();
     expect(screen.getByText('What do employees see for temporary housing?')).toBeInTheDocument();
+  });
+
+  // ── AIQ-833 / F2: end-to-end render through the REAL RAG adapter ──────────
+  // Feeds the actual flat RAG payload through ragResponseToHrResponse and
+  // renders it in the real panel — the deterministic stand-in for the browser
+  // smoke (criteria 2, 4, 6).
+
+  it('RAG cutover: a grounded answer renders inline citation + Source reference', async () => {
+    postPolicyAssistantQuery.mockResolvedValue(
+      ragResponseToHrResponse(
+        {
+          answer_text: 'Housing allowance is 2000 EUR/month [chunk:c1].',
+          answer_kind: 'answer',
+          cited_chunks: [
+            {
+              id: 'c1',
+              source_type: 'matrix_benefit',
+              source_ref: 'policy_config_benefits.b1',
+              chunk_text: 'Housing cap is 2000 EUR per month.',
+            },
+          ],
+          audit_id: 'audit-1',
+        },
+        'pol-1'
+      )
+    );
+    render(<HrPolicyAssistantPanel policyId="pol-1" />);
+    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
+      target: { value: 'What is the housing allowance?' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    const region = await screen.findByRole('region', { name: /HR policy answer/i });
+    expect(within(region).getByText(/housing allowance is 2000 eur\/month/i)).toBeInTheDocument();
+    // Citation chip derived from the [chunk:c1] token + cited_chunks lookup.
+    expect(within(region).getByTestId('policy-evidence-citation')).toBeInTheDocument();
+    // Source reference section populated from cited_chunks via the adapter.
+    expect(within(region).getByText(/source reference/i)).toBeInTheDocument();
+    expect(within(region).getByText(/housing cap is 2000 eur per month/i)).toBeInTheDocument();
+  });
+
+  it('RAG cutover: a refusal renders the exact engine copy', async () => {
+    postPolicyAssistantQuery.mockResolvedValue(
+      ragResponseToHrResponse(
+        {
+          answer_text: "I don't see this in your company's policy. Check with your HR team.",
+          answer_kind: 'refusal_out_of_policy',
+          cited_chunks: [],
+          audit_id: 'audit-2',
+        },
+        'pol-1'
+      )
+    );
+    render(<HrPolicyAssistantPanel policyId="pol-1" />);
+    fireEvent.change(screen.getByPlaceholderText(/employees see for shipment/i), {
+      target: { value: 'give me legal advice' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^ask$/i }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(/i don't see this in your company's policy\. check with your hr team\./i)
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByText(/no policy answer/i)).toBeInTheDocument();
   });
 });
