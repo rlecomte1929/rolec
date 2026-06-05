@@ -4270,6 +4270,19 @@ def assign_case(
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
 
+        # SECURITY: company-scoped — same boundary as GET /api/hr/cases/{id} (B5).
+        # An HR may only assign on a case owned by their own company (or one they
+        # own). A case with no company_id yet is unowned and is claimed by the
+        # assigning HR below, so only enforce when the case already has a company.
+        # 404 (not 403) so we don't leak case existence across tenants.
+        if not effective.get("is_admin"):
+            case_company = case.get("company_id")
+            if case_company and not (
+                (hr_company_id and hr_company_id == case_company)
+                or (effective.get("id") and effective.get("id") == case.get("hr_user_id"))
+            ):
+                raise HTTPException(status_code=404, detail="Case not found")
+
         if not case.get("company_id"):
             db.upsert_relocation_case(
                 case_id=case_id,
