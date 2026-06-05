@@ -5648,6 +5648,7 @@ def review_employee_task(
     - action: 'approved' or 'revision_requested'
     - Only acts on tasks in status 'submitted'; idempotent otherwise.
     """
+    _assert_hr_can_mutate_case(case_id, user)  # tenant scope
     if body.action not in ("approved", "revision_requested"):
         raise HTTPException(status_code=400, detail="action must be 'approved' or 'revision_requested'")
 
@@ -5685,6 +5686,7 @@ def create_case_task_for_hr(
     - employee_id: the employee's auth user ID (must be linked to this case)
     - Starts in status 'pending'
     """
+    _assert_hr_can_mutate_case(case_id, user)  # tenant scope
     VALID_TYPES = {"document_upload", "address_confirmation", "acknowledgment", "selection", "custom"}
     if body.task_type not in VALID_TYPES:
         raise HTTPException(status_code=400, detail=f"task_type must be one of {sorted(VALID_TYPES)}")
@@ -7279,6 +7281,29 @@ def _hr_can_access_assignment(assignment: Dict[str, Any], user: Dict[str, Any]) 
         return True
     hr_company = _get_hr_company_id(effective)
     return bool(hr_company and db.assignment_belongs_to_company(assignment.get("id", ""), hr_company))
+
+
+def _assert_hr_can_mutate_case(case_id: str, user: Dict[str, Any]) -> None:
+    """Raise 404 unless the HR (or admin) may mutate this case — the same
+    company boundary as GET /api/hr/cases/{id}. Resolves via the case's
+    assignment first (covers HR-owner + company), then the canonical case's
+    company_id. 404 (not 403) so we don't leak case existence across tenants.
+    Use on every case-scoped HR mutation endpoint."""
+    effective = _effective_user(user, UserRole.HR)
+    if effective.get("is_admin"):
+        return
+    assignment = db.get_assignment_by_case_id(case_id)
+    if assignment and _hr_can_access_assignment(assignment, user):
+        return
+    case = db.get_case_by_id(case_id)
+    if case:
+        hr_company = _get_hr_company_id(effective)
+        uid = effective.get("id")
+        if (hr_company and hr_company == case.get("company_id")) or (
+            uid and uid == case.get("hr_user_id")
+        ):
+            return
+    raise HTTPException(status_code=404, detail="Case not found")
 
 
 def _require_company_for_user(user: Dict[str, Any]) -> Dict[str, Any]:
@@ -10605,6 +10630,8 @@ def update_assignment_identifier(
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):  # tenant scope
+        raise HTTPException(status_code=404, detail="Assignment not found")
 
     identifier = request.employeeIdentifier.strip()
     if not identifier:
@@ -10619,6 +10646,8 @@ def run_compliance(assignment_id: str, user: Dict[str, Any] = Depends(require_ro
     _deny_if_impersonating(user)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):  # tenant scope
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     profile = db.get_employee_profile(assignment_id)
@@ -10649,6 +10678,8 @@ def hr_decision(assignment_id: str, request: HRAssignmentDecision, user: Dict[st
     effective = _effective_user(user, UserRole.HR)
     assignment = db.get_assignment_by_id(assignment_id)
     if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):  # tenant scope
         raise HTTPException(status_code=404, detail="Assignment not found")
     case_id = assignment.get("case_id") or ""
 
@@ -13413,6 +13444,8 @@ def create_policy_exception(
     assignment = db.get_assignment_by_case_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):  # tenant scope
+        raise HTTPException(status_code=404, detail="Assignment not found")
     if not request.category:
         raise HTTPException(status_code=400, detail="Category required")
     exception_id = str(uuid.uuid4())
@@ -13466,6 +13499,8 @@ def run_case_compliance(case_id: str, user: Dict[str, Any] = Depends(require_rol
     assignment = db.get_assignment_by_id(case_id)
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):  # tenant scope
+        raise HTTPException(status_code=404, detail="Assignment not found")
     profile = db.get_employee_profile(case_id)
     if not profile:
         profile = RelocationProfile(userId=case_id).model_dump()
@@ -13487,6 +13522,8 @@ def record_compliance_action(
     _deny_if_impersonating(user)
     assignment = db.get_assignment_by_id(case_id)
     if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not _hr_can_access_assignment(assignment, user):  # tenant scope
         raise HTTPException(status_code=404, detail="Assignment not found")
     if not request.checkId or not request.actionType:
         raise HTTPException(status_code=400, detail="Missing action details")
