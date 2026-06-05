@@ -96,5 +96,39 @@ class AssignmentBasedCaseAccessTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 404)
 
 
+class CanonicalCaseEnumGuardTests(unittest.TestCase):
+    """Source guard for the bridge's public.cases enum values.
+
+    public.cases enforces CHECK constraints — status in (draft, active, on_hold,
+    completed, cancelled), stage in (discovery, dossier, roadmap, in_progress,
+    closing, closed). The first cut of the bridge inserted 'created'/'intake',
+    which failed the CHECK (silently, fail-safe) so no canonical row was created
+    and the trigger generated no forms (empty roadmap/dossier). SQLite has no
+    CHECK constraints, so an integration test can't catch this — guard at source.
+    """
+
+    def _bridge_source(self) -> str:
+        import os
+        path = os.path.join(_REPO_ROOT, "backend", "database.py")
+        with open(path, "r", encoding="utf-8") as fh:
+            src = fh.read()
+        start = src.index("def _ensure_canonical_case_from_wizard")
+        end = src.index("\n    def ", start + 1)
+        return src[start:end]
+
+    def test_bridge_uses_valid_status_and_stage(self) -> None:
+        body = self._bridge_source()
+        self.assertIn("'active', 'discovery'", body,
+                      "bridge must seed a valid status/stage for public.cases")
+        for bad in ("'created', 'intake'", "'created',", "'intake',"):
+            self.assertNotIn(bad, body,
+                             f"{bad} violates the public.cases status/stage CHECK constraints")
+
+
+_REPO_ROOT = __import__("os").path.dirname(
+    __import__("os").path.dirname(__import__("os").path.dirname(__file__))
+)
+
+
 if __name__ == "__main__":
     unittest.main()
