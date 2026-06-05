@@ -342,5 +342,56 @@ class ExceptionRequestRouterTests(unittest.TestCase):
         self.assertEqual(rows[0]["organization_id"], company_a)
 
 
+class CallerCompanyResolutionTests(unittest.TestCase):
+    """`_caller_company_id` must resolve legacy (non-UUID) ids that have no
+    profile.company_id and no `company` token claim — the bug that 403'd the
+    demo HR account. Resolution order: profile → token → hr_users → assignment.
+    """
+
+    def _call(self, user):
+        return router_module._caller_company_id(user)
+
+    def test_profile_company_id_wins(self):
+        with mock.patch.object(
+            router_module.db, "get_profile_record",
+            return_value={"id": "u", "company_id": "comp-profile"},
+        ):
+            self.assertEqual(self._call({"id": "u"}), "comp-profile")
+
+    def test_token_company_used_when_no_profile(self):
+        with mock.patch.object(router_module.db, "get_profile_record", return_value=None):
+            self.assertEqual(self._call({"id": "u", "company": "comp-token"}), "comp-token")
+
+    def test_legacy_hr_resolves_via_hr_users(self):
+        # No profile.company_id, no token company → hr_users link resolves it.
+        with mock.patch.object(router_module.db, "get_profile_record", return_value=None), \
+             mock.patch.object(router_module.db, "get_hr_company_id", return_value="comp-hr") as ghc:
+            self.assertEqual(self._call({"id": "seed-hr-testingapril"}), "comp-hr")
+            ghc.assert_called_once_with("seed-hr-testingapril")
+
+    def test_legacy_employee_resolves_via_assignment(self):
+        with mock.patch.object(router_module.db, "get_profile_record", return_value=None), \
+             mock.patch.object(router_module.db, "get_hr_company_id", return_value=None), \
+             mock.patch.object(
+                 router_module.db, "get_assignment_for_employee", return_value={"id": "asg-1"}
+             ), \
+             mock.patch.object(
+                 router_module.db, "get_company_id_for_assignment_id", return_value="comp-asg"
+             ):
+            self.assertEqual(self._call({"id": "seed-emp-testingapril"}), "comp-asg")
+
+    def test_lookup_failure_degrades_to_403_not_500(self):
+        with mock.patch.object(router_module.db, "get_profile_record", return_value=None), \
+             mock.patch.object(
+                 router_module.db, "get_hr_company_id", side_effect=Exception("no hr_users table")
+             ), \
+             mock.patch.object(
+                 router_module.db, "get_assignment_for_employee", side_effect=Exception("boom")
+             ):
+            with self.assertRaises(HTTPException) as ctx:
+                self._call({"id": "u"})
+            self.assertEqual(ctx.exception.status_code, 403)
+
+
 if __name__ == "__main__":
     unittest.main()
