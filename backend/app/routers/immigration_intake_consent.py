@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,6 +20,7 @@ from sqlalchemy import text
 from ..auth_deps import get_current_user, get_org_id_for_hr_user, require_admin_or_hr
 from ...database import db
 from ..services.immigration_requirement_service import (
+    RiskFlag,
     evaluate_risks,
     get_requirements,
     get_timeline_days,
@@ -26,6 +28,7 @@ from ..services.immigration_requirement_service import (
 from ..services.immigration_service import (
     _check_consent,
     _get_case_details,
+    _load_profile_for_case,
     _log_access,
     _now_iso,
 )
@@ -46,6 +49,59 @@ class WithdrawConsentBody(BaseModel):
 router = APIRouter(prefix="/api", tags=["immigration-intake-consent"])
 
 
+def _uncovered_response(
+    corridor_from: Optional[str],
+    corridor_to: Optional[str],
+    visa_type: str,
+) -> Dict[str, Any]:
+    """
+    Structured fail-closed payload for a corridor we cannot answer for —
+    either the case has no origin/destination geography, or the corridor ×
+    visa_type combination is not seeded in immigration_requirements.
+
+    Returns HTTP 200 (graceful degrade) with covered=False so the caller can
+    distinguish "no coverage" from a real, populated checklist. Never emits a
+    default corridor or a default timeline — that silent FR→DE fallback was the
+    bug this guards against (AIQ-832 / F1).
+    """
+    corridor = (
+        f"{corridor_from}→{corridor_to}"
+        if corridor_from and corridor_to
+        else None
+    )
+    return {
+        "covered": False,
+        "coverage_reason": "corridor_not_supported",
+        "corridor": corridor,
+        "corridor_from": corridor_from,
+        "corridor_to": corridor_to,
+        "visa_type": visa_type,
+        "requirements": [],
+        "risk_flags": [],
+        "estimated_timeline_days": None,
+        "document_count": 0,
+    }
+
+
+def _log_view_access(case_id: str, hr_user: Dict[str, Any]) -> None:
+    """
+    Record an immigration-requirements view in the access audit trail.
+
+    The fail-closed paths return before any employee profile is loaded, so
+    profile_id is None — but the access still happened and must be logged, just
+    as the covered path logs it (parity preserved from before the fail-closed
+    early returns were added).
+    """
+    _log_access(
+        case_id=case_id,
+        profile_id=None,
+        user_id=hr_user["id"],
+        role="hr",
+        action="view",
+        fields=["immigration_requirements"],
+    )
+
+
 @router.get("/hr/cases/{case_id}/immigration-requirements")
 def get_immigration_requirements(
     case_id: str,
@@ -61,17 +117,27 @@ def get_immigration_requirements(
     Corridor can be passed explicitly or derived from the case record.
     Also returns risk flags if an employee_profile exists for the case.
     """
-    # Derive corridor from case if not supplied
+    # Derive corridor from the case when not supplied — with NO silent country
+    # defaults. A case lacking origin/destination geography fails closed rather
+    # than resolving to the previously hardcoded FR→DE fallback corridor (AIQ-832).
     if not corridor_from or not corridor_to:
         case = _get_case_details(case_id, org_id)
         if case:
-            corridor_from = corridor_from or case.get("origin_country") or "FR"
-            corridor_to = corridor_to or case.get("dest_country") or "DE"
-        else:
-            corridor_from = corridor_from or "FR"
-            corridor_to = corridor_to or "DE"
+            corridor_from = corridor_from or case.get("origin_country")
+            corridor_to = corridor_to or case.get("dest_country")
+
+    # Fail closed: missing geography cannot be answered authoritatively.
+    if not corridor_from or not corridor_to:
+        _log_view_access(case_id, hr_user)
+        return _uncovered_response(corridor_from, corridor_to, visa_type)
 
     requirements = get_requirements(corridor_from, corridor_to, visa_type, employee_type)
+
+    # Fail closed: an unseeded corridor returns no rows — report it as such
+    # instead of an empty checklist that looks like "nothing required".
+    if not requirements:
+        _log_view_access(case_id, hr_user)
+        return _uncovered_response(corridor_from, corridor_to, visa_type)
 
     # Load employee profile if available for risk evaluation
     employee_profile = _load_profile_for_case(case_id)
@@ -104,6 +170,9 @@ def get_immigration_requirements(
     )
 
     return {
+        "covered": True,
+        "coverage_reason": None,
+        "corridor": f"{corridor_from}→{corridor_to}",
         "corridor_from": corridor_from,
         "corridor_to": corridor_to,
         "visa_type": visa_type,
