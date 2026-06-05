@@ -11,12 +11,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Detect which areas changed so we run only the jobs that matter for this diff.
+  # Most PRs touch a single layer; skipping the others is the bulk of the
+  # Actions-minute savings. No required status checks are configured on this repo,
+  # so a skipped job is safe — it simply does not run (and does not block merge).
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+      hr_dashboard: ${{ steps.filter.outputs.hr_dashboard }}
+      migrations: ${{ steps.filter.outputs.migrations }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+              - 'scripts/**'
+            hr_dashboard:
+              - 'apps/hr-dashboard/**'
+            migrations:
+              - 'supabase/migrations/**'
+            workflows:
+              - '.github/workflows/**'
+
   actionlint:
     # Catches workflow YAML errors (bad `uses:` refs, secrets.* in job-level
     # `if:`, broken matrix syntax, etc.) on PRs — before they reach main and
     # cause the 0-second "workflow file issue" parse failure that blocks every
     # subsequent push. Background: PR #134.
     name: Actionlint (workflow YAML)
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +60,8 @@ jobs:
 
   frontend-build:
     name: Frontend build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,11 +89,74 @@ jobs:
             exit 1
           fi
 
+  # Frontend type-check + lint. Moved here from autofix-ci.yml (DEV-LOOP-2C) so a
+  # single workflow covers the frontend and the autofix workflow no longer
+  # double-runs on every push/PR. Same check name as before.
+  frontend-checks:
+    name: TypeScript & ESLint
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        # Non-blocking until the AIQ-397 (no-clickable-div) + AIQ-398 (no-console)
+        # cleanup sprints drain the pre-existing violations. Flip to blocking
+        # (`continue-on-error: false`) once they reach 0.
+        run: npx eslint src --ext .ts,.tsx --max-warnings 0
+        continue-on-error: true
+
+  # Frontend unit tests (Vitest). Moved here from autofix-ci.yml. Same check name.
+  frontend-unit-tests:
+    name: Unit Tests
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest unit tests
+        run: npm test
+        env:
+          CI: true
+
   hr-dashboard-build:
     # C1-11a: separate Vite app at apps/hr-dashboard/. Mirrors the
     # frontend-build job's shape (npm ci → build → typecheck → lint) so a
     # regression in either app surfaces in the same CI lane.
     name: HR Dashboard build
+    needs: changes
+    if: needs.changes.outputs.hr_dashboard == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -94,6 +192,8 @@ jobs:
 
   backend-tests:
     name: Backend tests (deterministic P1 suite)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: sqlite:///./ci_test.db
@@ -152,6 +252,8 @@ jobs:
     # route is found outside the allowlist. Extended from GET-only to mutations
     # after a sweep found unauthenticated POST/PATCH handlers (cases_write).
     name: Route-auth audit
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -167,12 +269,14 @@ jobs:
     # one is on the supabase/rls_allowlist.txt allowlist. Drains over time.
     # Requires DATABASE_URL secret pointing at the live/staging Supabase (read-only).
     name: RLS coverage check
+    needs: changes
     runs-on: ubuntu-latest
     # GitHub Actions does not allow `secrets.*` in a job-level `if:` — referencing
     # one here makes the whole workflow fail at parse time with the unhelpful
     # "workflow file issue" error (0s run, no log). Gate on a repo variable instead:
     # set `vars.RLS_COVERAGE_DATABASE_URL_SET=true` when the secret is configured.
-    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    # Only relevant when migrations change.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -193,8 +297,10 @@ jobs:
     # secret; gate on a repo variable because secrets.* is not allowed in a
     # job-level if:.
     name: Storage bucket visibility check
+    needs: changes
     runs-on: ubuntu-latest
-    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    # Only relevant when migrations change.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -218,8 +324,10 @@ jobs:
     # rls-coverage: read-only DATABASE_URL secret, gated on a repo variable
     # because secrets.* is not allowed in a job-level if:.
     name: Migration ledger drift check
+    needs: changes
     runs-on: ubuntu-latest
-    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' }}
+    # Only relevant when migrations change.
+    if: ${{ vars.RLS_COVERAGE_DATABASE_URL_SET == 'true' && needs.changes.outputs.migrations == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python

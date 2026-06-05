@@ -1,14 +1,12 @@
 # autofix-ci.yml — DEV-LOOP-2C
 # ─────────────────────────────────────────────────────────────────────────────
-# CI workflow that runs automatically on every autofix/* branch pushed by the
-# auto-fix pipeline. Also runs on main for regression protection.
+# Autofix-pipeline guardrail. Runs ONLY on autofix/* branches pushed by the
+# auto-fix pipeline, and validates that the changed files are not in a blocked
+# path (lib/autofix-blocklist.ts).
 #
-# Jobs:
-#   lint        — ESLint + TypeScript check
-#   test        — Unit tests (Vitest)
-#   e2e-smoke   — Playwright smoke test against the preview deployment
-#
-# If all jobs pass, the PR can be merged by the auto-merge workflow (DEV-LOOP-2D).
+# Frontend type-check, lint and unit tests now live in ci.yml (which runs on the
+# autofix PR like any other PR), so this workflow no longer duplicates them on
+# every push/PR — that double-run was the main Actions-minute waste.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Autofix CI
@@ -17,11 +15,6 @@ on:
   push:
     branches:
       - 'autofix/**'
-      - main
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened]
 
 # Cancel in-progress runs for the same branch
 concurrency:
@@ -32,94 +25,11 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  # ── TypeScript + Lint ───────────────────────────────────────────────────────
-  lint:
-    name: TypeScript & ESLint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        # Stage-2 fix: install frontend deps (root package.json has only `typescript`,
-        # which left tsc with no @types/react/jsx-runtime and the lint job failed on
-        # "Cannot find module 'react'" across pre-existing files (VendorRfq, richMessage,
-        # employeeJourneyPerf, etc.). Root-level deps not required for lint.
-        run: npm ci
-        working-directory: frontend
-
-      - name: TypeScript type-check
-        run: npx tsc --noEmit
-        working-directory: frontend
-
-      - name: ESLint
-        # AUDIT-A6-followup (AIQ-395): @typescript-eslint/parser is now wired
-        # in eslint.config.js — ESLint can parse all .ts/.tsx files and the
-        # no-clickable-div + no-console rules are active. However, enabling the
-        # TS parser for the first time surfaced 303 pre-existing no-clickable-div
-        # violations and 25 pre-existing no-console violations that were hidden
-        # when ESLint couldn't parse TypeScript. These are tracked in AIQ-397
-        # (a11y cleanup sprint) and AIQ-398 (no-console cleanup). Until those
-        # sprints land, keep non-blocking to avoid breaking every PR. Flip back
-        # to blocking (`continue-on-error: false`) once AIQ-397 drains to 0.
-        run: npx eslint src --ext .ts,.tsx --max-warnings 0
-        working-directory: frontend
-        continue-on-error: true
-
-  # ── Unit tests ──────────────────────────────────────────────────────────────
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies (for Vitest)
-        run: npm ci
-        working-directory: frontend
-
-      - name: Run autofix blocklist tests
-        # Stage-2 fix: these scripts import from `../lib/autofix-blocklist.ts`
-        # which is fine for the autofix pipeline (autofix branches), but they
-        # use the `--esm` flag which requires a `"type": "module"` package.json
-        # in scope — only `frontend/package.json` has it. Non-autofix PRs don't
-        # depend on these scripts, so flag them as non-blocking. The autofix
-        # pipeline itself still validates them via `autofix-validate.yml`.
-        run: npx ts-node --esm scripts/test-autofix-blocklist.ts
-        continue-on-error: true
-
-      - name: Run bug classifier tests
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: npx ts-node --esm scripts/test-bug-classifier.ts
-        # Only run if API key is available (skip in fork PRs)
-        if: env.ANTHROPIC_API_KEY != ''
-        continue-on-error: true
-
-      - name: Run Vitest unit tests
-        run: npm test
-        working-directory: frontend
-        env:
-          CI: true
-
   # ── Autofix-specific validation ─────────────────────────────────────────────
   validate-autofix:
     name: Validate autofix change
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: startsWith(github.ref, 'refs/heads/autofix/')
     steps:
       - uses: actions/checkout@v4
 
@@ -133,12 +43,7 @@ jobs:
 
       - name: Check changed files are not in blocked paths
         run: |
-          # Get list of changed files in this PR vs main.
-          # Bug fix (actionlint #138): the env: block below previously read from
-          # `steps.changed-files.outputs.all`, but no step with that id exists in
-          # this workflow — CHANGED_FILES was always empty and the blocklist
-          # check passed trivially regardless of which files actually changed.
-          # Switched to exporting CHANGED_FILES from this step inline.
+          # Get list of changed files in this branch vs main.
           git fetch origin main --depth=1
           CHANGED_FILES=$(git diff --name-only origin/main HEAD)
           export CHANGED_FILES
@@ -157,21 +62,3 @@ jobs:
           }
           console.log('✅ All changed files passed blocklist check');
           EOF
-
-  # ── Status summary ──────────────────────────────────────────────────────────
-  ci-status:
-    name: CI Status
-    runs-on: ubuntu-latest
-    needs: [lint, test]
-    if: always()
-    steps:
-      - name: Report status
-        run: |
-          if [[ "${{ needs.lint.result }}" == "success" && "${{ needs.test.result }}" == "success" ]]; then
-            echo "✅ All CI checks passed — autofix PR is ready for review"
-          else
-            echo "❌ CI failed:"
-            echo "  lint: ${{ needs.lint.result }}"
-            echo "  test: ${{ needs.test.result }}"
-            exit 1
-          fi
