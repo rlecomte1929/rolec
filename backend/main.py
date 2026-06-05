@@ -152,6 +152,7 @@ from .app.routers import admin as admin_router
 from .app.routers import admin_resources as admin_resources_router
 from .app.routers import admin_staging as admin_staging_router
 from .app.routers import admin_freshness as admin_freshness_router
+from .app.routers import admin_source_change_review as admin_source_change_review_router
 from .app.routers import admin_review_queue as admin_review_queue_router
 from .app.routers import admin_notifications as admin_notifications_router
 from .app.routers import admin_ops_analytics as admin_ops_analytics_router
@@ -737,6 +738,8 @@ app.include_router(admin_freshness_router.router, prefix="/api/admin")
 app.include_router(admin_freshness_router.crawl_router, prefix="/api/admin")
 app.include_router(admin_freshness_router.changes_router, prefix="/api/admin")
 app.include_router(admin_review_queue_router.router, prefix="/api/admin")
+# P2-02d material-change review queue (full prefix on the router; no extra here).
+app.include_router(admin_source_change_review_router.router)
 app.include_router(admin_notifications_router.router, prefix="/api/admin")
 app.include_router(admin_ops_analytics_router.router, prefix="/api/admin")
 app.include_router(admin_workflow_analytics_router.router, prefix="/api/admin")

@@ -2129,6 +2129,16 @@ export const adminFreshnessAPI = {
     api.get('/api/admin/changes/live-stale-events', { params }).then((r) => r.data),
 };
 
+// P2-02d — admin material-change review queue (approve before users are notified).
+export const sourceChangeReviewAPI = {
+  listPending: (params?: { limit?: number; offset?: number }) =>
+    api.get('/api/admin/source-change-reviews', { params }).then((r) => r.data),
+  approve: (id: string) =>
+    api.post(`/api/admin/source-change-reviews/${id}/approve`).then((r) => r.data),
+  reject: (id: string, note?: string) =>
+    api.post(`/api/admin/source-change-reviews/${id}/reject`, { note }).then((r) => r.data),
+};
+
 // Admin Review Queue API (admin-only)
 export const adminReviewQueueAPI = {
   list: (params?: {
