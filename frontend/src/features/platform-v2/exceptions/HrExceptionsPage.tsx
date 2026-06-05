@@ -5,6 +5,7 @@ import { AIRecommendationCard } from '../../ai-oversight/AIRecommendationCard';
 import {
   getExceptionAuditTrail,
   listExceptionRequestsForCompany,
+  resolveExceptionRequest,
 } from '../../../api/exceptions';
 import type {
   ExceptionAuditEvent,
@@ -17,14 +18,11 @@ import type {
  * Two-pane inbox: left = filterable exception request list; right = detail
  * pane with approve/reject decision flow + audit trail.
  *
- * Backend: no list/get endpoint exists yet for exception_requests.
- * The page starts with mock data structured to match the expected shape so
- * the real API can be dropped in without layout changes. The POST endpoint
- * `/api/hr/cases/:caseId/policy/exceptions` already exists (hrAPI.requestPolicyException).
- *
- * TODO when backend is ready:
- *   const { data } = await hrAPI.listExceptionRequests();
- *   setRequests(data.requests);
+ * Backend: live. On mount the page fetches `GET /api/exception-requests`
+ * (listExceptionRequestsForCompany); when rows come back it swaps in the real
+ * data and approve/reject decisions persist via `PATCH /api/exception-requests/:id`
+ * (resolveExceptionRequest). MOCK_REQUESTS remains only as the fallback for
+ * dev/unauthenticated environments with no seeded rows, so the page still demos.
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -739,21 +737,28 @@ export function HrExceptionsPage() {
 
   const handleDecide = useCallback(
     (id: string, intent: 'approve' | 'reject', note: string) => {
+      const nextStatus = intent === 'approve' ? 'approved' : 'rejected';
+      // Optimistic update — reflect the decision immediately in the inbox.
+      const prev = requests;
       setRequests((rs) =>
         rs.map((r) =>
           r.id === id
-            ? {
-                ...r,
-                status: intent === 'approve' ? 'approved' : 'rejected',
-                hrNote: note,
-                decidedBy: 'You',
-                unread: false,
-              }
+            ? { ...r, status: nextStatus, hrNote: note, decidedBy: 'You', unread: false }
             : r
         )
       );
+      // For live backend rows, persist the decision. Mock rows (demo fallback,
+      // not live data) stay client-only. On failure, roll back the optimistic
+      // change so the inbox doesn't claim a decision the server never recorded.
+      if (isLiveData) {
+        resolveExceptionRequest(id, { status: nextStatus, hr_note: note || undefined }).catch(
+          () => {
+            setRequests(prev);
+          }
+        );
+      }
     },
-    []
+    [isLiveData, requests]
   );
 
   const TABS: { key: FilterTab; label: string }[] = [

@@ -168,9 +168,33 @@ class AuditEventRead(BaseModel):
 
 
 def _caller_company_id(user: Dict[str, Any]) -> str:
-    """Resolve the caller's company id from their profile; 403 if missing."""
-    profile = db.get_profile_record(user.get("id"))
+    """Resolve the caller's company id; 403 if none can be found.
+
+    Mirrors the multi-path resolution the policy_config router uses so that
+    legacy (non-UUID) HR and employee ids resolve correctly — resolving via
+    the profile alone 403'd every legacy seed account:
+      1. profile.company_id          (UUID-native users)
+      2. hr_users link               (HR whose id is not a profile uuid)
+      3. case assignment → company   (employees)
+    """
+    uid = user.get("id")
+    profile = db.get_profile_record(uid) if uid else None
     company_id = (profile or {}).get("company_id") or user.get("company")
+    # Legacy (non-UUID) ids have no profile.company_id and may not carry a
+    # `company` token claim; fall back to the tenant-link tables. Guarded so a
+    # lookup failure degrades to the 403 below rather than a 500.
+    if not company_id and uid:
+        try:
+            company_id = db.get_hr_company_id(uid)
+        except Exception:
+            logger.debug("exception_requests: hr_users lookup failed", exc_info=True)
+    if not company_id and uid:
+        try:
+            assignment = db.get_assignment_for_employee(uid, request_id=None)
+            if assignment:
+                company_id = db.get_company_id_for_assignment_id(str(assignment.get("id")))
+        except Exception:
+            logger.debug("exception_requests: assignment lookup failed", exc_info=True)
     if not company_id:
         raise HTTPException(
             status_code=403,
