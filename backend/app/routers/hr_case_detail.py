@@ -93,12 +93,22 @@ class DocumentsResponse(BaseModel):
     documents: List[CaseDocumentDTO] = Field(default_factory=list)
 
 
+class CaseCitationDTO(BaseModel):
+    legal_reference: Optional[str] = None
+    source_url: Optional[str] = None
+
+
 class CaseStepDTO(BaseModel):
     step_id: str
     label: str
     status: str
     due_date: Optional[str] = None
     owner_label: Optional[str] = None
+    # C2-07 StepGraph fields (sourced from rce.steps / rce.deadlines / rce.rule_citations).
+    prerequisite_step_ids: List[str] = Field(default_factory=list)
+    expected_duration_days: Optional[int] = None
+    derivation: Optional[str] = None  # legal derivation of the deadline, if any
+    citations: List[CaseCitationDTO] = Field(default_factory=list)
 
 
 class StepsResponse(BaseModel):
@@ -345,6 +355,8 @@ def get_case_steps(
     _hr_user: Dict[str, Any] = Depends(require_admin_or_hr),
     org_id: str = Depends(get_org_id_for_hr_user),
 ) -> StepsResponse:
+    import json
+
     _require_case_access(case_id, org_id)
     steps: List[CaseStepDTO] = []
     try:
@@ -356,7 +368,22 @@ def get_case_steps(
                       s.step_id,
                       s.name AS label,
                       s.responsible_party AS owner_label,
-                      dl.due_date
+                      s.expected_duration_days,
+                      COALESCE(s.prerequisite_step_ids, '{}')::text[] AS prerequisite_step_ids,
+                      dl.due_date,
+                      dl.derivation,
+                      COALESCE(
+                        (
+                          SELECT json_agg(json_build_object(
+                                   'legal_reference', rc.legal_reference,
+                                   'source_url', rc.source_url))
+                          FROM rce.rule_citations rc
+                          WHERE rc.case_id = :case_id
+                            AND rc.output_kind = 'STEP'
+                            AND rc.output_id = s.step_id
+                        ),
+                        '[]'::json
+                      ) AS citations
                     FROM rce.steps s
                     LEFT JOIN rce.deadlines dl
                       ON dl.step_id = s.step_id AND dl.case_id = :case_id
@@ -364,19 +391,37 @@ def get_case_steps(
                        OR s.corridor_id = (
                          SELECT corridor_id FROM rce.cases WHERE case_id = :case_id LIMIT 1
                        )
-                    ORDER BY COALESCE(dl.due_date, s.created_at) ASC
+                    ORDER BY s.created_at ASC
                     """
                 ),
                 {"case_id": case_id},
             ).mappings().all()
         for r in rows:
+            raw_citations = r.get("citations")
+            if isinstance(raw_citations, str):
+                raw_citations = json.loads(raw_citations)
+            citations = [
+                CaseCitationDTO(
+                    legal_reference=c.get("legal_reference"),
+                    source_url=c.get("source_url"),
+                )
+                for c in (raw_citations or [])
+                if c
+            ]
             steps.append(
                 CaseStepDTO(
                     step_id=str(r["step_id"]),
                     label=str(r.get("label") or "Step"),
+                    # Per-case step status is not yet tracked in rce.* (no completion
+                    # signal exists pre-launch); default to "pending" until a step
+                    # state machine lands. The frontend renders this faithfully.
                     status="pending",
                     due_date=r["due_date"].isoformat() if r.get("due_date") else None,
                     owner_label=r.get("owner_label"),
+                    prerequisite_step_ids=[str(p) for p in (r.get("prerequisite_step_ids") or [])],
+                    expected_duration_days=r.get("expected_duration_days"),
+                    derivation=r.get("derivation"),
+                    citations=citations,
                 )
             )
     except Exception:
